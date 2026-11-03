@@ -145,8 +145,8 @@ export async function installMonitor(page) {
         }
 
         // ---- Çalışanı olan ama üretmeyen iş yeri (gün sonu: 17:00 örneği) ----
-        if (s.time.hour >= 9 && s.time.hour <= 16) for (const b of s.buildings) if (b.workerIds.size > 0) m.worked.add(b.id);
-        if (s.time.hour === 17) {
+        if (s.time.hour >= 9 && s.time.hour <= 15) for (const b of s.buildings) if (b.workerIds.size > 0) m.worked.add(b.id);
+        if (s.time.hour === 16) { // 16:30 örneği: mesai bitmeden günün üretimi
           for (const b of s.buildings) {
             if (!b.functional || !b.definition.production || b.damaged) continue;
             const key = `${b.type}@${b.tileX},${b.tileY}`;

@@ -159,17 +159,20 @@ export const stepsPerHour = (speed = 4) => Math.round((STEPS_PER_HOUR * 4) / spe
  * Oyunu saat cinsinden ilerletir (her oyun saatinde isteğe bağlı bir sayfa işlevi çağrılır). Adım sayısı oyunun o anki
  * hızına (state.time.speed) göre hesaplanır: 1x hızda aynı oyun saati dört kat daha çok (ve daha küçük) adımla geçer.
  */
-export async function runHours(page, hours, hook = null) {
+export async function runHours(page, hours, hook = null, halfHook = null) {
   await page.evaluate(
-    ({ hours, hook, base }) => {
+    ({ hours, hook, halfHook, base }) => {
       const perHour = Math.round((base * 4) / (window.game.state.time.speed || 4));
       const steps = Math.round(hours * perHour);
       for (let i = 0; i < steps; i++) {
         window.game.update(1 / 60);
         if (hook && i % perHour === 0) window[hook]?.();
+        // Saat buçuğunda çağrılan ikinci işlev (bekçi): görevlerin çoğu saat başında biter / başlar, o tek adımlık
+        // geçişler örneğe "görevsiz sakin" olarak yansımasın
+        if (halfHook && i % perHour === perHour >> 1) window[halfHook]?.();
       }
     },
-    { hours, hook, base: STEPS_PER_HOUR }
+    { hours, hook, halfHook, base: STEPS_PER_HOUR }
   );
 }
 

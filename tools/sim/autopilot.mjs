@@ -101,12 +101,9 @@ await page.evaluate((passive) => {
     }
   };
 
-  // Bekçi otopilottan önce örnek alır: otopilotun o anki eylemleri (yapı kurmak yolları keser, görevleri bitirir)
-  // örneğe "görevsiz sakin" olarak yansımasın
-  window.__tick = () => {
-    window.__monitor.sample();
-    window.__autopilot();
-  };
+  // Bekçi saat buçuğunda örnek alır (runHours'un ikinci işlevi): saat başındaki otopilot eylemleri ve görev
+  // geçişleri örneğe "görevsiz sakin" olarak yansımasın
+  window.__sample = () => window.__monitor.sample();
 
   window.__autopilot = () => {
     const s = game.state;
@@ -279,7 +276,7 @@ function summary() {
 }
 
 for (let d = 0; d < days; d++) {
-  for (let h = 0; h < 4; h++) await runHours(page, 6, '__tick');
+  for (let h = 0; h < 4; h++) await runHours(page, 6, '__autopilot', '__sample');
   if (!options.quiet) console.log(await summary());
 }
 console.log(await summary());

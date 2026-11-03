@@ -261,8 +261,9 @@ const PAGE_HELPERS = () => {
     const scene = () => game.scenes.current;
     const hours = (h) => {
       for (let i = 0; i < h; i++) {
-        sim.step(225);
-        window.__monitor.sample();
+        sim.step(112);
+        window.__monitor.sample(); // saat buçuğunda (saat başı görev geçişlerinden uzak)
+        sim.step(113);
       }
     };
     const starve = () => {
