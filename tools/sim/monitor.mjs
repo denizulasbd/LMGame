@@ -33,6 +33,7 @@ export async function installMonitor(page) {
         track: new Map(),   // karakter id -> { tile, since, flagged }
         jobTrack: new Map(),// iş id -> { progress, since, flagged }
         maxPop: 0,
+        maxFeuds: 0, // (15. aşama) aynı anda en çok küs (eksi puanlı) çift
         minNeeds: { hunger: 100, energy: 100, social: 100, fun: 100 },
         events: { weddings: 0, births: 0, grownUp: 0, quarrels: 0, reconciled: 0, ill: 0, cured: 0, cold: 0, warmed: 0, masterworks: 0, exhibited: 0, sold: 0 },
         outfitErrors: [], // (15. aşama) çizilemeyen ya da yanlış kademede kıyafet
@@ -71,6 +72,7 @@ export async function installMonitor(page) {
         const now = s.totalMinutes;
         m.samples++;
         m.maxPop = Math.max(m.maxPop, s.characters.length);
+        m.maxFeuds = Math.max(m.maxFeuds, Object.values(s.relationships).filter((v) => v < 0).length);
         const ids = new Set(s.characters.map((c) => c.id));
         const byId = new Map(s.characters.map((c) => [c.id, c]));
         const buildings = new Map(s.buildings.map((b) => [b.id, b]));
@@ -200,6 +202,9 @@ export async function installMonitor(page) {
           minNeeds: m.minNeeds,
           outfitErrors: m.outfitErrors,
           outfits: s.characters.filter((c) => c.outfit).map((c) => c.outfit),
+          feuds: Object.values(s.relationships).filter((v) => v < 0).length,
+          maxFeuds: m.maxFeuds,
+          pairs: Object.keys(s.relationships).length,
           quarrels: s.stats.quarrels ?? 0,
           reconciliations: s.stats.reconciliations ?? 0,
           events: m.events,
