@@ -12,13 +12,15 @@
 //   child: çocuk (12x14): aynı baş, kısa gövde — gövdenin iki satırı çıkarılır
 //   coat : kürk yakalı kışlık palto (gömlek palto rengine boyanır, etek kemeri örter)
 //   bag  : sırt çantası (önden askılar, arkadan çanta, yandan sırtta çıkıntı)
+//   outfit: (15. aşama) meslek kıyafeti 'kit:kademe' (ör. 'miner:3'); bkz. outfits.js. Palto gövdeyi örter.
 import { PALETTE, CHARACTER_COLORS } from '../palette.js';
+import { applyOutfit } from './outfits.js';
 import { getSprite, composeRows, flipRowsHorizontal, squashRows, emptyRows } from '../PixelSprite.js';
 
 export const CHARACTER_WIDTH = 12;
 export const CHARACTER_HEIGHT = 18;
 export const CHILD_HEIGHT = 14;
-export const NO_LOOK = Object.freeze({ child: false, coat: false, bag: false });
+export const NO_LOOK = Object.freeze({ child: false, coat: false, bag: false, outfit: null });
 
 /** Görünüşe göre sprite yüksekliği. */
 export function characterHeight(look = NO_LOOK) {
@@ -216,9 +218,11 @@ const BAG_SIDE = ['.KK', 'KXK', 'KEK', 'KwK', '.KK']; // yandan, sırtta (x 1, y
 
 /** Paltoyu ve çantayı yetişkin karesine (18 satır, oturmadan / büzülmeden önce) giydirir. */
 function dress(rows, view, look) {
-  if (!look.coat && !look.bag) return rows;
+  const outfit = look.child ? null : look.outfit ?? null;
+  if (!look.coat && !look.bag && !outfit) return rows;
   const out = rows.map((row) => [...row]);
   const kind = view === 'side' ? 'side' : view;
+  if (outfit) applyOutfit(out, kind, outfit, look.coat);
   if (look.coat) {
     for (let y = COAT_FIRST_ROW; y <= COAT_LAST_ROW; y++) {
       out[y] = out[y].map((c) => COAT_COLORS[c] ?? c);
@@ -265,9 +269,9 @@ function buildFrame(view, frame, hairStyle, look) {
   return view === 'back' ? hideFace(rows, offset) : rows;
 }
 
-/** Görünüşün önbellek anahtarı: '' (yetişkin), 'c' (çocuk), 'C' (palto), 'B' (çanta) birleşimleri. */
+/** Görünüşün önbellek anahtarı: '' (yetişkin), 'c' (çocuk), 'C' (palto), 'B' (çanta), '@kit:kademe' birleşimleri. */
 export function lookKey(look = NO_LOOK) {
-  return `${look.child ? 'c' : ''}${look.coat ? 'C' : ''}${look.bag ? 'B' : ''}`;
+  return `${look.child ? 'c' : ''}${look.coat ? 'C' : ''}${look.bag ? 'B' : ''}${look.outfit && !look.child ? `@${look.outfit}` : ''}`;
 }
 
 const paletteCache = new Map();

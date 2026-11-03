@@ -11,6 +11,7 @@ import { TOWN_NAMES, TOWN_NAME_MAX_LENGTH } from '../data/town.js';
 import { EQUIPMENT_KEYS } from '../data/equipment.js';
 import { RESEARCH } from '../data/research.js';
 import { RELICS } from '../data/luxury.js';
+import { MASTERPIECES } from '../data/masterpieces.js';
 import { SEASON_FESTIVALS } from '../data/festivals.js';
 import { WEATHER_TYPES } from '../data/weather.js';
 import { Character } from '../entities/Character.js';
@@ -82,6 +83,8 @@ export class GameState {
       seasonFestivals: 0, // kutlanan mevsim festivali (14. aşama)
       recollections: 0, // sakinlerin güzel bir anıyı hatırlaması
       rallies: 0, // çalınan toplanma zili
+      quarrels: 0, // (15. aşama) atışma
+      reconciliations: 0, // (15. aşama) barışan küs çiftler
     };
     // Hayvanlar (AnimalSystem, 11. aşama): yaban hayatı (tavşan, geyik) ve kasaba kedileri / köpekleri.
     // animalMeta: wildlifeSeeded yaban hayatı yerleştirildi mi, lastPetDay son evcil hayvanın geldiği gün
@@ -115,6 +118,8 @@ export class GameState {
     this.seasonFestival = { day: null, theme: null, stage: null, startedAt: null, decor: [], attendees: [], held: {} };
     // Toplanma Zili (14. aşama): sakinler bu dakikaya kadar meydanda toplanır { until, rungAt } ya da null
     this.rally = null;
+    // Usta işi eserler (CraftsmanshipSystem, 15. aşama): ustaların çıkardığı eserler ve durumları (bkz. systems/Masterworks.js)
+    this.masterworks = emptyMasterworks();
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -176,6 +181,7 @@ export class GameState {
       history: this.history,
       seasonFestival: this.seasonFestival,
       rally: this.rally,
+      masterworks: this.masterworks,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -257,6 +263,8 @@ export class GameState {
     };
     if (next.seasonFestival.theme && !SEASON_FESTIVALS[next.seasonFestival.theme]) next.seasonFestival.stage = null;
     next.rally = data.rally && Number.isFinite(data.rally.until) ? { ...data.rally } : null;
+    // 15. aşamadan eski kayıtlarda usta işi eser yoktur: vitrin boş başlar (kıyafetler deneyimden türetilir)
+    next.masterworks = restoreMasterworks(data.masterworks);
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
@@ -282,6 +290,29 @@ export class GameState {
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
+}
+
+function emptyMasterworks() {
+  return { items: [], nextId: 1, made: 0, exhibited: 0, sold: 0, goldEarned: 0, lastByMaker: {} };
+}
+
+const MASTERWORK_STATUSES = new Set(['stored', 'exhibited', 'sold']);
+
+/** Kayıttaki usta işi eserler: bilinmeyen tür ya da durumdaki eserler atlanır, sayaçlar en az eser sayısı kadar olur. */
+function restoreMasterworks(data) {
+  const out = emptyMasterworks();
+  if (!data || typeof data !== 'object') return out;
+  out.items = (Array.isArray(data.items) ? data.items : [])
+    .filter((i) => i && MASTERPIECES[i.type] && MASTERWORK_STATUSES.has(i.status) && Number.isFinite(i.id))
+    .map((i) => ({ ...i }));
+  const maxId = out.items.reduce((m, i) => Math.max(m, i.id), 0);
+  out.nextId = Math.max(maxId + 1, Number(data.nextId) || 1);
+  out.made = Math.max(out.items.length, Number(data.made) || 0);
+  out.exhibited = Math.max(out.items.filter((i) => i.status === 'exhibited').length, Number(data.exhibited) || 0);
+  out.sold = Math.max(out.items.filter((i) => i.status === 'sold').length, Number(data.sold) || 0);
+  out.goldEarned = Math.max(0, Number(data.goldEarned) || 0);
+  out.lastByMaker = { ...(data.lastByMaker ?? {}) };
+  return out;
 }
 
 /**

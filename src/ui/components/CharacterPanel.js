@@ -12,13 +12,13 @@ import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
 import { EQUIPMENT, EQUIPMENT_SLOTS, SLOT_KEYS } from '../../data/equipment.js';
 import { topFriends, worstRelation, partnerOf, childrenOf, getFriendship } from '../../systems/RelationshipSystem.js';
-import { topSkills, progressToNext } from '../../systems/SkillSystem.js';
+import { topSkills, progressToNext, primarySkill } from '../../systems/SkillSystem.js';
 import { isShivering } from '../../systems/HeatingSystem.js';
 import { coldProtection } from '../../systems/Equipment.js';
 import { opposingTrait } from '../../ai/TraitProfile.js';
 import { getSeason } from '../../data/seasons.js';
 import { ILLNESS, VIGOR } from '../../data/health.js';
-import { PANEL_SKILL_COUNT, SKILL_LEVELS } from '../../data/skills.js';
+import { PANEL_SKILL_COUNT, SKILL_LEVELS, OUTFIT_KITS, CRAFT_BADGES } from '../../data/skills.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
 import { SCHOOL } from '../../data/research.js';
 import { CHARACTER_NAME_MAX_LENGTH } from '../../data/characters.js';
@@ -76,6 +76,11 @@ export class CharacterPanel {
     this.nameInput.addEventListener('blur', () => this.editName(false, true));
     this.meta = el('div', { className: 'character-meta' });
     this.traits = el('div', { className: 'character-traits' });
+    // (15. aşama) Zanaat rozeti: ana meslek ve kademesi (Çırak bronz, Kalfa gümüş, Usta altın) ve giydiği kıyafet
+    this.badgeIcon = el('img', { className: 'craft-badge-icon', alt: '' });
+    this.badgeText = el('span', { className: 'craft-badge-text' });
+    this.craftBadge = el('div', { className: 'craft-badge', hidden: true }, [this.badgeIcon, this.badgeText]);
+    this.lastBadge = null;
     this.status = el('div', { className: 'character-status-text' });
 
     const closeButton = this.button('✕', 'Kapat (Esc)', () => this.events.emit('ui:selectCharacter', null));
@@ -119,7 +124,7 @@ export class CharacterPanel {
       closeButton,
       el('div', { className: 'character-header' }, [
         el('div', { className: 'character-portrait-frame' }, [this.portrait]),
-        el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.meta, this.traits]),
+        el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.meta, this.craftBadge, this.traits]),
       ]),
       el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
       el('div', { className: 'character-needs' }, needs),
@@ -247,6 +252,7 @@ export class CharacterPanel {
     this.renderRelations(character, game.state);
     this.renderEquipment(character);
     this.renderSkills(character);
+    this.renderBadge(character);
     this.renderConditions(character, game.state);
     this.renderMemories(character, game.state);
   }
@@ -349,6 +355,23 @@ export class CharacterPanel {
   }
 
   /** Meslekler: ad, kademe (Çırak / Kalfa / Usta) yıldızları ve bir sonraki kademeye ilerleme. */
+  /** (15. aşama) Ana mesleğin zanaat rozeti: "Usta Madenci" altın, "Kalfa Fırıncı" gümüş, "Çırak Oduncu" bronz. */
+  renderBadge(character) {
+    const main = character.isChild ? null : primarySkill(character);
+    const key = main ? `${main.skill}:${main.level.level}` : '';
+    if (key === this.lastBadge) return;
+    this.lastBadge = key;
+    this.craftBadge.hidden = !main;
+    if (!main) return;
+    const badge = CRAFT_BADGES[main.level.level];
+    const kit = OUTFIT_KITS[main.skill];
+    const wear = main.level.level === 3 ? kit?.master : main.level.level === 2 ? kit?.journeyman : null;
+    this.craftBadge.className = `craft-badge is-${badge.metal}`;
+    this.badgeIcon.src = getIconDataURL(`badge${badge.metal[0].toUpperCase()}${badge.metal.slice(1)}`);
+    this.badgeText.textContent = `${main.level.name} ${main.def.title}`;
+    this.craftBadge.title = `${badge.name} zanaat rozeti · ${main.def.name}${wear ? ` · Kıyafeti: ${wear}` : ' · Çıraklar sade köylü giysisi giyer'}`;
+  }
+
   renderSkills(character) {
     const skills = topSkills(character, PANEL_SKILL_COUNT);
     const key = skills.map((s) => `${s.skill}:${Math.floor(s.xp / 10)}`).join('|');

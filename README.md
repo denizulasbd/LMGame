@@ -46,6 +46,7 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 | Karakter panelinde sakinin **adına** tık | Sakinin adını değiştir (Enter kaydeder, Esc vazgeçer) |
 | Yapı panelinde **İşçi Ata** / **Sabitle** / **Sabitlemeyi Kaldır** | Bir sakini o iş yerine sabit çalışan yap (yalnızca orada çalışır) ya da serbest bırak |
 | `I` / sol sütunda **Arşiv** | Kasaba Arşivi'ni aç / kapat: son 32 günün grafikleri ve kasabanın tarihi |
+| Arşivde **Usta İşi Eserler** · **Sergile** / **Sat** | Ustaların eserini vitrinde sergile (kalıcı +1 refah) ya da limandan / tüccara sat (200-400 altın) |
 | Bir kediye ya da köpeğe sol tık | Hayvanı sev: sevinçle zıplar, kalpler uçuşur, miyavlar / havlar |
 | Seç aracıyla bir ağaca ya da kayaya sol tık | Öncelikli kesme / kırma emri: boştaki işçiler ilk iş olarak oraya koşar (kırmızı ünlem) |
 | Meydan havuzunun ya da Belediye Konağı'nın panelinde **Zili Çal** | Toplanma Zili: uyanık bütün sakinler bir saatliğine meydanda toplanır |
@@ -137,6 +138,7 @@ LMGame/
     │       ├── structuresWonder.js Büyük Vadi Saat Kulesi: üç aşama (Temel, Gövde, Görkemli Kule) ve iskele kademeleri
     │       ├── structuresGarden.js Kiraz Çiçeği Ağacı (dört mevsim), iki katmanlı Ahşap Çardak, Mermer Kemer, birleşen Çiçekli Çit
     │       ├── festival.js   Mevsim festivali süslemeleri (çiçek kemeri, ziyafet sofrası, hasat sepeti, kardan adam...), saç çiçeği
+    │       ├── outfits.js    (15. aşama) Meslek kıyafetleri: on kit, Kalfa aksesuarı ve Usta kostümü (başlık + gövde katmanı)
     │       └── animals.js    Tavşan, geyik, kedi ve köpek (otomatik konturlu, poz ve renk çeşitleri)
     ├── data/               Saf veri tanımları (oyun kuralları, denge değerleri)
     │   ├── tiles.js        Karo/nesne kuralları: yürünebilir, inşa edilebilir, yol bulma maliyeti;
@@ -147,6 +149,7 @@ LMGame/
     │   │                   değerinde), Kasaba Hazinesi (Altın, depo sınırı yok), başlangıç stoğu, depo kapasitesi,
     │   │                   öğün maliyeti
     │   ├── festivals.js    Dört mevsim kapanış festivali: saatler, yerler, bonuslar, süslemeler, anı cümleleri
+    │   ├── masterpieces.js (15. aşama) Usta işi eserler: altı eser, meslekleri, iş yerleri, fiyatları; şans ve sergi kuralları
     │   ├── luxury.js       Altın harcama kanalları: lüks mallar (baharat, ipek ve mermer), beş kasaba yadigârı ve artan
     │   │                   fiyatları, altın fermanları (ikramiye, kraliyet mimarları)
     │   ├── research.js     Bilgelik Evi araştırmaları (maliyet, iş, etki) ve okul kuralları (ders saati, Kalfa eşiği)
@@ -222,6 +225,8 @@ LMGame/
     │   ├── SeasonFestivalSystem.js Mevsim festivalleri: duyuru, yer ve süsleme, katılım, Mevsim Coşkusu
     │   ├── MemorySystem.js Sakinlerin anıları (yaşam günlüğü) ve sakin anlarda güzel bir anıyı hatırlama
     │   ├── RallySystem.js  Toplanma Zili: sakinleri bir saatliğine meydanda toplar
+    │   ├── CraftsmanshipSystem.js (15. aşama) Meslek kıyafetlerini giydirir; ustaların eserlerini üretir, sergiler, satar
+    │   ├── Masterworks.js  (15. aşama) Usta işi eserlerin saf hesapları: fiyat, satış / sergi durumu, refah katkısı
     │   ├── WeatherSystem.js Güneşli / bulutlu / yağmurlu arası yumuşak geçişler
     │   ├── RelationshipSystem.js Sohbet ve birlikte çalışmayla artan ilişki puanları, aşk ve düğün
     │   ├── ConflictSystem.js Zıt kişiliklilerin atışması, handa / şenlikte barışma
@@ -363,8 +368,11 @@ yemeğin kişisel bonusu (`buffs.spiced`) ve yeni süs yapıları (kiraz, çarda
 sakinlerin anıları (`memories`), mevsim festivalinin durumu ve süslemeleri (`seasonFestival`; şenliğin teması
 `events.festival.theme`), Toplanma Zili (`rally`), sisin yoğunluğu (`weather.mist`), öncelikli işler (`jobs[].urgent`),
 Büyük İhracat Seferi (`trade.grandDay`, `grandPending`, `grandVoyages`, teknenin `grand`'ı) ve yeni sayaçlar
-(`stats.seasonFestivals`, `recollections`, `rallies`) eklendi. Kayıt sürümü 12'dir; 4.–13. aşamanın (sürüm 2–11)
-kayıtları da açılır (anısı olmayan sakinin anı defteri ilk açılışta "Kasabada yaşamaya başladı" ile açılır): eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
+(`stats.seasonFestivals`, `recollections`, `rallies`) eklendi. 15. aşamada usta işi eserler (`masterworks`: eserler,
+türleri, ustaları, durumları — depoda / sergide / satıldı — ve satış fiyatları, sayaçlar, ustanın son eser günü) ve atışma /
+barışma sayaçları (`stats.quarrels`, `reconciliations`) eklendi; meslek kıyafetleri deneyimden türetildiği için kayda
+girmez, yüklenince her sakin kademesine göre yeniden giyinir. Kayıt sürümü 13'tür; 4.–14. aşamanın (sürüm 2–12)
+kayıtları da açılır (usta işi eser vitrini boş başlar) (anısı olmayan sakinin anı defteri ilk açılışta "Kasabada yaşamaya başladı" ile açılır): eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
 ve ekipmansız başlar; yün, demir, ekmek ve altın 0 olur; araştırma, ihracat ve yadigâr boş başlar; arşiv ilk açılışta
 kurulur, düğün ve doğum sayaçları evli çiftlerden ve ebeveynli sakinlerden tahmin edilir; yaban hayatı ilk açılışta
 yerleşir), adı olmayan kasabaya tohumdan bir ad önerilir. Açık bir karar penceresiyle kaydedilen oyun

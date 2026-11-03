@@ -380,6 +380,43 @@
   gap: 4px;
 }
 
+/* (15. aşama) Zanaat rozeti: bronz (Çırak), gümüş (Kalfa), altın (Usta) */
+.craft-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  margin: 2px 0 4px;
+  padding: 1px 7px 1px 3px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 2px solid var(--ui-ink);
+  box-shadow: inset -2px -2px 0 rgba(27, 20, 35, 0.18), inset 2px 2px 0 rgba(255, 255, 255, 0.45);
+}
+
+.craft-badge[hidden] {
+  display: none;
+}
+
+.craft-badge-icon {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+}
+
+.craft-badge.is-bronze {
+  background: #e0a56a;
+}
+
+.craft-badge.is-silver {
+  background: #dfe3ea;
+}
+
+.craft-badge.is-gold {
+  background: #ffd23f;
+  box-shadow: inset -2px -2px 0 #e0a030, inset 2px 2px 0 #fff3b0, 0 0 0 1px #fff3b0;
+}
+
 .trait-chip {
   font-size: 12px;
   font-weight: 600;
@@ -2437,7 +2474,8 @@ button.relation-row:hover {
 
 .archive {
   position: absolute;
-  inset: 0;
+  /* (15. aşama) pencere inşa çubuğunun üstünde biter; uzun içerik (usta işi eserler vitrini) kendi içinde kayar */
+  inset: 12px 0 var(--ui-bottom-reserve, 12px) 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2455,7 +2493,8 @@ button.relation-row:hover {
 .archive-panel {
   pointer-events: auto;
   width: min(540px, calc(100vw - 32px));
-  max-height: calc(100vh - 150px);
+  max-height: 100%;
+  box-sizing: border-box;
   overflow-y: auto;
 }
 
@@ -2779,4 +2818,63 @@ button.relation-row:hover {
   margin-top: 3px;
   padding: 0 6px 1px;
   font-size: 12px;
+}
+
+/* ---------- 15. aşama: Kasaba Arşivi'nde usta işi eserler vitrini ---------- */
+.masterwork-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.masterwork-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 5px;
+  background: #fff6d6;
+  border: 2px solid var(--ui-paper-shade);
+}
+
+.masterwork-row.is-exhibited {
+  border-color: #e0a030;
+  background: #fff3c4;
+}
+
+.masterwork-row img {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.masterwork-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.masterwork-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.masterwork-meta,
+.masterwork-state {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.masterwork-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.masterwork-btn {
+  font-size: 12px;
+  padding: 1px 6px 2px;
+  white-space: nowrap;
 }

@@ -10,6 +10,8 @@ import { NEED_KEYS } from '../data/characters.js';
 import { CHILDREN } from '../data/family.js';
 import { buildTraitProfile } from '../ai/TraitProfile.js';
 import { getCharacterSprite, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT, getFlowerCrownSprite } from '../art/sprites/index.js';
+
+const CELEBRATION_SECONDS = 2.6; // (15. aşama) usta işi eser kutlamasının süresi
 import {
   getBubbleSprite,
   getHeldToolSprite,
@@ -131,6 +133,8 @@ export class Character extends Entity {
     this.role = null; // 'merchant' gibi kasabalı olmayan ziyaretçiler için
     this.backpack = false; // gezgin tüccarın sırt çantası
     this.coatVisible = false; // paltosu varsa sonbahar ve kışın giyer (CraftingSystem günceller)
+    this.celebrateAt = null; // (15. aşama) usta işi eser kutlamasının başladığı gerçek zaman (çizim)
+    this.outfit = null; // (15. aşama) meslek kıyafeti 'kit:kademe' (deneyimden türetilir, kaydedilmez)
     this.lookCache = null;
   }
 
@@ -144,8 +148,9 @@ export class Character extends Entity {
     const child = this.isChild;
     const coat = !child && this.coatVisible;
     const bag = !child && this.equipment.bag === 'backpack';
+    const outfit = child ? null : this.outfit; // (15. aşama) meslek kıyafeti (CraftsmanshipSystem yazar)
     const cached = this.lookCache;
-    if (!cached || cached.child !== child || cached.coat !== coat || cached.bag !== bag) this.lookCache = { child, coat, bag };
+    if (!cached || cached.child !== child || cached.coat !== coat || cached.bag !== bag || cached.outfit !== outfit) this.lookCache = { child, coat, bag, outfit };
     return this.lookCache;
   }
 
@@ -292,9 +297,38 @@ export class Character extends Entity {
 
   /** Dünya katmanında, gece örtüsünün altında çizilen efektler: kazma tozu, olta ipi. */
   drawEffects(renderer, time) {
+    if (this.celebrateAt !== null && this.visible) this.drawCelebration(renderer, time);
     if (!this.visible || this.waypoints) return;
     if (this.workEffect === 'dust' && this.pose === 'work') this.drawWorkDust(renderer);
     if (this.tool === 'rod' && this.pose === 'fish') this.drawFishingLine(renderer, time);
+  }
+
+  /** (15. aşama) Usta işi bir eser çıkınca başının çevresinde altın kıvılcımlar yükselir (birkaç saniye). */
+  celebrate() {
+    this.celebrateAt = -1; // ilk çizimde gerçek zamanla başlar
+  }
+
+  drawCelebration(renderer, time) {
+    if (this.celebrateAt < 0) this.celebrateAt = time;
+    const t = (time - this.celebrateAt) / CELEBRATION_SECONDS;
+    if (t >= 1 || t < 0) {
+      this.celebrateAt = null;
+      return;
+    }
+    const cx = Math.round(this.x);
+    const top = Math.round(this.y) - this.spriteHeight;
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 + t * 3;
+      const r = 5 + t * 7;
+      const px = Math.round(cx + Math.cos(angle) * r);
+      const py = Math.round(top + 6 - t * 10 + Math.sin(angle) * r * 0.5);
+      const alpha = (1 - t).toFixed(2);
+      renderer.fillRect(px, py, 1, 1, `rgba(255, 243, 176, ${alpha})`);
+      if (i % 2 === 0) {
+        renderer.fillRect(px - 1, py, 3, 1, `rgba(255, 210, 63, ${alpha})`);
+        renderer.fillRect(px, py - 1, 1, 3, `rgba(255, 210, 63, ${alpha})`);
+      }
+    }
   }
 
   /**

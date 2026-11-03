@@ -40,6 +40,8 @@ import { el } from '../dom.js';
 import { luxuryCards, relicShelf, goldDecreeCards } from './luxuryCards.js';
 import { ACTIVITY_SKILLS, SKILL_LEVELS } from '../../data/skills.js';
 import { skillLevel } from '../../systems/SkillSystem.js';
+import { storedMasterworks, exhibitedMasterworks, masterworkHappiness, masterworkPrice } from '../../systems/Masterworks.js';
+import { MASTERPIECE_BY_ACTIVITY, MASTERPIECES, MASTERWORK } from '../../data/masterpieces.js';
 
 const thumbnailCache = new Map();
 
@@ -721,6 +723,11 @@ export class BuildingPanel {
         if (trade.last) lines.push(`Son sefer (Gün ${trade.last.day}): ${cargoText(trade.last.cargo)} → +${trade.last.gold} altın`);
         lines.push(`Ara sıra Ticaret Bereketi (%${Math.round(EXPORT.bonusChance * 100)}): kasabaya refah ve iş hızı`);
         lines.push(building.lit ? 'Liman feneri yanıyor' : 'Liman feneri akşam yanar');
+        {
+          // (15. aşama) usta işi eserler limandan tam değerine ihraç edilir (Kasaba Arşivi'nin vitrininden)
+          const stored = storedMasterworks(state);
+          if (stored.length) lines.push(`Usta işi eser: ${stored.length} eser ihraca hazır (${stored.reduce((a, i) => a + masterworkPrice(i.type, 'harbor'), 0)} altın değerinde) · Arşiv'den sat`);
+        }
         break;
       }
       case 'wonder': {
@@ -747,6 +754,15 @@ export class BuildingPanel {
           `Her sabah ${String(TOWN_HALL.hour).padStart(2, '0')}:00: deposu %${Math.round(TOWN_HALL.richRatio * 100)} dolu olan temel kaynaktan en çok ${TOWN_HALL.max} birimi, %${Math.round(TOWN_HALL.poorRatio * 100)}'in altına düşene aktarır`
         );
         lines.push(state.town?.balanceDay === state.time.day ? 'Bugünün erzak defteri tutuldu' : 'Erzak defteri yarın sabah tutulacak');
+        {
+          // (15. aşama) zanaat vitrini
+          const shown = exhibitedMasterworks(state);
+          lines.push(
+            shown.length
+              ? `Zanaat vitrini: ${shown.map((i) => MASTERPIECES[i.type].name).slice(-3).join(', ')}${shown.length > 3 ? ` ve ${shown.length - 3} eser daha` : ''} · refah +${masterworkHappiness(state)}`
+              : `Zanaat vitrini boş: ustaların eserleri Kasaba Arşivi'nden sergilenir (her biri refah +${MASTERWORK.exhibitHappiness})`
+          );
+        }
         break;
       // 13. aşama: peyzaj
       case 'cherryTree': {
@@ -826,6 +842,13 @@ export class BuildingPanel {
         break;
       default:
         break;
+    }
+    // (15. aşama) Ustaların bu iş yerinde çıkarabileceği usta işi eser
+    const masterpiece = MASTERPIECES[MASTERPIECE_BY_ACTIVITY[def.workActivity]];
+    if (masterpiece && building.functional) {
+      const low = Math.round(MASTERWORK.baseChance * 100);
+      const high = Math.round((MASTERWORK.baseChance + MASTERWORK.pinnedBonus + MASTERWORK.toolBonus) * 100);
+      lines.push(`Usta işi eser: Usta çalışanlar mesai sonunda %${low}-${high} şansla ${masterpiece.name} çıkarır`);
     }
     return lines;
   }

@@ -413,6 +413,10 @@ export class BehaviorSystem {
       if (task.activity === 'equip') this.crafting.equip(c, task.item);
       if (task.activity === 'heal') this.health.cure(c, this.world.getBuilding(task.buildingId));
       if (task.activity === 'sleep' && !task.nap) this.events.emit('character:woke', { character: c });
+      // (15. aşama) Üretim yapısında bir mesai bitti: ustalar nadiren usta işi bir eser çıkarır (CraftsmanshipSystem)
+      if (activity.kind === 'work' && task.workBuildingId) {
+        this.events.emit('work:finished', { character: c, activity: task.activity, building: this.world.getBuilding(task.workBuildingId) });
+      }
       // Sıcak yemek bir süre tok tutar (NeedsSystem acıkmayı yavaşlatır)
       if (task.activity === 'innMeal') {
         c.buffs.warmMeal = this.world.state.totalMinutes + WARM_MEAL.hours * 60;

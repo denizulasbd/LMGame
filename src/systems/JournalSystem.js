@@ -27,7 +27,8 @@ const FIRST_GOODS_TEXT = {
   bread: 'Fırından ilk sıcak ekmekler çıktı: kasabanın sofrası bereketlendi',
 };
 
-const RECONCILE_PLACES = { inn: 'handa', festival: 'şenlikte' };
+// (15. aşama) barışılan yer; 'chat' sohbet edilen herhangi bir yer
+const RECONCILE_PLACES = { inn: 'handa ', gazebo: 'çardakta ', campfire: 'ateş başında ', festival: 'şenlikte ', chat: '' };
 
 const WEATHER_TEXT = {
   rainy: 'Yağmur başladı; bahçeler sevinecek.',
@@ -80,7 +81,11 @@ export class JournalSystem {
         const why = `${TRAITS[traits[0]].name} ${a.name}, ${TRAITS[traits[1]].name.toLocaleLowerCase('tr')} ${b.name} ile`;
         this.log(`${why} atıştı${place ? ` (${place})` : ''}`, 'angry');
       }),
-      on('relationship:reconciled', ({ a, b, place }) => this.log(`${a.name} ile ${b.name} ${RECONCILE_PLACES[place]} barıştı`, 'heart')),
+      on('relationship:reconciled', ({ a, b, place }) => this.log(`${a.name} ile ${b.name} ${RECONCILE_PLACES[place] ?? ''}barıştı`, 'handshake')),
+      // (15. aşama) usta işi eserler
+      on('masterwork:created', ({ piece, character }) => this.log(`Usta ${character.name} usta işi bir eser ortaya koydu: ${piece.name}`, piece.icon)),
+      on('masterwork:exhibited', ({ piece }) => this.log(`${piece.name} Kasaba Arşivi'nin vitrininde sergilenmeye başladı`, piece.icon)),
+      on('masterwork:sold', ({ piece, price, source }) => this.log(`${piece.name} ${source === 'harbor' ? 'limandan ihraç edildi' : 'gezgin tüccara satıldı'}: +${price} altın`, 'coin')),
       on('relationship:partnered', ({ a, b }) => this.log(`${a.name} ile ${b.name} birbirine aşık oldu!`, 'love')),
       on('relationship:married', ({ a, b, venue, festival }) => {
         const where = festival ? 'şenlikte' : venue ? `${venue.name} başında` : 'kasabada';

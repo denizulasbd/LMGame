@@ -53,3 +53,26 @@ export const SKILL_LEVELS = [
 export const SKILL_PREFERENCE_TILES = 8;
 // Karakter panelinde gösterilen en fazla meslek
 export const PANEL_SKILL_COUNT = 3;
+
+// (15. aşama) Meslek kıyafetleri: sakin en çok geliştirdiği mesleğin kitini giyer (Kalfa'da aksesuar, Usta'da tam
+// kostüm; çizimi src/art/sprites/outfits.js). badge: Karakter Paneli'ndeki zanaat rozetinin metali (kademeye göre).
+export const OUTFIT_KITS = {
+  woodcutting: { kit: 'lumberjack', journeyman: 'deri yelek ve eldiven', master: 'kırmızı ekose gömlek ve bere' },
+  farming: { kit: 'farmer', journeyman: 'hasır şapka', master: 'çiçekli hasır şapka ve kot tulum' },
+  masonry: { kit: 'miner', journeyman: 'bandana ve bel feneri', master: 'fenerli kask ve koruyucu zırh' },
+  mining: { kit: 'miner', journeyman: 'bandana ve bel feneri', master: 'fenerli kask ve koruyucu zırh' },
+  herbalism: { kit: 'healer', journeyman: 'omuzdan asılı ot çantası', master: 'bilge cübbesi ve yaprak çelengi' },
+  baking: { kit: 'baker', journeyman: 'beyaz önlük', master: 'kabarık aşçı şapkası ve önlük' },
+  cooking: { kit: 'baker', journeyman: 'beyaz önlük', master: 'kabarık aşçı şapkası ve önlük' },
+  husbandry: { kit: 'shepherd', journeyman: 'kırmızı boyun mendili', master: 'keçe şapka ve yün yelek' },
+  fishing: { kit: 'fisher', journeyman: 'kova şapka', master: 'sarı yağmurluk ve şapkası' },
+  building: { kit: 'builder', journeyman: 'alet kemeri', master: 'baret ve alet kemeri' },
+  crafting: { kit: 'artisan', journeyman: 'deri önlük', master: 'koruyucu gözlük ve deri önlük' },
+  scholarship: { kit: 'scholar', journeyman: 'mor atkı', master: 'kep ve bilge cübbesi' },
+};
+
+export const CRAFT_BADGES = {
+  1: { metal: 'bronze', name: 'Bronz' },
+  2: { metal: 'silver', name: 'Gümüş' },
+  3: { metal: 'gold', name: 'Altın' },
+};

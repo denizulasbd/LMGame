@@ -14,6 +14,10 @@ export const BLOCKED_MINUTES = 120;  // yürünemez karoda (su, yapı) görevsiz
 export const JOB_STALE_DAYS = 4;      // atanmış iş emri bu kadar gün ilerlemezse "sonsuz bekleme" sayılır
 
 export async function installMonitor(page) {
+  await page.evaluate(async () => {
+    window.__outfitFor = (await import('/src/systems/SkillSystem.js')).outfitFor;
+    window.__charSprite = (await import('/src/art/sprites/index.js')).getCharacterSprite;
+  });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS }) => {
       const game = window.game;
@@ -30,7 +34,8 @@ export async function installMonitor(page) {
         jobTrack: new Map(),// iş id -> { progress, since, flagged }
         maxPop: 0,
         minNeeds: { hunger: 100, energy: 100, social: 100, fun: 100 },
-        events: { weddings: 0, births: 0, grownUp: 0, quarrels: 0, reconciled: 0, ill: 0, cured: 0, cold: 0, warmed: 0 },
+        events: { weddings: 0, births: 0, grownUp: 0, quarrels: 0, reconciled: 0, ill: 0, cured: 0, cold: 0, warmed: 0, masterworks: 0, exhibited: 0, sold: 0 },
+        outfitErrors: [], // (15. aşama) çizilemeyen ya da yanlış kademede kıyafet
       };
       const on = (name, key) => game.events.on(name, () => m.events[key]++);
       on('relationship:married', 'weddings');
@@ -42,6 +47,9 @@ export async function installMonitor(page) {
       on('health:cured', 'cured');
       on('heating:cold', 'cold');
       on('heating:restored', 'warmed');
+      on('masterwork:created', 'masterworks');
+      on('masterwork:exhibited', 'exhibited');
+      on('masterwork:sold', 'sold');
 
       const stamp = () => ({ day: game.state.time.day, hour: game.state.time.hour });
       // Takılan sakinin ayrıntısı: görevi, bulunduğu karodaki yapı, konumu (hata ayıklamak için)
@@ -144,9 +152,24 @@ export async function installMonitor(page) {
           }
         }
 
-        // ---- Çalışanı olan ama üretmeyen iş yeri (gün sonu: 17:00 örneği) ----
+        // ---- (15. aşama) Meslek kıyafetleri: deneyime uygun kademe, sprite çizilebiliyor ----
+        if (s.time.hour === 12) {
+          for (const c of s.characters) {
+            // Kademe anında (kademe atlama olayıyla) güncellenir; aynı kademede ana meslek değişirse kit saat başı tazelenir
+            const want = window.__outfitFor(c);
+            const level = (o) => (o ? o.split(':')[1] : null);
+            if (level(c.outfit) !== level(want)) m.outfitErrors.push(`G${s.time.day} ${c.name}: ${c.outfit} != ${want}`);
+            if (c.outfit) {
+              const sprite = window.__charSprite(c.appearance, 'down', 'walk0', c.look);
+              if (!sprite || sprite.width !== 12) m.outfitErrors.push(`G${s.time.day} ${c.name}: ${c.outfit} çizilemedi`);
+            }
+          }
+          m.outfitErrors.length = Math.min(m.outfitErrors.length, 30);
+        }
+
+        // ---- Çalışanı olan ama üretmeyen iş yeri (16:30 örneği: mesai bitmeden günün üretimi) ----
         if (s.time.hour >= 9 && s.time.hour <= 15) for (const b of s.buildings) if (b.workerIds.size > 0) m.worked.add(b.id);
-        if (s.time.hour === 16) { // 16:30 örneği: mesai bitmeden günün üretimi
+        if (s.time.hour === 16) {
           for (const b of s.buildings) {
             if (!b.functional || !b.definition.production || b.damaged) continue;
             const key = `${b.type}@${b.tileX},${b.tileY}`;
@@ -175,6 +198,10 @@ export async function installMonitor(page) {
           staleJobs: m.staleJobs,
           stalledWorkplaces: stalled,
           minNeeds: m.minNeeds,
+          outfitErrors: m.outfitErrors,
+          outfits: s.characters.filter((c) => c.outfit).map((c) => c.outfit),
+          quarrels: s.stats.quarrels ?? 0,
+          reconciliations: s.stats.reconciliations ?? 0,
           events: m.events,
           welfare: Math.round(s.town.welfare ?? 0),
           tier: s.town.tier,

@@ -53,6 +53,7 @@ import { relicMask } from '../systems/Luxury.js';
 import { SeasonFestivalSystem } from '../systems/SeasonFestivalSystem.js';
 import { MemorySystem } from '../systems/MemorySystem.js';
 import { RallySystem } from '../systems/RallySystem.js';
+import { CraftsmanshipSystem } from '../systems/CraftsmanshipSystem.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -136,6 +137,7 @@ export class TownScene extends Scene {
     this.seasonFestivals = new SeasonFestivalSystem(this.game, this.world, new Random(state.seed + 14), { attract: this.attract });
     this.memories = new MemorySystem(this.game, this.world, new Random(state.seed + 15));
     this.rally = new RallySystem(this.game);
+    this.craftsmanship = new CraftsmanshipSystem(this.game, this.world, this.economy, new Random(state.seed + 16));
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       economy: this.economy,
       jobs: this.jobs,
@@ -213,6 +215,7 @@ export class TownScene extends Scene {
       this.seasonFestivals,
       this.memories,
       this.rally,
+      this.craftsmanship,
     ];
 
     this.camera = new Camera();

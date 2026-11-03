@@ -3,11 +3,15 @@
 // canvas'a piksel çizgisiyle) ve kasabanın toplam istatistikleri (üretilen ekmek, düğünler, doğan çocuklar, atlatılan
 // kışlar, sergilenen yadigârlar...) yer alır. Veriyi StatsSystem (state.history) ve diğer sistemler (state.stats,
 // state.trade, state.luxury, state.research) yazar; burası yalnızca GameState'i okur.
+// (15. aşama) "Usta İşi Eserler" vitrini: ustaların çıkardığı eserler; her biri sergilenir (kalıcı +1 refah) ya da
+// limandan / tüccara satılır. Düğmeler yalnızca 'ui:exhibitMasterwork' / 'ui:sellMasterwork' yayınlar.
 import { CONFIG } from '../../config.js';
 import { RELIC_KEYS } from '../../data/luxury.js';
 import { RESEARCH_KEYS } from '../../data/research.js';
 import { getAnyIconURL } from '../../art/ui/index.js';
 import { townSnapshot } from '../../systems/StatsSystem.js';
+import { MASTERPIECES, MASTERWORK } from '../../data/masterpieces.js';
+import { masterworkSaleStatus, masterworkHappiness, bestMasterworkBuyer } from '../../systems/Masterworks.js';
 import { el } from '../dom.js';
 
 const CHART_W = 236;
@@ -62,6 +66,9 @@ export class StatsPanel {
       return { spec, canvas, value, change, range, box };
     });
     this.totals = el('div', { className: 'archive-totals' });
+    this.vitrineInfo = el('div', { className: 'archive-subtitle masterwork-info' });
+    this.vitrine = el('div', { className: 'masterwork-list' });
+    this.lastVitrine = '';
     this.window = el('div', { className: 'archive ui-interactive', hidden: true }, [
       el('div', { className: 'panel archive-panel' }, [
         el('div', { className: 'journal-header' }, [el('span', { text: 'Kasaba Arşivi' }), close]),
@@ -69,6 +76,9 @@ export class StatsPanel {
         el('div', { className: 'archive-grid' }, this.charts.map((c) => c.box)),
         el('div', { className: 'building-section-title', text: 'Kasabanın tarihi' }),
         this.totals,
+        el('div', { className: 'building-section-title', text: 'Usta İşi Eserler' }),
+        this.vitrineInfo,
+        this.vitrine,
       ]),
     ]);
     this.extra = [{ slot: 'free', element: this.window }];
@@ -81,11 +91,13 @@ export class StatsPanel {
     this.window.hidden = !open;
     this.toggle.classList.toggle('is-active', open);
     this.lastKey = '';
+    this.lastVitrine = '';
   }
 
   render(game) {
     if (!this.open) return;
     const state = game.state;
+    this.renderVitrine(state);
     // Grafiklerin son noktası her zaman bugünün anlık değeri (arşiv her sabah yazılır)
     const now = townSnapshot(state);
     const history = state.history.filter((h) => h.day < now.day).slice(-(CONFIG.HISTORY_CHART_DAYS - 1));
@@ -160,6 +172,52 @@ export class StatsPanel {
     ctx.fillRect(xAt(values.length - 1) - 1, yAt(last) - 1, 3, 3);
   }
 
+  /** (15. aşama) Usta işi eserler: depodakiler (Sergile / Sat), sergilenenler ve satılanların özeti. */
+  renderVitrine(state) {
+    const mw = state.masterworks;
+    const buyer = bestMasterworkBuyer(state);
+    const key = JSON.stringify([mw.items.map((i) => `${i.id}${i.status}`), buyer]);
+    if (key === this.lastVitrine) return;
+    this.lastVitrine = key;
+    const shown = mw.items.filter((i) => i.status !== 'sold');
+    const bonus = masterworkHappiness(state);
+    this.vitrineInfo.textContent = mw.made
+      ? `${mw.made} eser yapıldı · ${mw.items.filter((i) => i.status === 'exhibited').length} sergileniyor (refah +${bonus}/${MASTERWORK.maxExhibitHappiness}) · ${mw.sold} satıldı (+${formatNumber(mw.goldEarned)} altın)`
+      : 'Henüz eser yok. Usta (Lv.3) sakinler kendi iş yerlerinde çalışırken nadiren usta işi bir eser ortaya koyar.';
+    const row = (item) => {
+      const piece = MASTERPIECES[item.type];
+      const actions = [];
+      if (item.status === 'stored') {
+        actions.push(this.vitrineButton('Sergile', `Vitrinde sergile: kasaba refahına kalıcı +${MASTERWORK.exhibitHappiness}`, () => this.events.emit('ui:exhibitMasterwork', { id: item.id })));
+        const source = buyer ?? 'harbor';
+        const sale = masterworkSaleStatus(state, item.id, source);
+        const sell = this.vitrineButton(`Sat ${sale.price} altın`, sale.ok ? `${source === 'harbor' ? 'Limandan ihraç et' : 'Gezgin tüccara sat'}: +${sale.price} altın` : `Satılamıyor: ${sale.reason}`, () =>
+          this.events.emit('ui:sellMasterwork', { id: item.id, source })
+        );
+        sell.disabled = !sale.ok;
+        actions.push(sell);
+      } else {
+        actions.push(el('span', { className: 'masterwork-state', text: 'Sergileniyor' }));
+      }
+      return el('div', { className: `masterwork-row is-${item.status}`, title: piece.description }, [
+        el('img', { src: getAnyIconURL(piece.icon), alt: '' }),
+        el('div', { className: 'masterwork-text' }, [
+          el('span', { className: 'masterwork-name', text: piece.name }),
+          el('span', { className: 'masterwork-meta', text: `Usta ${item.maker} · Gün ${item.day}` }),
+        ]),
+        el('div', { className: 'masterwork-actions' }, actions),
+      ]);
+    };
+    this.vitrine.replaceChildren(...shown.sort((a, b) => (a.status === b.status ? b.id - a.id : a.status === 'stored' ? -1 : 1)).map(row));
+  }
+
+  vitrineButton(label, title, onClick) {
+    const b = el('button', { className: 'hud-btn masterwork-btn', type: 'button', text: label, title, tabIndex: -1 });
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
   renderTotals(state) {
     const stats = state.stats;
     const goods = stats.goods ?? {};
@@ -181,6 +239,8 @@ export class StatsPanel {
       ['book', 'Tamamlanan araştırma', `${Object.keys(state.research.done).length}/${RESEARCH_KEYS.length}`],
       ['remedy', 'Şifacıda iyileşen', stats.cured ?? 0],
       ['map', 'Verilen karar', stats.dilemmas ?? 0],
+      ['handshake', 'Barışan küsler', stats.reconciliations ?? 0],
+      ['masterpiece', 'Usta işi eser', state.masterworks?.made ?? 0],
     ];
     this.totals.replaceChildren(
       ...rows.map(([icon, label, v]) =>

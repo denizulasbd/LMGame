@@ -55,6 +55,8 @@ await Promise.all(Array.from({ length: jobs }, worker));
 
 results.sort((a, b) => a.speed - b.speed || a.seed - b.seed);
 const sum = (f) => results.reduce((a, r) => a + (r.data ? f(r.data) : 0), 0);
+const q = sum((d) => d.monitor.quarrels ?? 0);
+const rc = sum((d) => d.monitor.reconciliations ?? 0);
 console.log(`\n${results.length} koşu, ${((Date.now() - started) / 60000).toFixed(1)} dk · raporlar: ${out}`);
 console.log(
   `toplam: takılma ${sum((d) => d.monitor.stuck.length)}, kopuk referans ${sum((d) => d.monitor.brokenCount)}, taşan ev ${sum((d) => d.monitor.overfullCount)}, ` +
@@ -63,6 +65,11 @@ console.log(
 console.log(
   `olaylar: düğün ${sum((d) => d.monitor.events.weddings)}, doğum ${sum((d) => d.monitor.events.births)}, büyüme ${sum((d) => d.monitor.events.grownUp)}, ` +
     `atışma ${sum((d) => d.monitor.events.quarrels)}, barışma ${sum((d) => d.monitor.events.reconciled)}, hastalık ${sum((d) => d.monitor.events.ill)}`
+);
+console.log(
+  `(15. aşama) barışma / atışma: ${rc}/${q} (%${q ? Math.round((rc / q) * 100) : 0}) · usta işi eser ${sum((d) => d.monitor.events.masterworks)} ` +
+    `(sergilenen ${sum((d) => d.monitor.events.exhibited)}, satılan ${sum((d) => d.monitor.events.sold)}) · Usta kostümü giyen ${sum((d) => d.monitor.outfits.filter((o) => o.endsWith(':3')).length)}, ` +
+    `Kalfa ${sum((d) => d.monitor.outfits.filter((o) => o.endsWith(':2')).length)} · kıyafet hatası ${sum((d) => d.monitor.outfitErrors.length)}`
 );
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

@@ -7,12 +7,13 @@
 //   save-v10.json: 12. aşamanın oyunu (kayıt sürümü 10): 31. gün, 30 sakin, dört araştırma, liman, hazinede altın ve
 //                  tamamlanmış Büyük Vadi Saat Kulesi
 //   save-v11.json: 13. aşamanın oyunu (kayıt sürümü 11): 37. gün, 30 sakin, üç yadigâr, peyzaj, arşiv
-//   save-v12.json: 14. aşamanın oyunu (kayıt sürümü 12, bugünkü): otopilotla 34 gün; festivaller, anılar
+//   save-v12.json: 14. aşamanın oyunu (kayıt sürümü 12): otopilotla 34 gün; festivaller, anılar
+//   save-v13.json: 15. aşamanın oyunu (kayıt sürümü 13, bugünkü): otopilotla 34 gün; usta işi eserler, barışmalar
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -22,7 +23,7 @@ const { results, report } = createChecks();
 
 for (const { name, raw } of fixtures) {
   const data = JSON.parse(raw);
-  const r = await page.evaluate((raw) => {
+  const r = await page.evaluate(async (raw) => {
     const game = window.game;
     const log = [];
     const offs = ['town:tierUp', 'town:tierAssessed', 'pet:arrived'].map((n) => game.events.on(n, (p) => log.push(n)));
@@ -39,6 +40,8 @@ for (const { name, raw } of fixtures) {
       terrain: scene.saves.snapshot().terrain.length,
       types: [...new Set(s.buildings.map((b) => b.type))],
       projects: s.buildings.filter((b) => b.project).map((b) => ({ id: b.id, job: scene.jobs.jobs.some((j) => j.buildingId === b.id) })),
+      // yüklendiği an (bir gün yaşarken ustalar yeni eser çıkarabilir)
+      masterworks: { items: s.masterworks.items.length, made: s.masterworks.made, exhibited: s.masterworks.items.filter((i) => i.status === 'exhibited').length },
     };
     // Referans bütünlüğü (yüklemeden hemen sonra ve bir gün sonra)
     const integrity = () => {
@@ -59,8 +62,11 @@ for (const { name, raw } of fixtures) {
     game.render(0);
     offs.forEach((off) => off());
     const integrityAfter = integrity();
+    const { outfitFor } = await import('/src/systems/SkillSystem.js');
     return {
       integrityAfter,
+      outfits: s.characters.filter((c) => c.outfit).length,
+      outfitsOk: s.characters.every((c) => c.outfit === outfitFor(c) || (c.outfit?.split(':')[1] === outfitFor(c)?.split(':')[1])),
       loaded,
       after: { day: s.time.day, pop: s.characters.length, tier: s.town.tier, assessed: s.town.assessed },
       animals: s.animals.length,
@@ -88,6 +94,9 @@ for (const { name, raw } of fixtures) {
   }, raw);
   const tag = `${name} (sürüm ${data.version})`;
   results.push({ name: `${tag}: referanslar sağlam (yüklenince ve bir gün sonra)`, ok: r.loaded.integrity.length === 0 && r.integrityAfter.length === 0, detail: [...r.loaded.integrity, ...r.integrityAfter].slice(0, 4).join(', ') });
+  if (data.version < 13) results.push({ name: `${tag}: usta işi eser vitrini boş başlar`, ok: r.loaded.masterworks.items === 0 && r.loaded.masterworks.made === 0 });
+  else results.push({ name: `${tag}: usta işi eserler korundu`, ok: r.loaded.masterworks.items === data.masterworks.items.length && r.loaded.masterworks.made === data.masterworks.made && r.loaded.masterworks.exhibited === data.masterworks.items.filter((i) => i.status === 'exhibited').length, detail: `${r.loaded.masterworks.items} eser, ${r.loaded.masterworks.exhibited} sergide` });
+  results.push({ name: `${tag}: meslek kıyafetleri deneyimden giyildi`, ok: r.outfitsOk, detail: `${r.outfits} sakin kıyafetli` });
   results.push({ name: `${tag}: harita farkları birebir uygulandı`, ok: r.loaded.terrain === data.terrain.length, detail: `${r.loaded.terrain}/${data.terrain.length} karo` });
   if (!data.map) results.push({ name: `${tag}: eski 48x48 biyomsuz harita`, ok: r.loaded.map.width === 48 && r.loaded.map.height === 48 && r.loaded.map.generator === 1, detail: JSON.stringify(r.loaded.map) });
   if (data.buildings.some((b) => b.type === 'lamp')) results.push({ name: `${tag}: Sokak Lambası Sokak Feneri'ne çevrildi`, ok: !r.loaded.types.includes('lamp') && r.loaded.types.includes('lantern') });

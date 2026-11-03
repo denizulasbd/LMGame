@@ -10,6 +10,7 @@
 import { SKILLS } from '../data/skills.js';
 import { getSeason } from '../data/seasons.js';
 import { clamp } from '../utils/math.js';
+import { RECONCILE_PLACES } from '../data/family.js';
 
 export const MEMORY = {
   max: 40,
@@ -103,7 +104,10 @@ export class MemorySystem {
       on('expedition:returned', ({ members, buff }) =>
         members.forEach((c) => remember(c, buff === 'talisman' ? 'Keşif seferinden Kadim Tılsım\'la döndü' : 'Keşif seferinden ganimetle döndü', 'map', { kind: 'expedition' }))
       ),
-      on('relationship:reconciled', ({ a, b }) => both(a, b, `${b.name} ile barıştı`, `${a.name} ile barıştı`, 'heart', { kind: 'reconcile' })),
+      on('relationship:reconciled', ({ a, b, place }) => {
+        const where = RECONCILE_PLACES[place] ?? '';
+        both(a, b, `${where}${b.name} ile barıştı`, `${where}${a.name} ile barıştı`, 'handshake', { kind: 'reconcile' });
+      }),
       on('pet:petted', ({ animal, character }) => {
         if (!animal?.name || character.memories?.some((m) => m.kind === 'pet' && m.text.includes(animal.name))) return;
         remember(character, `Kasabanın ${animal.kind === 'cat' ? 'kedisi' : 'köpeği'} ${animal.name} ile can dostu oldu`, 'paw', { kind: 'pet' });

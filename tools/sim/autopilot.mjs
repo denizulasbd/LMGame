@@ -203,6 +203,18 @@ await page.evaluate((passive) => {
       if (busy >= 2 && res.gold >= 3000 && L.goldDecreeStatus(s, 'royalArchitects').ok) game.events.emit('ui:goldDecree', { id: 'royalArchitects' });
     }
 
+    // (15. aşama) Usta işi eserler: vitrin dolana kadar sergile (kalıcı refah), sonra limandan / tüccara sat
+    {
+      const MW = window.__masterworks;
+      for (const item of MW.storedMasterworks(s)) {
+        if (MW.masterworkHappiness(s) < window.__mwMax) game.events.emit('ui:exhibitMasterwork', { id: item.id });
+        else {
+          const buyer = MW.bestMasterworkBuyer(s);
+          if (buyer) game.events.emit('ui:sellMasterwork', { id: item.id, source: buyer });
+        }
+      }
+    }
+
     const sites = s.buildings.filter((b) => (b.underConstruction || b.project) && b.type !== 'wonder').length;
     if (sites >= 2) return;
     const beds = s.buildings.filter((b) => b.functional && b.capacity).reduce((n, b) => n + b.capacity, 0);
@@ -251,6 +263,8 @@ await page.evaluate(async () => {
   window.__luxury = await import('/src/systems/Luxury.js');
   window.__relicKeys = (await import('/src/data/luxury.js')).RELIC_KEYS;
   window.__harbor = await import('/src/systems/HarborSystem.js');
+  window.__masterworks = await import('/src/systems/Masterworks.js');
+  window.__mwMax = (await import('/src/data/masterpieces.js')).MASTERWORK.maxExhibitHappiness;
 });
 
 function summary() {
@@ -307,6 +321,14 @@ const report = await page.evaluate(() => {
     sampleMemories: (s.characters.find((c) => c.memories.length >= 6) ?? s.characters[0]).memories.slice(-8).map((m) => `G${m.day} ${m.text}`),
     sampleName: (s.characters.find((c) => c.memories.length >= 6) ?? s.characters[0]).name,
     grandVoyages: s.trade.grandVoyages ?? 0,
+    quarrels: s.stats.quarrels ?? 0,
+    reconciliations: s.stats.reconciliations ?? 0,
+    mw: { made: s.masterworks.made, exhibited: s.masterworks.exhibited, sold: s.masterworks.sold, goldEarned: s.masterworks.goldEarned },
+    outfits: s.characters.reduce((acc, c) => {
+      const k = c.outfit ? c.outfit.split(':')[1] === '3' ? 'usta' : 'kalfa' : c.isChild ? 'çocuk' : 'çırak';
+      acc[k] = (acc[k] ?? 0) + 1;
+      return acc;
+    }, {}),
   };
 });
 console.log(report.log.join('\n'));
@@ -326,6 +348,7 @@ console.log(`mevsim festivalleri: ${JSON.stringify(report.held)} · ${report.sta
 const mem = report.memories;
 console.log(`anılar: sakin başına ${Math.min(...mem)}-${Math.max(...mem)} (ortalama ${(mem.reduce((a, b) => a + b, 0) / mem.length).toFixed(1)}), ${report.recollections} kez hatırlandı · Büyük İhracat Seferi: ${report.grandVoyages}`);
 console.log(`hava değişimleri: ${JSON.stringify(report.stats.weather)}`);
+console.log(`(15. aşama) atışma ${report.quarrels} · barışma ${report.reconciliations} (oran %${report.quarrels ? Math.round((report.reconciliations / report.quarrels) * 100) : 0}) · usta işi eser ${report.mw.made} (sergilenen ${report.mw.exhibited}, satılan ${report.mw.sold}, +${report.mw.goldEarned} altın) · kıyafet ${JSON.stringify(report.outfits)}`);
 console.log(`${report.sampleName} anıları:\n  ${report.sampleMemories.join('\n  ')}`);
 console.log(`harika: aşama ${report.wonder}/3, ${sum(spent.wonder)} birim (${fmt(spent.wonder)}); hazinede ${report.gold} altın`);
 const late = report.stats.daily.slice(-12);
@@ -349,7 +372,8 @@ for (const st of mon.stuck.slice(0, 10)) console.log(`  takıldı: G${st.day} ${
 for (const b of mon.broken.slice(0, 10)) console.log(`  referans: ${b}`);
 for (const j of mon.staleJobs.slice(0, 5)) console.log(`  iş: ${j}`);
 for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}`);
-const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0;
+const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0;
+for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
   fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, healthy }, null, 1));
 }

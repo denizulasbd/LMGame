@@ -8,6 +8,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { HAPPINESS_WEIGHTS, HAPPINESS_LEVELS, IMMIGRATION, TOWN_BUFFS, TOWN_TIERS, TITLE_WORDS, CIVIC_PROJECTS } from '../data/town.js';
 import { EXPEDITION } from '../data/dilemmas.js';
 import { RESOURCES, FOOD_KEYS } from '../data/resources.js';
+import { masterworkHappiness } from './Masterworks.js';
 
 /** Bir sakinin mutluluğu 0-100: ihtiyaçlarının ağırlıklı ortalaması. */
 export function happinessOf(character) {
@@ -39,6 +40,8 @@ export function townHappinessBonus(state) {
   bonus += (state.civic?.relics ?? 0) * EXPEDITION.relicHappiness;
   // (13. aşama) İpek Kumaş ve Mermer Sütunlar: Seviye 2 yapıların kalıcı prestiji
   bonus += silkPrestige(state);
+  // (15. aşama) Kasaba Arşivi'nin vitrininde sergilenen usta işi eserler
+  bonus += masterworkHappiness(state);
   return bonus;
 }
 
