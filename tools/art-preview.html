@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <title>LMGame · Sanat Önizleme</title>
+  <style>
+    body { margin: 16px; font: 14px ui-monospace, Menlo, monospace; background: #6cc04a; color: #1b1423; }
+    h2 { margin: 18px 0 6px; }
+    .row { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end; }
+    figure { margin: 0; text-align: center; }
+    canvas { image-rendering: pixelated; background: #4a9a46; border: 1px dashed rgba(27,20,35,.4); }
+    figcaption { font-size: 12px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Yapı, karakter ve simge önizlemesi</h1>
+  <p>Geliştirme aracı: <code>python3 tools/serve.py</code> çalışırken <code>/tools/art-preview.html</code> adresinden açılır. Yapılar 5 kat büyütülmüş çizilir.</p>
+  <div id="root"></div>
+  <script type="module">
+    import { getStructureSprite, getConstructionSiteSprite } from '../src/art/sprites/index.js';
+    import { getIconSprite, getBackpackSprite, getNoteSprite, getBubbleSprite, getHeldToolSprite } from '../src/art/ui/index.js';
+    import { getCharacterSprite } from '../src/art/sprites/index.js';
+    import { getTileSprite, getObjectSprite, getEdgeSprite } from '../src/art/tiles/index.js';
+    import { TILE_TYPES } from '../src/data/tiles.js';
+
+    const root = document.getElementById('root');
+    const SCALE = 5;
+
+    function show(title, items, scale = SCALE) {
+      const h = document.createElement('h2');
+      h.textContent = title;
+      const row = document.createElement('div');
+      row.className = 'row';
+      for (const [label, sprite] of items) {
+        const fig = document.createElement('figure');
+        const c = document.createElement('canvas');
+        c.width = sprite.width * scale;
+        c.height = sprite.height * scale;
+        const ctx = c.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(sprite, 0, 0, c.width, c.height);
+        const cap = document.createElement('figcaption');
+        cap.textContent = `${label} (${sprite.width}x${sprite.height})`;
+        fig.append(c, cap);
+        row.append(fig);
+      }
+      root.append(h, row);
+    }
+
+    const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+    const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 9. aşama: çocuklar, palto ve sırt çantası, balonlar, ekipman, Zanaat Atölyesi ---
+    const looks = [
+      { hair: 'long', hairColor: 'auburn', skin: 'light', shirt: 'rose', pants: 'navy' },
+      { hair: 'spiky', hairColor: 'black', skin: 'medium', shirt: 'sky', pants: 'denim' },
+      { hair: 'bun', hairColor: 'blonde', skin: 'deep', shirt: 'mustard', pants: 'plum' },
+      { hair: 'short', hairColor: 'ginger', skin: 'tan', shirt: 'mint', pants: 'brown' },
+    ];
+    const CHILD = { child: true, coat: false, bag: false };
+    show('Çocuklar (12x14): önden, nefes, yürüme, arkadan, yandan, oturma', looks.flatMap((a, i) => [
+      [`çocuk ${i + 1}`, getCharacterSprite(a, 'down', 'idle0', CHILD)],
+      ...(i === 0 ? [
+        ['nefes', getCharacterSprite(a, 'down', 'idle1', CHILD)],
+        ['yürüme', getCharacterSprite(a, 'down', 'walk0', CHILD)],
+        ['arkadan', getCharacterSprite(a, 'up', 'walk1', CHILD)],
+        ['yandan', getCharacterSprite(a, 'right', 'walk0', CHILD)],
+        ['sola', getCharacterSprite(a, 'left', 'idle0', CHILD)],
+        ['oturma', getCharacterSprite(a, 'down', 'sit0', CHILD)],
+      ] : []),
+      ...(i === 1 ? [['yanında yetişkin', getCharacterSprite(a, 'down', 'idle0')]] : []),
+    ]), 8);
+    const COAT = { child: false, coat: true, bag: false };
+    const BAG = { child: false, coat: false, bag: true };
+    const BOTH = { child: false, coat: true, bag: true };
+    show('Kışlık palto ve sırt çantası (karakterin üstünde)', [
+      ['palto yok', getCharacterSprite(looks[0], 'down', 'idle0')],
+      ['palto önden', getCharacterSprite(looks[0], 'down', 'idle0', COAT)],
+      ['palto arkadan', getCharacterSprite(looks[0], 'up', 'idle0', COAT)],
+      ['palto yandan', getCharacterSprite(looks[0], 'right', 'walk0', COAT)],
+      ['çanta önden', getCharacterSprite(looks[1], 'down', 'idle0', BAG)],
+      ['çanta arkadan', getCharacterSprite(looks[1], 'up', 'walk0', BAG)],
+      ['çanta yandan', getCharacterSprite(looks[1], 'right', 'idle0', BAG)],
+      ['çanta sola', getCharacterSprite(looks[1], 'left', 'walk1', BAG)],
+      ['ikisi birden', getCharacterSprite(looks[3], 'down', 'walk0', BOTH)],
+      ['ikisi arkadan', getCharacterSprite(looks[3], 'up', 'idle0', BOTH)],
+      ['ikisi yandan', getCharacterSprite(looks[3], 'right', 'walk1', BOTH)],
+      ['paltolu oturma', getCharacterSprite(looks[2], 'down', 'sit0', COAT)],
+    ], 8);
+    show('Yeni ifade balonları: aşk (çift kalp), öfke şimşeği, somurtma, düğün yüzüğü', ['love', 'angry', 'sulk', 'ring', 'heart'].map((n) => [n, getBubbleSprite(n)]), 8);
+    show('Ekipman ve zanaat simgeleri', ['sturdyTool', 'winterCoat', 'backpack', 'anvil'].map((n) => [n, getIconSprite(n)]), 10);
+    show('Eldeki aletler: normal ve Sağlam Alet', ['hammer', 'axe', 'pickaxe', 'hoe', 'rod'].flatMap((t) => [[t, getHeldToolSprite(t, false)], [`${t} sağlam`, getHeldToolSprite(t, false, true)]]), 8);
+    show('Zanaat Atölyesi (3x2)', [
+      ['boşta', getStructureSprite('workshop', {})],
+      ['çalışıyor: örs kızarır', getStructureSprite('workshop', { active: true, frame: 0 })],
+      ['kıvılcım', getStructureSprite('workshop', { active: true, frame: 1 })],
+      ['kış', getStructureSprite('workshop', { season: 'winter' })],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(3, 2, stage, 'workshop')]),
+    ], 5);
+
+    // --- 8. aşama: mikro-biyomlar, Seviye 2 yapılar, kadim harabeler ---
+    for (const season of SEASONS) {
+      const tile = (name, v) => getTileSprite(name, v, 0, season);
+      show(`Mikro-biyomlar: ${NAMES[season]}`, [
+        ['çimen', tile('grass', 0)],
+        ['bereketli: yoncalı', tile('meadow', 0)],
+        ['bereketli: çiçekli', tile('meadow', 1)],
+        ['kayalık: çakıllı', tile('rocky', 0)],
+        ['kayalık: taşlı', tile('rocky', 1)],
+        ['orman: yosunlu', tile('forest', 0)],
+        ['orman: yapraklı', tile('forest', 1)],
+      ], 4);
+    }
+
+    /** Elle dizilmiş küçük bir karo haritası: biyom geçişleri oyundaki gibi (TileMap kuralı) çizilir. */
+    function mosaic(rows, season) {
+      const legend = { '.': 'grass', ',': 'meadow', '^': 'rocky', F: 'forest', '#': 'path', ':': 'sand', '~': 'water' };
+      const h = rows.length;
+      const w = rows[0].length;
+      const canvas = document.createElement('canvas');
+      canvas.width = w * 16;
+      canvas.height = h * 16;
+      const ctx = canvas.getContext('2d');
+      const at = (x, y) => (rows[y] && rows[y][x] ? legend[rows[y][x]] : null);
+      const offsets = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const name = at(x, y);
+          ctx.drawImage(getTileSprite(name, (x * 3 + y) % 2, 0, season), x * 16, y * 16);
+          const overlays = [].concat(TILE_TYPES[name].edgeOverlay ?? []);
+          offsets.forEach(([dx, dy], dir) => {
+            const n = at(x + dx, y + dy);
+            if (season === 'winter' && n && TILE_TYPES[name].ground && TILE_TYPES[n].ground) return;
+            const overlay = n && overlays.find((o) => o.neighbors.includes(n));
+            if (overlay) ctx.drawImage(getEdgeSprite(overlay.sprite, dir, 0, season), x * 16, y * 16);
+          });
+        }
+      }
+      return canvas;
+    }
+    const PATCH = [
+      '^^^^^...FFFF',
+      '^^^^....FFFF',
+      '^^^.....##FF',
+      '..,,,,..#..F',
+      '.,,,,,,.#...',
+      ':,,,,,,,#,..',
+      '~:,,,,,,#,,.',
+    ];
+    show('Biyom geçişleri (kayalık, çimen, orman, bereketli toprak, yol, kıyı)', SEASONS.map((s) => [NAMES[s], mosaic(PATCH, s)]), 3);
+
+    show('Seviye 2 yapılar: yükseltmeden önce ve sonra', [
+      ['Kulübe', getStructureSprite('cabin', {})],
+      ['Taş Ev', getStructureSprite('cabin', { level: 2 })],
+      ['Taş Ev gece', getStructureSprite('cabin', { level: 2, windowsLit: true, tone: 1 })],
+      ['Oduncu Kulübesi', getStructureSprite('lumberHut', {})],
+      ['Kereste Atölyesi', getStructureSprite('lumberHut', { level: 2 })],
+      ['hızar dönüyor', getStructureSprite('lumberHut', { level: 2, active: true, frame: 1 })],
+    ], 5);
+    show('Seviye 2 yapılar (3x3)', [
+      ['Sebze Bahçesi', getStructureSprite('garden', {})],
+      ['Cam Sera', getStructureSprite('garden', { level: 2 })],
+      ['Taş Ocağı', getStructureSprite('quarry', {})],
+      ['Derin Maden Ocağı', getStructureSprite('quarry', { level: 2 })],
+      ['vinç sallanır', getStructureSprite('quarry', { level: 2, active: true, frame: 1 })],
+    ], 4);
+    show('Seviye 2 yapılar kışın', [
+      ['Taş Ev', getStructureSprite('cabin', { level: 2, season: 'winter' })],
+      ['Kereste Atölyesi', getStructureSprite('lumberHut', { level: 2, season: 'winter' })],
+      ['Cam Sera (donmaz)', getStructureSprite('garden', { level: 2, season: 'winter' })],
+      ['Bahçe (donar)', getStructureSprite('garden', { season: 'winter' })],
+      ['Derin Maden Ocağı', getStructureSprite('quarry', { level: 2, season: 'winter' })],
+    ], 4);
+    show('Kadim harabeler: yıkık ve onarılmış', [
+      ['Yıkık Gözetleme Kulesi', getStructureSprite('watchtower', { ruined: true })],
+      ['Gözetleme Kulesi', getStructureSprite('watchtower', {})],
+      ['gece, fener yanık', getStructureSprite('watchtower', { lit: true })],
+      ['Terk Edilmiş Erzak Kampı', getStructureSprite('supplyCamp', { ruined: true })],
+      ['Erzak Kampı', getStructureSprite('supplyCamp', {})],
+      ['Kurumuş Kadim Çeşme', getStructureSprite('ancientFountain', { ruined: true })],
+      ...[0, 1, 2, 3].map((frame) => [`Kadim Çeşme kare ${frame}`, getStructureSprite('ancientFountain', { frame })]),
+    ], 5);
+    show('Harabeler kışın', [
+      ['yıkık kule', getStructureSprite('watchtower', { ruined: true, season: 'winter' })],
+      ['kule', getStructureSprite('watchtower', { season: 'winter' })],
+      ['yıkık kamp', getStructureSprite('supplyCamp', { ruined: true, season: 'winter' })],
+      ['kamp', getStructureSprite('supplyCamp', { season: 'winter' })],
+      ['kuru çeşme', getStructureSprite('ancientFountain', { ruined: true, season: 'winter' })],
+      ['çeşme', getStructureSprite('ancientFountain', { season: 'winter' })],
+    ], 4);
+    // Mevsim önizlemesi: her mevsim için çimen karoları ve ağaçlar yan yana
+    for (const season of SEASONS) {
+      const tile = (name, v) => getTileSprite(name, v, 0, season);
+      const oaks = season === 'autumn' ? [0, 1, 2].map((v) => [`meşe ${v}`, getObjectSprite('oak', season, v)]) : [['meşe', getObjectSprite('oak', season)]];
+      show(`Mevsim: ${NAMES[season]}`, [
+        ['çimen', tile('grass', 0)],
+        ['çiçekli', tile('grass', 1)],
+        ['taşlı', tile('grass', 2)],
+        ...oaks,
+        ['çam', getObjectSprite('pine', season)],
+        ['fidan', getObjectSprite('sapling', season)],
+        ['kaya', getObjectSprite('rock', season)],
+        ['çalı', getStructureSprite('berryBush', { berries: 3, maxBerries: 3, season })],
+      ], 4);
+    }
+    show('Mevsimlik yapılar', [
+      ...SEASONS.map((season) => [`bahçe ${NAMES[season]}`, getStructureSprite('garden', { season })]),
+      ['kulübe kış', getStructureSprite('cabin', { season: 'winter', tone: 0 })],
+      ['kulübe (mavi çatı) kış', getStructureSprite('cabin', { season: 'winter', tone: 1 })],
+      ['han kış', getStructureSprite('inn', { season: 'winter' })],
+      ['kiler kış', getStructureSprite('storage', { season: 'winter' })],
+    ], 3);
+    show('Süsleme ve prestij (7. aşama)', [
+      ['taş yol', getTileSprite('cobble', 0, 0)],
+      ['toprak yol', getTileSprite('path', 0, 0)],
+      ['fener gündüz', getStructureSprite('lantern', { lit: false })],
+      ['fener gece', getStructureSprite('lantern', { lit: true })],
+      ['anıt', getStructureSprite('monument', {})],
+      ['anıt kış', getStructureSprite('monument', { season: 'winter' })],
+    ], 5);
+    show('Taş ocağı', [
+      ['kare 0', getStructureSprite('quarry', { active: false })],
+      ['kare 1 (vinç sallanır)', getStructureSprite('quarry', { active: true, frame: 1 })],
+    ]);
+    show('Balıkçı iskelesi', [
+      ['gündüz, su sağda', getStructureSprite('fishingPier', { lit: false })],
+      ['gece, fener yanık', getStructureSprite('fishingPier', { lit: true })],
+      ['su solda', getStructureSprite('fishingPier', { lit: false, orientation: 'left' })],
+    ]);
+    show('İskele şantiyesi', [0, 1, 2].map((stage) => ['aşama ' + stage, getConstructionSiteSprite(2, 2, stage, 'fishingPier')]));
+    show('Kasaba Hanı', [
+      ['gündüz', getStructureSprite('inn', { lit: false, frame: 0 })],
+      ['gece, tabela sağa', getStructureSprite('inn', { lit: true, frame: 1 })],
+      ['tabela sola', getStructureSprite('inn', { lit: true, frame: 3 })],
+    ]);
+    show('Pazar Yeri', [
+      ['tüccar yok', getStructureSprite('market', { open: false })],
+      ['tüccar geldi, flama 0', getStructureSprite('market', { open: true, frame: 0 })],
+      ['flama 1', getStructureSprite('market', { open: true, frame: 1 })],
+    ]);
+    show('Çiçek tarhı', [0, 1, 2].flatMap((tone) => [0, 1].map((frame) => [`renk ${tone} kare ${frame}`, getStructureSprite('flowerBed', { tone, frame })])));
+    const merchantLook = { hair: 'bun', hairColor: 'gray', skin: 'light', shirt: 'teal', pants: 'plum' };
+    show('Gezgin tüccar ve şenlik', [
+      ['tüccar', getCharacterSprite(merchantLook, 'down', 'idle0')],
+      ['çanta önden', getBackpackSprite('front')],
+      ['çanta arkadan', getBackpackSprite('back')],
+      ['çanta yandan', getBackpackSprite('right')],
+      ...['P', 'p', 'i', 'a', 'O'].map((c) => [`nota ${c}`, getNoteSprite(c)]),
+    ], 8);
+    show('HUD simgeleri', ['sound', 'mute', 'smile', 'frown', 'coin', 'spring', 'summer', 'autumn', 'winter', 'snow', 'star', 'starEmpty'].map((n) => [n, getIconSprite(n)]), 10);
+    show('Hava simgeleri', ['sun', 'cloud', 'rain', 'firefly', 'moon', 'journal'].map((n) => [n, getIconSprite(n)]), 10);
+  </script>
+</body>
+</html>

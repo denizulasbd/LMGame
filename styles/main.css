@@ -1,0 +1,39 @@
+/* Genel sayfa ve canvas düzeni */
+:root {
+  --bg: #1b1423;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#game-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+#game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+  /* Pixel art'ın bulanıklaşmaması için */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#game-canvas.is-pointing {
+  cursor: pointer;
+}
+
+#game-canvas.is-dragging {
+  cursor: grabbing;
+}

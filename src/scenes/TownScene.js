@@ -1,0 +1,603 @@
+// Ana oyun sahnesi: kasaba haritası, yapılar, sakinler, kamera, seçim, yönetim araçları,
+// zaman ve atmosfer. Sahne sistemleri doğru sırayla çalıştırır ve her şeyi derinlik
+// sırasına göre çizer; oyun kuralları sistemlerde ve yapay zekâdadır.
+import { Scene } from './Scene.js';
+import { ToolController } from './ToolController.js';
+import { CONFIG } from '../config.js';
+import { Camera } from '../rendering/Camera.js';
+import { DayNightOverlay, getAmbientColor } from '../rendering/DayNightOverlay.js';
+import { WeatherEffects } from '../rendering/WeatherEffects.js';
+import { FireflyField } from '../rendering/Fireflies.js';
+import { RenderQueue } from '../rendering/RenderQueue.js';
+import { drawTileCursor, drawAreaCursor } from '../rendering/TileCursor.js';
+import { drawJobMarkers } from '../rendering/JobMarkers.js';
+import { generateTown } from '../world/WorldGenerator.js';
+import { World } from '../world/World.js';
+import { captureTerrain, diffTerrain, applyTerrain } from '../world/TerrainSnapshot.js';
+import { BUILDINGS } from '../data/buildings.js';
+import { fireflyIntensity, isRainActive } from '../data/weather.js';
+import { getSeason } from '../data/seasons.js';
+import { LeafFall } from '../rendering/SeasonalEffects.js';
+import { createStartingResidents } from '../world/residents.js';
+import { Building } from '../entities/Building.js';
+import { TimeSystem } from '../systems/TimeSystem.js';
+import { NeedsSystem } from '../systems/NeedsSystem.js';
+import { MovementSystem } from '../systems/MovementSystem.js';
+import { BehaviorSystem } from '../systems/BehaviorSystem.js';
+import { StructureSystem } from '../systems/StructureSystem.js';
+import { EconomySystem } from '../systems/EconomySystem.js';
+import { JobSystem } from '../systems/JobSystem.js';
+import { ConstructionSystem } from '../systems/ConstructionSystem.js';
+import { NatureSystem } from '../systems/NatureSystem.js';
+import { PopulationSystem } from '../systems/PopulationSystem.js';
+import { WeatherSystem } from '../systems/WeatherSystem.js';
+import { RelationshipSystem } from '../systems/RelationshipSystem.js';
+import { ConflictSystem } from '../systems/ConflictSystem.js';
+import { FamilySystem } from '../systems/FamilySystem.js';
+import { CraftingSystem } from '../systems/CraftingSystem.js';
+import { JournalSystem } from '../systems/JournalSystem.js';
+import { SaveSystem } from '../systems/SaveSystem.js';
+import { EventSystem } from '../systems/EventSystem.js';
+import { HeatingSystem } from '../systems/HeatingSystem.js';
+import { MilestoneSystem } from '../systems/MilestoneSystem.js';
+import { TILE_TYPES, TILE_BY_ID, isGround } from '../data/tiles.js';
+import { TOWN_NAME_MAX_LENGTH } from '../data/town.js';
+import { AudioSystem } from '../systems/AudioSystem.js';
+import { FestivalEffects } from '../rendering/FestivalEffects.js';
+import { Random } from '../utils/random.js';
+import { getSelectionRing, getTargetMarker } from '../art/ui/index.js';
+
+const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
+const HOVER_REFRESH_SECONDS = 0.5;
+const PATH_DOT_SPACING = 5;      // seçili karakterin rota noktaları arası (dünya pikseli)
+const PATH_DOT_COLOR = '#fff3b0';
+const PATH_DOT_SHADOW = 'rgba(27, 20, 35, 0.55)';
+
+export class TownScene extends Scene {
+  /**
+   * @param {{ attract?: boolean }} params attract: başlangıç ekranının arkasında yaşayan tanıtım kasabası
+   *   (girdi kapalı, kamera kendiliğinden süzülür, hiçbir şey kaydedilmez)
+   */
+  enter(params = {}) {
+    const { state, renderer, events } = this.game;
+    this.attract = Boolean(params.attract);
+    if (this.attract) {
+      state.time.speed = CONFIG.TIME_SPEEDS[0];
+      state.time.paused = false;
+    }
+    const { width, height, generator } = state.map;
+    const { map, landmarks, structures } = generateTown(width, height, new Random(state.seed), { biomes: generator >= 2 });
+    this.map = map;
+    this.baseTerrain = captureTerrain(map); // kayıtta yalnızca bundan farklı karolar saklanır
+
+    // Kayıttan yüklendiyse harita farkları ve yapılar kayıttan gelir, sakinler zaten durumdadır
+    const restoring = state.pendingTerrain !== null;
+    if (restoring) {
+      applyTerrain(map, state.pendingTerrain);
+      state.pendingTerrain = null;
+      map.occupants.fill(0);
+      for (const building of state.buildings) this.occupyFootprint(building);
+    } else {
+      state.buildings = structures.map((record) => new Building(record));
+    }
+    this.world = new World(map, state, landmarks);
+    if (restoring) this.reattachResidents();
+    else state.characters = createStartingResidents(this.world, new Random(state.seed + 1), this.currentHour());
+
+    // Servisler: birbirine ihtiyaç duyan sistemler
+    this.timeSystem = new TimeSystem(this.game);
+    this.economy = new EconomySystem(this.game, this.world);
+    this.jobs = new JobSystem(this.game, this.world);
+    this.construction = new ConstructionSystem(this.game, this.world, this.economy, this.jobs, {
+      // Kaldırılan toprak yolun altından, harita üretildiğindeki biyom zemini geri gelir
+      groundAt: (x, y) => {
+        const tile = TILE_BY_ID[this.baseTerrain.tiles[map.index(x, y)]];
+        return isGround(tile) ? tile : null;
+      },
+    });
+    this.nature = new NatureSystem(this.game, this.world);
+    this.population = new PopulationSystem(this.game, this.world, new Random(state.seed + 3));
+    this.townEvents = new EventSystem(this.game, this.world, { population: this.population, economy: this.economy });
+    this.audio = new AudioSystem(this.game, this.world, () => {
+      const { width, height } = this.game.renderer;
+      return this.camera.screenToWorld(width / 2, height / 2);
+    });
+    this.weather = new WeatherSystem(this.game);
+    this.relationships = new RelationshipSystem(this.game, this.world, new Random(state.seed + 5));
+    this.conflicts = new ConflictSystem(this.game, this.world, this.relationships, new Random(state.seed + 6));
+    this.family = new FamilySystem(this.game, this.world, new Random(state.seed + 7));
+    this.crafting = new CraftingSystem(this.game, this.world, this.economy);
+    this.journal = new JournalSystem(this.game);
+    this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
+      economy: this.economy,
+      jobs: this.jobs,
+      relationships: this.relationships,
+      crafting: this.crafting,
+    });
+    this.saves = new SaveSystem(this.game, {
+      captureTerrain: () => diffTerrain(this.baseTerrain, this.map),
+      reloadScene: () => this.game.scenes.switchTo('town'),
+      attract: this.attract,
+    });
+    this.milestones = new MilestoneSystem(this.game, this.world, TILE_TYPES.cobble.id);
+
+    // Sıra önemlidir: hava, yapı durumu ve kapasite, iş temizliği, atölye durumu, ihtiyaç azalması,
+    // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar ve doğa
+    this.structures = new StructureSystem(this.game, this.world);
+    this.heating = new HeatingSystem(this.game, this.world, this.economy);
+    this.systems = [
+      this.weather,
+      this.structures,
+      this.economy,
+      this.jobs,
+      this.crafting,
+      new NeedsSystem(this.world),
+      new MovementSystem(this.world),
+      this.behavior,
+      this.relationships,
+      this.conflicts,
+      this.family,
+      this.townEvents,
+      this.heating,
+      this.milestones,
+      this.nature,
+    ];
+
+    this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
+    this.disposables = [
+      this.timeSystem,
+      this.construction,
+      this.nature,
+      this.population,
+      this.behavior,
+      this.tools,
+      this.journal,
+      this.saves,
+      this.townEvents,
+      this.audio,
+      this.structures,
+      this.heating,
+      this.milestones,
+      this.relationships,
+      this.family,
+      this.crafting,
+    ];
+
+    this.camera = new Camera();
+    const size = CONFIG.TILE_SIZE;
+    this.camera.centerOn(landmarks.plaza.centerX * size, landmarks.plaza.centerY * size, renderer.width, renderer.height);
+    this.camera.clamp(map.pixelWidth, map.pixelHeight, renderer.width, renderer.height);
+
+    this.queue = new RenderQueue();
+    this.dayNight = new DayNightOverlay();
+    this.weatherFx = new WeatherEffects();
+    this.fireflies = new FireflyField(state.seed);
+    this.festivalFx = new FestivalEffects();
+    this.leaves = new LeafFall();
+    this.animationTime = 0; // görsel animasyonlar için gerçek zaman (oyun duraklasa da akar)
+
+    this.hovered = null;
+    this.hoverKey = '';
+    this.hoverRefresh = 0;
+    this.hoveredCharacterId = null;
+    this.selectedId = null;
+    this.selectedBuildingId = null;
+    this.followId = null;
+    this.focusId = null;
+
+    this.unsubscribers = [
+      events.on('ui:selectCharacter', (id) => {
+        this.select(id);
+        this.focusId = id; // listeden seçilince kamera bir kez karaktere kayar
+      }),
+      events.on('ui:followCharacter', (id) => this.setFollow(id)),
+      events.on('ui:selectBuilding', (id) => this.selectBuilding(id)),
+      events.on('ui:demolishBuilding', (id) => {
+        const building = this.world.getBuilding(id);
+        const result = building ? this.construction.demolishAt(building.tileX, building.tileY) : null;
+        if (result && !result.ok) events.emit('toast', { text: result.reason, tone: 'warn', icon: 'demolish' });
+      }),
+      events.on('ui:startProject', (id) => {
+        const result = this.construction.startProject(this.world.getBuilding(id));
+        if (!result.ok) events.emit('toast', { text: result.reason, tone: 'warn', icon: 'hammer' });
+      }),
+      events.on('ui:cancelProject', (id) => this.construction.cancelProject(this.world.getBuilding(id))),
+      events.on('building:removed', (building) => {
+        if (building.id === this.selectedBuildingId) this.selectBuilding(null);
+      }),
+      events.on('ui:renameTown', (name) => {
+        const clean = String(name ?? '').trim().slice(0, TOWN_NAME_MAX_LENGTH);
+        if (!clean || clean === state.townName) return;
+        state.townName = clean;
+        events.emit('town:renamed', { name: clean });
+      }),
+    ];
+
+    events.emit('camera:zoom', this.camera.zoom);
+    events.emit('map:hover', null);
+    events.emit('character:selected', null);
+    events.emit('building:selected', null);
+    events.emit('camera:followChanged', null);
+    events.emit('tool:changed', { tool: 'select', buildType: null });
+    events.emit(this.attract ? 'title:show' : 'title:hide', {});
+  }
+
+  exit() {
+    this.unsubscribers?.forEach((off) => off());
+    this.disposables?.forEach((system) => system.destroy());
+  }
+
+  /** Kayıttan gelen yapının kapladığı karoları haritada işaretler. */
+  occupyFootprint(building) {
+    const { w, h } = BUILDINGS[building.type].size;
+    for (let y = building.tileY; y < building.tileY + h; y++) {
+      for (let x = building.tileX; x < building.tileX + w; x++) this.map.setOccupant(x, y, building.id);
+    }
+  }
+
+  /** Kayıttan yüklenen sakinlerden içeride olanları binalarına geri yerleştirir; bina yoksa dışarı çıkarır. */
+  reattachResidents() {
+    for (const character of this.world.characters) {
+      if (character.insideBuildingId === null) continue;
+      const building = this.world.getBuilding(character.insideBuildingId);
+      if (building) {
+        building.occupants.add(character.id);
+      } else {
+        character.insideBuildingId = null;
+        character.visible = true;
+        character.pose = 'stand';
+      }
+    }
+  }
+
+  currentHour() {
+    const { hour, minute } = this.game.state.time;
+    return hour + minute / 60;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Seçim ve takip
+  // ---------------------------------------------------------------------------
+
+  select(id) {
+    const valid = id !== null && this.world.getCharacter(id) ? id : null;
+    if (valid !== null) this.selectBuilding(null);
+    if (valid === this.selectedId) return;
+    this.selectedId = valid;
+    // Başka biri seçilince (ya da seçim kalkınca) eski takip biter
+    if (this.followId !== null && this.followId !== valid) this.setFollow(null);
+    if (valid === null) this.focusId = null;
+    this.game.events.emit('character:selected', valid);
+  }
+
+  selectBuilding(id) {
+    const valid = id !== null && this.world.getBuilding(id) ? id : null;
+    if (valid !== null) this.select(null);
+    if (valid === this.selectedBuildingId) return;
+    this.selectedBuildingId = valid;
+    this.game.events.emit('building:selected', valid);
+  }
+
+  setFollow(id) {
+    const valid = id !== null && this.world.getCharacter(id) ? id : null;
+    if (valid !== null) this.select(valid);
+    if (valid === this.followId) return;
+    this.followId = valid;
+    this.focusId = null;
+    this.game.events.emit('camera:followChanged', valid);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Güncelleme
+  // ---------------------------------------------------------------------------
+
+  update(dt) {
+    this.animationTime += dt;
+    if (this.attract) this.driftCamera();
+    else {
+      this.handleTimeControls();
+      this.handleCamera(dt);
+    }
+
+    this.timeSystem.update(dt);
+    const tick = this.timeSystem.getTick(dt);
+    for (const system of this.systems) system.update(tick);
+
+    const { renderer } = this.game;
+    const season = getSeason(this.game.state.time.day);
+    this.weatherFx.update(dt, this.game.state.weather, this.camera, renderer, this.map, season.key);
+    this.leaves.update(dt, season.key === 'autumn', this.camera, renderer, this.map);
+    this.fireflies.update(dt, this.map);
+    this.audio.update(dt, tick.hour);
+
+    if (this.attract) {
+      this.drainInput();
+      return;
+    }
+    const hovered = this.hoveredTile();
+    const escapeUsed = this.tools.handleKeys();
+    this.tools.update(hovered);
+    if (!this.tools.isActive) this.handleSelectionInput(escapeUsed);
+
+    this.updateCameraTarget(dt);
+    this.updateHover(dt, hovered);
+  }
+
+  /** Başlangıç ekranında kamera meydanın çevresinde yavaşça süzülür. */
+  driftCamera() {
+    const { renderer } = this.game;
+    const { plaza } = this.world.landmarks;
+    const t = this.animationTime;
+    const size = CONFIG.TILE_SIZE;
+    this.camera.centerOn(
+      plaza.centerX * size + Math.cos(t * 0.045) * 150,
+      plaza.centerY * size + Math.sin(t * 0.06) * 90,
+      renderer.width,
+      renderer.height
+    );
+    this.camera.clamp(this.map.pixelWidth, this.map.pixelHeight, renderer.width, renderer.height);
+  }
+
+  /** Başlangıç ekranında haritaya gelen tıklama ve sürüklemeler yok sayılır. */
+  drainInput() {
+    const { input } = this.game;
+    input.consumeClick();
+    input.consumeDrag();
+    input.consumeZoomSteps();
+    input.consumeLeftPress();
+    input.consumeLeftRelease();
+  }
+
+  handleTimeControls() {
+    const { input, events } = this.game;
+    if (input.wasPressed('pause')) events.emit('time:togglePause');
+    if (input.wasPressed('toggleJournal')) events.emit('ui:toggleJournal');
+    if (input.wasPressed('toggleGoals')) events.emit('ui:toggleGoals');
+    ['speed1', 'speed2', 'speed3'].forEach((action, i) => {
+      if (input.wasPressed(action)) events.emit('time:setSpeed', CONFIG.TIME_SPEEDS[i]);
+    });
+  }
+
+  handleCamera(dt) {
+    const { input, renderer } = this.game;
+    const camera = this.camera;
+
+    // Klavye: ekranda sabit hızda kaysın diye yakınlaştırmaya bölünür
+    const speed = (CONFIG.CAMERA_SPEED * dt) / camera.zoom;
+    let manual = false;
+    const moves = { left: [-speed, 0], right: [speed, 0], up: [0, -speed], down: [0, speed] };
+    for (const [action, [dx, dy]] of Object.entries(moves)) {
+      if (input.isDown(action)) {
+        camera.move(dx, dy);
+        manual = true;
+      }
+    }
+
+    // Sağ tık sürükleme: harita imleci takip eder
+    const drag = input.consumeDrag();
+    if (drag.x || drag.y) {
+      camera.move(-drag.x / camera.zoom, -drag.y / camera.zoom);
+      manual = true;
+    }
+    // Elle kaydırma takibi bırakır
+    if (manual) {
+      this.setFollow(null);
+      this.focusId = null;
+    }
+
+    // Tekerlek imleç etrafında, klavye ekran merkezinde yakınlaştırır
+    let zoomSteps = input.consumeZoomSteps();
+    if (input.wasPressed('zoomIn')) zoomSteps++;
+    if (input.wasPressed('zoomOut')) zoomSteps--;
+    if (zoomSteps !== 0) {
+      const anchorX = input.mouse.inside && !this.followId ? input.mouse.x : renderer.width / 2;
+      const anchorY = input.mouse.inside && !this.followId ? input.mouse.y : renderer.height / 2;
+      if (camera.zoomAt(anchorX, anchorY, camera.zoom + zoomSteps)) {
+        this.game.events.emit('camera:zoom', camera.zoom);
+      }
+    }
+
+    camera.clamp(this.map.pixelWidth, this.map.pixelHeight, renderer.width, renderer.height);
+  }
+
+  hoveredTile() {
+    const tile = this.game.input.getHoveredTile(this.camera);
+    return tile && this.map.inBounds(tile.tileX, tile.tileY) ? tile : null;
+  }
+
+  /** Seç aracında: karaktere, yoksa yapıya tıklamak onu seçer; boş yere tıklamak seçimi bırakır. */
+  handleSelectionInput(escapeUsed) {
+    const { input } = this.game;
+    if (input.wasPressed('cancel') && !escapeUsed) {
+      this.select(null);
+      this.selectBuilding(null);
+    }
+
+    const click = input.consumeClick();
+    if (!click) return;
+    const point = this.camera.screenToWorld(click.x, click.y);
+    // Gezgin tüccara tıklamak takas penceresini açar
+    if (this.world.findVisitorAt(point.x, point.y)) {
+      this.game.events.emit('ui:openTrade');
+      return;
+    }
+    const character = this.world.findCharacterAt(point.x, point.y);
+    if (character) {
+      this.select(character.id);
+      return;
+    }
+    const buildingId = this.map.getOccupant(Math.floor(point.x / CONFIG.TILE_SIZE), Math.floor(point.y / CONFIG.TILE_SIZE));
+    if (buildingId) {
+      this.selectBuilding(buildingId);
+      if (this.world.getBuilding(buildingId)?.open) this.game.events.emit('ui:openTrade');
+      return;
+    }
+    this.select(null);
+    this.selectBuilding(null);
+  }
+
+  /** Takip edilen (ya da listeden seçilip odaklanılan) karaktere kamerayı yumuşakça kaydırır. */
+  updateCameraTarget(dt) {
+    const targetId = this.followId ?? this.focusId;
+    if (targetId === null) return;
+    const character = this.world.getCharacter(targetId);
+    if (!character) {
+      this.setFollow(null);
+      this.focusId = null;
+      return;
+    }
+    const { renderer } = this.game;
+    const viewW = renderer.width / this.camera.zoom;
+    const viewH = renderer.height / this.camera.zoom;
+    const tx = character.x - viewW / 2;
+    const ty = character.y - 8 - viewH / 2;
+    const k = 1 - Math.exp(-dt * FOLLOW_SMOOTHING);
+    this.camera.x += (tx - this.camera.x) * k;
+    this.camera.y += (ty - this.camera.y) * k;
+    this.camera.clamp(this.map.pixelWidth, this.map.pixelHeight, renderer.width, renderer.height);
+
+    // Tek seferlik odaklanma hedefe varınca biter
+    if (this.focusId !== null && Math.hypot(tx - this.camera.x, ty - this.camera.y) < 1) this.focusId = null;
+  }
+
+  updateHover(dt, hovered) {
+    const { input, renderer } = this.game;
+    const point = input.getWorldPosition(this.camera);
+    const visitor = point && !this.tools.isActive ? this.world.findVisitorAt(point.x, point.y) : null;
+    const character = visitor ?? (point && !this.tools.isActive ? this.world.findCharacterAt(point.x, point.y) : null);
+    renderer.canvas.classList.toggle('is-pointing', Boolean(character));
+
+    this.hovered = hovered;
+    this.hoveredCharacterId = character?.id ?? null;
+    this.hoverRefresh -= dt;
+    const key = hovered ? `${hovered.tileX},${hovered.tileY},${this.hoveredCharacterId}` : '';
+    // Karo değişince ya da yapı durumu (meyve, ateş, inşaat) güncellensin diye arada bir yayınla
+    if (key === this.hoverKey && (key === '' || this.hoverRefresh > 0)) return;
+    this.hoverKey = key;
+    this.hoverRefresh = HOVER_REFRESH_SECONDS;
+
+    let info = hovered ? this.world.getTileInfo(hovered.tileX, hovered.tileY) : null;
+    if (info && character) info = { ...info, character: { id: character.id, name: character.name, visitor: Boolean(visitor) } };
+    if (info) info.job = this.jobs.jobAt(hovered.tileX, hovered.tileY)?.type ?? null;
+    this.game.events.emit('map:hover', info);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Çizim
+  // ---------------------------------------------------------------------------
+
+  render(renderer) {
+    const hour = this.timeSystem.getHourFloat();
+    const weather = this.game.state.weather;
+    const season = getSeason(this.game.state.time.day);
+    const freezing = this.game.state.heating.cold; // kışın odun bitti: ocaklar söndü
+    const env = {
+      time: this.animationTime,
+      hour,
+      season: season.key,
+      butterflies: season.butterflies,
+      windowsLit: hour >= 18.5 || hour < 6.5,
+      raining: isRainActive(weather),
+      sleepingHomes: new Set(
+        this.world.characters.filter((c) => c.isSleeping && c.insideBuildingId).map((c) => c.insideBuildingId)
+      ),
+      // Odun bitince bacalardan duman tütmez
+      smokingHomes: freezing ? new Set() : new Set(this.world.characters.map((c) => c.homeId).filter((id) => id !== null)),
+    };
+    const view = this.camera.getViewBounds(renderer.width, renderer.height);
+
+    renderer.applyCamera(this.camera);
+    this.map.renderGround(renderer, this.camera, this.animationTime, season.key);
+    this.weatherFx.drawGround(renderer);
+    this.drawSelectionGround(renderer);
+
+    // Derinlik sıralı katman: ağaçlar, kayalar, yapılar ve karakterler birlikte sıralanır
+    this.map.queueObjects(this.queue, renderer, this.camera, season.key);
+    for (const building of this.world.buildings) {
+      if (building.isVisible(view)) building.queueDraw(this.queue, env);
+    }
+    for (const character of this.world.characters) character.queueDraw(this.queue);
+    for (const visitor of this.world.visitors) visitor.queueDraw(this.queue);
+    this.queue.flush(renderer);
+
+    for (const building of this.world.buildings) building.drawEffects(renderer, env);
+    for (const character of this.world.characters) character.drawEffects(renderer, this.animationTime);
+    this.leaves.draw(renderer);
+    this.weatherFx.drawClouds(renderer, this.camera, weather, this.map, this.animationTime);
+
+    const lights = [];
+    for (const building of this.world.buildings) building.collectLights(lights, env);
+    const festivalVenue = this.festivalVenue();
+    if (festivalVenue) this.festivalFx.collectLights(lights, festivalVenue);
+    this.dayNight.render(renderer, this.camera, hour, lights, weather, season.tint);
+
+    // Atmosferin üstü: ateşböcekleri, yağmur, balonlar, iş işaretleri, araç önizlemesi ve imleç gece de net görünsün
+    renderer.applyCamera(this.camera);
+    this.fireflies.draw(renderer, view, fireflyIntensity(weather, hour), this.animationTime, season.fireflies);
+    if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime);
+    renderer.resetCamera();
+    const daylight = 1 - Math.min(1, getAmbientColor(hour).a / 0.55);
+    this.weatherFx.drawRain(renderer, this.camera, weather, daylight);
+    renderer.applyCamera(this.camera);
+    for (const building of this.world.buildings) building.drawOverlay(renderer, env);
+    drawJobMarkers(renderer, this.jobs.jobs, this.animationTime);
+    for (const character of this.world.characters) character.drawOverlay(renderer);
+    for (const visitor of this.world.visitors) visitor.drawOverlay(renderer);
+    this.drawSelectedBuilding(renderer);
+
+    if (this.tools.isActive) {
+      this.tools.render(renderer, env);
+    } else if (this.hovered && this.hoveredCharacterId === null) {
+      const { tileX, tileY } = this.hovered;
+      drawTileCursor(renderer, tileX, tileY, this.animationTime, this.map.isBuildable(tileX, tileY));
+    }
+    renderer.resetCamera();
+  }
+
+  /** Şenlik sürüyorsa yapıldığı yer, yoksa null. */
+  festivalVenue() {
+    const festival = this.game.state.events.festival;
+    return festival.active ? this.world.getBuilding(festival.venueId) : null;
+  }
+
+  drawSelectedBuilding(renderer) {
+    const building = this.selectedBuildingId !== null ? this.world.getBuilding(this.selectedBuildingId) : null;
+    if (!building) return;
+    const { w, h } = building.definition.size;
+    drawAreaCursor(renderer, building.tileX, building.tileY, w, h, this.animationTime, true, false);
+  }
+
+  /** Seçili karakterin ayak altı halkası ve gideceği yolun noktalı çizgisi. */
+  drawSelectionGround(renderer) {
+    const character = this.selectedId !== null ? this.world.getCharacter(this.selectedId) : null;
+    if (!character) return;
+
+    const points = character.remainingWaypoints();
+    if (points.length > 0) {
+      const offset = (this.animationTime * 12) % PATH_DOT_SPACING;
+      let travelled = 0;
+      let prev = { x: character.x, y: character.y };
+      for (const point of points) {
+        const dx = point.x - prev.x;
+        const dy = point.y - prev.y;
+        const length = Math.hypot(dx, dy);
+        const start = (((offset - travelled) % PATH_DOT_SPACING) + PATH_DOT_SPACING) % PATH_DOT_SPACING;
+        for (let d = start; d < length; d += PATH_DOT_SPACING) {
+          const x = Math.round(prev.x + (dx * d) / length);
+          const y = Math.round(prev.y + (dy * d) / length);
+          renderer.fillRect(x, y + 1, 1, 1, PATH_DOT_SHADOW); // her zeminde okunsun diye gölgeli
+          renderer.fillRect(x, y, 1, 1, PATH_DOT_COLOR);
+        }
+        travelled += length;
+        prev = point;
+      }
+      const last = points[points.length - 1];
+      renderer.drawImage(getTargetMarker(), Math.round(last.x) - 2, Math.round(last.y) - 2);
+    }
+
+    if (character.visible) {
+      const ring = getSelectionRing(Math.floor(this.animationTime * 2.5));
+      renderer.drawImage(ring, Math.round(character.x) - 7, Math.round(character.y) - 3);
+    }
+  }
+}
