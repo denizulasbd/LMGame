@@ -29,6 +29,7 @@ import {
 import { CONFLICT } from '../data/family.js';
 import { clashingTraits } from '../ai/TraitProfile.js';
 import { clamp } from '../utils/math.js';
+import { buffMultiplier } from './TownStatus.js';
 
 const FESTIVAL_NEAR_PIXELS = 34; // şenlikte iki karodan yakın olanlar
 
@@ -219,7 +220,9 @@ export class RelationshipSystem {
     this.groups = activityGroups(this.world.characters);
     const evening = isEvening(tick.hour, MARRIAGE.eveningFrom, MARRIAGE.eveningTo);
     for (const group of this.groups) {
-      const { rate, members, near } = group;
+      const { members, near } = group;
+      // Büyük Panayır (11. aşama) sohbetlerde arkadaşlığı hızlandırır
+      const rate = group.rate * (group.kind === 'work' ? 1 : buffMultiplier(this.state ?? this.world.state, 'friendship'));
       for (let i = 0; i < members.length; i++) {
         for (let j = i + 1; j < members.length; j++) {
           const a = members[i];

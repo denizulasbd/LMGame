@@ -25,6 +25,7 @@ import { getWorkshopSprite } from './structuresCraft.js';
 import { getSheepFarmSprite } from './structuresFarm.js';
 import { getMillSprite, getIronMineSprite } from './structuresIndustry.js';
 import { getTownHallSprite } from './structuresCivic.js';
+import { getHealerHutSprite } from './structuresHealth.js';
 import { seasonalFoliageRows, winterize } from '../seasons.js';
 
 // ---------------------------------------------------------------------------
@@ -605,6 +606,7 @@ const WINTER_ROOFS = {
   supplyCamp: { light: ['S'], main: ['s'], maxRow: 17 },
   workshop: { light: ['c'], main: ['B'], dark: ['n'], maxRow: 17 },
   townHall: { light: ['Z', 'c'], main: ['C', 'B'], dark: ['U', 'n'], maxRow: 36 },
+  healerHut: { light: ['Y'], main: ['P'], dark: ['X'], maxRow: 19 },
 };
 
 export function getStructureSprite(type, state = {}) {
@@ -676,6 +678,8 @@ function getBaseStructureSprite(type, state) {
       return getIronMineSprite(state.frame ?? 0, Boolean(state.active), Boolean(state.lit ?? state.windowsLit));
     case 'townHall':
       return getTownHallSprite(Boolean(state.windowsLit), state.frame ?? 0);
+    case 'healerHut':
+      return getHealerHutSprite(Boolean(state.active), state.frame ?? 0, Boolean(state.windowsLit));
     case 'monument':
       return getMonumentSprite();
     default:

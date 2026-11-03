@@ -8,6 +8,8 @@
 //   childBorn / grownUp, equipment:equipped, worker:dismissed
 //   10. aşama: goods:firstProduced (ilk yün / demir / ekmek), town:tierUp / tierAssessed (kasaba seviyesi),
 //   townHall:balanced (belediyenin erzak dengesi)
+//   11. aşama: pet:arrived, health:fellIll / recovered / cured, dilemma:resolved / recruited, storm:struck,
+//   expedition:departed / returned, civic:decreed, building:mended
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
@@ -49,7 +51,7 @@ export class JournalSystem {
       on('building:placed', ({ building }) => this.log(`${building.name} için şantiye kuruldu`, 'hammer')),
       on('building:completed', (building) => this.log(`${building.name} tamamlandı`, 'hammer')),
       on('building:projectStarted', ({ building, kind }) =>
-        this.log(kind === 'repair' ? `${building.name} için onarım başladı` : `${building.name} yükseltiliyor`, 'hammer')
+        this.log(kind !== 'upgrade' ? `${building.name} için onarım başladı` : `${building.name} yükseltiliyor`, 'hammer')
       ),
       on('building:upgraded', ({ building, from }) => this.log(`${from} yükseltildi: artık bir ${building.name}`, 'star')),
       on('ruin:restored', ({ building, from, treasure }) => {
@@ -112,6 +114,25 @@ export class JournalSystem {
         this.log(`${townName} büyüdü: artık bir ${tier.name}! ${formatTownTitle(townName, tier)} adını gururla taşıyor`, tier.icon)
       ),
       on('town:tierAssessed', ({ tier, townName }) => this.log(`Kasaba seviyesi belirlendi: ${formatTownTitle(townName, tier)}`, tier.icon)),
+      on('pet:arrived', ({ animal }) => this.log(`Kasabaya ${animal.name} adında bir ${animal.kind === 'cat' ? 'kedi' : 'köpek'} yerleşti`, 'paw')),
+      on('health:fellIll', ({ character }) => this.log(`${character.name} üşüttü; halsiz ve yavaş`, 'sneeze')),
+      on('health:recovered', ({ character }) => this.log(`${character.name} iyileşti`, 'heart')),
+      on('health:cured', ({ character, wasIll }) =>
+        this.log(wasIll ? `${character.name} şifacının iksiriyle iyileşti ve dinçleşti` : `${character.name} şifacıdan dinç çıktı`, 'herb')
+      ),
+      on('dilemma:resolved', ({ title, option, auto }) => this.log(`${title}: ${option.label}${auto ? ' (süre doldu)' : ''}`, 'map')),
+      on('dilemma:recruited', ({ character, skill }) => this.log(`Kafilenin en becerikli üyesi ${character.name}, usta bir ${SKILLS[skill].title}, kasabaya katıldı`, 'heart')),
+      on('storm:struck', ({ kind, damaged, safe, winter }) => {
+        if (kind === 'wolves') this.log(safe ? 'Kurt sürüsü ağıla yaklaşamadan kovuldu' : 'Kurtlar Koyun Ağılı\'na daldı, ağıl hasar gördü', 'wolf');
+        else this.log(safe ? `${winter ? 'Kar fırtınası' : 'Fırtına'} kasabayı hasarsız geçti` : `${winter ? 'Kar fırtınası' : 'Fırtına'} hasar verdi: ${damaged.map((b) => b.name).join(', ')}`, 'storm');
+      }),
+      on('expedition:departed', ({ members }) => this.log(`${members.map((c) => c.name).join(' ve ')} keşif seferine çıktı`, 'map')),
+      on('expedition:returned', ({ members, loot, text }) => {
+        const got = Object.keys(loot).length ? `: ${describeLoot(loot)}` : '';
+        this.log(`${members.map((c) => c.name).join(' ve ')} seferden döndü. ${text}${got}`, 'map');
+      }),
+      on('civic:decreed', ({ project }) => this.log(`Belediye fermanı: ${project.name}`, project.icon)),
+      on('building:mended', ({ building }) => this.log(`${building.name} fırtına hasarından onarıldı`, 'hammer')),
       on('townHall:balanced', ({ building, from, to, amount }) =>
         this.log(`${building.name} erzak dengesini sağladı: ${amount} ${RESOURCES[from].name.toLocaleLowerCase('tr')} ambarlardan ${RESOURCES[to].name.toLocaleLowerCase('tr')} ambarına geçti`, RESOURCES[to].icon)
       ),

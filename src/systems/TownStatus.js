@@ -4,7 +4,8 @@
 // 10. aşama: kasabanın toplam yiyecek değeri (ekmek 2,5 sayılır), kasaba seviyesi (Mezra -> Gelişmiş
 // Şehir) ölçütleri ve unvanı, belediyenin iş verimi çarpanı.
 import { BUILDINGS } from '../data/buildings.js';
-import { HAPPINESS_WEIGHTS, HAPPINESS_LEVELS, IMMIGRATION, TOWN_BUFFS, TOWN_TIERS, TITLE_WORDS } from '../data/town.js';
+import { HAPPINESS_WEIGHTS, HAPPINESS_LEVELS, IMMIGRATION, TOWN_BUFFS, TOWN_TIERS, TITLE_WORDS, CIVIC_PROJECTS } from '../data/town.js';
+import { EXPEDITION } from '../data/dilemmas.js';
 import { RESOURCES, FOOD_KEYS } from '../data/resources.js';
 
 /** Bir sakinin mutluluğu 0-100: ihtiyaçlarının ağırlıklı ortalaması. */
@@ -22,8 +23,20 @@ export function townHappiness(state) {
   const people = state.characters;
   if (people.length === 0) return 0;
   const average = people.reduce((sum, c) => sum + happinessOf(c), 0) / people.length;
-  const bonus = (prestige(state)?.happinessBonus ?? 0) + landmarkBonus(state) + (townTier(state).happiness ?? 0);
-  return Math.min(100, average + bonus);
+  return Math.min(100, average + townHappinessBonus(state));
+}
+
+/**
+ * Kasaba refahına eklenen kalıcı ve geçici puanlar: anıt, gözetleme kulesi / belediye, şehir gururu,
+ * (11. aşama) etkin bonuslar (Büyük Ziyafet, Panayır, İyilik Şöhreti) ve keşiflerden gelen kadim tılsımlar.
+ */
+export function townHappinessBonus(state) {
+  let bonus = (prestige(state)?.happinessBonus ?? 0) + landmarkBonus(state) + (townTier(state).happiness ?? 0);
+  for (const key of Object.keys(TOWN_BUFFS)) {
+    if (TOWN_BUFFS[key].happiness && isBuffActive(state, key)) bonus += TOWN_BUFFS[key].happiness;
+  }
+  bonus += (state.civic?.relics ?? 0) * EXPEDITION.relicHappiness;
+  return bonus;
 }
 
 /** Tamamlanmış prestij yapısının (anıt) kalıcı bonusu ya da null. */
@@ -217,6 +230,16 @@ export function civicWorkMultiplier(state) {
     if (civic && b.functional) value = Math.max(value, civic.workSpeed ?? 1);
   }
   return value;
+}
+
+/** Zanaat Loncası fermanının meslek deneyimi çarpanı (ilan edilmediyse 1). */
+export function civicXpMultiplier(state) {
+  return state.civic?.craftGuild ? CIVIC_PROJECTS.craftGuild.xpMultiplier : 1;
+}
+
+/** Zanaat Loncası fermanının üretim yapılarındaki çalışma verimi çarpanı (ilan edilmediyse 1). */
+export function civicProductionMultiplier(state) {
+  return state.civic?.craftGuild ? CIVIC_PROJECTS.craftGuild.productionMultiplier : 1;
 }
 
 /** Kasaba çapında iş hızı: geçici bonuslar (Alet Paketi, şenlik, lonca) × belediye. */

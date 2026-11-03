@@ -11,6 +11,7 @@ import { TOWN_NAMES, TOWN_NAME_MAX_LENGTH } from '../data/town.js';
 import { EQUIPMENT_KEYS } from '../data/equipment.js';
 import { Character } from '../entities/Character.js';
 import { Building } from '../entities/Building.js';
+import { Animal } from '../entities/Animal.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
 
@@ -68,7 +69,24 @@ export class GameState {
       cobbles: 0, // döşenmiş taş yol karosu (MilestoneSystem sayar)
       winter: null, // sürmekte olan kışın takibi: { minHappiness, startPopulation }
       goods: { wool: 0, iron: 0, bread: 0 }, // üretim zincirlerinin toplam ürettiği işlenmiş mallar (10. aşama)
+      illnesses: 0, // üşüten sakin sayısı (11. aşama)
+      cured: 0, // şifacıda iyileşen
+      petted: 0, // sakinlerin kedi / köpek sevmesi
+      dilemmas: 0, // karar verilen ikilem olayı
     };
+    // Hayvanlar (AnimalSystem, 11. aşama): yaban hayatı (tavşan, geyik) ve kasaba kedileri / köpekleri.
+    // animalMeta: wildlifeSeeded yaban hayatı yerleştirildi mi, lastPetDay son evcil hayvanın geldiği gün
+    this.animals = [];
+    this.animalMeta = { wildlifeSeeded: false, lastPetDay: 0 };
+    // Belediye fermanları (CivicSystem, 11. aşama): depo genişletme kademesi, lonca, son ziyafet günü,
+    // keşif seferlerinden gelen kadim tılsımlar (refaha kalıcı katkı)
+    this.civic = { storageLevel: 0, craftGuild: false, feastDay: -99, decrees: 0, relics: 0 };
+    // İkilem olayları (DilemmaSystem, 11. aşama):
+    //   nextDay   : bir sonraki olayın günü, history: { olay: son çıktığı gün }
+    //   active    : açık karar penceresi { id, remaining (gerçek saniye), wasPaused }
+    //   storm     : yaklaşan fırtına / kurt saldırısı { kind, at (oyun dakikası), fortified, watchChance }
+    //   expedition: süren keşif seferi { members: [id], until, size }
+    this.dilemma = { nextDay: null, history: {}, active: null, storm: null, expedition: null };
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -122,6 +140,10 @@ export class GameState {
       resources: this.resources,
       pantry: this.pantry,
       town: this.town,
+      civic: this.civic,
+      dilemma: this.dilemma,
+      animals: this.animals.map((a) => a.toJSON()),
+      animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
       nextJobId: this.nextJobId,
       regrowth: this.regrowth,
@@ -172,6 +194,11 @@ export class GameState {
     next.milestones = { ...(data.milestones ?? {}) };
     next.stats = { ...next.stats, ...(data.stats ?? {}) };
     next.stats.goods = { ...new GameState().stats.goods, ...(data.stats?.goods ?? {}) };
+    // 11. aşamadan eski kayıtlarda hayvan, ferman ve olay yoktur: yaban hayatı ilk açılışta yerleştirilir
+    next.civic = { ...next.civic, ...(data.civic ?? {}) };
+    next.dilemma = { ...next.dilemma, ...(data.dilemma ?? {}), history: { ...(data.dilemma?.history ?? {}) } };
+    next.animals = (data.animals ?? []).filter((a) => a && Number.isFinite(a.x) && Number.isFinite(a.y)).map((a) => Animal.fromJSON(a));
+    next.animalMeta = { ...next.animalMeta, ...(data.animalMeta ?? {}) };
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
     if (data.town && Number.isInteger(data.town.tier)) {

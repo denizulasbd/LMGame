@@ -6,14 +6,18 @@
 //   - Yükselt / Onar (maliyet ve gerekçeyle), sürmekte olan işin ilerlemesi ve iptali, Yık
 //   - (9. aşama) evde yaşayan aile (eşler, çocuklar); iş yerinde çalışanları "İşten Çıkar" ile görevden
 //     alma ve geri alma; zanaat atölyesinde üretim seçimi, tezgâhtaki iş ve depodaki ekipman
+//   - (11. aşama) şifacı kulübesinin ot ve iksir stoğu, belediye fermanları (ilan et düğmeleri), fırtına hasarı
+//     ve onarımı
 //   - (10. aşama) yan ürün (ağılda yiyecek, madende taş), değirmen-fırının işleme satırları (1 yiyecek -> 1
 //     ekmek), ekipmanın asıl (demir / yün) ve eski usul tarifi, ağıldaki koyunlar, belediyenin etkileri
 // Panel oyun durumunu yalnızca okur; istekleri olay olarak yayınlar (ui:startProject, ui:cancelProject,
 // ui:demolishBuilding, ui:selectCharacter, ui:dismissWorker, ui:rehireWorker, ui:setCraftMode). Ne
 // değiştiğini anlamak için her karede kısa bir anahtar üretir; anahtar değişmedikçe DOM'a dokunmaz.
-import { BUILDINGS } from '../../data/buildings.js';
+import { BUILDINGS, mendSpec } from '../../data/buildings.js';
+import { STORM } from '../../data/dilemmas.js';
 import { RESOURCES, RESOURCE_KEYS, formatCost } from '../../data/resources.js';
-import { TOWN_HALL } from '../../data/town.js';
+import { TOWN_HALL, CIVIC_PROJECTS, CIVIC_PROJECT_KEYS } from '../../data/town.js';
+import { civicStatus, CivicSystem } from '../../systems/CivicSystem.js';
 import { EQUIPMENT, EQUIPMENT_KEYS, CRAFT_MODES } from '../../data/equipment.js';
 import { getSeason } from '../../data/seasons.js';
 import { lacking } from '../../systems/Equipment.js';
@@ -47,6 +51,7 @@ export class BuildingPanel {
     this.progress = el('div', { className: 'need-bar building-progress' }, [el('span', { className: 'need-fill need-fun' })]);
     this.people = el('div', { className: 'building-people' });
     this.crafting = el('div', { className: 'building-crafting' });
+    this.decrees = el('div', { className: 'building-decrees' });
     this.lines = el('div', { className: 'building-lines' });
     this.upgrade = el('div', { className: 'building-upgrade' });
     this.tradeButton = this.button('Takas Penceresini Aç', 'Gezgin tüccarla takas et', () => this.events.emit('ui:openTrade'));
@@ -68,6 +73,7 @@ export class BuildingPanel {
       this.progress,
       this.people,
       this.crafting,
+      this.decrees,
       this.lines,
       this.upgrade,
       this.tradeButton,
@@ -103,8 +109,18 @@ export class BuildingPanel {
     const craftKey = building.definition.crafting
       ? [building.craftMode, building.craft?.item, Math.floor(building.craftRatio * 20), building.craftStatus, EQUIPMENT_KEYS.map((k) => state.equipment[k]).join(',')].join(':')
       : '';
+    const decreeKey = building.definition.civic
+      ? CIVIC_PROJECT_KEYS.map((id) => {
+          const st = civicStatus(state, id, building.functional);
+          return `${st.ok}:${st.reason}:${st.level}`;
+        }).join(',')
+      : '';
     const key = [
       craftKey,
+      decreeKey,
+      building.damaged,
+      building.herbs ? Math.floor(building.herbs) : 0,
+      building.remedies,
       building.processStatus,
       building.id,
       building.level,
@@ -137,6 +153,7 @@ export class BuildingPanel {
 
     this.renderPeople(building, people);
     this.renderCrafting(building, state);
+    this.renderDecrees(building, state);
     this.lines.replaceChildren(...lines.map((text) => el('div', { className: 'building-line', text })));
     this.lines.hidden = lines.length === 0;
     this.renderUpgrade(building, next, state);
@@ -147,6 +164,7 @@ export class BuildingPanel {
   }
 
   badgeText(building) {
+    if (building.damaged) return building.project ? 'Hasarlı · onarılıyor' : 'Hasarlı · onarılmalı';
     if (building.ruined) return building.project ? 'Kadim Harabe · onarılıyor' : 'Kadim Harabe';
     if (building.definition.ruin) return 'Onarılmış Kadim Yapı';
     if (building.upgraded) return 'Seviye 2 · Gelişmiş';
@@ -265,11 +283,44 @@ export class BuildingPanel {
     );
   }
 
+  /** Belediye fermanları: her biri için açıklama, maliyet, durum ve "İlan Et" düğmesi. */
+  renderDecrees(building, state) {
+    const show = Boolean(building.definition.civic) && building.functional;
+    this.decrees.hidden = !show;
+    if (!show) return;
+    const cards = CIVIC_PROJECT_KEYS.map((id) => {
+      const project = CIVIC_PROJECTS[id];
+      const st = civicStatus(state, id, true);
+      const done = st.maxed;
+      const levelText = project.levels ? `Kademe ${Math.min(st.level, project.levels.length)}/${project.levels.length}` : done ? 'İlan edildi' : project.cooldownDays ? 'Tekrarlanabilir' : 'Bir kez';
+      const costs = Object.entries(st.cost).map(([r, v]) =>
+        el('span', { className: `build-cost${state.resources[r] < v ? ' is-missing' : ''}` }, [el('img', { src: getIconDataURL(RESOURCES[r].icon), alt: RESOURCES[r].name }), String(v)])
+      );
+      if (st.provisions) {
+        const stores = state.resources.bread + state.resources.food;
+        costs.push(el('span', { className: `build-cost${stores < st.provisions ? ' is-missing' : ''}`, title: 'Erzak: önce ekmek, yetmezse yiyecek' }, [el('img', { src: getIconDataURL('bread'), alt: 'Erzak' }), `${st.provisions} erzak`]));
+      }
+      const go = this.button(done ? 'Tamamlandı' : 'Fermanı İlan Et', st.ok ? `${project.name}: ${CivicSystem.describeCost(st)}` : st.reason, () =>
+        this.events.emit('ui:civicProject', { id })
+      );
+      go.classList.add('upgrade-button');
+      go.disabled = !st.ok;
+      return el('div', { className: `decree${done ? ' is-done' : ''}` }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL(project.icon), alt: '' }), project.name, el('span', { className: 'decree-state', text: levelText })]),
+        el('div', { className: 'upgrade-text', text: project.description }),
+        ...(done ? [] : [el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, costs), go])]),
+        ...(!st.ok && !done ? [el('div', { className: 'upgrade-text is-active', text: st.reason })] : []),
+      ]);
+    });
+    this.decrees.replaceChildren(el('div', { className: 'building-section-title', text: 'Belediye Fermanları' }), ...cards);
+  }
+
   /** Sıradaki geliştirme: harabeyse onarım, yükseltilebiliyorsa Seviye 2, yoksa null. */
   nextStep(building) {
     const def = BUILDINGS[building.type];
     if (building.underConstruction) return null;
     if (building.ruined) return { kind: 'repair', spec: def.ruin };
+    if (building.damaged) return { kind: 'mend', spec: mendSpec(building.type, STORM.mend) };
     if (def.upgrade && !building.upgraded) return { kind: 'upgrade', spec: def.upgrade };
     return null;
   }
@@ -278,14 +329,14 @@ export class BuildingPanel {
     this.upgrade.hidden = !next;
     if (!next) return;
     const { kind, spec } = next;
-    const title = kind === 'repair' ? `Onarınca: ${building.definition.name}` : `Seviye 2: ${spec.name}`;
+    const title = kind === 'repair' ? `Onarınca: ${building.definition.name}` : kind === 'mend' ? 'Fırtına hasarı: onarım gerekli' : `Seviye 2: ${spec.name}`;
     const text = kind === 'repair' ? building.definition.description : spec.description;
     const children = [el('div', { className: 'building-section-title', text: title }), el('div', { className: 'upgrade-text', text })];
 
     if (building.project) {
-      const verb = kind === 'repair' ? 'Onarım' : 'Yükseltme';
+      const verb = kind !== 'upgrade' ? 'Onarım' : 'Yükseltme';
       children.push(el('div', { className: 'upgrade-text is-active', text: `${verb} sürüyor: ${percent(building.projectRatio)} tamamlandı` }));
-      const cancelLabel = kind === 'repair' ? 'Onarımı İptal Et' : 'Yükseltmeyi İptal Et';
+      const cancelLabel = kind !== 'upgrade' ? 'Onarımı İptal Et' : 'Yükseltmeyi İptal Et';
       const cancel = this.button(cancelLabel, 'Hiç çalışılmadıysa tamamı, yoksa yarısı iade edilir', () =>
         this.events.emit('ui:cancelProject', building.id)
       );
@@ -299,7 +350,7 @@ export class BuildingPanel {
         ])
       );
       const missing = Object.entries(spec.cost).filter(([r, v]) => state.resources[r] < v).map(([r]) => RESOURCES[r].name);
-      const label = kind === 'repair' ? 'Onarımı Başlat' : 'Yükselt';
+      const label = kind !== 'upgrade' ? 'Onarımı Başlat' : 'Yükselt';
       const go = this.button(label, missing.length ? `Yetersiz kaynak: ${missing.join(', ')}` : 'İnşaatçılar gelip çalışmaya başlar', () =>
         this.events.emit('ui:startProject', building.id)
       );
@@ -324,6 +375,7 @@ export class BuildingPanel {
       return lines;
     }
 
+    if (building.damaged) lines.push(building.project ? 'Hasarlı: inşaatçılar onarıyor' : 'Hasarlı: onarılana kadar kimse çalışamaz');
     if (def.production && building.factors) lines.push(...this.productionLines(building, state));
     if (def.processing) lines.push(...this.processingLines(building));
 
@@ -357,9 +409,21 @@ export class BuildingPanel {
       case 'sheepFarm': {
         const flock = building.flock;
         const lambs = flock?.lamb ? 1 : 0;
-        lines.push(`Ağılda ${flock ? flock.sheep.length : def.flock.sheep} koyun${lambs ? ' ve annesinin peşinden koşan bir kuzu' : ''}`);
+        if (building.damaged) lines.push('Kurtlar çiti yıktı, koyunların çoğu dağıldı: ağılda 2 koyun kaldı');
+        else lines.push(`Ağılda ${flock ? flock.sheep.length : def.flock.sheep} koyun${lambs ? ' ve annesinin peşinden koşan bir kuzu' : ''}`);
         if (flock?.sleepers().length) lines.push('Koyunlar ahırın önünde uyuyor');
         lines.push('İlkbaharda kırkım bereketli; kışın koyunlar ahırda, yün azalır');
+        break;
+      }
+      case 'healerHut': {
+        const spec = def.apothecary;
+        const nature = building.natureFactor ?? 1;
+        lines.push(`İksir rafı: ${building.remedies}/${spec.maxRemedies} · şifalı ot: ${Math.floor(building.herbs)}/${spec.maxHerbs}`);
+        lines.push(`Ot toplama verimi (çevredeki ağaçlar): %${Math.round(nature * 100)}`);
+        lines.push(`Bugün hazırlanan: ${building.producedToday} iksir · tedavi edilen: ${building.treatedToday}`);
+        const sick = state.characters.filter((c) => c.illness).map((c) => c.name);
+        lines.push(sick.length ? `Kasabada hasta: ${sick.join(', ')}` : 'Kasabada şu an hasta yok');
+        if (building.processStatus) lines.push(building.processStatus);
         break;
       }
       case 'ironMine':

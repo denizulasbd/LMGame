@@ -132,7 +132,12 @@ export class Hud {
     const buffs = activeBuffs(state);
     const heating = Math.round(heatingPerDay(state) * 10) / 10;
     const freezing = state.heating.cold && heating > 0;
-    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}`;
+    // 11. aşama: hasta sakinler, seferdekiler, yaklaşan fırtına ve hasarlı yapılar da bu satırda
+    const sick = state.characters.filter((c) => c.illness).map((c) => c.name);
+    const away = state.characters.filter((c) => c.away).map((c) => c.name);
+    const storm = state.dilemma?.storm;
+    const damaged = state.buildings.filter((b) => b.damaged).map((b) => b.name);
+    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}`;
     if (buffKey !== this.lastBuffs) {
       this.lastBuffs = buffKey;
       const chips = buffs.map((b) =>
@@ -150,6 +155,15 @@ export class Hud {
           ])
         );
       }
+      const chip = (icon, text, title, cls = '') =>
+        el('span', { className: `buff-chip${cls}`, title }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
+      if (sick.length) chips.push(chip('sneeze', `${sick.length} hasta`, `Üşütenler: ${sick.join(', ')}. Şifacı Kulübesi'nde iksirle hemen iyileşirler.`, ' is-freezing'));
+      if (away.length) chips.push(chip('map', `Seferde: ${away.length}`, `Keşif seferindekiler: ${away.join(', ')}`));
+      if (storm) {
+        const label = storm.kind === 'wolves' ? 'Kurt tehlikesi' : 'Fırtına yaklaşıyor';
+        chips.push(chip(storm.kind === 'wolves' ? 'wolf' : 'storm', `${label}${storm.fortified ? ' · hazır' : ''}`, storm.fortified ? 'Kasaba güçlendirildi' : 'Güçlendirilmedi: hasar verebilir', storm.fortified ? '' : ' is-freezing'));
+      }
+      if (damaged.length) chips.push(chip('storm', `${damaged.length} hasarlı yapı`, `Onarılmalı: ${damaged.join(', ')}`, ' is-freezing'));
       this.buffs.hidden = chips.length === 0;
       this.buffs.replaceChildren(...chips);
       this.resources.wood.box.title = heating > 0 ? `Odun · ısınma gideri −${heating}/gün\n${RESOURCES.wood.hint}` : `Odun\n${RESOURCES.wood.hint}`;

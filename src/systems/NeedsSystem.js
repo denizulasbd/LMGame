@@ -16,6 +16,7 @@ import { buffMultiplier, prestige } from './TownStatus.js';
 import { HEATING, getSeason } from '../data/seasons.js';
 import { isShivering, isFreezing } from './HeatingSystem.js';
 import { coldProtection, travelFatigue } from './Equipment.js';
+import { healthEnergyMultiplier } from './HealthSystem.js';
 import { clamp } from '../utils/math.js';
 
 /** Üşüme çarpanının fazlası paltoyla azalır: 1 + (m - 1) × (1 - koruma). */
@@ -39,7 +40,9 @@ export class NeedsSystem {
     const season = getSeason(state.time.day);
     const freezing = isFreezing(state);
     for (const c of this.world.characters) {
+      if (c.away) continue; // keşif seferindekiler kendi erzaklarıyla yaşar (ihtiyaçları donar)
       const sleeping = c.isSleeping;
+      const healthEnergy = healthEnergyMultiplier(c, now); // üşüten çabuk, dinç yavaş yorulur
       const rainy = raining && c.visible; // yağmur yalnızca dışarıdakileri ıslatır
       const shivering = isShivering(c, state);
       const winter = season.cold;
@@ -64,6 +67,7 @@ export class NeedsSystem {
         // Sırt çantalı sakin uzun yollarda daha az yorulur; eşiyle mutlu uyanan güne keyifle başlar
         if (walking && need === 'energy') multiplier *= travelFatigue(c);
         if (happyHome && need === 'fun') multiplier *= HAPPY_HOME.funDecay;
+        if (need === 'energy') multiplier *= healthEnergy;
         c.needs[need] = clamp(c.needs[need] - perMinute * multiplier * tick.gameMinutes, 0, 100);
       }
       if (rainy && c.profile.rainLover) {

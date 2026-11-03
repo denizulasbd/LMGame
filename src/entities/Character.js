@@ -63,6 +63,9 @@ export class Character extends Entity {
     lastChildAt = null,
     equipment = null,
     relocating = false,
+    illness = null,
+    exposure = 0,
+    away = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -81,6 +84,10 @@ export class Character extends Entity {
     this.lastChildAt = lastChildAt; // ailesine son çocuğun katıldığı oyun dakikası
     this.relocating = relocating; // evlenince eşiyle paylaşacağı yeni eve taşınacak
     this.equipment = { ...EMPTY_EQUIPMENT, ...(equipment ?? {}) };
+    // 11. aşama: sağlık ve keşif seferi
+    this.illness = illness ? { ...illness } : null; // üşütme: { since, remaining (oyun dakikası) }
+    this.exposure = exposure; // hastalığa yakınlık 0-100 (soğuk, yağmur, açlık, bitkinlik; data/health.js)
+    this.away = away ? { ...away } : null; // keşif seferinde: { stage: 'leaving' | 'away', until, exit }
     this.profile = buildTraitProfile(traits, { child: this.isChild });
 
     // Anlık durum (kaydedilmez, yapay zekâ yeniden kurar)
@@ -369,6 +376,9 @@ export class Character extends Entity {
       lastChildAt: this.lastChildAt,
       relocating: this.relocating,
       equipment: this.equipment,
+      illness: this.illness,
+      exposure: this.exposure,
+      away: this.away,
     };
   }
 
@@ -387,6 +397,13 @@ export class Character extends Entity {
     if (data.activityLabel) c.activityLabel = data.activityLabel;
     c.buffs = { ...(data.buffs ?? {}) };
     c.skills = { ...(data.skills ?? {}) };
+    // Sefere yola çıkmışken kaydedildiyse yüklenince doğrudan seferde sayılır (görünmez)
+    if (c.away) {
+      c.away.stage = 'away';
+      c.visible = false;
+      c.pose = 'hidden';
+      c.insideBuildingId = null;
+    }
     return c;
   }
 }

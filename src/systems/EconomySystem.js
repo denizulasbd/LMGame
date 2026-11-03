@@ -11,6 +11,7 @@
 import { RESOURCES, BASE_STORAGE_CAPACITY } from '../data/resources.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { foodSupply } from './TownStatus.js';
+import { civicStorageBonus } from './CivicSystem.js';
 
 const FULL_RESET_RATIO = 0.9; // doluluk bu oranın altına inince "depo doldu" uyarısı yeniden verilebilir
 const EPSILON = 1e-9;
@@ -36,7 +37,8 @@ export class EconomySystem {
   }
 
   recalculateCapacity() {
-    let capacity = BASE_STORAGE_CAPACITY;
+    // (11. aşama) Belediyenin Altyapı ve Depo Genişletmesi fermanı her kademede kalıcı +150 ekler
+    let capacity = BASE_STORAGE_CAPACITY + civicStorageBonus(this.state);
     for (const b of this.world.buildings) {
       if (b.functional) capacity += BUILDINGS[b.type].storageBonus ?? 0;
     }

@@ -20,6 +20,7 @@ import { TradePanel } from './components/TradePanel.js';
 import { MilestonePanel } from './components/MilestonePanel.js';
 import { CelebrationModal } from './components/CelebrationModal.js';
 import { TitleMenu } from './components/TitleMenu.js';
+import { DilemmaModal } from './components/DilemmaModal.js';
 
 const BOTTOM_GAP = 12; // inşa çubuğu ile pencere kenarı / sütunlar arasındaki boşluk (piksel)
 
@@ -50,6 +51,7 @@ export class UIManager {
       new TownJournal(game),
       new MilestonePanel(game),
       new CelebrationModal(game),
+      new DilemmaModal(game),
       new TitleMenu(game),
     ];
     for (const component of this.components) {

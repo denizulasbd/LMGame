@@ -123,7 +123,7 @@ export class BuildMenu {
       button.classList.toggle('is-tier-locked', Boolean(tierLocked));
       button.dataset.tier = tierLocked ? TOWN_TIERS[def.requiresTier - 1].name : '';
       button.title = tierLocked
-        ? `${def.name} — kasaba ${TOWN_TIERS[def.requiresTier - 1].name} seviyesine ulaşınca açılır. ${def.description}`
+        ? `${def.name} — kasaba ${TOWN_TIERS[def.requiresTier - 1].name} seviyesine ulaşınca açılır · ${def.description}`
         : needsOther
         ? `${def.name} — ${def.requiresBuilding.reason}`
         : alreadyHave

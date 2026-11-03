@@ -6,6 +6,8 @@
 // Öncelik sırası:
 //   0. Kasabaya yeni geldiyse ya da evlenip eşinin evine taşınacaksa önce yeni evine yerleşmek
 //   1. Çok açsa (Tokluk < 15) her şeyden önce yemek
+//   1b. (11. aşama) Üşüttüyse iksiri olan Şifacı Kulübesi'ne gidip tedavi olmak; şifacı yoksa gündüz yorulunca
+//       evinde kestirmek
 //   2. Uyku saati geldiyse ya da enerjisi bittiyse eve dönüp uyumak
 //   3. Sırtında yük varsa kilere bırakmak
 //   2b. Akşam şenliği varsa (ve çok yorgun değilse) meydana koşmak
@@ -21,6 +23,7 @@ import { MEAL_FOOD_COST } from '../data/resources.js';
 import { WORK_SESSION } from '../data/jobs.js';
 import { isBedtime, isWorkHours } from './TraitProfile.js';
 import { getSeason } from '../data/seasons.js';
+import { ILLNESS } from '../data/health.js';
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
 const PLAYGROUND_TYPES = ['fountain', 'campfire', 'inn', 'monument'];
@@ -48,7 +51,8 @@ export class Brain {
    *   relationships: import('../systems/RelationshipSystem.js').RelationshipSystem,
    *   crafting: import('../systems/CraftingSystem.js').CraftingSystem }} services
    */
-  constructor(world, rng, { economy, jobs, relationships, crafting }) {
+  constructor(world, rng, { economy, jobs, relationships, crafting, health }) {
+    this.health = health;
     this.world = world;
     this.rng = rng;
     this.economy = economy;
@@ -70,6 +74,14 @@ export class Brain {
     if (needs.hunger < 15) {
       const plan = this.planEat(c);
       if (plan) return plan;
+    }
+    if (c.illness) {
+      const plan = this.planHeal(c);
+      if (plan) return plan;
+      if (!bedtime && needs.energy < ILLNESS.restBelow) {
+        const nap = this.planSleep(c, true);
+        if (nap) return nap;
+      }
     }
     if (this.world.state.events.festival.active && needs.energy > FESTIVAL_MIN_ENERGY) {
       const plan = this.planFestival(c);
@@ -225,6 +237,92 @@ export class Brain {
     };
   }
 
+  /** Hasta sakin: iksiri olan en yakın şifacı kulübesine gidip içeride tedavi olur (yoksa null). */
+  planHeal(c) {
+    if (!this.health) return null;
+    const origin = this.originTile(c);
+    let best = null;
+    for (const clinic of this.health.clinics()) {
+      if (clinic.remedies - this.health.claims(clinic, c) <= 0) continue;
+      const doors = this.world.getSpots(clinic);
+      if (doors.length === 0) continue;
+      const spot = this.nearest(doors, c);
+      const path = this.world.findPath(origin, spot);
+      if (!path) continue;
+      const cost = this.world.pathCost(path);
+      if (!best || cost < best.cost) best = { clinic, spot, cost };
+    }
+    if (!best) return null;
+    return {
+      activity: 'heal',
+      buildingId: best.clinic.id,
+      spot: best.spot,
+      finalPoint: best.clinic.entrancePoint,
+      duration: this.durationFor('heal'),
+    };
+  }
+
+  /**
+   * Şifacının işi: kulübede yeterince ot yoksa yakındaki ağaçların ya da çiçeklerin dibinde ot toplar,
+   * varsa kulübenin önündeki tezgâhta iksir hazırlar.
+   */
+  planHerbalist(c, building, found, duration) {
+    const spec = building.definition.apothecary;
+    const brewing = building.herbs >= spec.herbsPerRemedy && building.remedies < spec.maxRemedies;
+    const gathering = building.herbs < spec.maxHerbs && (!brewing || building.herbs < spec.herbsPerRemedy * 2);
+    if (gathering) {
+      const spot = this.herbSpot(c, building);
+      if (spot) {
+        return {
+          activity: 'gatherHerbs',
+          buildingId: building.id,
+          workBuildingId: building.id,
+          spot,
+          reserve: true,
+          facing: spot.facing ?? 'down',
+          faceTarget: spot.face,
+          duration,
+        };
+      }
+    }
+    return {
+      activity: 'brew',
+      buildingId: building.id,
+      workBuildingId: building.id,
+      spot: found.spot,
+      reserve: true,
+      faceTarget: building.center,
+      finalPoint: this.freeWorkPoint(building, c),
+      facing: building.workFacing,
+      duration,
+    };
+  }
+
+  /** Kulübenin yakınında ot toplanacak yer: bir ağacın dibi ya da çiçekli çimen (yoksa null). */
+  herbSpot(c, building) {
+    const spec = building.definition.apothecary;
+    const cx = building.tileX + 1;
+    const cy = building.tileY + 1;
+    const options = [];
+    const map = this.world.map;
+    for (let y = cy - spec.natureRadius; y <= cy + spec.natureRadius; y++) {
+      for (let x = cx - spec.natureRadius; x <= cx + spec.natureRadius; x++) {
+        const object = map.getObject(x, y);
+        if (object !== 'oak' && object !== 'pine') continue;
+        for (const s of this.world.getApproachSpots(x, y)) {
+          if (!this.world.isReserved(s.x, s.y, c.id)) options.push({ ...s, face: { x: x * 16 + 8, y: y * 16 + 8 } });
+        }
+      }
+    }
+    for (const s of this.world.flowerSpots) {
+      if (Math.abs(s.x - cx) <= spec.natureRadius && Math.abs(s.y - cy) <= spec.natureRadius && !this.world.isReserved(s.x, s.y, c.id)) options.push(s);
+    }
+    if (options.length === 0) return null;
+    const origin = this.originTile(c);
+    options.sort((a, b) => distanceSq(a, origin) - distanceSq(b, origin));
+    return this.rng.pick(options.slice(0, 6));
+  }
+
   /** İş kuyruğundan bir iş ya da üretim binasında boş bir koltuk. */
   planWork(c) {
     const found = this.jobs.findWorkFor(c, this.originTile(c));
@@ -242,6 +340,7 @@ export class Brain {
       };
     }
     const building = found.building;
+    if (building.definition.apothecary) return this.planHerbalist(c, building, found, duration);
     return {
       activity: building.definition.workActivity,
       buildingId: building.id,

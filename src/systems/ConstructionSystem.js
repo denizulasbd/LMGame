@@ -8,7 +8,8 @@
 //                      peşin ödenir, inşaatçılar yapının çevresinde çalışır, yapı bu sırada işlemeye devam eder
 //   - proje bitince yapı Seviye 2 olur ('building:upgraded') ya da harabe onarılır ('ruin:restored';
 //     erzak kampının hazinesi stoğa eklenir)
-import { BUILDINGS, TILE_BUILDS, TILE_REMOVAL } from '../data/buildings.js';
+import { BUILDINGS, TILE_BUILDS, TILE_REMOVAL, mendSpec } from '../data/buildings.js';
+import { STORM } from '../data/dilemmas.js';
 import { OBJECT_TYPES, TILE_TYPES, GROUND_TILES } from '../data/tiles.js';
 import { formatCost } from '../data/resources.js';
 import { Building } from '../entities/Building.js';
@@ -65,7 +66,7 @@ export class ConstructionSystem {
     let reason = def.unique && this.world.getBuildingsOfType(type).length > 0 ? `Kasabada yalnızca bir ${def.name} olabilir` : null;
     // Kasaba seviyesiyle açılan yapılar (değirmen: Köy, belediye: Kasaba) önce bunu söyler
     if (!reason && def.requiresTier && (this.world.state.town?.tier ?? 1) < def.requiresTier) {
-      reason = `Kasaba ${TOWN_TIERS[def.requiresTier - 1].name} seviyesine ulaşınca açılır`;
+      reason = `${TOWN_TIERS[def.requiresTier - 1].name} seviyesine ulaşınca açılır`;
     }
     let orientation = 'right';
 
@@ -293,6 +294,8 @@ export class ConstructionSystem {
   projectFor(building) {
     const def = BUILDINGS[building.type];
     if (building.ruined) return def.ruin ? { kind: 'repair', spec: def.ruin } : null;
+    // Fırtınada / kurt saldırısında hasar gören yapı önce onarılır (11. aşama)
+    if (building.damaged) return { kind: 'mend', spec: mendSpec(building.type, STORM.mend) };
     if (def.upgrade && !building.upgraded) return { kind: 'upgrade', spec: def.upgrade };
     return null;
   }
@@ -305,7 +308,7 @@ export class ConstructionSystem {
     const { kind, spec } = next;
     let reason = null;
     if (building.underConstruction) reason = 'Önce inşaatı bitmeli';
-    else if (building.project) reason = kind === 'repair' ? 'Onarım sürüyor' : 'Yükseltme sürüyor';
+    else if (building.project) reason = kind !== 'upgrade' ? 'Onarım sürüyor' : 'Yükseltme sürüyor';
     else if (!this.hasReachableRing(building)) reason = 'Çevresine ulaşılamıyor: önce bir yol aç';
     else if (!this.economy.canAfford(spec.cost)) reason = `Yetersiz kaynak: ${this.economy.missing(spec.cost).join(', ')}`;
     return { ok: !reason, reason, kind, spec };
@@ -335,7 +338,7 @@ export class ConstructionSystem {
     this.jobs.createProjectJob(building);
     this.events.emit('building:projectStarted', { building, kind });
     this.events.emit('toast', {
-      text: kind === 'repair' ? `Onarım başladı: ${before} (${formatCost(spec.cost)})` : `Yükseltme başladı: ${before} → ${spec.name} (${formatCost(spec.cost)})`,
+      text: kind !== 'upgrade' ? `Onarım başladı: ${before} (${formatCost(spec.cost)})` : `Yükseltme başladı: ${before} → ${spec.name} (${formatCost(spec.cost)})`,
       tone: 'info',
       icon: 'hammer',
     });
@@ -361,6 +364,13 @@ export class ConstructionSystem {
     const { kind } = building.project;
     const before = building.name;
     building.project = null;
+    if (kind === 'mend') {
+      building.damaged = false;
+      this.world.invalidateSpots(building);
+      this.events.emit('building:mended', { building });
+      this.events.emit('toast', { text: `${building.name} onarıldı, yeniden çalışıyor`, tone: 'success', icon: 'hammer' });
+      return;
+    }
     if (kind === 'repair') {
       building.condition = 'restored';
       this.economy.recalculateCapacity(); // onarılan kampın depo katkısı hazineden önce gelsin

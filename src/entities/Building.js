@@ -31,6 +31,7 @@ import {
   MILL_ART,
   IRON_MINE_ART,
   TOWN_HALL_ART,
+  HEALER_ART,
   getSheepFarmLayer,
 } from '../art/sprites/index.js';
 import { getBubbleSprite, BUBBLE_WIDTH, BUBBLE_HEIGHT, getIconSprite } from '../art/ui/index.js';
@@ -63,12 +64,13 @@ const BASELINE_INSET = {
   mill: 3,
   ironMine: 2,
   townHall: 3,
+  healerHut: 2,
 };
 const SITE_BASELINE_INSET = 2;
 const RECENT_WORKERS_EXTRA = 2; // panelde çalışan yuvasından bu kadar fazla "son çalışan" hatırlanır
 
 // Animasyon kare hızı (kare / saniye): ateş titrer, tabela ve flama sallanır, çiçekler eğilir
-const FRAME_RATES = { campfire: 8, flowerBed: 1.4, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5 };
+const FRAME_RATES = { campfire: 8, flowerBed: 1.4, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3 };
 const DEFAULT_FRAME_RATE = 3;
 const MAX_OVERHANG = 32; // yapıların karolarının üstüne taşabileceği en fazla piksel (görünürlük testi; kule 32)
 // Değirmen kanatları: saniyede kaç kare (çeyrek tur = MILL_ART.sailFrames kare) döner
@@ -96,6 +98,10 @@ export class Building extends Entity {
     craft = null,
     excludedWorkers = [],
     recentWorkers = [],
+    herbs = 0,
+    remedies = 0,
+    damaged = false,
+    treatedToday = 0,
   }) {
     super({ id, x: tileX * T, y: tileY * T });
     this.type = type;
@@ -133,6 +139,11 @@ export class Building extends Entity {
     this.flock = null; // ağıldaki koyunlar (yalnızca görsel; StructureSystem kurar ve günceller)
     this.sailPhase = (this.id * 0.37) % 6; // değirmen kanatlarının açısı (kare cinsinden; gerçek zamanla döner)
     this.sailClock = null;
+    // 11. aşama: şifacı kulübesindeki şifalı ot ve iksir stoğu; fırtına / kurt hasarı
+    this.herbs = herbs;
+    this.remedies = remedies;
+    this.treatedToday = treatedToday;
+    this.damaged = damaged; // hasarlı yapı onarılana (project 'mend') kadar çalışmaz
   }
 
   /** Burada çalışmaya başlayan sakini son çalışanlar listesine ekler. */
@@ -263,10 +274,11 @@ export class Building extends Entity {
       return { name: `Şantiye: ${this.name}`, detail: `%${Math.floor(this.buildRatio * 100)} tamamlandı` };
     }
     if (this.project) {
-      const verb = this.project.kind === 'repair' ? 'Onarılıyor' : 'Yükseltiliyor';
+      const verb = this.project.kind !== 'upgrade' ? 'Onarılıyor' : 'Yükseltiliyor';
       return { name: this.name, detail: `${verb}: %${Math.floor(this.projectRatio * 100)}` };
     }
     if (this.ruined) return { name: this.name, detail: 'Kadim harabe · tıkla ve onar' };
+    if (this.damaged) return { name: this.name, detail: 'Hasarlı · tıkla ve onar' };
     if (this.type === 'cabin') {
       const names = world.getResidents(this).map((c) => c.name);
       const owner = names.length ? `${names.join(' ve ')} yaşıyor` : 'Boş, yeni sakin bekliyor';
@@ -303,7 +315,10 @@ export class Building extends Entity {
       return { name: this.name, detail: `${count} koyun · bugün ${this.producedToday} yün${this.active ? ' · çoban başında' : ''}` };
     }
     if (this.type === 'townHall') {
-      return { name: this.name, detail: 'Kasabanın iş ve inşaat verimi +%15 · her sabah erzak dengesi' };
+      return { name: this.name, detail: 'Kasabanın iş ve inşaat verimi +%15 · her sabah erzak dengesi · fermanlar' };
+    }
+    if (this.type === 'healerHut') {
+      return { name: this.name, detail: `İksir ${this.remedies}/${this.definition.apothecary.maxRemedies} · şifalı ot ${Math.floor(this.herbs)}` };
     }
     if (this.workerSlots) {
       const workers = [...this.workerIds].map((id) => world.getCharacter(id)?.name).filter(Boolean);
@@ -380,6 +395,7 @@ export class Building extends Entity {
    */
   drawEffects(renderer, env) {
     if (this.underConstruction) return;
+    if (this.damaged) this.drawDamage(renderer);
     switch (this.type) {
       case 'cabin':
         if (env.smokingHomes?.has(this.id)) {
@@ -407,6 +423,10 @@ export class Building extends Entity {
         break;
       case 'fishingPier':
         this.drawFishJump(renderer, env);
+        break;
+      case 'healerHut':
+        // Şifacı çalışırken kazandan yeşilimsi buhar yükselir
+        if (this.active) this.drawSteam(renderer, env);
         break;
       case 'mill': {
         // Fırın bacası: fırıncı çalışırken yoğun, gündüz fırın sıcakken ince tüter
@@ -499,6 +519,11 @@ export class Building extends Entity {
       this.drawProgressBar(renderer, env, this.projectRatio, top);
       return;
     }
+    if (this.damaged) {
+      // Hasarlı yapının üstünde sallanan fırtına uyarısı
+      const bob = Math.sin(env.time * 3) > 0 ? 0 : 1;
+      renderer.drawImage(getIconSprite('storm'), Math.round(this.center.x) - 4, this.y + this.height - this.currentSprite(env).height - 6 + bob);
+    }
     if (this.type === 'sheepFarm' && this.flock) {
       this.drawSleepingSheep(renderer, env);
       return;
@@ -509,6 +534,36 @@ export class Building extends Entity {
     const bx = this.x + Math.floor((this.width - BUBBLE_WIDTH) / 2) - 3;
     const by = artTop - BUBBLE_HEIGHT + 2 + bob;
     renderer.drawImage(getBubbleSprite('zzz'), bx, by);
+  }
+
+  /** Şifacı kazanından yükselen ince, yeşilimsi buhar. */
+  drawSteam(renderer, env) {
+    const artTop = this.y + this.height - HEALER_ART.height;
+    for (let i = 0; i < 4; i++) {
+      const phase = (env.time * 0.6 + i / 4 + this.id * 0.13) % 1;
+      const x = Math.round(this.x + HEALER_ART.steam.x + Math.sin(phase * 7 + i) * 1.5);
+      const y = Math.round(artTop + HEALER_ART.steam.y - phase * 12);
+      const alpha = (0.55 * (1 - phase)).toFixed(2);
+      renderer.fillRect(x, y, phase < 0.5 ? 1 : 2, 1, `rgba(200, 240, 200, ${alpha})`);
+    }
+  }
+
+  /** Fırtına hasarı: yapının dibine saçılmış kırık tahtalar, kiremit ve taş parçaları. */
+  drawDamage(renderer) {
+    const base = this.y + this.height - 3;
+    const pieces = [
+      [0.15, -1, 4, 1, '#7a4a2a'],
+      [0.32, 0, 2, 1, '#b4523f'],
+      [0.55, -2, 5, 1, '#a8703f'],
+      [0.62, 0, 1, 2, '#4f2d1a'],
+      [0.8, -1, 3, 1, '#8b8f9c'],
+      [0.45, 1, 2, 1, '#5d6070'],
+    ];
+    for (const [fx, dy, w, h, color] of pieces) {
+      renderer.fillRect(Math.round(this.x + this.width * fx), base + dy, w, h, color);
+    }
+    // Eğik, kırık bir kalas
+    for (let i = 0; i < 6; i++) renderer.fillRect(Math.round(this.x + this.width * 0.25) + i, base - 4 + Math.floor(i / 2), 1, 1, '#4f2d1a');
   }
 
   /** Uyuyan koyunların başının üstünde yavaşça yükselen küçük "z" harfleri. */
@@ -593,6 +648,9 @@ export class Building extends Entity {
       for (const l of TOWN_HALL_ART.lamps) {
         out.push({ x: this.x + l.x, y: artTop + l.y, radius: 34, color: [255, 200, 110], intensity: 0.85, glow: 0.35 });
       }
+    } else if (this.type === 'healerHut' && env.windowsLit) {
+      const artTop = this.y + this.height - HEALER_ART.height;
+      out.push({ x: this.x + HEALER_ART.window.x, y: artTop + HEALER_ART.window.y, radius: 20, color: [190, 255, 170], intensity: 0.6, glow: 0.3 });
     } else if (this.type === 'ancientFountain' && env.windowsLit) {
       // Kadim çeşmenin suyu gece hafif mavi parıldar
       out.push({ x: this.center.x, y: this.center.y, radius: 30, color: [150, 220, 255], intensity: 0.55, glow: 0.35 });
@@ -626,6 +684,10 @@ export class Building extends Entity {
       craft: this.craft,
       excludedWorkers: [...this.excludedWorkers],
       recentWorkers: this.recentWorkers,
+      herbs: this.herbs,
+      remedies: this.remedies,
+      treatedToday: this.treatedToday,
+      damaged: this.damaged,
     };
   }
 }

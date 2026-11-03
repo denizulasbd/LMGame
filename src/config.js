@@ -36,7 +36,7 @@ export const CONFIG = {
   // --- Kayıt ---
   SAVE_KEY: 'lmgame.save.v2',          // elle kaydedilen / sabah otomatik kaydedilen oyun
   SESSION_KEY: 'lmgame.session.v2',    // sayfa kapanırken yazılır: F5 oyunu kaldığı yerden sürdürür
-  SAVE_VERSION: 8,                     // 10. aşama: yün / demir / ekmek, ağıl, değirmen, maden, belediye, kasaba seviyesi
+  SAVE_VERSION: 9,                     // 11. aşama: hayvanlar, sağlık, şifacı, ikilem olayları, belediye fermanları
   SAVE_MIN_VERSION: 2,                 // bundan eski kayıtlar açılmaz; arası eksik alanlarla yüklenir
   AUTOSAVE_HOUR: 6,                    // her sabah bu saatte otomatik kayıt
 

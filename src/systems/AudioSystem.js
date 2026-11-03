@@ -56,6 +56,13 @@ export class AudioSystem {
       on('building:upgraded', () => this.playMastery()),
       on('ruin:restored', () => this.playGrandFanfare()),
       on('town:tierUp', () => this.playGrandFanfare()),
+      on('civic:decreed', () => this.playGrandFanfare()),
+      on('dilemma:opened', () => this.playBell()),
+      on('storm:struck', ({ kind, safe }) => (kind === 'wolves' ? this.playHowl() : this.playThunder(safe))),
+      on('pet:arrived', () => this.playChime()),
+      on('health:fellIll', () => this.playSneeze()),
+      on('health:cured', () => this.playMilestone()),
+      on('expedition:returned', () => this.playFanfare()),
       on('goods:firstProduced', () => this.playMilestone()),
       on('relationship:married', () => this.playWedding()),
       on('relationship:partnered', () => this.playChime()),
@@ -313,6 +320,24 @@ export class AudioSystem {
       const lamb = base * 1.6;
       this.sound.tone({ freq: lamb, to: lamb * 0.9, type: 'triangle', duration: 0.35, attack: 0.03, volume: volume * 0.7, delay: 0.75, vibrato: 30 });
     }
+  }
+
+  /** Hapşırma: kısa, genizden bir nefes ve patlama. */
+  playSneeze() {
+    this.sound.noise({ filter: 'bandpass', freq: 2400, q: 1.5, duration: 0.12, volume: 0.05, attack: 0.08 });
+    this.sound.noise({ filter: 'highpass', freq: 3000, duration: 0.18, volume: 0.09, delay: 0.16 });
+  }
+
+  /** Gök gürültüsü (güçlendirilmiş kasabada daha uzak ve boğuk). */
+  playThunder(far) {
+    this.sound.noise({ color: 'brown', filter: 'lowpass', freq: far ? 300 : 700, to: 90, duration: 1.6, volume: far ? 0.25 : 0.45, attack: 0.02 });
+    this.sound.noise({ color: 'brown', filter: 'lowpass', freq: 200, duration: 1.2, volume: 0.2, delay: 0.5 });
+  }
+
+  /** Uzaktan kurt uluması. */
+  playHowl() {
+    this.sound.tone({ freq: 420, to: 620, type: 'sine', duration: 0.6, attack: 0.25, volume: 0.05, vibrato: 8 });
+    this.sound.tone({ freq: 620, to: 380, type: 'sine', duration: 1.1, attack: 0.05, volume: 0.05, delay: 0.6, vibrato: 10 });
   }
 
   playCrickets() {

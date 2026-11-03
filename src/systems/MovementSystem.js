@@ -1,7 +1,9 @@
 // Karakterleri yol noktaları boyunca yürütür. Hız; temel hız, kişilik (Çalışkan daha hızlı)
 // ve üzerinde yürünen karonun hız çarpanıyla (yolda daha hızlı, kumda daha yavaş) belirlenir.
-// Oyun duraklatıldığında (simDt = 0) kimse kıpırdamaz.
+// Oyun duraklatıldığında (simDt = 0) kimse kıpırdamaz. (11. aşama) Üşüten sakin %35 yavaş, "Dinçlik"
+// bonusu olan %15 hızlı yürür.
 import { CONFIG } from '../config.js';
+import { healthWalkMultiplier } from './HealthSystem.js';
 
 export class MovementSystem {
   /** @param {import('../world/World.js').World} world */
@@ -10,9 +12,10 @@ export class MovementSystem {
   }
 
   update(tick) {
+    const now = this.world.state.totalMinutes;
     for (const c of [...this.world.characters, ...this.world.visitors]) {
       c.animTime += tick.simDt;
-      if (c.waypoints && tick.simDt > 0) this.advance(c, tick.simDt);
+      if (c.waypoints && tick.simDt > 0) this.advance(c, tick.simDt * healthWalkMultiplier(c, now));
     }
   }
 

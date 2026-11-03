@@ -8,6 +8,8 @@
 // 10. aşama: işleme yapıları (değirmen-fırın) malzeme yoksa ya da ürünün deposu doluysa boşta kalır
 // (building.idle, building.processStatus); koyun ağılındaki koyunlar (building.flock, yalnızca görsel)
 // oyun zamanıyla otlar, dolaşır, gece ahırın önünde yatar.
+// 11. aşama: şifacı kulübesi otlar ve iksir raflar doluysa boşta kalır; fırtınada / kurt saldırısında hasar alan
+// yapı onarılana kadar boşta kalır (building.damaged), hasarlı ağılda koyunların bir kısmı kaçmıştır.
 import { BUILDINGS } from '../data/buildings.js';
 import { RESOURCES } from '../data/resources.js';
 import { Flock } from '../entities/Flock.js';
@@ -123,6 +125,15 @@ export class StructureSystem {
     }
   }
 
+  /** Şifacı kulübesi: otlar ve iksir rafları doluysa şifacı gelmez. */
+  updateApothecary(building, spec) {
+    const full = building.remedies >= spec.maxRemedies && building.herbs >= spec.maxHerbs - 0.01;
+    const trees = this.world.countTreesNear(building.tileX + 1, building.tileY + 1, spec.natureRadius);
+    building.natureFactor = clamp(trees / spec.natureIdeal, 0.35, 1); // panelde ot toplama verimi
+    building.idle = !building.functional || full;
+    building.processStatus = full ? 'İksir rafları ve ot sepetleri dolu: hasta bekleniyor' : null;
+  }
+
   update(tick) {
     // Yeni günde üretim sayaçları sıfırlanır
     const newDay = this.state.time.day !== this.day;
@@ -136,20 +147,27 @@ export class StructureSystem {
       if (newDay) {
         building.producedToday = 0;
         building.extraToday = 0;
+        building.treatedToday = 0;
       }
       if (def.production) {
         building.factors = productionFactors(building, this.world, raining, season);
         building.efficiency = building.factors.total;
       }
       building.frozen = Boolean(def.production?.seasonal) && building.efficiency <= 0;
+      if (!def.crafting && !def.processing && !def.apothecary) building.idle = false;
       if (def.processing) this.updateProcessing(building, def.processing);
+      if (def.apothecary) this.updateApothecary(building, def.apothecary);
+      if (building.damaged) {
+        building.idle = true;
+        building.processStatus = building.project ? 'Onarılıyor' : 'Fırtınada hasar gördü: onarılana kadar çalışmaz';
+      }
       if (def.flock) {
         building.flock ??= new Flock(building);
         if (building.functional) building.flock.update(tick, season.key, raining);
       }
       // Biri gerçekten çalışırken (yolda değil) ocak, iskele, değirmen ve fırın canlanır
       building.active =
-        (def.production !== undefined || def.kitchen !== undefined || def.crafting !== undefined || def.processing !== undefined) &&
+        (def.production !== undefined || def.kitchen !== undefined || def.crafting !== undefined || def.processing !== undefined || def.apothecary !== undefined) &&
         [...building.workerIds].some((id) => {
           const task = this.world.getCharacter(id)?.task;
           return task?.phase === 'perform';

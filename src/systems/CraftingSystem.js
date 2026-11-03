@@ -62,9 +62,9 @@ export class CraftingSystem {
     for (const c of this.world.characters) c.coatVisible = coatSeason && c.equipment.clothing === 'winterCoat';
     for (const building of this.world.buildings) {
       if (!building.definition.crafting) continue;
-      if (!building.functional) {
+      if (!building.functional || building.damaged) {
         building.idle = true;
-        building.craftStatus = null;
+        building.craftStatus = building.damaged ? 'Fırtınada hasar gördü: onarılana kadar çalışmaz' : null;
         continue;
       }
       if (building.craft) {

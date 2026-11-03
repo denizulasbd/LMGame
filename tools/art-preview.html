@@ -17,7 +17,7 @@
   <p>Geliştirme aracı: <code>python3 tools/serve.py</code> çalışırken <code>/tools/art-preview.html</code> adresinden açılır. Yapılar 5 kat büyütülmüş çizilir.</p>
   <div id="root"></div>
   <script type="module">
-    import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite } from '../src/art/sprites/index.js';
+    import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite } from '../src/art/sprites/index.js';
     import { getIconSprite, getBackpackSprite, getNoteSprite, getBubbleSprite, getHeldToolSprite, getCarrySprite } from '../src/art/ui/index.js';
     import { getCharacterSprite } from '../src/art/sprites/index.js';
     import { getTileSprite, getObjectSprite, getEdgeSprite } from '../src/art/tiles/index.js';
@@ -49,6 +49,37 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 11. aşama: hayvanlar, Şifacı Kulübesi, sağlık ve olay simgeleri ---
+    show('Tavşanlar (9x8): oturma, zıplama, kemirme; gri kürk, kışın beyaz; sola bakan', [
+      ...['sit', 'hop0', 'hop1', 'eat'].map((p) => [p, getRabbitSprite(p, 'right', 0)]),
+      ['gri', getRabbitSprite('sit', 'right', 1)],
+      ['kış', getRabbitSprite('sit', 'right', 0, true)],
+      ['kış zıplama', getRabbitSprite('hop1', 'left', 0, true)],
+    ], 8);
+    show('Geyikler (16x16): dişi ve boynuzlu erkek; ayakta, yürüme, otlama, yatma', [
+      ...['stand', 'walk0', 'walk1', 'graze', 'lie'].map((p) => [`dişi ${p}`, getDeerSprite(p, 'right', false)]),
+      ...['stand', 'walk1', 'graze', 'lie'].map((p) => [`erkek ${p}`, getDeerSprite(p, 'left', true)]),
+    ], 6);
+    show('Kasaba kedileri (10x8): tekir, sarman, kara-beyaz; oturma, yürüme, kıvrılıp uyuma', [0, 1, 2].flatMap((v) =>
+      ['sit', 'walk0', 'walk1', 'sleep'].map((p) => [`${['tekir', 'sarman', 'kara-beyaz'][v]} ${p}`, getCatSprite(p, 'right', v)])
+    ), 7);
+    show('Kasaba köpekleri (12x10): kahverengi ve alacalı; oturma, yürüme, uyuma', [0, 1].flatMap((v) =>
+      ['sit', 'walk0', 'walk1', 'sleep'].map((p) => [`${['kahverengi', 'alacalı'][v]} ${p}`, getDogSprite(p, v ? 'left' : 'right', v)])
+    ), 7);
+    show('Şifacı Kulübesi (2x2): boşta, kazan kaynıyor (iki kare), gece, kış, şantiye', [
+      ['boşta', getStructureSprite('healerHut', {})],
+      ['kazan 0', getStructureSprite('healerHut', { active: true, frame: 0 })],
+      ['kazan 1', getStructureSprite('healerHut', { active: true, frame: 1 })],
+      ['gece', getStructureSprite('healerHut', { windowsLit: true })],
+      ['kış', getStructureSprite('healerHut', { season: 'winter' })],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(2, 2, stage, 'healerHut')]),
+    ], 6);
+    show('Sağlık ve olay simgeleri: şifalı ot, iksir, hasta, fırtına, kurt, hazine haritası, pati', ['herb', 'remedy', 'sick', 'storm', 'wolf', 'map', 'paw'].map((n) => [n, getIconSprite(n)]), 10);
+    show('Yeni balonlar ve alet: hapşırma, ateş, şifalı ot; havan eli', [
+      ...['sneeze', 'fever', 'herb'].map((n) => [n, getBubbleSprite(n)]),
+      ['havan eli', getHeldToolSprite('pestle', false)],
+    ], 8);
 
     // --- 10. aşama: işlenmiş mallar, koyun ağılı ve koyunlar, yel değirmeni ve fırın, demir madeni, belediye ---
     show('İşlenmiş mallar ve kasaba seviyesi armaları (HUD)', ['wool', 'iron', 'bread', 'tierHamlet', 'tierVillage', 'tierTown', 'tierCity'].map((n) => [n, getIconSprite(n)]), 10);

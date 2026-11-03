@@ -2,7 +2,7 @@
 // src/ai/Brain.js) bu tabloyu okur; yeni etkinlik eklemek çoğunlukla buraya bir kayıt
 // ve Brain içinde bir hedef seçici eklemekten ibarettir.
 //
-//   kind        : need (ihtiyaç gidermek) | rest (uyku) | social | leisure | idle | work | festival
+//   kind        : need (ihtiyaç gidermek) | rest (uyku) | social | leisure | idle | work | festival | away (sefer)
 //                 festival yarıda kesilmez (uyku saati gelse de şenlik bitene kadar sürer).
 //                 social/leisure/idle/work etkinlikleri acil bir ihtiyaç doğunca yarıda kesilir.
 //   indoor      : hedefe varınca kapıdan girip görünmez olur (uyku, evde yemek)
@@ -249,6 +249,38 @@ export const ACTIVITIES = {
     tool: 'pickaxe',
     effect: 'dust',
     bubbles: ['sweat', 'note'],
+  },
+  // --- 11. aşama: şifacılık, tedavi ve keşif seferi ---
+  brew: {
+    kind: 'work',
+    travelLabel: 'Şifacı kulübesine gidiyor',
+    label: 'Havanda şifalı ot dövüp iksir hazırlıyor',
+    pose: 'work',
+    tool: 'pestle',
+    bubbles: ['herb', 'sparkle', 'note'],
+  },
+  gatherHerbs: {
+    kind: 'work',
+    travelLabel: 'Şifalı ot toplamaya gidiyor',
+    label: 'Doğadan şifalı ot topluyor',
+    pose: 'gather',
+    bubbles: ['herb', 'sparkle'],
+  },
+  // Hasta sakin şifacıya gidip iksirle tedavi olur (içeride)
+  heal: {
+    kind: 'need',
+    indoor: true,
+    travelLabel: 'Şifacıya gidiyor',
+    label: 'Şifacıda iksirle tedavi oluyor',
+    duration: [25, 35],
+    effects: { energy: 0.4 },
+    urgentBubble: 'fever',
+  },
+  // Keşif seferine çıkan sakin harita kenarına yürür ve bir gün ortadan kaybolur
+  expedition: {
+    kind: 'away',
+    travelLabel: 'Keşif seferine yola çıkıyor',
+    label: 'Keşif seferinde',
   },
   // Zanaat atölyesinde ekipman üretimi ({item}: yapılan ekipman)
   craft: {

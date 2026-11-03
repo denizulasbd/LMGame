@@ -43,10 +43,14 @@ export function topSkills(character, count) {
     .map(([skill, xp]) => ({ skill, def: SKILLS[skill], xp, level: levelFor(xp) }));
 }
 
-/** Deneyim ekler; kademe atlarsa olayı yayınlar. */
-export function addExperience(events, character, activity, minutes) {
+/**
+ * Deneyim ekler; kademe atlarsa olayı yayınlar. multiplier: (11. aşama) Zanaat Loncası fermanı deneyim
+ * kazanma hızını artırır.
+ */
+export function addExperience(events, character, activity, minutes, multiplier = 1) {
   const skill = skillForActivity(activity);
   if (!skill || minutes <= 0) return;
+  minutes *= multiplier;
   const before = levelFor(character.skills[skill] ?? 0);
   character.skills[skill] = (character.skills[skill] ?? 0) + minutes;
   const after = levelFor(character.skills[skill]);

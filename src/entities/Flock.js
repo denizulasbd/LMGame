@@ -185,7 +185,9 @@ export class Flock {
 
   /** Koyunları derinlik kuyruğuna ekler (bx, by: yapının sol üst köşesinin dünya pikseli). */
   queueDraw(queue, bx, by) {
-    const all = this.lamb ? [...this.sheep, this.lamb] : this.sheep;
+    // Kurtlar ağıla daldıysa (yapı hasarlı) koyunların çoğu kaçmıştır: onarılana kadar ikisi kalır
+    const flock = this.building.damaged ? this.sheep.slice(0, 2) : this.sheep;
+    const all = this.lamb && !this.building.damaged ? [...flock, this.lamb] : flock;
     for (const s of all) {
       const sprite = getSheepSprite(this.poseOf(s), s.facing, s.lamb);
       const x = Math.round(bx + s.x - sprite.width / 2);

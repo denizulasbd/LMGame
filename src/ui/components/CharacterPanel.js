@@ -13,6 +13,7 @@ import { isShivering } from '../../systems/HeatingSystem.js';
 import { coldProtection } from '../../systems/Equipment.js';
 import { opposingTrait } from '../../ai/TraitProfile.js';
 import { getSeason } from '../../data/seasons.js';
+import { ILLNESS, VIGOR } from '../../data/health.js';
 import { PANEL_SKILL_COUNT, SKILL_LEVELS } from '../../data/skills.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
@@ -342,6 +343,18 @@ export class CharacterPanel {
     }
     if ((character.buffs.warmMeal ?? -1) > now) tags.push({ text: 'Sıcak yemekle tok', icon: 'food', cls: 'is-warm' });
     if ((character.buffs.happyHome ?? -1) > now) tags.push({ text: 'Mutlu Yuva', icon: 'love', cls: 'is-love' });
+    // 11. aşama: hastalık, Dinçlik, keşif seferi
+    if (character.illness) {
+      const hours = Math.ceil(character.illness.remaining / 60);
+      tags.push({ text: `${ILLNESS.label}: %${Math.round((1 - ILLNESS.workSpeed) * 100)} yavaş (~${hours} sa)`, icon: 'sneeze', cls: 'is-sick' });
+    } else if (character.exposure >= ILLNESS.threshold) {
+      tags.push({ text: 'Üşütmek üzere', icon: 'cold', cls: 'is-cold' });
+    }
+    if ((character.buffs.vigor ?? -1) > now) tags.push({ text: `${VIGOR.name}: %${Math.round((VIGOR.workSpeed - 1) * 100)} hızlı`, icon: 'herb', cls: 'is-vigor' });
+    if (character.away) {
+      const back = character.away.until - now;
+      tags.push({ text: `Keşif seferinde (~${Math.max(1, Math.ceil(back / 60))} sa sonra döner)`, icon: 'map', cls: 'is-warm' });
+    }
     const key = tags.map((t) => t.text).join('|');
     if (key === this.lastConditions) return;
     this.lastConditions = key;

@@ -491,6 +491,87 @@ Object.assign(ICONS, {
   ],
 });
 
+// 11. aşama: şifalı ot, iksir, fırtına, kurt, hazine haritası, pati, hasta / dinç sakin
+Object.assign(ICONS, {
+  herb: [
+    '....vV...',
+    '...vVv.V.',
+    '.Vv.f.vV.',
+    '.vVvfvVv.',
+    '...vfv...',
+    '..V.f.i..',
+    '..vvf.ii.',
+    '....f.i..',
+    '....x....',
+  ],
+  remedy: [
+    '...KKK...',
+    '...KEK...',
+    '...KxK...',
+    '..KcacK..',
+    '.KvVvvvK.',
+    '.KvVvvvK.',
+    '.KvvvvfK.',
+    '..KKKKK..',
+    '.........',
+  ],
+  storm: [
+    '..KKK....',
+    '.KqqqKK..',
+    'KqqqqqqK.',
+    'KRqRqqRK.',
+    '.KKPKKK..',
+    '...PP....',
+    '..PP.c.c.',
+    '...P..c..',
+    '....c..c.',
+  ],
+  wolf: [
+    'K.......K',
+    'KRK...KRK',
+    'KrRKKKRrK',
+    'KrrrrrrrK',
+    'KrKrrrKrK',
+    'KrrrqrrrK',
+    '.KrqqqrK.',
+    '..KqKqK..',
+    '...KKK...',
+  ],
+  map: [
+    '.........',
+    'KKKKKKKK.',
+    'KSsSSsSK.',
+    'KSoS.SsKK',
+    'KsSoSSSsK',
+    'KSsSoSoSK',
+    'KSSsSSsSK',
+    '.KKKKKKKK',
+    '.........',
+  ],
+  paw: [
+    '.........',
+    '.KK...KK.',
+    'KXXK.KXXK',
+    '.KK.K.KK.',
+    '...KXK...',
+    '..KXXXK..',
+    '.KXXXXXK.',
+    '.KXXXXXK.',
+    '..KKKKK..',
+  ],
+  sick: [
+    '..KKKKK..',
+    '.KaaaaaK.',
+    'KaaKaKaaK',
+    'KaaaaaaaK',
+    'KaKKKKKaK',
+    'KaaaaaaaK',
+    '.KaaaaaK.',
+    '..KKKKK..',
+    '.........',
+  ],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);
@@ -504,6 +585,8 @@ const HELD_TOOLS = {
   axe: ['.KK..', 'KqqK.', 'KqKw.', '.K.w.', '...w.', '...x.'],
   pickaxe: ['.KKK.', 'KqwqK', 'K.w.K', '..w..', '..w..', '..x..'],
   hoe: ['KKKw.', 'Kq.w.', '...w.', '...w.', '...w.', '...x.'],
+  // Havan eli (11. aşama, şifacı)
+  pestle: ['..KK.', '.KqqK', '.KqK.', '..r..', '..r..', '..R..'],
   // Fırın küreği: geniş yassı ağız, uzun sap (10. aşama)
   peel: ['KEEK.', 'KXXK.', '.Kw..', '..w..', '..w..', '..x..'],
   // Çoban değneği (5x15): tepesi kıvrık uzun asa; çoban onu yere dayayıp dik tutar ('tend' pozu)
@@ -610,6 +693,10 @@ const BUBBLE_ICONS = {
   angry: ['...YYO.', '..YYO..', '.YYYYYO', '...YYO.', '..YYO..', '..YO...'],
   sulk: ['..RRR..', '.RrrrR.', 'RrqrrrR', '.RRRRR.', '..c..c.', '.c..c..'],
   ring: ['...a...', '..aWa..', '..PPP..', '.P...P.', '.P...P.', '..PPP..'],
+  // 11. aşama: hapşırma, ateş (termometre), şifalı ot, iyileşme
+  sneeze: ['....c.c', '...c.a.', 'KK..c.c', 'KTK..a.', 'KK..c.c', '....c..'],
+  fever: ['...K...', '..KuK..', '..KoK..', '..KoK..', '.KoooK.', '..KKK..'],
+  herb: ['...vV..', '..vVv.V', '.V.f.v.', '.vvfvV.', '...f...', '...x...'],
 };
 
 export const BUBBLE_WIDTH = 11;

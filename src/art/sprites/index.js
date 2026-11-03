@@ -18,3 +18,5 @@ export { WORKSHOP_ART } from './structuresCraft.js';
 export { SHEEP_FARM_ART, getSheepFarmLayer, getSheepSprite } from './structuresFarm.js';
 export { MILL_ART, IRON_MINE_ART } from './structuresIndustry.js';
 export { TOWN_HALL_ART } from './structuresCivic.js';
+export { HEALER_ART } from './structuresHealth.js';
+export { getAnimalSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite } from './animals.js';

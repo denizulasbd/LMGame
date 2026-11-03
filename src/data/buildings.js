@@ -52,7 +52,15 @@ import { GROUND_TILES } from './tiles.js';
 //   requiresTier : kasaba bu seviyeye ulaşınca kilidi açılır (data/town.js -> TOWN_TIERS; değirmen Köy,
 //                  belediye Kasaba)
 //   civic        : { workSpeed } tamamlanınca kasabanın tüm iş ve inşaat hızı çarpanı (belediye); her sabahki
-//                  erzak dengesi data/town.js -> TOWN_HALL'da
+//                  erzak dengesi data/town.js -> TOWN_HALL'da, belediye fermanları data/town.js -> CIVIC_PROJECTS'te
+//
+// 11. aşama — sağlık:
+//   apothecary   : { herbsPerHour, brewPerHour, herbsPerRemedy, maxHerbs, maxRemedies, natureRadius, natureIdeal }
+//                  şifacı doğadan (yakındaki ağaç ve çiçek tarlası) şifalı ot toplar, kulübede iksir ve merhem
+//                  hazırlar; hasta sakinler gelip bir iksirle iyileşir (data/health.js). Çevresinde ağaç azsa ot
+//                  toplamak yavaşlar (natureIdeal ağaçta tam hız)
+//   (DAMAGEABLE_TYPES) fırtınada ya da kurt saldırısında hasar alabilen yapılar; hasarlı yapı onarılana kadar
+//                  çalışmaz (bkz. data/dilemmas.js -> STORM)
 //
 // Seviye 2 (8. aşama) — upgrade: yapı yıkılmadan Yapı Bilgi Paneli'nden geliştirilir:
 //   { name, description, cost, buildWork, capacity?, workers?, productionBonus?, seasonalFloor?,
@@ -310,6 +318,30 @@ export const BUILDINGS = {
       reason: 'Kayalık Tepe biyomuna ya da kayaların yanına kurulmalı (6 karo içinde en az 3 kaya / çakıl)',
     },
   },
+  // --- 11. aşama: sağlık ---
+  healerHut: {
+    name: 'Şifacı Kulübesi',
+    size: { w: 2, h: 2 },
+    spots: 'door',
+    doorTiles: [
+      { dx: 0, dy: 2 },
+      { dx: 1, dy: 2 },
+    ],
+    entrance: { x: 21, y: 31 },
+    buildable: true,
+    demolishable: true,
+    category: 'Sağlık',
+    description:
+      'Çatısında şifalı otlar kurutulan aktar kulübesi. Şifacı doğadan ot toplar, havanda döverek iksir ve merhem hazırlar. Üşüten sakinler buraya gelip çabucak iyileşir ve "Dinçlik" kazanır. Ormana yakın kurulursa ot toplamak hızlanır.',
+    cost: { wood: 30, stone: 15 },
+    buildWork: 150,
+    workers: 1,
+    workActivity: 'brew',
+    // Şifacı kulübenin önündeki tezgâhta havan döver
+    workPoints: [{ x: 9, y: 36 }],
+    workFacing: 'up',
+    apothecary: { herbsPerHour: 4, brewPerHour: 1.5, herbsPerRemedy: 2, maxHerbs: 10, maxRemedies: 6, natureRadius: 7, natureIdeal: 6 },
+  },
   townHall: {
     name: 'Belediye Konağı',
     size: { w: 3, h: 3 },
@@ -520,6 +552,7 @@ export const BUILD_MENU = [
   'storage',
   'inn',
   'workshop',
+  'healerHut',
   'market',
   'townHall',
   'flowerBed',
@@ -531,6 +564,23 @@ export const BUILD_MENU = [
 /** Bir menü öğesinin tanımı (yapı ya da zemin). */
 export function getBuildDefinition(type) {
   return BUILDINGS[type] ?? TILE_BUILDS[type] ?? null;
+}
+
+// Fırtınada / kurt saldırısında hasar alabilen yapılar (11. aşama; data/dilemmas.js -> STORM)
+export const DAMAGEABLE_TYPES = ['lumberHut', 'garden', 'quarry', 'fishingPier', 'sheepFarm', 'mill', 'ironMine', 'workshop', 'market', 'healerHut'];
+
+/**
+ * Fırtınada hasar gören yapının onarım projesi: yapının maliyetinin bir oranı ve sabit iş (11. aşama).
+ * mend: { costRatio, buildWork } (data/dilemmas.js -> STORM.mend)
+ */
+export function mendSpec(type, mend) {
+  const def = BUILDINGS[type];
+  const cost = Object.fromEntries(
+    Object.entries(def.cost ?? {})
+      .map(([r, v]) => [r, Math.max(1, Math.ceil(v * mend.costRatio))])
+      .filter(([r]) => r === 'wood' || r === 'stone')
+  );
+  return { name: def.name, description: 'Fırtınanın kırdığı kirişler, uçan kiremitler ve yıkılan çitler onarılır; yapı yeniden çalışır.', cost, buildWork: mend.buildWork };
 }
 
 // Kaldırılan yapı türlerinin yerini alanlar. Eski kayıtlar yüklenirken (state/SaveManager.js)

@@ -36,9 +36,15 @@ export const FESTIVAL = {
 
 // Kasaba çapındaki geçici bonuslar. hours: süre; workSpeed: iş hızı çarpanı; funDecay: keyif azalma
 // çarpanı; instantFun: başladığı an herkese eklenen keyif
+// 11. aşama: happiness: etkinken kasaba refahına eklenen puan; friendship: sohbetlerde arkadaşlık kazancı çarpanı
 export const TOWN_BUFFS = {
   tools: { name: 'Alet Paketi', icon: 'hammer', hours: 24, workSpeed: 1.25 },
   guild: { name: 'Lonca Ustaları', icon: 'anvil', hours: 24, workSpeed: 1.2, funDecay: 0.85 },
+  // Belediye fermanı ve ikilem olaylarının bonusları (11. aşama)
+  grandFeast: { name: 'Büyük Ziyafet', icon: 'bread', hours: 72, workSpeed: 1.2, funDecay: 0.5, happiness: 6 },
+  fair: { name: 'Büyük Panayır', icon: 'note', hours: 48, funDecay: 0.4, friendship: 1.6, happiness: 4 },
+  goodwill: { name: 'İyilik Şöhreti', icon: 'heart', hours: 48, happiness: 5 },
+  talisman: { name: 'Kadim Tılsım', icon: 'star', hours: 72, workSpeed: 1.15, funDecay: 0.8 },
   feast: { name: 'Kasaba İkramı', icon: 'food', hours: 24, funDecay: 0.5, instantFun: 25 },
   festival: { name: 'Şenlik Coşkusu', icon: 'sparkle', hours: 20, workSpeed: 1.15, funDecay: 0.7 },
 };
@@ -105,10 +111,10 @@ export const TOWN_TIERS = [
     name: 'Köy',
     suffix: 'Köyü',
     icon: 'tierVillage',
-    requires: { population: 10, buildings: 6, upgraded: 0, welfare: 60 },
+    requires: { population: 13, buildings: 8, upgraded: 1, welfare: 63 },
     merchantBonus: 1,
     unlocks: ['mill'],
-    perks: ['Yel Değirmeni ve Fırın inşa edilebilir', 'Gezgin tüccar yün balyası ve demir külçesi getirir', 'Tüccarın her malından +1 stok'],
+    perks: ['Yel Değirmeni ve Fırın inşa edilebilir', 'Kasabaya bir kedi ve bir köpek yerleşir', 'Gezgin tüccar yün balyası ve demir külçesi getirir', 'Tüccarın her malından +1 stok'],
   },
   {
     tier: 3,
@@ -116,11 +122,11 @@ export const TOWN_TIERS = [
     name: 'Kasaba',
     suffix: 'Kasabası',
     icon: 'tierTown',
-    requires: { population: 16, buildings: 13, upgraded: 2, welfare: 65 },
+    requires: { population: 20, buildings: 17, upgraded: 3, welfare: 68 },
     merchantBonus: 2,
     unlocks: ['townHall'],
     maxPerMorning: 3,
-    perks: ['Belediye Konağı inşa edilebilir', 'Tüccar kervanla gelir: ekmek sepeti, yün ve demir alımı', 'Tüccarın her malından +2 stok', 'Bir sabah 3 göçmene kadar gelebilir'],
+    perks: ['Belediye Konağı inşa edilebilir', 'Tüccar kervanla gelir: ekmek sepeti, yün ve demir alımı', 'Tüccarın her malından +2 stok', 'Bir sabah 3 göçmene kadar gelebilir', 'Bir kedi daha gelir'],
   },
   {
     tier: 4,
@@ -128,12 +134,12 @@ export const TOWN_TIERS = [
     name: 'Gelişmiş Şehir',
     suffix: 'Şehri',
     icon: 'tierCity',
-    requires: { population: 24, buildings: 22, upgraded: 6, welfare: 72, townHall: 1 },
+    requires: { population: 28, buildings: 28, upgraded: 8, welfare: 75, townHall: 1 },
     merchantBonus: 3,
     maxPerMorning: 3,
     maxPopulation: 30,
     happiness: 4,
-    perks: ['Şehir gururu: kasaba refahına kalıcı +4', 'Göç sınırı 24 yerine 30 sakin', 'Kervanbaşı Şehir Kervanı ve Lonca Ustaları getirir', 'Tüccarın her malından +3 stok'],
+    perks: ['Şehir gururu: kasaba refahına kalıcı +4', 'Göç sınırı 24 yerine 30 sakin', 'Kervanbaşı Şehir Kervanı ve Lonca Ustaları getirir', 'Tüccarın her malından +3 stok', 'Bir köpek daha gelir'],
   },
 ];
 
@@ -155,3 +161,47 @@ export const TOWN_HALL = {
   share: 0.15,
   max: 12,
 };
+
+// ---------------------------------------------------------------------------
+// Belediye fermanları (11. aşama): geç oyunun kaynak bolluğunu kalıcı yatırımlara çevirir.
+// Belediye Konağı'nın Yapı Bilgi Paneli'nden ilan edilir; mantık src/systems/CivicSystem.js'te.
+//   cost       : stoktan harcanan kaynak
+//   provisions : ayrıca harcanan erzak birimi (önce ekmek, yetmezse yiyecek; birim birim sayılır)
+//   buff       : başlayan kasaba bonusu (TOWN_BUFFS), instant: herkese hemen eklenen ihtiyaç
+//   cooldownDays: tekrar ilan edilebilmesi için geçmesi gereken gün
+//   levels     : kademeli ferman: her kademe kendi maliyeti; capacity depo kapasitesine kalıcı eklenir,
+//                cobbles meydana yakın bu kadar toprak yol karosu taş yola çevrilir ("yollar güzelleşir")
+//   once       : bir kez ilan edilir; xpMultiplier meslek deneyimi, productionMultiplier üretim yapılarındaki
+//                çalışma verimi çarpanı (kalıcı)
+// ---------------------------------------------------------------------------
+export const CIVIC_PROJECTS = {
+  grandFeast: {
+    name: 'Büyük Kışlık Ziyafet',
+    icon: 'bread',
+    description: 'Meydanda üç gün süren büyük ziyafet: herkes doyar, keyfi tavan yapar; 3 gün boyunca refah +6, iş şevki +%20, keyif yarı hızda düşer.',
+    cost: { wood: 40 },
+    provisions: 80,
+    buff: 'grandFeast',
+    instant: { fun: 30, hunger: 45 },
+    cooldownDays: 5,
+  },
+  storehouse: {
+    name: 'Altyapı ve Depo Genişletmesi',
+    icon: 'stone',
+    description: 'Ambarlar büyütülür, yollar arnavut kaldırımıyla döşenir: tüm kaynakların depo sınırı kalıcı olarak +150.',
+    levels: [
+      { cost: { wood: 100, stone: 100, iron: 40 }, capacity: 150, cobbles: 30 },
+      { cost: { wood: 150, stone: 150, iron: 60 }, capacity: 150, cobbles: 40 },
+    ],
+  },
+  craftGuild: {
+    name: 'Zanaat Loncası Desteği',
+    icon: 'anvil',
+    description: 'Kasabanın ustalarına lonca kurulur: meslek deneyimi kazanma hızı ve üretim yapılarındaki verim kalıcı olarak +%15.',
+    cost: { wool: 50, iron: 50 },
+    once: true,
+    xpMultiplier: 1.15,
+    productionMultiplier: 1.15,
+  },
+};
+export const CIVIC_PROJECT_KEYS = Object.keys(CIVIC_PROJECTS);
