@@ -66,6 +66,10 @@ export class Character extends Entity {
     illness = null,
     exposure = 0,
     away = null,
+    schooling = 0,
+    schoolDay = 0,
+    schoolToday = 0,
+    educated = false,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -88,6 +92,11 @@ export class Character extends Entity {
     this.illness = illness ? { ...illness } : null; // üşütme: { since, remaining (oyun dakikası) }
     this.exposure = exposure; // hastalığa yakınlık 0-100 (soğuk, yağmur, açlık, bitkinlik; data/health.js)
     this.away = away ? { ...away } : null; // keşif seferinde: { stage: 'leaving' | 'away', until, exit }
+    // 12. aşama: okul (çocukken Bilgelik Evi'nde dinlenen ders dakikası; yeterliyse büyüyünce Kalfa başlar)
+    this.schooling = schooling;
+    this.schoolDay = schoolDay;
+    this.schoolToday = schoolToday;
+    this.educated = educated; // okulu bitirip meslekte Kalfa olarak başladı
     this.profile = buildTraitProfile(traits, { child: this.isChild });
 
     // Anlık durum (kaydedilmez, yapay zekâ yeniden kurar)
@@ -379,6 +388,10 @@ export class Character extends Entity {
       illness: this.illness,
       exposure: this.exposure,
       away: this.away,
+      schooling: this.schooling,
+      schoolDay: this.schoolDay,
+      schoolToday: this.schoolToday,
+      educated: this.educated,
     };
   }
 

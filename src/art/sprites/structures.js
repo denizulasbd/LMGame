@@ -26,6 +26,9 @@ import { getSheepFarmSprite } from './structuresFarm.js';
 import { getMillSprite, getIronMineSprite } from './structuresIndustry.js';
 import { getTownHallSprite } from './structuresCivic.js';
 import { getHealerHutSprite } from './structuresHealth.js';
+import { getAcademySprite } from './structuresWisdom.js';
+import { getHarborSprite, getHarborSiteSprite } from './structuresHarbor.js';
+import { getWonderSprite } from './structuresWonder.js';
 import { seasonalFoliageRows, winterize } from '../seasons.js';
 
 // ---------------------------------------------------------------------------
@@ -581,13 +584,16 @@ function buildSiteRows(w, h, stage) {
 
 export function getConstructionSiteSprite(w, h, stage, type = null, orientation = 'right') {
   if (type === 'fishingPier') return getFishingPierSiteSprite(stage, orientation === 'left');
+  if (type === 'harbor') return getHarborSiteSprite(stage, orientation === 'left');
   return getSprite(`building:site:${w}x${h}:${stage}`, () => buildSiteRows(w, h, stage));
 }
 
 // ---------------------------------------------------------------------------
 // Tek giriş: türüne ve anlık durumuna göre yapı görseli (inşa menüsü ve hayalet önizleme de kullanır)
 //   state: { windowsLit, tone, frame, lit, berries, maxBerries, active, orientation, open, season,
-//            level (2 = yükseltilmiş), ruined (yıkık harabe), sailFrame (değirmen kanatlarının açısı) }
+//            level (2 = yükseltilmiş), ruined (yıkık harabe), sailFrame (değirmen kanatlarının açısı),
+//            wonderStage (harikanın tamamlanan aşaması; verilmezse tamamlanmış hali), scaffold / step
+//            (harikada sıradaki aşama iskelede yükseliyor) }
 // Kışın her yapı karla örtülür (çatılar beyazlar, tepelere kar yığılır); çalı ve bahçe kendi kış
 // çizimlerini kullanır (bahçenin Seviye 2'si Cam Sera ise kışın da yeşildir, yalnızca çatısı karlanır).
 // ---------------------------------------------------------------------------
@@ -607,6 +613,8 @@ const WINTER_ROOFS = {
   workshop: { light: ['c'], main: ['B'], dark: ['n'], maxRow: 17 },
   townHall: { light: ['Z', 'c'], main: ['C', 'B'], dark: ['U', 'n'], maxRow: 36 },
   healerHut: { light: ['Y'], main: ['P'], dark: ['X'], maxRow: 19 },
+  academy: { light: ['c'], main: ['B', 'b'], dark: ['n', 'N'], maxRow: 39 },
+  harbor: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 22 },
 };
 
 export function getStructureSprite(type, state = {}) {
@@ -682,6 +690,17 @@ function getBaseStructureSprite(type, state) {
       return getHealerHutSprite(Boolean(state.active), state.frame ?? 0, Boolean(state.windowsLit));
     case 'monument':
       return getMonumentSprite();
+    case 'academy':
+      return getAcademySprite(Boolean(state.windowsLit), state.frame ?? 0, Boolean(state.active));
+    case 'harbor':
+      return getHarborSprite(Boolean(state.lit ?? state.windowsLit), state.frame ?? 0, Boolean(state.active), state.orientation === 'left');
+    case 'wonder':
+      return getWonderSprite(state.wonderStage ?? 3, {
+        lit: Boolean(state.windowsLit),
+        frame: state.frame ?? 0,
+        scaffold: Boolean(state.scaffold),
+        step: state.step ?? 0,
+      });
     default:
       throw new Error(`Yapı görseli yok: ${type}`);
   }

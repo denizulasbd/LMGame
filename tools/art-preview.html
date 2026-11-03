@@ -17,7 +17,7 @@
   <p>Geliştirme aracı: <code>python3 tools/serve.py</code> çalışırken <code>/tools/art-preview.html</code> adresinden açılır. Yapılar 5 kat büyütülmüş çizilir.</p>
   <div id="root"></div>
   <script type="module">
-    import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite } from '../src/art/sprites/index.js';
+    import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite, getBoatSprite } from '../src/art/sprites/index.js';
     import { getIconSprite, getBackpackSprite, getNoteSprite, getBubbleSprite, getHeldToolSprite, getCarrySprite } from '../src/art/ui/index.js';
     import { getCharacterSprite } from '../src/art/sprites/index.js';
     import { getTileSprite, getObjectSprite, getEdgeSprite } from '../src/art/tiles/index.js';
@@ -49,6 +49,39 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 12. aşama: Bilgelik Evi, Büyük Ticaret Limanı ve tekne, üç aşamalı Kasaba Harikası, yeni simgeler ---
+    show('Bilgelik Evi (3x3): flama dalgalanır, Bilge çalışırken kubbeden dürbün uzanır, gece kitaplıklar yanar, kış', [
+      ...[0, 1, 2].map((f) => [`flama ${f}`, getStructureSprite('academy', { frame: f })]),
+      ['Bilge çalışıyor', getStructureSprite('academy', { active: true, frame: 1 })],
+      ['gece', getStructureSprite('academy', { windowsLit: true, frame: 2 })],
+      ['kış', getStructureSprite('academy', { season: 'winter' })],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(3, 3, stage, 'academy')]),
+    ], 4);
+    show('Büyük Ticaret Limanı (3x2): su sağda / solda, tekne yanaşınca vinç sandık indirir (iki kare), gece feneri, kış, şantiye', [
+      ['su sağda', getStructureSprite('harbor', {})],
+      ['su solda', getStructureSprite('harbor', { orientation: 'left' })],
+      ...[0, 1].map((f) => [`vinç ${f}`, getStructureSprite('harbor', { active: true, frame: f })]),
+      ['gece', getStructureSprite('harbor', { lit: true })],
+      ['kış', getStructureSprite('harbor', { season: 'winter' })],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(3, 2, stage, 'harbor')]),
+    ], 4);
+    show('Ticaret teknesi (30x22): boş / yüklü, iki kare (yelken şişer, flama, köpük), sola giden', [
+      ...[0, 1].map((f) => [`boş ${f}`, getBoatSprite('right', false, f)]),
+      ...[0, 1].map((f) => [`yüklü ${f}`, getBoatSprite('right', true, f)]),
+      ['sola, yüklü', getBoatSprite('left', true, 0)],
+    ], 6);
+    show('Kasaba Harikası (4x4): Temel, Gövde, Görkemli Kule; gece (mangallar, pencereler, çan odası feneri), kış', [
+      ...[1, 2, 3].map((stage) => [`aşama ${stage}`, getStructureSprite('wonder', { wonderStage: stage, frame: 1 })]),
+      ...[1, 2, 3].map((stage) => [`aşama ${stage} gece`, getStructureSprite('wonder', { wonderStage: stage, windowsLit: true, frame: 2 })]),
+      ['kış', getStructureSprite('wonder', { wonderStage: 3, season: 'winter' })],
+    ], 3);
+    show('Harika: aşama sürerken iskele ve yükselen yapı (4 kademe), ilk şantiye', [
+      ...[0, 1, 2, 3].map((step) => [`Gövde ${step + 1}/4`, getStructureSprite('wonder', { wonderStage: 1, scaffold: true, step })]),
+      ...[0, 1, 2, 3].map((step) => [`Kule ${step + 1}/4`, getStructureSprite('wonder', { wonderStage: 2, scaffold: true, step, frame: step })]),
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(4, 4, stage, 'wonder')]),
+    ], 3);
+    show('Yeni simgeler: kitap (Bilgelik), dişli (araştırma), tekne (liman), harika, altın (hazine)', ['book', 'gears', 'boat', 'wonder', 'coin'].map((n) => [n, getIconSprite(n)]), 10);
 
     // --- 11. aşama: hayvanlar, Şifacı Kulübesi, sağlık ve olay simgeleri ---
     show('Tavşanlar (9x8): oturma, zıplama, kemirme; gri kürk, kışın beyaz; sola bakan', [

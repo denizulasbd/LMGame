@@ -59,6 +59,14 @@ import { GROUND_TILES } from './tiles.js';
 //                  şifacı doğadan (yakındaki ağaç ve çiçek tarlası) şifalı ot toplar, kulübede iksir ve merhem
 //                  hazırlar; hasta sakinler gelip bir iksirle iyileşir (data/health.js). Çevresinde ağaç azsa ot
 //                  toplamak yavaşlar (natureIdeal ağaçta tam hız)
+//
+// 12. aşama — bilgi, ticaret ve harika:
+//   academy      : Bilgelik Evi: Bilge araştırma yapar (data/research.js), çocuklar ders dinler
+//   placement 'harbor' : nehir kıyısına; ayak izinin kara yanı kum, kalanı su ve suyun ötesinde teknelerin
+//                  geçeceği açık bir su şeridi olmalı (ihracat teknesi oraya yanaşır; data/trade.js -> EXPORT)
+//   wonder       : { stages: [{ name, description, cost, work }] } çok aşamalı harika: ilk aşama şantiye olarak
+//                  kurulur, sonrakiler Yapı Bilgi Paneli'nden başlatılır (project 'stage'); son aşama bitince
+//                  townBonus, light ve warmRadius etkin olur (systems/TownStatus.js, HeatingSystem.js)
 //   (DAMAGEABLE_TYPES) fırtınada ya da kurt saldırısında hasar alabilen yapılar; hasarlı yapı onarılana kadar
 //                  çalışmaz (bkz. data/dilemmas.js -> STORM)
 //
@@ -342,6 +350,67 @@ export const BUILDINGS = {
     workFacing: 'up',
     apothecary: { herbsPerHour: 4, brewPerHour: 1.5, herbsPerRemedy: 2, maxHerbs: 10, maxRemedies: 6, natureRadius: 7, natureIdeal: 6 },
   },
+  // --- 12. aşama: Bilgelik Evi, Büyük Ticaret Limanı, Büyük Saat Kulesi ---
+  academy: {
+    name: 'Bilgelik Evi',
+    size: { w: 3, h: 3 },
+    spots: 'door',
+    doorTiles: [{ dx: 1, dy: 3 }],
+    entrance: { x: 24, y: 47 },
+    buildable: true,
+    demolishable: true,
+    category: 'Bilgi',
+    description:
+      'Kitaplıkları ve gözlem kubbesiyle kasabanın okulu ve kütüphanesi. Bilge burada kalıcı kasaba teknolojileri araştırır; çocuklar ders saatlerinde gelip ders dinler ve büyüyünce bir meslekte doğrudan Kalfa olarak başlar.',
+    cost: { wood: 70, stone: 60, wool: 15 },
+    buildWork: 320,
+    workers: 1,
+    workActivity: 'teach',
+    academy: true,
+    requiresTier: 2,
+  },
+  harbor: {
+    name: 'Büyük Ticaret Limanı',
+    size: { w: 3, h: 2 },
+    spots: 'pier',
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Ticaret',
+    description:
+      'Nehre uzanan büyük taş-ahşap rıhtım, yük vinci ve sandık yığınları. Ticaret tekneleri nehirden süzülüp yanaşır; depoda belirlenen sınırı aşan fazla malları ya da hazırlanan ihracat sandığını yükleyip götürür, karşılığında Kasaba Hazinesi\'ne altın bırakır.',
+    cost: { wood: 120, stone: 80, iron: 20 },
+    buildWork: 300,
+    allowedTiles: ['sand', 'water'],
+    placement: 'harbor',
+    requiresTier: 3,
+    litHours: { from: 18.5, to: 6.5 },
+  },
+  wonder: {
+    name: 'Büyük Vadi Saat Kulesi',
+    size: { w: 4, h: 4 },
+    spots: 'ring',
+    buildable: true,
+    demolishable: false,
+    unique: true,
+    category: 'Harika',
+    description:
+      'Vadinin her yerinden görünen, saat kuleli taş külliye. Üç aşamada yükselir (Temel, Gövde, Görkemli Kule). Tamamlanınca kasaba altın çağını yaşar: refah +12, geceleri kulesi bir fener gibi vadiyi aydınlatıp ısıtır, saat başı çan çalar.',
+    cost: { wood: 200, stone: 300, bread: 80, gold: 300 },
+    buildWork: 600,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 4,
+    wonder: {
+      stages: [
+        { name: 'Temel', description: 'Kesme taş temel ve geniş basamaklar atılır.', cost: { wood: 200, stone: 300, bread: 80, gold: 300 }, work: 600 },
+        { name: 'Gövde', description: 'Kemerli taş gövde, demir kuşaklar ve yün kilimli iç salonlar yükselir.', cost: { wood: 150, stone: 400, iron: 150, wool: 80, bread: 120, gold: 800 }, work: 900 },
+        { name: 'Görkemli Kule', description: 'Saat kulesi, bronz çan ve altın kubbeli fener tamamlanır.', cost: { stone: 300, iron: 250, wool: 150, bread: 150, gold: 1600 }, work: 1200 },
+      ],
+      light: { radius: 230 },
+      warmRadius: 420, // tamamlanınca bu yarıçaptaki (≈26 karo: kasabanın neredeyse tamamı) dışarıdaki sakinlerin içi ısınır (piksel)
+    },
+    townBonus: { happiness: 12 },
+  },
   townHall: {
     name: 'Belediye Konağı',
     size: { w: 3, h: 3 },
@@ -554,11 +623,14 @@ export const BUILD_MENU = [
   'workshop',
   'healerHut',
   'market',
+  'harbor',
+  'academy',
   'townHall',
   'flowerBed',
   'bench',
   'lantern',
   'monument',
+  'wonder',
 ];
 
 /** Bir menü öğesinin tanımı (yapı ya da zemin). */
@@ -568,6 +640,14 @@ export function getBuildDefinition(type) {
 
 // Fırtınada / kurt saldırısında hasar alabilen yapılar (11. aşama; data/dilemmas.js -> STORM)
 export const DAMAGEABLE_TYPES = ['lumberHut', 'garden', 'quarry', 'fishingPier', 'sheepFarm', 'mill', 'ironMine', 'workshop', 'market', 'healerHut'];
+
+// Yapı projelerinin metinleri (yükseltme, harabe onarımı, fırtına onarımı, harika aşaması)
+export const PROJECT_WORDS = {
+  upgrade: { noun: 'Yükseltme', ing: 'Yükseltiliyor', doing: 'Yükseltiyor', start: 'Yükselt', cancel: 'Yükseltmeyi İptal Et', busy: 'Yükseltme sürüyor' },
+  repair: { noun: 'Onarım', ing: 'Onarılıyor', doing: 'Onarıyor', start: 'Onarımı Başlat', cancel: 'Onarımı İptal Et', busy: 'Onarım sürüyor' },
+  mend: { noun: 'Onarım', ing: 'Onarılıyor', doing: 'Onarıyor', start: 'Onarımı Başlat', cancel: 'Onarımı İptal Et', busy: 'Onarım sürüyor' },
+  stage: { noun: 'Aşama', ing: 'Yükseliyor', doing: 'Harikayı yükseltiyor', start: 'Aşamayı Başlat', cancel: 'Aşamayı İptal Et', busy: 'Aşama sürüyor' },
+};
 
 /**
  * Fırtınada hasar gören yapının onarım projesi: yapının maliyetinin bir oranı ve sabit iş (11. aşama).

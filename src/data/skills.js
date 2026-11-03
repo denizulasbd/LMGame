@@ -18,6 +18,8 @@ export const SKILLS = {
   mining: { name: 'Madencilik', title: 'Madenci', icon: 'iron' },
   // 11. aşama
   herbalism: { name: 'Şifacılık', title: 'Şifacı', icon: 'herb' },
+  // 12. aşama
+  scholarship: { name: 'Bilgelik', title: 'Bilge', icon: 'book' },
 };
 
 export const SKILL_KEYS = Object.keys(SKILLS);
@@ -38,6 +40,7 @@ export const ACTIVITY_SKILLS = {
   mineIron: 'mining',
   brew: 'herbalism',
   gatherHerbs: 'herbalism',
+  teach: 'scholarship',
 };
 
 export const SKILL_LEVELS = [

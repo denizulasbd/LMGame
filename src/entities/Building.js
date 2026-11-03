@@ -15,7 +15,7 @@
 // belediye geceleri ışık verir; madenin girişinde fener yanar.
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
-import { BUILDINGS } from '../data/buildings.js';
+import { BUILDINGS, PROJECT_WORDS } from '../data/buildings.js';
 import { EQUIPMENT } from '../data/equipment.js';
 import {
   getStructureSprite,
@@ -32,6 +32,9 @@ import {
   IRON_MINE_ART,
   TOWN_HALL_ART,
   HEALER_ART,
+  ACADEMY_ART,
+  HARBOR_ART,
+  WONDER_ART,
   getSheepFarmLayer,
 } from '../art/sprites/index.js';
 import { getBubbleSprite, BUBBLE_WIDTH, BUBBLE_HEIGHT, getIconSprite } from '../art/ui/index.js';
@@ -65,14 +68,17 @@ const BASELINE_INSET = {
   ironMine: 2,
   townHall: 3,
   healerHut: 2,
+  academy: 3,
+  harbor: 2,
+  wonder: 4,
 };
 const SITE_BASELINE_INSET = 2;
 const RECENT_WORKERS_EXTRA = 2; // panelde çalışan yuvasından bu kadar fazla "son çalışan" hatırlanır
 
 // Animasyon kare hızı (kare / saniye): ateş titrer, tabela ve flama sallanır, çiçekler eğilir
-const FRAME_RATES = { campfire: 8, flowerBed: 1.4, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3 };
+const FRAME_RATES = { campfire: 8, flowerBed: 1.4, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3, academy: 2.5, harbor: 1.6, wonder: 2.4 };
 const DEFAULT_FRAME_RATE = 3;
-const MAX_OVERHANG = 32; // yapıların karolarının üstüne taşabileceği en fazla piksel (görünürlük testi; kule 32)
+const MAX_OVERHANG = 70; // yapıların karolarının üstüne taşabileceği en fazla piksel (görünürlük testi; harika 64)
 // Değirmen kanatları: saniyede kaç kare (çeyrek tur = MILL_ART.sailFrames kare) döner
 const SAIL_SPEED = { wind: 2.5, working: 9 };
 const SHEEP_Z_COLOR = 'rgba(238, 244, 250, 0.85)';
@@ -102,6 +108,9 @@ export class Building extends Entity {
     remedies = 0,
     damaged = false,
     treatedToday = 0,
+    wonderStage = 0,
+    exportThreshold = undefined,
+    crate = null,
   }) {
     super({ id, x: tileX * T, y: tileY * T });
     this.type = type;
@@ -144,6 +153,11 @@ export class Building extends Entity {
     this.remedies = remedies;
     this.treatedToday = treatedToday;
     this.damaged = damaged; // hasarlı yapı onarılana (project 'mend') kadar çalışmaz
+    // 12. aşama: harikanın tamamlanan aşaması (0 şantiye, 1 temel, 2 gövde, 3 tamamlandı); limanın fazlalık
+    // ihracatı sınırı (null = kapalı) ve rıhtımda bekleyen ihracat sandığı { kaynak: birim }
+    this.wonderStage = wonderStage;
+    this.exportThreshold = exportThreshold === undefined ? null : exportThreshold;
+    this.crate = crate ? { ...crate } : null;
   }
 
   /** Burada çalışmaya başlayan sakini son çalışanlar listesine ekler. */
@@ -161,6 +175,11 @@ export class Building extends Entity {
 
   get definition() {
     return BUILDINGS[this.type];
+  }
+
+  /** Çok aşamalı harikanın son aşaması bitti mi? */
+  get wonderComplete() {
+    return Boolean(this.definition.wonder) && this.wonderStage >= this.definition.wonder.stages.length;
   }
 
   /** Yükseltilmiş mi (Seviye 2)? */
@@ -274,7 +293,7 @@ export class Building extends Entity {
       return { name: `Şantiye: ${this.name}`, detail: `%${Math.floor(this.buildRatio * 100)} tamamlandı` };
     }
     if (this.project) {
-      const verb = this.project.kind !== 'upgrade' ? 'Onarılıyor' : 'Yükseltiliyor';
+      const verb = PROJECT_WORDS[this.project.kind].ing;
       return { name: this.name, detail: `${verb}: %${Math.floor(this.projectRatio * 100)}` };
     }
     if (this.ruined) return { name: this.name, detail: 'Kadim harabe · tıkla ve onar' };
@@ -316,6 +335,18 @@ export class Building extends Entity {
     }
     if (this.type === 'townHall') {
       return { name: this.name, detail: 'Kasabanın iş ve inşaat verimi +%15 · her sabah erzak dengesi · fermanlar' };
+    }
+    if (this.type === 'academy') {
+      if (this.processStatus) return { name: this.name, detail: this.processStatus };
+      return { name: this.name, detail: this.active ? 'Bilge çalışıyor · araştırma ve ders' : 'Bilge bekleniyor' };
+    }
+    if (this.type === 'harbor') {
+      const t = this.exportThreshold;
+      return { name: this.name, detail: `${this.active ? 'Tekne yanaştı, yükleniyor · ' : ''}${t === null ? 'Fazlalık ihracatı kapalı' : `Stok ${t}'ü geçince fazlası ihraç edilir`}` };
+    }
+    if (this.type === 'wonder') {
+      const n = this.definition.wonder.stages.length;
+      return { name: this.name, detail: this.wonderComplete ? 'Altın çağ · geceleri vadiyi aydınlatır ve ısıtır' : `Aşama ${this.wonderStage}/${n} tamamlandı · tıkla ve sıradakini başlat` };
     }
     if (this.type === 'healerHut') {
       return { name: this.name, detail: `İksir ${this.remedies}/${this.definition.apothecary.maxRemedies} · şifalı ot ${Math.floor(this.herbs)}` };
@@ -361,6 +392,9 @@ export class Building extends Entity {
       maxBerries: this.definition.maxBerries,
       level: this.upgraded ? 2 : 1,
       ruined: this.ruined,
+      wonderStage: this.wonderStage,
+      scaffold: this.project?.kind === 'stage',
+      step: Math.min(3, Math.floor(this.projectRatio * 4)),
     });
   }
 
@@ -651,6 +685,41 @@ export class Building extends Entity {
     } else if (this.type === 'healerHut' && env.windowsLit) {
       const artTop = this.y + this.height - HEALER_ART.height;
       out.push({ x: this.x + HEALER_ART.window.x, y: artTop + HEALER_ART.window.y, radius: 20, color: [190, 255, 170], intensity: 0.6, glow: 0.3 });
+    } else if (this.type === 'academy' && env.windowsLit) {
+      const artTop = this.y + this.height - ACADEMY_ART.height;
+      for (const w of ACADEMY_ART.windows) {
+        out.push({ x: this.x + w.x, y: artTop + w.y, radius: 18, color: [255, 214, 120], intensity: 0.7, glow: 0.28 });
+      }
+      for (const l of ACADEMY_ART.lamps) {
+        out.push({ x: this.x + l.x, y: artTop + l.y, radius: 30, color: [255, 200, 110], intensity: 0.8, glow: 0.34 });
+      }
+    } else if (this.type === 'harbor' && this.lit) {
+      const artTop = this.y + this.height - HARBOR_ART.height;
+      const flipped = this.orientation === 'left';
+      const lx = flipped ? this.width - HARBOR_ART.light.x : HARBOR_ART.light.x;
+      const wx = flipped ? this.width - HARBOR_ART.window.x : HARBOR_ART.window.x;
+      const flicker = Math.sin(env.time * 6 + this.id) * 1.5;
+      out.push({ x: this.x + lx, y: artTop + HARBOR_ART.light.y, radius: 56 + flicker, color: [255, 214, 130], intensity: 0.85, glow: 0.36 });
+      out.push({ x: this.x + wx, y: artTop + HARBOR_ART.window.y, radius: 16, color: [255, 200, 110], intensity: 0.6, glow: 0.26 });
+    } else if (this.type === 'wonder' && env.windowsLit) {
+      // 128 piksellik tam çerçeve alt kenara hizalı: ışık noktaları aşamadan bağımsız
+      const frameTop = this.y + this.height - WONDER_ART.fullHeight;
+      for (const b of WONDER_ART.braziers) {
+        const flicker = Math.sin(env.time * 9 + b.x) * 2;
+        out.push({ x: this.x + b.x, y: frameTop + b.y, radius: 34 + flicker, color: [255, 160, 70], intensity: 0.85, glow: 0.4 });
+      }
+      if (this.wonderStage >= 2) {
+        for (const w of WONDER_ART.windows) out.push({ x: this.x + w.x, y: frameTop + w.y, radius: 18, color: [255, 200, 110], intensity: 0.65, glow: 0.28 });
+      }
+      if (this.wonderComplete) {
+        // Altın çağ: çan odası tüm vadiyi aydınlatan bir fener gibi parlar (hafifçe nefes alır)
+        const pulse = Math.sin(env.time * 1.3) * 8;
+        const { radius } = this.definition.wonder.light;
+        const bx = this.x + WONDER_ART.beacon.x;
+        const by = frameTop + WONDER_ART.beacon.y;
+        out.push({ x: bx, y: by, radius: radius + pulse, color: [255, 214, 140], intensity: 0.7, glow: 0.16 });
+        out.push({ x: bx, y: by, radius: 34, color: [255, 236, 170], intensity: 0.9, glow: 0.42 }); // fenerin sıcak çekirdeği
+      }
     } else if (this.type === 'ancientFountain' && env.windowsLit) {
       // Kadim çeşmenin suyu gece hafif mavi parıldar
       out.push({ x: this.center.x, y: this.center.y, radius: 30, color: [150, 220, 255], intensity: 0.55, glow: 0.35 });
@@ -688,6 +757,9 @@ export class Building extends Entity {
       remedies: this.remedies,
       treatedToday: this.treatedToday,
       damaged: this.damaged,
+      wonderStage: this.wonderStage,
+      exportThreshold: this.exportThreshold,
+      crate: this.crate,
     };
   }
 }

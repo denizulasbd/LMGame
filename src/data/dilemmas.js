@@ -207,7 +207,7 @@ export const EXPEDITION = {
       { weight: 3, get: { iron: [25, 40] }, text: 'Eski madenin galerilerinde zengin demir damarları' },
       { weight: 3, get: { wool: [20, 35], food: [10, 20] }, text: 'Terk edilmiş bir yaylada sahipsiz koyun sürüsünün yünleri' },
       { weight: 2, get: { iron: [10, 20], stone: [20, 30] }, text: 'Çökmüş bir kalenin işlenmiş taşları ve demir kapı menteşeleri' },
-      { weight: 1, get: { iron: [10, 15] }, buff: 'talisman', relic: 2, text: 'Kadim bir tapınakta parıldayan bir tılsım!' },
+      { weight: 2, get: { iron: [10, 15] }, buff: 'talisman', relic: 2, text: 'Kadim bir tapınakta parıldayan bir tılsım!' },
     ],
     small: [
       { weight: 3, get: { iron: [8, 15] }, text: 'Dere yatağında demir cevheri' },
@@ -216,4 +216,7 @@ export const EXPEDITION = {
     ],
   },
   relicHappiness: 2, // tılsımla dönen seferin kasaba refahına kalıcı katkısı (adet başına)
+  // Şans sayacı: tılsımsız dönen her seferden sonra artar; bu sayıya ulaşan sefer (büyük ya da küçük) tılsımı
+  // kesin bulur (en geç 3. başarılı seferde)
+  talismanPity: 3,
 };

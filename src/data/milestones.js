@@ -69,6 +69,14 @@ export const MILESTONES = [
     kind: 'monument',
     target: 1,
   },
+  {
+    id: 'pearl',
+    name: 'Vadinin İncisi',
+    description: 'Büyük Saat Kulesi Harikası\'nı üç aşamasıyla tamamla.',
+    icon: 'wonder',
+    kind: 'wonder',
+    target: 3, // temel, gövde, kule
+  },
 ];
 
 // Kış sınavı: kış boyunca refah bunun altına düşmemeli

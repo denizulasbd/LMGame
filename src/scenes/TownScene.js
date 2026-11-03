@@ -45,6 +45,8 @@ import { HealthSystem } from '../systems/HealthSystem.js';
 import { AnimalSystem } from '../systems/AnimalSystem.js';
 import { CivicSystem } from '../systems/CivicSystem.js';
 import { DilemmaSystem } from '../systems/DilemmaSystem.js';
+import { ResearchSystem } from '../systems/ResearchSystem.js';
+import { HarborSystem } from '../systems/HarborSystem.js';
 import { TILE_TYPES, TILE_BY_ID, isGround } from '../data/tiles.js';
 import { TOWN_NAME_MAX_LENGTH } from '../data/town.js';
 import { AudioSystem } from '../systems/AudioSystem.js';
@@ -116,12 +118,15 @@ export class TownScene extends Scene {
     this.animals = new AnimalSystem(this.game, this.world, new Random(state.seed + 9));
     this.civic = new CivicSystem(this.game, this.world, this.economy);
     this.journal = new JournalSystem(this.game);
+    this.research = new ResearchSystem(this.game, this.world, this.economy, new Random(state.seed + 12));
+    this.harbor = new HarborSystem(this.game, this.world, this.economy, new Random(state.seed + 13));
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       economy: this.economy,
       jobs: this.jobs,
       relationships: this.relationships,
       crafting: this.crafting,
       health: this.health,
+      research: this.research,
     });
     this.saves = new SaveSystem(this.game, {
       captureTerrain: () => diffTerrain(this.baseTerrain, this.map),
@@ -132,13 +137,15 @@ export class TownScene extends Scene {
     this.townLevel = new TownLevelSystem(this.game, this.world, this.economy, { attract: this.attract });
     this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population }, { attract: this.attract });
 
-    // Sıra önemlidir: hava, yapı durumu ve kapasite, iş temizliği, atölye durumu, ihtiyaç azalması,
+    // Sıra önemlidir: hava, yapı durumu ve kapasite, Bilgelik Evi ve liman durumu, iş temizliği, atölye durumu, ihtiyaç azalması,
     // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar, kasaba seviyesi ve doğa
     this.structures = new StructureSystem(this.game, this.world);
     this.heating = new HeatingSystem(this.game, this.world, this.economy);
     this.systems = [
       this.weather,
       this.structures,
+      this.research,
+      this.harbor,
       this.economy,
       this.jobs,
       this.crafting,
@@ -180,6 +187,8 @@ export class TownScene extends Scene {
       this.animals,
       this.civic,
       this.dilemmas,
+      this.research,
+      this.harbor,
     ];
 
     this.camera = new Camera();
@@ -538,10 +547,12 @@ export class TownScene extends Scene {
     for (const character of this.world.characters) character.queueDraw(this.queue);
     for (const visitor of this.world.visitors) visitor.queueDraw(this.queue);
     for (const animal of this.game.state.animals) animal.queueDraw(this.queue, env);
+    for (const boat of this.world.boats ?? []) boat.queueDraw(this.queue, env);
     this.queue.flush(renderer);
 
     for (const building of this.world.buildings) building.drawEffects(renderer, env);
     for (const character of this.world.characters) character.drawEffects(renderer, this.animationTime);
+    for (const boat of this.world.boats ?? []) boat.drawEffects(renderer, this.animationTime);
     this.leaves.draw(renderer);
     this.weatherFx.drawClouds(renderer, this.camera, weather, this.map, this.animationTime);
 

@@ -206,6 +206,14 @@ export class Hud {
       : `Yiyecek\n${RESOURCES.food.hint}`;
     for (const key of GOODS_KEYS) {
       const slot = this.resources[key];
+      if (RESOURCES[key].treasury) {
+        // Kasaba Hazinesi (12. aşama): depo sınırı yok; liman teknelerinin getirdiği altın
+        const trade = state.trade;
+        const text = trade.shipments ? `${trade.shipments} sefer · +${trade.goldEarned}` : 'liman teknesi bekleniyor';
+        if (slot.detail.textContent !== text) slot.detail.textContent = text;
+        slot.box.title = `${RESOURCES[key].longName}: ${state.resources[key]} (sınırsız)\n${RESOURCES[key].hint}\n${trade.shipments ? `${trade.shipments} ihracat seferinden toplam ${trade.goldEarned} altın` : 'Henüz ihracat yapılmadı'}`;
+        continue;
+      }
       const { count, today } = producersOf(state, key);
       const text = count ? `${count} yapı · bugün +${today}` : 'üreten yapı yok';
       if (slot.detail.textContent !== text) slot.detail.textContent = text;
@@ -413,12 +421,13 @@ export class Hud {
     }
     for (const key of RESOURCE_KEYS) {
       const slot = this.resources[key];
-      const compact = RESOURCES[key].processed && !this.goodsExpanded;
+      const treasury = Boolean(RESOURCES[key].treasury); // hazinenin (altın) depo sınırı yok
+      const compact = (RESOURCES[key].processed && !this.goodsExpanded) || treasury;
       const text = compact ? String(game.state.resources[key]) : `${game.state.resources[key]}/${game.state.storageCapacity}`;
       if (text !== slot.last) {
         slot.last = text;
         slot.amount.textContent = text;
-        slot.box.classList.toggle('is-full', game.state.resources[key] >= game.state.storageCapacity);
+        slot.box.classList.toggle('is-full', !treasury && game.state.resources[key] >= game.state.storageCapacity);
         slot.box.classList.toggle('is-empty', game.state.resources[key] === 0);
       }
     }

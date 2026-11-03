@@ -17,6 +17,7 @@
 //   5. Mesai saatindeyse iş kuyruğu: şantiye > toplama emri > üretim binası
 //      (kişiliğe göre ara sıra mola verir; çocuklar çalışmaz)
 //   6. Yalnız hissediyorsa toplanma yerine gitmek, gerekirse birini davet etmek (çocuklar oynar)
+//   6b. (12. aşama) Çocuk: ders saatinde (09:00-15:00) günlük dersini dinlemediyse Bilgelik Evi'ne gitmek
 //   7. Değilse kişiliğine göre ağırlıklı bir boş zaman etkinliği (çocuklar: oyun, çiçekler, yürüyüş)
 import { ACTIVITIES } from '../data/activities.js';
 import { MEAL_FOOD_COST } from '../data/resources.js';
@@ -24,6 +25,8 @@ import { WORK_SESSION } from '../data/jobs.js';
 import { isBedtime, isWorkHours } from './TraitProfile.js';
 import { getSeason } from '../data/seasons.js';
 import { ILLNESS } from '../data/health.js';
+import { SCHOOL } from '../data/research.js';
+import { healSpeedMultiplier } from '../systems/ResearchSystem.js';
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
 const PLAYGROUND_TYPES = ['fountain', 'campfire', 'inn', 'monument'];
@@ -51,8 +54,9 @@ export class Brain {
    *   relationships: import('../systems/RelationshipSystem.js').RelationshipSystem,
    *   crafting: import('../systems/CraftingSystem.js').CraftingSystem }} services
    */
-  constructor(world, rng, { economy, jobs, relationships, crafting, health }) {
+  constructor(world, rng, { economy, jobs, relationships, crafting, health, research }) {
     this.health = health;
+    this.research = research;
     this.world = world;
     this.rng = rng;
     this.economy = economy;
@@ -116,6 +120,10 @@ export class Brain {
     if (needs.social < profile.thresholds.social && !c.isChild) {
       const plan = this.planSocial(c, hour);
       if (plan) return { ...plan, onBreak };
+    }
+    if (c.isChild) {
+      const plan = this.planSchool(c, hour);
+      if (plan) return plan;
     }
     const leisure = this.planLeisure(c, hour);
     return leisure ? { ...leisure, onBreak } : this.planWait();
@@ -237,6 +245,22 @@ export class Brain {
     };
   }
 
+  /** Çocuk: ders saatinde, bugünkü dersini dinlemediyse en yakın Bilgelik Evi'ne gider (yoksa null). */
+  planSchool(c, hour) {
+    if (!this.research || !this.research.schoolHours(hour)) return null;
+    const today = c.schoolDay === this.world.state.time.day ? c.schoolToday : 0;
+    if (today >= SCHOOL.minutesPerDay - 10) return null; // bugünkü dersini (neredeyse) dinledi
+    const origin = this.originTile(c);
+    for (const school of this.research.academies()) {
+      const doors = this.world.getSpots(school);
+      if (doors.length === 0) continue;
+      const spot = this.nearest(doors, c);
+      if (!this.world.findPath(origin, spot)) continue;
+      return { activity: 'school', buildingId: school.id, spot, finalPoint: school.entrancePoint, duration: Math.min(this.durationFor('school'), SCHOOL.minutesPerDay - today) };
+    }
+    return null;
+  }
+
   /** Hasta sakin: iksiri olan en yakın şifacı kulübesine gidip içeride tedavi olur (yoksa null). */
   planHeal(c) {
     if (!this.health) return null;
@@ -258,7 +282,8 @@ export class Brain {
       buildingId: best.clinic.id,
       spot: best.spot,
       finalPoint: best.clinic.entrancePoint,
-      duration: this.durationFor('heal'),
+      // Şifalı Bitki Yetiştiriciliği araştırması tedaviyi hızlandırır
+      duration: Math.ceil(this.durationFor('heal') / healSpeedMultiplier(this.world.state)),
     };
   }
 

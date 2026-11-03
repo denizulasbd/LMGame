@@ -80,8 +80,9 @@ export function freeBeds(state) {
 
 /** Onarılmış kadim yapıların (gözetleme kulesi) kasaba refahına kalıcı katkısı. */
 export function landmarkBonus(state) {
+  // Harika yalnızca son aşaması bitince sayılır
   return state.buildings
-    .filter((b) => b.functional && BUILDINGS[b.type].townBonus)
+    .filter((b) => b.functional && BUILDINGS[b.type].townBonus && (!BUILDINGS[b.type].wonder || b.wonderComplete))
     .reduce((sum, b) => sum + BUILDINGS[b.type].townBonus.happiness, 0);
 }
 

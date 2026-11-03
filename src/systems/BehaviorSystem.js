@@ -24,12 +24,14 @@ import { ACTIVITIES, LEAVING_HOME_LABEL, BREAK_PREFIX, LOVE_BUBBLES, RIVAL_BUBBL
 import { RESOURCES, MEAL_FOOD_COST } from '../data/resources.js';
 import { EQUIPMENT } from '../data/equipment.js';
 import { RECONCILE } from '../data/family.js';
+import { PROJECT_WORDS } from '../data/buildings.js';
 import { DEFAULT_WORK } from '../data/characters.js';
 import { Brain } from '../ai/Brain.js';
 import { isBedtime, isWorkHours } from '../ai/TraitProfile.js';
 import { WARM_MEAL } from '../data/town.js';
 import { townWorkMultiplier, civicProductionMultiplier, civicXpMultiplier } from './TownStatus.js';
 import { healthWorkMultiplier } from './HealthSystem.js';
+import { researchProductionMultiplier, researchBuildMultiplier, healSpeedMultiplier } from './ResearchSystem.js';
 import { workBonus, addExperience } from './SkillSystem.js';
 import { isFreezing } from './HeatingSystem.js';
 import { equipmentWorkSpeed } from './Equipment.js';
@@ -57,6 +59,7 @@ export class BehaviorSystem {
     this.relationships = services.relationships;
     this.crafting = services.crafting;
     this.health = services.health;
+    this.research = services.research;
     this.state = game.state;
     this.brain = new Brain(world, rng, services);
     this.unsubscribers = [
@@ -264,8 +267,9 @@ export class BehaviorSystem {
     if (task.activity === 'meal' && building?.type === 'storage') label = task.bread ? activity.breadStorageLabel : activity.storageLabel;
     else if (task.activity === 'meal' && task.bread) label = activity.breadLabel;
     if (task.activity === 'bake' && building?.idle) label = activity.idleLabel;
-    if (task.activity === 'build' && building?.project) label = building.project.kind !== 'upgrade' ? 'Onarıyor: {target}' : 'Yükseltiyor: {target}';
+    if (task.activity === 'build' && building?.project) label = `${PROJECT_WORDS[building.project.kind].doing}: {target}`;
     if (task.activity === 'craft') label = building?.craft ? label.replace('{item}', this.crafting.currentItemName(building)) : activity.idleLabel;
+    if (task.activity === 'teach' && !this.state.research?.active) label = activity.teachLabel;
     if (task.item) label = label.replace('{item}', EQUIPMENT[task.item].name);
     if (building) label = label.replace('{target}', building.name);
     return task.onBreak ? `${BREAK_PREFIX}${label}` : label;
@@ -366,6 +370,10 @@ export class BehaviorSystem {
     task.elapsed += minutes;
     this.applyEffects(c, activity.effects, minutes, activity);
     if (task.bread) this.applyEffects(c, activity.breadEffects, minutes, activity);
+    if (task.activity === 'school' && task.phase === 'perform') {
+      const school = this.world.getBuilding(task.buildingId);
+      if (school) this.research.learn(c, school, minutes);
+    }
     if (task.activity === 'sleep') this.applyHomeComfort(c, minutes);
 
     let bubbles = activity.bubbles;
@@ -449,6 +457,8 @@ export class BehaviorSystem {
       healthWorkMultiplier(c, this.state.totalMinutes);
     // Zanaat Loncası fermanı üretim yapılarında (inşaat ve toplama emirleri hariç) verimi artırır
     if (task.workBuildingId) amount *= civicProductionMultiplier(this.state);
+    // (12. aşama) Mimarlık Loncası inşaatı, yükseltmeyi ve onarımı hızlandırır
+    if (task.jobId && task.activity === 'build') amount *= researchBuildMultiplier(this.state);
     addExperience(this.events, c, task.activity, minutes, civicXpMultiplier(this.state));
 
     if (task.jobId) {
@@ -462,7 +472,10 @@ export class BehaviorSystem {
 
     const building = this.world.getBuilding(task.workBuildingId);
     if (!building || building.frozen || building.damaged) return false; // tarla dondu / fırtına yıktı: iş biter
-    if (building.definition.apothecary) return this.apothecaryWork(building, task, amount);
+    if (building.definition.academy) return this.research.work(building, amount);
+    // (12. aşama) Gelişmiş Çarklar: oduncu, taş ocağı, maden ve değirmende verim +%20
+    amount *= researchProductionMultiplier(this.state, building.type);
+    if (building.definition.apothecary) return this.apothecaryWork(building, task, amount * (task.activity === 'brew' ? healSpeedMultiplier(this.state) : 1));
     if (building.definition.kitchen) {
       this.cook(building, amount);
       return true;

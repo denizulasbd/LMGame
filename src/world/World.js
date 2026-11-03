@@ -27,6 +27,7 @@ export class World {
     this.landmarks = landmarks;
     this.reservations = new Map(); // "x,y" -> karakter kimliği
     this.visitors = []; // kasabalı olmayan, haritada yürüyen karakterler (tüccar)
+    this.boats = []; // nehirdeki ticaret teknesi (HarborSystem, 12. aşama; yalnızca çizim)
 
     this.pathGrid = {
       width: map.width,
@@ -277,7 +278,7 @@ export class World {
     } else if (kind === 'front') {
       for (let x = tileX; x < tileX + w; x++) if (usable(x, tileY + h)) spots.push({ x, y: tileY + h });
     } else if (kind === 'pier') {
-      spots = pierLandingTiles(tileX, tileY, building.orientation).filter((s) => usable(s.x, s.y));
+      spots = pierLandingTiles(tileX, tileY, building.orientation, w).filter((s) => usable(s.x, s.y));
     } else if (kind === 'adjacent') {
       spots = CARDINALS.map(([dx, dy]) => ({ x: tileX + dx, y: tileY + dy })).filter((s) => usable(s.x, s.y));
     } else if (kind === 'self') {

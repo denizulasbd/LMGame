@@ -1,5 +1,6 @@
 // Oyun içi vitrin: yeni yapıları ve hayvanları kurup birkaç saat yaşatır, yakın plan ekran görüntüleri alır
-// (gündüz, gece), karar penceresini ve belediye fermanlarını açar.
+// (gündüz, gece), karar penceresini ve belediye fermanlarını açar. (12. aşama) Bilgelik Evi, liman ve rıhtıma
+// yanaşan ticaret teknesi, Büyük Vadi Saat Kulesi (gündüz / gece) ve bu yapıların bilgi panelleri.
 // Kullanım: node tools/sim/showcase.mjs [tohum=11] [--out klasör]
 import fs from 'fs';
 import { openGame, parseArgs, runHours } from './lib.mjs';
@@ -54,6 +55,49 @@ await shoot('sifaci', { type: 'healerHut' });
 await shoot('tavsan', { animal: 'rabbit' }, 5);
 await shoot('geyik', { animal: 'deer' }, 5);
 await shoot('kedi', { animal: 'cat' }, 5);
+// --- 12. aşama ---
+await page.evaluate(() => {
+  const game = window.game;
+  const sim = window.sim;
+  const s = game.state;
+  s.town.tier = 4;
+  sim.give({ wood: 400, stone: 400, food: 300, iron: 200, wool: 200, bread: 200, gold: 0 });
+  sim.place('academy', { maxRadius: 40 });
+  sim.give({ wood: 400, stone: 400, iron: 100 });
+  sim.place('harbor', { maxRadius: 45 });
+  sim.give({ wood: 400, stone: 400, bread: 200, gold: 200, iron: 200 });
+  const w = sim.place('wonder', { maxRadius: 40 });
+  if (w) w.wonderStage = 3;
+  game.events.emit('ui:startResearch', { id: 'gears' });
+  sim.give({ wood: 520, stone: 480, food: 450 });
+  s.trade.nextBoatAt = s.totalMinutes;
+});
+await page.evaluate(() => {
+  for (let i = 0; i < 40 && window.game.state.trade.boat?.stage !== 'docked'; i++) window.sim.step(56);
+});
+await shoot('liman-tekne', { type: 'harbor' }, 4);
+await shoot('bilgelik', { type: 'academy' }, 4);
+await shoot('harika', { type: 'wonder' }, 3);
+// Paneller: sakin listesi gizlenir, panel tüm yüksekliğiyle çekilir
+await page.setViewportSize({ width: 1360, height: 1500 });
+await page.evaluate(() => {
+  for (const el of document.querySelectorAll('.residents')) el.style.display = 'none';
+});
+for (const type of ['academy', 'harbor', 'wonder']) {
+  await page.evaluate((type) => {
+    const game = window.game;
+    const b = game.state.buildings.find((x) => x.type === type);
+    if (b) game.events.emit('ui:selectBuilding', b.id);
+    game.render(0);
+  }, type);
+  await page.locator('.building-panel').screenshot({ path: `${out}/vitrin-panel-${type}.png` });
+  console.log(`${out}/vitrin-panel-${type}.png`);
+}
+await page.evaluate(() => {
+  for (const el of document.querySelectorAll('.residents')) el.style.display = '';
+});
+await page.setViewportSize({ width: 1360, height: 860 });
+
 await page.evaluate(() => {
   const game = window.game;
   const b = game.state.buildings.find((x) => x.type === 'townHall');
@@ -73,6 +117,7 @@ await shoot('karar', {});
 await page.evaluate(() => window.game.events.emit('ui:chooseDilemma', { optionId: 'fair' }));
 await runHours(page, 12); // 22:00
 await shoot('gece-kedi', { animal: 'cat' }, 5);
+await shoot('gece-harika', { type: 'wonder' }, 2);
 console.log('Sayfa hataları:', errors.length ? errors.join('\n') : 'yok');
 await browser.close();
 process.exit(errors.length ? 1 : 0);

@@ -56,6 +56,12 @@ export class AudioSystem {
       on('building:upgraded', () => this.playMastery()),
       on('ruin:restored', () => this.playGrandFanfare()),
       on('town:tierUp', () => this.playGrandFanfare()),
+      on('wonder:completed', () => this.playGrandFanfare()),
+      on('wonder:stageCompleted', () => this.playMastery()),
+      on('research:completed', () => this.playMastery()),
+      on('school:graduated', () => this.playMilestone()),
+      on('harbor:shipped', ({ gold }) => gold > 0 && this.playCoin()),
+      on('harbor:boatDocked', () => this.playBell()),
       on('civic:decreed', () => this.playGrandFanfare()),
       on('dilemma:opened', () => this.playBell()),
       on('storm:struck', ({ kind, safe }) => (kind === 'wolves' ? this.playHowl() : this.playThunder(safe))),
@@ -75,6 +81,8 @@ export class AudioSystem {
       on('journal:added', () => this.playChime()),
       on('time:hour', (hour) => {
         if (hour === 6) this.playMorning();
+        // Altın çağ (12. aşama): Büyük Vadi Saat Kulesi saat başı çan çalar (gece yarısından sabaha susar)
+        else if (hour >= 7 && hour <= 22 && this.world.getCompleted('wonder').some((b) => b.wonderComplete)) this.playClockTower(hour);
       }),
       on('merchant:arrived', () => this.playBell()),
       on('trade:completed', () => this.playCoin()),
@@ -232,6 +240,18 @@ export class AudioSystem {
     this.sound.tone({ freq: NOTE.A5, type: 'triangle', duration: 0.9, volume: 0.06 });
     this.sound.tone({ freq: NOTE.A5 * 1.5, duration: 0.7, volume: 0.03, delay: 0.02 });
     this.sound.tone({ freq: NOTE.E5, type: 'triangle', duration: 0.9, volume: 0.05, delay: 0.25 });
+  }
+
+  /** Saat kulesi: dört notalı kısa melodi, ardından saate göre (en çok üç) derin çan vuruşu. */
+  playClockTower(hour) {
+    this.lastChime = this.time;
+    ['E5', 'C5', 'D5', 'G4'].forEach((n, i) => this.sound.tone({ freq: NOTE[n], type: 'triangle', duration: 0.6, attack: 0.01, volume: 0.045, delay: i * 0.32 }));
+    const strikes = Math.min(3, hour % 12 || 12);
+    for (let i = 0; i < strikes; i++) {
+      const delay = 1.5 + i * 0.7;
+      this.sound.tone({ freq: NOTE.G4 / 2, type: 'triangle', duration: 1.4, attack: 0.005, volume: 0.06, delay });
+      this.sound.tone({ freq: (NOTE.G4 / 2) * 2.4, duration: 0.9, volume: 0.02, delay });
+    }
   }
 
   playCoin() {

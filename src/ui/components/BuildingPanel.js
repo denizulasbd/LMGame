@@ -8,18 +8,25 @@
 //     alma ve geri alma; zanaat atölyesinde üretim seçimi, tezgâhtaki iş ve depodaki ekipman
 //   - (11. aşama) şifacı kulübesinin ot ve iksir stoğu, belediye fermanları (ilan et düğmeleri), fırtına hasarı
 //     ve onarımı
+//   - (12. aşama) Bilgelik Evi'nin araştırma kartları (Araştır düğmesi, ilerleme) ve okulu; limanın fazlalık
+//     ihracatı sınırı, ihracat sandığı, tekne durumu ve Kasaba Hazinesi; harikanın aşamaları
 //   - (10. aşama) yan ürün (ağılda yiyecek, madende taş), değirmen-fırının işleme satırları (1 yiyecek -> 1
 //     ekmek), ekipmanın asıl (demir / yün) ve eski usul tarifi, ağıldaki koyunlar, belediyenin etkileri
 // Panel oyun durumunu yalnızca okur; istekleri olay olarak yayınlar (ui:startProject, ui:cancelProject,
-// ui:demolishBuilding, ui:selectCharacter, ui:dismissWorker, ui:rehireWorker, ui:setCraftMode). Ne
+// ui:demolishBuilding, ui:selectCharacter, ui:dismissWorker, ui:rehireWorker, ui:setCraftMode, ui:civicProject,
+// ui:startResearch, ui:setExportThreshold, ui:prepareCrate). Ne
 // değiştiğini anlamak için her karede kısa bir anahtar üretir; anahtar değişmedikçe DOM'a dokunmaz.
-import { BUILDINGS, mendSpec } from '../../data/buildings.js';
+import { BUILDINGS, mendSpec, PROJECT_WORDS } from '../../data/buildings.js';
 import { STORM } from '../../data/dilemmas.js';
 import { RESOURCES, RESOURCE_KEYS, formatCost } from '../../data/resources.js';
 import { TOWN_HALL, CIVIC_PROJECTS, CIVIC_PROJECT_KEYS } from '../../data/town.js';
 import { civicStatus, CivicSystem } from '../../systems/CivicSystem.js';
 import { EQUIPMENT, EQUIPMENT_KEYS, CRAFT_MODES } from '../../data/equipment.js';
 import { getSeason } from '../../data/seasons.js';
+import { RESEARCH, RESEARCH_KEYS, SCHOOL } from '../../data/research.js';
+import { EXPORT } from '../../data/trade.js';
+import { researchStatus } from '../../systems/ResearchSystem.js';
+import { cargoValue, exportExcess, cratePreview, boatStatus } from '../../systems/HarborSystem.js';
 import { lacking } from '../../systems/Equipment.js';
 import { arePartners } from '../../systems/RelationshipSystem.js';
 import { getStructureSprite } from '../../art/sprites/index.js';
@@ -28,11 +35,17 @@ import { el } from '../dom.js';
 
 const thumbnailCache = new Map();
 
-function thumbnailURL(type, level, ruined) {
-  const key = `${type}:${level}:${ruined}`;
-  if (!thumbnailCache.has(key)) thumbnailCache.set(key, getStructureSprite(type, { level, ruined }).toDataURL());
+function thumbnailURL(type, level, ruined, wonderStage = 0) {
+  const key = `${type}:${level}:${ruined}:${wonderStage}`;
+  if (!thumbnailCache.has(key)) thumbnailCache.set(key, getStructureSprite(type, { level, ruined, wonderStage: wonderStage || undefined }).toDataURL());
   return thumbnailCache.get(key);
 }
+
+/** "120 odun, 40 taş" */
+const cargoText = (cargo) =>
+  Object.entries(cargo)
+    .map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`)
+    .join(', ');
 
 const percent = (value) => `%${Math.round(value * 100)}`;
 
@@ -52,6 +65,8 @@ export class BuildingPanel {
     this.people = el('div', { className: 'building-people' });
     this.crafting = el('div', { className: 'building-crafting' });
     this.decrees = el('div', { className: 'building-decrees' });
+    this.research = el('div', { className: 'building-decrees building-research' });
+    this.harbor = el('div', { className: 'building-decrees building-harbor' });
     this.lines = el('div', { className: 'building-lines' });
     this.upgrade = el('div', { className: 'building-upgrade' });
     this.tradeButton = this.button('Takas Penceresini Aç', 'Gezgin tüccarla takas et', () => this.events.emit('ui:openTrade'));
@@ -74,6 +89,8 @@ export class BuildingPanel {
       this.people,
       this.crafting,
       this.decrees,
+      this.research,
+      this.harbor,
       this.lines,
       this.upgrade,
       this.tradeButton,
@@ -115,9 +132,31 @@ export class BuildingPanel {
           return `${st.ok}:${st.reason}:${st.level}`;
         }).join(',')
       : '';
+    const researchKey = building.definition.academy
+      ? [
+          state.research.active?.id,
+          state.research.active ? Math.floor((state.research.active.progress / RESEARCH[state.research.active.id].work) * 100) : 0,
+          RESEARCH_KEYS.map((id) => researchStatus(state, id, this.academyReady(building)).reason).join(','),
+        ].join(':')
+      : '';
+    const harborKey =
+      building.type === 'harbor'
+        ? [
+            building.exportThreshold,
+            JSON.stringify(building.crate),
+            JSON.stringify(cratePreview(state)),
+            JSON.stringify(exportExcess(state, building.exportThreshold)),
+            boatStatus(state),
+            state.resources.gold,
+            state.trade.shipments,
+          ].join(':')
+        : '';
     const key = [
       craftKey,
       decreeKey,
+      researchKey,
+      harborKey,
+      building.wonderStage,
       building.damaged,
       building.herbs ? Math.floor(building.herbs) : 0,
       building.remedies,
@@ -139,7 +178,7 @@ export class BuildingPanel {
     this.lastKey = key;
 
     const def = BUILDINGS[building.type];
-    this.thumb.src = thumbnailURL(building.type, building.upgraded ? 2 : 1, building.ruined);
+    this.thumb.src = thumbnailURL(building.type, building.upgraded ? 2 : 1, building.ruined, building.definition.wonder ? Math.max(1, building.wonderStage) : 0);
     this.name.textContent = building.underConstruction ? `Şantiye: ${building.name}` : building.name;
     this.badge.textContent = this.badgeText(building);
     this.badge.className = `building-badge${building.upgraded ? ' is-tier2' : ''}${building.ruined ? ' is-ruin' : ''}`;
@@ -154,11 +193,13 @@ export class BuildingPanel {
     this.renderPeople(building, people);
     this.renderCrafting(building, state);
     this.renderDecrees(building, state);
+    this.renderResearch(building, state);
+    this.renderHarbor(building, state);
     this.lines.replaceChildren(...lines.map((text) => el('div', { className: 'building-line', text })));
     this.lines.hidden = lines.length === 0;
     this.renderUpgrade(building, next, state);
 
-    this.demolishButton.hidden = !def.demolishable;
+    this.demolishButton.hidden = !def.demolishable && !building.underConstruction;
     this.tradeButton.hidden = !(building.type === 'market' && building.open);
     this.demolishButton.textContent = building.underConstruction ? 'Şantiyeyi İptal Et' : 'Yık';
   }
@@ -169,6 +210,11 @@ export class BuildingPanel {
     if (building.definition.ruin) return 'Onarılmış Kadim Yapı';
     if (building.upgraded) return 'Seviye 2 · Gelişmiş';
     if (building.definition.upgrade) return building.project ? 'Seviye 1 · yükseltiliyor' : 'Seviye 1';
+    if (building.definition.wonder && !building.underConstruction) {
+      const n = building.definition.wonder.stages.length;
+      if (building.wonderComplete) return `Aşama ${n}/${n} · Altın Çağ`;
+      return `Aşama ${building.wonderStage}/${n}${building.project ? ' · yükseliyor' : ''}`;
+    }
     return '';
   }
 
@@ -315,12 +361,94 @@ export class BuildingPanel {
     this.decrees.replaceChildren(el('div', { className: 'building-section-title', text: 'Belediye Fermanları' }), ...cards);
   }
 
+  /** Bilgelik Evi araştırma yapabilir mi (tamamlanmış ve hasarsız)? */
+  academyReady(building) {
+    return building.functional && !building.damaged;
+  }
+
+  /** Bilgelik Evi: dört araştırmanın kartları (durum, maliyet, Araştır düğmesi) ve süren araştırmanın ilerlemesi. */
+  renderResearch(building, state) {
+    const show = Boolean(building.definition.academy) && building.functional;
+    this.research.hidden = !show;
+    if (!show) return;
+    const ready = this.academyReady(building);
+    const active = state.research.active;
+    const cards = RESEARCH_KEYS.map((id) => {
+      const def = RESEARCH[id];
+      const st = researchStatus(state, id, ready);
+      const stateText = st.done ? 'Tamamlandı' : st.active ? `Araştırılıyor · ${percent(Math.min(1, active.progress / def.work))}` : 'Araştırılmadı';
+      const children = [
+        el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL(def.icon), alt: '' }), def.name, el('span', { className: 'decree-state', text: stateText })]),
+        el('div', { className: 'upgrade-text', text: def.description }),
+      ];
+      if (st.active) {
+        children.push(el('div', { className: 'need-bar building-progress' }, [el('span', { className: 'need-fill need-fun', style: `width: ${Math.floor(Math.min(1, active.progress / def.work) * 100)}%` })]));
+      } else if (!st.done) {
+        const costs = Object.entries(def.cost).map(([r, v]) =>
+          el('span', { className: `build-cost${state.resources[r] < v ? ' is-missing' : ''}` }, [el('img', { src: getIconDataURL(RESOURCES[r].icon), alt: RESOURCES[r].name }), String(v)])
+        );
+        const go = this.button('Araştır', st.ok ? `${def.name}: maliyet peşin ödenir, Bilge çalıştıkça ilerler` : st.reason, () => this.events.emit('ui:startResearch', { id }));
+        go.classList.add('upgrade-button');
+        go.disabled = !st.ok;
+        children.push(el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, costs), go]));
+        if (!st.ok) children.push(el('div', { className: 'upgrade-text is-active', text: st.reason }));
+      }
+      return el('div', { className: `decree${st.done ? ' is-done' : ''}` }, children);
+    });
+    this.research.replaceChildren(el('div', { className: 'building-section-title', text: 'Kasaba Araştırmaları' }), ...cards);
+  }
+
+  /** Liman: fazlalık ihracatı sınırı, ihracat sandığı, tekne ve hazine. */
+  renderHarbor(building, state) {
+    const show = building.type === 'harbor' && building.functional;
+    this.harbor.hidden = !show;
+    if (!show) return;
+    const threshold = building.exportThreshold;
+    const chips = EXPORT.thresholds.map((t) => {
+      const b = this.button(t === null ? 'Kapalı' : `${t}+`, t === null ? 'Fazlalık ihracatını kapat: tekne yalnızca hazırlanan sandığı götürür' : `Stoğu ${t}'ü aşan mallar ihraç edilsin`, () =>
+        this.events.emit('ui:setExportThreshold', { buildingId: building.id, threshold: t })
+      );
+      b.classList.add('craft-mode');
+      b.classList.toggle('is-active', threshold === t);
+      return b;
+    });
+    const excess = exportExcess(state, threshold);
+    const excessText = Object.keys(excess).length
+      ? `Şu an sınırı aşan: ${cargoText(excess)} (≈${cargoValue(excess)} altın; tekne en çok ${EXPORT.capacity} birim alır)`
+      : threshold === null
+        ? 'Kapalı: tekne yalnızca rıhtımdaki sandığı götürür'
+        : `Şu an ${threshold}'ü aşan stok yok`;
+    const preview = cratePreview(state);
+    const costs = Object.entries(preview).map(([r, v]) => el('span', { className: 'build-cost' }, [el('img', { src: getIconDataURL(RESOURCES[r].icon), alt: RESOURCES[r].name }), String(v)]));
+    const crate = this.button('İhracat Sandığı Hazırla', Object.keys(preview).length ? `Her kaynaktan en çok ${EXPORT.crate.perResource} birim rıhtıma konur (stokta en az ${EXPORT.crate.minStock} kalır)` : `Sandığa koyacak fazla mal yok (her kaynaktan en az ${EXPORT.crate.minStock} stokta kalır)`, () =>
+      this.events.emit('ui:prepareCrate', { buildingId: building.id })
+    );
+    crate.classList.add('upgrade-button');
+    crate.disabled = Object.keys(preview).length === 0;
+    const values = Object.entries(EXPORT.values).map(([r, v]) => `${RESOURCES[r].name.toLocaleLowerCase('tr')} ${v}`).join(' · ');
+    const children = [
+      el('div', { className: 'building-section-title', text: 'Nehir İhracatı' }),
+      el('div', { className: 'upgrade-text', text: 'Otomatik fazlalık ihracatı (stok sınırı):' }),
+      el('div', { className: 'craft-modes' }, chips),
+      el('div', { className: 'upgrade-text', text: excessText }),
+      el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, costs.length ? costs : [el('span', { className: 'person-empty', text: 'Sandık için fazla mal yok' })]), crate]),
+    ];
+    if (building.crate) children.push(el('div', { className: 'upgrade-text is-active', text: `Rıhtımda bekleyen sandık: ${cargoText(building.crate)} (≈${cargoValue(building.crate)} altın)` }));
+    children.push(el('div', { className: 'upgrade-text is-active', text: boatStatus(state) }));
+    children.push(el('div', { className: 'upgrade-text', text: `Birim başına altın: ${values}` }));
+    this.harbor.replaceChildren(...children);
+  }
+
   /** Sıradaki geliştirme: harabeyse onarım, yükseltilebiliyorsa Seviye 2, yoksa null. */
   nextStep(building) {
     const def = BUILDINGS[building.type];
     if (building.underConstruction) return null;
     if (building.ruined) return { kind: 'repair', spec: def.ruin };
     if (building.damaged) return { kind: 'mend', spec: mendSpec(building.type, STORM.mend) };
+    if (def.wonder && !building.wonderComplete) {
+      const stage = def.wonder.stages[building.wonderStage];
+      return { kind: 'stage', spec: { ...stage, buildWork: stage.work }, index: building.wonderStage };
+    }
     if (def.upgrade && !building.upgraded) return { kind: 'upgrade', spec: def.upgrade };
     return null;
   }
@@ -329,14 +457,22 @@ export class BuildingPanel {
     this.upgrade.hidden = !next;
     if (!next) return;
     const { kind, spec } = next;
-    const title = kind === 'repair' ? `Onarınca: ${building.definition.name}` : kind === 'mend' ? 'Fırtına hasarı: onarım gerekli' : `Seviye 2: ${spec.name}`;
+    const stages = building.definition.wonder?.stages.length ?? 0;
+    const title =
+      kind === 'repair'
+        ? `Onarınca: ${building.definition.name}`
+        : kind === 'mend'
+          ? 'Fırtına hasarı: onarım gerekli'
+          : kind === 'stage'
+            ? `Aşama ${next.index + 1}/${stages}: ${spec.name}`
+            : `Seviye 2: ${spec.name}`;
     const text = kind === 'repair' ? building.definition.description : spec.description;
     const children = [el('div', { className: 'building-section-title', text: title }), el('div', { className: 'upgrade-text', text })];
 
     if (building.project) {
-      const verb = kind !== 'upgrade' ? 'Onarım' : 'Yükseltme';
+      const verb = PROJECT_WORDS[kind].noun;
       children.push(el('div', { className: 'upgrade-text is-active', text: `${verb} sürüyor: ${percent(building.projectRatio)} tamamlandı` }));
-      const cancelLabel = kind !== 'upgrade' ? 'Onarımı İptal Et' : 'Yükseltmeyi İptal Et';
+      const cancelLabel = PROJECT_WORDS[kind].cancel;
       const cancel = this.button(cancelLabel, 'Hiç çalışılmadıysa tamamı, yoksa yarısı iade edilir', () =>
         this.events.emit('ui:cancelProject', building.id)
       );
@@ -350,7 +486,7 @@ export class BuildingPanel {
         ])
       );
       const missing = Object.entries(spec.cost).filter(([r, v]) => state.resources[r] < v).map(([r]) => RESOURCES[r].name);
-      const label = kind !== 'upgrade' ? 'Onarımı Başlat' : 'Yükselt';
+      const label = PROJECT_WORDS[kind].start;
       const go = this.button(label, missing.length ? `Yetersiz kaynak: ${missing.join(', ')}` : 'İnşaatçılar gelip çalışmaya başlar', () =>
         this.events.emit('ui:startProject', building.id)
       );
@@ -426,6 +562,49 @@ export class BuildingPanel {
         if (building.processStatus) lines.push(building.processStatus);
         break;
       }
+      case 'academy': {
+        const kids = state.characters.filter((c) => c.isChild);
+        const pupils = kids.filter((c) => c.task?.activity === 'school' && c.task.buildingId === building.id && c.task.phase === 'perform');
+        lines.push(`Okul (${String(SCHOOL.hours.from).padStart(2, '0')}:00-${SCHOOL.hours.to}:00): şu an derste ${pupils.length} çocuk`);
+        if (kids.length) {
+          const progress = kids.map((c) => {
+            const ratio = Math.min(1, (c.schooling ?? 0) / SCHOOL.graduateMinutes);
+            return ratio >= 1 ? `${c.name} hazır` : `${c.name} ${percent(ratio)}`;
+          });
+          lines.push(`Öğrenciler: ${progress.join(' · ')}`);
+          lines.push('Okulu bitiren çocuk büyüyünce rastgele bir meslekte doğrudan Kalfa (Sv. 2) olur');
+        } else {
+          lines.push('Kasabada şu an okul çağında çocuk yok');
+        }
+        const educated = state.characters.filter((c) => c.educated).length;
+        if (educated) lines.push(`Okuldan yetişen: ${educated} sakin`);
+        const done = RESEARCH_KEYS.filter((id) => state.research.done[id]).length;
+        lines.push(`Tamamlanan araştırma: ${done}/${RESEARCH_KEYS.length}`);
+        if (building.processStatus) lines.push(building.processStatus);
+        break;
+      }
+      case 'harbor': {
+        const trade = state.trade;
+        lines.push(`Kasaba Hazinesi: ${state.resources.gold} altın`);
+        lines.push(`Toplam: ${trade.shipments} sefer · ${trade.goldEarned} altın kazanıldı`);
+        if (trade.last) lines.push(`Son sefer (Gün ${trade.last.day}): ${cargoText(trade.last.cargo)} → +${trade.last.gold} altın`);
+        lines.push(`Ara sıra Ticaret Bereketi (%${Math.round(EXPORT.bonusChance * 100)}): kasabaya refah ve iş hızı`);
+        lines.push(building.lit ? 'Liman feneri yanıyor' : 'Liman feneri akşam yanar');
+        break;
+      }
+      case 'wonder': {
+        const stages = def.wonder.stages;
+        stages.forEach((st, i) => lines.push(`${i < building.wonderStage ? '✓' : i === building.wonderStage && building.project ? '…' : '·'} Aşama ${i + 1}: ${st.name}`));
+        if (building.wonderComplete) {
+          lines.push(`Altın çağ: kasaba refahı +${def.townBonus.happiness}`);
+          lines.push('Geceleri kule bir fener gibi vadiyi aydınlatır; ışığındaki sakinler üşümez');
+          lines.push('Saat başı (07:00-22:00) çan çalar');
+        } else {
+          lines.push('Her aşama inşaatçıların emeğiyle yükselir; maliyet aşama başlarken ödenir');
+          lines.push(`Tamamlanınca: refah +${def.townBonus.happiness}, gece feneri, saat başı çan`);
+        }
+        break;
+      }
       case 'ironMine':
         lines.push(building.lit ? 'Girişteki fener yanıyor' : 'Girişteki fener akşam yanar');
         lines.push('Çıkan demir zanaatkârın çelik başlı aletlerine gider');
@@ -462,7 +641,7 @@ export class BuildingPanel {
       case 'storage':
       case 'supplyCamp':
         lines.push(`Depo kapasitesine katkı: +${def.storageBonus}`);
-        lines.push(`Stok: ${RESOURCE_KEYS.map((r) => `${RESOURCES[r].name} ${state.resources[r]}`).join(' · ')} / ${state.storageCapacity}`);
+        lines.push(`Stok: ${RESOURCE_KEYS.filter((r) => !RESOURCES[r].treasury).map((r) => `${RESOURCES[r].name} ${state.resources[r]}`).join(' · ')} / ${state.storageCapacity}`);
         if (building.type === 'supplyCamp') lines.push('Uzak yollarda yorulanlar burada soluklanır');
         break;
       case 'berryBush':

@@ -16,6 +16,7 @@ import { getSeason } from '../../data/seasons.js';
 import { ILLNESS, VIGOR } from '../../data/health.js';
 import { PANEL_SKILL_COUNT, SKILL_LEVELS } from '../../data/skills.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
+import { SCHOOL } from '../../data/research.js';
 import { el } from '../dom.js';
 
 const PORTRAIT_SCALE = 5;
@@ -350,6 +351,12 @@ export class CharacterPanel {
     } else if (character.exposure >= ILLNESS.threshold) {
       tags.push({ text: 'Üşütmek üzere', icon: 'cold', cls: 'is-cold' });
     }
+    // 12. aşama: okul
+    if (character.isChild && (character.schooling ?? 0) > 0) {
+      const ratio = Math.min(1, character.schooling / SCHOOL.graduateMinutes);
+      tags.push({ text: ratio >= 1 ? 'Okulu bitirdi: büyüyünce Kalfa olacak' : `Okula gidiyor: %${Math.round(ratio * 100)}`, icon: 'book', cls: 'is-vigor' });
+    }
+    if (character.educated) tags.push({ text: 'Bilgelik Evi mezunu', icon: 'book', cls: 'is-vigor' });
     if ((character.buffs.vigor ?? -1) > now) tags.push({ text: `${VIGOR.name}: %${Math.round((VIGOR.workSpeed - 1) * 100)} hızlı`, icon: 'herb', cls: 'is-vigor' });
     if (character.away) {
       const back = character.away.until - now;

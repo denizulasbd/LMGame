@@ -9,6 +9,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { getSeason } from '../data/seasons.js';
 import { TOWN_NAMES, TOWN_NAME_MAX_LENGTH } from '../data/town.js';
 import { EQUIPMENT_KEYS } from '../data/equipment.js';
+import { RESEARCH } from '../data/research.js';
 import { Character } from '../entities/Character.js';
 import { Building } from '../entities/Building.js';
 import { Animal } from '../entities/Animal.js';
@@ -80,13 +81,22 @@ export class GameState {
     this.animalMeta = { wildlifeSeeded: false, lastPetDay: 0 };
     // Belediye fermanları (CivicSystem, 11. aşama): depo genişletme kademesi, lonca, son ziyafet günü,
     // keşif seferlerinden gelen kadim tılsımlar (refaha kalıcı katkı)
-    this.civic = { storageLevel: 0, craftGuild: false, feastDay: -99, decrees: 0, relics: 0 };
+    this.civic = { storageLevel: 0, craftGuild: false, feastDay: -99, decrees: 0, relics: 0, expeditionsSinceTalisman: 0 };
     // İkilem olayları (DilemmaSystem, 11. aşama):
     //   nextDay   : bir sonraki olayın günü, history: { olay: son çıktığı gün }
     //   active    : açık karar penceresi { id, remaining (gerçek saniye), wasPaused }
     //   storm     : yaklaşan fırtına / kurt saldırısı { kind, at (oyun dakikası), fortified, watchChance }
     //   expedition: süren keşif seferi { members: [id], until, size }
     this.dilemma = { nextDay: null, history: {}, active: null, storm: null, expedition: null };
+    // Bilgelik Evi (ResearchSystem, 12. aşama): süren araştırma { id, progress } ve biten araştırmalar
+    // { id: { day, hour, minute } }
+    this.research = { active: null, done: {} };
+    // Nehir ihracatı (HarborSystem, 12. aşama):
+    //   boat      : nehirdeki ticaret teknesi { stage: arriving | docked | leaving, progress, cargo, dockUntil } ya da null
+    //   nextBoatAt: sıradaki teknenin yola çıkacağı oyun dakikası
+    //   shipments, goldEarned, exported: toplam sefer, kazanılan altın ve kaynak başına ihraç edilen birim
+    //   last      : son sefer { day, hour, minute, gold, cargo }
+    this.trade = { boat: null, nextBoatAt: null, shipments: 0, goldEarned: 0, exported: {}, last: null };
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -142,6 +152,8 @@ export class GameState {
       town: this.town,
       civic: this.civic,
       dilemma: this.dilemma,
+      research: this.research,
+      trade: this.trade,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -199,6 +211,12 @@ export class GameState {
     next.dilemma = { ...next.dilemma, ...(data.dilemma ?? {}), history: { ...(data.dilemma?.history ?? {}) } };
     next.animals = (data.animals ?? []).filter((a) => a && Number.isFinite(a.x) && Number.isFinite(a.y)).map((a) => Animal.fromJSON(a));
     next.animalMeta = { ...next.animalMeta, ...(data.animalMeta ?? {}) };
+    // 12. aşamadan eski kayıtlarda araştırma, okul ve liman yoktur: boş başlar
+    next.research = {
+      active: RESEARCH[data.research?.active?.id] ? { id: data.research.active.id, progress: Math.max(0, Number(data.research.active.progress) || 0) } : null,
+      done: Object.fromEntries(Object.entries(data.research?.done ?? {}).filter(([id]) => RESEARCH[id])),
+    };
+    next.trade = { ...next.trade, ...(data.trade ?? {}), exported: { ...(data.trade?.exported ?? {}) } };
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
     if (data.town && Number.isInteger(data.town.tier)) {

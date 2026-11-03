@@ -8,7 +8,7 @@
 //                      peşin ödenir, inşaatçılar yapının çevresinde çalışır, yapı bu sırada işlemeye devam eder
 //   - proje bitince yapı Seviye 2 olur ('building:upgraded') ya da harabe onarılır ('ruin:restored';
 //     erzak kampının hazinesi stoğa eklenir)
-import { BUILDINGS, TILE_BUILDS, TILE_REMOVAL, mendSpec } from '../data/buildings.js';
+import { BUILDINGS, TILE_BUILDS, TILE_REMOVAL, mendSpec, PROJECT_WORDS } from '../data/buildings.js';
 import { STORM } from '../data/dilemmas.js';
 import { OBJECT_TYPES, TILE_TYPES, GROUND_TILES } from '../data/tiles.js';
 import { formatCost } from '../data/resources.js';
@@ -99,6 +99,18 @@ export class ConstructionSystem {
         orientation = 'right';
       }
     }
+    // Liman (12. aşama): kara yanı kum, kalanı su; suyun ötesinde teknelerin geçeceği açık bir su şeridi olmalı
+    if (!reason && def.placement === 'harbor') {
+      orientation = this.shoreOrientation(tileX, tileY, def.size.w) ?? null;
+      if (!orientation) {
+        reason = 'Nehir kıyısına kurulmalı: bir sütun kum, iki sütun su';
+        orientation = 'right';
+      } else {
+        const channelX = orientation === 'right' ? tileX + def.size.w : tileX - 1;
+        const open = [tileY, tileY + 1].every((y) => map.get(channelX, y) === 'water' && map.getOccupant(channelX, y) === 0);
+        if (!open) reason = 'Limanın önünde teknelerin yanaşacağı açık su kalmalı (nehrin tamamını kapatma)';
+      }
+    }
 
     // Kapı / çalışma noktası yürünebilir ve yapı kurulduktan SONRA da kasabaya bağlı olmalı (önü yalnızca
     // kendi ayak izinin içinden bağlanan yapı kendi girişini koparmasın). Ulaşılabilirlik bir kez hesaplanır.
@@ -161,14 +173,14 @@ export class ConstructionSystem {
    * 2x2 iskele ayak izi için su yönü: sol sütun kum + sağ sütun su ise 'right', tersi ise 'left'.
    * Her iki satırın da aynı olması gerekir. Uygun değilse null.
    */
-  shoreOrientation(tileX, tileY) {
+  shoreOrientation(tileX, tileY, width = 2) {
     const map = this.world.map;
     const column = (x) => [map.get(x, tileY), map.get(x, tileY + 1)];
-    const left = column(tileX);
-    const right = column(tileX + 1);
     const all = (tiles, type) => tiles.every((t) => t === type);
-    if (all(left, 'sand') && all(right, 'water')) return 'right';
-    if (all(left, 'water') && all(right, 'sand')) return 'left';
+    const columns = Array.from({ length: width }, (_, i) => column(tileX + i));
+    // 'right': sol sütun kum, diğerleri su; 'left': sağ sütun kum, diğerleri su
+    if (all(columns[0], 'sand') && columns.slice(1).every((c) => all(c, 'water'))) return 'right';
+    if (all(columns[width - 1], 'sand') && columns.slice(0, -1).every((c) => all(c, 'water'))) return 'left';
     return null;
   }
 
@@ -234,7 +246,8 @@ export class ConstructionSystem {
   }
 
   demolishBlocker(building) {
-    if (!BUILDINGS[building.type].demolishable) return `${building.name} yıkılamaz`;
+    // Yıkılamayan yapının (harika) şantiyesi yine de iptal edilebilir
+    if (!BUILDINGS[building.type].demolishable && !building.underConstruction) return `${building.name} yıkılamaz`;
     const residents = this.world.getResidents(building);
     if (residents.length > 0) return `Bu evde ${residents.map((c) => c.name).join(' ve ')} yaşıyor`;
     if (building.occupants.size > 0) return 'İçeride biri var';
@@ -280,8 +293,16 @@ export class ConstructionSystem {
     if (!building || !building.underConstruction) return;
     building.underConstruction = false;
     building.buildProgress = building.definition.buildWork;
+    // Çok aşamalı harika: şantiye ilk aşamaydı (Temel); sonraki aşamalar panelden başlatılır
+    if (building.definition.wonder) building.wonderStage = 1;
     this.world.refreshStaticData();
     this.events.emit('building:completed', building);
+    if (building.definition.wonder) {
+      const [first, second] = building.definition.wonder.stages;
+      this.events.emit('wonder:stageCompleted', { building, stage: first, index: 1 });
+      this.events.emit('toast', { text: `${building.name}: ${first.name} atıldı! Sıradaki aşamayı (${second.name}) panelden başlatabilirsin.`, tone: 'success', icon: 'wonder' });
+      return;
+    }
     const extra = building.type === 'cabin' ? ' Yarın sabah yeni sakinler gelebilir.' : '';
     this.events.emit('toast', { text: `İnşaat tamamlandı: ${building.name}!${extra}`, tone: 'success', icon: 'hammer' });
   }
@@ -296,6 +317,11 @@ export class ConstructionSystem {
     if (building.ruined) return def.ruin ? { kind: 'repair', spec: def.ruin } : null;
     // Fırtınada / kurt saldırısında hasar gören yapı önce onarılır (11. aşama)
     if (building.damaged) return { kind: 'mend', spec: mendSpec(building.type, STORM.mend) };
+    // Çok aşamalı harika: sıradaki aşama (Gövde, Görkemli Kule)
+    if (def.wonder && !building.wonderComplete) {
+      const stage = def.wonder.stages[building.wonderStage];
+      return { kind: 'stage', spec: { ...stage, buildWork: stage.work } };
+    }
     if (def.upgrade && !building.upgraded) return { kind: 'upgrade', spec: def.upgrade };
     return null;
   }
@@ -308,7 +334,7 @@ export class ConstructionSystem {
     const { kind, spec } = next;
     let reason = null;
     if (building.underConstruction) reason = 'Önce inşaatı bitmeli';
-    else if (building.project) reason = kind !== 'upgrade' ? 'Onarım sürüyor' : 'Yükseltme sürüyor';
+    else if (building.project) reason = PROJECT_WORDS[kind].busy;
     else if (!this.hasReachableRing(building)) reason = 'Çevresine ulaşılamıyor: önce bir yol aç';
     else if (!this.economy.canAfford(spec.cost)) reason = `Yetersiz kaynak: ${this.economy.missing(spec.cost).join(', ')}`;
     return { ok: !reason, reason, kind, spec };
@@ -338,7 +364,12 @@ export class ConstructionSystem {
     this.jobs.createProjectJob(building);
     this.events.emit('building:projectStarted', { building, kind });
     this.events.emit('toast', {
-      text: kind !== 'upgrade' ? `Onarım başladı: ${before} (${formatCost(spec.cost)})` : `Yükseltme başladı: ${before} → ${spec.name} (${formatCost(spec.cost)})`,
+      text:
+        kind === 'upgrade'
+          ? `Yükseltme başladı: ${before} → ${spec.name} (${formatCost(spec.cost)})`
+          : kind === 'stage'
+            ? `${before}: ${spec.name} aşaması başladı (${formatCost(spec.cost)})`
+            : `Onarım başladı: ${before} (${formatCost(spec.cost)})`,
       tone: 'info',
       icon: 'hammer',
     });
@@ -364,6 +395,20 @@ export class ConstructionSystem {
     const { kind } = building.project;
     const before = building.name;
     building.project = null;
+    if (kind === 'stage') {
+      building.wonderStage += 1;
+      this.world.invalidateSpots(building);
+      this.world.refreshStaticData();
+      const stage = building.definition.wonder.stages[building.wonderStage - 1];
+      this.events.emit('wonder:stageCompleted', { building, stage, index: building.wonderStage });
+      if (building.wonderComplete) {
+        this.events.emit('wonder:completed', { building, townName: this.world.state.townName });
+        this.events.emit('toast', { text: `${building.name} tamamlandı! Kasaba altın çağını yaşıyor.`, tone: 'success', icon: 'wonder' });
+      } else {
+        this.events.emit('toast', { text: `${building.name}: ${stage.name} aşaması tamamlandı. Sıradaki aşamayı panelden başlatabilirsin.`, tone: 'success', icon: 'wonder' });
+      }
+      return;
+    }
     if (kind === 'mend') {
       building.damaged = false;
       this.world.invalidateSpots(building);

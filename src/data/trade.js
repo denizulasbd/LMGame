@@ -77,3 +77,27 @@ export const MERCHANT = {
     { hair: 'long', hairColor: 'auburn', skin: 'medium', shirt: 'lavender', pants: 'denim' },
   ],
 };
+
+// ---------------------------------------------------------------------------
+// İhracat (12. aşama): Büyük Ticaret Limanı'na nehirden ticaret teknesi gelir. Mantık src/systems/HarborSystem.js'te.
+//   values       : bir birimin altın değeri (Kasaba Hazinesi)
+//   thresholds   : limanın "fazlalık ihracatı" seçenekleri: bu sınırın üstündeki stok tekneyle gider (null = kapalı)
+//   crate        : "İhracat Sandığı Hazırla": her kaynaktan minStock'un üstünde kalanından en çok perResource birim
+//   intervalHours: iki tekne arası (oyun saati); tekneler 06:00-20:00 arası gelir
+//   dockHours    : teknenin rıhtımda yükleme süresi; capacity: bir teknenin taşıyabileceği en çok birim
+//   speed        : teknenin nehirde süzülme hızı (dünya pikseli / oyun-hızlı saniye)
+//   bonusChance  : yüklü bir seferin nadir ticaret bonusu (Ticaret Bereketi) getirme olasılığı
+// ---------------------------------------------------------------------------
+export const EXPORT = {
+  values: { wood: 1, stone: 1, food: 1, wool: 3, iron: 4, bread: 3 },
+  thresholds: [null, 250, 400, 550],
+  defaultThreshold: 400,
+  crate: { perResource: 40, minStock: 100 },
+  intervalHours: 4,
+  dockHours: 1.5,
+  capacity: 640,
+  speed: 18,
+  hours: { from: 6, to: 20 },
+  bonusChance: 0.2,
+  bonusBuff: 'prosperity',
+};

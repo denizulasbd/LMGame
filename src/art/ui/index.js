@@ -572,6 +572,54 @@ Object.assign(ICONS, {
   ],
 });
 
+// 12. aşama: Bilgelik Evi (açık kitap), araştırmalar (dişli), liman teknesi, Kasaba Harikası (saat kulesi)
+Object.assign(ICONS, {
+  book: [
+    '.........',
+    '.KKK.KKK.',
+    'KuuuKuuuK',
+    'KuRRKRRuK',
+    'KuuuKuuuK',
+    'KuRRKRRuK',
+    'KuuuKuuuK',
+    'KBBBKBBBK',
+    '.KKK.KKK.',
+  ],
+  gears: [
+    '...K.K...',
+    '..KqKqK..',
+    '.KqqqqrK.',
+    'KqqKKKrrK',
+    '.qrK.KrR.',
+    'KqrKKKrRK',
+    '.KrrrRRK.',
+    '..KRKRK..',
+    '...K.K...',
+  ],
+  boat: [
+    '....Koo..',
+    '...KK....',
+    '..KuK....',
+    '.KuuK....',
+    'KuuuK....',
+    '....K....',
+    'KKKKKKKKK',
+    '.KXwwwwK.',
+    'c.KKKKK.c',
+  ],
+  wonder: [
+    '....P....',
+    '...KYK...',
+    '..KYPOK..',
+    '..KKKKK..',
+    '..KuKuK..',
+    '..KuuKK..',
+    '.KKqqqKK.',
+    'KqqKwKqqK',
+    'KKKKKKKKK',
+  ],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);

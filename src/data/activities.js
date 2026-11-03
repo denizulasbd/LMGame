@@ -276,6 +276,23 @@ export const ACTIVITIES = {
     effects: { energy: 0.4 },
     urgentBubble: 'fever',
   },
+  // --- 12. aşama: Bilgelik Evi ---
+  teach: {
+    kind: 'work',
+    indoor: true,
+    travelLabel: 'Bilgelik Evi\'ne gidiyor',
+    label: 'Bilgelik Evi\'nde araştırma yapıyor',
+    teachLabel: 'Bilgelik Evi\'nde çocuklara ders veriyor',
+  },
+  // Çocuklar ders saatlerinde Bilgelik Evi'nde ders dinler (içeride)
+  school: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: 'Okula koşuyor',
+    label: 'Bilgelik Evi\'nde ders dinliyor',
+    duration: [50, 80],
+    effects: { social: 0.3, fun: 0.15 },
+  },
   // Keşif seferine çıkan sakin harita kenarına yürür ve bir gün ortadan kaybolur
   expedition: {
     kind: 'away',

@@ -21,6 +21,7 @@ import { RESOURCES } from '../data/resources.js';
 import { getSeason } from '../data/seasons.js';
 import { freeBeds, immigrationLimit } from './TownStatus.js';
 import { clamp } from '../utils/math.js';
+import { stormResistance } from './ResearchSystem.js';
 
 /** Bir olayın başlığı (kışın fırtına "Kar Fırtınası"). */
 export function dilemmaTitle(dilemma, state) {
@@ -52,6 +53,7 @@ export class DilemmaSystem {
     if (this.dilemma.nextDay === null) this.scheduleNext(DILEMMA_SCHEDULE.firstDay);
     // Kayıtta açık bir karar penceresi varsa oyun yine durur ve pencere açılır
     if (this.dilemma.active && !attract) {
+      this.publishOptions();
       this.events.emit('time:setPaused', true);
       this.events.emit('dilemma:opened', { active: this.dilemma.active });
     }
@@ -75,6 +77,7 @@ export class DilemmaSystem {
     if (d.active) {
       d.active.remaining -= tick.realDt;
       if (d.active.remaining <= 0) this.choose(null, true);
+      else this.publishOptions();
     }
     if (d.storm && this.state.totalMinutes >= d.storm.at) this.strike();
     if (d.expedition && this.state.totalMinutes >= d.expedition.until + 120) this.checkExpedition(true);
@@ -116,6 +119,7 @@ export class DilemmaSystem {
     }
     const id = force ?? this.rng.weighted(pool);
     d.active = { id, remaining: DILEMMA_SCHEDULE.timeoutSeconds, wasPaused: this.state.time.paused };
+    this.publishOptions();
     this.events.emit('time:setPaused', true);
     this.events.emit('dilemma:opened', { active: d.active });
     return true;
@@ -160,6 +164,19 @@ export class DilemmaSystem {
       if (key === 'dog' && !this.state.animals.some((a) => a.kind === 'dog')) return { ok: false, reason: 'Kasabada köpek yok' };
     }
     return { ok: true, reason: null };
+  }
+
+  /**
+   * Açık pencerenin seçeneklerinin durumu GameState'e yazılır (arayüz yalnızca durumu okur):
+   * active.options = [{ id, ok, reason }], active.defaultId: süre dolunca uygulanacak seçenek.
+   */
+  publishOptions() {
+    const active = this.dilemma.active;
+    if (!active) return;
+    const def = DILEMMAS[active.id];
+    active.options = def.options.map((o) => ({ id: o.id, ...this.optionStatus(o) }));
+    active.defaultId = this.defaultOption(def).id;
+    active.title = dilemmaTitle(def, this.state);
   }
 
   /** Süre dolunca: varsayılan seçeneklerden uygulanabilir ilki (yoksa uygulanabilir herhangi biri). */
@@ -241,8 +258,13 @@ export class DilemmaSystem {
     if (!force && members.some((c) => c.away)) return;
     this.dilemma.expedition = null;
     const table = EXPEDITION.loot[exp.size] ?? EXPEDITION.loot.small;
-    const pick = this.rng.weighted(table.map((entry, i) => [i, entry.weight]));
-    const entry = table[pick];
+    const civic = this.state.civic;
+    // Şans sayacı: tılsımsız geçen seferler birikir; sayaç dolunca bu sefer tılsımı kesin bulur
+    const sinceTalisman = (civic.expeditionsSinceTalisman ?? 0) + 1;
+    const talismanEntry = EXPEDITION.loot.big.find((e) => e.buff === 'talisman');
+    let entry = table[this.rng.weighted(table.map((e, i) => [i, e.weight]))];
+    if (!entry.buff && sinceTalisman >= EXPEDITION.talismanPity) entry = talismanEntry;
+    civic.expeditionsSinceTalisman = entry.buff === 'talisman' ? 0 : sinceTalisman;
     const got = {};
     for (const [resource, [min, max]] of Object.entries(entry.get)) {
       const added = this.economy.add(resource, this.rng.int(min, max));
@@ -293,7 +315,8 @@ export class DilemmaSystem {
     }
     const candidates = this.damageable();
     const [min, max] = STORM.damage;
-    const count = Math.min(candidates.length, this.rng.int(min, max));
+    // Mimarlık Loncası araştırması yapıları fırtınaya iki kat dayanıklı kılar
+    const count = Math.min(candidates.length, Math.floor(this.rng.int(min, max) / stormResistance(this.state)));
     const damaged = [];
     for (let i = 0; i < count; i++) {
       const b = candidates.splice(this.rng.int(0, candidates.length - 1), 1)[0];

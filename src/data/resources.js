@@ -7,6 +7,7 @@
 //   foodValue        : 1 birimin yiyecek değeri. Ekmek 2,5'tir: öğünler ve göç koşulu ekmeği bu değerle sayar
 //                      (bkz. EconomySystem.consumeFood, TownStatus.foodSupply)
 //   longName / hint  : HUD ipucu ve panellerdeki uzun ad / ne işe yaradığı
+//   treasury         : (12. aşama) Kasaba Hazinesi: depo sınırı yoktur, ihracattan gelir, harikada harcanır
 export const RESOURCES = {
   wood: { name: 'Odun', icon: 'wood', hint: 'İnşaat, ısınma ve zanaat malzemesi' },
   stone: { name: 'Taş', icon: 'stone', hint: 'İnşaat ve yükseltme malzemesi' },
@@ -33,6 +34,14 @@ export const RESOURCES = {
     foodValue: 2.5,
     hint: 'Yel Değirmeni ve Fırın 1 yiyecekten 1 sıcak ekmek yapar: her ekmek 2,5 yiyecek değerindedir',
   },
+  gold: {
+    name: 'Altın',
+    longName: 'Kasaba Hazinesi',
+    icon: 'coin',
+    processed: true,
+    treasury: true,
+    hint: 'Büyük Ticaret Limanı\'ndan ihraç edilen mallar altına döner. Depo sınırı yoktur; Büyük Saat Kulesi\'nin aşamalarında harcanır',
+  },
 };
 export const RESOURCE_KEYS = Object.keys(RESOURCES);
 // Temel kaynaklar ve işlenmiş mallar (HUD bunları iki satırda gösterir)
@@ -41,7 +50,7 @@ export const GOODS_KEYS = RESOURCE_KEYS.filter((k) => RESOURCES[k].processed);
 // Yiyecek yerine sayılan kaynaklar (yiyecek, ekmek)
 export const FOOD_KEYS = RESOURCE_KEYS.filter((k) => RESOURCES[k].foodValue);
 
-export const STARTING_RESOURCES = { wood: 30, stone: 20, food: 25, wool: 0, iron: 0, bread: 0 };
+export const STARTING_RESOURCES = { wood: 30, stone: 20, food: 25, wool: 0, iron: 0, bread: 0, gold: 0 };
 
 // Depo binası olmadan her kaynaktan saklanabilecek miktar (her Kiler buna eklenir)
 export const BASE_STORAGE_CAPACITY = 100;

@@ -18,6 +18,7 @@ import { TRAITS } from '../data/characters.js';
 import { describeOffer } from './EventSystem.js';
 import { SKILLS } from '../data/skills.js';
 import { formatTownTitle } from './TownStatus.js';
+import { cargoValue } from './HarborSystem.js';
 
 // İşlenmiş malların ilk üretimi
 const FIRST_GOODS_TEXT = {
@@ -49,9 +50,11 @@ export class JournalSystem {
     this.unsubscribers = [
       on('population:joined', ({ character }) => this.log(`${character.name} kasabaya katıldı`, 'heart')),
       on('building:placed', ({ building }) => this.log(`${building.name} için şantiye kuruldu`, 'hammer')),
-      on('building:completed', (building) => this.log(`${building.name} tamamlandı`, 'hammer')),
+      on('building:completed', (building) => {
+        if (!building.definition.wonder) this.log(`${building.name} tamamlandı`, 'hammer'); // harikanın ilk aşaması aşağıda
+      }),
       on('building:projectStarted', ({ building, kind }) =>
-        this.log(kind !== 'upgrade' ? `${building.name} için onarım başladı` : `${building.name} yükseltiliyor`, 'hammer')
+        this.log(kind === 'upgrade' ? `${building.name} yükseltiliyor` : kind === 'stage' ? `${building.name}: yeni aşamanın inşaatı başladı` : `${building.name} için onarım başladı`, 'hammer')
       ),
       on('building:upgraded', ({ building, from }) => this.log(`${from} yükseltildi: artık bir ${building.name}`, 'star')),
       on('ruin:restored', ({ building, from, treasure }) => {
@@ -131,6 +134,22 @@ export class JournalSystem {
         const got = Object.keys(loot).length ? `: ${describeLoot(loot)}` : '';
         this.log(`${members.map((c) => c.name).join(' ve ')} seferden döndü. ${text}${got}`, 'map');
       }),
+      // 12. aşama: Bilgelik Evi, okul, liman ve harika
+      on('research:started', ({ research }) => this.log(`Bilgelik Evi'nde araştırma başladı: ${research.name}`, 'book')),
+      on('research:completed', ({ research }) => this.log(`Araştırma tamamlandı: ${research.name}`, research.icon)),
+      on('school:graduated', ({ character, skill }) =>
+        this.log(`${character.name} okulda öğrendikleriyle doğrudan Kalfa ${SKILLS[skill].title} olarak başladı`, 'book')
+      ),
+      on('harbor:cratePrepared', ({ cargo }) => this.log(`Rıhtıma ihracat sandığı hazırlandı (${cargoValue(cargo)} altın değerinde)`, 'boat')),
+      on('harbor:shipped', ({ cargo, gold, bonus }) => {
+        if (gold <= 0) return;
+        const units = Object.values(cargo).reduce((a, b) => a + b, 0);
+        this.log(`Ticaret teknesi ${units} birim malı nehirden götürdü: Kasaba Hazinesi'ne +${gold} altın${bonus ? ' · Ticaret Bereketi' : ''}`, 'coin');
+      }),
+      on('wonder:stageCompleted', ({ building, stage, index }) =>
+        this.log(`${building.name}: ${stage.name} aşaması tamamlandı (${index}/${building.definition.wonder.stages.length})`, 'wonder')
+      ),
+      on('wonder:completed', ({ building, townName }) => this.log(`${building.name} göğe yükseldi! ${townName} altın çağını yaşıyor`, 'star')),
       on('civic:decreed', ({ project }) => this.log(`Belediye fermanı: ${project.name}`, project.icon)),
       on('building:mended', ({ building }) => this.log(`${building.name} fırtına hasarından onarıldı`, 'hammer')),
       on('townHall:balanced', ({ building, from, to, amount }) =>

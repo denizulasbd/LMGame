@@ -165,9 +165,10 @@ export class StructureSystem {
         building.flock ??= new Flock(building);
         if (building.functional) building.flock.update(tick, season.key, raining);
       }
-      // Biri gerçekten çalışırken (yolda değil) ocak, iskele, değirmen ve fırın canlanır
+      // Biri gerçekten çalışırken (yolda değil) ocak, iskele, değirmen ve fırın canlanır; Bilge çalışırken
+      // Bilgelik Evi'nin kubbesinden dürbün uzanır (limanın vinci HarborSystem'de, tekne yanaşınca çalışır)
       building.active =
-        (def.production !== undefined || def.kitchen !== undefined || def.crafting !== undefined || def.processing !== undefined || def.apothecary !== undefined) &&
+        (def.production !== undefined || def.kitchen !== undefined || def.crafting !== undefined || def.processing !== undefined || def.apothecary !== undefined || def.academy !== undefined) &&
         [...building.workerIds].some((id) => {
           const task = this.world.getCharacter(id)?.task;
           return task?.phase === 'perform';

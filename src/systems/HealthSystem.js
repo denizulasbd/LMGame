@@ -15,6 +15,7 @@ import { isRainActive } from '../data/weather.js';
 import { isShivering } from './HeatingSystem.js';
 import { coldProtection } from './Equipment.js';
 import { clamp } from '../utils/math.js';
+import { researchVigorHours } from './ResearchSystem.js';
 
 /** Dinçlik bonusu sürüyor mu? */
 export function hasVigor(c, now) {
@@ -125,7 +126,7 @@ export class HealthSystem {
     const wasIll = Boolean(c.illness);
     c.illness = null;
     c.exposure = 0;
-    c.buffs.vigor = this.state.totalMinutes + VIGOR.hours * 60;
+    c.buffs.vigor = this.state.totalMinutes + (researchVigorHours(this.state) ?? VIGOR.hours) * 60;
     c.showBubble('sparkle', 2.2);
     this.state.stats.cured = (this.state.stats.cured ?? 0) + 1;
     this.events.emit('health:cured', { character: c, building, wasIll });

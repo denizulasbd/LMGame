@@ -2,9 +2,10 @@
 // Başlık, simge, atmosferik metin ve 2-3 seçenek (maliyet çipleri, etkisi; koşulu tutmayan seçenek soluk ve
 // nedeni yazılı). Oyun duraklatılmıştır; alttaki çubuk 30 saniyelik süreyi gösterir: süre dolunca varsayılan
 // güvenli seçenek uygulanır. Seçim 'ui:chooseDilemma' { optionId } olarak yayınlanır; kurallar DilemmaSystem'de.
+// Pencere yalnızca GameState'i okur: seçeneklerin uygunluğu, başlık ve varsayılan seçenek DilemmaSystem'in
+// state.dilemma.active'e yazdığı alanlardan gelir (options: [{ id, ok, reason }], defaultId, title).
 import { DILEMMAS, DILEMMA_SCHEDULE } from '../../data/dilemmas.js';
 import { RESOURCES } from '../../data/resources.js';
-import { dilemmaTitle } from '../../systems/DilemmaSystem.js';
 import { getAnyIconURL, getIconDataURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
 
@@ -38,22 +39,20 @@ export class DilemmaModal {
       this.lastKey = '';
       return;
     }
-    const scene = game.scenes.current;
-    const system = scene?.dilemmas;
     const def = DILEMMAS[active.id];
     const resources = game.state.resources;
-    const statuses = def.options.map((o) => system?.optionStatus(o) ?? { ok: true });
+    const statuses = def.options.map((o) => active.options?.find((x) => x.id === o.id) ?? { ok: true, reason: null });
     const key = `${active.id}|${statuses.map((s) => s.ok).join(',')}|${Object.values(resources).join(',')}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       this.icon.src = getAnyIconURL(def.icon);
-      this.title.textContent = dilemmaTitle(def, game.state);
+      this.title.textContent = active.title ?? def.title;
       this.text.textContent = def.text;
       this.options.replaceChildren(...def.options.map((option, i) => this.optionButton(option, statuses[i], resources)));
     }
     const left = Math.max(0, active.remaining);
     this.timerFill.style.width = `${(left / DILEMMA_SCHEDULE.timeoutSeconds) * 100}%`;
-    const fallback = system?.defaultOption(def);
+    const fallback = def.options.find((o) => o.id === active.defaultId);
     this.timerText.textContent = `Oyun duraklatıldı · ${Math.ceil(left)} sn içinde seçilmezse: ${fallback?.label ?? '—'}`;
   }
 

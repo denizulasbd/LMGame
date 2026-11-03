@@ -55,6 +55,7 @@ export class EconomySystem {
 
   /** Bu kaynak için depoda kalan boş yer. */
   room(resource) {
+    if (RESOURCES[resource].treasury) return Infinity;
     return Math.max(0, this.capacity - this.amount(resource));
   }
 
@@ -90,13 +91,14 @@ export class EconomySystem {
   /** Kaynak ekler (depo kapasitesine kadar). Gerçekten eklenen miktarı döndürür. */
   add(resource, amount) {
     const current = this.amount(resource);
-    const added = Math.max(0, Math.min(Math.floor(amount), this.capacity - current));
+    const limit = RESOURCES[resource].treasury ? Infinity : this.capacity; // hazinenin (altın) sınırı yok
+    const added = Math.max(0, Math.min(Math.floor(amount), limit - current));
     if (added > 0) {
       this.state.resources[resource] = current + added;
       this.emitChange(resource, added);
     }
     const now = this.amount(resource);
-    if (now >= this.capacity && !this.fullWarned.has(resource)) {
+    if (now >= limit && !this.fullWarned.has(resource)) {
       this.fullWarned.add(resource);
       this.events.emit('toast', {
         text: `${RESOURCES[resource].name} deposu doldu! Kiler kurarak kapasiteyi artırabilirsin.`,
