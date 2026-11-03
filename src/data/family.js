@@ -47,12 +47,12 @@ export const CHILD_HAIR_STYLES = ['short', 'long', 'bun', 'spiky'];
 // cooldownMinutes boyunca yeniden atışmaz. Zıt kişilikliler sohbet ve çalışmadan yarı puan kazanır.
 export const CONFLICT = {
   // (15. aşama) Sosyal denge: 50 günlük stres koşularında 5330 atışmaya 128 barışma düşüyordu; sürtüşmeler
-  // törpülendi (olasılıklar düştü, aynı çift en az 7 saat ara verir), barışma yerleri çoğaldı
-  workChancePerMinute: 0.018,
+  // törpülendi (olasılıklar düştü, aynı çift en az 10 saat ara verir), barışma yerleri çoğaldı
+  workChancePerMinute: 0.012,
   chatChancePerMinute: 0.0005,
-  encounterChancePerMinute: 0.006,
+  encounterChancePerMinute: 0.004,
   encounterRadius: 12,
-  cooldownMinutes: 420,
+  cooldownMinutes: 600,
   scoreLoss: 8,
   funLoss: 6,
   clashGainMultiplier: 0.5,
@@ -64,7 +64,7 @@ export const CONFLICT = {
 // Akşam (eveningFrom'dan sonra) handa sıcak yemek yiyenler de içeride barışabilir.
 export const RECONCILE = {
   below: 0, // (15. aşama) atışıp eksiye düşen her çift küstür (eskiden yalnızca -10'un altı)
-  chancePerMinute: 0.03,
+  chancePerMinute: 0.05,
   venueMultiplier: 4,
   venues: ['inn', 'gazebo', 'campfire', 'festival'],
   resetTo: 12,

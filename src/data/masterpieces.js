@@ -65,7 +65,7 @@ export const MASTERWORK = {
   baseChance: 0.04, // Usta bir mesaiyi bitirince
   pinnedBonus: 0.02, // oyuncunun sabitlediği iş yerinde (kendi tezgâhı)
   toolBonus: 0.02, // Sağlam Alet kuşanmışsa
-  perMakerPerDay: 1, // bir usta günde en çok bir eser
+  makerCooldownDays: 3, // bir usta iki eser arasında en az bu kadar gün bekler (kasabada 20+ usta olunca eser bollaşmasın)
   exhibitHappiness: 1, // sergilenen her eser kasaba refahına kalıcı +1
   maxExhibitHappiness: 12,
   merchantRate: 0.85, // gezgin tüccar limanın ödediğinin %85'ini öder

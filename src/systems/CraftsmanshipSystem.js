@@ -6,7 +6,7 @@
 //
 //   Usta işi eser: Usta (Lv.3) bir sakin kendi iş yerinde (Kereste Atölyesi, Taş Ocağı, Demir Madeni, Fırın, Koyun
 //   Ağılı, Şifacı Kulübesi) bir mesaiyi bitirince MASTERWORK.baseChance (+ sabit iş yeri, + Sağlam Alet) olasılıkla
-//   bir eser çıkarır (günde en çok bir tane). Eser Kasaba Arşivi'nin vitrinine girer:
+//   bir eser çıkarır (iki eser arasında en az MASTERWORK.makerCooldownDays gün). Eser Kasaba Arşivi'nin vitrinine girer:
 //     'ui:exhibitMasterwork' { id }         : sergilenir, kasaba refahına kalıcı +1 (en çok +12)
 //     'ui:sellMasterwork' { id, source }    : limandan ('harbor') ya da gezgin tüccara ('merchant') satılır
 // Yayınladığı olaylar: 'masterwork:created' { item, piece, character, building }, 'masterwork:exhibited' { item, piece },
@@ -82,7 +82,8 @@ export class CraftsmanshipSystem {
     if (!type || !building?.functional) return;
     const day = this.state.time.day;
     const mw = this.masterworks;
-    if ((mw.lastByMaker[c.id] ?? -1) === day) return; // bir usta günde en çok bir eser
+    const last = mw.lastByMaker[c.id];
+    if (last !== undefined && day - last < MASTERWORK.makerCooldownDays) return; // usta eserler arasında dinlenir
     if (storedMasterworks(this.state).length >= MASTERWORK.maxStored) return; // vitrin dolu
     const chance = this.chanceFor(c, type, building);
     if (chance <= 0 || this.rng.next() >= chance) return;

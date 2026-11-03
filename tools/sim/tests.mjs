@@ -982,7 +982,7 @@ const pageResults = await page.evaluate(async () => {
     const rel = sc().relationships;
 
     // --- Sosyal denge ---
-    check('atışma bekleme süresi uzadı, olasılıklar törpülendi', CONFLICT.cooldownMinutes >= 420 && CONFLICT.encounterChancePerMinute <= 0.006 && CONFLICT.workChancePerMinute <= 0.018);
+    check('atışma bekleme süresi uzadı, olasılıklar törpülendi', CONFLICT.cooldownMinutes >= 600 && CONFLICT.encounterChancePerMinute <= 0.004 && CONFLICT.workChancePerMinute <= 0.012);
     const rate = (place) => {
       let ok = 0;
       const off = game.events.on('relationship:reconciled', () => ok++);
@@ -1111,7 +1111,7 @@ const pageResults = await page.evaluate(async () => {
     mw.lastByMaker = {};
     made = 0;
     for (let i = 0; i < 2000; i++) game.events.emit('work:finished', { character: rc, activity: 'mineIron', building: mine });
-    check('bir usta günde en çok bir eser çıkarır', made === 1, `${made}`);
+    check(`usta iki eser arasında ${MASTERWORK.makerCooldownDays} gün dinlenir`, made === 1, `${made}`);
     offMade();
     const item = mw.items.find((it) => it.status === 'stored');
     check('eser vitrine (depoya) girer, ustanın anısına ve günlüğe yazılır', item?.type === 'ironStatue' && item.maker === rc.name && rc.memories.at(-1).text.includes(MASTERPIECES.ironStatue.name) && s.journal.some((j) => j.text.includes(MASTERPIECES.ironStatue.name)));
