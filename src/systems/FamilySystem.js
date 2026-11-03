@@ -12,6 +12,7 @@
 //                büyüyüp yetişkin olur.
 // Yayınladığı olaylar: 'family:homeShared' { a, b, home, swapped? }, 'family:madeRoom' { character, from, to },
 //   'family:childBorn' { child, parents, home }, 'family:grownUp' { character }, 'population:changed'.
+import { compoundName } from '../utils/names.js';
 import { Character } from '../entities/Character.js';
 import { HAPPY_HOME, CHILDREN, CHILD_NAMES, CHILD_SHIRTS, CHILD_HAIR_STYLES } from '../data/family.js';
 import { MARRIAGE } from '../data/relationships.js';
@@ -279,7 +280,8 @@ export class FamilySystem {
     const free = CHILD_NAMES.filter((n) => !taken.has(n));
     if (free.length) return this.rng.pick(free);
     const extra = EXTRA_NAMES.filter((n) => !taken.has(n));
-    return extra.length ? this.rng.pick(extra) : `${this.rng.pick(CHILD_NAMES)} ${taken.size + 1}`;
+    if (extra.length) return this.rng.pick(extra);
+    return compoundName(this.rng, [...CHILD_NAMES, ...EXTRA_NAMES], taken);
   }
 
   growUp(c) {

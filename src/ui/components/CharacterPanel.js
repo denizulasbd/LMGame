@@ -5,6 +5,8 @@
 // en çok geliştiği meslekler; kışın üşüyüp üşümediği, Mutlu Yuva morali ve kamera takibi.
 // (13. aşama) Ada tıklayınca metin kutusuna döner: Enter yeni adı kaydeder ('ui:renameCharacter'), Esc vazgeçer.
 // Sabitlenmiş iş yeri ve handaki baharatlı yemeğin hız bonusu durum etiketlerinde görünür.
+// (14. aşama) "Anılar ve Hatıralar": sakinin hayat yolculuğu (en yenisi üstte; ilk 5'i, istenirse tümü); o an
+// hatırladığı anı vurgulanır ve durum satırında "Anılara daldı" etiketi çıkar.
 import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../../art/sprites/index.js';
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
@@ -93,6 +95,14 @@ export class CharacterPanel {
     this.equipmentList = el('div', { className: 'equipment-slots' });
     this.skillsList = el('div', { className: 'relations-list skills-list' });
     this.conditions = el('div', { className: 'character-conditions' });
+    this.memoryList = el('div', { className: 'memory-list' });
+    this.memoryToggle = this.button('Tümünü Göster', 'Sakinin bütün anılarını göster / gizle', () => {
+      this.showAllMemories = !this.showAllMemories;
+      this.lastMemories = null;
+    });
+    this.memoryToggle.classList.add('memory-toggle');
+    this.memoryBox = el('div', {}, [this.memoryList, this.memoryToggle]);
+    this.showAllMemories = false;
 
     this.followButton = this.button('Kamerayla Takip Et', 'Kamera bu karakteri takip etsin', () => {
       const next = this.followingId === this.characterId ? null : this.characterId;
@@ -113,6 +123,7 @@ export class CharacterPanel {
       section('İlişkiler', this.relationsList),
       section('Ekipman', this.equipmentList),
       section('Meslekler', this.skillsList),
+      section('Anılar ve Hatıralar', this.memoryBox),
       this.followButton,
     ]);
   }
@@ -194,6 +205,7 @@ export class CharacterPanel {
     this.lastConditions = null;
     this.lastFamily = null;
     this.lastEquipment = null;
+    this.lastMemories = null;
   }
 
   render(game) {
@@ -230,6 +242,7 @@ export class CharacterPanel {
     this.renderEquipment(character);
     this.renderSkills(character);
     this.renderConditions(character, game.state);
+    this.renderMemories(character, game.state);
   }
 
   /** Aile: medeni durum (eşi / sevgilisi), çocukları ve ebeveynleri; çocuksa büyümesine kalan süre. */
@@ -361,6 +374,29 @@ export class CharacterPanel {
     );
   }
 
+  /** Anılar: en yenisi üstte; kapalıyken son 5 anı. Hatırlanan anı vurgulanır. */
+  renderMemories(character, state) {
+    const memories = character.memories ?? [];
+    const recalling = character.recall && character.recall.until > state.totalMinutes ? character.recall : null;
+    const key = `${character.id}:${memories.length}:${memories.at(-1)?.text}:${this.showAllMemories}:${recalling?.text ?? ''}`;
+    if (key === this.lastMemories) return;
+    this.lastMemories = key;
+    const shown = [...memories].reverse().slice(0, this.showAllMemories ? memories.length : 5);
+    this.memoryList.replaceChildren(
+      ...(shown.length
+        ? shown.map((m) =>
+            el('div', { className: `memory-row${recalling && recalling.text === m.text ? ' is-recalled' : ''}`, title: `Gün ${m.day}, ${String(m.hour).padStart(2, '0')}:00` }, [
+              el('img', { src: getAnyIconURL(m.icon ?? 'heart'), alt: '' }),
+              el('span', { className: 'memory-day', text: `Gün ${m.day}` }),
+              el('span', { text: m.text }),
+            ])
+          )
+        : [el('div', { className: 'relations-empty', text: 'Henüz anlatacak bir anısı yok.' })])
+    );
+    this.memoryToggle.hidden = memories.length <= 5;
+    this.memoryToggle.textContent = this.showAllMemories ? 'Son Anılar' : `Tümünü Göster (${memories.length})`;
+  }
+
   /** Durum etiketleri: kışın üşüyor (paltolu daha az) / içi ısındı, sıcak yemekle tok, Mutlu Yuva. */
   renderConditions(character, state) {
     const now = state.totalMinutes;
@@ -390,6 +426,9 @@ export class CharacterPanel {
     if (character.workplaceId !== null) {
       const place = state.buildings.find((b) => b.id === character.workplaceId);
       if (place) tags.push({ text: `Sabit iş yeri: ${place.name}`, icon: 'pin', cls: 'is-warm' });
+    }
+    if (character.recall && character.recall.until > now) {
+      tags.push({ text: `Anılara daldı: “${character.recall.text}”`, icon: 'memory', cls: 'is-love' });
     }
     if ((character.buffs.spiced ?? -1) > now) {
       tags.push({ text: `Baharat ve kahve: %${Math.round((LUXURY_GOODS.spiceCrate.personal.workSpeed - 1) * 100)} hızlı`, icon: 'spice', cls: 'is-vigor' });

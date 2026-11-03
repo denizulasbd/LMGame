@@ -2,6 +2,11 @@
 //
 //   cloud / rain : hedef bulutluluk ve yağmur şiddeti (0-1); değerler yumuşakça bu hedefe yaklaşır
 //   next         : bir sonraki değişimde hangi havaların hangi ağırlıkla seçileceği
+// 14. aşama — nadir hava olayları (WEATHER_SPECIALS ile belli saatte zar atılarak başlar, normal sırada seçilmez):
+//   mist         : sis yoğunluğu (0-1); sabah sisi haritayı kaplar, nehrin üstünde süzülür
+//   downpour     : yağmur damlası yoğunluğu çarpanı (bardaktan boşanırcasına)
+//   thunder      : şimşek çakar ve gök gürler (yalnızca görüntü ve ses)
+//   durationHours: [en az, en çok] süresi (oyun saati); funDecay: dışarıdakilerin keyif azalma çarpanı
 //
 // Gece ateşböcekleri ayrı bir hava türü değildir: açık (güneşli) bir gece FIREFLY_NIGHT
 // saatlerine denk gelirse arayüz ve atmosfer onu "Ateşböcekleri" olarak gösterir.
@@ -27,6 +32,33 @@ export const WEATHER_TYPES = {
     rain: 1,
     next: { sunny: 0.3, cloudy: 0.5, rainy: 0.2 },
   },
+  mist: {
+    name: 'Sabah Sisi',
+    icon: 'mist',
+    cloud: 0.2,
+    rain: 0,
+    mist: 1,
+    durationHours: [2.5, 4.5],
+    funDecay: 0.8, // sisli sabah dinlendirir: dışarıdakilerin keyfi yavaş düşer
+    next: { sunny: 0.75, cloudy: 0.25 },
+  },
+  thunderstorm: {
+    name: 'Gök Gürültülü Fırtına',
+    icon: 'thunder',
+    cloud: 1,
+    rain: 1,
+    downpour: 2.2,
+    thunder: true,
+    durationHours: [1.5, 2.5],
+    next: { cloudy: 0.6, sunny: 0.4 },
+  },
+};
+
+// Nadir hava olaylarının zarı: her gün rollHour'da, bu mevsimlerde bu olasılıkla ve şu an from havalarından biri
+// sürüyorsa başlar (ilkbahar / sonbahar sabahları sis, yaz öğleden sonraları kısa gök gürültülü fırtına)
+export const WEATHER_SPECIALS = {
+  mist: { rollHour: 5, seasons: { spring: 0.4, autumn: 0.18 }, from: ['sunny', 'cloudy'] },
+  thunderstorm: { rollHour: 14, seasons: { summer: 0.3 }, from: ['sunny', 'cloudy'] },
 };
 
 export const WEATHER_KEYS = Object.keys(WEATHER_TYPES);
@@ -78,6 +110,6 @@ export function describeWeather(weather, hour, season = 'summer') {
   if (weather.type === 'sunny' && fireflyIntensity(weather, hour) > 0.05) {
     return { key: 'fireflies', name: 'Ateşböcekleri', icon: 'firefly' };
   }
-  const def = WEATHER_TYPES[weather.type];
+  const def = WEATHER_TYPES[weather.type] ?? WEATHER_TYPES.sunny;
   return { key: weather.type, name: def.name, icon: def.icon };
 }

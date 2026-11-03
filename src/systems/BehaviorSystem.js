@@ -40,6 +40,10 @@ import { isFreezing } from './HeatingSystem.js';
 import { equipmentWorkSpeed } from './Equipment.js';
 import { arePartners } from './RelationshipSystem.js';
 import { HEATING } from '../data/seasons.js';
+import { JOBS } from '../data/jobs.js';
+import { ACTIVITY_SKILLS } from '../data/skills.js';
+
+const JOBS_MAX = Object.fromEntries(Object.entries(JOBS).map(([k, v]) => [k, v.maxWorkers]));
 import { clamp } from '../utils/math.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
@@ -76,6 +80,15 @@ export class BehaviorSystem {
       }),
       game.events.on('expedition:depart', ({ ids, until, exit }) => this.departExpedition(ids, until, exit)),
       // Şenlik başlayınca boş zamanı olanlar elindekini bırakıp şenliğe katılır
+      // (14. aşama) Toplanma Zili: uyanık herkes elindekini bırakır (uyuyanlar uyanmaz)
+      game.events.on('rally:rung', () => {
+        for (const c of this.world.characters) {
+          const kind = c.task ? ACTIVITIES[c.task.activity].kind : 'idle';
+          if (c.visible && !c.away && INTERRUPTIBLE_KINDS.has(kind)) this.endTask(c);
+        }
+      }),
+      // (14. aşama) Öncelikli hedef: boştaki en uygun işçiler hemen oraya koşar
+      game.events.on('job:urgent', ({ job }) => this.sendToUrgentJob(job)),
       game.events.on('festival:started', () => {
         for (const c of this.world.characters) {
           const kind = c.task ? ACTIVITIES[c.task.activity].kind : 'idle';
@@ -746,6 +759,24 @@ export class BehaviorSystem {
     const c = this.world.getCharacter(characterId);
     if (!building || !c || !building.excludedWorkers.delete(c.id)) return;
     this.events.emit('toast', { text: `${c.name} yeniden ${building.name} işinde çalışabilir`, tone: 'info', icon: 'hammer' });
+  }
+
+  /** Öncelikli işaretlenen hedefe boştaki (dinlenen, gezen, sohbet eden) en uygun yetişkinleri gönderir. */
+  sendToUrgentJob(job) {
+    const skill = ACTIVITY_SKILLS[job.type];
+    const idle = this.world.characters.filter((c) => {
+      if (c.isChild || !c.visible || c.away || c.newcomer || c.workplaceId !== null) return false;
+      const kind = c.task ? ACTIVITIES[c.task.activity].kind : 'idle';
+      return kind === 'leisure' || kind === 'idle' || kind === 'social';
+    });
+    const score = (c) => Math.hypot(c.tileX - job.x, c.tileY - job.y) - (skill ? (c.skills?.[skill] ?? 0) / 100 : 0);
+    idle.sort((a, b) => score(a) - score(b));
+    const sent = idle.slice(0, Math.max(0, JOBS_MAX[job.type] - job.assignees.length));
+    for (const c of sent) {
+      this.endTask(c);
+      c.activityLabel = 'Öncelikli işe koşuyor';
+    }
+    return sent;
   }
 
   /**

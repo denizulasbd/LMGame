@@ -33,6 +33,8 @@ const WEATHER_TEXT = {
   rainy: 'Yağmur başladı; bahçeler sevinecek.',
   cloudy: 'Gökyüzü bulutlandı.',
   sunny: 'Bulutlar dağıldı, hava açtı.',
+  mist: 'Sabah sisi çöktü; nehrin üstünde süzülüyor.',
+  thunderstorm: 'Gök gürledi, bardaktan boşanırcasına yağmur başladı!',
 };
 
 /** Hazinenin kısa yazımı: "35 odun, 25 taş ve 30 yiyecek". */
@@ -94,8 +96,12 @@ export class JournalSystem {
       on('equipment:equipped', ({ character, item }) => this.log(`${character.name} ${EQUIPMENT[item].name} kuşandı`, EQUIPMENT[item].icon)),
       on('worker:dismissed', ({ building, character }) => this.log(`${character.name} ${building.name} işinden çıkarıldı`, 'sulk')),
       on('weather:changed', ({ type }) => this.log(WEATHER_TEXT[type] ?? WEATHER_TYPES[type].name, WEATHER_TYPES[type].icon)),
-      on('festival:started', ({ venue }) => this.log(`Kasaba Şenliği başladı (${venue.name})`, 'note')),
-      on('festival:ended', () => this.log('Şenlik bitti; herkes yarına neşeyle başlayacak', 'sparkle')),
+      on('festival:started', ({ venue, festival }) => this.log(festival ? `${festival.name} başladı (${venue.name})` : `Kasaba Şenliği başladı (${venue.name})`, festival?.icon ?? 'note')),
+      on('festival:ended', ({ theme } = {}) => !theme && this.log('Şenlik bitti; herkes yarına neşeyle başlayacak', 'sparkle')),
+      // 14. aşama: mevsim festivalleri, toplanma zili
+      on('seasonFestival:announced', ({ festival }) => this.log(`Duyuru: bugün 15:00'te ${festival.name}`, festival.icon)),
+      on('seasonFestival:ended', ({ festival, attendees }) => this.log(`${festival.name} gece yarısı sona erdi; ${attendees.length} sakin kutladı, kasaba yeni mevsime coşkuyla giriyor`, festival.icon)),
+      on('rally:rung', () => this.log('Toplanma Zili çaldı; sakinler meydanda toplandı', 'bell')),
       on('merchant:arrived', ({ name }) => this.log(`${name} kasabaya geldi`, 'sparkle')),
       on('merchant:left', ({ name, nextVisitDay }) => this.log(`${name} ayrıldı; Gün ${nextVisitDay} gibi yine gelir`, 'sparkle')),
       on('trade:completed', ({ offer }) => this.log(`Takas: ${describeOffer(offer)}`, 'sparkle')),
@@ -141,10 +147,11 @@ export class JournalSystem {
         this.log(`${character.name} okulda öğrendikleriyle doğrudan Kalfa ${SKILLS[skill].title} olarak başladı`, 'book')
       ),
       on('harbor:cratePrepared', ({ cargo }) => this.log(`Rıhtıma ihracat sandığı hazırlandı (${cargoValue(cargo)} altın değerinde)`, 'boat')),
-      on('harbor:shipped', ({ cargo, gold, bonus }) => {
+      on('harbor:grandVoyage', ({ price }) => this.log(`Büyük İhracat Seferi ilan edildi (${price} altın): kervan teknesi yolda`, 'boat')),
+      on('harbor:shipped', ({ cargo, gold, bonus, grand }) => {
         if (gold <= 0) return;
         const units = Object.values(cargo).reduce((a, b) => a + b, 0);
-        this.log(`Ticaret teknesi ${units} birim malı nehirden götürdü: Kasaba Hazinesi'ne +${gold} altın${bonus ? ' · Ticaret Bereketi' : ''}`, 'coin');
+        this.log(`${grand ? 'Kervan teknesi (Büyük İhracat Seferi)' : 'Ticaret teknesi'} ${units} birim malı nehirden götürdü: Kasaba Hazinesi'ne +${gold} altın${bonus ? ' · Ticaret Bereketi' : ''}`, 'coin');
       }),
       on('wonder:stageCompleted', ({ building, stage, index }) =>
         this.log(`${building.name}: ${stage.name} aşaması tamamlandı (${index}/${building.definition.wonder.stages.length})`, 'wonder')

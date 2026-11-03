@@ -101,6 +101,21 @@ export const ACTIVITIES = {
     bubbles: ['note', 'sparkle'],
     partnerBubbles: ['heart', 'chat', 'laugh', 'note'],
   },
+  // 14. aşama: Toplanma Zili — sakinler meydanda toplanıp bekler
+  rally: {
+    kind: 'social',
+    target: 'fountain',
+    travelLabel: 'Toplanma zilini duyup meydana koşuyor',
+    label: 'Meydanda toplandı, kalabalığı seyrediyor',
+    partnerLabel: '{partner} ile meydanda merakla bekliyor',
+    duration: [60, 60],
+    effects: { fun: 0.2 },
+    socialGain: 0.9,
+    aloneSocialGain: 0.4,
+    faceBuilding: true,
+    bubbles: ['note', 'chat'],
+    partnerBubbles: ['chat', 'laugh', 'note'],
+  },
   bench: {
     kind: 'leisure',
     target: 'bench',

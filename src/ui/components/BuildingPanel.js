@@ -29,12 +29,13 @@ import { getSeason } from '../../data/seasons.js';
 import { RESEARCH, RESEARCH_KEYS, SCHOOL } from '../../data/research.js';
 import { EXPORT } from '../../data/trade.js';
 import { researchStatus } from '../../systems/ResearchSystem.js';
-import { cargoValue, exportExcess, cratePreview, boatStatus, boatCapacity } from '../../systems/HarborSystem.js';
+import { cargoValue, exportExcess, cratePreview, boatStatus, boatCapacity, grandVoyageStatus } from '../../systems/HarborSystem.js';
 import { relicExportValue } from '../../systems/Luxury.js';
+import { rallyStatus, isRallyActive, RALLY } from '../../systems/RallySystem.js';
 import { lacking } from '../../systems/Equipment.js';
 import { arePartners } from '../../systems/RelationshipSystem.js';
 import { getStructureSprite } from '../../art/sprites/index.js';
-import { getIconDataURL } from '../../art/ui/index.js';
+import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
 import { luxuryCards, relicShelf, goldDecreeCards } from './luxuryCards.js';
 import { ACTIVITY_SKILLS, SKILL_LEVELS } from '../../data/skills.js';
@@ -75,6 +76,7 @@ export class BuildingPanel {
     this.research = el('div', { className: 'building-decrees building-research' });
     this.harbor = el('div', { className: 'building-decrees building-harbor' });
     this.luxury = el('div', { className: 'building-decrees building-luxury' });
+    this.bell = el('div', { className: 'building-decrees building-bell' });
     this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
     this.lines = el('div', { className: 'building-lines' });
     this.upgrade = el('div', { className: 'building-upgrade' });
@@ -101,6 +103,7 @@ export class BuildingPanel {
       this.research,
       this.harbor,
       this.luxury,
+      this.bell,
       this.lines,
       this.upgrade,
       this.tradeButton,
@@ -158,6 +161,7 @@ export class BuildingPanel {
             JSON.stringify(cratePreview(state)),
             JSON.stringify(exportExcess(state, building.exportThreshold)),
             boatStatus(state),
+            JSON.stringify(grandVoyageStatus(state)),
             state.resources.gold,
             state.trade.shipments,
           ].join(':')
@@ -167,7 +171,9 @@ export class BuildingPanel {
         ? [JSON.stringify(state.luxury), state.resources.gold, Math.floor((state.buffs.spices ?? 0) / 60), Math.floor((state.buffs.goldBonus ?? 0) / 60), Math.floor((state.buffs.royalArchitects ?? 0) / 60), state.time.day, state.buildings.length].join(':')
         : '';
     const pickerKey = this.pickerFor === building.id ? this.workerCandidates(building, state).map((o) => `${o.character.id}:${o.character.name}:${o.level}:${o.pinnedTo}`).join(',') : '';
+    const bellKey = building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}` : '';
     const key = [
+      bellKey,
       craftKey,
       decreeKey,
       researchKey,
@@ -215,6 +221,7 @@ export class BuildingPanel {
     this.renderResearch(building, state);
     this.renderHarbor(building, state);
     this.renderLuxury(building, state);
+    this.renderBell(building, state);
     this.lines.replaceChildren(...lines.map((text) => el('div', { className: 'building-line', text })));
     this.lines.hidden = lines.length === 0;
     this.renderUpgrade(building, next, state);
@@ -433,6 +440,26 @@ export class BuildingPanel {
       .sort((a, b) => b.level - a.level || a.character.name.localeCompare(b.character.name, 'tr'));
   }
 
+  /** (14. aşama) Meydan havuzu ve Belediye Konağı: Toplanma Zili. */
+  renderBell(building, state) {
+    const show = (building.type === 'fountain' || Boolean(building.definition.civic)) && building.functional;
+    this.bell.hidden = !show;
+    if (!show) return;
+    const st = rallyStatus(state);
+    const go = this.button('Zili Çal', st.ok ? 'Kasaba çanı çalar; uyanık herkes bir saatliğine meydanda toplanır' : st.reason, () => this.events.emit('ui:rallyBell'));
+    go.classList.add('upgrade-button');
+    go.disabled = !st.ok;
+    this.bell.replaceChildren(
+      el('div', { className: 'building-section-title', text: 'Toplanma Zili' }),
+      el('div', { className: 'decree luxury-card' }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('bell'), alt: '' }), 'Kasaba çanı', el('span', { className: 'decree-state', text: isRallyActive(state) ? 'Toplanıyorlar' : '3 saatte bir' })]),
+        el('div', { className: 'upgrade-text', text: `Çan çalınca uyanık bütün sakinler elindekini bırakıp ${RALLY.minutes} dakikalığına meydanda toplanır (şenlikleri ya da kasabayı toplu seyretmek için). Uyuyanlar uyanmaz.` }),
+        el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, []), go]),
+        ...(st.ok ? [] : [el('div', { className: 'upgrade-text is-active', text: st.reason })]),
+      ])
+    );
+  }
+
   /** (13. aşama) Liman: lüks mallar; Belediye Konağı: yadigâr rafı ve altın fermanları. */
   renderLuxury(building, state) {
     const harbor = building.type === 'harbor' && building.functional;
@@ -525,6 +552,20 @@ export class BuildingPanel {
     ];
     if (building.crate) children.push(el('div', { className: 'upgrade-text is-active', text: `Rıhtımda bekleyen sandık: ${cargoText(building.crate)} (≈${cargoValue(building.crate, relicExportValue(state))} altın)` }));
     children.push(el('div', { className: 'upgrade-text is-active', text: boatStatus(state) }));
+    // (14. aşama) Büyük İhracat Seferi fermanı
+    const gv = grandVoyageStatus(state);
+    const spec = EXPORT.grandVoyage;
+    const grand = this.button('Büyük İhracat Seferi', gv.ok ? `${spec.price} altın: kervan teknesi hemen gelir` : gv.reason, () => this.events.emit('ui:grandVoyage', { buildingId: building.id }));
+    grand.classList.add('upgrade-button');
+    grand.disabled = !gv.ok;
+    children.push(
+      el('div', { className: 'decree luxury-card' }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL('boat'), alt: '' }), 'Büyük İhracat Seferi', el('span', { className: 'decree-state', text: `${spec.cooldownDays} günde bir` })]),
+        el('div', { className: 'upgrade-text', text: `Kervan teknesi saati beklemeden yola çıkar, ${spec.capacityMultiplier} kat yük alır ve ${spec.threshold}'ü aşan bütün malları götürür; yükün değeri %${Math.round((spec.valueBonus - 1) * 100)} fazladır. Toplam ${state.trade.grandVoyages ?? 0} kervan seferi.` }),
+        el('div', { className: 'upgrade-row' }, [el('span', { className: `luxury-price${(state.resources.gold ?? 0) < spec.price ? ' is-missing' : ''}` }, [el('img', { src: getIconDataURL('coin'), alt: 'Altın' }), String(spec.price)]), grand]),
+        ...(gv.ok ? [] : [el('div', { className: 'upgrade-text is-active', text: gv.reason }) ]),
+      ])
+    );
     children.push(el('div', { className: 'upgrade-text', text: `Birim başına altın: ${values}` }));
     this.harbor.replaceChildren(...children);
   }

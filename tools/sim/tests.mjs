@@ -8,7 +8,10 @@
 //              sandığı, ticaret teknesinin seferi ve Kasaba Hazinesi, üç aşamalı Harika ve 9. hedef
 //   13. aşama: lüks mallar (baharat, ipek ve mermer), beş yadigâr ve artan fiyatları, etkileri (gerçek üretim dahil),
 //              altın fermanları (ikramiye, 3 kat hızlı inşaat), kemer / çit / kiraz / çardak, sakin adı, işçi sabitleme,
-//              Kasaba Arşivi ve sayaçlar, fotoğraf modu, kayıt sürümü 11
+//              Kasaba Arşivi ve sayaçlar, fotoğraf modu
+//   14. aşama: tekne kapasitesi ve Büyük İhracat Seferi, sabah sisi ve yaz fırtınası (şimşek), dört mevsim festivali
+//              (duyuru, yer, süsleme, katılım, anı, Mevsim Coşkusu), anılar ve nostalji, hayvan sevme, öncelikli kesim,
+//              Toplanma Zili, kayıt sürümü 12
 import { openGame, createChecks } from './lib.mjs';
 
 const { browser, page, errors } = await openGame({ seed: 5 });
@@ -526,7 +529,7 @@ const pageResults = await page.evaluate(async () => {
   check('Güneş Saati Küresi ve Bereket Boynuzu', near(L.relicProductionMultiplier(s, 'wood'), 1.1) && near(L.relicProductionMultiplier(s, 'food'), 1.1 * 1.25));
   check('Usta Lonca Mührü: deneyim +%30', near(L.relicXpMultiplier(s), 1.3));
   const H13 = await import('/src/systems/HarborSystem.js');
-  check('Denizci Pusulası: tekne +%50 yük, altın +%20', H13.boatCapacity(s) === Math.round(640 * 1.5) && H13.cargoValue({ wood: 100 }, L.relicExportValue(s)) === 120);
+  check('Denizci Pusulası: tekne +%50 yük, altın +%20', H13.boatCapacity(s) === Math.round(EXPORT.capacity * 1.5) && H13.cargoValue({ wood: 100 }, L.relicExportValue(s)) === 120);
   {
     const { heatingSources } = await import('/src/systems/HeatingSystem.js');
     const rate = () => heatingSources(s).filter((x) => x.building.type === 'cabin').reduce((a, x) => a + x.perMinute, 0);
@@ -742,7 +745,226 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:chooseDilemma', { optionId: s.dilemma.active.defaultId });
   }
 
-  // --- Kayıt gidiş-dönüşü (sürüm 11) ---
+  // ===== 14. aşama =====
+  const clickAt = (wx, wy) => {
+    // Haritaya gerçek bir sol tık: dünya noktasını ekrana çevirip girdiye bırakır, sahne bir karede işler
+    const cam = scene.camera;
+    game.input.pendingClick = { x: (wx - cam.x) * cam.zoom, y: (wy - cam.y) * cam.zoom };
+    sim.step(1);
+  };
+  // --- Rötuş: tekne kapasitesi ve Büyük İhracat Seferi ---
+  check('ticaret teknesi taban kapasitesi %35 arttı (864)', EXPORT.capacity === 864);
+  {
+    for (let i = 0; i < 60 && s.trade.boat; i++) hours(0.25);
+    s.resources.gold = 100;
+    check('Büyük İhracat Seferi altın ister', !H13.grandVoyageStatus(s).ok);
+    sim.give({ gold: 1000, wood: 1600, stone: 1500, food: 900 });
+    const gold0 = s.resources.gold;
+    game.events.emit('ui:grandVoyage', { buildingId: harbor.id });
+    check('Büyük İhracat Seferi ilan edilir, kervan hemen yola çıkar', s.resources.gold === gold0 - EXPORT.grandVoyage.price && s.trade.boat?.grand && s.trade.grandDay === s.time.day);
+    check('aynı gün ikinci sefer ilan edilemez', !H13.grandVoyageStatus(s).ok);
+    let shipped = null;
+    const off = game.events.on('harbor:shipped', (p) => (shipped = p));
+    for (let i = 0; i < 80 && !shipped; i++) hours(0.25);
+    off();
+    const units = shipped ? Object.values(shipped.cargo).reduce((a, b) => a + b, 0) : 0;
+    check('kervan teknesi 2,5 kat yük alır ve 350 sınırına boşaltır', shipped?.grand && units > H13.boatCapacity(s) && units <= H13.boatCapacity(s, true), `${units} birim`);
+    check('kervan yükü %10 daha değerli', shipped && shipped.gold === H13.cargoValue(shipped.cargo, L.relicExportValue(s) * EXPORT.grandVoyage.valueBonus));
+  }
+
+  // --- Hava: sis ve yaz fırtınası ---
+  {
+    const { WEATHER_TYPES } = await import('/src/data/weather.js');
+    scene.weather.force('mist');
+    hours(1.5);
+    const left = (s.weather.nextChangeAt - s.totalMinutes) / 60;
+    check('sabah sisi çöker (yoğunluk ve süre)', s.weather.mist > 0.9 && left > 0 && left <= 4.5, `${s.weather.mist.toFixed(2)} · ${left.toFixed(1)} sa kaldı`);
+    check('sis dinlendirir: dışarıda keyif yavaş düşer', WEATHER_TYPES.mist.funDecay < 1);
+    // Zar: yazın öğleden sonra fırtına çıkabilir, kışın çıkmaz
+    const day0 = s.time.day;
+    const type0 = s.weather.type;
+    const rolls = { summer: 0, winter: 0 };
+    for (let d = 0; d < 40; d++) {
+      for (const [season, base] of [['summer', 5], ['winter', 13]]) {
+        s.time.day = base + (d % 4) + 16 * Math.floor(d / 4);
+        s.weather.type = 'sunny';
+        if (scene.weather.rollSpecial(14) === 'thunderstorm') rolls[season]++;
+      }
+    }
+    s.time.day = day0;
+    check('gök gürültülü fırtına yalnızca yazın, ara sıra', rolls.summer > 3 && rolls.summer < 30 && rolls.winter === 0, JSON.stringify(rolls));
+    scene.weather.force('thunderstorm');
+    let flashes = 0;
+    const off = game.events.on('weather:lightning', () => flashes++);
+    sim.step(400);
+    const rainPeak = s.weather.rain;
+    sim.step(2000);
+    off();
+    check('fırtınada şimşek çakar ve gök gürler', flashes >= 2 && rainPeak > 0.9 && WEATHER_TYPES.thunderstorm.downpour > 1, `${flashes} şimşek · yağmur ${s.weather.rain.toFixed(2)} · ${s.weather.type} · duraklı ${s.time.paused}`);
+    scene.weather.force(type0 === 'mist' || type0 === 'thunderstorm' ? 'sunny' : type0);
+  }
+
+  // --- Mevsim festivalleri ---
+  {
+    const { SEASON_FESTIVALS } = await import('/src/data/festivals.js');
+    const SF = await import('/src/systems/SeasonFestivalSystem.js');
+    check('festival günleri mevsimin son günü', SF.isFestivalDay(4) && SF.isFestivalDay(8) && SF.isFestivalDay(16) && !SF.isFestivalDay(5) && !SF.isFestivalDay(3));
+    // Duyuru: festival günü sabah 08:00
+    const day0 = s.time.day;
+    const fday = day0 + ((4 - (day0 % 4)) % 4 || 0) || day0;
+    s.time.day = SF.isFestivalDay(day0) ? day0 : day0 + (4 - (day0 % 4));
+    const announced = [];
+    const offA = game.events.on('seasonFestival:announced', (p) => announced.push(p.theme));
+    scene.seasonFestivals.onHour(8);
+    offA();
+    check('festival günü sabah duyurulur', announced.length === 1 && s.seasonFestival.stage === 'announced' && SF.currentSeasonFestival(s)?.stage === 'announced');
+    s.time.day = day0;
+    s.seasonFestival.stage = null;
+    for (const theme of ['spring', 'summer', 'autumn', 'winter']) {
+      if (s.events.festival.active) scene.townEvents.endFestival();
+      Object.assign(s.seasonFestival, { day: s.time.day, theme, stage: 'announced' });
+      const started = scene.seasonFestivals.start();
+      const f = s.events.festival;
+      const venue = scene.world.getBuilding(f.venueId);
+      const expectVenue = SEASON_FESTIVALS[theme].venues.find((t) => scene.world.getCompleted(t).length);
+      check(`${SEASON_FESTIVALS[theme].name}: başlar, yeri ve süslemeleri kurulur`, started && f.active && f.theme === theme && venue?.type === expectVenue && s.seasonFestival.decor.length >= 1 && (s.buffs[SEASON_FESTIVALS[theme].buff] ?? 0) > s.totalMinutes, `${venue?.type} · ${s.seasonFestival.decor.map((d) => d.kind).join(',')}`);
+      hours(1.5);
+      const attendees = s.seasonFestival.attendees.length;
+      if (theme === 'spring') check('Çiçek Şenliği: herkes saçına çiçek takar, aşk ve dostluk artar', s.characters.every((c) => c.flowerCrown) && buffMultiplier(s, 'romance') >= 2.5 && buffMultiplier(s, 'friendship') >= 1.8);
+      if (theme === 'winter') check('Işıklar Gecesi: şölen ateşi festivaldekileri ısıtır, kardan adam yükselir', s.characters.filter((c) => s.seasonFestival.attendees.includes(c.id)).every((c) => (c.buffs.warmUntil ?? 0) > s.totalMinutes) && s.seasonFestival.decor.some((d) => d.kind === 'snowman'));
+      const ends = [];
+      const offE = game.events.on('seasonFestival:ended', (p) => ends.push(p));
+      scene.townEvents.endFestival();
+      offE();
+      const memory = SEASON_FESTIVALS[theme].memory;
+      const remembered = s.characters.filter((c) => c.memories.some((m) => m.text === memory)).length;
+      check(`${SEASON_FESTIVALS[theme].name}: sakinler katılır, biter, anılara yazılır, Mevsim Coşkusu`, attendees >= 3 && ends.length === 1 && remembered === attendees && !s.events.festival.active && s.seasonFestival.held[theme] >= 1 && (s.buffs.seasonCheer ?? 0) > s.totalMinutes, `${attendees} katılımcı, ${remembered} anı`);
+    }
+    check('festival bitince çiçek taçları çıkar ve süslemeler kaldırılır', s.characters.every((c) => !c.flowerCrown) && s.seasonFestival.decor.length === 0);
+  }
+
+  // --- Anılar ve hatıralar ---
+  {
+    const { MEMORY, addMemory } = await import('/src/systems/MemorySystem.js');
+    const [a, b] = s.characters.filter((c) => !c.isChild);
+    const before = a.memories.length;
+    game.events.emit('relationship:married', { a, b, venue: null, festival: true });
+    check('düğün iki sakinin de anısına yazılır', a.memories.at(-1).text === `${b.name} ile şenlikte evlendi` && b.memories.at(-1).text === `${a.name} ile şenlikte evlendi` && a.memories.length === before + 1);
+    game.events.emit('skill:levelUp', { character: a, skill: 'masonry', level: { level: 3, name: 'Usta' } });
+    check('Usta unvanı anıya yazılır', a.memories.at(-1).text === 'Usta Taşçı unvanını kazandı');
+    {
+      // Kalabalıkta dostluk anıları sınırlı; en iyi arkadaşlık "dost oldu"nun yerini alır
+      const others = s.characters.filter((c) => c !== a && c !== b);
+      const friendLevel = { key: 'friend', name: 'Dost' };
+      const kept = a.memories.slice();
+      for (const o of others.slice(0, 7)) game.events.emit('relationship:levelUp', { a, b: o, level: friendLevel });
+      const dostCount = a.memories.filter((m) => m.text.endsWith(' ile dost oldu')).length;
+      const firstFriend = a.memories.find((m) => m.text.endsWith(' ile dost oldu'))?.text.replace(' ile dost oldu', '');
+      const pal = s.characters.find((c) => c.name === firstFriend);
+      game.events.emit('relationship:levelUp', { a, b: pal, level: { key: 'bestFriend', name: 'En İyi Arkadaş' } });
+      check('dostluk anıları sınırlı; en iyi arkadaşlık eski dostluk anısının yerini alır', dostCount <= MEMORY.friends && !a.memories.some((m) => m.text === `${pal.name} ile dost oldu`) && a.memories.at(-1).text === `${pal.name} ile en iyi arkadaş oldu`, `${dostCount} dostluk`);
+      a.memories = kept;
+    }
+    game.events.emit('health:cured', { character: a, building: null, wasIll: true });
+    check('hastalanıp iyileşmek anıya yazılır', a.memories.at(-1).text.includes("Şifacı'nın iksiriyle iyileşti"));
+    const first = a.memories[0].text;
+    for (let i = 0; i < 60; i++) addMemory(s, a, `deneme ${i}`, 'heart');
+    check('anılar en çok 40; ilk anı korunur', a.memories.length === MEMORY.max && a.memories[0].text === first && a.memories.at(-1).text === 'deneme 59');
+    check('her sakinin bir hayat hikâyesi var', s.characters.every((c) => c.memories.length >= 1));
+    {
+      // Defter dolunca önce küçük anılar (dostluk...) silinir; aynı anı yinelenmez
+      const saved = b.memories.slice();
+      b.memories = [saved[0]];
+      addMemory(s, b, 'Düğün anısı', 'ring', { kind: 'wedding' });
+      addMemory(s, b, 'Kaan ile dost oldu', 'heart', { kind: 'friend' });
+      addMemory(s, b, 'Kaan ile dost oldu', 'heart', { kind: 'friend' });
+      const dup = b.memories.filter((m) => m.text === 'Kaan ile dost oldu').length;
+      for (let i = 0; i < 60; i++) addMemory(s, b, `dost ${i}`, 'heart', { kind: 'friend' });
+      check('aynı anı yinelenmez; defter dolunca önce dostluk anıları silinir, düğün kalır', dup === 1 && b.memories.length === MEMORY.max && b.memories.some((m) => m.text === 'Düğün anısı') && b.memories[0] === saved[0]);
+      b.memories = saved;
+    }
+    // Nostalji: sakin bankta otururken güzel bir anısını hatırlar
+    a.recall = null;
+    a.needs.fun = 40;
+    const task0 = a.task;
+    a.task = { activity: 'bench', phase: 'perform', elapsed: 0, duration: 60 };
+    const recalled = [];
+    const offR = game.events.on('memory:recalled', (p) => recalled.push(p));
+    scene.memories.update({ gameMinutes: 2000 });
+    scene.memories.update({ gameMinutes: 2000 });
+    offR();
+    a.task = task0;
+    check('sakin bankta güzel bir anısını hatırlar: keyif ve anı balonu', recalled.length === 1 && recalled[0].character === a && a.needs.fun >= 40 + MEMORY.fun - 1e-6 && a.recall?.text === recalled[0].memory.text, `${recalled.length} kez`);
+    game.events.emit('ui:selectCharacter', a.id);
+    game.render(0);
+    const rows = document.querySelectorAll('.memory-row').length;
+    check('Karakter Paneli anıları listeler (son 5 / tümü)', rows === 5 && document.querySelector('.memory-toggle') && !document.querySelector('.memory-toggle').hidden, `${rows} satır`);
+    game.events.emit('ui:selectCharacter', null);
+  }
+
+  // --- Oyuncunun dünyayla etkileşimi ---
+  {
+    // Kediyi / köpeği fareyle sevmek
+    const pet = s.animals.find((x) => x.isPet && x.visible);
+    const cheers = [];
+    const offC = game.events.on('pet:cheered', (p) => cheers.push(p));
+    scene.camera.centerOn(pet.x, pet.y, game.renderer.width, game.renderer.height);
+    clickAt(pet.x, pet.y - 4);
+    offC();
+    check('kediye / köpeğe tıklayınca sevinçle zıplar, kalpler uçuşur', cheers.length === 1 && cheers[0].animal === pet && pet.cheer > 0, `${pet.kind} ${pet.name}`);
+    // Öncelikli kesim: ağaca tıklamak
+    const map = scene.world.map;
+    let tree = null;
+    for (let r = 2; r < 25 && !tree; r++) {
+      for (let dy = -r; dy <= r && !tree; dy++) {
+        for (let dx = -r; dx <= r && !tree; dx++) {
+          const x = plaza.centerX + dx;
+          const y = plaza.centerY + dy;
+          if ((map.getObject(x, y) === 'oak' || map.getObject(x, y) === 'pine') && !scene.jobs.jobAt(x, y) && scene.world.getApproachSpots(x, y).length) tree = { x, y };
+        }
+      }
+    }
+    const idle = s.characters.find((c) => !c.isChild && c.visible && !c.away && c.workplaceId === null);
+    scene.behavior.endTask(idle);
+    scene.behavior.startPlan(idle, scene.behavior.brain.resolveLeisure(idle, 'stroll', 12) ?? { activity: 'wait', duration: 30, spot: { x: idle.tileX, y: idle.tileY } }, 12);
+    scene.camera.centerOn(tree.x * 16 + 8, tree.y * 16 + 8, game.renderer.width, game.renderer.height);
+    const urgent = [];
+    const offU = game.events.on('job:urgent', (p) => urgent.push(p));
+    clickAt(tree.x * 16 + 8, tree.y * 16 + 10);
+    offU();
+    const job = scene.jobs.jobAt(tree.x, tree.y);
+    check('ağaca tıklayınca öncelikli kesim emri verilir', job?.urgent && job.type === 'chop' && urgent.length === 1);
+    const other = scene.jobs.designate(...(() => {
+      for (let r = 2; r < 25; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        const x = plaza.centerX + dx;
+        const y = plaza.centerY + dy;
+        if (map.getObject(x, y) === 'rock' && !scene.jobs.jobAt(x, y)) return [x, y];
+      }
+      return [0, 0];
+    })());
+    const pick = scene.jobs.findWorkFor(idle, { x: idle.tileX, y: idle.tileY });
+    check('öncelikli hedef bütün işlerden önce seçilir', pick?.job === job, pick?.job?.type);
+    if (other) scene.jobs.cancel(other);
+    check('boştaki işçi elindekini bırakıp koşar', urgent.length === 1 && (!idle.task || idle.task.activity !== 'stroll'));
+    // Toplanma Zili
+    const R = await import('/src/systems/RallySystem.js');
+    for (let i = 0; i < 96 && !(s.time.hour >= 10 && s.time.hour < 13); i++) hours(0.25);
+    s.rally = null;
+    check('toplanma zili çalınabilir', R.rallyStatus(s).ok);
+    game.events.emit('ui:rallyBell');
+    check('zil çalınca toplanma bir saat sürer', R.isRallyActive(s) && s.rally.until - s.totalMinutes === 60);
+    hours(0.5);
+    const gathered = s.characters.filter((c) => c.task?.activity === 'rally').length;
+    const awake = s.characters.filter((c) => c.visible && !c.away).length;
+    check('uyanık sakinler meydanda toplanır', gathered >= Math.max(3, Math.floor(awake * 0.6)), `${gathered}/${awake}`);
+    game.events.emit('ui:rallyBell');
+    check('zil hemen yeniden çalınamaz', !R.rallyStatus(s).ok);
+    hours(0.75);
+    check('bir saat sonra toplanma biter', !R.isRallyActive(s) && s.rally.ended);
+    window.__mem = { id: s.characters[0].id, count: s.characters[0].memories.length };
+  }
+
+  // --- Kayıt gidiş-dönüşü (sürüm 12) ---
   const ill = s.characters.find((c) => !c.isChild);
   scene.health.fallIll(ill);
   hut.remedies = 4;
@@ -754,13 +976,15 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 11', raw.version === 11);
+  check('kayıt sürümü 12', raw.version === 12);
+  check('kayıttan anılar döner', s2.characters.find((c) => c.id === window.__mem.id)?.memories.length === window.__mem.count);
+  check('kayıttan festival geçmişi, kervan seferi ve sayaçlar döner', ['spring', 'summer', 'autumn', 'winter'].every((t) => s2.seasonFestival.held[t] >= 1) && s2.trade.grandVoyages >= 1 && s2.stats.rallies >= 1 && s2.stats.seasonFestivals >= 4);
   check('kayıttan yadigârlar, ipek ve fermanlar döner', RELIC_KEYS.every((id) => s2.luxury.relics[id]) && s2.luxury.silk && s2.luxury.decreeDays.goldBonus !== undefined && s2.luxury.goldSpent === s.luxury.goldSpent);
   check('kayıttan arşiv ve sayaçlar döner', s2.history.length === s.history.length && s2.stats.weddings === s.stats.weddings);
   check('kayıttan sakin adı ve sabit işçi döner', s2.characters.some((c) => c.id === window.__renamed.id && c.name === window.__renamed.name && c.customName) && s2.characters.find((c) => c.id === window.__pin.id)?.workplaceId === window.__pin.buildingId, `${s2.characters.map((c) => c.name).join(',')} pin ${s2.characters.find((c) => c.id === window.__pin.id)?.workplaceId}/${window.__pin.buildingId} önce ${s.characters.find((c) => c.id === window.__pin.id)?.workplaceId}`);
   check('kayıttan kemer yine altından geçilir', !window.__arch || (game.scenes.current.world.map.isWalkable(window.__arch.x, window.__arch.y) && game.scenes.current.world.map.getOccupant(window.__arch.x, window.__arch.y) === window.__arch.id));
   check('kayıttan araştırmalar döner', ['gears', 'architecture', 'herbalism', 'insulation'].every((id) => s2.research.done[id]) && s2.research.active === null);
-  check('kayıttan liman, hazine ve ihracat döner', s2.trade.shipments === 1 && s2.trade.goldEarned > 0 && s2.resources.gold === raw.resources.gold && s2.buildings.find((b) => b.type === 'harbor')?.exportThreshold === null);
+  check('kayıttan liman, hazine ve ihracat döner', s2.trade.shipments === raw.trade.shipments && raw.trade.shipments >= 2 && s2.trade.goldEarned > 0 && s2.resources.gold === raw.resources.gold && s2.buildings.find((b) => b.type === 'harbor')?.exportThreshold === null);
   check('kayıttan harika aşaması döner', s2.buildings.find((b) => b.type === 'wonder')?.wonderStage === 3 && s2.buildings.find((b) => b.type === 'wonder')?.wonderComplete);
   check('kayıttan okul mezunu döner', s2.characters.some((c) => c.educated));
   check('kayıttan hayvanlar ve adları döner', s2.animals.length === animals && s2.animals.some((a) => a.name === cat.name));

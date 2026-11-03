@@ -2708,3 +2708,56 @@ button.relation-row:hover {
 .character-name[hidden] {
   display: none;
 }
+
+/* ---------- 14. aşama: festival duyurusu, anılar, toplanma zili ---------- */
+.buff-chip.is-festival {
+  background: #fff3b0;
+  border-color: var(--ui-highlight);
+  animation: festival-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes festival-pulse {
+  50% {
+    filter: brightness(1.12);
+  }
+}
+
+.memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.memory-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.memory-row img {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+}
+
+.memory-day {
+  flex: none;
+  min-width: 46px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.memory-row.is-recalled {
+  background: #fff3b0;
+  outline: 1px solid var(--ui-highlight);
+}
+
+.memory-toggle {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 0 6px 1px;
+  font-size: 12px;
+}

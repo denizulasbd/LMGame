@@ -10,6 +10,7 @@
 //                  yanan kamp ateşinin başına, hanın ya da bir evin saçağının altına kıvrılıp uyur.
 //   Sevme       : yanından geçen sakin onu sever: sakinin başında kalp balonu, hayvanın başında küçük kalp,
 //                  sakine anlık keyif (çocuklara daha çok). Aynı sakin bir süre yeniden sevmez.
+import { CHEER_TIME } from '../entities/Animal.js';
 import { WILDLIFE, PETS } from '../data/animals.js';
 import { getSeason } from '../data/seasons.js';
 import { isRainActive } from '../data/weather.js';
@@ -38,6 +39,7 @@ export class AnimalSystem {
       game.events.on('time:hour', (hour) => {
         if (hour === PETS.arrivalHour) this.petArrival();
       }),
+      game.events.on('ui:petAnimal', ({ id }) => this.cheer(id)),
     ];
   }
 
@@ -49,8 +51,27 @@ export class AnimalSystem {
     return this.state.animals;
   }
 
+  /**
+   * (14. aşama) Oyuncu bir kediye ya da köpeğe fareyle tıklayınca: sevinçle zıplar, kalpler uçuşur, miyavlar / havlar
+   * ('pet:cheered' { animal }). Uyuyorsa uyanır.
+   */
+  cheer(id) {
+    const a = this.animals.find((x) => x.id === id && x.isPet);
+    if (!a) return null;
+    a.cheer = CHEER_TIME;
+    if (a.mode === 'sleep' || a.pose === 'sleep') {
+      a.mode = 'idle';
+      a.pose = 'sit';
+      a.timer = 2;
+    }
+    this.state.stats.cheered = (this.state.stats.cheered ?? 0) + 1;
+    this.events.emit('pet:cheered', { animal: a });
+    return a;
+  }
+
   update(tick) {
     if (!this.state.animalMeta.wildlifeSeeded) this.seedWildlife();
+    for (const a of this.animals) if (a.cheer > 0) a.cheer = Math.max(0, a.cheer - tick.realDt); // oyun dursa da zıplar
     const dt = tick.simDt;
     if (dt <= 0) return;
     const season = getSeason(this.state.time.day).key;

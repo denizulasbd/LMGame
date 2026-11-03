@@ -87,6 +87,7 @@ export const MERCHANT = {
 //   dockHours    : teknenin rıhtımda yükleme süresi; capacity: bir teknenin taşıyabileceği en çok birim
 //   speed        : teknenin nehirde süzülme hızı (dünya pikseli / oyun-hızlı saniye)
 //   bonusChance  : yüklü bir seferin nadir ticaret bonusu (Ticaret Bereketi) getirme olasılığı
+//   grandVoyage  : (14. aşama) Büyük İhracat Seferi fermanı: fiyat (altın), bekleme, kapasite katı, geçici sınır, değer bonusu
 // ---------------------------------------------------------------------------
 export const EXPORT = {
   values: { wood: 1, stone: 1, food: 1, wool: 3, iron: 4, bread: 3 },
@@ -95,9 +96,13 @@ export const EXPORT = {
   crate: { perResource: 40, minStock: 100 },
   intervalHours: 4,
   dockHours: 1.5,
-  capacity: 640,
+  capacity: 864, // 14. aşama: 640'tan %35 artırıldı (yadigârlarla artan üretim)
   speed: 18,
   hours: { from: 6, to: 20 },
   bonusChance: 0.2,
   bonusBuff: 'prosperity',
+  // 14. aşama: "Büyük İhracat Seferi" fermanı (limanın paneli): büyük bir kervan teknesi hemen yola çıkar, normal
+  // teknenin capacityMultiplier katı yük alır ve sınırı threshold'a indirerek fazlalığı boşaltır. Altınla ödenir,
+  // cooldownDays günde bir ilan edilir.
+  grandVoyage: { price: 250, cooldownDays: 2, capacityMultiplier: 2.5, threshold: 350, valueBonus: 1.1 },
 };

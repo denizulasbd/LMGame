@@ -4,11 +4,12 @@
 //   save-v9.json : 11. aşamanın oyunu (kayıt sürümü 9): 33. gün, 30 sakin, şifacı, hayvanlar, fermanlar ve olaylar
 //   save-v10.json: 12. aşamanın oyunu (kayıt sürümü 10): 31. gün, 30 sakin, dört araştırma, liman, hazinede altın ve
 //                  tamamlanmış Büyük Vadi Saat Kulesi
+//   save-v11.json: 13. aşamanın oyunu (kayıt sürümü 11): 37. gün, 30 sakin, üç yadigâr, peyzaj, arşiv
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = ['save-v7.json', 'save-v8.json', 'save-v9.json', 'save-v10.json'].map((name) => ({
+const fixtures = ['save-v7.json', 'save-v8.json', 'save-v9.json', 'save-v10.json', 'save-v11.json'].map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -46,6 +47,9 @@ for (const { name, raw } of fixtures) {
       weddings: s.stats.weddings,
       married: s.characters.filter((c) => c.married).length,
       wonderStage: s.buildings.find((b) => b.type === 'wonder')?.wonderStage ?? 0,
+      memories: s.characters.map((c) => c.memories.length),
+      festivalStage: s.seasonFestival.stage,
+      weather: s.weather.type,
       dilemma: s.dilemma.nextDay,
       log,
       celebration: !document.querySelector('.celebration').hidden,
@@ -70,10 +74,23 @@ for (const { name, raw } of fixtures) {
       detail: `${Object.keys(r.research.done).length} araştırma, ${r.gold} altın, harika aşaması ${r.wonderStage}`,
     });
   }
+  if (data.version < 11) {
+    results.push({
+      name: `${tag}: yadigâr, sabit işçi boş; arşiv kuruldu; düğün sayacı tahmin edildi`,
+      ok: Object.keys(r.luxury.relics).length === 0 && !r.luxury.silk && r.pinned === 0 && r.history >= 1 && r.weddings === Math.floor(r.married / 2),
+      detail: `arşiv ${r.history} gün, düğün ${r.weddings}`,
+    });
+  } else {
+    results.push({
+      name: `${tag}: yadigârlar ve arşiv korundu`,
+      ok: Object.keys(r.luxury.relics).length === Object.keys(data.luxury.relics).length && r.history >= data.history.length,
+      detail: `${Object.keys(r.luxury.relics).length} yadigâr, arşiv ${r.history} gün`,
+    });
+  }
   results.push({
-    name: `${tag}: yadigâr, sabit işçi boş; arşiv kuruldu; düğün sayacı tahmin edildi`,
-    ok: Object.keys(r.luxury.relics).length === 0 && !r.luxury.silk && r.pinned === 0 && r.history >= 1 && r.weddings === Math.floor(r.married / 2),
-    detail: `arşiv ${r.history} gün, düğün ${r.weddings}`,
+    name: `${tag}: her sakine anı defteri açıldı, festival ve hava geçerli`,
+    ok: r.memories.every((n) => n >= 1) && (r.festivalStage === null || r.festivalStage === 'announced' || r.festivalStage === 'active') && typeof r.weather === 'string',
+    detail: `anı ${Math.min(...r.memories)}-${Math.max(...r.memories)}, hava ${r.weather}`,
   });
   results.push({ name: `${tag}: olay takvimi kuruldu`, ok: Number.isFinite(r.dilemma), detail: `ilk olay günü ${r.dilemma}` });
   if (data.version < 8) {

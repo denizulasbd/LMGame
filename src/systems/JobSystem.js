@@ -43,6 +43,18 @@ export class JobSystem {
     return this.jobs.find((j) => (j.buildingId ? j.buildingId === occupant && occupant !== 0 : j.x === x && j.y === y)) ?? null;
   }
 
+  /**
+   * (14. aşama) Öncelikli toplama / kırma: oyuncu seç aracıyla bir ağaca, kayaya ya da çalıya tıklar. Emir yoksa verilir
+   * ve öne alınır; boştaki işçiler ilk iş olarak oraya koşar ('job:urgent' { job }). Dönüş: iş ya da null.
+   */
+  prioritize(x, y) {
+    const job = this.jobAt(x, y) ?? this.designate(x, y);
+    if (!job || job.type === 'build') return null;
+    job.urgent = true;
+    this.events.emit('job:urgent', { job });
+    return job;
+  }
+
   /** Bu karoya toplama emri verilebilir mi? */
   isHarvestable(x, y) {
     const building = this.world.getBuilding(this.world.map.getOccupant(x, y));
@@ -253,7 +265,8 @@ export class JobSystem {
       const full = job.assignees.length >= JOBS[job.type].maxWorkers && !job.assignees.includes(c.id);
       if (full || !this.isValid(job)) continue;
       const spot = freeSpot(this.spotsFor(job));
-      if (spot) candidates.push({ priority: JOBS[job.type].priority, d: dist(spot, origin) - preference(job.type), job, spot });
+      // Öncelikli işaretlenen hedef her işten önce gelir
+      if (spot) candidates.push({ priority: job.urgent ? -1 : JOBS[job.type].priority, d: dist(spot, origin) - preference(job.type), job, spot });
     }
     for (const building of this.world.getCompleted()) {
       const def = BUILDINGS[building.type];

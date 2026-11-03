@@ -734,6 +734,87 @@ Object.assign(ICONS, {
   ],
 });
 
+// 14. aşama: mevsim festivalleri, toplanma zili, nadir hava olayları
+Object.assign(ICONS, {
+  blossom: [
+    '...pp....',
+    '..pupp.p.',
+    '.ppPpp.pp',
+    '..pppp.v.',
+    '...pp.vv.',
+    '....fv...',
+    '...vf.pp.',
+    '..vv.pup.',
+    '.....pp..',
+  ],
+  sunfair: [
+    'P...P...P',
+    '.P.KKK.P.',
+    '..KPPPK..',
+    'PKPYYYPKP',
+    '.KPYuYPK.',
+    '..KPPPK..',
+    'o.oKKKo.o',
+    'ooo.o.ooo',
+    'o...o...o',
+  ],
+  harvest: [
+    '..P.P.P..',
+    '.PYPYPYP.',
+    '..x.x.x..',
+    'KKKKKKKKK',
+    'KXEXEXEXK',
+    'KEXEXEXEK',
+    'KXEXEXEXK',
+    '.KXEXEXK.',
+    '..KKKKK..',
+  ],
+  snowman: [
+    '...KKK...',
+    '..KRRRK..',
+    '..K8K8K..',
+    '..K8O8K..',
+    '.ooooooo.',
+    '.K88888K.',
+    'K888K888K',
+    'K8888888K',
+    '.KKKKKKK.',
+  ],
+  bell: [
+    '....K....',
+    '...KPK...',
+    '..KYPPK..',
+    '..KYPPK..',
+    '.KYPPPOK.',
+    '.KYPPPOK.',
+    'KKKKKKKKK',
+    '...KYK...',
+    '....K....',
+  ],
+  mist: [
+    '.........',
+    '.aaaaa...',
+    '.........',
+    '...aaaaaa',
+    '.........',
+    'aaaaaa...',
+    '.........',
+    '..aaaaaa.',
+    '.........',
+  ],
+  thunder: [
+    '..KKK....',
+    '.KRRRKK..',
+    'KRRRRRRK.',
+    'KRqRRRqK.',
+    '.KKPKKK..',
+    '...PP....',
+    '..PPc.c..',
+    '...P.c...',
+    '..P.c..c.',
+  ],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);
@@ -859,6 +940,8 @@ const BUBBLE_ICONS = {
   sneeze: ['....c.c', '...c.a.', 'KK..c.c', 'KTK..a.', 'KK..c.c', '....c..'],
   fever: ['...K...', '..KuK..', '..KoK..', '..KoK..', '.KoooK.', '..KKK..'],
   herb: ['...vV..', '..vVv.V', '.V.f.v.', '.vvfvV.', '...f...', '...x...'],
+  // 14. aşama: güzel bir anıyı hatırlamak (çerçeveli küçük resim, içinde kalp)
+  memory: ['KKKKKKK', 'KyoyoyK', 'KyoooyK', 'KyyoyyK', 'KKKKKKK', '.......'],
 };
 
 export const BUBBLE_WIDTH = 11;

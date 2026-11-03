@@ -11,6 +11,8 @@ import { TOWN_NAMES, TOWN_NAME_MAX_LENGTH } from '../data/town.js';
 import { EQUIPMENT_KEYS } from '../data/equipment.js';
 import { RESEARCH } from '../data/research.js';
 import { RELICS } from '../data/luxury.js';
+import { SEASON_FESTIVALS } from '../data/festivals.js';
+import { WEATHER_TYPES } from '../data/weather.js';
 import { Character } from '../entities/Character.js';
 import { Building } from '../entities/Building.js';
 import { Animal } from '../entities/Animal.js';
@@ -52,7 +54,7 @@ export class GameState {
     this.regrowth = []; // yeniden büyüyen ağaçlar (NatureSystem)
     // Hava: type hedef hava, cloud/rain o an görünen yumuşak değerler, changes değişim sayacı,
     // nextChangeAt bir sonraki değişimin oyun dakikası (WeatherSystem)
-    this.weather = { type: STARTING_WEATHER, cloud: 0, rain: 0, changes: 0, nextChangeAt: null };
+    this.weather = { type: STARTING_WEATHER, cloud: 0, rain: 0, mist: 0, changes: 0, nextChangeAt: null };
     this.relationships = {}; // "küçükId-büyükId" -> ilişki puanı -50..100 (RelationshipSystem)
     // Kasaba deposundaki boşta kişisel ekipman: { sturdyTool, winterCoat, backpack } (CraftingSystem)
     this.equipment = Object.fromEntries(EQUIPMENT_KEYS.map((k) => [k, 0]));
@@ -77,6 +79,9 @@ export class GameState {
       dilemmas: 0, // karar verilen ikilem olayı
       weddings: 0, // düğün (13. aşama: Kasaba Arşivi)
       births: 0, // doğan çocuk
+      seasonFestivals: 0, // kutlanan mevsim festivali (14. aşama)
+      recollections: 0, // sakinlerin güzel bir anıyı hatırlaması
+      rallies: 0, // çalınan toplanma zili
     };
     // Hayvanlar (AnimalSystem, 11. aşama): yaban hayatı (tavşan, geyik) ve kasaba kedileri / köpekleri.
     // animalMeta: wildlifeSeeded yaban hayatı yerleştirildi mi, lastPetDay son evcil hayvanın geldiği gün
@@ -99,12 +104,17 @@ export class GameState {
     //   nextBoatAt: sıradaki teknenin yola çıkacağı oyun dakikası
     //   shipments, goldEarned, exported: toplam sefer, kazanılan altın ve kaynak başına ihraç edilen birim
     //   last      : son sefer { day, hour, minute, gold, cargo }
-    this.trade = { boat: null, nextBoatAt: null, shipments: 0, goldEarned: 0, exported: {}, last: null };
+    this.trade = { boat: null, nextBoatAt: null, shipments: 0, goldEarned: 0, exported: {}, last: null, grandDay: null, grandPending: false, grandVoyages: 0 };
     // Altın ekonomisi (LuxurySystem, 13. aşama): sergilenen yadigârlar { id: { day, hour, minute } }, ipek ve mermer
     // alındı mı, altın fermanlarının son ilan günü, satın alma sayısı ve harcanan toplam altın
     this.luxury = { relics: {}, silk: false, decreeDays: {}, purchases: 0, goldSpent: 0 };
     // Kasaba Arşivi (StatsSystem, 13. aşama): her sabahın özeti { day, population, welfare, stock, gold }
     this.history = [];
+    // Mevsim festivalleri (SeasonFestivalSystem, 14. aşama): duyurulan / süren festival, süslemeleri, katılanlar ve
+    // her temanın kaç kez kutlandığı
+    this.seasonFestival = { day: null, theme: null, stage: null, startedAt: null, decor: [], attendees: [], held: {} };
+    // Toplanma Zili (14. aşama): sakinler bu dakikaya kadar meydanda toplanır { until, rungAt } ya da null
+    this.rally = null;
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -117,7 +127,7 @@ export class GameState {
     //   merchant : { nextVisitDay, visits, present, leaving, name, appearance, x, y, exit, stock } gezgin tüccar
     //   immigration: { lastNoticeDay } göçmenlerin gelmediği günün bildirimi bir kez verilsin
     this.events = {
-      festival: { active: false, venueId: null, lastDay: -99, endsAt: 0 },
+      festival: { active: false, venueId: null, lastDay: -99, endsAt: 0, theme: null },
       merchant: {
         nextVisitDay: null,
         visits: 0,
@@ -164,6 +174,8 @@ export class GameState {
       trade: this.trade,
       luxury: this.luxury,
       history: this.history,
+      seasonFestival: this.seasonFestival,
+      rally: this.rally,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -235,6 +247,17 @@ export class GameState {
       decreeDays: { ...(data.luxury?.decreeDays ?? {}) },
     };
     next.history = (data.history ?? []).filter((h) => h && Number.isFinite(h.day)).slice(-CONFIG.HISTORY_DAYS);
+    // 14. aşamadan eski kayıtlarda festival, toplanma zili ve anı yoktur (anılar ilk açılışta kurulur)
+    next.seasonFestival = {
+      ...next.seasonFestival,
+      ...(data.seasonFestival ?? {}),
+      decor: [...(data.seasonFestival?.decor ?? [])],
+      attendees: [...(data.seasonFestival?.attendees ?? [])],
+      held: { ...(data.seasonFestival?.held ?? {}) },
+    };
+    if (next.seasonFestival.theme && !SEASON_FESTIVALS[next.seasonFestival.theme]) next.seasonFestival.stage = null;
+    next.rally = data.rally && Number.isFinite(data.rally.until) ? { ...data.rally } : null;
+    if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
     if (data.town && Number.isInteger(data.town.tier)) {

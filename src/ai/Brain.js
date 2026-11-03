@@ -26,6 +26,7 @@ import { isBedtime, isWorkHours } from './TraitProfile.js';
 import { getSeason } from '../data/seasons.js';
 import { ILLNESS } from '../data/health.js';
 import { SCHOOL } from '../data/research.js';
+import { isRallyActive } from '../systems/RallySystem.js';
 import { healSpeedMultiplier } from '../systems/ResearchSystem.js';
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
@@ -91,6 +92,11 @@ export class Brain {
     }
     if (this.world.state.events.festival.active && needs.energy > FESTIVAL_MIN_ENERGY) {
       const plan = this.planFestival(c);
+      if (plan) return plan;
+    }
+    // (14. aşama) Toplanma Zili çaldıysa uyanık herkes meydana koşar
+    if (isRallyActive(this.world.state)) {
+      const plan = this.planRally(c);
       if (plan) return plan;
     }
     if (bedtime || needs.energy < profile.thresholds.energy) {
@@ -500,7 +506,7 @@ export class Brain {
   planGathering(c, building, nearSpot = null, mode = 'gather') {
     const spots = this.world.freeGatherSpots(building, c.id, mode);
     if (spots.length === 0) return null;
-    const spread = mode === 'festival' || Boolean(ACTIVITIES[building.type].faceBuilding);
+    const spread = mode === 'festival' || Boolean(ACTIVITIES[building.type]?.faceBuilding);
     const reference = spread || !nearSpot ? this.originTile(c) : nearSpot;
     const taken = spread ? this.world.getGatherSpots(building, mode).filter((s) => this.world.isReserved(s.x, s.y, c.id)) : [];
     const crowding = (spot) => taken.filter((t) => Math.max(Math.abs(t.x - spot.x), Math.abs(t.y - spot.y)) <= 1).length;
@@ -517,8 +523,19 @@ export class Brain {
       reserve: true,
       // Çardakta önündeki karodan içeri, bankına oturur
       ...(spot.seat ? { finalPoint: spot.seat, facing: 'down' } : {}),
-      duration: this.durationFor(building.type),
+      // Liman ve iskele gibi toplanma etkinliği olmayan festival yerlerinde süreyi çağıran belirler
+      duration: ACTIVITIES[building.type] ? this.durationFor(building.type) : 60,
     };
+  }
+
+  /** Toplanma Zili: meydanın çevresinde zil süresi bitene kadar beklemek. */
+  planRally(c) {
+    const rally = this.world.state.rally;
+    const venue = this.world.getBuilding(rally.venueId);
+    if (!venue) return null;
+    const plan = this.planGathering(c, venue, null, 'festival');
+    if (!plan) return null;
+    return { ...plan, activity: 'rally', duration: Math.max(5, rally.until - this.world.state.totalMinutes) };
   }
 
   /** Şenlik yerine gidip bitene kadar dans etmek. */

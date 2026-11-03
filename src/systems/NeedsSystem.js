@@ -9,7 +9,7 @@
 // "Mutlu Yuva" morali keyfin yavaş düşmesini sağlar, oynayan çocuklar yanındaki yetişkinleri keyiflendirir.
 import { NEEDS, NEED_KEYS, SLEEP_DECAY_MULTIPLIER } from '../data/characters.js';
 import { BUILDINGS } from '../data/buildings.js';
-import { RAIN_EFFECTS, isRainActive } from '../data/weather.js';
+import { RAIN_EFFECTS, isRainActive, WEATHER_TYPES } from '../data/weather.js';
 import { WARM_MEAL } from '../data/town.js';
 import { HAPPY_HOME, CHILD_JOY } from '../data/family.js';
 import { buffMultiplier, prestige } from './TownStatus.js';
@@ -34,6 +34,7 @@ export class NeedsSystem {
     if (tick.gameMinutes <= 0) return;
     const state = this.world.state;
     const raining = isRainActive(state.weather);
+    const weatherFun = WEATHER_TYPES[state.weather.type]?.funDecay ?? 1;
     // Kasaba İkramı, Şenlik Coşkusu ve anıtın kalıcı gururu keyfin yavaş düşmesini sağlar
     const funBuff = buffMultiplier(state, 'funDecay') * (prestige(state)?.funDecay ?? 1);
     const now = state.totalMinutes;
@@ -54,6 +55,8 @@ export class NeedsSystem {
         const perMinute = NEEDS[need].decayPerHour / 60;
         let multiplier = c.profile.decay[need] * (sleeping ? SLEEP_DECAY_MULTIPLIER[need] : 1);
         if (rainy && need === 'fun' && !c.profile.rainLover) multiplier *= RAIN_EFFECTS.funDecayMultiplier;
+        // (14. aşama) Sisli sabah dinlendirir: dışarıdakilerin keyfi yavaş düşer
+        if (need === 'fun' && c.visible && weatherFun !== 1) multiplier *= weatherFun;
         if (need === 'fun') multiplier *= funBuff;
         if (need === 'hunger' && (c.buffs.warmMeal ?? -1) > now) multiplier *= WARM_MEAL.hungerDecay;
         // Kışın üşüyen sakin daha çabuk yorulur ve keyfi kaçar; odun bitince evler de soğuktur ve

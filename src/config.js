@@ -36,7 +36,7 @@ export const CONFIG = {
   // --- Kayıt ---
   SAVE_KEY: 'lmgame.save.v2',          // elle kaydedilen / sabah otomatik kaydedilen oyun
   SESSION_KEY: 'lmgame.session.v2',    // sayfa kapanırken yazılır: F5 oyunu kaldığı yerden sürdürür
-  SAVE_VERSION: 11,                    // 13. aşama: yadigârlar, altın fermanları, peyzaj, sabit işçiler, sakin adları, arşiv
+  SAVE_VERSION: 12,                    // 14. aşama: sakin anıları, mevsim festivalleri, toplanma zili, sis ve yaz fırtınası, kervan teknesi
   SAVE_MIN_VERSION: 2,                 // bundan eski kayıtlar açılmaz; arası eksik alanlarla yüklenir
   AUTOSAVE_HOUR: 6,
   HISTORY_DAYS: 64,                    // Kasaba Arşivi'nde saklanan günlük özet sayısı (grafikler son 32 günü çizer)

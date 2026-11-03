@@ -6,7 +6,11 @@
 //   Tekne   : 06:00-20:00 arası, birkaç saatte bir nehrin bir ucundan süzülerek gelir (yol: nehir ve köprü altları),
 //             limanın önündeki açık suya yanaşır, yükler ve öteki uca doğru gider. Ayrılırken yükün değeri altın olarak
 //             Kasaba Hazinesi'ne girer ('harbor:shipped' { cargo, gold, bonus }); ara sıra Ticaret Bereketi getirir.
-// Durum state.trade'dedir (kayda girer): { boat, nextBoatAt, shipments, goldEarned, exported, last }.
+//   (14. aşama) Büyük İhracat Seferi ('ui:grandVoyage' { buildingId }): altınla ilan edilir; büyük bir kervan teknesi
+//             hemen yola çıkar (nehirde yük almamış tekne varsa o kervana dönüşür), normalin 2,5 katı yük alır ve sınırı
+//             350'ye indirerek fazlalığı boşaltır; yükün değeri %10 fazladır ('harbor:grandVoyage' { building }).
+// Durum state.trade'dedir (kayda girer): { boat, nextBoatAt, shipments, goldEarned, exported, last, grandDay,
+// grandPending, grandVoyages }.
 import { EXPORT } from '../data/trade.js';
 import { RESOURCES } from '../data/resources.js';
 import { TOWN_BUFFS } from '../data/town.js';
@@ -21,9 +25,26 @@ export function cargoValue(cargo, multiplier = 1) {
   return Math.floor(Object.entries(cargo ?? {}).reduce((sum, [r, v]) => sum + v * (EXPORT.values[r] ?? 0), 0) * multiplier);
 }
 
-/** Teknenin taşıyabileceği en çok birim (Denizci Pusulası ile artar). */
-export function boatCapacity(state) {
-  return Math.round(EXPORT.capacity * relicExportCapacity(state));
+/** Teknenin taşıyabileceği en çok birim (Denizci Pusulası ile artar; Büyük İhracat Seferi'nde 2,5 katı). */
+export function boatCapacity(state, grand = false) {
+  return Math.round(EXPORT.capacity * relicExportCapacity(state) * (grand ? EXPORT.grandVoyage.capacityMultiplier : 1));
+}
+
+/** Büyük İhracat Seferi ilan edilebilir mi? { ok, reason, price, waitDays } (arayüz de aynı sonucu gösterir). */
+export function grandVoyageStatus(state) {
+  const spec = EXPORT.grandVoyage;
+  const price = spec.price;
+  const harbor = state.buildings.some((b) => b.type === 'harbor' && b.functional && !b.damaged);
+  if (!harbor) return { ok: false, reason: 'Önce Büyük Ticaret Limanı tamamlanmalı', price };
+  const trade = state.trade;
+  if (trade.grandPending || trade.boat?.grand) return { ok: false, reason: 'Kervan teknesi zaten yolda', price };
+  const last = trade.grandDay;
+  if (last !== null && last !== undefined && state.time.day - last < spec.cooldownDays) {
+    const waitDays = spec.cooldownDays - (state.time.day - last);
+    return { ok: false, reason: `${waitDays} gün sonra yeniden ilan edilebilir`, price, waitDays };
+  }
+  if ((state.resources.gold ?? 0) < price) return { ok: false, reason: `Yetersiz altın (${state.resources.gold ?? 0}/${price})`, price };
+  return { ok: true, reason: null, price };
 }
 
 /** Sınırı aşan fazlalık: { kaynak: birim } (altın ve sınır yoksa boş). */
@@ -51,6 +72,8 @@ export function cratePreview(state) {
 /** Teknenin durumu (panel ve günlük için kısa metin). */
 export function boatStatus(state) {
   const boat = state.trade?.boat;
+  if (boat?.grand && boat.stage === 'arriving') return 'Kervan teknesi (Büyük İhracat Seferi) nehirden geliyor';
+  if (boat?.grand && boat.stage === 'docked') return 'Kervan teknesi rıhtımda: bütün fazlalık yükleniyor';
   if (boat?.stage === 'arriving') return 'Ticaret teknesi nehirden süzülerek geliyor';
   if (boat?.stage === 'docked') return 'Tekne rıhtımda: mallar yükleniyor';
   if (boat?.stage === 'leaving') return 'Tekne yüküyle nehrin aşağısına gidiyor';
@@ -81,6 +104,7 @@ export class HarborSystem {
     this.unsubscribers = [
       game.events.on('ui:setExportThreshold', ({ buildingId, threshold }) => this.setThreshold(buildingId, threshold)),
       game.events.on('ui:prepareCrate', ({ buildingId }) => this.prepareCrate(buildingId)),
+      game.events.on('ui:grandVoyage', () => this.orderGrandVoyage()),
       game.events.on('building:completed', (b) => {
         if (b.type === 'harbor') this.onBuilt(b);
       }),
@@ -230,7 +254,7 @@ export class HarborSystem {
     if (!boat) {
       const now = this.state.totalMinutes;
       if (this.trade.nextBoatAt === null) this.trade.nextBoatAt = now + 120;
-      if (now >= this.trade.nextBoatAt && isWithinHours(tick.hour, EXPORT.hours)) this.launch(harbor);
+      if (now >= this.trade.nextBoatAt && (isWithinHours(tick.hour, EXPORT.hours) || this.trade.grandPending)) this.launch(harbor);
       return;
     }
     const route = this.getRoute(harbor);
@@ -284,6 +308,7 @@ export class HarborSystem {
     const map = this.world.map;
     e.visible = map.get(Math.floor(point.x / T), Math.floor(point.y / T)) !== 'bridge';
     e.loaded = Object.keys(this.trade.boat?.cargo ?? {}).length > 0;
+    e.grand = Boolean(this.trade.boat?.grand);
   }
 
   launch(harbor) {
@@ -291,9 +316,42 @@ export class HarborSystem {
       this.trade.nextBoatAt = this.state.totalMinutes + 120;
       return;
     }
-    this.trade.boat = { stage: 'arriving', progress: 0, cargo: {}, dockUntil: 0 };
+    const grand = Boolean(this.trade.grandPending);
+    this.trade.grandPending = false;
+    this.trade.boat = { stage: 'arriving', progress: 0, cargo: {}, dockUntil: 0, grand };
     this.ensureEntity();
-    this.events.emit('harbor:boatArriving', { building: harbor });
+    this.events.emit('harbor:boatArriving', { building: harbor, grand });
+  }
+
+  /** (14. aşama) Büyük İhracat Seferi: altın ödenir, kervan teknesi hemen yola çıkar ya da sıradaki tekne kervan olur. */
+  orderGrandVoyage() {
+    const status = grandVoyageStatus(this.state);
+    if (!status.ok) {
+      this.events.emit('toast', { text: `Büyük İhracat Seferi: ${status.reason}`, tone: 'warn', icon: 'boat' });
+      return status;
+    }
+    const harbor = this.harbor();
+    if (!this.economy.spend({ gold: status.price })) return { ok: false, reason: 'Yetersiz altın' };
+    const trade = this.trade;
+    trade.grandDay = this.state.time.day;
+    trade.grandVoyages = (trade.grandVoyages ?? 0) + 1;
+    if (this.state.luxury) {
+      this.state.luxury.goldSpent += status.price;
+      this.state.luxury.purchases += 1;
+    }
+    const boat = trade.boat;
+    if (boat && boat.stage === 'arriving') boat.grand = true; // henüz yük almamış tekne kervana dönüşür
+    else {
+      trade.grandPending = true;
+      if (!boat) this.launch(harbor); // saati beklemeden hemen yola çıkar
+    }
+    this.events.emit('harbor:grandVoyage', { building: harbor, price: status.price });
+    this.events.emit('toast', {
+      text: `Büyük İhracat Seferi ilan edildi (−${status.price} altın): kervan teknesi nehirden geliyor; ${EXPORT.grandVoyage.threshold}'ü aşan mallar 2,5 kat yükle gidecek.`,
+      tone: 'success',
+      icon: 'boat',
+    });
+    return { ok: true };
   }
 
   /** Yanaştı: sandığı ve sınırı aşan fazlalığı yükler (tekne kapasitesine kadar, orantılı). */
@@ -301,7 +359,8 @@ export class HarborSystem {
     const boat = this.trade.boat;
     boat.stage = 'docked';
     boat.dockUntil = this.state.totalMinutes + EXPORT.dockHours * 60;
-    let room = boatCapacity(this.state);
+    const grand = Boolean(boat.grand);
+    let room = boatCapacity(this.state, grand);
     const cargo = {};
     // Önce rıhtımdaki sandık
     for (const [r, v] of Object.entries(harbor.crate ?? {})) {
@@ -311,7 +370,9 @@ export class HarborSystem {
     }
     harbor.crate = null;
     // Sonra fazlalık (her kaynaktan orantılı)
-    const excess = exportExcess(this.state, harbor.exportThreshold);
+    // Büyük İhracat Seferi'nde sınır geçici olarak düşer (ihracat kapalıysa bile)
+    const threshold = grand ? Math.min(harbor.exportThreshold ?? Infinity, EXPORT.grandVoyage.threshold) : harbor.exportThreshold;
+    const excess = exportExcess(this.state, threshold);
     const total = Object.values(excess).reduce((a, b) => a + b, 0);
     if (total > 0 && room > 0) {
       const ratio = Math.min(1, room / total);
@@ -328,7 +389,8 @@ export class HarborSystem {
   depart(harbor) {
     const boat = this.trade.boat;
     const cargo = boat.cargo ?? {};
-    const gold = cargoValue(cargo, relicExportValue(this.state));
+    const grand = Boolean(boat.grand);
+    const gold = cargoValue(cargo, relicExportValue(this.state) * (grand ? EXPORT.grandVoyage.valueBonus : 1));
     const trade = this.trade;
     let bonus = null;
     if (gold > 0) {
@@ -346,11 +408,11 @@ export class HarborSystem {
     boat.stage = 'leaving';
     boat.progress = 0;
     harbor.active = false;
-    this.events.emit('harbor:shipped', { building: harbor, cargo, gold, bonus });
+    this.events.emit('harbor:shipped', { building: harbor, cargo, gold, bonus, grand });
     if (gold > 0) {
       const list = Object.entries(cargo).map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`).join(', ');
       this.events.emit('toast', {
-        text: `Ticaret teknesi yüklendi: ${list} → +${gold} altın${bonus ? ' · Ticaret Bereketi!' : ''}`,
+        text: `${grand ? 'Büyük İhracat Seferi: kervan teknesi' : 'Ticaret teknesi'} yüklendi: ${list} → +${gold} altın${bonus ? ' · Ticaret Bereketi!' : ''}`,
         tone: 'success',
         icon: 'coin',
       });
@@ -359,6 +421,7 @@ export class HarborSystem {
 
   finishVoyage() {
     this.dismissBoat();
-    this.trade.nextBoatAt = this.state.totalMinutes + EXPORT.intervalHours * 60;
+    // Bekleyen bir Büyük İhracat Seferi varsa kervan hemen gelir
+    this.trade.nextBoatAt = this.state.totalMinutes + (this.trade.grandPending ? 0 : EXPORT.intervalHours * 60);
   }
 }

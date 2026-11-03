@@ -3,7 +3,8 @@
 // araştırma seçer, limanda fazlalık ihracatını açık tutar ve mal birikince ihracat sandığı hazırlar, Gelişmiş
 // Şehir olunca Harika'nın üç aşamasını kaynak yettikçe başlatır. (13. aşama) Harika bitince hazinedeki altını
 // yadigârlara, lüks mallara ve altın fermanlarına harcar; planın sonunda peyzaj yapıları (kiraz, çardak, kemer, çit)
-// kurar. Günlük özet, olay günlüğü ve sonunda stokların
+// kurar. (14. aşama) Harika bittikten sonra Büyük İhracat Seferi'ni bekleme süresi dolunca ilan eder; sonunda mevsim
+// festivallerini, sakinlerin anılarını ve nadir hava olaylarını raporlar. Günlük özet, olay günlüğü ve sonunda stokların
 // nereye harcandığını (araştırma, ihracat, harika) basar.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--save kayit.json] [--passive] [--quiet]
@@ -32,6 +33,10 @@ await page.evaluate((passive) => {
     if (kind === 'stage') addSpent(window.__stats.spent.wonder, building.project.spec?.cost ?? building.definition.wonder.stages[building.wonderStage].cost);
   });
   game.events.on('harbor:cratePrepared', () => window.__stats.spent.crates++);
+  window.__stats.weather = {};
+  game.events.on('weather:changed', ({ type }) => (window.__stats.weather[type] = (window.__stats.weather[type] ?? 0) + 1));
+  window.__stats.festivals = [];
+  game.events.on('seasonFestival:ended', ({ theme, attendees }) => window.__stats.festivals.push(`G${game.state.time.day - 1} ${theme}:${attendees.length}`));
   window.__stats.gold = { relics: 0, goods: 0, decrees: 0, items: [] };
   game.events.on('relic:exhibited', ({ relic, price }) => {
     window.__stats.gold.relics += price;
@@ -151,14 +156,18 @@ await page.evaluate((passive) => {
       const id = ORDER.find((k) => !s.research.done[k] && Object.entries(window.__research[k].cost).every(([r, v]) => res[r] >= v + 25));
       if (id) game.events.emit('ui:startResearch', { id });
     }
-    // Liman: fazlalık ihracatı açık. Harika için biriktirirken sınır yüksek (taş, demir ve yün kalsın), yoksa düşük;
+    // Liman: fazlalık ihracatı açık. Harika için biriktirirken sınır yüksek (taş, demir ve yün kalsın), önce düşük (250),
+    // harika bitince oyunun varsayılanı (400); (14. aşama) stok 400'ün çok üstüne çıkınca Büyük İhracat Seferi;
     // harika yükselirken ihracat sandığı hazırlanmaz
     const wonder = s.buildings.find((b) => b.type === 'wonder');
     const saving = s.town.tier >= 4 && !wonder?.wonderComplete;
     for (const h of world.getCompleted('harbor')) {
-      const threshold = saving ? 550 : 250;
+      const threshold = saving ? 550 : wonder?.wonderComplete ? 400 : 250; // harika bitince oyunun varsayılan sınırı
       if (h.exportThreshold !== threshold) game.events.emit('ui:setExportThreshold', { buildingId: h.id, threshold });
       if (!saving && !h.crate && (res.wool > 300 || res.iron > 300 || res.bread > 300)) game.events.emit('ui:prepareCrate', { buildingId: h.id });
+      // (14. aşama) Harika bitince stok 250'nin çok üstündeyse Büyük İhracat Seferi
+      const over = ['wood', 'stone', 'food', 'wool', 'iron', 'bread'].reduce((a, r) => a + Math.max(0, res[r] - 400), 0);
+      if (!saving && wonder?.wonderComplete && over > 900 && window.__harbor.grandVoyageStatus(s).ok) game.events.emit('ui:grandVoyage', { buildingId: h.id });
     }
     // Harika: Gelişmiş Şehir'de kurulur, aşamalar kaynak yettikçe başlatılır
     if (s.town.tier >= 4 && !wonder && Object.entries(window.__wonder.cost).every(([r, v]) => res[r] >= v)) {
@@ -230,6 +239,7 @@ await page.evaluate(async () => {
   window.__wonder = BUILDINGS.wonder;
   window.__luxury = await import('/src/systems/Luxury.js');
   window.__relicKeys = (await import('/src/data/luxury.js')).RELIC_KEYS;
+  window.__harbor = await import('/src/systems/HarborSystem.js');
 });
 
 function summary() {
@@ -280,6 +290,12 @@ const report = await page.evaluate(() => {
     decor: ['cherryTree', 'gazebo', 'marbleArch', 'flowerFence'].map((t) => `${t}:${s.buildings.filter((b) => b.type === t && b.functional).length}`).join(' '),
     pinned: s.characters.filter((c) => c.workplaceId !== null).length,
     history: s.history.map((h) => `${h.day}:${h.gold}`).slice(-12).join(' '),
+    held: s.seasonFestival.held,
+    memories: s.characters.map((c) => c.memories.length),
+    recollections: s.stats.recollections ?? 0,
+    sampleMemories: (s.characters.find((c) => c.memories.length >= 6) ?? s.characters[0]).memories.slice(-8).map((m) => `G${m.day} ${m.text}`),
+    sampleName: (s.characters.find((c) => c.memories.length >= 6) ?? s.characters[0]).name,
+    grandVoyages: s.trade.grandVoyages ?? 0,
   };
 });
 console.log(report.log.join('\n'));
@@ -295,6 +311,11 @@ console.log(`ihracat: ${report.trade.shipments} sefer, ${sum(report.trade.export
 const g = report.stats.gold;
 console.log(`altın harcaması (harika sonrası): ${report.goldSpent} altın · yadigârlar ${g.relics} (${report.relics.length}/5), lüks mallar ${g.goods}, fermanlar ${g.decrees}; ${g.items.length} alım`);
 console.log(`peyzaj: ${report.decor} · arşiv (gün:altın) ${report.history}`);
+console.log(`mevsim festivalleri: ${JSON.stringify(report.held)} · ${report.stats.festivals.join(', ')}`);
+const mem = report.memories;
+console.log(`anılar: sakin başına ${Math.min(...mem)}-${Math.max(...mem)} (ortalama ${(mem.reduce((a, b) => a + b, 0) / mem.length).toFixed(1)}), ${report.recollections} kez hatırlandı · Büyük İhracat Seferi: ${report.grandVoyages}`);
+console.log(`hava değişimleri: ${JSON.stringify(report.stats.weather)}`);
+console.log(`${report.sampleName} anıları:\n  ${report.sampleMemories.join('\n  ')}`);
 console.log(`harika: aşama ${report.wonder}/3, ${sum(spent.wonder)} birim (${fmt(spent.wonder)}); hazinede ${report.gold} altın`);
 const late = report.stats.daily.slice(-12);
 if (late.length) {

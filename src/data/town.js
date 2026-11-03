@@ -53,6 +53,12 @@ export const TOWN_BUFFS = {
   goldBonus: { name: 'Altın İkramiye', icon: 'coin', hours: 72, workSpeed: 1.2, funDecay: 0.8, happiness: 5 },
   royalArchitects: { name: 'Kraliyet Mimarları', icon: 'hammer', hours: 48, buildSpeed: 3 },
   spices: { name: 'Baharat ve Kahve', icon: 'spice', hours: 96 },
+  // 14. aşama: mevsim festivalleri sürerken (data/festivals.js) ve bittikten sonra
+  blossomFestival: { name: 'Çiçek Şenliği', icon: 'blossom', hours: 9, friendship: 1.8, romance: 2.5, funDecay: 0.5 },
+  sunFair: { name: 'Güneş ve Nehir Panayırı', icon: 'sunfair', hours: 9, friendship: 1.4, funDecay: 0.4, happiness: 4 },
+  harvestFeast: { name: 'Büyük Hasat Bayramı', icon: 'harvest', hours: 9, friendship: 1.4, funDecay: 0.5, happiness: 5 },
+  lightsNight: { name: 'Işıklar Gecesi', icon: 'snowman', hours: 9, friendship: 1.5, funDecay: 0.4, happiness: 6 },
+  seasonCheer: { name: 'Mevsim Coşkusu', icon: 'sparkle', hours: 24, workSpeed: 1.15, funDecay: 0.8, happiness: 6 },
 };
 
 // Handa sıcak yemek yiyen sakinin kişisel bonusu: bu kadar oyun saati boyunca yavaş acıkır

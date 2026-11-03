@@ -6,6 +6,7 @@
 //   Şantiye: suya kazıklar çakılır, rıhtımın taşları dizilir, iskele kalasları döşenir (3 kademe).
 //   Tekne (30x22, yandan): ahşap gövde, krem yelken (kırmızı şeritli), direkte flama, kıçta dümenci;
 //   yüklüyken güvertede sandık ve çuvallar. İki kare: yelken şişer, flama dalgalanır, gövdede köpük.
+//   (14. aşama) Büyük İhracat Seferi'nin kervan teknesi yelkeninde altın şerit ve armayla ayırt edilir.
 // Görsel yapının kapladığı karoların ALT kenarına hizalanır; vinç ve ambar üstteki karolara 28 piksel taşar.
 import { getSprite, CharGrid, flipRowsHorizontal } from '../PixelSprite.js';
 
@@ -204,7 +205,7 @@ export function getHarborSiteSprite(stage, flipped = false) {
 // Ticaret teknesi
 // ---------------------------------------------------------------------------
 
-function buildBoatRows(loaded, frame) {
+function buildBoatRows(loaded, frame, grand = false) {
   const { width: W, height: H } = BOAT_ART;
   const g = new CharGrid(W, H);
   // Gövde: kıç (sol) alçak, pruva (sağ) kalkık
@@ -238,8 +239,10 @@ function buildBoatRows(loaded, frame) {
     g.set(8, y, 'K').set(22 + bulge, y, 'K');
   }
   g.hline(9, 21, 3, 'y');
-  g.hline(9, 21 + belly, 6, 'o');
-  g.hline(9, 21 + belly, 7, 'o');
+  // Kervan teknesi (Büyük İhracat Seferi): yelkende altın şerit ve arma
+  g.hline(9, 21 + belly, 6, grand ? 'P' : 'o');
+  g.hline(9, 21 + belly, 7, grand ? 'Y' : 'o');
+  if (grand) g.set(14, 4, 'P').set(15, 4, 'Y').set(14, 9, 'o').set(18, 9, 'o').set(11, 9, 'o');
   for (let y = 4; y <= 9; y++) g.set(20 + (y >= 4 && y <= 8 ? belly : 0), y, 's');
   g.set(15, 5, 'K').set(15, 8, 'K'); // yelken bağları
   // Flama
@@ -273,11 +276,12 @@ function buildBoatRows(loaded, frame) {
  * @param {'left'|'right'} facing gidiş yönü
  * @param {boolean} loaded güvertede yük var mı
  * @param {number} frame yelken / flama / köpük karesi
+ * @param {boolean} grand Büyük İhracat Seferi'nin kervan teknesi (altın şeritli yelken)
  */
-export function getBoatSprite(facing = 'right', loaded = false, frame = 0) {
+export function getBoatSprite(facing = 'right', loaded = false, frame = 0, grand = false) {
   const f = frame % 2;
-  return getSprite(`boat:${facing}:${loaded ? 1 : 0}:${f}`, () => {
-    const rows = buildBoatRows(loaded, f);
+  return getSprite(`boat:${facing}:${loaded ? 1 : 0}:${f}:${grand ? 'G' : 'N'}`, () => {
+    const rows = buildBoatRows(loaded, f, grand);
     return facing === 'left' ? flipRowsHorizontal(rows) : rows;
   });
 }

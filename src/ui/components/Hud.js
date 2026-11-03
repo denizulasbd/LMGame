@@ -14,6 +14,8 @@ import { BUILDINGS } from '../../data/buildings.js';
 import { TOWN_TIERS } from '../../data/town.js';
 import { JOBS } from '../../data/jobs.js';
 import { describeWeather } from '../../data/weather.js';
+import { currentSeasonFestival } from '../../systems/SeasonFestivalSystem.js';
+import { isRallyActive } from '../../systems/RallySystem.js';
 import { IMMIGRATION, TOWN_NAME_MAX_LENGTH } from '../../data/town.js';
 import { getSeason } from '../../data/seasons.js';
 import { heatingPerDay } from '../../systems/HeatingSystem.js';
@@ -137,7 +139,10 @@ export class Hud {
     const away = state.characters.filter((c) => c.away).map((c) => c.name);
     const storm = state.dilemma?.storm;
     const damaged = state.buildings.filter((b) => b.damaged).map((b) => b.name);
-    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}`;
+    // 14. aşama: duyurulan / süren mevsim festivali ve toplanma zili
+    const festival = currentSeasonFestival(state);
+    const rally = isRallyActive(state) ? Math.ceil((state.rally.until - state.totalMinutes) / 10) : 0;
+    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}`;
     if (buffKey !== this.lastBuffs) {
       this.lastBuffs = buffKey;
       const chips = buffs.map((b) =>
@@ -157,6 +162,8 @@ export class Hud {
       }
       const chip = (icon, text, title, cls = '') =>
         el('span', { className: `buff-chip${cls}`, title }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
+      if (festival?.stage === 'announced') chips.unshift(chip(festival.festival.icon, `${festival.festival.name} · 15:00`, festival.festival.announce, ' is-festival'));
+      if (rally) chips.push(chip('bell', 'Meydanda toplanma', 'Toplanma Zili çaldı: sakinler bir saatliğine meydanda'));
       if (sick.length) chips.push(chip('sneeze', `${sick.length} hasta`, `Üşütenler: ${sick.join(', ')}. Şifacı Kulübesi'nde iksirle hemen iyileşirler.`, ' is-freezing'));
       if (away.length) chips.push(chip('map', `Seferde: ${away.length}`, `Keşif seferindekiler: ${away.join(', ')}`));
       if (storm) {

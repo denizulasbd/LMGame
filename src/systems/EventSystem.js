@@ -320,10 +320,17 @@ export class EventSystem {
 
   endFestival() {
     const f = this.festival;
+    const theme = f.theme ?? null;
     f.active = false;
+    f.theme = null;
+    // (14. aşama) Mevsim festivalinin kapanışını (Mevsim Coşkusu, anılar) SeasonFestivalSystem yapar
+    if (theme) {
+      this.events.emit('festival:ended', { theme });
+      return;
+    }
     for (const c of this.state.characters) c.needs.fun = clamp(c.needs.fun + FESTIVAL.afterglowFun, 0, 100);
     this.applyBuff('festival');
-    this.events.emit('festival:ended', {});
+    this.events.emit('festival:ended', { theme: null });
     this.events.emit('toast', { text: 'Şenlik sona erdi. Kasaba yarına tam motivasyonla başlayacak!', tone: 'info', icon: 'sparkle' });
   }
 }

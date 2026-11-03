@@ -9,7 +9,7 @@ import { Entity } from './Entity.js';
 import { NEED_KEYS } from '../data/characters.js';
 import { CHILDREN } from '../data/family.js';
 import { buildTraitProfile } from '../ai/TraitProfile.js';
-import { getCharacterSprite, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../art/sprites/index.js';
+import { getCharacterSprite, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT, getFlowerCrownSprite } from '../art/sprites/index.js';
 import {
   getBubbleSprite,
   getHeldToolSprite,
@@ -72,6 +72,7 @@ export class Character extends Entity {
     educated = false,
     workplaceId = null,
     customName = false,
+    memories = [],
   }) {
     super({ id, x, y });
     this.name = name;
@@ -102,6 +103,11 @@ export class Character extends Entity {
     // 13. aşama: oyuncunun sabitlediği iş yeri (yalnızca orada çalışır) ve oyuncunun verdiği ad
     this.workplaceId = workplaceId;
     this.customName = customName;
+    // 14. aşama: hayat yolculuğu (MemorySystem): { day, hour, text, icon, kind, fond }; o an hatırladığı anı ve
+    // Çiçek Şenliği'nde saça takılan çiçek (bu ikisi kaydedilmez)
+    this.memories = (memories ?? []).filter((m) => m && typeof m.text === 'string').map((m) => ({ ...m }));
+    this.recall = null;
+    this.flowerCrown = false;
     this.profile = buildTraitProfile(traits, { child: this.isChild });
 
     // Anlık durum (kaydedilmez, yapay zekâ yeniden kurar)
@@ -238,6 +244,11 @@ export class Character extends Entity {
     const x = Math.round(this.x);
     const y = Math.round(this.y);
     queue.addImage(this.sortY, sprite, x - HALF_WIDTH, y - sprite.height + 1);
+    // (14. aşama) Çiçek Şenliği: saçta küçük bir çiçek
+    if (this.flowerCrown) {
+      const side = this.facing === 'left' ? -4 : this.facing === 'right' ? 1 : this.id % 2 === 0 ? -4 : 1;
+      queue.addImage(this.sortY + 0.02, getFlowerCrownSprite(this.id % 3), x + side, y - sprite.height + 1);
+    }
 
     // Gezgin tüccarın sırt çantası: yukarı bakarken önde (sırtı görünür), diğer yönlerde arkada
     if (this.backpack) {
@@ -399,6 +410,7 @@ export class Character extends Entity {
       educated: this.educated,
       workplaceId: this.workplaceId,
       customName: this.customName,
+      memories: this.memories,
     };
   }
 

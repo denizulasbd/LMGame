@@ -8,6 +8,7 @@ export class Boat {
     this.y = 0;
     this.facing = 'right';
     this.loaded = false;
+    this.grand = false; // (14. aşama) Büyük İhracat Seferi'nin kervan teknesi
     this.moving = false;
     this.visible = true;
     this.heading = { x: 0, y: 1 }; // gidiş yönü (iz için)
@@ -16,7 +17,7 @@ export class Boat {
   queueDraw(queue, env) {
     if (!this.visible) return;
     const frame = Math.floor(env.time * (this.moving ? 3 : 1.2)) % 2;
-    const sprite = getBoatSprite(this.facing, this.loaded, frame);
+    const sprite = getBoatSprite(this.facing, this.loaded, frame, this.grand);
     // Tekne suyun üstündedir: kıyıdaki her şeyin arkasında kalmasın diye kendi alt kenarıyla sıralanır
     queue.addImage(this.y + 4, sprite, Math.round(this.x - sprite.width / 2), Math.round(this.y - sprite.height + 6));
   }

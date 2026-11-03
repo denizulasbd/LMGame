@@ -2,7 +2,8 @@
 // (gündüz, gece), karar penceresini ve belediye fermanlarını açar. (12. aşama) Bilgelik Evi, liman ve rıhtıma
 // yanaşan ticaret teknesi, Büyük Vadi Saat Kulesi (gündüz / gece) ve bu yapıların bilgi panelleri. (13. aşama) Peyzaj
 // (kiraz ağaçları, çardakta oturan çift, mermer kemer, çiçekli çitler), yadigârları sergileyen Belediye Konağı,
-// Belediye ve liman panellerinin altın bölümleri, Kasaba Arşivi penceresi ve fotoğraf modu.
+// Belediye ve liman panellerinin altın bölümleri, Kasaba Arşivi penceresi ve fotoğraf modu. (14. aşama) Dört mevsim
+// festivali, sabah sisi, Toplanma Zili, yaz fırtınasında şimşek ve bir sakinin anılar paneli.
 // Kullanım: node tools/sim/showcase.mjs [tohum=11] [--out klasör]
 import fs from 'fs';
 import { openGame, parseArgs, runHours } from './lib.mjs';
@@ -194,6 +195,70 @@ await page.evaluate(() => window.game.events.emit('ui:chooseDilemma', { optionId
 await runHours(page, 12); // 22:00
 await shoot('gece-kedi', { animal: 'cat' }, 5);
 await shoot('gece-harika', { type: 'wonder' }, 2);
+
+// --- 14. aşama: mevsim festivalleri, sis, fırtına, anılar, toplanma zili ---
+async function festival(theme) {
+  await page.evaluate((theme) => {
+    const game = window.game;
+    const s = game.state;
+    if (s.events.festival.active) game.scenes.current.townEvents.endFestival();
+    Object.assign(s.seasonFestival, { day: s.time.day, theme, stage: 'announced' });
+    game.scenes.current.seasonFestivals.start();
+  }, theme);
+  await runHours(page, 1.5);
+  await page.evaluate(() => {
+    const game = window.game;
+    const venue = game.state.buildings.find((b) => b.id === game.state.events.festival.venueId);
+    const scene = game.scenes.current;
+    scene.camera.zoom = 3;
+    scene.camera.centerOn(venue.center.x, venue.center.y + 12, game.renderer.width, game.renderer.height);
+    scene.camera.clamp(scene.map.pixelWidth, scene.map.pixelHeight, game.renderer.width, game.renderer.height);
+    game.render(0);
+  });
+  await page.screenshot({ path: `${out}/vitrin-festival-${theme}.png` });
+  console.log(`${out}/vitrin-festival-${theme}.png`);
+}
+await festival('winter'); // gece: şölen ateşi, kardan adam, parıldayan fenerler
+await page.evaluate(() => window.game.scenes.current.townEvents.endFestival());
+await runHours(page, 10); // sabah
+await page.evaluate(() => window.game.scenes.current.weather.force('mist'));
+await runHours(page, 1);
+await shoot('sabah-sisi', { type: 'fountain' }, 3);
+await festival('spring');
+await festival('autumn');
+await festival('summer');
+await page.evaluate(() => window.game.scenes.current.townEvents.endFestival());
+// Anılar: en çok anısı olan sakinin paneli
+await page.setViewportSize({ width: 1360, height: 1500 });
+await page.evaluate(() => {
+  for (const el of document.querySelectorAll('.residents')) el.style.display = 'none';
+  const game = window.game;
+  const c = [...game.state.characters].sort((a, b) => b.memories.length - a.memories.length)[0];
+  game.scenes.current.memories.recall(c);
+  game.events.emit('ui:selectCharacter', c.id);
+  game.render(0);
+});
+await page.locator('.character-panel:not([hidden])').first().screenshot({ path: `${out}/vitrin-anilar.png` });
+console.log(`${out}/vitrin-anilar.png`);
+await page.evaluate(() => {
+  for (const el of document.querySelectorAll('.residents')) el.style.display = '';
+  window.game.events.emit('ui:selectCharacter', null);
+});
+await page.setViewportSize({ width: 1360, height: 860 });
+// Toplanma Zili ve fırtına
+await page.evaluate(() => {
+  window.game.state.rally = null;
+  window.game.events.emit('ui:rallyBell');
+});
+await runHours(page, 0.5);
+await shoot('toplanma-zili', { type: 'fountain' }, 3);
+await page.evaluate(() => window.game.scenes.current.weather.force('thunderstorm'));
+await runHours(page, 0.6);
+await page.evaluate(() => {
+  const fx = window.game.scenes.current.weatherFx;
+  fx.flash = 0.9; // şimşek anı
+});
+await shoot('yaz-firtinasi', { type: 'fountain' }, 3);
 console.log('Sayfa hataları:', errors.length ? errors.join('\n') : 'yok');
 await browser.close();
 process.exit(errors.length ? 1 : 0);

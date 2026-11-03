@@ -50,7 +50,13 @@ import { HarborSystem } from '../systems/HarborSystem.js';
 import { LuxurySystem } from '../systems/LuxurySystem.js';
 import { StatsSystem } from '../systems/StatsSystem.js';
 import { relicMask } from '../systems/Luxury.js';
-import { TILE_TYPES, TILE_BY_ID, isGround } from '../data/tiles.js';
+import { SeasonFestivalSystem } from '../systems/SeasonFestivalSystem.js';
+import { MemorySystem } from '../systems/MemorySystem.js';
+import { RallySystem } from '../systems/RallySystem.js';
+import { getFestivalDecorSprite } from '../art/sprites/index.js';
+import { SNOWMAN_STAGES } from '../data/festivals.js';
+import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
+import { JOBS } from '../data/jobs.js';
 import { TOWN_NAME_MAX_LENGTH } from '../data/town.js';
 import { CHARACTER_NAME_MAX_LENGTH } from '../data/characters.js';
 import { AudioSystem } from '../systems/AudioSystem.js';
@@ -127,6 +133,9 @@ export class TownScene extends Scene {
     this.harbor = new HarborSystem(this.game, this.world, this.economy, new Random(state.seed + 13));
     this.luxury = new LuxurySystem(this.game, this.economy);
     this.stats = new StatsSystem(this.game);
+    this.seasonFestivals = new SeasonFestivalSystem(this.game, this.world, new Random(state.seed + 14), { attract: this.attract });
+    this.memories = new MemorySystem(this.game, this.world, new Random(state.seed + 15));
+    this.rally = new RallySystem(this.game);
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       economy: this.economy,
       jobs: this.jobs,
@@ -165,6 +174,9 @@ export class TownScene extends Scene {
       this.conflicts,
       this.family,
       this.townEvents,
+      this.seasonFestivals,
+      this.memories,
+      this.rally,
       this.heating,
       this.milestones,
       this.townLevel,
@@ -198,6 +210,9 @@ export class TownScene extends Scene {
       this.harbor,
       this.luxury,
       this.stats,
+      this.seasonFestivals,
+      this.memories,
+      this.rally,
     ];
 
     this.camera = new Camera();
@@ -362,7 +377,8 @@ export class TownScene extends Scene {
 
     const { renderer } = this.game;
     const season = getSeason(this.game.state.time.day);
-    this.weatherFx.update(dt, this.game.state.weather, this.camera, renderer, this.map, season.key);
+    this.weatherFx.update(dt, this.game.state.weather, this.camera, renderer, this.map, season.key, tick.gameMinutes);
+    if (this.weatherFx.takeLightning()) this.game.events.emit('weather:lightning', {});
     this.leaves.update(dt, season.key === 'autumn', this.camera, renderer, this.map);
     this.fireflies.update(dt, this.map);
     this.audio.update(dt, tick.hour);
@@ -489,6 +505,12 @@ export class TownScene extends Scene {
       this.game.events.emit('ui:openTrade');
       return;
     }
+    // (14. aşama) Kediye / köpeğe tıklamak onu sever: sevinçle zıplar, kalpler uçuşur
+    const pet = this.game.state.animals.find((a) => a.hitTest?.(point.x, point.y));
+    if (pet) {
+      this.game.events.emit('ui:petAnimal', { id: pet.id });
+      return;
+    }
     const character = this.world.findCharacterAt(point.x, point.y);
     if (character) {
       this.select(character.id);
@@ -498,6 +520,20 @@ export class TownScene extends Scene {
     if (buildingId) {
       this.selectBuilding(buildingId);
       if (this.world.getBuilding(buildingId)?.open) this.game.events.emit('ui:openTrade');
+      return;
+    }
+    // (14. aşama) Ağaca ya da kayaya tıklamak onu öncelikli kesme / kırma hedefi yapar
+    const tx = Math.floor(point.x / CONFIG.TILE_SIZE);
+    const ty = Math.floor(point.y / CONFIG.TILE_SIZE);
+    const object = this.map.getObject(tx, ty);
+    if (object && OBJECT_TYPES[object]?.harvest) {
+      const job = this.jobs.prioritize(tx, ty);
+      if (job) {
+        const verb = job.type === 'chop' ? 'kesilecek' : job.type === 'mine' ? 'kırılacak' : 'toplanacak';
+        this.game.events.emit('toast', { text: `Öncelikli hedef: bu ${OBJECT_TYPES[object].name.toLocaleLowerCase('tr')} ilk iş olarak ${verb}; boştaki işçiler koşuyor`, tone: 'info', icon: JOBS[job.type].marker });
+      }
+      this.select(null);
+      this.selectBuilding(null);
       return;
     }
     this.select(null);
@@ -533,7 +569,8 @@ export class TownScene extends Scene {
     const point = input.getWorldPosition(this.camera);
     const visitor = point && !this.tools.isActive ? this.world.findVisitorAt(point.x, point.y) : null;
     const character = visitor ?? (point && !this.tools.isActive ? this.world.findCharacterAt(point.x, point.y) : null);
-    renderer.canvas.classList.toggle('is-pointing', Boolean(character));
+    const pet = point && !this.tools.isActive && this.game.state.animals.some((a) => a.hitTest?.(point.x, point.y));
+    renderer.canvas.classList.toggle('is-pointing', Boolean(character) || Boolean(pet));
 
     this.hovered = hovered;
     this.hoveredCharacterId = character?.id ?? null;
@@ -572,6 +609,8 @@ export class TownScene extends Scene {
       // Odun bitince bacalardan duman tütmez
       smokingHomes: freezing ? new Set() : new Set(this.world.characters.map((c) => c.homeId).filter((id) => id !== null)),
       relics: relicMask(this.game.state), // (13. aşama) Belediye Konağı'nda sergilenen yadigârlar
+      // (14. aşama) süren mevsim festivalinin teması (kışın fenerler parıldar, şölen ateşi harlanır)
+      festivalTheme: this.game.state.events.festival.active ? this.game.state.events.festival.theme ?? null : null,
     };
     const view = this.camera.getViewBounds(renderer.width, renderer.height);
 
@@ -589,6 +628,7 @@ export class TownScene extends Scene {
     for (const visitor of this.world.visitors) visitor.queueDraw(this.queue);
     for (const animal of this.game.state.animals) animal.queueDraw(this.queue, env);
     for (const boat of this.world.boats ?? []) boat.queueDraw(this.queue, env);
+    this.queueFestivalDecor(env);
     this.queue.flush(renderer);
 
     for (const building of this.world.buildings) building.drawEffects(renderer, env);
@@ -596,20 +636,22 @@ export class TownScene extends Scene {
     for (const boat of this.world.boats ?? []) boat.drawEffects(renderer, this.animationTime);
     this.leaves.draw(renderer);
     this.weatherFx.drawClouds(renderer, this.camera, weather, this.map, this.animationTime);
+    this.weatherFx.drawMist(renderer, this.camera, weather, this.map, this.animationTime);
 
     const lights = [];
     for (const building of this.world.buildings) building.collectLights(lights, env);
     const festivalVenue = this.festivalVenue();
-    if (festivalVenue) this.festivalFx.collectLights(lights, festivalVenue);
+    if (festivalVenue) this.festivalFx.collectLights(lights, festivalVenue, env.festivalTheme, this.game.state.seasonFestival);
     this.dayNight.render(renderer, this.camera, hour, lights, weather, season.tint);
 
     // Atmosferin üstü: ateşböcekleri, yağmur, balonlar, iş işaretleri, araç önizlemesi ve imleç gece de net görünsün
     renderer.applyCamera(this.camera);
     this.fireflies.draw(renderer, view, fireflyIntensity(weather, hour), this.animationTime, season.fireflies);
-    if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime);
+    if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime, env.festivalTheme, this.game.state.seasonFestival);
     renderer.resetCamera();
     const daylight = 1 - Math.min(1, getAmbientColor(hour).a / 0.55);
     this.weatherFx.drawRain(renderer, this.camera, weather, daylight);
+    this.weatherFx.drawLightning(renderer);
     renderer.applyCamera(this.camera);
     for (const building of this.world.buildings) building.drawOverlay(renderer, env);
     if (!this.cinematic) drawJobMarkers(renderer, this.jobs.jobs, this.animationTime);
@@ -629,6 +671,19 @@ export class TownScene extends Scene {
       drawTileCursor(renderer, tileX, tileY, this.animationTime, this.map.isBuildable(tileX, tileY));
     }
     renderer.resetCamera();
+  }
+
+  /** (14. aşama) Mevsim festivalinin süslemeleri: çiçek kemerleri, sofralar, hasat sepeti, kardan adam... */
+  queueFestivalDecor(env) {
+    const sf = this.game.state.seasonFestival;
+    if (sf.stage !== 'active') return;
+    const elapsed = this.game.state.totalMinutes - (sf.startedAt ?? 0);
+    const snowStage = SNOWMAN_STAGES.filter((m) => elapsed >= m).length - 1;
+    for (const d of sf.decor) {
+      const sprite = getFestivalDecorSprite(d.kind, { frame: Math.floor(env.time * 3), stage: snowStage, season: env.season });
+      if (!sprite) continue;
+      this.queue.addImage(d.y, sprite, Math.round(d.x - sprite.width / 2), Math.round(d.y - sprite.height + 2));
+    }
   }
 
   /** Şenlik sürüyorsa yapıldığı yer, yoksa null. */

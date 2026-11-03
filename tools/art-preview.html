@@ -17,7 +17,7 @@
   <p>Geliştirme aracı: <code>python3 tools/serve.py</code> çalışırken <code>/tools/art-preview.html</code> adresinden açılır. Yapılar 5 kat büyütülmüş çizilir.</p>
   <div id="root"></div>
   <script type="module">
-    import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite, getBoatSprite, getGazeboLayer } from '../src/art/sprites/index.js';
+    import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite, getBoatSprite, getGazeboLayer, getFestivalDecorSprite, getFlowerCrownSprite } from '../src/art/sprites/index.js';
     import { getIconSprite, getBackpackSprite, getNoteSprite, getBubbleSprite, getHeldToolSprite, getCarrySprite } from '../src/art/ui/index.js';
     import { getCharacterSprite } from '../src/art/sprites/index.js';
     import { getTileSprite, getObjectSprite, getEdgeSprite } from '../src/art/tiles/index.js';
@@ -49,6 +49,30 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 14. aşama: mevsim festivallerinin süslemeleri, kervan teknesi, yeni simgeler ve anı balonu ---
+    show('Mevsim festivali süslemeleri: Çiçek Şenliği (kemer, sepet), Panayır (sofra, flama iki kare), Hasat Bayramı (dev sepet, kabak, şıra fıçısı)', [
+      ['çiçek kemeri', getFestivalDecorSprite('flowerArch')],
+      ['çiçek sepeti', getFestivalDecorSprite('flowerBasket')],
+      ['ziyafet sofrası', getFestivalDecorSprite('feastTable')],
+      ...[0, 1].map((f) => [`flama ${f}`, getFestivalDecorSprite('flagPole', { frame: f })]),
+      ['hasat sepeti', getFestivalDecorSprite('harvestBasket')],
+      ['kabak', getFestivalDecorSprite('pumpkin')],
+      ['şıra fıçısı', getFestivalDecorSprite('ciderBarrel')],
+    ], 5);
+    show('Işıklar Gecesi: kardan adam üç kademede yükselir; Çiçek Şenliği saç çiçekleri', [
+      ...[0, 1, 2].map((stage) => [`kardan adam ${stage + 1}/3`, getFestivalDecorSprite('snowman', { stage })]),
+      ...[0, 1, 2].map((v) => [`saç çiçeği ${v + 1}`, getFlowerCrownSprite(v)]),
+    ], 8);
+    show('Büyük İhracat Seferi: kervan teknesi (altın şeritli yelken), boş / yüklü, sola giden', [
+      ...[0, 1].map((f) => [`kervan ${f}`, getBoatSprite('right', false, f, true)]),
+      ['kervan yüklü', getBoatSprite('right', true, 0, true)],
+      ['sola, yüklü', getBoatSprite('left', true, 1, true)],
+    ], 6);
+    show('Yeni simgeler: dört festival, toplanma zili, sabah sisi, gök gürültülü fırtına; anı balonu', [
+      ...['blossom', 'sunfair', 'harvest', 'snowman', 'bell', 'mist', 'thunder'].map((n) => [n, getIconSprite(n)]),
+      ['anı balonu', getBubbleSprite('memory')],
+    ], 10);
 
     // --- 13. aşama: peyzaj, kasaba yadigârları, lüks mallar ve yeni arayüz simgeleri ---
     show('Kiraz Çiçeği Ağacı (1x1): ilkbahar, yaz, sonbahar, kış (yaprakları oyunda rüzgârla savrulur)', SEASONS.map((season) => [NAMES[season], getStructureSprite('cherryTree', { season })]), 6);

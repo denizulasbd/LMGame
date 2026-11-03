@@ -677,7 +677,9 @@ export class Building extends Entity {
     } else if (this.type === 'lantern' && this.lit) {
       // Sokak feneri: sıcak sarı, geniş ışık halkası
       const artTop = this.y + this.height - LANTERN_ART.height;
-      out.push({ x: this.x + LANTERN_ART.light.x, y: artTop + LANTERN_ART.light.y, radius: 52, color: [255, 214, 120], intensity: 0.85, glow: 0.34 });
+      // (14. aşama) Işıklar Gecesi'nde bütün fenerler parıldar
+      const sparkle = env.festivalTheme === 'winter' ? 1.35 + Math.sin(env.time * 4 + this.id) * 0.08 : 1;
+      out.push({ x: this.x + LANTERN_ART.light.x, y: artTop + LANTERN_ART.light.y, radius: 52 * sparkle, color: [255, 214, 120], intensity: 0.85, glow: 0.34 * Math.min(1.25, sparkle) });
     } else if (this.type === 'monument' && env.windowsLit) {
       // Anıtın yıldızı gece hafifçe parlar
       const artTop = this.y + this.height - MONUMENT_ART.height;
