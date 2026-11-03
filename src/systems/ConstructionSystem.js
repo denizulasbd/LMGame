@@ -14,6 +14,7 @@ import { formatCost } from '../data/resources.js';
 import { Building } from '../entities/Building.js';
 import { assignBridgeVariants } from '../world/WorldGenerator.js';
 import { accessTiles, hasAccessRule } from '../world/footprint.js';
+import { TOWN_TIERS } from '../data/town.js';
 
 const DEMOLISH_REFUND = 0.5;
 
@@ -62,6 +63,10 @@ export class ConstructionSystem {
     const footprint = [];
     // Kasabada tek olabilen yapı (anıt) zaten varsa önce bu söylenir
     let reason = def.unique && this.world.getBuildingsOfType(type).length > 0 ? `Kasabada yalnızca bir ${def.name} olabilir` : null;
+    // Kasaba seviyesiyle açılan yapılar (değirmen: Köy, belediye: Kasaba) önce bunu söyler
+    if (!reason && def.requiresTier && (this.world.state.town?.tier ?? 1) < def.requiresTier) {
+      reason = `Kasaba ${TOWN_TIERS[def.requiresTier - 1].name} seviyesine ulaşınca açılır`;
+    }
     let orientation = 'right';
 
     for (let y = tileY; y < tileY + def.size.h; y++) {
@@ -78,7 +83,7 @@ export class ConstructionSystem {
       }
     }
 
-    // Yakınında kaya gibi doğal nesneler isteyen yapılar (taş ocağı)
+    // Yakınında kaya gibi doğal nesneler isteyen yapılar (taş ocağı, demir madeni)
     if (!reason && def.requires) reason = this.checkRequirements(def, tileX, tileY);
     // Önce başka bir yapı gerektirenler (pazar yeri -> kiler)
     if (!reason && def.requiresBuilding && this.world.getCompleted(def.requiresBuilding.type).length === 0) {
@@ -94,9 +99,12 @@ export class ConstructionSystem {
       }
     }
 
-    // Kapı / çalışma noktası yürünebilir ve kasabaya bağlı olmalı
+    // Kapı / çalışma noktası yürünebilir ve yapı kurulduktan SONRA da kasabaya bağlı olmalı (önü yalnızca
+    // kendi ayak izinin içinden bağlanan yapı kendi girişini koparmasın). Ulaşılabilirlik bir kez hesaplanır.
     const doors = accessTiles(type, tileX, tileY, orientation);
-    const approachable = (x, y) => map.isWalkable(x, y) && this.world.isReachable(x, y);
+    let after = null;
+    const reachableAfter = () => (after ??= this.world.reachabilityWithout(footprint));
+    const approachable = (x, y) => map.isWalkable(x, y) && map.inBounds(x, y) && reachableAfter()[map.index(x, y)] === 1;
     if (!reason && def.doorTiles && !doors.every((d) => approachable(d.x, d.y))) {
       reason = 'Kapının önü yola bağlı ve açık olmalı';
     }
@@ -113,15 +121,30 @@ export class ConstructionSystem {
       );
       if (blocked) reason = `${blocked.name} girişinin önüne kurulamaz`;
     }
+    // Başka bir yapıyı (ve onun önündeki yolu) kasabadan tamamen koparıp kapalı bir cepte bırakmasın
+    if (!reason) {
+      const isolated = this.world.wouldIsolate(footprint, reachableAfter());
+      if (isolated) reason = `${isolated.name} kasabadan kopar: aradaki geçidi kapatma`;
+    }
     if (!reason && !this.economy.canAfford(def.cost)) {
       reason = `Yetersiz kaynak: ${this.economy.missing(def.cost).join(', ')}`;
     }
     return { ok: !reason, reason, footprint, doors, orientation };
   }
 
-  /** Yakında yeterince kaya / çakıl var mı? Yoksa gerekçe metni döner. */
+  /**
+   * Yakında yeterince kaya / çakıl var mı? Yoksa gerekçe metni döner. requires.biome verilmişse ayak izinin
+   * en az min karosu o biyomdaysa (demir madeni: kayalık tepe) yakında nesne aranmaz.
+   */
   checkRequirements(def, tileX, tileY) {
-    const { nearObjects, radius, min, reason } = def.requires;
+    const { nearObjects, radius, min, reason, biome } = def.requires;
+    if (biome) {
+      let tiles = 0;
+      for (let y = tileY; y < tileY + def.size.h; y++) {
+        for (let x = tileX; x < tileX + def.size.w; x++) if (this.world.map.get(x, y) === biome.tile) tiles++;
+      }
+      if (tiles >= biome.min) return null;
+    }
     const cx = tileX + Math.floor(def.size.w / 2);
     const cy = tileY + Math.floor(def.size.h / 2);
     let count = 0;

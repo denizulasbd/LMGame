@@ -2000,3 +2000,230 @@ button.relation-row:hover {
 @keyframes confetti-fall {
   to { transform: translateY(110vh) rotate(360deg); }
 }
+
+/* ---------- 10. aşama: kasaba unvanı ve seviye armaları (HUD) ---------- */
+.hud-tier-icon {
+  flex: none;
+}
+
+.hud-tier {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: auto;
+  padding: 3px 4px;
+  background: #fff6d6;
+  border: 2px solid var(--ui-wood);
+  cursor: help;
+}
+
+.hud-tier.is-ready {
+  border-color: var(--ui-ok);
+  animation: tier-ready 1.2s steps(2) infinite;
+}
+
+@keyframes tier-ready {
+  50% { border-color: var(--ui-highlight); }
+}
+
+.tier-pip {
+  width: 6px;
+  height: 6px;
+  background: var(--ui-paper-shade);
+  box-shadow: inset 0 0 0 1px var(--ui-wood-dark);
+}
+
+.tier-pip.is-on {
+  background: var(--ui-highlight);
+  box-shadow: inset 0 0 0 1px var(--ui-ink), inset -1px -1px 0 1px #ffb84d;
+}
+
+/* ---------- İşlenmiş mallar satırı (HUD): özet / açık görünüm ---------- */
+.resource-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.resource-name,
+.resource-detail {
+  display: none;
+}
+
+.hud-goods {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.goods-label {
+  font-size: 13px;
+  color: var(--ui-wood-dark);
+}
+
+.hud-btn.goods-toggle {
+  min-width: 0;
+  padding: 0 5px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.resource.is-goods {
+  font-size: 13px;
+  padding: 0 5px 0 2px;
+  border-width: 2px;
+  border-style: dashed;
+}
+
+.resource.is-goods .resource-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.hud-goods.is-expanded {
+  align-items: stretch;
+}
+
+.hud-goods.is-expanded .goods-label {
+  flex-basis: calc(100% - 40px);
+}
+
+.hud-goods.is-expanded .resource.is-goods {
+  flex: 1 1 100%;
+  border-style: solid;
+  padding: 2px 6px 2px 3px;
+}
+
+.hud-goods.is-expanded .resource-text {
+  flex: 1;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  column-gap: 8px;
+}
+
+.hud-goods.is-expanded .resource-name {
+  display: inline;
+  min-width: 46px;
+}
+
+.hud-goods.is-expanded .resource-detail {
+  display: inline;
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ui-wood-dark);
+}
+
+/* İnşa menüsü: kasaba seviyesiyle açılan yapı (kilitliyken seviye adı rozet olarak görünür) */
+.build-item.is-tier-locked {
+  position: relative;
+}
+
+.build-item.is-tier-locked::after {
+  content: attr(data-tier);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  padding: 0 3px;
+  font-size: 10px;
+  line-height: 13px;
+  color: #fff6d6;
+  background: var(--ui-ink);
+}
+
+/* Takas penceresi: kasaba seviyesiyle gelen mallar */
+.trade-row.is-tier {
+  background: linear-gradient(90deg, #fff1c4, transparent 70%);
+}
+
+/* Hedefler paneli: kasaba seviyesi kartı */
+.goal-row.tier-card {
+  display: block;
+  margin-bottom: 4px;
+  background: linear-gradient(#fff6d6, #fbe9b8);
+  border: 2px solid var(--ui-wood);
+}
+
+.tier-card .goal-icon {
+  filter: none;
+  opacity: 1;
+}
+
+.tier-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tier-head {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 6px;
+}
+
+.tier-steps {
+  display: flex;
+  gap: 4px;
+}
+
+.tier-step {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--ui-paper-shade);
+  border: 2px solid var(--ui-wood-dark);
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+.tier-step.is-on {
+  background: #fff1c4;
+  border-color: var(--ui-ink);
+  opacity: 1;
+  filter: none;
+}
+
+.tier-step img,
+.tier-check img {
+  width: 14px;
+  height: 14px;
+  image-rendering: pixelated;
+}
+
+.tier-check {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 70px;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.tier-check.is-ok .tier-check-name {
+  color: var(--ui-ok);
+  font-weight: 600;
+}
+
+.tier-check.is-ok .goal-fill {
+  background: var(--ui-ok);
+}
+
+.tier-perks {
+  margin-top: 2px;
+}
+
+/* Kutlama penceresi: seviye ödülleri */
+.celebration-perks {
+  margin: 0;
+  padding: 6px 10px;
+  list-style: none;
+  font-size: 13px;
+  text-align: left;
+  background: #fff6d6;
+  border: 2px solid var(--ui-wood);
+}
+
+.celebration-perks[hidden] {
+  display: none;
+}
+
+.celebration-perks li::before {
+  content: '★ ';
+  color: #b0832a;
+}

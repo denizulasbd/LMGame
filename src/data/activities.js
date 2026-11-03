@@ -12,7 +12,7 @@
 //   travelEffects: hedefe yürürken dakika başına kazanç (yürüyüş keyfi)
 //   socialGain / aloneSocialGain: toplanma yerinde biriyle / yalnızken dakika başına sosyallik
 //   nature      : true ise 'Doğa Sever' kazanç çarpanı uygulanır
-//   pose        : stand | sit | gather | work | fish
+//   pose        : stand | sit | gather | work | fish | tend (aletini dik tutup bekler: çoban değneği)
 //   tool        : çalışırken elde tutulan alet (art/ui -> held tools)
 //   effect      : çalışırken karakterin önünde çizilen efekt ('dust': kazma darbesinde toz ve kıymık)
 //   friendshipMultiplier: bu yerde sohbet edenlerin arkadaşlık puanı kazanç çarpanı
@@ -38,6 +38,9 @@ export const ACTIVITIES = {
     travelLabel: 'Yemek yemeye gidiyor',
     label: 'Evinde yemek yiyor',
     storageLabel: 'Kilerde yemek yiyor',
+    breadLabel: 'Evinde taze ekmekle yemek yiyor',
+    breadStorageLabel: 'Kilerde taze ekmekle yemek yiyor',
+    breadEffects: { fun: 0.25 }, // sıcak ekmekli öğün biraz da keyif verir
     duration: [12, 18],
     effects: { hunger: 4 },
     urgentBubble: 'apple',
@@ -219,6 +222,33 @@ export const ACTIVITIES = {
     indoor: true,
     travelLabel: 'Hana aşçılığa gidiyor',
     label: 'Handa sıcak yemek pişiriyor',
+  },
+  // --- 10. aşama: hayvancılık, değirmen-fırın ve demir madeni ---
+  herd: {
+    kind: 'work',
+    travelLabel: 'Koyun ağılına gidiyor',
+    label: 'Ağılda koyunları otlatıyor',
+    pose: 'tend',
+    tool: 'crook',
+    bubbles: ['note', 'heart', 'sparkle'],
+  },
+  bake: {
+    kind: 'work',
+    travelLabel: 'Değirmene ve fırına gidiyor',
+    label: 'Fırında sıcak ekmek pişiriyor',
+    idleLabel: 'Fırının başında un bekliyor',
+    pose: 'work',
+    tool: 'peel',
+    bubbles: ['fire', 'sparkle', 'note'],
+  },
+  mineIron: {
+    kind: 'work',
+    travelLabel: 'Demir madenine gidiyor',
+    label: 'Madende demir cevheri kazıyor',
+    pose: 'work',
+    tool: 'pickaxe',
+    effect: 'dust',
+    bubbles: ['sweat', 'note'],
   },
   // Zanaat atölyesinde ekipman üretimi ({item}: yapılan ekipman)
   craft: {

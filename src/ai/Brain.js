@@ -9,7 +9,8 @@
 //   2. Uyku saati geldiyse ya da enerjisi bittiyse eve dönüp uyumak
 //   3. Sırtında yük varsa kilere bırakmak
 //   2b. Akşam şenliği varsa (ve çok yorgun değilse) meydana koşmak
-//   4. Acıktıysa (kişiye özel eşik) handa sıcak yemek, kilerden / evden yemek, stok yoksa böğürtlen
+//   4. Acıktıysa (kişiye özel eşik) handa sıcak yemek, kilerden / evden yemek (ekmek varsa taze ekmekle),
+//      stok yoksa böğürtlen
 //   4b. Depoda ona ayrılmış boşta ekipman varsa atölyeye / kilere gidip kuşanmak (yetişkinler)
 //   5. Mesai saatindeyse iş kuyruğu: şantiye > toplama emri > üretim binası
 //      (kişiliğe göre ara sıra mola verir; çocuklar çalışmaz)
@@ -170,7 +171,8 @@ export class Brain {
     const origin = this.originTile(c);
     const places = [];
     for (const inn of this.world.getCompleted('inn')) if (inn.meals > 0) places.push({ place: inn, activity: 'innMeal' });
-    if (this.economy.amount('food') >= MEAL_FOOD_COST) {
+    // Kilerde yiyecek ya da ekmek (2,5 yiyecek değerinde) varsa evde / kilerde oturup yenir
+    if (this.economy.canFeed(MEAL_FOOD_COST)) {
       for (const storage of this.world.getCompleted('storage')) places.push({ place: storage, activity: 'meal' });
       const home = this.world.getBuilding(c.homeId);
       if (home && !home.underConstruction) places.push({ place: home, activity: 'meal' });

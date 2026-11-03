@@ -17,8 +17,8 @@
   <p>Geliştirme aracı: <code>python3 tools/serve.py</code> çalışırken <code>/tools/art-preview.html</code> adresinden açılır. Yapılar 5 kat büyütülmüş çizilir.</p>
   <div id="root"></div>
   <script type="module">
-    import { getStructureSprite, getConstructionSiteSprite } from '../src/art/sprites/index.js';
-    import { getIconSprite, getBackpackSprite, getNoteSprite, getBubbleSprite, getHeldToolSprite } from '../src/art/ui/index.js';
+    import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite } from '../src/art/sprites/index.js';
+    import { getIconSprite, getBackpackSprite, getNoteSprite, getBubbleSprite, getHeldToolSprite, getCarrySprite } from '../src/art/ui/index.js';
     import { getCharacterSprite } from '../src/art/sprites/index.js';
     import { getTileSprite, getObjectSprite, getEdgeSprite } from '../src/art/tiles/index.js';
     import { TILE_TYPES } from '../src/data/tiles.js';
@@ -49,6 +49,46 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 10. aşama: işlenmiş mallar, koyun ağılı ve koyunlar, yel değirmeni ve fırın, demir madeni, belediye ---
+    show('İşlenmiş mallar ve kasaba seviyesi armaları (HUD)', ['wool', 'iron', 'bread', 'tierHamlet', 'tierVillage', 'tierTown', 'tierCity'].map((n) => [n, getIconSprite(n)]), 10);
+    show('Taşınan yükler ve yeni aletler', [
+      ...['wool', 'iron', 'bread'].map((r) => [`yük: ${r}`, getCarrySprite(r)]),
+      ['fırın küreği', getHeldToolSprite('peel', false)],
+      ['çoban değneği', getHeldToolSprite('crook', false)],
+      ['değnek (sola)', getHeldToolSprite('crook', true)],
+    ], 8);
+    show('Koyunlar (12x9) ve kuzu (9x7): ayakta, yürüme, otlama (çiğneme), uyku; sola bakan', [
+      ...['stand', 'walk0', 'walk1', 'graze0', 'graze1', 'sleep'].map((p) => [p, getSheepSprite(p, 'right')]),
+      ['sola', getSheepSprite('stand', 'left')],
+      ['sola otlar', getSheepSprite('graze0', 'left')],
+      ...['stand', 'walk1', 'graze0', 'sleep'].map((p) => [`kuzu ${p}`, getSheepSprite(p, 'right', true)]),
+    ], 8);
+    show('Koyun Ağılı (3x3): tam görsel, oyundaki iki katman (arka / ön çit), mevsimler', [
+      ...SEASONS.map((season) => [`ağıl ${NAMES[season]}`, getStructureSprite('sheepFarm', { season })]),
+      ['arka katman', getSheepFarmLayer('back', 'summer')],
+      ['ön katman', getSheepFarmLayer('front', 'summer')],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(3, 3, stage, 'sheepFarm')]),
+    ], 4);
+    show('Yel Değirmeni ve Fırın (3x3): kanatlar 6 karede çeyrek tur döner', [0, 1, 2, 3, 4, 5].map((f) => [`kanat ${f}`, getStructureSprite('mill', { sailFrame: f })]), 4);
+    show('Değirmen: fırın yanıyor, gece, kış', [
+      ['fırın alevi 0', getStructureSprite('mill', { sailFrame: 2, active: true, frame: 0 })],
+      ['fırın alevi 1', getStructureSprite('mill', { sailFrame: 3, active: true, frame: 1 })],
+      ['gece (pencere)', getStructureSprite('mill', { sailFrame: 4, windowsLit: true })],
+      ['kış', getStructureSprite('mill', { sailFrame: 1, season: 'winter' })],
+    ], 4);
+    show('Demir Madeni (3x3): boşta, vagon raylarda gidip gelir (çalışırken), gece feneri, kış', [
+      ['boşta', getStructureSprite('ironMine', {})],
+      ...[0, 1, 2, 3].map((f) => [`vagon ${f}`, getStructureSprite('ironMine', { active: true, frame: f })]),
+      ['gece', getStructureSprite('ironMine', { lit: true })],
+      ['kış', getStructureSprite('ironMine', { season: 'winter' })],
+    ], 4);
+    show('Belediye Konağı (3x3): bayrak dalgalanır, gece pencereler ve fenerler yanar, kış', [
+      ...[0, 1, 2].map((f) => [`bayrak ${f}`, getStructureSprite('townHall', { frame: f })]),
+      ['gece', getStructureSprite('townHall', { windowsLit: true, frame: 1 })],
+      ['kış', getStructureSprite('townHall', { season: 'winter' })],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(3, 3, stage, 'townHall')]),
+    ], 4);
 
     // --- 9. aşama: çocuklar, palto ve sırt çantası, balonlar, ekipman, Zanaat Atölyesi ---
     const looks = [
@@ -247,7 +287,7 @@
       ['çanta yandan', getBackpackSprite('right')],
       ...['P', 'p', 'i', 'a', 'O'].map((c) => [`nota ${c}`, getNoteSprite(c)]),
     ], 8);
-    show('HUD simgeleri', ['sound', 'mute', 'smile', 'frown', 'coin', 'spring', 'summer', 'autumn', 'winter', 'snow', 'star', 'starEmpty'].map((n) => [n, getIconSprite(n)]), 10);
+    show('HUD simgeleri', ['wood', 'stone', 'food', 'wool', 'iron', 'bread', 'sound', 'mute', 'smile', 'frown', 'coin', 'spring', 'summer', 'autumn', 'winter', 'snow', 'star', 'starEmpty'].map((n) => [n, getIconSprite(n)]), 10);
     show('Hava simgeleri', ['sun', 'cloud', 'rain', 'firefly', 'moon', 'journal'].map((n) => [n, getIconSprite(n)]), 10);
   </script>
 </body>

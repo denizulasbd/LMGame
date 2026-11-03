@@ -1,12 +1,21 @@
-// Kasabanın ortak kaynak bankası: Odun, Taş, Yiyecek.
-//   - Depo kapasitesi = temel kapasite + tamamlanmış Kiler'lerin katkısı
+// Kasabanın ortak kaynak bankası: Odun, Taş, Yiyecek ve (10. aşama) işlenmiş mallar Yün, Demir, Ekmek.
+//   - Depo kapasitesi = temel kapasite + tamamlanmış Kiler'lerin katkısı (her kaynak için ayrı ayrı)
 //   - Harcama / ekleme tek yerden yapılır ve 'resources:changed' olayı yayınlanır
 //     (HUD +5 / -10 vurgularını bu olaydan çizer)
-//   - Depo dolunca ya da yiyecek bitince bir kez bildirim gösterilir
+//   - Depo dolunca ya da kasabanın yiyeceği (ekmek dahil) bitince bir kez bildirim gösterilir
+//   - Yiyecek değeri: ekmek 2,5 yiyecek sayılır. Öğünler consumeFood ile ödenir: önce kesilmiş ekmekten
+//     artan pay (state.pantry.credit), sonra ekmek, en son ham yiyecek; handaki aşçı ise önce ham yiyecek
+//     kullanır. Bir ekmek dilimlenince artan yiyecek değeri pay olarak saklanır, hiçbir şey kaybolmaz.
+//   - Üretim yapıları produce() ile ekler: işlenmiş malların toplam üretimi state.stats.goods'a yazılır,
+//     kasabanın ilk yünü / demiri / ekmeği için 'goods:firstProduced' { resource, building } yayınlanır
 import { RESOURCES, BASE_STORAGE_CAPACITY } from '../data/resources.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { foodSupply } from './TownStatus.js';
 
 const FULL_RESET_RATIO = 0.9; // doluluk bu oranın altına inince "depo doldu" uyarısı yeniden verilebilir
+const EPSILON = 1e-9;
+const HUNGER_WARNING_SUPPLY = 1; // kasabanın toplam yiyecek değeri bunun altına inince uyarı
+const HUNGER_RESET_SUPPLY = 6; // ve bunun üstüne çıkınca uyarı yeniden verilebilir
 
 export class EconomySystem {
   /**
@@ -18,6 +27,7 @@ export class EconomySystem {
     this.state = game.state;
     this.world = world;
     this.fullWarned = new Set();
+    this.hungerWarned = false;
     this.recalculateCapacity();
   }
 
@@ -41,6 +51,11 @@ export class EconomySystem {
     return this.state.resources[resource] ?? 0;
   }
 
+  /** Bu kaynak için depoda kalan boş yer. */
+  room(resource) {
+    return Math.max(0, this.capacity - this.amount(resource));
+  }
+
   canAfford(cost = {}) {
     return Object.entries(cost).every(([r, v]) => this.amount(r) >= v);
   }
@@ -59,11 +74,14 @@ export class EconomySystem {
       if (value <= 0) continue;
       this.state.resources[resource] -= value;
       this.emitChange(resource, -value);
-      if (this.amount(resource) === 0) this.events.emit('resource:depleted', { resource });
-      if (resource === 'food' && this.amount('food') === 0) {
-        this.events.emit('toast', { text: 'Kilerde yiyecek kalmadı! Sakinler çalılara yöneliyor.', tone: 'warn', icon: 'food' });
+      // İşlenmiş mallar (yün, demir, ekmek) zanaatkâr ve fırın kullandıkça sık sık sıfırlanır: günlüğe
+      // yazılmaz. Ham yiyecek de fırın una çevirdikçe biter; kilerde ekmek varsa kasaba aç değildir.
+      const depleted = this.amount(resource) === 0 && !RESOURCES[resource].processed;
+      if (depleted && (resource !== 'food' || this.foodSupply() < HUNGER_WARNING_SUPPLY)) {
+        this.events.emit('resource:depleted', { resource });
       }
     }
+    if (cost.food || cost.bread) this.checkHunger();
     return true;
   }
 
@@ -86,12 +104,92 @@ export class EconomySystem {
     } else if (now < this.capacity * FULL_RESET_RATIO) {
       this.fullWarned.delete(resource);
     }
+    if (added > 0 && RESOURCES[resource].foodValue) this.checkHunger();
+    return added;
+  }
+
+  /**
+   * Bir üretim yapısının ürünü stoğa girer (add gibi). İşlenmiş malların toplam üretimi sayılır; kasabanın
+   * ilk yünü, demiri ya da ekmeği çıkınca 'goods:firstProduced' yayınlanır (günlük ve bildirim).
+   */
+  produce(resource, amount, building = null) {
+    const added = this.add(resource, amount);
+    if (added > 0 && RESOURCES[resource].processed) {
+      const goods = this.state.stats.goods;
+      const first = !goods[resource];
+      goods[resource] = (goods[resource] ?? 0) + added;
+      if (first) this.events.emit('goods:firstProduced', { resource, building });
+    }
     return added;
   }
 
   /** İnşaat iptali / yıkım iadesi. */
   refund(cost = {}, ratio = 1) {
     for (const [resource, value] of Object.entries(cost)) this.add(resource, Math.floor(value * ratio));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Yiyecek değeri (10. aşama): ekmek 2,5 yiyecek sayılır
+  // ---------------------------------------------------------------------------
+
+  /** Kasabanın toplam yiyecek değeri: yiyecek + ekmek × 2,5 + dilimlenmiş ekmekten artan pay. */
+  foodSupply() {
+    return foodSupply(this.state);
+  }
+
+  /** Bu kadar yiyecek değeri karşılanabilir mi (ekmek dahil)? */
+  canFeed(units) {
+    return this.foodSupply() + EPSILON >= units;
+  }
+
+  /**
+   * units yiyecek değerini öder. Öğünler önce ekmek yer (preferRaw: false); handaki aşçı önce ham yiyecek
+   * kullanır (preferRaw: true). Yetmiyorsa hiçbir şey harcamaz.
+   * Dönüş: { ok, bread } — bread: ödemenin bir kısmı ekmekten mi karşılandı
+   */
+  consumeFood(units, { preferRaw = false } = {}) {
+    if (!this.canFeed(units)) return { ok: false, bread: false };
+    if (preferRaw && Number.isInteger(units) && this.amount('food') >= units) {
+      this.spend({ food: units });
+      return { ok: true, bread: false };
+    }
+    const pantry = this.state.pantry;
+    const breadValue = RESOURCES.bread.foodValue;
+    let need = units;
+    let usedBread = false;
+    const takeCredit = () => {
+      const take = Math.min(pantry.credit, need);
+      pantry.credit -= take;
+      need -= take;
+    };
+    takeCredit();
+    while (need > EPSILON && this.amount('bread') > 0) {
+      this.spend({ bread: 1 });
+      pantry.credit += breadValue;
+      usedBread = true;
+      takeCredit();
+    }
+    if (need > EPSILON) {
+      // Kalan pay ham yiyecekten; tam birim harcanır, artanı pay olarak saklanır
+      const whole = Math.ceil(need - EPSILON);
+      this.spend({ food: whole });
+      pantry.credit += whole - need;
+      need = 0;
+    }
+    if (pantry.credit < EPSILON) pantry.credit = 0;
+    this.checkHunger();
+    return { ok: true, bread: usedBread };
+  }
+
+  /** Kasabanın yiyeceği (ekmek dahil) bitince bir kez uyarır. */
+  checkHunger() {
+    const supply = this.foodSupply();
+    if (supply < HUNGER_WARNING_SUPPLY && !this.hungerWarned) {
+      this.hungerWarned = true;
+      this.events.emit('toast', { text: 'Kilerde yiyecek ve ekmek kalmadı! Sakinler çalılara yöneliyor.', tone: 'warn', icon: 'food' });
+    } else if (supply >= HUNGER_RESET_SUPPLY) {
+      this.hungerWarned = false;
+    }
   }
 
   emitChange(resource, delta) {

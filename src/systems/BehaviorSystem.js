@@ -9,6 +9,10 @@
 // "İçeride" geçen etkinlikler (uyku, evde yemek, yeni eve yerleşme): karakter kapıdan girip
 // görünmez olur, bir sonraki planda kapıdan çıkar.
 //
+// 10. aşama: üretim yapılarının yan ürünü (ağılda yiyecek, madende taş: production.extra), değirmen-fırında
+// işleme (processing: 1 yiyecek -> 1 ekmek), öğünlerin yiyecek değeriyle ödenmesi (önce ekmek: "taze ekmekle
+// yemek", biraz da keyif verir) ve belediyenin iş verimi (townWorkMultiplier).
+//
 // Uyku bitince 'character:woke' { character } yayınlanır (FamilySystem Mutlu Yuva'yı verir). Oyuncu bir
 // çalışanı işten çıkarınca ('ui:dismissWorker') görevi biter ve o yapıda bir daha çalışmaz
 // ('ui:rehireWorker' geri alır).
@@ -20,7 +24,7 @@ import { DEFAULT_WORK } from '../data/characters.js';
 import { Brain } from '../ai/Brain.js';
 import { isBedtime, isWorkHours } from '../ai/TraitProfile.js';
 import { WARM_MEAL } from '../data/town.js';
-import { buffMultiplier } from './TownStatus.js';
+import { townWorkMultiplier } from './TownStatus.js';
 import { workBonus, addExperience } from './SkillSystem.js';
 import { isFreezing } from './HeatingSystem.js';
 import { equipmentWorkSpeed } from './Equipment.js';
@@ -244,7 +248,9 @@ export class BehaviorSystem {
     const building = task.buildingId ? this.world.getBuilding(task.buildingId) : null;
     let label = activity.label;
     if (task.activity === 'sleep' && task.nap) label = activity.napLabel;
-    if (task.activity === 'meal' && building?.type === 'storage') label = activity.storageLabel;
+    if (task.activity === 'meal' && building?.type === 'storage') label = task.bread ? activity.breadStorageLabel : activity.storageLabel;
+    else if (task.activity === 'meal' && task.bread) label = activity.breadLabel;
+    if (task.activity === 'bake' && building?.idle) label = activity.idleLabel;
     if (task.activity === 'build' && building?.project) label = building.project.kind === 'repair' ? 'Onarıyor: {target}' : 'Yükseltiyor: {target}';
     if (task.activity === 'craft') label = building?.craft ? label.replace('{item}', this.crafting.currentItemName(building)) : activity.idleLabel;
     if (task.item) label = label.replace('{item}', EQUIPMENT[task.item].name);
@@ -302,10 +308,14 @@ export class BehaviorSystem {
       }
       building.meals -= 1;
     }
-    if (task.activity === 'meal' && !this.economy.spend({ food: MEAL_FOOD_COST })) {
-      // Yolda stok bitti: kapıdan çıkıp başka çare arasın
-      this.endTask(c);
-      return;
+    if (task.activity === 'meal') {
+      const paid = this.economy.consumeFood(MEAL_FOOD_COST);
+      if (!paid.ok) {
+        // Yolda stok bitti: kapıdan çıkıp başka çare arasın
+        this.endTask(c);
+        return;
+      }
+      task.bread = paid.bread; // taze ekmekle yemek: biraz da keyif verir
     }
     c.visible = false;
     c.pose = 'hidden';
@@ -327,6 +337,7 @@ export class BehaviorSystem {
     const minutes = tick.gameMinutes;
     task.elapsed += minutes;
     this.applyEffects(c, activity.effects, minutes, activity);
+    if (task.bread) this.applyEffects(c, activity.breadEffects, minutes, activity);
     if (task.activity === 'sleep') this.applyHomeComfort(c, minutes);
 
     let bubbles = activity.bubbles;
@@ -397,10 +408,10 @@ export class BehaviorSystem {
     const work = c.profile.work;
     c.needs.energy = clamp(c.needs.energy - DEFAULT_WORK.energyCost * work.fatigue * minutes, 0, 100);
     c.needs.fun = clamp(c.needs.fun - DEFAULT_WORK.funCost * minutes, 0, 100);
-    // Kasaba bonusları (Alet Paketi, Şenlik Coşkusu) herkesi, meslek ustalığı ustayı, kişisel ekipman
-    // (Sağlam Alet, Sırt Çantası) da kuşananı hızlandırır
+    // Kasaba bonusları (Alet Paketi, Şenlik Coşkusu, Lonca Ustaları) ve Belediye Konağı herkesi, meslek
+    // ustalığı ustayı, kişisel ekipman (Sağlam Alet, Sırt Çantası) da kuşananı hızlandırır
     const amount =
-      minutes * work.speed * buffMultiplier(this.world.state, 'workSpeed') * workBonus(c, task.activity) * equipmentWorkSpeed(c);
+      minutes * work.speed * townWorkMultiplier(this.world.state) * workBonus(c, task.activity) * equipmentWorkSpeed(c);
     addExperience(this.events, c, task.activity, minutes);
 
     if (task.jobId) {
@@ -423,6 +434,7 @@ export class BehaviorSystem {
       if (working) c.activityLabel = this.performLabel(c, task, ACTIVITIES[task.activity]);
       return working;
     }
+    if (building.definition.processing) return this.process(building, amount);
     const production = building?.definition.production;
     if (!production) return false;
     // Verim (oduncu için çevredeki ağaç sayısı) StructureSystem'de hesaplanır
@@ -430,7 +442,40 @@ export class BehaviorSystem {
     const whole = Math.floor(building.productionBuffer);
     if (whole > 0) {
       building.productionBuffer -= whole;
-      building.producedToday += this.economy.add(production.resource, whole);
+      building.producedToday += this.economy.produce(production.resource, whole, building);
+    }
+    // Yan ürün (ağılda süt-peynir, madende taş): aynı verimle, kendi küsuratıyla
+    for (const [resource, perHour] of Object.entries(production.extra ?? {})) {
+      const buffers = (building.extraBuffers ??= {});
+      buffers[resource] = (buffers[resource] ?? 0) + (perHour / 60) * amount * building.efficiency;
+      const extra = Math.floor(buffers[resource]);
+      if (extra > 0) {
+        buffers[resource] -= extra;
+        const added = this.economy.produce(resource, extra, building);
+        building.extraToday = (building.extraToday ?? 0) + added;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * İşleme (değirmen-fırın): saatte perHour kez stoktan malzemeyi (1 yiyecek) alıp ürünü (1 ekmek) üretir.
+   * Malzeme biter ya da ürünün deposu dolarsa iş biter (fırıncı başka işe geçer; yapı boşta kalır).
+   */
+  process(building, amount) {
+    const processing = building.definition.processing;
+    building.productionBuffer += (processing.perHour / 60) * amount;
+    while (building.productionBuffer >= 1) {
+      const room = Object.keys(processing.output).every((r) => this.economy.room(r) > 0);
+      if (!room || !this.economy.spend(processing.input)) {
+        building.productionBuffer = 0;
+        return false;
+      }
+      building.productionBuffer -= 1;
+      for (const [resource, value] of Object.entries(processing.output)) {
+        building.producedToday += this.economy.produce(resource, value, building);
+      }
+      this.events.emit('processing:made', { building });
     }
     return true;
   }
@@ -444,7 +489,8 @@ export class BehaviorSystem {
     if (building.meals >= kitchen.capacity) return;
     building.mealBuffer += (kitchen.perHour / 60) * amount;
     while (building.mealBuffer >= 1 && building.meals < kitchen.capacity) {
-      if (!this.economy.spend({ food: kitchen.foodPerMeal })) {
+      // Aşçı önce ham yiyecek kullanır; kilerde yalnızca ekmek kaldıysa onu da sofraya koyar
+      if (!this.economy.consumeFood(kitchen.foodPerMeal, { preferRaw: true }).ok) {
         building.mealBuffer = 0;
         return;
       }

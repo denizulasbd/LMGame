@@ -4,6 +4,7 @@
 //   farm        : sebze bahçesi üretim çarpanı (kışın 0 = tarla donar)
 //   fishing     : balıkçı iskelesi üretim çarpanı (kışın buzlu suda %75)
 //   lumber      : oduncu kulübesi üretim çarpanı (kışın karda %45)
+//   pasture     : koyun ağılı üretim çarpanı (10. aşama: ilkbaharda kırkım bereketi, kışın ahırda az yün)
 //   berries     : böğürtlen çalısının yenilenme ve toplama verimi çarpanı (kışın 0 = donar)
 //   growth      : kütük / fidan büyüme çarpanı
 //   cold        : kış: ısınma için odun yakılır, dışarıdakiler üşür
@@ -23,6 +24,7 @@ export const SEASONS = [
     farm: 1,
     fishing: 1,
     lumber: 1,
+    pasture: 1.25, // kırkım mevsimi
     berries: 1,
     growth: 1.3,
     weather: { rainy: 1.1 },
@@ -40,6 +42,7 @@ export const SEASONS = [
     farm: 1,
     fishing: 1,
     lumber: 1,
+    pasture: 1,
     berries: 1,
     growth: 1,
     weather: { rainy: 0.5, cloudy: 0.8 },
@@ -57,6 +60,7 @@ export const SEASONS = [
     farm: 1.35,
     fishing: 1,
     lumber: 1,
+    pasture: 1,
     berries: 1.35,
     growth: 0.8,
     weather: { rainy: 1.4, cloudy: 1.2 },
@@ -74,6 +78,7 @@ export const SEASONS = [
     farm: 0,
     fishing: 0.75, // buzlu suda balık az
     lumber: 0.45, // karda ağaç kesmek zor
+    pasture: 0.6, // koyunlar ahırda, samanla beslenir
     berries: 0,
     growth: 0,
     cold: true,

@@ -54,14 +54,17 @@ export class TradePanel {
       return;
     }
     const resources = game.state.resources;
-    const key = `${m.name}|${game.state.time.day}|${JSON.stringify(m.stock)}|${Object.values(resources).join(',')}`;
+    const key = `${m.name}|${game.state.time.day}|${game.state.town?.tier}|${JSON.stringify(m.stock)}|${Object.values(resources).join(',')}`;
     if (key === this.lastKey) return;
     this.lastKey = key;
 
     this.portrait.src = getCharacterPortraitURL(m.appearance);
     this.name.textContent = m.name;
-    this.meta.textContent = `Sırt çantasında uzak kasabaların malları. ${pad(MERCHANT.departHour)}:00'e kadar Pazar Yeri'nde.`;
-    const offers = offersFor(getSeason(game.state.time.day).key);
+    this.meta.textContent =
+      (m.tier ?? 1) >= 3
+        ? `Kervanında uzak şehirlerin malları: yün, demir, sıcak ekmek. ${pad(MERCHANT.departHour)}:00'e kadar Pazar Yeri'nde.`
+        : `Sırt çantasında uzak kasabaların malları. ${pad(MERCHANT.departHour)}:00'e kadar Pazar Yeri'nde.`;
+    const offers = offersFor(getSeason(game.state.time.day).key, game.state.town?.tier ?? 1);
     this.offers.replaceChildren(...offers.map((offer) => this.offerRow(offer, m.stock[offer.id] ?? 0, resources)));
   }
 
@@ -83,7 +86,8 @@ export class TradePanel {
       deal,
       ...(offer.description ? [el('div', { className: 'trade-description', text: offer.description })] : []),
     ]);
-    return el('div', { className: `trade-row${offer.buff || offer.seasons ? ' is-special' : ''}` }, [
+    const tierClass = (offer.minTier ?? 1) > 1 ? ' is-tier' : '';
+    return el('div', { className: `trade-row${offer.buff || offer.seasons ? ' is-special' : ''}${tierClass}` }, [
       info,
       el('div', { className: 'trade-side' }, [button, el('span', { className: 'trade-stock', text: `stok ${stock}` })]),
     ]);

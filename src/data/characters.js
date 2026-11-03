@@ -54,12 +54,13 @@ export const DEFAULT_LEISURE = {
 export const TRAITS = {
   natureLover: {
     name: 'Doğa Sever',
-    description: 'Nehir kenarında ve çiçeklerin arasında keyfi çok daha hızlı yerine gelir. Yağmuru sever.',
+    description: 'Nehir kenarında ve çiçeklerin arasında keyfi çok daha hızlı yerine gelir. Yağmuru ve koyun ağılında çobanlığı sever.',
     decay: { fun: 0.9 },
     gain: { nature: 1.6 },
     rainLover: true,
     leisure: { river: 3, flowers: 3, stroll: 1.5 },
     work: { breakChance: 0.25 },
+    skillPreference: { husbandry: 8 }, // koyunlarla açık havada çalışmayı sever
   },
   sleepyhead: {
     name: 'Uykucu',
@@ -115,9 +116,9 @@ export const TRAITS = {
   },
   ambitious: {
     name: 'Hırslı',
-    description: 'Taş ocağında ve kaya başında çalışmaya bayılır, hızlı çalışır; boş durunca keyfi kaçar. Anıtı çok sever.',
+    description: 'Taş ocağında, madende ve kaya başında çalışmaya bayılır, hızlı çalışır; boş durunca keyfi kaçar. Anıtı çok sever.',
     decay: { fun: 1.15 },
-    skillPreference: { masonry: 10 },
+    skillPreference: { masonry: 10, mining: 10 },
     leisure: { monument: 2.5, stroll: 1.5, river: 0.6, flowers: 0.5 },
     work: { speed: 1.15 },
   },

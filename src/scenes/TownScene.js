@@ -40,6 +40,7 @@ import { SaveSystem } from '../systems/SaveSystem.js';
 import { EventSystem } from '../systems/EventSystem.js';
 import { HeatingSystem } from '../systems/HeatingSystem.js';
 import { MilestoneSystem } from '../systems/MilestoneSystem.js';
+import { TownLevelSystem } from '../systems/TownLevelSystem.js';
 import { TILE_TYPES, TILE_BY_ID, isGround } from '../data/tiles.js';
 import { TOWN_NAME_MAX_LENGTH } from '../data/town.js';
 import { AudioSystem } from '../systems/AudioSystem.js';
@@ -120,9 +121,10 @@ export class TownScene extends Scene {
       attract: this.attract,
     });
     this.milestones = new MilestoneSystem(this.game, this.world, TILE_TYPES.cobble.id);
+    this.townLevel = new TownLevelSystem(this.game, this.world, this.economy, { attract: this.attract });
 
     // Sıra önemlidir: hava, yapı durumu ve kapasite, iş temizliği, atölye durumu, ihtiyaç azalması,
-    // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar ve doğa
+    // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar, kasaba seviyesi ve doğa
     this.structures = new StructureSystem(this.game, this.world);
     this.heating = new HeatingSystem(this.game, this.world, this.economy);
     this.systems = [
@@ -140,6 +142,7 @@ export class TownScene extends Scene {
       this.townEvents,
       this.heating,
       this.milestones,
+      this.townLevel,
       this.nature,
     ];
 
@@ -161,6 +164,7 @@ export class TownScene extends Scene {
       this.relationships,
       this.family,
       this.crafting,
+      this.townLevel,
     ];
 
     this.camera = new Camera();

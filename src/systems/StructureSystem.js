@@ -5,7 +5,12 @@
 // Üretim verimi çarpanların çarpımıdır (productionFactors): mevsim (Seviye 2'de alt sınırlı: sera kışın
 // %60), çevredeki ağaçlar (oduncu), yağmur (bahçe), ayak izindeki biyom (bereketli toprakta bahçe +%25,
 // kayalıkta taş ocağı +%20) ve yükseltme (+%40 / +%50).
+// 10. aşama: işleme yapıları (değirmen-fırın) malzeme yoksa ya da ürünün deposu doluysa boşta kalır
+// (building.idle, building.processStatus); koyun ağılındaki koyunlar (building.flock, yalnızca görsel)
+// oyun zamanıyla otlar, dolaşır, gece ahırın önünde yatar.
 import { BUILDINGS } from '../data/buildings.js';
+import { RESOURCES } from '../data/resources.js';
+import { Flock } from '../entities/Flock.js';
 import { TILE_TYPES } from '../data/tiles.js';
 import { isRainActive } from '../data/weather.js';
 import { getSeason } from '../data/seasons.js';
@@ -94,6 +99,30 @@ export class StructureSystem {
     this.unsubscribe();
   }
 
+  /**
+   * İşleme yapısının (değirmen-fırın) durumu: stokta malzeme yoksa ya da ürünün deposu doluysa boşta kalır,
+   * kimse çalışmaya gelmez (building.idle); panel nedenini processStatus'tan okur.
+   */
+  updateProcessing(building, processing) {
+    const resources = this.state.resources;
+    const capacity = this.state.storageCapacity;
+    const missing = Object.entries(processing.input).filter(([r, v]) => (resources[r] ?? 0) < v);
+    const full = Object.keys(processing.output).filter((r) => (resources[r] ?? 0) >= capacity);
+    if (!building.functional) {
+      building.idle = true;
+      building.processStatus = null;
+    } else if (missing.length) {
+      building.idle = true;
+      building.processStatus = `${missing.map(([r]) => RESOURCES[r].name).join(', ')} bekleniyor: kilerde un yapılacak bir şey yok`;
+    } else if (full.length) {
+      building.idle = true;
+      building.processStatus = `${full.map((r) => RESOURCES[r].name).join(', ')} deposu dolu: kiler kurarak yer aç`;
+    } else {
+      building.idle = false;
+      building.processStatus = null;
+    }
+  }
+
   update(tick) {
     // Yeni günde üretim sayaçları sıfırlanır
     const newDay = this.state.time.day !== this.day;
@@ -104,15 +133,23 @@ export class StructureSystem {
     const freezing = this.state.heating.cold;
     for (const building of this.world.buildings) {
       const def = BUILDINGS[building.type];
-      if (newDay) building.producedToday = 0;
+      if (newDay) {
+        building.producedToday = 0;
+        building.extraToday = 0;
+      }
       if (def.production) {
         building.factors = productionFactors(building, this.world, raining, season);
         building.efficiency = building.factors.total;
       }
       building.frozen = Boolean(def.production?.seasonal) && building.efficiency <= 0;
-      // Biri gerçekten çalışırken (yolda değil) ocak ve iskele canlanır
+      if (def.processing) this.updateProcessing(building, def.processing);
+      if (def.flock) {
+        building.flock ??= new Flock(building);
+        if (building.functional) building.flock.update(tick, season.key, raining);
+      }
+      // Biri gerçekten çalışırken (yolda değil) ocak, iskele, değirmen ve fırın canlanır
       building.active =
-        (def.production !== undefined || def.kitchen !== undefined || def.crafting !== undefined) &&
+        (def.production !== undefined || def.kitchen !== undefined || def.crafting !== undefined || def.processing !== undefined) &&
         [...building.workerIds].some((id) => {
           const task = this.world.getCharacter(id)?.task;
           return task?.phase === 'perform';

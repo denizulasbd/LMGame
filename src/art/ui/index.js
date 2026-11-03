@@ -403,6 +403,94 @@ Object.assign(ICONS, {
   ],
 });
 
+// 10. aşama: işlenmiş mallar (yün yumağı, demir cevheri, sıcak ekmek) ve kasaba seviyesi armaları
+Object.assign(ICONS, {
+  // Yün: yumak ve sarkan iplik
+  wool: [
+    '...KKK...',
+    '..KuuuK..',
+    '.Kuq6uuK.',
+    'Kuq6uq6uK',
+    'Ku6uq6uuK',
+    'Kuuq6uquK',
+    '.Kuu6uuK.',
+    '..KKKKKqq',
+    '.......q.',
+  ],
+  // Demir cevheri: pas damarlı kaya parçası
+  iron: [
+    '.........',
+    '...KKKK..',
+    '..KrCUqK.',
+    '.KrCUCRrK',
+    '.KRUCrCUK',
+    'KRrCURCRK',
+    'KKRRRRRK.',
+    '.KKKKKK..',
+    '.........',
+  ],
+  // Ekmek: çizikli kızarmış somun
+  bread: [
+    '.........',
+    '...KKKK..',
+    '..KyYYYK.',
+    '.KyYXYXYK',
+    'KYYXYXYEK',
+    'KEYYYYEXK',
+    '.KXEEEXK.',
+    '..KKKKK..',
+    '.........',
+  ],
+  // Mezra: çadır
+  tierHamlet: [
+    '....K....',
+    '...KsK...',
+    '..KssSK..',
+    '.KsszsSK.',
+    'KsszKzsSK',
+    'KszKxKzsK',
+    'KKKKKKKKK',
+    '.........',
+    '.........',
+  ],
+  // Köy: kiremit çatılı ev
+  tierVillage: [
+    '....K....',
+    '...KCK...',
+    '..KCZCK..',
+    '.KCUCUCK.',
+    'KKKKKKKKK',
+    '.KXwKaXK.',
+    '.KwXKXwK.',
+    '.KKKKKKK.',
+    '.........',
+  ],
+  // Kasaba: bayraklı, sütunlu konak
+  tierTown: [
+    '....Koo..',
+    '....Ko...',
+    '....K....',
+    '..KKKKK..',
+    '.KPSSSPK.',
+    'KKKKKKKKK',
+    '.KuKuKuK.',
+    '.KuKuKuK.',
+    'KKKKKKKKK',
+  ],
+  // Gelişmiş Şehir: mazgallı kuleler ve altın kapı
+  tierCity: [
+    'K.K...K.K',
+    'KKK.o.KKK',
+    'KqK.K.KqK',
+    'KqKKKKKqK',
+    'KqqqPqqqK',
+    'KqKqqqKqK',
+    'KqqKPKqqK',
+    'KqqKPKqqK',
+    'KKKKKKKKK',
+  ],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);
@@ -416,6 +504,26 @@ const HELD_TOOLS = {
   axe: ['.KK..', 'KqqK.', 'KqKw.', '.K.w.', '...w.', '...x.'],
   pickaxe: ['.KKK.', 'KqwqK', 'K.w.K', '..w..', '..w..', '..x..'],
   hoe: ['KKKw.', 'Kq.w.', '...w.', '...w.', '...w.', '...x.'],
+  // Fırın küreği: geniş yassı ağız, uzun sap (10. aşama)
+  peel: ['KEEK.', 'KXXK.', '.Kw..', '..w..', '..w..', '..x..'],
+  // Çoban değneği (5x15): tepesi kıvrık uzun asa; çoban onu yere dayayıp dik tutar ('tend' pozu)
+  crook: [
+    '.www.',
+    'w...w',
+    'w...w',
+    'x...w',
+    '....w',
+    '....w',
+    '....X',
+    '....w',
+    '....w',
+    '....w',
+    '....X',
+    '....w',
+    '....w',
+    '....w',
+    '....x',
+  ],
   // Olta (9x9): sapı sol altta, ince ucu sağ üstte
   rod: [
     '........w',
@@ -445,6 +553,9 @@ const CARRY_BUNDLES = {
   wood: ['.KKKKKK.', 'KEwwwwwK', 'KKKKKKKK', 'KEwwwwwK', '.KKKKKK.'],
   stone: ['..KKKK..', '.KqqrrK.', 'KqrrRRRK', 'KrRRRRQK', '.KKKKKK.'],
   food: ['.K....K.', '.KKKKKK.', 'KmlmlmmK', 'KXwXwXwK', '.KKKKKK.'],
+  wool: ['.KKKKKK.', 'Kuu6uuuK', 'Ku6uu6uK', 'K6uuuu6K', '.KKKKKK.'],
+  iron: ['..KKKK..', '.KCUrCK.', 'KUCRCUCK', 'KRRRRRRK', '.KKKKKK.'],
+  bread: ['.K....K.', '.KKKKKK.', 'KYOYOYOK', 'KXwXwXwK', '.KKKKKK.'],
 };
 
 export function getCarrySprite(resource) {

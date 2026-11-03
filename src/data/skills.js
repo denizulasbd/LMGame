@@ -12,6 +12,10 @@ export const SKILLS = {
   cooking: { name: 'Aşçılık', title: 'Aşçı', icon: 'food' },
   building: { name: 'İnşaat', title: 'Yapı Ustası', icon: 'hammer' },
   crafting: { name: 'Zanaatkârlık', title: 'Zanaatkâr', icon: 'anvil' },
+  // 10. aşama: hayvancılık, fırıncılık ve madencilik
+  husbandry: { name: 'Hayvancılık', title: 'Çoban', icon: 'wool' },
+  baking: { name: 'Fırıncılık', title: 'Fırıncı', icon: 'bread' },
+  mining: { name: 'Madencilik', title: 'Madenci', icon: 'iron' },
 };
 
 export const SKILL_KEYS = Object.keys(SKILLS);
@@ -27,6 +31,9 @@ export const ACTIVITY_SKILLS = {
   cook: 'cooking',
   build: 'building',
   craft: 'crafting',
+  herd: 'husbandry',
+  bake: 'baking',
+  mineIron: 'mining',
 };
 
 export const SKILL_LEVELS = [

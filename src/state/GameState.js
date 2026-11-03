@@ -39,6 +39,8 @@ export class GameState {
       speed: CONFIG.TIME_SPEEDS[0],
     };
     this.resources = { ...STARTING_RESOURCES };
+    // Dilimlenmiş ekmekten artan yiyecek değeri (EconomySystem.consumeFood; ekmek 2,5 yiyecek sayılır)
+    this.pantry = { credit: 0 };
     this.storageCapacity = BASE_STORAGE_CAPACITY; // EconomySystem yapılara göre günceller
     this.characters = [];
     this.buildings = [];
@@ -65,7 +67,15 @@ export class GameState {
       wintersSurvived: 0,
       cobbles: 0, // döşenmiş taş yol karosu (MilestoneSystem sayar)
       winter: null, // sürmekte olan kışın takibi: { minHappiness, startPopulation }
+      goods: { wool: 0, iron: 0, bread: 0 }, // üretim zincirlerinin toplam ürettiği işlenmiş mallar (10. aşama)
     };
+    // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
+    //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
+    //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
+    //   welfare     : ortalama refah (kasaba refahının yarım günlük yürüyen ortalaması)
+    //   balanceDay  : belediyenin erzak dengesini en son yaptığı gün
+    //   assessed    : seviye bu kayıtta hiç değerlendirildi mi (eski kayıtlarda ilk değerlendirme sessiz olur)
+    this.town = { tier: 1, reached: { 1: { day: this.time.day, hour: this.time.hour, minute: this.time.minute } }, welfare: null, balanceDay: 0, assessed: true };
     // Dinamik olaylar (EventSystem):
     //   festival : { active, venueId, lastDay, endsAt } akşam şenliği
     //   merchant : { nextVisitDay, visits, present, leaving, name, appearance, x, y, exit, stock } gezgin tüccar
@@ -110,6 +120,8 @@ export class GameState {
       map: this.map,
       time: this.time,
       resources: this.resources,
+      pantry: this.pantry,
+      town: this.town,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
       nextJobId: this.nextJobId,
       regrowth: this.regrowth,
@@ -142,6 +154,9 @@ export class GameState {
       : { width: CONFIG.LEGACY_MAP_SIZE, height: CONFIG.LEGACY_MAP_SIZE, generator: 1 };
     next.time = { ...next.time, ...data.time };
     next.resources = { ...next.resources, ...data.resources };
+    // 10. aşamadan eski kayıtlarda yün, demir ve ekmek yoktur: 0 başlar
+    for (const key of Object.keys(next.resources)) next.resources[key] = Math.max(0, Math.floor(Number(next.resources[key]) || 0));
+    next.pantry = { credit: Math.max(0, Number(data.pantry?.credit) || 0) };
     next.jobs = data.jobs.map((j) => ({ ...j, assignees: [] }));
     next.nextJobId = data.nextJobId ?? next.jobs.reduce((m, j) => Math.max(m, j.id + 1), 1);
     next.regrowth = data.regrowth ?? [];
@@ -156,6 +171,20 @@ export class GameState {
     if (typeof data.townName === 'string' && data.townName.trim()) next.townName = data.townName.trim().slice(0, TOWN_NAME_MAX_LENGTH);
     next.milestones = { ...(data.milestones ?? {}) };
     next.stats = { ...next.stats, ...(data.stats ?? {}) };
+    next.stats.goods = { ...new GameState().stats.goods, ...(data.stats?.goods ?? {}) };
+    // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
+    // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
+    if (data.town && Number.isInteger(data.town.tier)) {
+      next.town = {
+        tier: Math.min(4, Math.max(1, data.town.tier)),
+        reached: { ...(data.town.reached ?? {}) },
+        welfare: Number.isFinite(data.town.welfare) ? data.town.welfare : null,
+        balanceDay: data.town.balanceDay ?? 0,
+        assessed: data.town.assessed !== false,
+      };
+    } else {
+      next.town = { tier: 1, reached: {}, welfare: null, balanceDay: 0, assessed: false };
+    }
     // Eski (2. sürüm) kayıtlarda olay alanları yoksa varsayılanlar kalır
     for (const key of Object.keys(next.events)) next.events[key] = { ...next.events[key], ...(data.events?.[key] ?? {}) };
     next.buildings = data.buildings.map((b) => new Building(b));

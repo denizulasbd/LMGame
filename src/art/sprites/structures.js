@@ -22,6 +22,9 @@ import {
   getAncientFountainSprite,
 } from './structuresTier2.js';
 import { getWorkshopSprite } from './structuresCraft.js';
+import { getSheepFarmSprite } from './structuresFarm.js';
+import { getMillSprite, getIronMineSprite } from './structuresIndustry.js';
+import { getTownHallSprite } from './structuresCivic.js';
 import { seasonalFoliageRows, winterize } from '../seasons.js';
 
 // ---------------------------------------------------------------------------
@@ -583,11 +586,11 @@ export function getConstructionSiteSprite(w, h, stage, type = null, orientation 
 // ---------------------------------------------------------------------------
 // Tek giriş: türüne ve anlık durumuna göre yapı görseli (inşa menüsü ve hayalet önizleme de kullanır)
 //   state: { windowsLit, tone, frame, lit, berries, maxBerries, active, orientation, open, season,
-//            level (2 = yükseltilmiş), ruined (yıkık harabe) }
+//            level (2 = yükseltilmiş), ruined (yıkık harabe), sailFrame (değirmen kanatlarının açısı) }
 // Kışın her yapı karla örtülür (çatılar beyazlar, tepelere kar yığılır); çalı ve bahçe kendi kış
 // çizimlerini kullanır (bahçenin Seviye 2'si Cam Sera ise kışın da yeşildir, yalnızca çatısı karlanır).
 // ---------------------------------------------------------------------------
-const OWN_WINTER_ART = new Set(['berryBush', 'garden']);
+const OWN_WINTER_ART = new Set(['berryBush', 'garden', 'sheepFarm', 'mill']);
 
 // Kışın karla örtülen çatı renkleri (açık / ana / koyu ton) ve çatının bittiği satır.
 // Kulübenin üç çatı tonu (kiremit, arduvaz, yosun) hepsi listede; ahırın yalnızca saçakları.
@@ -601,6 +604,7 @@ const WINTER_ROOFS = {
   watchtower: { light: ['X'], main: ['w'], maxRow: 9 },
   supplyCamp: { light: ['S'], main: ['s'], maxRow: 17 },
   workshop: { light: ['c'], main: ['B'], dark: ['n'], maxRow: 17 },
+  townHall: { light: ['Z', 'c'], main: ['C', 'B'], dark: ['U', 'n'], maxRow: 36 },
 };
 
 export function getStructureSprite(type, state = {}) {
@@ -664,6 +668,14 @@ function getBaseStructureSprite(type, state) {
       return getWorkshopSprite(Boolean(state.active), state.frame ?? 0);
     case 'lantern':
       return getLanternSprite(Boolean(state.lit ?? state.windowsLit));
+    case 'sheepFarm':
+      return getSheepFarmSprite(state.season ?? 'summer');
+    case 'mill':
+      return getMillSprite(state.sailFrame ?? 1, Boolean(state.active), state.frame ?? 0, Boolean(state.windowsLit), state.season);
+    case 'ironMine':
+      return getIronMineSprite(state.frame ?? 0, Boolean(state.active), Boolean(state.lit ?? state.windowsLit));
+    case 'townHall':
+      return getTownHallSprite(Boolean(state.windowsLit), state.frame ?? 0);
     case 'monument':
       return getMonumentSprite();
     default:

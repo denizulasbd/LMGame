@@ -101,7 +101,7 @@ export const TILE_TYPES = {
     ground: true,
     moveCost: 1,
     variants: ['Yoncalı', 'Çiçekli'],
-    biome: { hint: 'Bahçe verimi +%25', buildingBonus: { garden: 0.25 } },
+    biome: { hint: 'Bahçe verimi +%25, Koyun Ağılı +%20', buildingBonus: { garden: 0.25, sheepFarm: 0.2 } },
   },
   rocky: {
     id: 8,
@@ -112,7 +112,7 @@ export const TILE_TYPES = {
     moveCost: 1.2,
     speedMultiplier: 0.9,
     variants: ['Çakıllı', 'Taşlı'],
-    biome: { hint: 'Taş Ocağı verimi +%20', buildingBonus: { quarry: 0.2 } },
+    biome: { hint: 'Taş Ocağı ve Demir Madeni verimi +%20', buildingBonus: { quarry: 0.2, ironMine: 0.2 } },
     edgeOverlay: GROUND_FRINGES.slice(1, 2), // bereketli toprak kayalığın kenarına taşar
   },
   forest: {

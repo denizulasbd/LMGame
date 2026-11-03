@@ -85,7 +85,7 @@ export class Character extends Entity {
 
     // Anlık durum (kaydedilmez, yapay zekâ yeniden kurar)
     this.facing = 'down';
-    this.pose = 'stand'; // stand | walk | sit | gather | work | fish | hidden
+    this.pose = 'stand'; // stand | walk | sit | gather | work | fish | tend | hidden
     this.visible = true;
     this.insideBuildingId = null;
     this.activityLabel = 'Etrafa bakınıyor';
@@ -232,6 +232,12 @@ export class Character extends Entity {
       const [dx, dy] = ROD_OFFSETS[side];
       const lift = this.animTime % 2.6 > 2.3 ? -1 : 0; // ara sıra oltayı kaldırıp indirir
       queue.addImage(this.sortY + 0.01, getHeldToolSprite('rod', side === 'left', this.hasSturdyTool), x + dx, y + dy + lift);
+    }
+    // Çoban değneği: yere dayalı, dik tutulur; elinin olduğu yanda, gövdenin önünde görünür
+    else if (this.tool && this.pose === 'tend') {
+      const sprite = getHeldToolSprite(this.tool, this.facing === 'left', false);
+      const dx = this.facing === 'left' ? -8 : 3;
+      queue.addImage(this.sortY + 0.01, sprite, x + dx, y - sprite.height + 1);
     }
     // Alet: yukarı bakarken karakterin arkasında, diğer yönlerde önünde
     else if (this.tool && this.pose === 'work') {

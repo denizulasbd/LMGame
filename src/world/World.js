@@ -4,7 +4,7 @@
 import { CONFIG } from '../config.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { findPath, pathCost } from '../utils/pathfinding.js';
-import { pierLandingTiles } from './footprint.js';
+import { pierLandingTiles, accessTiles } from './footprint.js';
 
 const CARDINALS = [
   [0, -1],
@@ -99,6 +99,37 @@ export class World {
 
   isReachable(x, y) {
     return this.map.inBounds(x, y) && this.reachable[this.map.index(x, y)] === 1;
+  }
+
+  /**
+   * Bu karolar yürünemez olsaydı (yeni yapı, yeniden büyüyen ağaç) kasabaya bağlı karolar: her karo için 1 / 0.
+   * Yerleşim kontrolü yeni yapının kendi girişini de bununla ölçer: önü yalnızca kendi ayak izinin içinden
+   * kasabaya bağlanan bir yapı, kurulunca kendi girişini koparmasın.
+   */
+  reachabilityWithout(tiles) {
+    const blocked = new Set(tiles.filter((t) => this.map.inBounds(t.x, t.y)).map((t) => this.map.index(t.x, t.y)));
+    if (blocked.size === 0) return this.reachable;
+    const seed = this.findReachabilitySeed();
+    return seed ? this.map.computeReachable(seed.x, seed.y, blocked) : new Uint8Array(this.map.width * this.map.height);
+  }
+
+  /**
+   * Bu karolar yürünemez olsaydı kasabaya bağlantısı tamamen kopacak bir yapı var mı? Bugün girişine / çalışma
+   * yerine ulaşılabilen ama sonra hiçbir giriş karosu kasabaya bağlı kalmayacak ilk yapıyı döndürür (yoksa null).
+   * Böylece yapılar arasında kapalı ceplerde kalan değirmen, maden ya da ev oluşmaz.
+   * after: (isteğe bağlı) önceden hesaplanmış reachabilityWithout(tiles) sonucu
+   */
+  wouldIsolate(tiles, after = this.reachabilityWithout(tiles)) {
+    if (after === this.reachable) return null;
+    for (const b of this.buildings) {
+      // Fener ve çiçek tarhı gibi kullanılmayan süs yapıları sayılmaz
+      if (BUILDINGS[b.type].spots === 'none') continue;
+      const access = accessTiles(b.type, b.tileX, b.tileY, b.orientation).filter((t) => this.map.inBounds(t.x, t.y));
+      const before = access.some((t) => this.isReachable(t.x, t.y));
+      if (!before) continue;
+      if (!access.some((t) => after[this.map.index(t.x, t.y)] === 1)) return b;
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------------------

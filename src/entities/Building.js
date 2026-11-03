@@ -9,6 +9,10 @@
 // 9. aşama: oyuncunun işten çıkardığı sakinler (excludedWorkers: burada bir daha çalışmazlar), son
 // çalışanlar (recentWorkers, Yapı Bilgi Paneli için) ve zanaat atölyesinin üretim seçimi (craftMode)
 // ile tezgâhtaki iş (craft: { item, progress }).
+//
+// 10. aşama: koyun ağılı iki katmanda çizilir, aradaki koyunlar (flock, entities/Flock.js) derinlik sırasıyla
+// girer; değirmenin kanatları rüzgârda ağır ağır, fırıncı çalışırken hızlı döner (sailPhase); fırın ve
+// belediye geceleri ışık verir; madenin girişinde fener yanar.
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -24,6 +28,10 @@ import {
   STONE_HOUSE_ART,
   WATCHTOWER_ART,
   WORKSHOP_ART,
+  MILL_ART,
+  IRON_MINE_ART,
+  TOWN_HALL_ART,
+  getSheepFarmLayer,
 } from '../art/sprites/index.js';
 import { getBubbleSprite, BUBBLE_WIDTH, BUBBLE_HEIGHT, getIconSprite } from '../art/ui/index.js';
 import { winterize } from '../art/seasons.js';
@@ -51,14 +59,21 @@ const BASELINE_INSET = {
   supplyCamp: 2,
   ancientFountain: 3,
   workshop: 2,
+  sheepFarm: 2,
+  mill: 3,
+  ironMine: 2,
+  townHall: 3,
 };
 const SITE_BASELINE_INSET = 2;
 const RECENT_WORKERS_EXTRA = 2; // panelde çalışan yuvasından bu kadar fazla "son çalışan" hatırlanır
 
 // Animasyon kare hızı (kare / saniye): ateş titrer, tabela ve flama sallanır, çiçekler eğilir
-const FRAME_RATES = { campfire: 8, flowerBed: 1.4, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5 };
+const FRAME_RATES = { campfire: 8, flowerBed: 1.4, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5 };
 const DEFAULT_FRAME_RATE = 3;
-const MAX_OVERHANG = 18; // yapıların karolarının üstüne taşabileceği en fazla piksel (görünürlük testi)
+const MAX_OVERHANG = 32; // yapıların karolarının üstüne taşabileceği en fazla piksel (görünürlük testi; kule 32)
+// Değirmen kanatları: saniyede kaç kare (çeyrek tur = MILL_ART.sailFrames kare) döner
+const SAIL_SPEED = { wind: 2.5, working: 9 };
+const SHEEP_Z_COLOR = 'rgba(238, 244, 250, 0.85)';
 
 export class Building extends Entity {
   constructor({
@@ -112,6 +127,12 @@ export class Building extends Entity {
     this.craft = craft ? { ...craft } : null; // atölye: tezgâhtaki iş { item, progress }
     this.craftStatus = null; // atölye: neden üretmediği (CraftingSystem her karede yazar)
     this.idle = false; // yapılacak iş yok (atölyede malzeme ya da sipariş yok): kimse çalışmaya gelmez
+    this.processStatus = null; // değirmen-fırın: neden boşta olduğu (StructureSystem yazar)
+    this.extraBuffers = {}; // yan ürünün (ağılda yiyecek, madende taş) henüz depoya girmemiş küsuratı
+    this.extraToday = 0; // bugün gelen yan ürün
+    this.flock = null; // ağıldaki koyunlar (yalnızca görsel; StructureSystem kurar ve günceller)
+    this.sailPhase = (this.id * 0.37) % 6; // değirmen kanatlarının açısı (kare cinsinden; gerçek zamanla döner)
+    this.sailClock = null;
   }
 
   /** Burada çalışmaya başlayan sakini son çalışanlar listesine ekler. */
@@ -273,6 +294,17 @@ export class Building extends Entity {
       if (this.craft) return { name: this.name, detail: `${EQUIPMENT[this.craft.item].name}: %${Math.floor(this.craftRatio * 100)}` };
       return { name: this.name, detail: this.craftStatus ?? 'Zanaatkâr bekleniyor' };
     }
+    if (this.type === 'mill') {
+      if (this.processStatus) return { name: this.name, detail: this.processStatus };
+      return { name: this.name, detail: `Bugün ${this.producedToday} sıcak ekmek · ${this.active ? 'fırın yanıyor' : 'kanatlar rüzgârda dönüyor'}` };
+    }
+    if (this.type === 'sheepFarm') {
+      const count = this.flock ? this.flock.sheep.length + (this.flock.lamb ? 1 : 0) : this.definition.flock.sheep;
+      return { name: this.name, detail: `${count} koyun · bugün ${this.producedToday} yün${this.active ? ' · çoban başında' : ''}` };
+    }
+    if (this.type === 'townHall') {
+      return { name: this.name, detail: 'Kasabanın iş ve inşaat verimi +%15 · her sabah erzak dengesi' };
+    }
     if (this.workerSlots) {
       const workers = [...this.workerIds].map((id) => world.getCharacter(id)?.name).filter(Boolean);
       return { name: this.name, detail: workers.length ? `Çalışan: ${workers.join(', ')}` : 'Çalışan yok' };
@@ -299,7 +331,9 @@ export class Building extends Entity {
       const site = getConstructionSiteSprite(w, h, Math.min(2, Math.floor(this.buildRatio * 3)), this.type, this.orientation);
       return env.season === 'winter' ? winterize(site) : site;
     }
+    if (this.type === 'mill') this.advanceSails(env.time);
     return getStructureSprite(this.type, {
+      sailFrame: Math.floor(this.sailPhase),
       windowsLit: env.windowsLit,
       tone: this.tone,
       frame: Math.floor(env.time * (FRAME_RATES[this.type] ?? DEFAULT_FRAME_RATE)),
@@ -315,8 +349,27 @@ export class Building extends Entity {
     });
   }
 
+  /** Değirmen kanatları gerçek zamanla döner: rüzgârda ağır ağır, fırıncı çalışırken hızlı (hız yumuşak değişir). */
+  advanceSails(time) {
+    const dt = this.sailClock === null ? 0 : Math.max(0, Math.min(0.25, time - this.sailClock));
+    this.sailClock = time;
+    const target = this.active ? SAIL_SPEED.working : SAIL_SPEED.wind;
+    this.sailSpeed = (this.sailSpeed ?? target) + (target - (this.sailSpeed ?? target)) * Math.min(1, dt * 1.5);
+    this.sailPhase = (this.sailPhase + dt * this.sailSpeed) % (MILL_ART.sailFrames * 1000);
+  }
+
   /** Görseli derinlik kuyruğuna ekler (karolarının alt kenarına hizalı). */
   queueDraw(queue, env) {
+    // Koyun ağılı: arka katman (otlak, ahır, yan çitler) + koyunlar + ön çit; koyunlar çitin arkasında kalır
+    if (this.type === 'sheepFarm' && !this.underConstruction) {
+      const back = getSheepFarmLayer('back', env.season);
+      const front = getSheepFarmLayer('front', env.season);
+      const top = this.y + this.height - back.height;
+      queue.addImage(this.y + 4, back, this.x, top);
+      this.flock?.queueDraw(queue, this.x, this.y);
+      queue.addImage(this.y + this.height - BASELINE_INSET.sheepFarm, front, this.x, top);
+      return;
+    }
     const sprite = this.currentSprite(env);
     queue.addImage(this.sortY, sprite, this.x, this.y + this.height - sprite.height);
   }
@@ -355,6 +408,13 @@ export class Building extends Entity {
       case 'fishingPier':
         this.drawFishJump(renderer, env);
         break;
+      case 'mill': {
+        // Fırın bacası: fırıncı çalışırken yoğun, gündüz fırın sıcakken ince tüter
+        const artTop = this.y + this.height - MILL_ART.height;
+        const warm = env.hour >= 6 && env.hour < 20 && this.producedToday > 0;
+        if (this.active || warm) this.drawChimneySmoke(renderer, env, this.x + MILL_ART.chimney.x, artTop + MILL_ART.chimney.y, this.active ? 1 : 0.55);
+        break;
+      }
       default:
         break;
     }
@@ -439,12 +499,30 @@ export class Building extends Entity {
       this.drawProgressBar(renderer, env, this.projectRatio, top);
       return;
     }
+    if (this.type === 'sheepFarm' && this.flock) {
+      this.drawSleepingSheep(renderer, env);
+      return;
+    }
     if (this.type !== 'cabin' || !env.sleepingHomes.has(this.id)) return;
     const artTop = this.y + this.height - this.homeArt.height;
     const bob = Math.round(Math.sin(env.time * 2.4) * 1.5);
     const bx = this.x + Math.floor((this.width - BUBBLE_WIDTH) / 2) - 3;
     const by = artTop - BUBBLE_HEIGHT + 2 + bob;
     renderer.drawImage(getBubbleSprite('zzz'), bx, by);
+  }
+
+  /** Uyuyan koyunların başının üstünde yavaşça yükselen küçük "z" harfleri. */
+  drawSleepingSheep(renderer, env) {
+    const sleepers = this.flock.sleepers();
+    sleepers.forEach((s, i) => {
+      if (s.lamb || i % 2 === 1) return; // hepsinde değil: kalabalık görünmesin
+      const phase = (env.time * 0.35 + i * 0.41 + this.id * 0.13) % 1;
+      const x = Math.round(this.x + s.x + 3 + phase * 3);
+      const y = Math.round(this.y + s.y - 8 - phase * 6);
+      renderer.fillRect(x, y, 3, 1, SHEEP_Z_COLOR);
+      renderer.fillRect(x + 1, y + 1, 1, 1, SHEEP_Z_COLOR);
+      renderer.fillRect(x, y + 2, 3, 1, SHEEP_Z_COLOR);
+    });
   }
 
   drawProgressBar(renderer, env, ratio, top = this.y) {
@@ -496,6 +574,25 @@ export class Building extends Entity {
       const artTop = this.y + this.height - WATCHTOWER_ART.height;
       const flicker = Math.sin(env.time * 7) * 2;
       out.push({ x: this.x + WATCHTOWER_ART.light.x, y: artTop + WATCHTOWER_ART.light.y, radius: 84 + flicker, color: [255, 200, 110], intensity: 0.9, glow: 0.4 });
+    } else if (this.type === 'mill') {
+      const artTop = this.y + this.height - MILL_ART.height;
+      if (env.windowsLit) out.push({ x: this.x + MILL_ART.window.x, y: artTop + MILL_ART.window.y, radius: 20, color: [255, 214, 120], intensity: 0.7, glow: 0.3 });
+      if (this.active) {
+        const flicker = Math.sin(env.time * 9) * 2;
+        out.push({ x: this.x + MILL_ART.oven.x, y: artTop + MILL_ART.oven.y, radius: 30 + flicker, color: [255, 150, 60], intensity: 0.85, glow: 0.4 });
+      }
+    } else if (this.type === 'ironMine' && this.lit) {
+      const artTop = this.y + this.height - IRON_MINE_ART.height;
+      const flicker = Math.sin(env.time * 8 + this.id) * 1.5;
+      out.push({ x: this.x + IRON_MINE_ART.light.x, y: artTop + IRON_MINE_ART.light.y, radius: 40 + flicker, color: [255, 190, 100], intensity: 0.85, glow: 0.35 });
+    } else if (this.type === 'townHall' && env.windowsLit) {
+      const artTop = this.y + this.height - TOWN_HALL_ART.height;
+      for (const w of TOWN_HALL_ART.windows) {
+        out.push({ x: this.x + w.x, y: artTop + w.y, radius: 18, color: [255, 214, 120], intensity: 0.7, glow: 0.28 });
+      }
+      for (const l of TOWN_HALL_ART.lamps) {
+        out.push({ x: this.x + l.x, y: artTop + l.y, radius: 34, color: [255, 200, 110], intensity: 0.85, glow: 0.35 });
+      }
     } else if (this.type === 'ancientFountain' && env.windowsLit) {
       // Kadim çeşmenin suyu gece hafif mavi parıldar
       out.push({ x: this.center.x, y: this.center.y, radius: 30, color: [150, 220, 255], intensity: 0.55, glow: 0.35 });

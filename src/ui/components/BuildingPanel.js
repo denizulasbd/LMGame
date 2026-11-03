@@ -6,11 +6,14 @@
 //   - Yükselt / Onar (maliyet ve gerekçeyle), sürmekte olan işin ilerlemesi ve iptali, Yık
 //   - (9. aşama) evde yaşayan aile (eşler, çocuklar); iş yerinde çalışanları "İşten Çıkar" ile görevden
 //     alma ve geri alma; zanaat atölyesinde üretim seçimi, tezgâhtaki iş ve depodaki ekipman
+//   - (10. aşama) yan ürün (ağılda yiyecek, madende taş), değirmen-fırının işleme satırları (1 yiyecek -> 1
+//     ekmek), ekipmanın asıl (demir / yün) ve eski usul tarifi, ağıldaki koyunlar, belediyenin etkileri
 // Panel oyun durumunu yalnızca okur; istekleri olay olarak yayınlar (ui:startProject, ui:cancelProject,
 // ui:demolishBuilding, ui:selectCharacter, ui:dismissWorker, ui:rehireWorker, ui:setCraftMode). Ne
 // değiştiğini anlamak için her karede kısa bir anahtar üretir; anahtar değişmedikçe DOM'a dokunmaz.
 import { BUILDINGS } from '../../data/buildings.js';
-import { RESOURCES, RESOURCE_KEYS } from '../../data/resources.js';
+import { RESOURCES, RESOURCE_KEYS, formatCost } from '../../data/resources.js';
+import { TOWN_HALL } from '../../data/town.js';
 import { EQUIPMENT, EQUIPMENT_KEYS, CRAFT_MODES } from '../../data/equipment.js';
 import { getSeason } from '../../data/seasons.js';
 import { lacking } from '../../systems/Equipment.js';
@@ -102,6 +105,7 @@ export class BuildingPanel {
       : '';
     const key = [
       craftKey,
+      building.processStatus,
       building.id,
       building.level,
       building.condition,
@@ -240,12 +244,13 @@ export class BuildingPanel {
       return b;
     });
     const current = building.craft
-      ? `Tezgâhta: ${EQUIPMENT[building.craft.item].name} · ${percent(building.craftRatio)}`
+      ? `Tezgâhta: ${EQUIPMENT[building.craft.item].name}${building.craft.recipe === 'fallback' ? ' (eski usul)' : ''} · ${percent(building.craftRatio)}`
       : building.craftStatus ?? 'Zanaatkâr bekleniyor (mesai 08:00-17:00)';
     const stock = EQUIPMENT_KEYS.map((item) => {
       const def = EQUIPMENT[item];
       const missing = lacking(state.characters, item).length;
-      return el('div', { className: 'craft-stock', title: `${def.name}: ${def.description} · Maliyet: ${Object.entries(def.cost).map(([r, v]) => `${RESOURCES[r].name} ${v}`).join(', ')}` }, [
+      const title = `${def.name}: ${def.description}\nTarif: ${formatCost(def.cost)}\nEski usul (${RESOURCES[def.material].name} üreten yapı yokken): ${formatCost(def.fallbackCost)}`;
+      return el('div', { className: 'craft-stock', title }, [
         el('img', { src: getIconDataURL(def.icon), alt: '' }),
         el('span', { className: 'craft-stock-name', text: def.shortName }),
         el('span', { className: 'craft-stock-count', text: `depoda ${state.equipment[item]}` }),
@@ -320,6 +325,7 @@ export class BuildingPanel {
     }
 
     if (def.production && building.factors) lines.push(...this.productionLines(building, state));
+    if (def.processing) lines.push(...this.processingLines(building));
 
     switch (building.type) {
       case 'cabin': {
@@ -345,7 +351,28 @@ export class BuildingPanel {
         break;
       case 'workshop':
         lines.push(`Bugün üretilen: ${building.producedToday} ekipman`);
+        lines.push('Alet demirden, palto ve çanta yünden yapılır; üreten yapı yoksa eski usulle odun, taş ve yiyecekten');
         lines.push('Sakinler boşta kalan ekipmanı buradan ya da kilerden alıp kuşanır');
+        break;
+      case 'sheepFarm': {
+        const flock = building.flock;
+        const lambs = flock?.lamb ? 1 : 0;
+        lines.push(`Ağılda ${flock ? flock.sheep.length : def.flock.sheep} koyun${lambs ? ' ve annesinin peşinden koşan bir kuzu' : ''}`);
+        if (flock?.sleepers().length) lines.push('Koyunlar ahırın önünde uyuyor');
+        lines.push('İlkbaharda kırkım bereketli; kışın koyunlar ahırda, yün azalır');
+        break;
+      }
+      case 'ironMine':
+        lines.push(building.lit ? 'Girişteki fener yanıyor' : 'Girişteki fener akşam yanar');
+        lines.push('Çıkan demir zanaatkârın çelik başlı aletlerine gider');
+        break;
+      case 'townHall':
+        lines.push(`Bürokrasi düzende: kasabanın tüm iş ve inşaat verimi +%${Math.round((def.civic.workSpeed - 1) * 100)}`);
+        lines.push(`Kalıcı refah: kasaba refahı +${def.townBonus.happiness}`);
+        lines.push(
+          `Her sabah ${String(TOWN_HALL.hour).padStart(2, '0')}:00: deposu %${Math.round(TOWN_HALL.richRatio * 100)} dolu olan temel kaynaktan en çok ${TOWN_HALL.max} birimi, %${Math.round(TOWN_HALL.poorRatio * 100)}'in altına düşene aktarır`
+        );
+        lines.push(state.town?.balanceDay === state.time.day ? 'Bugünün erzak defteri tutuldu' : 'Erzak defteri yarın sabah tutulacak');
         break;
       case 'flowerBed':
         lines.push('Yanından geçenlerin ve etrafında dinlenenlerin keyfi artar');
@@ -365,6 +392,7 @@ export class BuildingPanel {
         else if (m.nextVisitDay) lines.push(`Gezgin tüccar Gün ${m.nextVisitDay} sabahı (09:00) bekleniyor`);
         else lines.push('Gezgin tüccar yakında haberi alıp gelecek');
         lines.push('Odun ve taşı yiyeceğe (ya da tersine) çevirir; Alet Paketi ve Kasaba İkramı satar');
+        lines.push('Kasaba büyüdükçe tüccar yün, demir, ekmek ve kervan malları getirir; stoğu da artar');
         break;
       }
       case 'storage':
@@ -419,7 +447,7 @@ export class BuildingPanel {
     if (production.seasonal) {
       if (f.seasonalRaw === 0 && f.seasonal === 0) lines.push(`${season.name}: donmuş, ilkbahara kadar üretim yok`);
       else if (f.seasonal > f.seasonalRaw) lines.push(`${season.name}: ${percent(f.seasonal)} (${building.name} sayesinde; normalde ${percent(f.seasonalRaw)})`);
-      else if (f.seasonal > 1) lines.push(`${season.name} hasadı: +${percent(f.seasonal - 1)}`);
+      else if (f.seasonal > 1) lines.push(`${season.name} ${production.seasonal === 'pasture' ? 'kırkımı' : 'hasadı'}: +${percent(f.seasonal - 1)}`);
       else if (f.seasonal < 1) lines.push(`${season.name} soğuğu: ${percent(f.seasonal)}`);
     }
     if (production.needsTrees) lines.push(`Çevredeki ağaçlar: ${percent(f.trees)}`);
@@ -427,6 +455,22 @@ export class BuildingPanel {
     if (f.biome > 1) lines.push(`${f.biomeName}: +${percent(f.biome - 1)}${f.biomeFull ? '' : ' (kısmen biyomda)'}`);
     if (f.upgrade > 1) lines.push(`Seviye 2: +${percent(f.upgrade - 1)}`);
     lines.push(`Bugün üretilen: +${building.producedToday} ${resource}`);
+    // Yan ürün: ağılda süt-peynir (yiyecek), madende taş
+    for (const [extra, perHour] of Object.entries(production.extra ?? {})) {
+      lines.push(`Yan ürün (kişi başı saatte): +${(perHour * f.total).toFixed(1)} ${RESOURCES[extra].name} · bugün +${building.extraToday ?? 0}`);
+    }
+    return lines;
+  }
+
+  /** İşleme yapısı (değirmen-fırın): saatlik dönüşüm, yiyecek değeri, durum ve bugünkü üretim. */
+  processingLines(building) {
+    const { perHour, input, output } = building.definition.processing;
+    const scale = (cost) => Object.fromEntries(Object.entries(cost).map(([r, v]) => [r, v * perHour]));
+    const value = Object.entries(output).reduce((sum, [r, v]) => sum + v * perHour * (RESOURCES[r].foodValue ?? 0), 0);
+    const lines = [`Saatlik (fırıncı başı): ${formatCost(scale(input))} → ${formatCost(scale(output))}${value ? ` (${String(value).replace('.', ',')} yiyecek değeri)` : ''}`];
+    lines.push(building.processStatus ?? (building.active ? 'Değirmen öğütüyor, fırın yanıyor' : 'Hazır: fırıncı mesaide gelir'));
+    lines.push(`Bugün çıkan: +${building.producedToday} ${RESOURCES[Object.keys(output)[0]].name.toLocaleLowerCase('tr')}`);
+    lines.push('Öğünlerde önce ekmek yenir: 1 ekmek 2,5 yiyecek sayılır ve biraz keyif verir');
     return lines;
   }
 }

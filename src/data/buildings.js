@@ -1,5 +1,6 @@
 // Kasaba yapılarının kuralları (görselden bağımsız). Görseller: src/art/sprites/structures.js
-// (8. aşamanın Seviye 2 yapıları ve harabeleri: src/art/sprites/structuresTier2.js)
+// (8. aşamanın Seviye 2 yapıları ve harabeleri: src/art/sprites/structuresTier2.js; 10. aşamanın ağılı,
+// değirmeni, madeni ve belediyesi: structuresFarm.js, structuresIndustry.js, structuresCivic.js)
 import { GROUND_TILES } from './tiles.js';
 //
 //   size        : kapladığı karo sayısı (bu karolar yürünemez ve inşa edilemez)
@@ -39,6 +40,19 @@ import { GROUND_TILES } from './tiles.js';
 //   crafting     : { recipes } zanaatkâr stoktan kaynak harcayıp kişisel ekipman üretir (zanaat atölyesi;
 //                  tarifler data/equipment.js'te)
 //   chimney      : { x, y } çalışırken tüten ocak bacasının görsel üstündeki yeri (zanaat atölyesi)
+//
+// 10. aşama — üretim zincirleri, hayvancılık ve kasaba seviyesi:
+//   production.extra : { kaynak: saatlik } ana ürünün yanında aynı verimle gelen yan ürün (ağılda yiyecek,
+//                      madende taş)
+//   processing   : { perHour, input, output } işleme yapısı: çalışan saatte perHour kez stoktan input'u alıp
+//                  output'u üretir (değirmen: 1 yiyecek -> 1 ekmek). Malzeme yoksa ya da depo doluysa boşta kalır
+//   flock        : { sheep, lambSeasons } ağılda dolaşan koyun sayısı ve kuzuların görüldüğü mevsimler (görsel)
+//   requires.biome : { tile, min } yakında yeterli nesne yoksa ayak izinde en az min karo bu biyomsa da olur
+//                  (demir madeni: kayalık tepe ya da kayaların yanı)
+//   requiresTier : kasaba bu seviyeye ulaşınca kilidi açılır (data/town.js -> TOWN_TIERS; değirmen Köy,
+//                  belediye Kasaba)
+//   civic        : { workSpeed } tamamlanınca kasabanın tüm iş ve inşaat hızı çarpanı (belediye); her sabahki
+//                  erzak dengesi data/town.js -> TOWN_HALL'da
 //
 // Seviye 2 (8. aşama) — upgrade: yapı yıkılmadan Yapı Bilgi Paneli'nden geliştirilir:
 //   { name, description, cost, buildWork, capacity?, workers?, productionBonus?, seasonalFloor?,
@@ -218,13 +232,102 @@ export const BUILDINGS = {
     demolishable: true,
     category: 'Zanaat',
     description:
-      'Zanaatkâr stoktaki odun, taş ve yiyecekten kişisel ekipman üretir: Sağlam Alet, Kışlık Palto, Sırt Çantası. Boşta kalan ekipmanı en çok ihtiyacı olan sakin gelip kuşanır.',
+      'Zanaatkâr kişisel ekipman üretir: demir ve odundan Sağlam Alet, yünden Kışlık Palto ve Sırt Çantası. Kasabada henüz demir ya da yün üreten yapı yoksa eski usulle odun, taş ve yiyecekten yapar. Boşta kalan ekipmanı en çok ihtiyacı olan sakin gelip kuşanır.',
     cost: { wood: 25, stone: 20 },
     buildWork: 180,
     workers: 1,
     workActivity: 'craft',
     workFacing: 'up',
     crafting: { recipes: ['sturdyTool', 'winterCoat', 'backpack'] },
+  },
+  // --- 10. aşama: üretim zincirleri ve hayvancılık ---
+  sheepFarm: {
+    name: 'Koyun Ağılı',
+    size: { w: 3, h: 3 },
+    spots: 'front',
+    buildable: true,
+    demolishable: true,
+    category: 'Hayvancılık',
+    description:
+      'Çitle çevrili ağılda koyunlar otlar. Çoban düzenli yün (kumaş malzemesi) ve biraz süt-peynir (yiyecek) getirir. İlkbaharda kırkım bereketlidir; kışın koyunlar ahırda daha az yün verir.',
+    cost: { wood: 30, stone: 8, food: 10 },
+    buildWork: 170,
+    workers: 1,
+    workActivity: 'herd',
+    // Çoban ağılın kapısının önünde, koyunlara dönük durur
+    workPoints: [{ x: 24, y: 52 }],
+    workFacing: 'up',
+    production: { resource: 'wool', perHour: 2, extra: { food: 1 }, seasonal: 'pasture' },
+    flock: { sheep: 4, lambSeasons: ['spring'] },
+  },
+  mill: {
+    name: 'Yel Değirmeni ve Fırın',
+    size: { w: 3, h: 3 },
+    spots: 'front',
+    buildable: true,
+    demolishable: true,
+    category: 'Üretim',
+    description:
+      'Rüzgârla dönen yelkenli taş değirmen ve taş fırın. Fırıncı bahçelerden gelen yiyeceği una, unu sıcak ekmeğe çevirir: 1 yiyecek, 2,5 yiyecek değerinde 1 ekmek olur. Kışın da çalışır.',
+    cost: { wood: 40, stone: 35 },
+    buildWork: 260,
+    workers: 1,
+    workActivity: 'bake',
+    // Fırıncı taş fırının ağzının önünde çalışır
+    workPoints: [{ x: 38, y: 51 }],
+    workFacing: 'up',
+    processing: { perHour: 4, input: { food: 1 }, output: { bread: 1 } },
+    requiresBuilding: { type: 'garden', reason: 'Önce bir Sebze Bahçesi tamamlanmalı (değirmen tahıl ister)' },
+    requiresTier: 2,
+  },
+  ironMine: {
+    name: 'Demir Madeni',
+    size: { w: 3, h: 3 },
+    spots: 'front',
+    buildable: true,
+    demolishable: true,
+    category: 'Üretim',
+    description:
+      'Kayalık tepeye açılmış derin maden. Madenciler kızıl demir cevheri ve yanında bir miktar taş çıkarır; girişteki fener geceleri yanar.',
+    cost: { wood: 40, stone: 20 },
+    buildWork: 240,
+    workers: 2,
+    workActivity: 'mineIron',
+    production: { resource: 'iron', perHour: 1.5, extra: { stone: 1 } },
+    // Madenciler tünel ağzının iki yanında kaya yüzüne dönük kazma sallar
+    workPoints: [
+      { x: 13, y: 39 },
+      { x: 35, y: 39 },
+    ],
+    workFacing: 'up',
+    sortLine: 37,
+    litHours: { from: 18.5, to: 6.5 },
+    requires: {
+      nearObjects: ['rock', 'pebbles'],
+      radius: 6,
+      min: 3,
+      biome: { tile: 'rocky', min: 3 },
+      reason: 'Kayalık Tepe biyomuna ya da kayaların yanına kurulmalı (6 karo içinde en az 3 kaya / çakıl)',
+    },
+  },
+  townHall: {
+    name: 'Belediye Konağı',
+    size: { w: 3, h: 3 },
+    spots: 'door',
+    doorTiles: [{ dx: 1, dy: 3 }],
+    entrance: { x: 24, y: 47 },
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Yönetim',
+    description:
+      'Saat kuleli, sütunlu görkemli meydan konağı. Bürokrasiyi düzene sokar: kasabanın tüm iş ve inşaat verimi +%15. Her sabah vergi ve erzak defterini tutar, bolca olan temel kaynağın bir kısmını azalan kaynağa aktarır.',
+    cost: { wood: 60, stone: 80, iron: 8 },
+    buildWork: 420,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 3,
+    civic: { workSpeed: 1.15 },
+    townBonus: { happiness: 3 },
   },
   market: {
     name: 'Pazar Yeri',
@@ -409,12 +512,16 @@ export const BUILD_MENU = [
   'cabin',
   'lumberHut',
   'quarry',
+  'ironMine',
   'garden',
+  'sheepFarm',
+  'mill',
   'fishingPier',
   'storage',
   'inn',
   'workshop',
   'market',
+  'townHall',
   'flowerBed',
   'bench',
   'lantern',

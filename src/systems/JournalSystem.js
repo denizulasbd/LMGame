@@ -6,6 +6,8 @@
 //   heating:cold / restored, skill:levelUp,
 //   9. aşama: relationship:partnered / married / quarrel / reconciled / levelDown, family:homeShared /
 //   childBorn / grownUp, equipment:equipped, worker:dismissed
+//   10. aşama: goods:firstProduced (ilk yün / demir / ekmek), town:tierUp / tierAssessed (kasaba seviyesi),
+//   townHall:balanced (belediyenin erzak dengesi)
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
@@ -13,6 +15,14 @@ import { EQUIPMENT } from '../data/equipment.js';
 import { TRAITS } from '../data/characters.js';
 import { describeOffer } from './EventSystem.js';
 import { SKILLS } from '../data/skills.js';
+import { formatTownTitle } from './TownStatus.js';
+
+// İşlenmiş malların ilk üretimi
+const FIRST_GOODS_TEXT = {
+  wool: 'Koyun Ağılı\'nda ilk yün kırkıldı: artık paltolar ve çantalar yünden dokunacak',
+  iron: 'Demir Madeni\'nden ilk demir cevheri çıktı: zanaatkâr çelik başlı aletler dövebilir',
+  bread: 'Fırından ilk sıcak ekmekler çıktı: kasabanın sofrası bereketlendi',
+};
 
 const RECONCILE_PLACES = { inn: 'handa', festival: 'şenlikte' };
 
@@ -97,6 +107,14 @@ export class JournalSystem {
       on('town:legendary', ({ townName }) => this.log(`${townName} efsaneleşti! Kasaba Anıtı göğe yükseldi`, 'star')),
       on('town:renamed', ({ name }) => this.log(`Kasabanın yeni adı: ${name}`, 'heart')),
       on('resource:depleted', ({ resource }) => this.log(`${RESOURCES[resource].name} stoğu tükendi`, RESOURCES[resource].icon)),
+      on('goods:firstProduced', ({ resource }) => this.log(FIRST_GOODS_TEXT[resource] ?? `İlk ${RESOURCES[resource].name} üretildi`, RESOURCES[resource].icon)),
+      on('town:tierUp', ({ tier, townName }) =>
+        this.log(`${townName} büyüdü: artık bir ${tier.name}! ${formatTownTitle(townName, tier)} adını gururla taşıyor`, tier.icon)
+      ),
+      on('town:tierAssessed', ({ tier, townName }) => this.log(`Kasaba seviyesi belirlendi: ${formatTownTitle(townName, tier)}`, tier.icon)),
+      on('townHall:balanced', ({ building, from, to, amount }) =>
+        this.log(`${building.name} erzak dengesini sağladı: ${amount} ${RESOURCES[from].name.toLocaleLowerCase('tr')} ambarlardan ${RESOURCES[to].name.toLocaleLowerCase('tr')} ambarına geçti`, RESOURCES[to].icon)
+      ),
     ];
     if (this.state.journal.length === 0) this.log('Kasabanın hikâyesi başladı', 'sun');
   }

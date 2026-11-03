@@ -15,3 +15,6 @@ export { getStructureSprite, getConstructionSiteSprite, CABIN_ART } from './stru
 export { QUARRY_ART, PIER_ART, INN_ART, MARKET_ART, LANTERN_ART, MONUMENT_ART } from './structuresExtra.js';
 export { STONE_HOUSE_ART, WATCHTOWER_ART } from './structuresTier2.js';
 export { WORKSHOP_ART } from './structuresCraft.js';
+export { SHEEP_FARM_ART, getSheepFarmLayer, getSheepSprite } from './structuresFarm.js';
+export { MILL_ART, IRON_MINE_ART } from './structuresIndustry.js';
+export { TOWN_HALL_ART } from './structuresCivic.js';

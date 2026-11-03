@@ -125,11 +125,12 @@ export class TileMap {
 
   /**
    * Bir başlangıç karosundan 4 yönlü yürünerek ulaşılabilen karoları işaretler.
+   * blocked: (isteğe bağlı) yürünemez sayılacak ek karoların index kümesi ("buraya yapı kurulsa?" sorusu için)
    * Dönüş: her karo için 1 (ulaşılabilir) / 0 içeren dizi.
    */
-  computeReachable(seedX, seedY) {
+  computeReachable(seedX, seedY, blocked = null) {
     const reachable = new Uint8Array(this.width * this.height);
-    if (!this.isWalkable(seedX, seedY)) return reachable;
+    if (!this.isWalkable(seedX, seedY) || blocked?.has(this.index(seedX, seedY))) return reachable;
     const stack = [[seedX, seedY]];
     reachable[this.index(seedX, seedY)] = 1;
     while (stack.length > 0) {
@@ -139,7 +140,7 @@ export class TileMap {
         const ny = y + dy;
         if (!this.inBounds(nx, ny)) continue;
         const i = this.index(nx, ny);
-        if (reachable[i] || !this.isWalkable(nx, ny)) continue;
+        if (reachable[i] || !this.isWalkable(nx, ny) || blocked?.has(i)) continue;
         reachable[i] = 1;
         stack.push([nx, ny]);
       }
