@@ -4,6 +4,7 @@
 // bonusu olan %15 hızlı yürür.
 import { CONFIG } from '../config.js';
 import { healthWalkMultiplier } from './HealthSystem.js';
+import { spiceWalkMultiplier } from './Luxury.js';
 
 export class MovementSystem {
   /** @param {import('../world/World.js').World} world */
@@ -15,7 +16,7 @@ export class MovementSystem {
     const now = this.world.state.totalMinutes;
     for (const c of [...this.world.characters, ...this.world.visitors]) {
       c.animTime += tick.simDt;
-      if (c.waypoints && tick.simDt > 0) this.advance(c, tick.simDt * healthWalkMultiplier(c, now));
+      if (c.waypoints && tick.simDt > 0) this.advance(c, tick.simDt * healthWalkMultiplier(c, now) * spiceWalkMultiplier(c, now));
     }
   }
 

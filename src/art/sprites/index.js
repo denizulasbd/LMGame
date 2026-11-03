@@ -22,4 +22,5 @@ export { HEALER_ART } from './structuresHealth.js';
 export { ACADEMY_ART } from './structuresWisdom.js';
 export { HARBOR_ART, BOAT_ART, getBoatSprite } from './structuresHarbor.js';
 export { WONDER_ART, wonderSpriteHeight } from './structuresWonder.js';
+export { CHERRY_ART, GAZEBO_ART, ARCH_ART, FENCE_ART, getGazeboLayer } from './structuresGarden.js';
 export { getAnimalSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite } from './animals.js';

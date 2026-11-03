@@ -12,12 +12,18 @@ import { RESOURCES } from '../data/resources.js';
 import { TOWN_BUFFS } from '../data/town.js';
 import { isWithinHours } from './StructureSystem.js';
 import { Boat } from '../entities/Boat.js';
+import { relicExportCapacity, relicExportValue } from './Luxury.js';
 
 const T = 16;
 
-/** Yükün altın değeri. */
-export function cargoValue(cargo) {
-  return Object.entries(cargo ?? {}).reduce((sum, [r, v]) => sum + v * (EXPORT.values[r] ?? 0), 0);
+/** Yükün altın değeri (multiplier: Denizci Pusulası). */
+export function cargoValue(cargo, multiplier = 1) {
+  return Math.floor(Object.entries(cargo ?? {}).reduce((sum, [r, v]) => sum + v * (EXPORT.values[r] ?? 0), 0) * multiplier);
+}
+
+/** Teknenin taşıyabileceği en çok birim (Denizci Pusulası ile artar). */
+export function boatCapacity(state) {
+  return Math.round(EXPORT.capacity * relicExportCapacity(state));
 }
 
 /** Sınırı aşan fazlalık: { kaynak: birim } (altın ve sınır yoksa boş). */
@@ -295,7 +301,7 @@ export class HarborSystem {
     const boat = this.trade.boat;
     boat.stage = 'docked';
     boat.dockUntil = this.state.totalMinutes + EXPORT.dockHours * 60;
-    let room = EXPORT.capacity;
+    let room = boatCapacity(this.state);
     const cargo = {};
     // Önce rıhtımdaki sandık
     for (const [r, v] of Object.entries(harbor.crate ?? {})) {
@@ -322,7 +328,7 @@ export class HarborSystem {
   depart(harbor) {
     const boat = this.trade.boat;
     const cargo = boat.cargo ?? {};
-    const gold = Math.floor(cargoValue(cargo));
+    const gold = cargoValue(cargo, relicExportValue(this.state));
     const trade = this.trade;
     let bonus = null;
     if (gold > 0) {

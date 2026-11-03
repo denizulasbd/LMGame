@@ -49,6 +49,10 @@ export const TOWN_BUFFS = {
   prosperity: { name: 'Ticaret Bereketi', icon: 'coin', hours: 24, workSpeed: 1.1, happiness: 3 },
   feast: { name: 'Kasaba İkramı', icon: 'food', hours: 24, funDecay: 0.5, instantFun: 25 },
   festival: { name: 'Şenlik Coşkusu', icon: 'sparkle', hours: 20, workSpeed: 1.15, funDecay: 0.7 },
+  // 13. aşama: altın fermanları ve lüks mallar (data/luxury.js)
+  goldBonus: { name: 'Altın İkramiye', icon: 'coin', hours: 72, workSpeed: 1.2, funDecay: 0.8, happiness: 5 },
+  royalArchitects: { name: 'Kraliyet Mimarları', icon: 'hammer', hours: 48, buildSpeed: 3 },
+  spices: { name: 'Baharat ve Kahve', icon: 'spice', hours: 96 },
 };
 
 // Handa sıcak yemek yiyen sakinin kişisel bonusu: bu kadar oyun saati boyunca yavaş acıkır

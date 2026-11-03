@@ -86,7 +86,7 @@ export class StructureSystem {
     this.world = world;
     this.day = game.state.time.day;
     // Kış gelince çalılardaki meyveler donar
-    this.unsubscribe = game.events.on('time:seasonChanged', ({ season }) => {
+    const offSeason = game.events.on('time:seasonChanged', ({ season }) => {
       if (season.berries > 0) return;
       for (const b of this.world.buildings) {
         if (BUILDINGS[b.type].maxBerries) {
@@ -95,10 +95,25 @@ export class StructureSystem {
         }
       }
     });
+    // (13. aşama) Çiçekli çitler yanındakilerle birleşir: yapı eklenip kaldırıldıkça bağlantılar yenilenir
+    const refresh = () => this.connectFences();
+    this.unsubscribers = [offSeason, ...['building:placed', 'building:completed', 'building:removed'].map((n) => game.events.on(n, refresh))];
+    this.connectFences();
   }
 
   destroy() {
-    this.unsubscribe();
+    this.unsubscribers.forEach((off) => off());
+  }
+
+  /** Birleşen yapıların (çit) dört yandaki komşu bağlantıları: building.connect = { left, right, up, down }. */
+  connectFences() {
+    const map = this.world.map;
+    const types = new Map(this.world.buildings.map((b) => [b.id, b.type]));
+    for (const b of this.world.buildings) {
+      if (!BUILDINGS[b.type].connects) continue;
+      const same = (x, y) => types.get(map.getOccupant(x, y)) === b.type;
+      b.connect = { left: same(b.tileX - 1, b.tileY), right: same(b.tileX + 1, b.tileY), up: same(b.tileX, b.tileY - 1), down: same(b.tileX, b.tileY + 1) };
+    }
   }
 
   /**

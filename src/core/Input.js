@@ -26,6 +26,8 @@ const KEY_BINDINGS = {
   toolDemolish: ['KeyX'],
   toggleJournal: ['KeyJ'],
   toggleGoals: ['KeyG'],
+  toggleStats: ['KeyI'],
+  toggleCinematic: ['KeyF'],
 };
 
 const BOUND_CODES = new Set(Object.values(KEY_BINDINGS).flat());

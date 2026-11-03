@@ -3,6 +3,7 @@
 // aynı hesabı kullansın diye tek yerde.
 // 10. aşama: kasabanın toplam yiyecek değeri (ekmek 2,5 sayılır), kasaba seviyesi (Mezra -> Gelişmiş
 // Şehir) ölçütleri ve unvanı, belediyenin iş verimi çarpanı.
+import { silkPrestige } from './Luxury.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { HAPPINESS_WEIGHTS, HAPPINESS_LEVELS, IMMIGRATION, TOWN_BUFFS, TOWN_TIERS, TITLE_WORDS, CIVIC_PROJECTS } from '../data/town.js';
 import { EXPEDITION } from '../data/dilemmas.js';
@@ -36,6 +37,8 @@ export function townHappinessBonus(state) {
     if (TOWN_BUFFS[key].happiness && isBuffActive(state, key)) bonus += TOWN_BUFFS[key].happiness;
   }
   bonus += (state.civic?.relics ?? 0) * EXPEDITION.relicHappiness;
+  // (13. aşama) İpek Kumaş ve Mermer Sütunlar: Seviye 2 yapıların kalıcı prestiji
+  bonus += silkPrestige(state);
   return bonus;
 }
 

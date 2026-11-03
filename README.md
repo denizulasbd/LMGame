@@ -41,6 +41,12 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 | Bilgelik Evi panelinde **Araştır** | Kasaba araştırmasını başlat (maliyet peşin; Bilge çalıştıkça ilerler) |
 | Liman panelinde **Kapalı / 250+ / 400+ / 550+** ve **İhracat Sandığı Hazırla** | Otomatik fazlalık ihracatının stok sınırını seç; rıhtıma bir ihracat sandığı koy |
 | Harikanın panelinde **Aşamayı Başlat** | Büyük Vadi Saat Kulesi'nin sıradaki aşamasını (Gövde, Görkemli Kule) başlat |
+| Takas penceresinin **Lüks Mallar (Altın)** sekmesi / limanın paneli | Altınla baharat sandığı, ipek ve mermer ya da kasaba yadigârı satın al |
+| Belediye Konağı panelinde **Altın Fermanları** | Ustalara Altın İkramiye ya da Kraliyet Mimarları fermanını ilan et |
+| Karakter panelinde sakinin **adına** tık | Sakinin adını değiştir (Enter kaydeder, Esc vazgeçer) |
+| Yapı panelinde **İşçi Ata** / **Sabitle** / **Sabitlemeyi Kaldır** | Bir sakini o iş yerine sabit çalışan yap (yalnızca orada çalışır) ya da serbest bırak |
+| `I` / sol sütunda **Arşiv** | Kasaba Arşivi'ni aç / kapat: son 32 günün grafikleri ve kasabanın tarihi |
+| `F` / sol sütunda **Fotoğraf** | Fotoğraf modu: bütün arayüz gizlenir; kamerayı gezdirip kasabayı seyret (`F`, `Esc` ya da sağ alttaki ipucu geri getirir) |
 | Karakter panelinde eşin, çocuğun, ebeveynin ya da bir ilişkinin adı | O sakini seç |
 | `B` | İnşa et aracı (alt çubuktan yapı seç, haritada tıkla; yolu sürükleyerek döşe) |
 | `H` | Kaynak topla aracı (ağaç, kaya, çalı üzerinde sürükle; emirliden başlarsan kaldırır) |
@@ -126,6 +132,7 @@ LMGame/
     │       ├── structuresWisdom.js Bilgelik Evi (kitaplıklı pencereler, saat kadranı, dürbünlü gözlem kubbesi)
     │       ├── structuresHarbor.js Büyük Ticaret Limanı (rıhtım, ambar, yük vinci, fener; şantiye) ve ticaret teknesi
     │       ├── structuresWonder.js Büyük Vadi Saat Kulesi: üç aşama (Temel, Gövde, Görkemli Kule) ve iskele kademeleri
+    │       ├── structuresGarden.js Kiraz Çiçeği Ağacı (dört mevsim), iki katmanlı Ahşap Çardak, Mermer Kemer, birleşen Çiçekli Çit
     │       └── animals.js    Tavşan, geyik, kedi ve köpek (otomatik konturlu, poz ve renk çeşitleri)
     ├── data/               Saf veri tanımları (oyun kuralları, denge değerleri)
     │   ├── tiles.js        Karo/nesne kuralları: yürünebilir, inşa edilebilir, yol bulma maliyeti;
@@ -135,6 +142,8 @@ LMGame/
     │   ├── resources.js    Odun / Taş / Yiyecek ve işlenmiş mallar Yün / Demir / Ekmek (ekmek 2,5 yiyecek
     │   │                   değerinde), Kasaba Hazinesi (Altın, depo sınırı yok), başlangıç stoğu, depo kapasitesi,
     │   │                   öğün maliyeti
+    │   ├── luxury.js       Altın harcama kanalları: lüks mallar (baharat, ipek ve mermer), beş kasaba yadigârı ve artan
+    │   │                   fiyatları, altın fermanları (ikramiye, kraliyet mimarları)
     │   ├── research.js     Bilgelik Evi araştırmaları (maliyet, iş, etki) ve okul kuralları (ders saati, Kalfa eşiği)
     │   ├── jobs.js         İş emri türleri (inşaat, kesim, kırma, toplama), öncelik, işçi sayısı
     │   ├── weather.js      Hava türleri ve geçiş olasılıkları, yağmurun etkileri, ateşböceği saatleri
@@ -202,6 +211,9 @@ LMGame/
     │   ├── CivicSystem.js  Belediye fermanları: Büyük Ziyafet, Depo Genişletmesi (+150 kapasite, taş yollar), Zanaat Loncası
     │   ├── ResearchSystem.js Bilgelik Evi: araştırma başlatma / ilerletme, etkilerin saf yardımcıları, okul ve Kalfa mezun
     │   ├── HarborSystem.js Liman: fazlalık ihracatı sınırı, ihracat sandığı, teknenin nehir yolu, yükleme ve Kasaba Hazinesi
+    │   ├── Luxury.js       Altın ekonomisinin saf hesapları: satın alınabilirlik, yadigâr fiyatı, kalıcı ve geçici etkiler
+    │   ├── LuxurySystem.js Lüks mal, yadigâr ve altın fermanı alımları (altını öder, etkiyi başlatır)
+    │   ├── StatsSystem.js  Kasaba Arşivi: her sabah nüfus / refah / stok / altın özeti, düğün ve doğum sayaçları
     │   ├── WeatherSystem.js Güneşli / bulutlu / yağmurlu arası yumuşak geçişler
     │   ├── RelationshipSystem.js Sohbet ve birlikte çalışmayla artan ilişki puanları, aşk ve düğün
     │   ├── ConflictSystem.js Zıt kişiliklilerin atışması, handa / şenlikte barışma
@@ -226,7 +238,8 @@ LMGame/
     │                       (takas penceresi), MilestonePanel (hedefler + kasaba seviyesi kartı),
     │                       CelebrationModal (anıt, seviye ve altın çağ kutlaması), DilemmaModal (karar
     │                       penceresi; yalnızca GameState'teki aktif ikilemi okur), BuildingPanel'in araştırma,
-    │                       ihracat ve harika bölümleri,
+    │                       ihracat ve harika bölümleri, (13. aşama) StatsPanel (Kasaba Arşivi grafikleri ve
+    │                       Arşiv / Fotoğraf düğmeleri), luxuryCards (lüks mal, yadigâr ve altın fermanı kartları),
     │                       TitleMenu (başlangıç ekranı), ControlsHint
     ├── state/              Kaydedilebilir oyun durumu
     │   ├── GameState.js    Tek doğruluk kaynağı; toJSON / restore ile kayıt dönüşümü
@@ -335,9 +348,14 @@ Hazinesi (`resources.gold`), nehir ihracatı (`trade`: nehirdeki tekne ve yolcul
 toplam sefer, altın ve kaynak başına ihraç, son sefer), limanın fazlalık sınırı ve rıhtımdaki sandık
 (`exportThreshold`, `crate`), harikanın tamamlanan aşaması (`wonderStage`) ve keşif seferlerinin Kadim Tılsım şans
 sayacı (`civic.expeditionsSinceTalisman`) eklendi; aktif ikilemin seçenekleri (`dilemma.active.options`) de kayda
-girer. Kayıt sürümü 10'dur; 4.–11. aşamanın (sürüm 2–9) kayıtları da açılır: eksik alanlar varsayılanla
-dolar (herkes bekâr, yetişkin, sağlıklı ve ekipmansız başlar; yün, demir, ekmek ve altın 0 olur; araştırma ve
-ihracat boş başlar; yaban hayatı ilk açılışta yerleşir), adı olmayan kasabaya tohumdan bir ad önerilir. Açık bir karar penceresiyle kaydedilen oyun
+girer. 13. aşamada sergilenen yadigârlar, ipek ve mermer, altın fermanlarının son ilan günü ve harcanan altın
+(`luxury`), Kasaba Arşivi'nin günlük özetleri (`history`, en çok 64 gün), düğün ve doğum sayaçları (`stats.weddings`,
+`stats.births`), sakinin oyuncunun verdiği adı (`customName`) ve sabit iş yeri (`workplaceId`), handaki baharatlı
+yemeğin kişisel bonusu (`buffs.spiced`) ve yeni süs yapıları (kiraz, çardak, kemer, çit) eklendi. Kayıt sürümü 11'dir;
+4.–12. aşamanın (sürüm 2–10) kayıtları da açılır: eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
+ve ekipmansız başlar; yün, demir, ekmek ve altın 0 olur; araştırma, ihracat ve yadigâr boş başlar; arşiv ilk açılışta
+kurulur, düğün ve doğum sayaçları evli çiftlerden ve ebeveynli sakinlerden tahmin edilir; yaban hayatı ilk açılışta
+yerleşir), adı olmayan kasabaya tohumdan bir ad önerilir. Açık bir karar penceresiyle kaydedilen oyun
 yüklenince pencere yeniden açılır ve oyun durur; sefere yola çıkmışken kaydedilen sakin yüklenince seferde sayılır.
 Seviyesi yazılmamış eski bir kasaba yüklenince seviyesi **sessizce** belirlenir: hak ettiği seviyeden başlar,
 günlüğe "Kasaba seviyesi belirlendi" yazılır, art arda kutlama penceresi açılmaz. Harita boyutu yazılmamış eski kayıtlar **48x48, biyomsuz** haritalarıyla açılır
@@ -465,6 +483,8 @@ ne çalacağı `systems/AudioSystem.js`'tedir:
 | (12. aşama) Okulu bitiren çocuk Kalfa oldu | hedef ezgisi |
 | (12. aşama) Harika tamamlandı | büyük kutlama ezgisi |
 | (12. aşama) Altın çağda saat başı (07:00–22:00) | saat kulesi: dört notalı melodi ve en çok üç derin çan vuruşu |
+| (13. aşama) Yadigâr sergilendi | büyük kutlama ezgisi |
+| (13. aşama) Lüks mal alındı / altın fermanı ilan edildi | sikke / neşeli arpej |
 
 Tarayıcılar sesi ancak bir kullanıcı etkileşiminden sonra başlatır: motor ilk tıklamada ya da tuşta
 açılır. Sessiz tercihi `localStorage`'da (`config.js` → `AUDIO_MUTE_KEY`) saklanır.
@@ -1188,6 +1208,163 @@ başlatır. Hiçbir koşuda sayfa hatası olmadı, girişi kopuk üretim yapıs�
 - üç yapının bilgi panellerini;
 - geceleri vadiyi aydınlatan saat kulesini.
 
+## Altın ekonomisi, peyzaj, mikro-yönetim, Kasaba Arşivi ve fotoğraf modu (13. aşama)
+
+Harika bittikten sonra hazinede binlerce altın birikiyordu. Artık bu altının sürekli harcanabileceği yerler var:
+lüks ve egzotik mallar, Belediye Konağı'nda sergilenen beş kasaba yadigârı ve altın fermanları. Kasabayı süslemek
+için dört peyzaj yapısı geldi. Oyuncu sakinlerine ad verebilir ve onları istediği iş yerine sabitleyebilir. Kasabanın
+geçmişi grafiklerle izlenebilir, kasaba arayüzsüz bir tablo gibi seyredilebilir.
+
+### Lüks ve egzotik mallar
+
+Yalnızca **altınla** alınır. Gezgin tüccar tezgâhtayken takas penceresinin **Lüks Mallar (Altın)** sekmesinden, ya da
+Büyük Ticaret Limanı kuruluysa limanın panelinden (limandan sipariş) her zaman alınabilir.
+
+| Mal | Fiyat | Etki |
+|---|---|---|
+| Baharat ve Kahve Sandığı | 400 altın | Hana teslim edilir (önce bir Kasaba Hanı gerekir). 4 gün boyunca handa yemek yiyen herkes 10 saat **%25 hızlı çalışır ve yürür**. Tekrar alınırsa süre uzar. |
+| İpek Kumaş ve Mermer Sütunlar | 600 altın (bir kez) | Kalıcı prestij: her Seviye 2 yapı refaha **+0,5** (en çok +8). Hemen: herkesin keyfi +25 ve Şenlik Coşkusu. |
+
+### Kasaba yadigârları
+
+Beş eşsiz eser, tüccardan ya da limandan alınır ve **Belediye Konağı'nda sergilenir** (önce konak gerekir). Fiyat
+sergilenen yadigâr sayısıyla artar: **1.500 → 3.000 → 5.000 → 7.000 → 9.000** altın.
+- **Görünüm:** Alınan yadigâr konağın basamaklarının iki yanındaki taş kaidelerde durur. Ebedi Ateş Kandili gelince
+  basamak fenerleri gece gündüz turkuaz yanar.
+- **Panel:** Konağın panelindeki **Kasaba Yadigârları** rafında beş yuva görünür; alınmamışlar soluk durur.
+
+| Yadigâr | Kalıcı etki |
+|---|---|
+| Güneş Saati Küresi | Tüm üretim ve işleme yapılarında verim +%10 |
+| Bereket Boynuzu | Yiyecek üreten yapılar (bahçe, ağıl, iskele) +%25 |
+| Usta Lonca Mührü | Meslek deneyimi kazanma +%30 |
+| Denizci Pusulası | Ticaret teknesi %50 fazla yük alır, ihracatın altın değeri +%20 |
+| Ebedi Ateş Kandili | Evler kışın %30 az odun yakar, dışarıdakiler yarı yarıya az üşür |
+
+### Altın fermanları
+
+Belediye Konağı'nın panelindeki **Altın Fermanları** bölümünden ilan edilir. Her biri 4 günde bir ilan edilebilir.
+
+| Ferman | Fiyat | Etki |
+|---|---|---|
+| Ustalara Altın İkramiye | 1.000 altın | Herkesin keyfi +15. 3 gün boyunca iş hızı +%20, keyif yavaş düşer, refah +5 |
+| Kraliyet Mimarları | 1.500 altın | 2 gün boyunca bütün şantiyeler, yükseltmeler, onarımlar ve harika aşamaları **3 kat** hızlı |
+
+Etkin bonuslar HUD'daki bonus satırında kalan süreleriyle görünür. Her alım bildirim, ses ve günlük kaydı bırakır.
+
+### Peyzaj ve süsleme
+
+| Yapı | Boyut | Maliyet | Ne yapar? |
+|---|---|---|---|
+| Kiraz Çiçeği Ağacı | 1x1 | Odun 12, Yiyecek 6, Altın 15 | İlkbaharda pembe-beyaz çiçek bulutu, yazın yeşil yapraklar arasında pembe çiçekler, sonbaharda altın-kehribar, kışın karlı dallarda pembe tomurcuklar. Rüzgârda yaprakları savrulur (kışın dökülmez). Yanından geçenin keyfi biraz dolar. |
+| Ahşap Çardak | 2x2 | Odun 45, Taş 10, Altın 60 | Sarmaşıklı, çiçek saçaklı kameriye; içinde iki kişilik bank. Sakinler önünden girip banka oturur, çatının altında sohbet eder. Burada arkadaşlık **%60 hızlı** gelişir, bekârlar **2,5 kat** daha kolay aşık olur, çiftler daha kolay evlenir. Sevgilisi / eşi olan sakin sohbete çağırınca çardağı seçer, dostlar da arada bir orada buluşur. |
+| Mermer Kemer | 1x1 | Taş 20, Altın 30 | Sarmaşıklı beyaz mermer kemer. Yolların (toprak, taş, meydan) ve bahçe girişlerinin üstüne kurulur. Altındaki yol olduğu gibi kalır, sakinler altından geçer, yolu kapatmaz. |
+| Çiçekli Çit | 1x1 | Odun 5 | Beyaz kazıklı, saksı çiçekli alçak çit. Yan yana (ve alt alta) kurulan çitler birleşir. |
+
+### Sakin adı ve işçi atama
+
+- **Ad değiştirme:** Karakter panelinde sakinin adına tıklanır, yeni ad yazılıp Enter'a basılır (en çok 16 harf).
+  - Boş ad ya da başka bir sakinin adı kabul edilmez.
+  - Günlüğe "X artık Y adıyla anılıyor" yazılır.
+  - Ad bütün panellerde, ilişkilerde ve durum metinlerinde hemen değişir.
+- **İşçi atama / sabitleme:** Her iş yerinin panelinde **İşçi Ata** düğmesi vardır.
+  - **Liste:** Yetişkin sakinler bu işteki ustalıklarına göre (Usta → Kalfa → Çırak) listelenir; başka yere sabitliyse
+    o da yazar. Birine tıklamak onu sabitler. Çalışan satırlarında da **Sabitle** / **Sabitlemeyi Kaldır** düğmeleri var.
+  - **Sabit sakin:** Mesaide yalnızca kendi iş yerinde çalışır, şantiyelere ya da başka işlere kaymaz, orada ustalaşır.
+    Elindeki başka işi bırakıp gelir; yapı sabit olmayan çalışanlarla doluysa biri ona yer açar. Yapı boştaysa ya
+    da hasarlıysa dinlenir.
+  - **Yuvalar:** Sabit çalışanın yuvası başkasına verilmez. Yuva sayısından fazla sakin sabitlenemez. Yapı yıkılınca
+    ya da sakin oradan işten çıkarılınca sabitleme kalkar.
+  - **Karakter paneli:** "Sabit iş yeri: …" etiketi görünür.
+
+### Kasaba Arşivi (`I`)
+
+Sol sütundaki **Arşiv** düğmesi (ya da `I`) ekranın ortasında bir pencere açar:
+- **Grafikler:** Son 32 günün dört piksel grafiği: Nüfus, Ortalama Refah, Stok Toplamı ve Kasaba Hazinesi.
+  - Her grafikte bugünkü değer, dönemdeki artış / azalış (▲ / ▼) ve en düşük / en yüksek değer yazar.
+  - Grafiğin son noktası her zaman bugünün anlık değeridir.
+- **Kasabanın tarihi:** Fırından çıkan ekmek, kırkılan yün, çıkarılan demir, pişen sıcak yemek, kıyılan düğün, doğan
+  çocuk, atlatılan kış, tamamlanan yapı, takas, ihracat seferi ve kazanılan altın, lüks mallara harcanan altın,
+  sergilenen yadigâr, araştırma, şifacıda iyileşen ve verilen karar sayısı.
+- **Veri:** Arşiv her sabah bir özet yazar ve en çok 64 gün saklar; kayda girer.
+
+### Fotoğraf / sinematik mod (`F`)
+
+`F` ya da sol sütundaki **Fotoğraf** düğmesi bütün arayüzü yumuşakça gizler. Sağ altta küçük bir "Arayüzü Göster (F)"
+ipucu kalır.
+- **Kontroller:** Kamera (WASD, sürükleme, tekerlek) ve zaman tuşları çalışır.
+- **Görüntü:** Haritada imleç, seçim halkası, iş işaretleri ve araç önizlemesi çizilmez. Yağan kar, yanan fenerler ve
+  gezinen sakinler bir tablo gibi seyredilir.
+- **Çıkış:** `F`, `Esc` ya da ipucu arayüzü geri getirir. Karar penceresi ya da kutlama açılırsa mod kendiliğinden
+  biter, böylece önemli bir an kaçmaz.
+
+### Denge ve test (simülasyon)
+
+Otopilot 4 haritada (tohum 42, 7, 3 ve kararlara dokunmayan "pasif" 2024) **40 gün** oynadı.
+- **Otopilotun harcama düzeni:** Harika bitene kadar altını biriktirir. Bittikten sonra hazineyi şu sırayla harcar:
+  - kaynak yettikçe sıradaki yadigâr (fiyatın 300 altın fazlası varsa);
+  - bir kez ipek ve mermer;
+  - handa baharat bitince yeni sandık;
+  - 4 günde bir altın ikramiye;
+  - iki şantiye birden sürerken kraliyet mimarları.
+
+  Planın sonunda iki kiraz ağacı, bir çardak, yolun üstüne bir mermer kemer ve iki çiçekli çit kurar.
+- **Hata yok:** Hiçbir koşuda sayfa hatası olmadı, girişi kopuk üretim yapısı kalmadı.
+- **Önceki aşamalar:**
+  - Köy 7.–8., Kasaba 9.–11., Gelişmiş Şehir 15.–18. günde geldi.
+  - Dört araştırma bitti. Harika 27.–32. günde tamamlandı.
+- **Altın harcaması:**
+  - Harika bittikten sonraki 5-13 günde **12.900-30.700 altın** harcandı: 3-5 yadigâr (9.500-25.500), lüks mallar
+    (1.400-2.200), altın fermanları (2.000-3.000).
+  - 12. aşamada harika sonrası hazine 8.000-21.000 altına birikip kalıyordu. Şimdi son günlerde 4.000-8.000
+    altında dolanıyor: ihracat getirir, yadigâr ve fermanlar götürür.
+  - Bir haritada (tohum 3) beş yadigârın hepsi 40. günden önce sergilendi.
+- **İhracat:** 29-39 sefer 12.100-22.000 birim mal götürdü, 20.900-39.400 altın getirdi. Denizci Pusulası'ndan sonra
+  tekne seferde 1.800-2.000 altın getiriyor.
+- **Stoklar:** Son 12 günün ortalama odun / taş / yiyecek stoğu 545-630.
+  - 12. aşamanın 34 günlük koşularında bu band 390-550 idi.
+  - Artışın kaynağı yadigârların (+%10 üretim, +%25 yiyecek) ve altın ikramiyenin üretimi artırmasıdır.
+  - Yine de deponun 740 sınırına dayandığı gün 12 günde 0-3; tekne fazlayı götürmeye devam ediyor.
+- **Diğer:** 3-7 kişi üşüttü, hepsi iyileşti. 11-13 karar verildi, 8 ferman ilan edildi. En düşük ortalama refah
+  %69-71'di.
+- **Hedefli testler (`tools/sim/tests.mjs`, 147):** Önceki aşamaların 100 testine 47 test eklendi:
+  - Lüks mallar: satıcı ve altın koşulu, baharat sandığının limandan alınıp hana teslimi, handa yiyen sakinin %25
+    hızlanması, ipek ve mermerin kalıcı prestiji ve tek seferliği.
+  - Yadigârlar:
+    - fiyatların 1.500 → 9.000 artışı, tüccar yokken alınamama, aynı yadigârın iki kez alınamaması;
+    - beş etkinin hepsi (Ebedi Ateş'in gerçekten %30 az odun yakması, Güneş Saati Küresi'nin taş ocağında gerçekten
+      %10 fazla üretmesi dahil).
+  - Altın fermanları: ikramiye, bekleme süresi, Kraliyet Mimarları'nda aynı inşaatçının gerçekten 3 kat ilerletmesi.
+  - Peyzaj:
+    - Mermer kemer: yolun üstüne kurulur, yol karosu kalır, altından geçilir, yol bulma içinden geçer, üstüne yapı
+      kurulamaz.
+    - Çitlerin birleşmesi, kirazın dört mevsimi.
+    - Çardak: iki oturak; iki sakin gerçekten oturup sohbet eder, arkadaşlıkları gelişir.
+  - Sakin adı: değiştirme, boş ya da başkasının adını reddetme, 16 harf sınırı.
+  - İşçi sabitleme:
+    - yalnızca kendi iş yerine gitme, yuvanın başkasına verilmemesi, yuva sınırı;
+    - mesaide gerçekten oraya gitme, sabitlemeyi kaldırma.
+  - Arşiv: günlük özet, düğün / doğum sayaçları, 64 gün sınırı, pencerenin 4 grafikle açılması.
+  - Fotoğraf modu: açılır, kapanır, karar penceresinde kendiliğinden biter.
+  - Sürüm 11 kaydının gidiş-dönüşü: yadigârlar, ipek, fermanlar, arşiv, sakin adı, sabit işçi, kemerin yürünebilirliği.
+- **Uyumluluk (`tools/sim/compat.mjs`, 32):** Sürüm 7, 8, 9 ve 10 kayıtları açılıp bir gün yaşadı.
+  - 12. aşamanın sürüm 10 kaydı (31. gün, şehir, harika ve dört araştırma) araştırmalarını, hazinesini ve harikasını
+    korudu.
+  - Hepsinde yadigâr ve sabit işçi boş başladı, arşiv kuruldu, düğün sayacı evli çiftlerden doğru tahmin edildi.
+
+**Önizleme:** `/tools/art-preview.html` sayfasının başında 13. aşamanın çizimleri var:
+- kiraz ağacının dört mevsimi;
+- çardağın tam görünümü, iki katmanı ve kışı;
+- mermer kemer ve çitin bütün birleşme biçimleri;
+- yadigârlarıyla Belediye Konağı (Ebedi Ateş ve gece dahil);
+- yeni simgeler.
+
+`node tools/sim/showcase.mjs` oyun içinde şunları çeker:
+- kirazlarla çevrili, içinde oturan sakinli çardağı;
+- yadigârları sergileyen konağı;
+- konağın ve limanın altın bölümlerini;
+- Kasaba Arşivi penceresini ve fotoğraf modunu.
+
 ## Simülasyon ve test araçları (`tools/sim/`)
 
 Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngüsünü durdurup sabit adımlarla ilerletir.
@@ -1197,11 +1374,11 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (100): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 7, 8 ve 9) açar, bir gün yaşatır |
-| `node tools/sim/autopilot.mjs 42 34` | Hilesiz otopilotla 34 günlük oyun: günlük özet (araştırma, altın, sefer, harika aşaması dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya ne kadar harcandığı ve son 12 günün ortalama stoğu. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (147): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 7, 8, 9 ve 10) açar, bir gün yaşatır |
+| `node tools/sim/autopilot.mjs 42 40` | Hilesiz otopilotla 40 günlük oyun: günlük özet (araştırma, altın, sefer, harika aşaması, yadigâr ve harcanan altın dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya, altının yadigâr / lüks mal / fermanlara ne kadar harcandığı, peyzaj ve son 12 günün ortalama stoğu. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar |
 | `node tools/sim/preview.mjs ["başlık"]` | Sanat önizleme sayfasının bölümlerinin ekran görüntüleri (`tools/sim/out/`) |
-| `node tools/sim/showcase.mjs 11` | Oyun içi vitrin: yeni yapılar ve hayvanlar, liman ve yanaşan tekne, Bilgelik Evi, harika, yapı panelleri, karar penceresi, fermanlar, gece görünümü |
+| `node tools/sim/showcase.mjs 11` | Oyun içi vitrin: yeni yapılar ve hayvanlar, liman ve yanaşan tekne, Bilgelik Evi, harika, peyzaj ve çardak, yadigârlı konak, yapı panelleri, Kasaba Arşivi, fotoğraf modu, karar penceresi, fermanlar, gece görünümü |
 
 `tools/sim/lib.mjs` ortak yardımcıları içerir: oyunu açma, saat saat ilerletme, `window.sim` (yapı kurma,
 kaynak verme, olay günlüğü) ve test kaydı.
@@ -1256,6 +1433,9 @@ karakter ve yapı panelleri durur. İki sütun aynı esnek kapsayıcıdadır (`.
 | İhracat değerleri, sınırlar, tekne aralığı / kapasitesi / hızı | `data/trade.js` → `EXPORT` (mantık `systems/HarborSystem.js`) |
 | Harikanın aşamaları, maliyetleri, ışığı ve ısıttığı alan | `data/buildings.js` → `wonder.wonder` (görsel `art/sprites/structuresWonder.js`) |
 | Proje türlerinin sözcükleri (Yükselt / Onar / Aşama) | `data/buildings.js` → `PROJECT_WORDS` |
+| Lüks malların, yadigârların, altın fermanlarının fiyatı ve etkisi | `data/luxury.js` (etkiler `systems/Luxury.js`, simgeler `art/ui/index.js`) |
+| Arşivde saklanan gün sayısı, grafiklerin gün sayısı | `config.js` → `HISTORY_DAYS`, `HISTORY_CHART_DAYS` |
+| Yeni süs yapısı (altından geçilen, birleşen, oturulan) | `data/buildings.js` → `walkable`, `connects`, `gazebo` (+ `art/sprites/structuresGarden.js`) |
 | Simülasyon / test | `tools/sim/` (bkz. *Simülasyon ve test araçları*) |
 | Günlüğe yeni olay | `systems/JournalSystem.js` (olayı dinle, metnini yaz) |
 | Kayda yeni alan | `state/GameState.js` → `toJSON` / `restore` (+ `SAVE_VERSION`) |

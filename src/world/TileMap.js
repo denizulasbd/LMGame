@@ -32,6 +32,7 @@ export class TileMap {
     this.variants = new Uint8Array(width * height);
     this.objects = new Uint8Array(width * height); // 0 = nesne yok
     this.occupants = new Uint16Array(width * height); // üzerindeki yapının kimliği, 0 = boş
+    this.passable = new Uint8Array(width * height); // 1: üzerindeki yapının altından / içinden geçilebilir (kemer)
   }
 
   get pixelWidth() {
@@ -89,8 +90,12 @@ export class TileMap {
     return this.inBounds(x, y) ? this.occupants[this.index(x, y)] : 0;
   }
 
-  setOccupant(x, y, buildingId) {
-    if (this.inBounds(x, y)) this.occupants[this.index(x, y)] = buildingId;
+  /** passable: sakinler bu yapının karosundan geçebilir (13. aşama: Mermer Kemer). */
+  setOccupant(x, y, buildingId, passable = false) {
+    if (!this.inBounds(x, y)) return;
+    const i = this.index(x, y);
+    this.occupants[i] = buildingId;
+    this.passable[i] = buildingId !== 0 && passable ? 1 : 0;
   }
 
   // ---- Kurallar ----
@@ -98,7 +103,7 @@ export class TileMap {
   isWalkable(x, y) {
     const tile = this.get(x, y);
     if (!tile || !TILE_TYPES[tile].walkable) return false;
-    if (this.getOccupant(x, y) !== 0) return false;
+    if (this.getOccupant(x, y) !== 0 && !this.passable[this.index(x, y)]) return false;
     const object = this.getObject(x, y);
     return !object || OBJECT_TYPES[object].walkable;
   }

@@ -120,11 +120,13 @@ async function installHelpers(page, stopLoop) {
       'town:tierUp', 'goods:firstProduced', 'heating:cold', 'milestone:completed', 'townHall:balanced', 'building:upgraded',
       'pet:arrived', 'health:fellIll', 'health:cured', 'health:recovered', 'dilemma:opened', 'dilemma:resolved', 'storm:struck',
       'expedition:departed', 'expedition:returned', 'civic:decreed', 'building:mended',
+      'relic:exhibited', 'luxury:bought', 'goldDecree:issued',
     ];
     for (const name of watch) {
       game.events.on(name, (p) => {
         const what =
           p?.tier?.name ?? p?.resource ?? p?.milestone?.id ?? p?.option?.id ?? p?.project?.name ?? p?.active?.id ??
+          p?.relic?.name ?? p?.good?.name ?? p?.decree?.name ??
           p?.animal?.name ?? p?.character?.name ?? p?.building?.type ?? p?.kind ?? '';
         const extra = p?.amount ? `${p.from}->${p.to} ${p.amount}` : p?.damaged ? `hasar: ${p.damaged.map((b) => b.type).join(',') || 'yok'}` : p?.auto ? '(süre doldu)' : '';
         sim.log.push(`${stamp()} ${name} ${what} ${extra}`.trim());

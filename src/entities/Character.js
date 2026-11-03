@@ -70,6 +70,8 @@ export class Character extends Entity {
     schoolDay = 0,
     schoolToday = 0,
     educated = false,
+    workplaceId = null,
+    customName = false,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -97,6 +99,9 @@ export class Character extends Entity {
     this.schoolDay = schoolDay;
     this.schoolToday = schoolToday;
     this.educated = educated; // okulu bitirip meslekte Kalfa olarak başladı
+    // 13. aşama: oyuncunun sabitlediği iş yeri (yalnızca orada çalışır) ve oyuncunun verdiği ad
+    this.workplaceId = workplaceId;
+    this.customName = customName;
     this.profile = buildTraitProfile(traits, { child: this.isChild });
 
     // Anlık durum (kaydedilmez, yapay zekâ yeniden kurar)
@@ -392,6 +397,8 @@ export class Character extends Entity {
       schoolDay: this.schoolDay,
       schoolToday: this.schoolToday,
       educated: this.educated,
+      workplaceId: this.workplaceId,
+      customName: this.customName,
     };
   }
 

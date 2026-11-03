@@ -1,6 +1,8 @@
 // Oyun içi vitrin: yeni yapıları ve hayvanları kurup birkaç saat yaşatır, yakın plan ekran görüntüleri alır
 // (gündüz, gece), karar penceresini ve belediye fermanlarını açar. (12. aşama) Bilgelik Evi, liman ve rıhtıma
-// yanaşan ticaret teknesi, Büyük Vadi Saat Kulesi (gündüz / gece) ve bu yapıların bilgi panelleri.
+// yanaşan ticaret teknesi, Büyük Vadi Saat Kulesi (gündüz / gece) ve bu yapıların bilgi panelleri. (13. aşama) Peyzaj
+// (kiraz ağaçları, çardakta oturan çift, mermer kemer, çiçekli çitler), yadigârları sergileyen Belediye Konağı,
+// Belediye ve liman panellerinin altın bölümleri, Kasaba Arşivi penceresi ve fotoğraf modu.
 // Kullanım: node tools/sim/showcase.mjs [tohum=11] [--out klasör]
 import fs from 'fs';
 import { openGame, parseArgs, runHours } from './lib.mjs';
@@ -97,6 +99,80 @@ await page.evaluate(() => {
   for (const el of document.querySelectorAll('.residents')) el.style.display = '';
 });
 await page.setViewportSize({ width: 1360, height: 860 });
+
+// --- 13. aşama ---
+await page.evaluate(() => {
+  const game = window.game;
+  const sim = window.sim;
+  const s = game.state;
+  const scene = game.scenes.current;
+  sim.give({ wood: 400, stone: 400, food: 300, gold: 40000 });
+  for (const id of ['sunSphere', 'cornucopia', 'guildSeal', 'compass', 'eternalFlame']) game.events.emit('ui:buyRelic', { id, source: 'harbor' });
+  game.events.emit('ui:buyLuxury', { id: 'silkMarble', source: 'harbor' });
+  game.events.emit('ui:goldDecree', { id: 'goldBonus' });
+  const gazebo = sim.place('gazebo', { maxRadius: 40 });
+  // Çardağın çevresine kiraz ağaçları, önüne çiçekli çit sırası, yola mermer kemer
+  if (gazebo) {
+    const tryPlace = (type, x, y) => {
+      if (!scene.construction.checkPlacement(type, x, y).ok) return null;
+      const b = scene.construction.placeSite(type, x, y).building;
+      const job = scene.jobs.jobs.find((j) => j.buildingId === b.id);
+      if (job) scene.jobs.cancel(job);
+      scene.construction.complete(b);
+      return b;
+    };
+    for (const [dx, dy] of [[-2, 0], [3, 0], [-2, 2], [3, 2], [-1, -1], [2, -1]]) tryPlace('cherryTree', gazebo.tileX + dx, gazebo.tileY + dy);
+    for (let dx = -2; dx <= 3; dx++) if (dx < 0 || dx > 1) tryPlace('flowerFence', gazebo.tileX + dx, gazebo.tileY + 3);
+    const map = scene.world.map;
+    for (let r = 1; r < 12; r++) {
+      const t = [[0, r], [r, 0], [0, -r], [-r, 0]].map(([dx, dy]) => ({ x: gazebo.tileX + dx, y: gazebo.tileY + 3 + dy })).find((p) => map.get(p.x, p.y) === 'path');
+      if (t && tryPlace('marbleArch', t.x, t.y)) break;
+    }
+    // Bir çift çardakta otursun
+    const [a, b] = s.characters.filter((c) => !c.isChild && c.visible).slice(0, 2);
+    const brain = scene.behavior.brain;
+    for (const c of [a, b]) scene.behavior.endTask(c);
+    const planA = brain.planGathering(a, gazebo);
+    scene.behavior.startPlan(a, planA, s.time.hour);
+    scene.behavior.startPlan(b, brain.planGathering(b, gazebo, planA.spot), s.time.hour);
+  }
+});
+await runHours(page, 1);
+await shoot('peyzaj-cardak', { type: 'gazebo' }, 4);
+await shoot('belediye-yadigarlar', { type: 'townHall' }, 4);
+await page.setViewportSize({ width: 1360, height: 1700 });
+await page.evaluate(() => {
+  for (const el of document.querySelectorAll('.residents')) el.style.display = 'none';
+});
+for (const type of ['townHall', 'harbor']) {
+  await page.evaluate((type) => {
+    const game = window.game;
+    const b = game.state.buildings.find((x) => x.type === type);
+    if (b) game.events.emit('ui:selectBuilding', b.id);
+    game.render(0);
+  }, type);
+  await page.locator('.building-panel').screenshot({ path: `${out}/vitrin-altin-${type}.png` });
+  console.log(`${out}/vitrin-altin-${type}.png`);
+}
+await page.evaluate(() => {
+  for (const el of document.querySelectorAll('.residents')) el.style.display = '';
+  window.game.events.emit('ui:selectBuilding', null);
+});
+await page.setViewportSize({ width: 1360, height: 860 });
+await runHours(page, 30); // arşivde birkaç gün birikir
+await page.evaluate(() => {
+  window.game.events.emit('ui:toggleStats');
+  window.game.render(0);
+});
+await page.screenshot({ path: `${out}/vitrin-arsiv.png` });
+console.log(`${out}/vitrin-arsiv.png`);
+await page.evaluate(() => {
+  window.game.events.emit('ui:toggleStats');
+  window.game.events.emit('ui:toggleCinematic');
+});
+await page.waitForTimeout(700); // arayüz yumuşakça kaybolur
+await shoot('fotograf-modu', { type: 'gazebo' }, 3);
+await page.evaluate(() => window.game.events.emit('ui:toggleCinematic'));
 
 await page.evaluate(() => {
   const game = window.game;

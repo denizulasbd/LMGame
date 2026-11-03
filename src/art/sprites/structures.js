@@ -29,6 +29,7 @@ import { getHealerHutSprite } from './structuresHealth.js';
 import { getAcademySprite } from './structuresWisdom.js';
 import { getHarborSprite, getHarborSiteSprite } from './structuresHarbor.js';
 import { getWonderSprite } from './structuresWonder.js';
+import { getCherryTreeSprite, getGazeboLayer, getMarbleArchSprite, getFlowerFenceSprite } from './structuresGarden.js';
 import { seasonalFoliageRows, winterize } from '../seasons.js';
 
 // ---------------------------------------------------------------------------
@@ -597,7 +598,7 @@ export function getConstructionSiteSprite(w, h, stage, type = null, orientation 
 // Kışın her yapı karla örtülür (çatılar beyazlar, tepelere kar yığılır); çalı ve bahçe kendi kış
 // çizimlerini kullanır (bahçenin Seviye 2'si Cam Sera ise kışın da yeşildir, yalnızca çatısı karlanır).
 // ---------------------------------------------------------------------------
-const OWN_WINTER_ART = new Set(['berryBush', 'garden', 'sheepFarm', 'mill']);
+const OWN_WINTER_ART = new Set(['berryBush', 'garden', 'sheepFarm', 'mill', 'cherryTree']);
 
 // Kışın karla örtülen çatı renkleri (açık / ana / koyu ton) ve çatının bittiği satır.
 // Kulübenin üç çatı tonu (kiremit, arduvaz, yosun) hepsi listede; ahırın yalnızca saçakları.
@@ -615,6 +616,7 @@ const WINTER_ROOFS = {
   healerHut: { light: ['Y'], main: ['P'], dark: ['X'], maxRow: 19 },
   academy: { light: ['c'], main: ['B', 'b'], dark: ['n', 'N'], maxRow: 39 },
   harbor: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 22 },
+  gazebo: { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 },
 };
 
 export function getStructureSprite(type, state = {}) {
@@ -685,7 +687,15 @@ function getBaseStructureSprite(type, state) {
     case 'ironMine':
       return getIronMineSprite(state.frame ?? 0, Boolean(state.active), Boolean(state.lit ?? state.windowsLit));
     case 'townHall':
-      return getTownHallSprite(Boolean(state.windowsLit), state.frame ?? 0);
+      return getTownHallSprite(Boolean(state.windowsLit), state.frame ?? 0, state.relics ?? 0);
+    case 'cherryTree':
+      return getCherryTreeSprite(state.season ?? 'spring');
+    case 'gazebo':
+      return getGazeboLayer('full');
+    case 'marbleArch':
+      return getMarbleArchSprite();
+    case 'flowerFence':
+      return getFlowerFenceSprite(state.connect ?? {});
     case 'healerHut':
       return getHealerHutSprite(Boolean(state.active), state.frame ?? 0, Boolean(state.windowsLit));
     case 'monument':

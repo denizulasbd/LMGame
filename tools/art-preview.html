@@ -17,7 +17,7 @@
   <p>Geliştirme aracı: <code>python3 tools/serve.py</code> çalışırken <code>/tools/art-preview.html</code> adresinden açılır. Yapılar 5 kat büyütülmüş çizilir.</p>
   <div id="root"></div>
   <script type="module">
-    import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite, getBoatSprite } from '../src/art/sprites/index.js';
+    import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite, getBoatSprite, getGazeboLayer } from '../src/art/sprites/index.js';
     import { getIconSprite, getBackpackSprite, getNoteSprite, getBubbleSprite, getHeldToolSprite, getCarrySprite } from '../src/art/ui/index.js';
     import { getCharacterSprite } from '../src/art/sprites/index.js';
     import { getTileSprite, getObjectSprite, getEdgeSprite } from '../src/art/tiles/index.js';
@@ -49,6 +49,34 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 13. aşama: peyzaj, kasaba yadigârları, lüks mallar ve yeni arayüz simgeleri ---
+    show('Kiraz Çiçeği Ağacı (1x1): ilkbahar, yaz, sonbahar, kış (yaprakları oyunda rüzgârla savrulur)', SEASONS.map((season) => [NAMES[season], getStructureSprite('cherryTree', { season })]), 6);
+    show('Ahşap Çardak (2x2): tam görünüm, oyundaki iki katman (arka: döşeme ve banklar / ön: direkler ve çatı), kış', [
+      ['çardak', getStructureSprite('gazebo', {})],
+      ['arka katman', getGazeboLayer('back')],
+      ['ön katman', getGazeboLayer('front')],
+      ['kış', getStructureSprite('gazebo', { season: 'winter' })],
+    ], 4);
+    show('Mermer Kemer (1x1, altından geçilir) ve Çiçekli Çit (yanındakilerle birleşir)', [
+      ['kemer', getStructureSprite('marbleArch', {})],
+      ['kemer kış', getStructureSprite('marbleArch', { season: 'winter' })],
+      ['çit tek', getStructureSprite('flowerFence', {})],
+      ['sol uç', getStructureSprite('flowerFence', { connect: { right: true } })],
+      ['orta', getStructureSprite('flowerFence', { connect: { left: true, right: true } })],
+      ['sağ uç', getStructureSprite('flowerFence', { connect: { left: true } })],
+      ['dikey', getStructureSprite('flowerFence', { connect: { up: true, down: true } })],
+      ['köşe', getStructureSprite('flowerFence', { connect: { right: true, down: true } })],
+      ['kış', getStructureSprite('flowerFence', { connect: { left: true, right: true }, season: 'winter' })],
+    ], 6);
+    show('Belediye Konağı ve kasaba yadigârları: hiç yok, iki yadigâr, dördü kaidelerde, Ebedi Ateş (turkuaz fenerler), gece', [
+      ['yadigârsız', getStructureSprite('townHall', { frame: 1 })],
+      ['küre + boynuz', getStructureSprite('townHall', { frame: 1, relics: 0b00011 })],
+      ['dört yadigâr', getStructureSprite('townHall', { frame: 1, relics: 0b01111 })],
+      ['hepsi', getStructureSprite('townHall', { frame: 0, relics: 0b11111 })],
+      ['hepsi gece', getStructureSprite('townHall', { frame: 2, relics: 0b11111, windowsLit: true })],
+    ], 4);
+    show('Yadigâr ve lüks mal simgeleri: Güneş Saati Küresi, Bereket Boynuzu, Lonca Mührü, Denizci Pusulası, Ebedi Ateş, baharat sandığı, ipek ve mermer; arşiv, fotoğraf, sabitleme', ['relicSun', 'relicHorn', 'relicSeal', 'relicCompass', 'relicFlame', 'spice', 'silk', 'chart', 'camera', 'pin'].map((n) => [n, getIconSprite(n)]), 10);
 
     // --- 12. aşama: Bilgelik Evi, Büyük Ticaret Limanı ve tekne, üç aşamalı Kasaba Harikası, yeni simgeler ---
     show('Bilgelik Evi (3x3): flama dalgalanır, Bilge çalışırken kubbeden dürbün uzanır, gece kitaplıklar yanar, kış', [

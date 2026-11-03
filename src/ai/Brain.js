@@ -39,7 +39,9 @@ const LANDMARK_LEISURE = new Map([
   ['campRest', 'supplyCamp'],
 ]);
 
-const GATHERING_ACTIVITIES = ['campfire', 'fountain', 'inn'];
+const GATHERING_ACTIVITIES = ['campfire', 'fountain', 'inn', 'gazebo'];
+const ALWAYS_OPEN_GATHERINGS = ['fountain', 'gazebo']; // ateş yanarken, han akşamları açıkken; bunlar hep açık
+const GAZEBO_INVITE_CHANCE = 0.35; // davet edenin çardağı seçme olasılığı (sevgilisi / eşi varsa her zaman)
 const INN_MEAL_PREFERENCE = 0.5; // handaki sıcak yemek, yol maliyeti yarıymış gibi tercih edilir
 const EVENING_START = 17;
 const EVENING_END = 2;
@@ -464,7 +466,7 @@ export class Brain {
     for (const building of gatherings) {
       const count = this.participants(building, c).length;
       if (count === 0 || this.world.freeGatherSpots(building, c.id).length === 0) continue;
-      const rank = count + (building.type === 'inn' ? 1.5 : building.type === 'campfire' ? 0.5 : 0);
+      const rank = count + (building.type === 'inn' ? 1.5 : building.type === 'campfire' ? 0.5 : building.type === 'gazebo' ? 1 : 0);
       const better = !best || rank > best.count;
       if (better) best = { building, count: rank };
     }
@@ -476,12 +478,16 @@ export class Brain {
     const inn = gatherings.find((b) => b.type === 'inn');
     const evening = hour >= EVENING_START || hour < EVENING_END;
     // Akşamları han kamp ateşinden de çok sevilir
-    const place = evening ? inn ?? campfire ?? fountain : fountain ?? campfire ?? inn;
+    let place = evening ? inn ?? campfire ?? fountain : fountain ?? campfire ?? inn;
+    // (13. aşama) Çiftler çardakta baş başa oturmayı, dostlar da arada bir orada sohbeti sever
+    const gazebo = gatherings.find((b) => b.type === 'gazebo' && this.world.freeGatherSpots(b, c.id).length >= 2);
+    const lover = c.partnerId !== null && c.partnerId !== undefined ? this.world.getCharacter(c.partnerId) : null;
+    if (gazebo && ((lover && this.isAvailableForChat(lover, hour)) || this.rng.next() < GAZEBO_INVITE_CHANCE)) place = gazebo;
     if (!place) return null;
 
     const plan = this.planGathering(c, place);
     if (!plan) return null;
-    const partner = this.findPartner(c, hour);
+    const partner = place === gazebo && lover && this.isAvailableForChat(lover, hour) ? lover : this.findPartner(c, hour);
     if (partner) plan.inviteId = partner.id;
     return plan;
   }
@@ -503,11 +509,14 @@ export class Brain {
       .filter((s) => !nearSpot || s.x !== nearSpot.x || s.y !== nearSpot.y)
       .sort((a, b) => score(a) - score(b));
     if (ordered.length === 0) return null;
+    const spot = ordered[0];
     return {
       activity: building.type,
       buildingId: building.id,
-      spot: ordered[0],
+      spot,
       reserve: true,
+      // Çardakta önündeki karodan içeri, bankına oturur
+      ...(spot.seat ? { finalPoint: spot.seat, facing: 'down' } : {}),
       duration: this.durationFor(building.type),
     };
   }
@@ -537,8 +546,10 @@ export class Brain {
     for (const [activity, type] of LANDMARK_LEISURE) {
       if (this.world.getCompleted(type).length === 0) weights[activity] = 0;
     }
+    // (13. aşama) Çardak: meydandaki havuz kadar sevilir; sevgilisi / eşi olan için iki kat
+    if (this.availableGatherings().some((b) => b.type === 'gazebo')) weights.gazebo = (weights.fountain ?? 1) * (c.partnerId !== null && c.partnerId !== undefined ? 1.8 : 0.9);
     for (const building of this.availableGatherings()) {
-      if (this.participants(building, c).length > 0) weights[building.type] *= 1.6;
+      if (this.participants(building, c).length > 0) weights[building.type] = (weights[building.type] ?? 0) * 1.6;
     }
 
     const options = Object.entries(weights).filter(([name, w]) => w > 0 && ACTIVITIES[name]);
@@ -594,6 +605,11 @@ export class Brain {
       case 'campfire': {
         const building = this.availableGatherings().find((b) => b.type === activity);
         return building ? this.planGathering(c, building) : null;
+      }
+      case 'gazebo': {
+        const gazebos = this.availableGatherings().filter((b) => b.type === 'gazebo' && this.world.freeGatherSpots(b, c.id).length > 0);
+        if (gazebos.length === 0) return null;
+        return this.planGathering(c, this.nearest(gazebos.map((b) => ({ x: b.tileX, y: b.tileY, b })), c).b);
       }
       case 'play': {
         // Çocuklar meydanda, havuzun, ateşin ve hanın çevresinde koşuşturur
@@ -668,7 +684,7 @@ export class Brain {
   availableGatherings() {
     return this.world
       .getCompleted()
-      .filter((b) => GATHERING_ACTIVITIES.includes(b.type) && (b.type === 'fountain' || b.lit));
+      .filter((b) => GATHERING_ACTIVITIES.includes(b.type) && (ALWAYS_OPEN_GATHERINGS.includes(b.type) || b.lit));
   }
 
   /** Bir toplanma yerinde olan ya da oraya giden diğer karakterler. */

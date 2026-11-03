@@ -36,9 +36,11 @@ export const CONFIG = {
   // --- Kayıt ---
   SAVE_KEY: 'lmgame.save.v2',          // elle kaydedilen / sabah otomatik kaydedilen oyun
   SESSION_KEY: 'lmgame.session.v2',    // sayfa kapanırken yazılır: F5 oyunu kaldığı yerden sürdürür
-  SAVE_VERSION: 10,                    // 12. aşama: araştırmalar, okul, nehir limanı ve teknesi, Kasaba Hazinesi, Harika
+  SAVE_VERSION: 11,                    // 13. aşama: yadigârlar, altın fermanları, peyzaj, sabit işçiler, sakin adları, arşiv
   SAVE_MIN_VERSION: 2,                 // bundan eski kayıtlar açılmaz; arası eksik alanlarla yüklenir
-  AUTOSAVE_HOUR: 6,                    // her sabah bu saatte otomatik kayıt
+  AUTOSAVE_HOUR: 6,
+  HISTORY_DAYS: 64,                    // Kasaba Arşivi'nde saklanan günlük özet sayısı (grafikler son 32 günü çizer)
+  HISTORY_CHART_DAYS: 32,                    // her sabah bu saatte otomatik kayıt
 
   // --- Ses ---
   AUDIO_MUTE_KEY: 'lmgame.audio.muted', // ses kapalı tercihi

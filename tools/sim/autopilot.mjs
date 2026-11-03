@@ -1,7 +1,9 @@
 // Otopilotlu uzun simülasyon: hile yok. Oyuncu gibi toplama emri verir, sırayla yapı kurar ve yükseltir,
 // karar olaylarında seçim yapar, stoklar dolunca belediye fermanı ilan eder. (12. aşama) Bilgelik Evi'nde
 // araştırma seçer, limanda fazlalık ihracatını açık tutar ve mal birikince ihracat sandığı hazırlar, Gelişmiş
-// Şehir olunca Harika'nın üç aşamasını kaynak yettikçe başlatır. Günlük özet, olay günlüğü ve sonunda stokların
+// Şehir olunca Harika'nın üç aşamasını kaynak yettikçe başlatır. (13. aşama) Harika bitince hazinedeki altını
+// yadigârlara, lüks mallara ve altın fermanlarına harcar; planın sonunda peyzaj yapıları (kiraz, çardak, kemer, çit)
+// kurar. Günlük özet, olay günlüğü ve sonunda stokların
 // nereye harcandığını (araştırma, ihracat, harika) basar.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--save kayit.json] [--passive] [--quiet]
@@ -30,6 +32,19 @@ await page.evaluate((passive) => {
     if (kind === 'stage') addSpent(window.__stats.spent.wonder, building.project.spec?.cost ?? building.definition.wonder.stages[building.wonderStage].cost);
   });
   game.events.on('harbor:cratePrepared', () => window.__stats.spent.crates++);
+  window.__stats.gold = { relics: 0, goods: 0, decrees: 0, items: [] };
+  game.events.on('relic:exhibited', ({ relic, price }) => {
+    window.__stats.gold.relics += price;
+    window.__stats.gold.items.push(relic.name);
+  });
+  game.events.on('luxury:bought', ({ good, price }) => {
+    window.__stats.gold.goods += price;
+    window.__stats.gold.items.push(good.name);
+  });
+  game.events.on('goldDecree:issued', ({ decree, price }) => {
+    window.__stats.gold.decrees += price;
+    window.__stats.gold.items.push(decree.name);
+  });
   for (const name of ['research:completed', 'school:graduated', 'harbor:shipped', 'wonder:stageCompleted', 'wonder:completed']) {
     game.events.on(name, (p) => {
       const what = p?.research?.name ?? (p?.skill ? `${p.character.name} -> ${p.skill}` : '') ?? '';
@@ -43,12 +58,13 @@ await page.evaluate((passive) => {
     'storage', 'lumberHut', 'garden', 'cabin', 'quarry', 'cabin', 'inn', 'workshop', 'sheepFarm', 'cabin', 'market',
     'ironMine', 'garden', 'healerHut', 'cabin', 'mill', 'academy', 'cabin', 'fishingPier', 'cabin', 'storage', 'townHall', 'harbor', 'ironMine', 'mill', 'cabin', 'cabin',
     'monument', 'cabin', 'flowerBed', 'lumberHut', 'cabin', 'sheepFarm', 'garden', 'healerHut', 'storage', 'fishingPier', 'quarry',
+    'cherryTree', 'gazebo', 'marbleArch', 'flowerFence', 'flowerFence', 'cherryTree',
   ];
   const UPGRADES = ['cabin', 'cabin', 'lumberHut', 'garden', 'cabin', 'quarry', 'cabin', 'garden', 'cabin', 'cabin', 'lumberHut', 'cabin'];
   const WOOD = { storage: 30, lumberHut: 20, garden: 15, cabin: 25, quarry: 35, inn: 45, workshop: 25, sheepFarm: 30, market: 40, ironMine: 40, mill: 40, fishingPier: 30, townHall: 60, monument: 40, healerHut: 30, flowerBed: 8, academy: 70, harbor: 120 };
   const ESSENTIAL = ['storage', 'lumberHut', 'garden', 'cabin'];
   // İsteğe bağlı yapılar: kaçıncı kopyasından itibaren (kurulamıyorsa sıra beklemeden atlanır)
-  const OPTIONAL = { academy: 1, harbor: 1, ironMine: 1, mill: 2 };
+  const OPTIONAL = { academy: 1, harbor: 1, ironMine: 1, mill: 2, cherryTree: 1, gazebo: 1, marbleArch: 1, flowerFence: 1 };
 
   /** Karar politikası: kasabanın yararına olan ve gücü yeten seçenek. */
   const PREFER = {
@@ -153,6 +169,20 @@ await page.evaluate((passive) => {
       if (Object.entries(stage.cost).every(([r, v]) => res[r] >= v)) scene.construction.startProject(wonder);
     }
 
+    // (13. aşama) Harika bitince hazine: önce yadigârlar (biraz yedek kalsın), ipek ve mermer, baharat, altın fermanları
+    if (wonder?.wonderComplete) {
+      const L = window.__luxury;
+      const source = world.getCompleted('harbor').length ? 'harbor' : 'merchant';
+      const price = L.relicPrice(s);
+      const relic = window.__relicKeys.find((id) => !s.luxury.relics[id]);
+      if (relic && price !== null && res.gold >= price + 300) game.events.emit('ui:buyRelic', { id: relic, source });
+      if (!s.luxury.silk && res.gold >= 900) game.events.emit('ui:buyLuxury', { id: 'silkMarble', source });
+      if ((s.buffs.spices ?? 0) <= s.totalMinutes && res.gold >= 1200 && L.luxuryStatus(s, 'spiceCrate', source).ok) game.events.emit('ui:buyLuxury', { id: 'spiceCrate', source });
+      if (res.gold >= 2500 && L.goldDecreeStatus(s, 'goldBonus').ok) game.events.emit('ui:goldDecree', { id: 'goldBonus' });
+      const busy = s.buildings.filter((b) => b.underConstruction || b.project).length;
+      if (busy >= 2 && res.gold >= 3000 && L.goldDecreeStatus(s, 'royalArchitects').ok) game.events.emit('ui:goldDecree', { id: 'royalArchitects' });
+    }
+
     const sites = s.buildings.filter((b) => (b.underConstruction || b.project) && b.type !== 'wonder').length;
     if (sites >= 2) return;
     const beds = s.buildings.filter((b) => b.functional && b.capacity).reduce((n, b) => n + b.capacity, 0);
@@ -198,6 +228,8 @@ await page.evaluate(async () => {
   window.__dilemmaDefs = DILEMMAS;
   window.__research = RESEARCH;
   window.__wonder = BUILDINGS.wonder;
+  window.__luxury = await import('/src/systems/Luxury.js');
+  window.__relicKeys = (await import('/src/data/luxury.js')).RELIC_KEYS;
 });
 
 function summary() {
@@ -213,7 +245,7 @@ function summary() {
     const pets = s.animals.filter((a) => a.isPet).length;
     window.__stats.daily.push({ day: s.time.day, cap: s.storageCapacity, wood: r.wood, stone: r.stone, food: r.food, wool: r.wool, iron: r.iron, bread: r.bread });
     const wonder = s.buildings.find((b) => b.type === 'wonder');
-    const p12 = `araştırma=${Object.keys(s.research.done).length}${s.research.active ? `+${s.research.active.id}` : ''} altın=${r.gold} sefer=${s.trade.shipments} harika=${wonder ? wonder.wonderStage + (wonder.project ? '+' : '') : '-'} mezun=${s.characters.filter((c) => c.educated).length}`;
+    const p12 = `araştırma=${Object.keys(s.research.done).length}${s.research.active ? `+${s.research.active.id}` : ''} altın=${r.gold} sefer=${s.trade.shipments} harika=${wonder ? wonder.wonderStage + (wonder.project ? '+' : '') : '-'} mezun=${s.characters.filter((c) => c.educated).length} yadigâr=${Object.keys(s.luxury.relics).length} harcanan=${s.luxury.goldSpent}`;
     return (
       `G${s.time.day} nüfus=${s.characters.length}(${s.characters.filter((c) => c.isChild).length}ç) seviye=${s.town.tier} refah=${Math.round(s.town.welfare)} ` +
       `O${r.wood} T${r.stone} Y${r.food} yün${r.wool} demir${r.iron} ekmek${r.bread} depo=${s.storageCapacity} | ${p12} | hasta=${sick} hastalık=${s.stats.illnesses} şifa=${s.stats.cured} ` +
@@ -243,6 +275,11 @@ const report = await page.evaluate(() => {
     research: Object.keys(s.research.done),
     wonder: s.buildings.find((b) => b.type === 'wonder')?.wonderStage ?? 0,
     gold: s.resources.gold,
+    goldSpent: s.luxury.goldSpent,
+    relics: Object.keys(s.luxury.relics),
+    decor: ['cherryTree', 'gazebo', 'marbleArch', 'flowerFence'].map((t) => `${t}:${s.buildings.filter((b) => b.type === t && b.functional).length}`).join(' '),
+    pinned: s.characters.filter((c) => c.workplaceId !== null).length,
+    history: s.history.map((h) => `${h.day}:${h.gold}`).slice(-12).join(' '),
   };
 });
 console.log(report.log.join('\n'));
@@ -255,6 +292,9 @@ const fmt = (o) => Object.entries(o).map(([r, v]) => `${r} ${v}`).join(', ') || 
 const { spent } = report.stats;
 console.log(`araştırmalar (${report.research.length}/4: ${report.research.join(', ') || '-'}): ${sum(spent.research)} birim (${fmt(spent.research)})`);
 console.log(`ihracat: ${report.trade.shipments} sefer, ${sum(report.trade.exported)} birim (${fmt(report.trade.exported)}), ${report.trade.goldEarned} altın kazanıldı; ${spent.crates} sandık`);
+const g = report.stats.gold;
+console.log(`altın harcaması (harika sonrası): ${report.goldSpent} altın · yadigârlar ${g.relics} (${report.relics.length}/5), lüks mallar ${g.goods}, fermanlar ${g.decrees}; ${g.items.length} alım`);
+console.log(`peyzaj: ${report.decor} · arşiv (gün:altın) ${report.history}`);
 console.log(`harika: aşama ${report.wonder}/3, ${sum(spent.wonder)} birim (${fmt(spent.wonder)}); hazinede ${report.gold} altın`);
 const late = report.stats.daily.slice(-12);
 if (late.length) {

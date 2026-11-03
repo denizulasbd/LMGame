@@ -241,3 +241,6 @@ export const APPEARANCE_PARTS = {
   shirt: ['rose', 'forest', 'sky', 'mustard', 'lavender', 'red', 'teal', 'mint'],
   pants: ['navy', 'brown', 'denim', 'plum'],
 };
+
+// Oyuncunun sakine verebileceği adın en çok uzunluğu (13. aşama: Karakter Paneli'nde ada tıklayınca)
+export const CHARACTER_NAME_MAX_LENGTH = 16;

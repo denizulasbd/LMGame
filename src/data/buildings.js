@@ -70,6 +70,14 @@ import { GROUND_TILES } from './tiles.js';
 //   (DAMAGEABLE_TYPES) fırtınada ya da kurt saldırısında hasar alabilen yapılar; hasarlı yapı onarılana kadar
 //                  çalışmaz (bkz. data/dilemmas.js -> STORM)
 //
+// 13. aşama — peyzaj ve süsleme:
+//   walkable     : sakinler yapının karosundan geçebilir (Mermer Kemer; yolun üstüne de kurulur). Yapı karoyu
+//                  kaplar ama yürünebilirliği bozmaz; altındaki yol / zemin olduğu gibi kalır
+//   gazebo       : { seats: [{ x, y }] } Çardak: önündeki iki karodan içeri girilip banklara oturulur; çiftlerin ve
+//                  dostların sevdiği sohbet köşesi (data/activities.js -> gazebo)
+//   connects     : (Çiçekli Çit) yanındaki aynı türden çitlerle görsel olarak birleşir
+//   seasonalFoliage : (Kiraz Ağacı) dört mevsim kendi görünümü ve rüzgârda dökülen yaprakları vardır
+//
 // Seviye 2 (8. aşama) — upgrade: yapı yıkılmadan Yapı Bilgi Paneli'nden geliştirilir:
 //   { name, description, cost, buildWork, capacity?, workers?, productionBonus?, seasonalFloor?,
 //     heatingFactor?, sleepFunPerMinute? }
@@ -469,6 +477,65 @@ export const BUILDINGS = {
     buildWork: 20,
     allowedTiles: [...GROUND_TILES, 'plaza'],
   },
+  // --- 13. aşama: peyzaj ve süsleme ---
+  cherryTree: {
+    name: 'Kiraz Çiçeği Ağacı',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Süsleme',
+    description:
+      'Zarif bir süs ağacı: ilkbahar ve yazın pembe çiçekli, sonbaharda altın yapraklı, kışın karlı pembe dallı. Rüzgârda yaprakları savrulur; yanından geçenlerin keyfi biraz yerine gelir.',
+    cost: { wood: 12, food: 6, gold: 15 },
+    buildWork: 30,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    seasonalFoliage: true,
+    funAura: { radius: 26, perMinute: 0.04 },
+  },
+  gazebo: {
+    name: 'Ahşap Çardak',
+    size: { w: 2, h: 2 },
+    spots: 'front',
+    buildable: true,
+    demolishable: true,
+    category: 'Süsleme',
+    description:
+      'Sarmaşık ve çiçeklerle örülü, içinde iki bankı olan şirin bir kameriye. Çiftlerin ve dostların en sevdiği sohbet köşesi: burada sohbet edenlerin arkadaşlığı ve aşkı daha hızlı gelişir.',
+    cost: { wood: 45, stone: 10, gold: 60 },
+    buildWork: 120,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    gazebo: { seats: [{ x: 10, y: 25 }, { x: 22, y: 25 }] },
+    funAura: { radius: 30, perMinute: 0.04 },
+  },
+  marbleArch: {
+    name: 'Mermer Kemer',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Süsleme',
+    description: 'Sarmaşıklı beyaz mermer kemer. Yolların ve bahçe girişlerinin üstüne kurulur; sakinler altından geçer.',
+    cost: { stone: 20, gold: 30 },
+    buildWork: 50,
+    allowedTiles: [...GROUND_TILES, 'path', 'cobble', 'plaza'],
+    walkable: true,
+    sortLine: 7,
+  },
+  flowerFence: {
+    name: 'Çiçekli Çit',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Süsleme',
+    description: 'Beyaz boyalı, saksı çiçekli alçak bahçe çiti. Yan yana kurulan çitler birleşir; bahçe kenarlarını süsler.',
+    cost: { wood: 5 },
+    buildWork: 15,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    connects: true,
+    funAura: { radius: 18, perMinute: 0.015 },
+  },
   lantern: {
     name: 'Sokak Feneri',
     size: { w: 1, h: 1 },
@@ -627,6 +694,10 @@ export const BUILD_MENU = [
   'academy',
   'townHall',
   'flowerBed',
+  'flowerFence',
+  'cherryTree',
+  'marbleArch',
+  'gazebo',
   'bench',
   'lantern',
   'monument',

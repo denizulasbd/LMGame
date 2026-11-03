@@ -10,6 +10,7 @@ import { getSeason } from '../data/seasons.js';
 import { TOWN_NAMES, TOWN_NAME_MAX_LENGTH } from '../data/town.js';
 import { EQUIPMENT_KEYS } from '../data/equipment.js';
 import { RESEARCH } from '../data/research.js';
+import { RELICS } from '../data/luxury.js';
 import { Character } from '../entities/Character.js';
 import { Building } from '../entities/Building.js';
 import { Animal } from '../entities/Animal.js';
@@ -74,6 +75,8 @@ export class GameState {
       cured: 0, // şifacıda iyileşen
       petted: 0, // sakinlerin kedi / köpek sevmesi
       dilemmas: 0, // karar verilen ikilem olayı
+      weddings: 0, // düğün (13. aşama: Kasaba Arşivi)
+      births: 0, // doğan çocuk
     };
     // Hayvanlar (AnimalSystem, 11. aşama): yaban hayatı (tavşan, geyik) ve kasaba kedileri / köpekleri.
     // animalMeta: wildlifeSeeded yaban hayatı yerleştirildi mi, lastPetDay son evcil hayvanın geldiği gün
@@ -97,6 +100,11 @@ export class GameState {
     //   shipments, goldEarned, exported: toplam sefer, kazanılan altın ve kaynak başına ihraç edilen birim
     //   last      : son sefer { day, hour, minute, gold, cargo }
     this.trade = { boat: null, nextBoatAt: null, shipments: 0, goldEarned: 0, exported: {}, last: null };
+    // Altın ekonomisi (LuxurySystem, 13. aşama): sergilenen yadigârlar { id: { day, hour, minute } }, ipek ve mermer
+    // alındı mı, altın fermanlarının son ilan günü, satın alma sayısı ve harcanan toplam altın
+    this.luxury = { relics: {}, silk: false, decreeDays: {}, purchases: 0, goldSpent: 0 };
+    // Kasaba Arşivi (StatsSystem, 13. aşama): her sabahın özeti { day, population, welfare, stock, gold }
+    this.history = [];
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -154,6 +162,8 @@ export class GameState {
       dilemma: this.dilemma,
       research: this.research,
       trade: this.trade,
+      luxury: this.luxury,
+      history: this.history,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -217,6 +227,14 @@ export class GameState {
       done: Object.fromEntries(Object.entries(data.research?.done ?? {}).filter(([id]) => RESEARCH[id])),
     };
     next.trade = { ...next.trade, ...(data.trade ?? {}), exported: { ...(data.trade?.exported ?? {}) } };
+    // 13. aşamadan eski kayıtlarda altın harcaması, yadigâr ve arşiv yoktur: boş başlar
+    next.luxury = {
+      ...next.luxury,
+      ...(data.luxury ?? {}),
+      relics: Object.fromEntries(Object.entries(data.luxury?.relics ?? {}).filter(([id]) => RELICS[id])),
+      decreeDays: { ...(data.luxury?.decreeDays ?? {}) },
+    };
+    next.history = (data.history ?? []).filter((h) => h && Number.isFinite(h.day)).slice(-CONFIG.HISTORY_DAYS);
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
     if (data.town && Number.isInteger(data.town.tier)) {
@@ -234,6 +252,12 @@ export class GameState {
     for (const key of Object.keys(next.events)) next.events[key] = { ...next.events[key], ...(data.events?.[key] ?? {}) };
     next.buildings = data.buildings.map((b) => new Building(b));
     next.characters = data.characters.map((c) => Character.fromJSON(c));
+    // Düğün ve doğum sayaçları eski kayıtlarda yoktur: sakinlerden tahmin edilir (evli çiftler, ebeveynli sakinler)
+    if (data.stats?.weddings === undefined) next.stats.weddings = Math.floor(next.characters.filter((c) => c.married).length / 2);
+    if (data.stats?.births === undefined) next.stats.births = next.characters.filter((c) => c.parentIds.length > 0).length;
+    // Sabitlenmiş iş yeri artık yoksa sabitleme kalkar
+    const ids = new Set(next.buildings.map((b) => b.id));
+    for (const c of next.characters) if (c.workplaceId !== null && !ids.has(c.workplaceId)) c.workplaceId = null;
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }

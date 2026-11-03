@@ -170,9 +170,10 @@ export class World {
   /** Haritaya yapı ekler ve kapladığı karoları doldurur (üzerindeki çakıl/kütük temizlenir). */
   addBuilding(building) {
     const { w, h } = BUILDINGS[building.type].size;
+    const passable = Boolean(BUILDINGS[building.type].walkable);
     for (let y = building.tileY; y < building.tileY + h; y++) {
       for (let x = building.tileX; x < building.tileX + w; x++) {
-        this.map.setOccupant(x, y, building.id);
+        this.map.setOccupant(x, y, building.id, passable);
         this.map.setObject(x, y, null);
       }
     }
@@ -339,6 +340,14 @@ export class World {
           if (!inside && usable(x, y)) spots.push({ x, y });
         }
       }
+    } else if (def.gazebo) {
+      // Çardak: önündeki iki karodan içeri girilip banklara oturulur (her karo bir oturak)
+      spots = [];
+      def.gazebo.seats.forEach((seat, i) => {
+        const x = tileX + Math.min(i, w - 1);
+        const y = tileY + h;
+        if (usable(x, y)) spots.push({ x, y, seat: { x: building.x + seat.x, y: building.y + seat.y } });
+      });
     } else if (def.gatherSpots === 'terrace') {
       spots = [];
       for (let y = tileY + h; y <= tileY + h + 1; y++) {

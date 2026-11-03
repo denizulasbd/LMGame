@@ -2408,3 +2408,303 @@ button.relation-row:hover {
   background: #e3f6d9;
   border-color: var(--ui-ok);
 }
+
+/* ---------- Kasaba Arşivi (13. aşama) ---------- */
+.archive-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.archive {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.archive[hidden] {
+  display: none;
+}
+
+#ui-layer .archive.ui-interactive {
+  pointer-events: none;
+}
+
+.archive-panel {
+  pointer-events: auto;
+  width: min(540px, calc(100vw - 32px));
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+
+.archive-subtitle {
+  margin: 2px 0 8px;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.archive-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.archive-chart {
+  padding: 4px 6px;
+  background: var(--ui-paper-shade);
+  border: 2px solid var(--ui-ink);
+}
+
+.archive-chart-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.archive-chart-head img,
+.archive-total img {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+}
+
+.archive-chart-title {
+  flex: 1;
+}
+
+.archive-change {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.archive-change.is-up {
+  color: var(--ui-ok);
+  opacity: 1;
+}
+
+.archive-change.is-down {
+  color: var(--ui-bad);
+  opacity: 1;
+}
+
+.archive-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 3px;
+  image-rendering: pixelated;
+  border: 1px solid rgba(79, 45, 26, 0.4);
+}
+
+.archive-range {
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.archive-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 14px;
+  font-size: 13px;
+}
+
+.archive-total {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.archive-total img {
+  width: 16px;
+  height: 16px;
+}
+
+.archive-total-label {
+  flex: 1;
+}
+
+.archive-total-value {
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .archive-grid,
+  .archive-totals {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Fotoğraf / sinematik mod (13. aşama) ---------- */
+#ui-layer > .ui-sidebars,
+#ui-layer > .ui-top,
+#ui-layer > .ui-bottom {
+  transition: opacity 0.45s ease;
+}
+
+#ui-layer.is-cinematic > :not(.cinematic-hint) {
+  opacity: 0;
+}
+
+#ui-layer.is-cinematic > :not(.cinematic-hint),
+#ui-layer.is-cinematic > :not(.cinematic-hint) * {
+  pointer-events: none !important;
+}
+
+.cinematic-hint {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.45s ease 0.2s;
+}
+
+.cinematic-hint kbd {
+  font-family: var(--ui-font);
+  font-size: 11px;
+  padding: 0 4px;
+  background: var(--ui-paper);
+  border: 1px solid var(--ui-ink);
+}
+
+#ui-layer.is-cinematic .cinematic-hint {
+  opacity: 0.75;
+  visibility: visible;
+}
+
+#ui-layer.is-cinematic .cinematic-hint:hover {
+  opacity: 1;
+}
+
+/* ---------- Lüks mallar, yadigârlar, altın fermanları, işçi atama (13. aşama) ---------- */
+.trade-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0 4px;
+}
+
+.trade-tab {
+  flex: 1;
+  padding: 1px 6px 2px;
+  font-size: 13px;
+}
+
+.trade-tab.is-active,
+.craft-mode.is-active.trade-tab {
+  background: var(--ui-highlight);
+}
+
+.luxury-card .decree-head img {
+  width: 18px;
+  height: 18px;
+}
+
+.luxury-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+}
+
+.luxury-price img {
+  width: 14px;
+  height: 14px;
+  image-rendering: pixelated;
+}
+
+.luxury-price.is-missing {
+  color: var(--ui-bad);
+}
+
+.relic-shelf {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.relic-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 2px;
+  font-size: 10px;
+  text-align: center;
+  background: #fff6d6;
+  border: 2px solid var(--ui-wood);
+}
+
+.relic-slot img {
+  width: 27px;
+  height: 27px;
+  image-rendering: pixelated;
+}
+
+.relic-slot.is-empty img {
+  filter: grayscale(1) brightness(0.6);
+  opacity: 0.45;
+}
+
+.relic-slot.is-owned {
+  border-color: var(--ui-highlight);
+  box-shadow: inset 0 0 0 1px #fff3b0;
+}
+
+.worker-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 4px 0;
+  padding: 4px;
+  background: #fff6d6;
+  border: 2px dashed var(--ui-wood);
+}
+
+.worker-picker .person-chip {
+  font-size: 12px;
+}
+
+.worker-picker .person-chip.is-skilled {
+  border-color: var(--ui-ok);
+}
+
+.worker-row .worker-state.is-pinned {
+  color: var(--ui-ok);
+  font-weight: 600;
+}
+
+.character-name.is-renamable {
+  cursor: text;
+}
+
+.character-name.is-renamable:hover {
+  text-decoration: underline dotted;
+}
+
+.character-name-input {
+  width: 100%;
+  font-family: var(--ui-font);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ui-ink);
+  background: #fff6d6;
+  border: 2px solid var(--ui-ink);
+  padding: 0 4px;
+}
+
+.character-name-input[hidden],
+.character-name[hidden] {
+  display: none;
+}

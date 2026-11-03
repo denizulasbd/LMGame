@@ -5,6 +5,9 @@
 //     kırmızı bayrak (3 kare)
 //   - sütunlar arasında asılı kırmızı flamalar; basamakların iki yanında geceleri yanan fenerler; geceleri
 //     pencereler sarı yanar (ışık noktaları TOWN_HALL_ART.windows / lamps)
+//   - (13. aşama) sergilenen kasaba yadigârları basamakların iki yanındaki taş kaidelerde durur (Güneş Saati
+//     Küresi, Bereket Boynuzu, Usta Lonca Mührü, Denizci Pusulası); Ebedi Ateş Kandili alınınca basamak fenerleri
+//     gece gündüz turkuaz alevle yanar
 // Görsel yapının kapladığı karoların ALT kenarına hizalanır; kule üstteki karolara 24 piksel taşar.
 import { getSprite, CharGrid } from '../PixelSprite.js';
 
@@ -26,7 +29,18 @@ export const TOWN_HALL_ART = {
     { x: 32.5, y: 61.5 },
   ],
   clock: { x: 24, y: 15 },
+  // Yadigâr kaideleri (data/luxury.js -> RELIC_KEYS sırasıyla ilk dördü) ve Ebedi Ateş'in yandığı fenerler
+  pedestals: [1, 7, 36, 42],
 };
+
+// Kaidelerin üstündeki küçük yadigârlar (5x5)
+const RELIC_STAMPS = [
+  ['.KKK.', 'KPuPK', 'KYPYK', 'KPPOK', '.KKK.'], // Güneş Saati Küresi
+  ['..KK.', '.KoEK', 'KvPXK', 'KXxK.', '.KK..'], // Bereket Boynuzu
+  ['.KKK.', 'KoooK', 'KoPoK', 'KoooK', '.KKK.'], // Usta Lonca Mührü
+  ['.KKK.', 'KqoqK', 'KqKqK', 'KqBqK', '.KKK.'], // Denizci Pusulası
+];
+const PEDESTAL = ['KKKKK', 'KqqqK', '.KrK.', '.KrK.', 'KKKKK'];
 
 // Bayrağın üç dalga karesi (direğin sağına doğru; kırmızı, altın kenar)
 const FLAGS = [
@@ -48,7 +62,7 @@ function windowAt(g, x, y, lit) {
   g.hline(x - 1, x + 5, y + 7, 'q');
 }
 
-function buildTownHallRows(lit, frame) {
+function buildTownHallRows(lit, frame, relics = 0) {
   const g = new CharGrid(TOWN_HALL_ART.width, TOWN_HALL_ART.height);
   // Gölge ve önündeki taş meydan şeridi
   g.rect(1, 69, 47, 3, 'k');
@@ -149,20 +163,30 @@ function buildTownHallRows(lit, frame) {
   g.hline(13, 34, 62, 'q').hline(13, 34, 63, 'r');
   g.hline(14, 33, 64, 'q').hline(14, 33, 65, 'r');
   g.hline(15, 32, 66, 'q').hline(15, 32, 67, 'R');
-  // Fenerler (basamakların iki yanında)
+  // Fenerler (basamakların iki yanında); Ebedi Ateş Kandili gece gündüz turkuaz yanar
+  const eternal = Boolean(relics & (1 << 4));
   for (const x of [15, 32]) {
     g.vline(x, 61, 67, 'K');
     g.rect(x - 1, 59, 3, 3, 'K');
-    g.set(x, 60, lit ? 'P' : 'R');
+    g.set(x, 60, eternal ? (frame % 2 === 0 ? 'a' : 'c') : lit ? 'P' : 'R');
+    if (eternal) g.set(x, 58, frame % 3 === 1 ? 'a' : 'c');
   }
+  // Sergilenen yadigârlar: kaideler ve üstlerindeki eserler
+  TOWN_HALL_ART.pedestals.forEach((x, i) => {
+    if (!(relics & (1 << i))) return;
+    g.stamp(PEDESTAL, x, 64);
+    g.stamp(RELIC_STAMPS[i], x, 59);
+    if (lit || (frame + i) % 3 === 0) g.set(x + 1, 60, 'u'); // parıltı
+  });
   return g.toRows();
 }
 
 /**
  * @param {boolean} lit gece: pencereler ve fenerler yanar
  * @param {number} frame bayrağın dalgası
+ * @param {number} relics sergilenen yadigârlar (5 bitlik maske, data/luxury.js -> RELIC_KEYS sırası)
  */
-export function getTownHallSprite(lit = false, frame = 0) {
+export function getTownHallSprite(lit = false, frame = 0, relics = 0) {
   const f = frame % FLAGS.length;
-  return getSprite(`building:townHall:${lit ? 1 : 0}:${f}`, () => buildTownHallRows(lit, f));
+  return getSprite(`building:townHall:${lit ? 1 : 0}:${f}:${relics}`, () => buildTownHallRows(lit, f, relics));
 }

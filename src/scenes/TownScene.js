@@ -47,8 +47,12 @@ import { CivicSystem } from '../systems/CivicSystem.js';
 import { DilemmaSystem } from '../systems/DilemmaSystem.js';
 import { ResearchSystem } from '../systems/ResearchSystem.js';
 import { HarborSystem } from '../systems/HarborSystem.js';
+import { LuxurySystem } from '../systems/LuxurySystem.js';
+import { StatsSystem } from '../systems/StatsSystem.js';
+import { relicMask } from '../systems/Luxury.js';
 import { TILE_TYPES, TILE_BY_ID, isGround } from '../data/tiles.js';
 import { TOWN_NAME_MAX_LENGTH } from '../data/town.js';
+import { CHARACTER_NAME_MAX_LENGTH } from '../data/characters.js';
 import { AudioSystem } from '../systems/AudioSystem.js';
 import { FestivalEffects } from '../rendering/FestivalEffects.js';
 import { Random } from '../utils/random.js';
@@ -83,6 +87,7 @@ export class TownScene extends Scene {
       applyTerrain(map, state.pendingTerrain);
       state.pendingTerrain = null;
       map.occupants.fill(0);
+      map.passable.fill(0);
       for (const building of state.buildings) this.occupyFootprint(building);
     } else {
       state.buildings = structures.map((record) => new Building(record));
@@ -120,6 +125,8 @@ export class TownScene extends Scene {
     this.journal = new JournalSystem(this.game);
     this.research = new ResearchSystem(this.game, this.world, this.economy, new Random(state.seed + 12));
     this.harbor = new HarborSystem(this.game, this.world, this.economy, new Random(state.seed + 13));
+    this.luxury = new LuxurySystem(this.game, this.economy);
+    this.stats = new StatsSystem(this.game);
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       economy: this.economy,
       jobs: this.jobs,
@@ -189,6 +196,8 @@ export class TownScene extends Scene {
       this.dilemmas,
       this.research,
       this.harbor,
+      this.luxury,
+      this.stats,
     ];
 
     this.camera = new Camera();
@@ -212,8 +221,13 @@ export class TownScene extends Scene {
     this.selectedBuildingId = null;
     this.followId = null;
     this.focusId = null;
+    this.cinematic = false; // (13. aşama) fotoğraf modu: arayüz gizli, haritada imleç ve seçim çizilmez
 
     this.unsubscribers = [
+      events.on('ui:setCinematic', (on) => {
+        this.cinematic = Boolean(on);
+        if (this.cinematic) this.tools.setTool('select');
+      }),
       events.on('ui:selectCharacter', (id) => {
         this.select(id);
         this.focusId = id; // listeden seçilince kamera bir kez karaktere kayar
@@ -232,6 +246,21 @@ export class TownScene extends Scene {
       events.on('ui:cancelProject', (id) => this.construction.cancelProject(this.world.getBuilding(id))),
       events.on('building:removed', (building) => {
         if (building.id === this.selectedBuildingId) this.selectBuilding(null);
+      }),
+      // (13. aşama) Sakinin adını değiştirmek: boş ya da başka bir sakinin adıyla aynı olamaz
+      events.on('ui:renameCharacter', ({ id, name }) => {
+        const c = this.world.getCharacter(id);
+        const clean = String(name ?? '').trim().replace(/\s+/g, ' ').slice(0, CHARACTER_NAME_MAX_LENGTH);
+        if (!c || !clean || clean === c.name) return;
+        const taken = state.characters.some((o) => o !== c && o.name.toLocaleLowerCase('tr') === clean.toLocaleLowerCase('tr'));
+        if (taken) {
+          events.emit('toast', { text: `Kasabada zaten ${clean} adında biri var`, tone: 'warn', icon: 'heart' });
+          return;
+        }
+        const from = c.name;
+        c.name = clean;
+        c.customName = true;
+        events.emit('character:renamed', { character: c, from });
       }),
       events.on('ui:renameTown', (name) => {
         const clean = String(name ?? '').trim().slice(0, TOWN_NAME_MAX_LENGTH);
@@ -259,7 +288,7 @@ export class TownScene extends Scene {
   occupyFootprint(building) {
     const { w, h } = BUILDINGS[building.type].size;
     for (let y = building.tileY; y < building.tileY + h; y++) {
-      for (let x = building.tileX; x < building.tileX + w; x++) this.map.setOccupant(x, y, building.id);
+      for (let x = building.tileX; x < building.tileX + w; x++) this.map.setOccupant(x, y, building.id, Boolean(BUILDINGS[building.type].walkable));
     }
   }
 
@@ -342,6 +371,15 @@ export class TownScene extends Scene {
       this.drainInput();
       return;
     }
+    // (13. aşama) Fotoğraf modu: kamera ve zaman kullanılır, haritaya tıklamak bir şey seçmez; Esc ya da F çıkar
+    if (this.cinematic) {
+      if (this.game.input.wasPressed('cancel')) this.game.events.emit('ui:toggleCinematic');
+      this.game.input.consumeClick();
+      this.game.input.consumeLeftPress();
+      this.game.input.consumeLeftRelease();
+      this.updateCameraTarget(dt);
+      return;
+    }
     const hovered = this.hoveredTile();
     const escapeUsed = this.tools.handleKeys();
     this.tools.update(hovered);
@@ -381,6 +419,8 @@ export class TownScene extends Scene {
     if (input.wasPressed('pause')) events.emit('time:togglePause');
     if (input.wasPressed('toggleJournal')) events.emit('ui:toggleJournal');
     if (input.wasPressed('toggleGoals')) events.emit('ui:toggleGoals');
+    if (input.wasPressed('toggleStats')) events.emit('ui:toggleStats');
+    if (input.wasPressed('toggleCinematic')) events.emit('ui:toggleCinematic');
     ['speed1', 'speed2', 'speed3'].forEach((action, i) => {
       if (input.wasPressed(action)) events.emit('time:setSpeed', CONFIG.TIME_SPEEDS[i]);
     });
@@ -531,13 +571,14 @@ export class TownScene extends Scene {
       ),
       // Odun bitince bacalardan duman tütmez
       smokingHomes: freezing ? new Set() : new Set(this.world.characters.map((c) => c.homeId).filter((id) => id !== null)),
+      relics: relicMask(this.game.state), // (13. aşama) Belediye Konağı'nda sergilenen yadigârlar
     };
     const view = this.camera.getViewBounds(renderer.width, renderer.height);
 
     renderer.applyCamera(this.camera);
     this.map.renderGround(renderer, this.camera, this.animationTime, season.key);
     this.weatherFx.drawGround(renderer);
-    this.drawSelectionGround(renderer);
+    if (!this.cinematic) this.drawSelectionGround(renderer);
 
     // Derinlik sıralı katman: ağaçlar, kayalar, yapılar ve karakterler birlikte sıralanır
     this.map.queueObjects(this.queue, renderer, this.camera, season.key);
@@ -571,10 +612,14 @@ export class TownScene extends Scene {
     this.weatherFx.drawRain(renderer, this.camera, weather, daylight);
     renderer.applyCamera(this.camera);
     for (const building of this.world.buildings) building.drawOverlay(renderer, env);
-    drawJobMarkers(renderer, this.jobs.jobs, this.animationTime);
+    if (!this.cinematic) drawJobMarkers(renderer, this.jobs.jobs, this.animationTime);
     for (const character of this.world.characters) character.drawOverlay(renderer);
     for (const visitor of this.world.visitors) visitor.drawOverlay(renderer);
     for (const animal of this.game.state.animals) animal.drawOverlay(renderer);
+    if (this.cinematic) {
+      renderer.resetCamera();
+      return; // fotoğraf modunda imleç, seçim ve araç önizlemesi çizilmez
+    }
     this.drawSelectedBuilding(renderer);
 
     if (this.tools.isActive) {

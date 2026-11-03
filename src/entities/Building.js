@@ -35,6 +35,8 @@ import {
   ACADEMY_ART,
   HARBOR_ART,
   WONDER_ART,
+  CHERRY_ART,
+  getGazeboLayer,
   getSheepFarmLayer,
 } from '../art/sprites/index.js';
 import { getBubbleSprite, BUBBLE_WIDTH, BUBBLE_HEIGHT, getIconSprite } from '../art/ui/index.js';
@@ -71,7 +73,13 @@ const BASELINE_INSET = {
   academy: 3,
   harbor: 2,
   wonder: 4,
+  cherryTree: 3,
+  gazebo: 2,
+  marbleArch: 1,
+  flowerFence: 3,
 };
+// Çardağın çatısı kışın karla örtülür (arka katman çatı altında kalır, karlanmaz)
+const GAZEBO_WINTER_ROOF = { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 };
 const SITE_BASELINE_INSET = 2;
 const RECENT_WORKERS_EXTRA = 2; // panelde çalışan yuvasından bu kadar fazla "son çalışan" hatırlanır
 
@@ -348,6 +356,9 @@ export class Building extends Entity {
       const n = this.definition.wonder.stages.length;
       return { name: this.name, detail: this.wonderComplete ? 'Altın çağ · geceleri vadiyi aydınlatır ve ısıtır' : `Aşama ${this.wonderStage}/${n} tamamlandı · tıkla ve sıradakini başlat` };
     }
+    if (this.type === 'gazebo') return { name: this.name, detail: 'Çiftlerin ve dostların sohbet köşesi' };
+    if (this.type === 'cherryTree') return { name: this.name, detail: 'Rüzgârda yaprakları savrulan süs ağacı' };
+    if (this.type === 'marbleArch') return { name: this.name, detail: 'Altından geçilebilir' };
     if (this.type === 'healerHut') {
       return { name: this.name, detail: `İksir ${this.remedies}/${this.definition.apothecary.maxRemedies} · şifalı ot ${Math.floor(this.herbs)}` };
     }
@@ -393,6 +404,8 @@ export class Building extends Entity {
       level: this.upgraded ? 2 : 1,
       ruined: this.ruined,
       wonderStage: this.wonderStage,
+      relics: env.relics ?? 0,
+      connect: this.connect,
       scaffold: this.project?.kind === 'stage',
       step: Math.min(3, Math.floor(this.projectRatio * 4)),
     });
@@ -417,6 +430,15 @@ export class Building extends Entity {
       queue.addImage(this.y + 4, back, this.x, top);
       this.flock?.queueDraw(queue, this.x, this.y);
       queue.addImage(this.y + this.height - BASELINE_INSET.sheepFarm, front, this.x, top);
+      return;
+    }
+    // (13. aşama) Çardak: arka katman (döşeme, kafes, banklar) + oturanlar + ön katman (direkler, çatı)
+    if (this.type === 'gazebo' && !this.underConstruction) {
+      const back = getGazeboLayer('back');
+      const front = env.season === 'winter' ? winterize(getGazeboLayer('front'), GAZEBO_WINTER_ROOF) : getGazeboLayer('front');
+      const top = this.y + this.height - back.height;
+      queue.addImage(this.y + 4, back, this.x, top);
+      queue.addImage(this.y + this.height - BASELINE_INSET.gazebo, front, this.x, top);
       return;
     }
     const sprite = this.currentSprite(env);
@@ -461,6 +483,9 @@ export class Building extends Entity {
       case 'healerHut':
         // Şifacı çalışırken kazandan yeşilimsi buhar yükselir
         if (this.active) this.drawSteam(renderer, env);
+        break;
+      case 'cherryTree':
+        this.drawPetals(renderer, env);
         break;
       case 'mill': {
         // Fırın bacası: fırıncı çalışırken yoğun, gündüz fırın sıcakken ince tüter
@@ -568,6 +593,23 @@ export class Building extends Entity {
     const bx = this.x + Math.floor((this.width - BUBBLE_WIDTH) / 2) - 3;
     const by = artTop - BUBBLE_HEIGHT + 2 + bob;
     renderer.drawImage(getBubbleSprite('zzz'), bx, by);
+  }
+
+  /** Kiraz ağacından rüzgârda süzülen yapraklar / çiçek yaprakları (kışın dökülmez). */
+  drawPetals(renderer, env) {
+    const colors = CHERRY_ART.petals[env.season] ?? [];
+    if (colors.length === 0) return;
+    const artTop = this.y + this.height - CHERRY_ART.height;
+    const { x: cx, y: cy, rx } = CHERRY_ART.canopy;
+    const count = env.raining ? 2 : 4;
+    for (let i = 0; i < count; i++) {
+      const phase = (env.time * 0.22 + i / count + this.id * 0.37) % 1;
+      const startX = this.x + cx + (((i * 7 + this.id * 3) % 11) - 5) * (rx / 5);
+      const x = Math.round(startX + phase * 14 + Math.sin(phase * 9 + i) * 2.5);
+      const y = Math.round(artTop + cy + 2 + phase * 20);
+      const color = colors[(i + this.id) % colors.length];
+      renderer.fillRect(x, y, Math.floor(env.time * 3 + i) % 2 === 0 ? 2 : 1, 1, color);
+    }
   }
 
   /** Şifacı kazanından yükselen ince, yeşilimsi buhar. */
@@ -679,8 +721,10 @@ export class Building extends Entity {
       for (const w of TOWN_HALL_ART.windows) {
         out.push({ x: this.x + w.x, y: artTop + w.y, radius: 18, color: [255, 214, 120], intensity: 0.7, glow: 0.28 });
       }
+      // (13. aşama) Ebedi Ateş Kandili sergileniyorsa basamak fenerleri turkuaz yanar
+      const eternal = Boolean((env.relics ?? 0) & (1 << 4));
       for (const l of TOWN_HALL_ART.lamps) {
-        out.push({ x: this.x + l.x, y: artTop + l.y, radius: 34, color: [255, 200, 110], intensity: 0.85, glow: 0.35 });
+        out.push({ x: this.x + l.x, y: artTop + l.y, radius: eternal ? 40 : 34, color: eternal ? [140, 235, 255] : [255, 200, 110], intensity: 0.85, glow: eternal ? 0.26 : 0.35 });
       }
     } else if (this.type === 'healerHut' && env.windowsLit) {
       const artTop = this.y + this.height - HEALER_ART.height;

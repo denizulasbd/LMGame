@@ -14,6 +14,10 @@ import { BUILDINGS } from '../data/buildings.js';
 import { HEATING, getSeason } from '../data/seasons.js';
 import { coldProtection } from './Equipment.js';
 import { researchHeatingMultiplier } from './ResearchSystem.js';
+import { relicHeatingMultiplier } from './Luxury.js';
+
+/** Evlerin kışlık odun çarpanı: Kışlık Yalıtım araştırması × Ebedi Ateş Kandili. */
+const homeHeating = (state) => researchHeatingMultiplier(state) * relicHeatingMultiplier(state);
 
 const COLD_BUBBLE_CHANCE = 0.004; // dakika başına "üşüyorum" balonu olasılığı
 
@@ -30,7 +34,7 @@ export function heatingSources(state) {
   const homes = new Set(state.characters.map((c) => c.homeId));
   for (const b of state.buildings) {
     if (b.underConstruction) continue;
-    if (b.type === 'cabin' && homes.has(b.id)) sources.push({ building: b, perMinute: (HEATING.homePerDay * b.stat('heatingFactor', 1) * researchHeatingMultiplier(state)) / 1440 });
+    if (b.type === 'cabin' && homes.has(b.id)) sources.push({ building: b, perMinute: (HEATING.homePerDay * b.stat('heatingFactor', 1) * homeHeating(state)) / 1440 });
     if (b.type === 'campfire' && b.lit) sources.push({ building: b, perMinute: HEATING.campfirePerDay / (litFraction(BUILDINGS.campfire.litHours) * 1440) });
     if (b.type === 'inn' && b.lit) sources.push({ building: b, perMinute: HEATING.innPerDay / (litFraction(BUILDINGS.inn.litHours) * 1440) });
   }
@@ -44,7 +48,7 @@ export function heatingPerDay(state) {
   let total = 0;
   for (const b of state.buildings) {
     if (b.underConstruction) continue;
-    if (b.type === 'cabin' && homes.has(b.id)) total += HEATING.homePerDay * b.stat('heatingFactor', 1) * researchHeatingMultiplier(state);
+    if (b.type === 'cabin' && homes.has(b.id)) total += HEATING.homePerDay * b.stat('heatingFactor', 1) * homeHeating(state);
     if (b.type === 'campfire') total += HEATING.campfirePerDay;
     if (b.type === 'inn') total += HEATING.innPerDay;
   }

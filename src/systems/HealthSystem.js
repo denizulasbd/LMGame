@@ -16,6 +16,7 @@ import { isShivering } from './HeatingSystem.js';
 import { coldProtection } from './Equipment.js';
 import { clamp } from '../utils/math.js';
 import { researchVigorHours } from './ResearchSystem.js';
+import { relicColdMultiplier } from './Luxury.js';
 
 /** Dinçlik bonusu sürüyor mu? */
 export function hasVigor(c, now) {
@@ -64,7 +65,7 @@ export class HealthSystem {
       if (c.away) continue; // seferdekiler kendi erzaklarıyla
       // Maruziyet kaynakları
       let gain = 0;
-      if (isShivering(c, state)) gain += e.cold * (1 - (c.visible ? coldProtection(c) : 0));
+      if (isShivering(c, state)) gain += e.cold * (1 - (c.visible ? coldProtection(c) : 0)) * relicColdMultiplier(state);
       if (raining && c.visible && !c.profile.rainLover) gain += e.rain;
       if (c.needs.energy < ILLNESS.exhaustedBelow) gain += e.exhausted;
       if (c.needs.hunger < ILLNESS.starvingBelow) gain += e.starving;

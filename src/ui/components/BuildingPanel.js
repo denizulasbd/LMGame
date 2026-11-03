@@ -8,13 +8,16 @@
 //     alma ve geri alma; zanaat atölyesinde üretim seçimi, tezgâhtaki iş ve depodaki ekipman
 //   - (11. aşama) şifacı kulübesinin ot ve iksir stoğu, belediye fermanları (ilan et düğmeleri), fırtına hasarı
 //     ve onarımı
+//   - (13. aşama) limanda "Lüks ve Egzotik Mallar" (altınla sipariş); Belediye Konağı'nda sergilenen yadigârlar ve
+//     altın fermanları; iş yerlerinde "İşçi Ata" ile sakini sabitleme (yalnızca orada çalışır) ve sabitlemeyi kaldırma
 //   - (12. aşama) Bilgelik Evi'nin araştırma kartları (Araştır düğmesi, ilerleme) ve okulu; limanın fazlalık
 //     ihracatı sınırı, ihracat sandığı, tekne durumu ve Kasaba Hazinesi; harikanın aşamaları
 //   - (10. aşama) yan ürün (ağılda yiyecek, madende taş), değirmen-fırının işleme satırları (1 yiyecek -> 1
 //     ekmek), ekipmanın asıl (demir / yün) ve eski usul tarifi, ağıldaki koyunlar, belediyenin etkileri
 // Panel oyun durumunu yalnızca okur; istekleri olay olarak yayınlar (ui:startProject, ui:cancelProject,
 // ui:demolishBuilding, ui:selectCharacter, ui:dismissWorker, ui:rehireWorker, ui:setCraftMode, ui:civicProject,
-// ui:startResearch, ui:setExportThreshold, ui:prepareCrate). Ne
+// ui:startResearch, ui:setExportThreshold, ui:prepareCrate, ui:buyLuxury, ui:buyRelic, ui:goldDecree, ui:pinWorker,
+// ui:unpinWorker). Ne
 // değiştiğini anlamak için her karede kısa bir anahtar üretir; anahtar değişmedikçe DOM'a dokunmaz.
 import { BUILDINGS, mendSpec, PROJECT_WORDS } from '../../data/buildings.js';
 import { STORM } from '../../data/dilemmas.js';
@@ -26,12 +29,16 @@ import { getSeason } from '../../data/seasons.js';
 import { RESEARCH, RESEARCH_KEYS, SCHOOL } from '../../data/research.js';
 import { EXPORT } from '../../data/trade.js';
 import { researchStatus } from '../../systems/ResearchSystem.js';
-import { cargoValue, exportExcess, cratePreview, boatStatus } from '../../systems/HarborSystem.js';
+import { cargoValue, exportExcess, cratePreview, boatStatus, boatCapacity } from '../../systems/HarborSystem.js';
+import { relicExportValue } from '../../systems/Luxury.js';
 import { lacking } from '../../systems/Equipment.js';
 import { arePartners } from '../../systems/RelationshipSystem.js';
 import { getStructureSprite } from '../../art/sprites/index.js';
 import { getIconDataURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
+import { luxuryCards, relicShelf, goldDecreeCards } from './luxuryCards.js';
+import { ACTIVITY_SKILLS, SKILL_LEVELS } from '../../data/skills.js';
+import { skillLevel } from '../../systems/SkillSystem.js';
 
 const thumbnailCache = new Map();
 
@@ -67,6 +74,8 @@ export class BuildingPanel {
     this.decrees = el('div', { className: 'building-decrees' });
     this.research = el('div', { className: 'building-decrees building-research' });
     this.harbor = el('div', { className: 'building-decrees building-harbor' });
+    this.luxury = el('div', { className: 'building-decrees building-luxury' });
+    this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
     this.lines = el('div', { className: 'building-lines' });
     this.upgrade = el('div', { className: 'building-upgrade' });
     this.tradeButton = this.button('Takas Penceresini Aç', 'Gezgin tüccarla takas et', () => this.events.emit('ui:openTrade'));
@@ -91,6 +100,7 @@ export class BuildingPanel {
       this.decrees,
       this.research,
       this.harbor,
+      this.luxury,
       this.lines,
       this.upgrade,
       this.tradeButton,
@@ -119,6 +129,7 @@ export class BuildingPanel {
       this.element.hidden = true;
       return;
     }
+    this.lastState = state;
     const lines = this.describe(building, state);
     const people = this.peopleOf(building, state);
     const next = this.nextStep(building);
@@ -151,11 +162,18 @@ export class BuildingPanel {
             state.trade.shipments,
           ].join(':')
         : '';
+    const luxuryKey =
+      building.type === 'harbor' || building.definition.civic
+        ? [JSON.stringify(state.luxury), state.resources.gold, Math.floor((state.buffs.spices ?? 0) / 60), Math.floor((state.buffs.goldBonus ?? 0) / 60), Math.floor((state.buffs.royalArchitects ?? 0) / 60), state.time.day, state.buildings.length].join(':')
+        : '';
+    const pickerKey = this.pickerFor === building.id ? this.workerCandidates(building, state).map((o) => `${o.character.id}:${o.character.name}:${o.level}:${o.pinnedTo}`).join(',') : '';
     const key = [
       craftKey,
       decreeKey,
       researchKey,
       harborKey,
+      luxuryKey,
+      pickerKey,
       building.wonderStage,
       building.damaged,
       building.herbs ? Math.floor(building.herbs) : 0,
@@ -169,7 +187,8 @@ export class BuildingPanel {
       Math.floor(building.projectRatio * 100),
       building.project?.kind,
       people.title,
-      people.list.map((p) => `${p.character.id}:${p.tag}:${p.here}`).join(','),
+      people.list.map((p) => `${p.character.id}:${p.character.name}:${p.tag}:${p.here}:${p.pinned}`).join(','),
+      people.canPin,
       (people.excluded ?? []).map((c) => c.id).join(','),
       affordable,
       lines.join('|'),
@@ -195,6 +214,7 @@ export class BuildingPanel {
     this.renderDecrees(building, state);
     this.renderResearch(building, state);
     this.renderHarbor(building, state);
+    this.renderLuxury(building, state);
     this.lines.replaceChildren(...lines.map((text) => el('div', { className: 'building-line', text })));
     this.lines.hidden = lines.length === 0;
     this.renderUpgrade(building, next, state);
@@ -236,12 +256,20 @@ export class BuildingPanel {
       return { title: `Burada yaşayan aile (${residents.length}/${building.capacity})`, list, empty: 'Boş, yeni sakin bekliyor' };
     }
     if (building.workerSlots) {
-      const working = [...building.workerIds].map(byId).filter(Boolean);
-      const recent = building.recentWorkers.map(byId).filter((c) => c && !working.includes(c) && !building.excludedWorkers.has(c.id));
-      const list = [...working.map((character) => ({ character, tag: '', here: true })), ...[...recent].reverse().map((character) => ({ character, tag: '', here: false }))];
+      // (13. aşama) Sabit çalışanlar en üstte, sonra şu an çalışanlar ve son çalışanlar
+      const pinned = state.characters.filter((c) => c.workplaceId === building.id);
+      const working = [...building.workerIds].map(byId).filter((c) => c && !pinned.includes(c));
+      const recent = building.recentWorkers.map(byId).filter((c) => c && !working.includes(c) && !pinned.includes(c) && !building.excludedWorkers.has(c.id));
+      const list = [
+        ...pinned.map((character) => ({ character, tag: '', here: building.workerIds.has(character.id), pinned: true })),
+        ...working.map((character) => ({ character, tag: '', here: true, pinned: false })),
+        ...[...recent].reverse().map((character) => ({ character, tag: '', here: false, pinned: false })),
+      ];
       const excluded = [...building.excludedWorkers].map(byId).filter(Boolean);
-      const title = building.type === 'inn' ? `Aşçı (${working.length}/${building.workerSlots})` : `Çalışanlar (${working.length}/${building.workerSlots})`;
-      return { title, list, empty: 'Şu an kimse yok; mesai saatinde biri gelir', workplace: true, excluded };
+      const count = building.workerIds.size;
+      const title = building.type === 'inn' ? `Aşçı (${count}/${building.workerSlots})` : `Çalışanlar (${count}/${building.workerSlots})`;
+      const canPin = pinned.length < building.workerSlots && building.functional;
+      return { title, list, empty: 'Şu an kimse yok; mesai saatinde biri gelir', workplace: true, excluded, canPin, building };
     }
     return { title: '', list: [], empty: '' };
   }
@@ -254,25 +282,56 @@ export class BuildingPanel {
     return '';
   }
 
-  renderPeople(building, { title, list, empty, workplace = false, excluded = [] }) {
+  renderPeople(building, { title, list, empty, workplace = false, excluded = [], canPin = false }) {
     this.people.hidden = !title;
     if (!title) return;
-    const rows = list.map(({ character, tag, here }) => {
+    const rows = list.map(({ character, tag, here, pinned }) => {
       const label = tag ? `${character.name} · ${tag}` : character.name;
       const chip = this.button(label, `${character.name}: seç ve kamerayı ona kaydır`, () => this.events.emit('ui:selectCharacter', character.id));
       chip.classList.add('person-chip');
       if (!workplace) return chip;
-      // İş yeri: çalışanın yanında durumu ve "İşten Çıkar" düğmesi
+      // İş yeri: çalışanın durumu, "Sabitle / Sabitlemeyi Kaldır" ve "İşten Çıkar" düğmeleri
       const dismiss = this.button('İşten Çıkar', `${character.name} bu yapıda bir daha çalışmasın (anlaşamayan çalışanları ayırmak için)`, () =>
         this.events.emit('ui:dismissWorker', { buildingId: building.id, characterId: character.id })
       );
       dismiss.classList.add('worker-dismiss');
-      return el('div', { className: 'worker-row' }, [chip, el('span', { className: 'worker-state', text: here ? 'şu an burada' : 'son çalışan' }), dismiss]);
+      const pin = pinned
+        ? this.button('Sabitlemeyi Kaldır', `${character.name} yeniden istediği işi seçebilsin`, () => this.events.emit('ui:unpinWorker', { characterId: character.id }))
+        : this.button('Sabitle', `${character.name} yalnızca burada çalışsın, başka işlere kaymasın`, () => this.events.emit('ui:pinWorker', { buildingId: building.id, characterId: character.id }));
+      pin.classList.add('worker-dismiss');
+      if (!pinned && !canPin) pin.disabled = true;
+      const stateText = pinned ? (here ? 'sabit · burada' : 'sabit çalışan') : here ? 'şu an burada' : 'son çalışan';
+      return el('div', { className: 'worker-row' }, [chip, el('span', { className: `worker-state${pinned ? ' is-pinned' : ''}`, text: stateText }), pin, dismiss]);
     });
     const children = [
       el('div', { className: 'building-section-title', text: title }),
       el('div', { className: workplace ? 'worker-list' : 'person-chips' }, rows.length ? rows : [el('span', { className: 'person-empty', text: empty })]),
     ];
+    // (13. aşama) İşçi Ata: yetişkin sakinlerden birini seçip bu iş yerine sabitle
+    if (workplace && canPin) {
+      const open = this.pickerFor === building.id;
+      const toggle = this.button(open ? 'Listeyi Kapat' : 'İşçi Ata', 'Kasabadaki yetişkinlerden birini bu iş yerine sabit çalışan olarak ata', () => {
+        this.pickerFor = open ? null : building.id;
+        this.lastKey = '';
+      });
+      toggle.classList.add('upgrade-button');
+      children.push(toggle);
+      if (open) {
+        const skill = ACTIVITY_SKILLS[building.definition.workActivity];
+        const chips = this.workerCandidates(building, this.lastState).map(({ character, level, pinnedTo }) => {
+          const levelName = skill ? SKILL_LEVELS.find((l) => l.level === level).name : '';
+          const text = `${character.name}${levelName ? ` · ${levelName}` : ''}${pinnedTo ? ` · ${pinnedTo}` : ''}`;
+          const chip = this.button(text, `${character.name} bu iş yerine sabitlensin`, () => {
+            this.pickerFor = null;
+            this.events.emit('ui:pinWorker', { buildingId: building.id, characterId: character.id });
+          });
+          chip.classList.add('person-chip');
+          if (level >= 2) chip.classList.add('is-skilled');
+          return chip;
+        });
+        children.push(el('div', { className: 'worker-picker' }, chips.length ? chips : [el('span', { className: 'person-empty', text: 'Atanabilecek yetişkin yok' })]));
+      }
+    }
     if (excluded.length) {
       children.push(el('div', { className: 'building-section-title is-sub', text: 'İşten çıkarılanlar (burada çalışmaz)' }));
       children.push(
@@ -361,6 +420,37 @@ export class BuildingPanel {
     this.decrees.replaceChildren(el('div', { className: 'building-section-title', text: 'Belediye Fermanları' }), ...cards);
   }
 
+  /** İşçi Ata listesi: bu yapıya sabitli olmayan yetişkinler, bu işteki ustalığa göre (en usta önce). */
+  workerCandidates(building, state) {
+    if (!state) return [];
+    const skill = ACTIVITY_SKILLS[building.definition.workActivity];
+    return state.characters
+      .filter((c) => !c.isChild && !c.away && c.workplaceId !== building.id)
+      .map((c) => {
+        const other = c.workplaceId !== null ? state.buildings.find((b) => b.id === c.workplaceId) : null;
+        return { character: c, level: skill ? skillLevel(c, skill).level : 1, pinnedTo: other ? `${other.name}'a sabit` : '' };
+      })
+      .sort((a, b) => b.level - a.level || a.character.name.localeCompare(b.character.name, 'tr'));
+  }
+
+  /** (13. aşama) Liman: lüks mallar; Belediye Konağı: yadigâr rafı ve altın fermanları. */
+  renderLuxury(building, state) {
+    const harbor = building.type === 'harbor' && building.functional;
+    const hall = Boolean(building.definition.civic) && building.functional;
+    this.luxury.hidden = !(harbor || hall);
+    if (harbor) {
+      this.luxury.replaceChildren(el('div', { className: 'building-section-title', text: 'Lüks ve Egzotik Mallar (limandan sipariş)' }), ...luxuryCards(state, this.events, 'harbor'));
+    } else if (hall) {
+      this.luxury.replaceChildren(
+        el('div', { className: 'building-section-title', text: 'Kasaba Yadigârları' }),
+        relicShelf(state),
+        el('div', { className: 'upgrade-text', text: 'Yadigârlar gezgin tüccardan (Lüks Mallar sekmesi) ya da Büyük Ticaret Limanı\'ndan altınla alınır ve burada sergilenir.' }),
+        el('div', { className: 'building-section-title', text: `Altın Fermanları · Hazine ${state.resources.gold ?? 0} altın` }),
+        ...goldDecreeCards(state, this.events)
+      );
+    }
+  }
+
   /** Bilgelik Evi araştırma yapabilir mi (tamamlanmış ve hasarsız)? */
   academyReady(building) {
     return building.functional && !building.damaged;
@@ -414,7 +504,7 @@ export class BuildingPanel {
     });
     const excess = exportExcess(state, threshold);
     const excessText = Object.keys(excess).length
-      ? `Şu an sınırı aşan: ${cargoText(excess)} (≈${cargoValue(excess)} altın; tekne en çok ${EXPORT.capacity} birim alır)`
+      ? `Şu an sınırı aşan: ${cargoText(excess)} (≈${cargoValue(excess, relicExportValue(state))} altın; tekne en çok ${boatCapacity(state)} birim alır)`
       : threshold === null
         ? 'Kapalı: tekne yalnızca rıhtımdaki sandığı götürür'
         : `Şu an ${threshold}'ü aşan stok yok`;
@@ -433,7 +523,7 @@ export class BuildingPanel {
       el('div', { className: 'upgrade-text', text: excessText }),
       el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, costs.length ? costs : [el('span', { className: 'person-empty', text: 'Sandık için fazla mal yok' })]), crate]),
     ];
-    if (building.crate) children.push(el('div', { className: 'upgrade-text is-active', text: `Rıhtımda bekleyen sandık: ${cargoText(building.crate)} (≈${cargoValue(building.crate)} altın)` }));
+    if (building.crate) children.push(el('div', { className: 'upgrade-text is-active', text: `Rıhtımda bekleyen sandık: ${cargoText(building.crate)} (≈${cargoValue(building.crate, relicExportValue(state))} altın)` }));
     children.push(el('div', { className: 'upgrade-text is-active', text: boatStatus(state) }));
     children.push(el('div', { className: 'upgrade-text', text: `Birim başına altın: ${values}` }));
     this.harbor.replaceChildren(...children);
@@ -616,6 +706,25 @@ export class BuildingPanel {
           `Her sabah ${String(TOWN_HALL.hour).padStart(2, '0')}:00: deposu %${Math.round(TOWN_HALL.richRatio * 100)} dolu olan temel kaynaktan en çok ${TOWN_HALL.max} birimi, %${Math.round(TOWN_HALL.poorRatio * 100)}'in altına düşene aktarır`
         );
         lines.push(state.town?.balanceDay === state.time.day ? 'Bugünün erzak defteri tutuldu' : 'Erzak defteri yarın sabah tutulacak');
+        break;
+      // 13. aşama: peyzaj
+      case 'cherryTree': {
+        const look = { spring: 'pembe-beyaz çiçek açmış', summer: 'yeşil yapraklar arasında pembe çiçekli', autumn: 'altın ve kehribar yapraklı', winter: 'karlı dallarında pembe tomurcuklar' };
+        lines.push(`Şu an ${look[getSeason(state.time.day).key]}; rüzgârda yaprakları savrulur`);
+        lines.push('Yanından geçenlerin keyfi biraz yerine gelir');
+        break;
+      }
+      case 'gazebo': {
+        const sitting = state.characters.filter((c) => c.task?.activity === 'gazebo' && c.task.buildingId === building.id && c.task.phase === 'perform').map((c) => c.name);
+        lines.push(sitting.length ? `Çardakta oturanlar: ${sitting.join(' ve ')}` : 'Şu an boş; iki kişilik banklar sohbet bekliyor');
+        lines.push('Burada sohbet edenlerin arkadaşlığı %60 hızlı gelişir; bekârlar burada daha kolay aşık olur, çiftler evlenir');
+        break;
+      }
+      case 'marbleArch':
+        lines.push('Sakinler kemerin altından geçer; yolların üstüne de kurulabilir');
+        break;
+      case 'flowerFence':
+        lines.push('Yan yana kurulan çitler birleşir; bahçe kenarlarını süsler');
         break;
       case 'flowerBed':
         lines.push('Yanından geçenlerin ve etrafında dinlenenlerin keyfi artar');

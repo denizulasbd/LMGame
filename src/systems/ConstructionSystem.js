@@ -116,7 +116,8 @@ export class ConstructionSystem {
     // kendi ayak izinin içinden bağlanan yapı kendi girişini koparmasın). Ulaşılabilirlik bir kez hesaplanır.
     const doors = accessTiles(type, tileX, tileY, orientation);
     let after = null;
-    const reachableAfter = () => (after ??= this.world.reachabilityWithout(footprint));
+    // Altından geçilebilen yapı (kemer) yolu kapatmaz
+    const reachableAfter = () => (after ??= this.world.reachabilityWithout(def.walkable ? [] : footprint));
     const approachable = (x, y) => map.isWalkable(x, y) && map.inBounds(x, y) && reachableAfter()[map.index(x, y)] === 1;
     if (!reason && def.doorTiles && !doors.every((d) => approachable(d.x, d.y))) {
       reason = 'Kapının önü yola bağlı ve açık olmalı';
@@ -125,8 +126,8 @@ export class ConstructionSystem {
     if (!reason && !def.doorTiles && !doors.some((d) => approachable(d.x, d.y))) {
       reason = def.spots === 'front' ? 'Önü açık ve yola bağlı olmalı' : def.spots === 'pier' ? 'Kıyıya ulaşılamıyor' : 'Çevresine ulaşılamıyor';
     }
-    // Başka bir yapının kapısını ya da çalışma yerini kapatmasın
-    if (!reason) {
+    // Başka bir yapının kapısını ya da çalışma yerini kapatmasın (altından geçilebilen kemer kapatmaz)
+    if (!reason && !def.walkable) {
       const covered = new Set(footprint.map((t) => `${t.x},${t.y}`));
       const blocked = this.world.buildings.find(
         (b) => hasAccessRule(BUILDINGS[b.type]) &&

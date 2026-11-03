@@ -16,6 +16,7 @@
 //   tool        : çalışırken elde tutulan alet (art/ui -> held tools)
 //   effect      : çalışırken karakterin önünde çizilen efekt ('dust': kazma darbesinde toz ve kıymık)
 //   friendshipMultiplier: bu yerde sohbet edenlerin arkadaşlık puanı kazanç çarpanı
+//   romanceMultiplier   : (13. aşama, çardak) burada sohbet eden bekârların aşık olma ve çiftlerin evlenme olasılığı çarpanı
 //   dance       : şenlikte karakter ritimle sağa sola döner
 //   bubbles     : etkinlik sırasında çıkan ifade balonları; partnerBubbles: sohbet ederken
 //                 (sevgilisi / eşiyle sohbet ederken LOVE_BUBBLES, anlaşamadığıyla RIVAL_BUBBLES)
@@ -82,6 +83,23 @@ export const ACTIVITIES = {
     aloneSocialGain: 0.1,
     bubbles: ['sparkle'],
     partnerBubbles: ['chat', 'laugh', 'heart', 'note'],
+  },
+  // 13. aşama: Ahşap Çardak — çiftlerin ve dostların sevdiği sohbet köşesi (arkadaşlık ve aşk daha hızlı gelişir)
+  gazebo: {
+    kind: 'social',
+    target: 'gazebo',
+    travelLabel: 'Çardağa yürüyor',
+    label: 'Çardakta oturup çiçekleri seyrediyor',
+    partnerLabel: '{partner} ile çardakta sohbet ediyor',
+    duration: [45, 80],
+    effects: { fun: 0.6, energy: 0.08 },
+    socialGain: 1.4,
+    aloneSocialGain: 0.15,
+    pose: 'sit',
+    friendshipMultiplier: 1.6,
+    romanceMultiplier: 2.5,
+    bubbles: ['note', 'sparkle'],
+    partnerBubbles: ['heart', 'chat', 'laugh', 'note'],
   },
   bench: {
     kind: 'leisure',

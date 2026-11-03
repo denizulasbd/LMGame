@@ -150,6 +150,12 @@ export class JournalSystem {
         this.log(`${building.name}: ${stage.name} aşaması tamamlandı (${index}/${building.definition.wonder.stages.length})`, 'wonder')
       ),
       on('wonder:completed', ({ building, townName }) => this.log(`${building.name} göğe yükseldi! ${townName} altın çağını yaşıyor`, 'star')),
+      // 13. aşama: altın ekonomisi, sakin adları ve sabit işçiler
+      on('luxury:bought', ({ good, price }) => this.log(`Hazineden ${price} altınla alındı: ${good.name}`, good.icon)),
+      on('relic:exhibited', ({ relic, price, count }) => this.log(`${relic.name} Belediye Konağı'nda sergileniyor (${count}. yadigâr, ${price} altın)`, relic.icon)),
+      on('goldDecree:issued', ({ decree, price }) => this.log(`Altın fermanı: ${decree.name} (${price} altın)`, decree.icon)),
+      on('character:renamed', ({ character, from }) => this.log(`${from} artık ${character.name} adıyla anılıyor`, 'heart')),
+      on('worker:pinned', ({ building, character }) => this.log(`${character.name} ${building.name} işine sabitlendi`, 'pin')),
       on('civic:decreed', ({ project }) => this.log(`Belediye fermanı: ${project.name}`, project.icon)),
       on('building:mended', ({ building }) => this.log(`${building.name} fırtına hasarından onarıldı`, 'hammer')),
       on('townHall:balanced', ({ building, from, to, amount }) =>

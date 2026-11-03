@@ -32,6 +32,9 @@ import { WARM_MEAL } from '../data/town.js';
 import { townWorkMultiplier, civicProductionMultiplier, civicXpMultiplier } from './TownStatus.js';
 import { healthWorkMultiplier } from './HealthSystem.js';
 import { researchProductionMultiplier, researchBuildMultiplier, healSpeedMultiplier } from './ResearchSystem.js';
+import { spiceWorkMultiplier, relicProductionMultiplier, relicXpMultiplier } from './Luxury.js';
+import { buffMultiplier, isBuffActive } from './TownStatus.js';
+import { LUXURY_GOODS } from '../data/luxury.js';
 import { workBonus, addExperience } from './SkillSystem.js';
 import { isFreezing } from './HeatingSystem.js';
 import { equipmentWorkSpeed } from './Equipment.js';
@@ -66,6 +69,11 @@ export class BehaviorSystem {
       game.events.on('world:blocked', ({ tiles }) => this.onTilesBlocked(tiles)),
       game.events.on('ui:dismissWorker', ({ buildingId, characterId }) => this.dismissWorker(buildingId, characterId)),
       game.events.on('ui:rehireWorker', ({ buildingId, characterId }) => this.rehireWorker(buildingId, characterId)),
+      game.events.on('ui:pinWorker', ({ buildingId, characterId }) => this.pinWorker(buildingId, characterId)),
+      game.events.on('ui:unpinWorker', ({ characterId }) => this.unpinWorker(characterId)),
+      game.events.on('building:removed', (building) => {
+        for (const c of this.world.characters) if (c.workplaceId === building.id) c.workplaceId = null;
+      }),
       game.events.on('expedition:depart', ({ ids, until, exit }) => this.departExpedition(ids, until, exit)),
       // Şenlik başlayınca boş zamanı olanlar elindekini bırakıp şenliğe katılır
       game.events.on('festival:started', () => {
@@ -393,7 +401,14 @@ export class BehaviorSystem {
       if (task.activity === 'heal') this.health.cure(c, this.world.getBuilding(task.buildingId));
       if (task.activity === 'sleep' && !task.nap) this.events.emit('character:woke', { character: c });
       // Sıcak yemek bir süre tok tutar (NeedsSystem acıkmayı yavaşlatır)
-      if (task.activity === 'innMeal') c.buffs.warmMeal = this.world.state.totalMinutes + WARM_MEAL.hours * 60;
+      if (task.activity === 'innMeal') {
+        c.buffs.warmMeal = this.world.state.totalMinutes + WARM_MEAL.hours * 60;
+        // (13. aşama) Handa baharat ve kahve varken yiyen sakin bir süre hızlı çalışır ve yürür
+        if (isBuffActive(this.state, LUXURY_GOODS.spiceCrate.buff)) {
+          c.buffs.spiced = this.state.totalMinutes + LUXURY_GOODS.spiceCrate.personal.hours * 60;
+          if (c.visible) c.showBubble('sparkle', 2);
+        }
+      }
       this.endTask(c);
     }
   }
@@ -454,12 +469,14 @@ export class BehaviorSystem {
       townWorkMultiplier(this.state) *
       workBonus(c, task.activity) *
       equipmentWorkSpeed(c) *
-      healthWorkMultiplier(c, this.state.totalMinutes);
+      healthWorkMultiplier(c, this.state.totalMinutes) *
+      spiceWorkMultiplier(c, this.state.totalMinutes);
     // Zanaat Loncası fermanı üretim yapılarında (inşaat ve toplama emirleri hariç) verimi artırır
     if (task.workBuildingId) amount *= civicProductionMultiplier(this.state);
     // (12. aşama) Mimarlık Loncası inşaatı, yükseltmeyi ve onarımı hızlandırır
-    if (task.jobId && task.activity === 'build') amount *= researchBuildMultiplier(this.state);
-    addExperience(this.events, c, task.activity, minutes, civicXpMultiplier(this.state));
+    // (13. aşama) Kraliyet Mimarları fermanı inşaatları 3 kat hızlandırır
+    if (task.jobId && task.activity === 'build') amount *= researchBuildMultiplier(this.state) * buffMultiplier(this.state, 'buildSpeed');
+    addExperience(this.events, c, task.activity, minutes, civicXpMultiplier(this.state) * relicXpMultiplier(this.state));
 
     if (task.jobId) {
       const job = this.jobs.getJob(task.jobId);
@@ -485,11 +502,12 @@ export class BehaviorSystem {
       if (working) c.activityLabel = this.performLabel(c, task, ACTIVITIES[task.activity]);
       return working;
     }
-    if (building.definition.processing) return this.process(building, amount);
+    // (13. aşama) Güneş Saati Küresi üretim ve işleme yapılarında verimi artırır
+    if (building.definition.processing) return this.process(building, amount * relicProductionMultiplier(this.state));
     const production = building?.definition.production;
     if (!production) return false;
-    // Verim (oduncu için çevredeki ağaç sayısı) StructureSystem'de hesaplanır
-    building.productionBuffer += (production.perHour / 60) * amount * building.efficiency;
+    // Verim (oduncu için çevredeki ağaç sayısı) StructureSystem'de hesaplanır; Bereket Boynuzu yiyeceği artırır
+    building.productionBuffer += (production.perHour / 60) * amount * building.efficiency * relicProductionMultiplier(this.state, production.resource);
     const whole = Math.floor(building.productionBuffer);
     if (whole > 0) {
       building.productionBuffer -= whole;
@@ -498,7 +516,7 @@ export class BehaviorSystem {
     // Yan ürün (ağılda süt-peynir, madende taş): aynı verimle, kendi küsuratıyla
     for (const [resource, perHour] of Object.entries(production.extra ?? {})) {
       const buffers = (building.extraBuffers ??= {});
-      buffers[resource] = (buffers[resource] ?? 0) + (perHour / 60) * amount * building.efficiency;
+      buffers[resource] = (buffers[resource] ?? 0) + (perHour / 60) * amount * building.efficiency * relicProductionMultiplier(this.state, resource);
       const extra = Math.floor(buffers[resource]);
       if (extra > 0) {
         buffers[resource] -= extra;
@@ -713,6 +731,7 @@ export class BehaviorSystem {
     const c = this.world.getCharacter(characterId);
     if (!building || !c || building.excludedWorkers.has(c.id)) return;
     building.excludedWorkers.add(c.id);
+    if (c.workplaceId === building.id) c.workplaceId = null; // işten çıkarılan sabit çalışanın sabitlemesi kalkar
     if (c.task?.workBuildingId === building.id) {
       this.endTask(c);
       c.activityLabel = 'İşten çıkarıldı, kendine başka iş arıyor';
@@ -727,6 +746,46 @@ export class BehaviorSystem {
     const c = this.world.getCharacter(characterId);
     if (!building || !c || !building.excludedWorkers.delete(c.id)) return;
     this.events.emit('toast', { text: `${c.name} yeniden ${building.name} işinde çalışabilir`, tone: 'info', icon: 'hammer' });
+  }
+
+  /**
+   * (13. aşama) Oyuncu bir sakini bu iş yerine sabitler: yalnızca orada çalışır, başka işlere kaymaz. Başka bir işte
+   * çalışıyorsa elindekini bırakıp gelir; yapı sabit olmayan çalışanlarla doluysa biri yer açar.
+   */
+  pinWorker(buildingId, characterId) {
+    const building = this.world.getBuilding(buildingId);
+    const c = this.world.getCharacter(characterId);
+    if (!building || !c || !building.workerSlots || c.isChild || c.workplaceId === building.id) return false;
+    const pinned = this.world.characters.filter((o) => o.workplaceId === building.id);
+    if (pinned.length >= building.workerSlots) {
+      this.events.emit('toast', { text: `${building.name}: bütün yuvalar sabit çalışanlara ayrılmış`, tone: 'warn', icon: 'pin' });
+      return false;
+    }
+    c.workplaceId = building.id;
+    building.excludedWorkers.delete(c.id);
+    // Başka bir işteyse bırakır; yapı doluysa sabit olmayan bir çalışan yer açar
+    if (c.task && ACTIVITIES[c.task.activity].kind === 'work' && c.task.workBuildingId !== building.id && c.visible) this.endTask(c);
+    if (building.workerIds.size >= building.workerSlots && !building.workerIds.has(c.id)) {
+      const loose = [...building.workerIds].map((id) => this.world.getCharacter(id)).find((o) => o && o.workplaceId !== building.id);
+      if (loose) {
+        this.endTask(loose);
+        loose.activityLabel = 'Yerini sabit çalışana bıraktı, başka iş arıyor';
+      }
+    }
+    if (c.visible) c.showBubble('sparkle', 2);
+    this.events.emit('worker:pinned', { building, character: c });
+    this.events.emit('toast', { text: `${c.name} artık yalnızca ${building.name} işinde çalışacak`, tone: 'info', icon: 'pin' });
+    return true;
+  }
+
+  unpinWorker(characterId) {
+    const c = this.world.getCharacter(characterId);
+    if (!c || c.workplaceId === null) return false;
+    const building = this.world.getBuilding(c.workplaceId);
+    c.workplaceId = null;
+    this.events.emit('worker:unpinned', { building, character: c });
+    this.events.emit('toast', { text: `${c.name} artık istediği işi seçebilir`, tone: 'info', icon: 'pin' });
+    return true;
   }
 
   nearestFreeTile(x, y) {

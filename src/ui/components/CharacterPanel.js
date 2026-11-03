@@ -3,6 +3,8 @@
 // sevgilisi, çocukları, ebeveynleri: isme tıklayınca o sakin seçilir); İlişkiler (eşi kalple, en yakın
 // arkadaşları ve anlaşamadığı rakibi kırmızı çubukla); kuşandığı ekipman (Alet, Kıyafet, Çanta yuvaları);
 // en çok geliştiği meslekler; kışın üşüyüp üşümediği, Mutlu Yuva morali ve kamera takibi.
+// (13. aşama) Ada tıklayınca metin kutusuna döner: Enter yeni adı kaydeder ('ui:renameCharacter'), Esc vazgeçer.
+// Sabitlenmiş iş yeri ve handaki baharatlı yemeğin hız bonusu durum etiketlerinde görünür.
 import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../../art/sprites/index.js';
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
@@ -17,6 +19,8 @@ import { ILLNESS, VIGOR } from '../../data/health.js';
 import { PANEL_SKILL_COUNT, SKILL_LEVELS } from '../../data/skills.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
 import { SCHOOL } from '../../data/research.js';
+import { CHARACTER_NAME_MAX_LENGTH } from '../../data/characters.js';
+import { LUXURY_GOODS } from '../../data/luxury.js';
 import { el } from '../dom.js';
 
 const PORTRAIT_SCALE = 5;
@@ -55,7 +59,15 @@ export class CharacterPanel {
     });
     this.portraitCtx = this.portrait.getContext('2d');
 
-    this.name = el('h2', { className: 'character-name' });
+    this.name = el('h2', { className: 'character-name is-renamable', title: 'Adını değiştirmek için tıkla' });
+    this.nameInput = el('input', { className: 'character-name-input', type: 'text', maxLength: CHARACTER_NAME_MAX_LENGTH, hidden: true });
+    this.name.addEventListener('click', () => this.editName(true));
+    this.nameInput.addEventListener('keydown', (e) => {
+      e.stopPropagation(); // yazarken oyun kısayolları çalışmasın
+      if (e.key === 'Enter') this.editName(false, true);
+      if (e.key === 'Escape') this.editName(false, false);
+    });
+    this.nameInput.addEventListener('blur', () => this.editName(false, true));
     this.meta = el('div', { className: 'character-meta' });
     this.traits = el('div', { className: 'character-traits' });
     this.status = el('div', { className: 'character-status-text' });
@@ -93,7 +105,7 @@ export class CharacterPanel {
       closeButton,
       el('div', { className: 'character-header' }, [
         el('div', { className: 'character-portrait-frame' }, [this.portrait]),
-        el('div', { className: 'character-identity' }, [this.name, this.meta, this.traits]),
+        el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.meta, this.traits]),
       ]),
       el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
       el('div', { className: 'character-needs' }, needs),
@@ -103,6 +115,23 @@ export class CharacterPanel {
       section('Meslekler', this.skillsList),
       this.followButton,
     ]);
+  }
+
+  /** Sakinin adını düzenlemeye başlar / bitirir (commit: yazılanı kaydet). */
+  editName(editing, commit = false) {
+    if (editing) {
+      if (this.characterId === null) return;
+      this.nameInput.value = this.name.textContent;
+      this.name.hidden = true;
+      this.nameInput.hidden = false;
+      this.nameInput.focus();
+      this.nameInput.select();
+      return;
+    }
+    if (this.nameInput.hidden) return;
+    this.nameInput.hidden = true;
+    this.name.hidden = false;
+    if (commit) this.events.emit('ui:renameCharacter', { id: this.characterId, name: this.nameInput.value });
   }
 
   button(label, title, onClick) {
@@ -127,7 +156,7 @@ export class CharacterPanel {
 
   /** Kimlik bilgisi değişince yeniden kurulur (karakter, ev, çocukluk, aile durumu). */
   identityKey(character) {
-    return `${character.id}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}`;
+    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}`;
   }
 
   /** Değişmedikçe bir kez kurulan kısımlar: ad, yaş, ev, özellik etiketleri. */
@@ -357,6 +386,14 @@ export class CharacterPanel {
       tags.push({ text: ratio >= 1 ? 'Okulu bitirdi: büyüyünce Kalfa olacak' : `Okula gidiyor: %${Math.round(ratio * 100)}`, icon: 'book', cls: 'is-vigor' });
     }
     if (character.educated) tags.push({ text: 'Bilgelik Evi mezunu', icon: 'book', cls: 'is-vigor' });
+    // 13. aşama: sabit iş yeri ve handaki baharatlı yemek
+    if (character.workplaceId !== null) {
+      const place = state.buildings.find((b) => b.id === character.workplaceId);
+      if (place) tags.push({ text: `Sabit iş yeri: ${place.name}`, icon: 'pin', cls: 'is-warm' });
+    }
+    if ((character.buffs.spiced ?? -1) > now) {
+      tags.push({ text: `Baharat ve kahve: %${Math.round((LUXURY_GOODS.spiceCrate.personal.workSpeed - 1) * 100)} hızlı`, icon: 'spice', cls: 'is-vigor' });
+    }
     if ((character.buffs.vigor ?? -1) > now) tags.push({ text: `${VIGOR.name}: %${Math.round((VIGOR.workSpeed - 1) * 100)} hızlı`, icon: 'herb', cls: 'is-vigor' });
     if (character.away) {
       const back = character.away.until - now;

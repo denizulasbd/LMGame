@@ -165,6 +165,11 @@ function groupKey(c) {
   return null;
 }
 
+/** Sohbet edilen yerin aşk / evlilik olasılığı çarpanı (13. aşama: çardak). */
+function romanceMultiplier(group) {
+  return ACTIVITIES[group.activity]?.romanceMultiplier ?? 1;
+}
+
 export class RelationshipSystem {
   /**
    * @param {import('../core/Game.js').Game} game
@@ -241,7 +246,7 @@ export class RelationshipSystem {
   /** Yakın iki bekâr sohbet ederken / dans ederken aşık olabilir. */
   tryRomance(a, b, group, minutes) {
     if (!canRomance(a, b) || this.get(a, b) < ROMANCE.minScore) return;
-    if (this.rng.next() >= ROMANCE.chancePerMinute * minutes) return;
+    if (this.rng.next() >= ROMANCE.chancePerMinute * minutes * romanceMultiplier(group)) return;
     const now = this.state.totalMinutes;
     a.partnerId = b.id;
     b.partnerId = a.id;
@@ -256,7 +261,7 @@ export class RelationshipSystem {
   tryMarriage(a, b, group, minutes) {
     if (!arePartners(a, b) || a.married) return;
     if (this.state.totalMinutes - a.partnerSince < MARRIAGE.minPartnerDays * 1440) return;
-    if (this.rng.next() >= MARRIAGE.chancePerMinute * minutes) return;
+    if (this.rng.next() >= MARRIAGE.chancePerMinute * minutes * romanceMultiplier(group)) return;
     this.marry(a, b, this.world.getBuilding(group.buildingId), group.kind === 'festival');
   }
 
