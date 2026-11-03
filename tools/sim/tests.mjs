@@ -1090,6 +1090,7 @@ const pageResults = await page.evaluate(async () => {
     const before = mw.items.length;
     for (let i = 0; i < 4000; i++) {
       mw.lastByMaker = {};
+      mw.today = 0;
       mw.items = mw.items.filter((it) => it.status !== 'stored');
       game.events.emit('work:finished', { character: rc, activity: 'mineIron', building: mine });
     }
@@ -1100,6 +1101,7 @@ const pageResults = await page.evaluate(async () => {
     rc.equipment.tool = 'sturdyTool';
     for (let i = 0; i < 4000; i++) {
       mw.lastByMaker = {};
+      mw.today = 0;
       mw.items = mw.items.filter((it) => it.status !== 'stored');
       game.events.emit('work:finished', { character: rc, activity: 'mineIron', building: mine });
     }
@@ -1109,9 +1111,22 @@ const pageResults = await page.evaluate(async () => {
     // Günde bir eser
     mw.items = mw.items.filter((it) => it.status !== 'stored');
     mw.lastByMaker = {};
+    mw.today = 0;
     made = 0;
     for (let i = 0; i < 2000; i++) game.events.emit('work:finished', { character: rc, activity: 'mineIron', building: mine });
     check(`usta iki eser arasında ${MASTERWORK.makerCooldownDays} gün dinlenir`, made === 1, `${made}`);
+    {
+      // Kasabada günde en çok bir eser: başka bir usta da aynı gün eser çıkaramaz
+      const other = adults.find((o) => o !== rc && o !== ra);
+      const skillsO = { ...other.skills };
+      other.skills = { mining: 2000 };
+      let extra = 0;
+      const offX = game.events.on('masterwork:created', () => extra++);
+      for (let i = 0; i < 2000; i++) game.events.emit('work:finished', { character: other, activity: 'mineIron', building: mine });
+      offX();
+      other.skills = skillsO;
+      check(`kasabada günde en çok ${MASTERWORK.townPerDay} usta işi eser`, extra === 0, `${extra}`);
+    }
     offMade();
     const item = mw.items.find((it) => it.status === 'stored');
     check('eser vitrine (depoya) girer, ustanın anısına ve günlüğe yazılır', item?.type === 'ironStatue' && item.maker === rc.name && rc.memories.at(-1).text.includes(MASTERPIECES.ironStatue.name) && s.journal.some((j) => j.text.includes(MASTERPIECES.ironStatue.name)));

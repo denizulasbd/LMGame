@@ -56,6 +56,7 @@ export const CONFLICT = {
   scoreLoss: 8,
   funLoss: 6,
   clashGainMultiplier: 0.5,
+  feudQuarrelMultiplier: 0.25, // küs çift birbirini görmezden gelir: yeniden atışma olasılığı dörtte bir
 };
 
 // Barışma: puanı below'un altında olan (küs: atışıp eksiye düşmüş) iki sakin aynı toplanma yerinde sohbet ederken dakikada chancePerMinute

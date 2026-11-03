@@ -99,7 +99,9 @@ export class ConflictSystem {
     const now = this.state.totalMinutes;
     if ((this.cooldowns.get(key) ?? -1) > now) return;
     const temper = Math.max(a.profile.quarrelChance, b.profile.quarrelChance);
-    if (this.rng.next() >= QUARREL_RATES[kind] * temper * minutes) return;
+    // (15. aşama) küsler birbirini görmezden gelir: aynı çiftin üst üste atışması seyrekleşir
+    const feud = this.relationships.get(a, b) < RECONCILE.below ? CONFLICT.feudQuarrelMultiplier : 1;
+    if (this.rng.next() >= QUARREL_RATES[kind] * temper * feud * minutes) return;
     this.quarrel(a, b, clash, kind, building);
   }
 

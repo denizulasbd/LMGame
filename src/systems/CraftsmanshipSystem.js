@@ -6,7 +6,7 @@
 //
 //   Usta işi eser: Usta (Lv.3) bir sakin kendi iş yerinde (Kereste Atölyesi, Taş Ocağı, Demir Madeni, Fırın, Koyun
 //   Ağılı, Şifacı Kulübesi) bir mesaiyi bitirince MASTERWORK.baseChance (+ sabit iş yeri, + Sağlam Alet) olasılıkla
-//   bir eser çıkarır (iki eser arasında en az MASTERWORK.makerCooldownDays gün). Eser Kasaba Arşivi'nin vitrinine girer:
+//   bir eser çıkarır (iki eser arasında en az MASTERWORK.makerCooldownDays gün; kasabada günde en çok MASTERWORK.townPerDay). Eser Kasaba Arşivi'nin vitrinine girer:
 //     'ui:exhibitMasterwork' { id }         : sergilenir, kasaba refahına kalıcı +1 (en çok +12)
 //     'ui:sellMasterwork' { id, source }    : limandan ('harbor') ya da gezgin tüccara ('merchant') satılır
 // Yayınladığı olaylar: 'masterwork:created' { item, piece, character, building }, 'masterwork:exhibited' { item, piece },
@@ -82,6 +82,7 @@ export class CraftsmanshipSystem {
     if (!type || !building?.functional) return;
     const day = this.state.time.day;
     const mw = this.masterworks;
+    if (mw.lastDay === day && (mw.today ?? 0) >= MASTERWORK.townPerDay) return; // kasabada bugünün eseri çıktı
     const last = mw.lastByMaker[c.id];
     if (last !== undefined && day - last < MASTERWORK.makerCooldownDays) return; // usta eserler arasında dinlenir
     if (storedMasterworks(this.state).length >= MASTERWORK.maxStored) return; // vitrin dolu
@@ -99,6 +100,8 @@ export class CraftsmanshipSystem {
     mw.items.push(item);
     mw.made += 1;
     mw.lastByMaker[c.id] = day;
+    mw.today = mw.lastDay === day ? (mw.today ?? 0) + 1 : 1;
+    mw.lastDay = day;
     if (c.visible) c.showBubble('masterpiece', 3.5);
     c.celebrate?.();
     addMemory(this.state, c, `Usta işi bir eser yaptı: ${piece.name}`, piece.icon, { kind: 'masterwork' });

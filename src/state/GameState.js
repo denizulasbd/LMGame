@@ -293,7 +293,7 @@ export class GameState {
 }
 
 function emptyMasterworks() {
-  return { items: [], nextId: 1, made: 0, exhibited: 0, sold: 0, goldEarned: 0, lastByMaker: {} };
+  return { items: [], nextId: 1, made: 0, exhibited: 0, sold: 0, goldEarned: 0, lastByMaker: {}, lastDay: null, today: 0 };
 }
 
 const MASTERWORK_STATUSES = new Set(['stored', 'exhibited', 'sold']);
@@ -312,6 +312,8 @@ function restoreMasterworks(data) {
   out.sold = Math.max(out.items.filter((i) => i.status === 'sold').length, Number(data.sold) || 0);
   out.goldEarned = Math.max(0, Number(data.goldEarned) || 0);
   out.lastByMaker = { ...(data.lastByMaker ?? {}) };
+  out.lastDay = Number.isFinite(data.lastDay) ? data.lastDay : null;
+  out.today = Math.max(0, Number(data.today) || 0);
   return out;
 }
 
