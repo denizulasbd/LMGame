@@ -1529,6 +1529,39 @@ Otopilot 4 haritada (tohum 42, 7, 3 ve kararlara dokunmayan "pasif" 2024) **40 g
 - sabah sisini, Toplanma Zili'ni ve şimşek anını;
 - bir sakinin anılar panelini.
 
+## Kod denetimi (15. aşama öncesi)
+
+Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
+
+**Düzeltilen hatalar**
+- **Dinleyici sızıntısı:** `WeatherSystem` sahne yeniden kurulunca temizlenmiyordu; her Yükle / Yeni Harita'da bir
+  `time:hour` dinleyicisi birikiyordu. `TownScene.exit` artık güncelleme listesindeki sistemleri de temizler.
+- **Takılma döngüsü:** Kıtlıkta (yiyecek, pişmiş yemek, böğürtlen yok) ya da evsizken sakin "işe git -> yolda acil
+  açlık -> yine işe git" döngüsüne giriyor, ne çalışıyor ne yiyordu. `Brain.hasUrgentNeed` yalnızca giderilebilecek
+  ihtiyaçta işi keser.
+- **Ad kutusu:** Sakinin adı düzenlenirken sağdaki listeden başka sakin seçilince Enter yeni seçilenin adını
+  değiştiriyordu; basılı bir tuşla metin kutusuna geçilince kamera yazarken kaymaya devam ediyordu.
+- **Tüccar ve şenlik:** Tüccar yoluna kurulan yapının içinden yürüyordu; şenlik yeri yıkılınca şenlik yersiz sürüyordu.
+- **İş gücü:** Hasta ya da seferdeki usta "bekleyen usta" sayılıp son iş yuvasını kilitliyordu.
+- **Kayıt:** Kopuk referanslı kayıtlar (var olmayan ev, karşılıksız eş, kayıp ebeveyn) yüklenirken onarılır.
+- **Arayüz:** Telefon genişliğinde araç çubuğu ekrandan taşıyordu (artık sarılır, kısayol etiketleri gizlenir).
+- **Ses:** Sessizde yalnızca kazanç 0'a iniyor, döngüler ve LFO'lar işlemci harcamaya devam ediyordu. Artık bağlam
+  askıya alınır, açılınca kazanç 0'dan yumuşakça yükselir; sessiz başlanan oyunda bağlam hiç kurulmaz.
+
+**Performans:** A* arama tamponları yeniden kullanılır (her aramada üç harita boyu dizi ayrılmaz); ilişki puanı
+ekleme, keyif auraları, yürüme, çizim ortamı, ışık listesi ve çizim kuyruğu karesel çöp üretmez; ekran dışındaki
+ışıklara gradyan kurulmaz; kışın her karedeki `JSON.stringify` kaldırıldı. 30 sakinli geç oyunda simülasyon adımı
+~%26 hızlandı. Ölü kod (`Animation.js` ve dört kullanılmayan dışa aktarım) silindi.
+
+**Test altyapısı:** Testler artık makinenin yükünden bağımsız deterministiktir (eskiden sayfa açılışıyla döngünün
+durması arasında gerçek zamana bağlı sayıda adım geçiyordu). Uzun koşuların bekçisi örneği saat buçuğunda alır.
+
+**Metrikler**
+- Stres matrisi (`stress.mjs`): 6 tohum (7, 13, 21, 42, 77, 101) x 1x / 2x / 4x x 50 gün = 18 koşu: takılma 0,
+  kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0. Her koşu Gelişmiş Şehir'e ve
+  30 sakine ulaştı; toplam 237 düğün, 93 doğum, 93 büyüme, 55 hastalık.
+- Denetim (`audit.mjs`): 49/49 · hedefli testler (`tests.mjs`): 190/190 · uyumluluk (`compat.mjs`, sürüm 2-12): 130/130.
+
 ## Simülasyon ve test araçları (`tools/sim/`)
 
 Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngüsünü durdurup sabit adımlarla ilerletir.
