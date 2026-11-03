@@ -1537,6 +1537,80 @@ Otopilot 4 haritada (tohum 42, 7, 3 ve kararlara dokunmayan "pasif" 2024) **40 g
 - sabah sisini, Toplanma Zili'ni ve şimşek anını;
 - bir sakinin anılar panelini.
 
+## Derinleşen yaşam: sosyal denge, meslek kıyafetleri ve usta işi eserler (15. aşama)
+
+### Sosyal denge: atışma ve barışma
+Denetimde 50 günlük koşularda 5330 atışmaya 128 barışma düşüyordu. Sürtüşmeler törpülendi, barışmanın yolları açıldı
+(`data/family.js` -> `CONFLICT`, `RECONCILE`):
+
+- **Daha seyrek atışma:** çalışırken, sohbette ve karşılaşınca atışma olasılıkları düştü; aynı çift en az 10 saat ara
+  verir. **Küsler birbirini görmezden gelir:** zaten küs olan çiftin yeniden atışma olasılığı dörtte birdir.
+- **Küs:** atışıp eksiye düşen her çift (eskiden yalnızca -10'un altı). Küs iki sakin aynı yerde sohbet ederken barışabilir.
+- **Gönül alma yerleri:** Kasaba Hanı, Ahşap Çardak, Kamp Ateşi ve şenlik / mevsim festivalleri. Buralarda barışma
+  olasılığı **4 kat (+%300)**, kimse atışmaz.
+- Barışınca iki sakinin başında **el sıkışma balonu** çıkar; anılarına ve günlüğe yeriyle yazılır ("Han'da Deniz ile
+  barıştı", "Çardakta...", "Ateş başında...", "Şenlikte..."). Kasaba Arşivi'nde "Barışan küsler" sayacı.
+
+### Meslek kıyafetleri ve zanaat rozeti
+Sakin, en çok deneyimi olan mesleğinin kademesini üzerinde taşır (`data/skills.js` -> `OUTFIT_KITS`,
+`art/sprites/outfits.js`):
+
+| Meslek | Kalfa (Lv.2) | Usta (Lv.3) |
+|---|---|---|
+| Oduncu | deri yelek ve eldiven | kırmızı ekose gömlek ve bere |
+| Çiftçi | hasır şapka | çiçekli hasır şapka ve kot tulum |
+| Madenci / Taşçı | bandana ve bel feneri | fenerli kask ve koruyucu zırh |
+| Şifacı | omuzdan asılı ot çantası | bilge cübbesi ve yaprak çelengi |
+| Fırıncı / Aşçı | beyaz önlük | kabarık aşçı şapkası, önlük, boyun mendili |
+| Çoban | kırmızı boyun mendili | keçe şapka ve yün yelek |
+| Balıkçı | kova şapka | sarı yağmurluk ve şapkası |
+| Yapı Ustası | alet kemeri | baret ve alet kemeri |
+| Zanaatkâr | deri önlük | koruyucu gözlük ve deri önlük |
+| Bilge | mor atkı | kep ve bilge cübbesi |
+
+Çıraklar sade köylü giysisi giyer. Kıyafet bütün yönlerde, yürürken ve otururken çizilir; kışlık palto gövdeyi örter ama
+başlık görünür; çocuklar giymez. Kıyafet deneyimden türetilir (kayda girmez): kademe atlayınca hemen, ana meslek
+değişince saat başı giyilir. Karakter Paneli'nde adın altında **zanaat rozeti** durur: Çırak bronz, Kalfa gümüş, Usta altın
+("Usta Madenci"); üzerine gelince giydiği kıyafet yazar.
+
+### Usta işi eserler
+Usta (Lv.3) bir sakin kendi iş yerinde bir mesaiyi bitirince **%4** (sabit iş yerinde +%2, Sağlam Alet'le +%2: en çok
+**%8**) şansla eşsiz bir eser ortaya koyar (`data/masterpieces.js`, `systems/CraftsmanshipSystem.js`):
+
+| Usta | İş yeri | Eser | Liman / Tüccar |
+|---|---|---|---|
+| Oduncu | Kereste Atölyesi | İşlemeli Yadigâr Sandık | 280 / 238 altın |
+| Taşçı | Taş Ocağı | Görkemli Taş Figür | 260 / 221 |
+| Madenci | Demir Madeni | Kusursuz Demir Heykel | 360 / 306 |
+| Fırıncı | Yel Değirmeni ve Fırın | Kraliyet Ziyafet Ekmeği | 240 / 204 |
+| Çoban | Koyun Ağılı | İnce Dokuma Kasaba Halısı | 320 / 272 |
+| Şifacı | Şifacı Kulübesi | Mucizevi Hayat İksiri | 400 / 340 |
+
+Eser çıkınca ustanın başında altın kıvılcımlar ve madalya balonu belirir, kutlama ezgisi çalar; günlüğe ve ustanın
+anılarına yazılır. Nadir kalsın diye bir usta iki eser arasında en az 3 gün dinlenir ve kasabada günde en çok bir eser
+çıkar; vitrinde 12 eser bekliyorsa yenisi yapılmaz. Eserler **Kasaba Arşivi'nin "Usta İşi Eserler" vitrininde** listelenir:
+
+- **Sergile:** kasaba refahına kalıcı **+1** (en çok +12). Belediye Konağı'nın paneli vitrindekileri gösterir.
+- **Sat:** limandan tam değerine ihraç edilir, gezgin tüccar %85'ini öder (200-400 altın). Liman paneli ihraca hazır eserleri
+  ve değerlerini gösterir.
+
+Üretim yapılarının panelinde o iş yerinde çıkabilecek eser ve şansı yazar.
+
+### Denge ve test (simülasyon)
+- **Stres matrisi** (6 tohum x 1x / 2x / 4x x 50 gün = 18 koşu): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0,
+  üretmeyen iş yeri 0, sayfa hatası 0, kıyafet hatası 0. Atışma 5330'dan 2362'ye indi (-%56); açık barışma 128'den 312'ye
+  çıktı (barışma / atışma %2,4 -> %13). Küslük kalıcı değil: 4x koşularının sonunda 2608 ilişki çiftinden yalnızca 1'i küs
+  (koşu başına aynı anda en çok ~4); diğerleri gönül alma yerlerinde ya da birlikte çalışıp sohbet ederek düzeliyor.
+- **Usta işi eserler:** koşu başına ~30 eser (18 koşuda 547; 216 sergilendi, 331 satıldı); 50. günde kasabaların
+  yarıdan çoğu Usta kostümü giyiyor (18 koşuda 457 Usta, 79 Kalfa).
+- **Hedefli testler** (`tests.mjs`, 220): barışma olasılığı gönül alma yerlerinde 4 kat, el sıkışma balonu, yerli anı ve
+  günlük, gönül alma yerinde atışılmaz; Çırak / Kalfa / Usta kıyafeti, kademe atlayınca anında giyilir, palto ve çocuk,
+  12 meslek x 4 yön x 3 kare çizimi, bronz / gümüş / altın rozet; Kalfa eser yapmaz, Usta %4, sabit iş yeri ve Sağlam Alet'le
+  %8, usta başına bekleme ve kasabada günlük sınır, anı / günlük / kutlama, sergileme (+1 refah, en çok +12), liman ve tüccar
+  satışı, 200-400 altın, Arşiv vitrinindeki Sergile düğmesi, kayıttan eserlerin ve kıyafetlerin dönmesi.
+- **Uyumluluk** (`compat.mjs`, sürüm 2-13, 165): eski kayıtlar boş vitrinle açılır, sakinler deneyimlerine göre giyinir;
+  sürüm 13 kaydının eserleri korunur. **Denetim** (`audit.mjs`): 49/49.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -1579,8 +1653,8 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (190): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 12'ye) açar, bir gün yaşatır; referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (220; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 13'e) açar, bir gün yaşatır; referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
 | `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |
