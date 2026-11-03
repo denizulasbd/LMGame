@@ -53,9 +53,7 @@ export function getFriendship(state, a, b) {
 
 export function levelIndexFor(score) {
   let index = 0;
-  RELATIONSHIP_LEVELS.forEach((level, i) => {
-    if (score >= level.min) index = i;
-  });
+  for (let i = 0; i < RELATIONSHIP_LEVELS.length; i++) if (score >= RELATIONSHIP_LEVELS[i].min) index = i;
   return index;
 }
 
@@ -201,14 +199,21 @@ export class RelationshipSystem {
   /** Çifte puan ekler (eksi olabilir); zıt kişilikliler yarı puan kazanır. Seviye değişirse olayı yayınlar. */
   add(a, b, amount) {
     const gain = amount > 0 && clashingTraits(a.traits, b.traits) ? amount * CONFLICT.clashGainMultiplier : amount;
-    this.set(a, b, this.get(a, b) + gain);
+    // Her adımda her çift için çağrılır: anahtar bir kez kurulur, önceki puan bir kez okunur
+    const key = pairKey(a.id, b.id);
+    const stored = this.state.relationships[key];
+    const before = stored !== undefined ? stored : getFriendship(this.state, a, b);
+    this.write(a, b, key, before, before + gain);
   }
 
   /** Puanı doğrudan ayarlar (barışma); seviye değişirse olayı yayınlar. */
   set(a, b, score) {
-    const before = this.get(a, b);
+    this.write(a, b, pairKey(a.id, b.id), this.get(a, b), score);
+  }
+
+  write(a, b, key, before, score) {
     const after = clamp(score, MIN_FRIENDSHIP, MAX_FRIENDSHIP);
-    this.state.relationships[pairKey(a.id, b.id)] = after;
+    this.state.relationships[key] = after;
     const from = levelIndexFor(before);
     const to = levelIndexFor(after);
     if (to === from) return;

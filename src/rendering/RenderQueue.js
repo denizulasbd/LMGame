@@ -1,9 +1,12 @@
 // Derinlik sıralı çizim kuyruğu (Y-sorting). Her öğe bir "taban çizgisi" (sortY) ile
 // eklenir; kuyruk boşaltılırken tabanı daha yukarıda olan önce çizilir. Böylece bir
 // karakter ağacın ya da evin arkasına geçtiğinde gerçekten arkasında kalır.
+const byDepth = (a, b) => a.sortY - b.sortY || a.order - b.order;
+
 export class RenderQueue {
   constructor() {
     this.items = [];
+    this.active = []; // boşaltılırken sıralanan öğeler (kareler arasında yeniden kullanılır)
     this.count = 0;
   }
 
@@ -34,14 +37,17 @@ export class RenderQueue {
   }
 
   flush(renderer) {
-    const active = this.items.slice(0, this.count);
-    active.sort((a, b) => a.sortY - b.sortY || a.order - b.order);
+    const active = this.active;
+    active.length = this.count;
+    for (let i = 0; i < this.count; i++) active[i] = this.items[i];
+    active.sort(byDepth);
     for (const item of active) {
       if (item.draw) item.draw(renderer);
       else renderer.drawImage(item.image, item.x, item.y);
       item.image = null;
       item.draw = null;
     }
+    active.length = 0;
     this.count = 0;
   }
 }

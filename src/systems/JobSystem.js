@@ -230,7 +230,8 @@ export class JobSystem {
     if (!skill) return false;
     const mine = skillLevel(c, skill).level;
     return this.world.characters.some((other) => {
-      if (other === c || !other.visible || other.newcomer || other.isChild || building.excludedWorkers.has(other.id)) return false;
+      // Hasta ya da seferdeki usta beklenmez: yoksa son yuva o iyileşene kadar boş kalırdı
+      if (other === c || !other.visible || other.newcomer || other.isChild || other.illness || other.away || building.excludedWorkers.has(other.id)) return false;
       if (other.workplaceId !== null && other.workplaceId !== undefined && other.workplaceId !== building.id) return false; // başka yere sabitli
       if (other.task?.workBuildingId || other.task?.jobId) return false; // zaten çalışıyor
       const level = skillLevel(other, skill).level;
@@ -286,11 +287,6 @@ export class JobSystem {
     }
     return null;
   }
-}
-
-/** Sabitlenmiş çalışanları (oyuncunun bu yapıya atadığı sakinler). */
-export function pinnedWorkers(characters, building) {
-  return characters.filter((c) => c.workplaceId === building.id);
 }
 
 function dist(a, b) {

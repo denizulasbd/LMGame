@@ -8,6 +8,9 @@
 import { getSprite, CharGrid, flipRowsHorizontal } from '../PixelSprite.js';
 import { seasonalGroundRows, winterize } from '../seasons.js';
 
+// Ahırın kışın karla örtülen çatı renkleri (her karede yeni nesne üretilmesin diye sabit)
+const FARM_WINTER_ROOF = { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 10 };
+
 // Küçük deterministik "rastgelelik": her ağılın çim tutamları aynı yerde kalsın
 function hash(x, y, salt = 0) {
   let h = (x * 374761393 + y * 668265263 + salt * 2147483647) | 0;
@@ -154,14 +157,12 @@ export function getSheepFarmLayer(layer, season = 'summer') {
   const key = `building:sheepFarm:${layer}:${season}`;
   const sprite = getSprite(key, () => seasonal(layer === 'front' ? buildFrontRows() : buildBackRows(), season));
   if (season !== 'winter') return sprite;
-  return winterize(sprite, layer === 'back' ? { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 10 } : null);
+  return winterize(sprite, layer === 'back' ? FARM_WINTER_ROOF : null);
 }
 
 // ---------------------------------------------------------------------------
 // Koyunlar (sağa bakar; sola bakınca aynalanır). Ayak noktası en alt satırın ortasıdır.
 // ---------------------------------------------------------------------------
-export const SHEEP_SIZE = { width: 12, height: 9, lambWidth: 9, lambHeight: 7 };
-
 const SHEEP = {
   stand: [
     '..KK.KK.....',
@@ -309,5 +310,5 @@ export function getSheepFarmSprite(season = 'summer') {
     g.stamp(buildFrontRows(), 0, 0);
     return seasonal(g.toRows(), season);
   });
-  return season === 'winter' ? winterize(sprite, { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 10 }) : sprite;
+  return season === 'winter' ? winterize(sprite, FARM_WINTER_ROOF) : sprite;
 }

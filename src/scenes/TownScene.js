@@ -296,7 +296,13 @@ export class TownScene extends Scene {
 
   exit() {
     this.unsubscribers?.forEach((off) => off());
-    this.disposables?.forEach((system) => system.destroy());
+    // Olay aboneliği olan her sistem (güncelleme listesindekiler dahil) bir kez temizlenir; listeye eklemeyi
+    // unutmak sahne her yeniden kurulduğunda (Yükle / Yeni Harita) dinleyici sızdırırdı.
+    const owners = new Set([...(this.disposables ?? []), ...(this.systems ?? [])]);
+    for (const system of owners) system?.destroy?.();
+    this.unsubscribers = null;
+    this.disposables = null;
+    this.systems = null;
   }
 
   /** Kayıttan gelen yapının kapladığı karoları haritada işaretler. */
@@ -596,22 +602,23 @@ export class TownScene extends Scene {
     const weather = this.game.state.weather;
     const season = getSeason(this.game.state.time.day);
     const freezing = this.game.state.heating.cold; // kışın odun bitti: ocaklar söndü
-    const env = {
-      time: this.animationTime,
-      hour,
-      season: season.key,
-      butterflies: season.butterflies,
-      windowsLit: hour >= 18.5 || hour < 6.5,
-      raining: isRainActive(weather),
-      sleepingHomes: new Set(
-        this.world.characters.filter((c) => c.isSleeping && c.insideBuildingId).map((c) => c.insideBuildingId)
-      ),
-      // Odun bitince bacalardan duman tütmez
-      smokingHomes: freezing ? new Set() : new Set(this.world.characters.map((c) => c.homeId).filter((id) => id !== null)),
-      relics: relicMask(this.game.state), // (13. aşama) Belediye Konağı'nda sergilenen yadigârlar
-      // (14. aşama) süren mevsim festivalinin teması (kışın fenerler parıldar, şölen ateşi harlanır)
-      festivalTheme: this.game.state.events.festival.active ? this.game.state.events.festival.theme ?? null : null,
-    };
+    // Çizim ortamı kareler arasında yeniden kullanılır (her karede yeni nesne ve küme üretilmez)
+    const env = this.renderEnv ?? (this.renderEnv = { sleepingHomes: new Set(), smokingHomes: new Set() });
+    env.time = this.animationTime;
+    env.hour = hour;
+    env.season = season.key;
+    env.butterflies = season.butterflies;
+    env.windowsLit = hour >= 18.5 || hour < 6.5;
+    env.raining = isRainActive(weather);
+    env.sleepingHomes.clear();
+    env.smokingHomes.clear(); // odun bitince bacalardan duman tütmez
+    for (const c of this.world.characters) {
+      if (c.isSleeping && c.insideBuildingId) env.sleepingHomes.add(c.insideBuildingId);
+      if (!freezing && c.homeId !== null) env.smokingHomes.add(c.homeId);
+    }
+    env.relics = relicMask(this.game.state); // (13. aşama) Belediye Konağı'nda sergilenen yadigârlar
+    // (14. aşama) süren mevsim festivalinin teması (kışın fenerler parıldar, şölen ateşi harlanır)
+    env.festivalTheme = this.game.state.events.festival.active ? this.game.state.events.festival.theme ?? null : null;
     const view = this.camera.getViewBounds(renderer.width, renderer.height);
 
     renderer.applyCamera(this.camera);
@@ -638,7 +645,8 @@ export class TownScene extends Scene {
     this.weatherFx.drawClouds(renderer, this.camera, weather, this.map, this.animationTime);
     this.weatherFx.drawMist(renderer, this.camera, weather, this.map, this.animationTime);
 
-    const lights = [];
+    const lights = this.lights ?? (this.lights = []);
+    lights.length = 0;
     for (const building of this.world.buildings) building.collectLights(lights, env);
     const festivalVenue = this.festivalVenue();
     if (festivalVenue) this.festivalFx.collectLights(lights, festivalVenue, env.festivalTheme, this.game.state.seasonFestival);

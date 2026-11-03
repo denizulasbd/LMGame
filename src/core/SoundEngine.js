@@ -9,6 +9,7 @@
 // Sessiz tercihi verilen anahtarla localStorage'da hatırlanır.
 
 const NOISE_SECONDS = 2;
+const MUTE_FADE_SECONDS = 0.25; // ses kapanırken / açılırken kazancın yumuşak geçişi (ani kesilme tık sesi yapar)
 
 export class SoundEngine {
   /** @param {{ storageKey?: string, volume?: number }} options */
@@ -20,6 +21,7 @@ export class SoundEngine {
     this.buffers = {};
     this.loops = new Map();
     this.muted = this.readMuted();
+    this.suspendTimer = null;
 
     this.unlock = () => this.start();
     window.addEventListener('pointerdown', this.unlock);
@@ -30,21 +32,27 @@ export class SoundEngine {
     return this.ctx !== null && this.ctx.state === 'running' && !this.muted;
   }
 
-  /** İlk kullanıcı etkileşiminde ses bağlamını kurar / sürdürür. */
+  /**
+   * İlk kullanıcı etkileşiminde ses bağlamını kurar / sürdürür. Ses kapalıyken bağlam hiç kurulmaz (ya da askıda
+   * kalır): sessizde Web Audio düğümleri işlemci harcamaz; ses açılınca (o tıklamanın içinde) kurulur.
+   */
   start() {
+    if (this.muted) return;
     const AudioContextClass = window.AudioContext ?? window.webkitAudioContext;
     if (!AudioContextClass) return;
     if (!this.ctx) {
       this.ctx = new AudioContextClass();
       this.master = this.ctx.createGain();
-      this.master.gain.value = this.muted ? 0 : this.volume;
+      this.master.gain.value = this.volume;
       this.master.connect(this.ctx.destination);
     }
-    if (this.ctx.state === 'suspended') this.ctx.resume();
-    if (this.ctx.state === 'running') {
+    const release = () => {
+      if (this.ctx?.state !== 'running') return;
       window.removeEventListener('pointerdown', this.unlock);
       window.removeEventListener('keydown', this.unlock);
-    }
+    };
+    if (this.ctx.state === 'suspended') this.ctx.resume().then(release, () => {});
+    release();
   }
 
   readMuted() {
@@ -56,6 +64,10 @@ export class SoundEngine {
     }
   }
 
+  /**
+   * Sesi kapatır / açar. Kapatınca ana kazanç yumuşakça 0'a iner, ardından bağlam askıya alınır (döngüler ve LFO'lar
+   * durur, işlemci harcanmaz). Açınca bağlam sürdürülür ve kazanç 0'dan yumuşakça yükselir (cızırtı / tık olmaz).
+   */
   setMuted(muted) {
     this.muted = muted;
     try {
@@ -63,7 +75,39 @@ export class SoundEngine {
     } catch {
       /* depolama erişilemez: tercih yalnızca bu oturumda geçerli */
     }
-    if (this.master) this.master.gain.setTargetAtTime(muted ? 0 : this.volume, this.ctx.currentTime, 0.05);
+    clearTimeout(this.suspendTimer);
+    if (!this.ctx) {
+      if (!muted) this.start(); // sessiz başlanmıştı: bağlam bu tıklamayla kurulur
+      return;
+    }
+    const gain = this.master.gain;
+    const hold = () => {
+      const now = this.ctx.currentTime;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(gain.value, now);
+      return now;
+    };
+    if (muted) {
+      gain.setTargetAtTime(0, hold(), MUTE_FADE_SECONDS / 4);
+      this.suspendTimer = setTimeout(() => {
+        if (this.muted && this.ctx.state === 'running') this.ctx.suspend().catch(() => {});
+      }, MUTE_FADE_SECONDS * 1000 + 100);
+      return;
+    }
+    const fadeIn = () => {
+      if (this.muted) return;
+      const now = this.ctx.currentTime;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(Math.min(gain.value, 0.0001), now);
+      gain.setTargetAtTime(this.volume, now, MUTE_FADE_SECONDS / 4);
+    };
+    if (this.ctx.state === 'suspended') this.ctx.resume().then(fadeIn, () => {});
+    else fadeIn();
+  }
+
+  /** Bağlam o an gerçekten ses işliyor mu (sessizde askıya alınmış olmalı)? */
+  get processing() {
+    return this.ctx !== null && this.ctx.state === 'running';
   }
 
   // ---------------------------------------------------------------------------

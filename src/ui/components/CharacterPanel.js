@@ -35,6 +35,7 @@ export class CharacterPanel {
     this.slot = 'right';
     this.events = game.events;
     this.characterId = null;
+    this.editingId = null; // adı düzenlenen sakin (düzenleme başladığı andaki seçim)
     this.followingId = null;
     this.builtFor = null;
     this.resetCaches();
@@ -42,6 +43,9 @@ export class CharacterPanel {
     this.build();
 
     game.events.on('character:selected', (id) => {
+      // Ad kutusu açıkken başka bir sakin seçilirse (ör. listeden; liste odağı çalmaz) yazılan ad eski sakine
+      // kaydedilir; aksi halde Enter yeni seçilen sakinin adını değiştirirdi
+      if (id !== this.characterId) this.editName(false, true);
       this.characterId = id;
       this.element.hidden = id === null;
       this.builtFor = null;
@@ -132,6 +136,7 @@ export class CharacterPanel {
   editName(editing, commit = false) {
     if (editing) {
       if (this.characterId === null) return;
+      this.editingId = this.characterId;
       this.nameInput.value = this.name.textContent;
       this.name.hidden = true;
       this.nameInput.hidden = false;
@@ -142,7 +147,8 @@ export class CharacterPanel {
     if (this.nameInput.hidden) return;
     this.nameInput.hidden = true;
     this.name.hidden = false;
-    if (commit) this.events.emit('ui:renameCharacter', { id: this.characterId, name: this.nameInput.value });
+    if (commit && this.editingId !== null) this.events.emit('ui:renameCharacter', { id: this.editingId, name: this.nameInput.value });
+    this.editingId = null;
   }
 
   button(label, title, onClick) {

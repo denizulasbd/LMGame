@@ -7,17 +7,24 @@
 // festivallerini, sakinlerin anılarını ve nadir hava olaylarını raporlar. Günlük özet, olay günlüğü ve sonunda stokların
 // nereye harcandığını (araştırma, ihracat, harika) basar.
 //
-// Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--save kayit.json] [--passive] [--quiet]
+// Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
+//   --speed   : oyun hızı (varsayılan 4); 1x'te aynı oyun günü dört kat çok, daha küçük adımla geçer
 //   --save    : simülasyon sonunda oyunu kayıt dosyasına yazar (uyumluluk testinin fikstürü için)
+//   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
+//               bulunursa çıkış kodu 1 olur
 import fs from 'fs';
-import { openGame, parseArgs, runHours, STEPS_PER_HOUR } from './lib.mjs';
+import { openGame, parseArgs, runHours } from './lib.mjs';
+import { installMonitor, monitorReport } from './monitor.mjs';
 
 const { positional, options } = parseArgs();
 const seed = Number(positional[0] ?? 42);
 const days = Number(positional[1] ?? 32);
+const speed = Number(options.speed ?? 4);
 
 const { browser, page, errors } = await openGame({ seed });
+await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
+await installMonitor(page);
 
 await page.evaluate((passive) => {
   const game = window.game;
@@ -92,6 +99,13 @@ await page.evaluate((passive) => {
         return;
       }
     }
+  };
+
+  // Bekçi otopilottan önce örnek alır: otopilotun o anki eylemleri (yapı kurmak yolları keser, görevleri bitirir)
+  // örneğe "görevsiz sakin" olarak yansımasın
+  window.__tick = () => {
+    window.__monitor.sample();
+    window.__autopilot();
   };
 
   window.__autopilot = () => {
@@ -265,7 +279,7 @@ function summary() {
 }
 
 for (let d = 0; d < days; d++) {
-  for (let h = 0; h < 4; h++) await runHours(page, 6, '__autopilot');
+  for (let h = 0; h < 4; h++) await runHours(page, 6, '__tick');
   if (!options.quiet) console.log(await summary());
 }
 console.log(await summary());
@@ -332,6 +346,16 @@ if (options.save) {
   fs.writeFileSync(options.save, snapshot);
   console.log('kayıt yazıldı:', options.save);
 }
+const mon = await monitorReport(page);
+console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length}`);
+for (const st of mon.stuck.slice(0, 10)) console.log(`  takıldı: G${st.day} ${st.hour}:00 ${st.name} @${st.tile} ${st.reason} (${st.task ?? '-'}/${st.phase ?? '-'}: ${st.label})`);
+for (const b of mon.broken.slice(0, 10)) console.log(`  referans: ${b}`);
+for (const j of mon.staleJobs.slice(0, 5)) console.log(`  iş: ${j}`);
+for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}`);
+const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0;
+if (options.json) {
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, healthy }, null, 1));
+}
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();
-process.exit(errors.length ? 1 : 0);
+process.exit(healthy ? 0 : 1);

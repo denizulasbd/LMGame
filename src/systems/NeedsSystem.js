@@ -99,10 +99,13 @@ export class NeedsSystem {
    * sakinlerin keyfi yavaşça artar; kadim çeşme enerjiyi de doldurur. Fener yalnızca yanarken etki eder.
    */
   applyFunAuras(minutes) {
-    const sources = this.world.getCompleted().filter((b) => {
+    // Kaynaklar her adımda yeniden kullanılan bir diziye toplanır (filtre dizisi çöp üretmesin)
+    const sources = this.auraSources ?? (this.auraSources = []);
+    sources.length = 0;
+    for (const b of this.world.buildings) {
       const def = BUILDINGS[b.type];
-      return def.funAura && (!def.litHours || b.lit);
-    });
+      if (def.funAura && b.functional && (!def.litHours || b.lit)) sources.push(b);
+    }
     if (sources.length === 0) return;
     for (const c of this.world.characters) {
       if (!c.visible) continue;

@@ -38,9 +38,9 @@ export const CONFIG = {
   SESSION_KEY: 'lmgame.session.v2',    // sayfa kapanırken yazılır: F5 oyunu kaldığı yerden sürdürür
   SAVE_VERSION: 12,                    // 14. aşama: sakin anıları, mevsim festivalleri, toplanma zili, sis ve yaz fırtınası, kervan teknesi
   SAVE_MIN_VERSION: 2,                 // bundan eski kayıtlar açılmaz; arası eksik alanlarla yüklenir
-  AUTOSAVE_HOUR: 6,
-  HISTORY_DAYS: 64,                    // Kasaba Arşivi'nde saklanan günlük özet sayısı (grafikler son 32 günü çizer)
-  HISTORY_CHART_DAYS: 32,                    // her sabah bu saatte otomatik kayıt
+  AUTOSAVE_HOUR: 6,                    // her sabah bu saatte otomatik kayıt
+  HISTORY_DAYS: 64,                    // Kasaba Arşivi'nde saklanan günlük özet sayısı
+  HISTORY_CHART_DAYS: 32,              // Arşiv grafiklerinin çizdiği son gün sayısı
 
   // --- Ses ---
   AUDIO_MUTE_KEY: 'lmgame.audio.muted', // ses kapalı tercihi

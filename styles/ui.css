@@ -643,6 +643,8 @@
 
 .tool-row {
   display: flex;
+  flex-wrap: wrap; /* çok dar pencerede araçlar ekrandan taşmaz, alt satıra geçer */
+  justify-content: center;
   gap: 6px;
 }
 
@@ -669,6 +671,23 @@
 .tool-btn.is-active {
   background: var(--ui-highlight);
   box-shadow: inset -2px -2px 0 #e0a030, inset 2px 2px 0 #fff3b0;
+}
+
+.tool-btn span {
+  white-space: nowrap;
+}
+
+/* Telefon genişliği: araç düğmeleri sıkışır, kısayol etiketleri gizlenir (dokunmatikte klavye yok) */
+@media (max-width: 560px) {
+  .tool-btn {
+    gap: 4px;
+    padding: 4px 7px 5px;
+    font-size: 14px;
+  }
+
+  .tool-btn kbd {
+    display: none;
+  }
 }
 
 .tool-btn kbd {

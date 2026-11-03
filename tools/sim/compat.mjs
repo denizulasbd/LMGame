@@ -1,15 +1,18 @@
 // Geriye uyumluluk: eski sürümlerin kayıtları (fixtures/) bugünkü oyunda açılır mı, bir gün sorunsuz yaşar mı?
+//   save-v2..v6  : 4.-8. aşamanın kayıt biçimleri (sentez: legacy-fixtures.mjs; o aşamaların kodu depoda yok).
+//                  v2-v5 eski 48x48 biyomsuz harita, v3-v5 Sokak Lambası ('lamp'), v6 yarım kalmış bir yükseltme
 //   save-v7.json : 9. aşamanın oyunu (kayıt sürümü 7): 14 sakin, atölye, anıt, iki Taş Ev
 //   save-v8.json : 10. aşamanın oyunu (kayıt sürümü 8): 33. gün, 30 sakin, Gelişmiş Şehir, tüm üretim zincirleri
 //   save-v9.json : 11. aşamanın oyunu (kayıt sürümü 9): 33. gün, 30 sakin, şifacı, hayvanlar, fermanlar ve olaylar
 //   save-v10.json: 12. aşamanın oyunu (kayıt sürümü 10): 31. gün, 30 sakin, dört araştırma, liman, hazinede altın ve
 //                  tamamlanmış Büyük Vadi Saat Kulesi
 //   save-v11.json: 13. aşamanın oyunu (kayıt sürümü 11): 37. gün, 30 sakin, üç yadigâr, peyzaj, arşiv
+//   save-v12.json: 14. aşamanın oyunu (kayıt sürümü 12, bugünkü): otopilotla 34 gün; festivaller, anılar
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = ['save-v7.json', 'save-v8.json', 'save-v9.json', 'save-v10.json', 'save-v11.json'].map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -26,11 +29,38 @@ for (const { name, raw } of fixtures) {
     localStorage.setItem('lmgame.save.v2', raw);
     game.events.emit('ui:load');
     const s = game.state;
-    const loaded = { day: s.time.day, pop: s.characters.length, buildings: s.buildings.length, res: { ...s.resources } };
+    const scene = game.scenes.current;
+    const loaded = {
+      day: s.time.day,
+      pop: s.characters.length,
+      buildings: s.buildings.length,
+      res: { ...s.resources },
+      map: { ...s.map },
+      terrain: scene.saves.snapshot().terrain.length,
+      types: [...new Set(s.buildings.map((b) => b.type))],
+      projects: s.buildings.filter((b) => b.project).map((b) => ({ id: b.id, job: scene.jobs.jobs.some((j) => j.buildingId === b.id) })),
+    };
+    // Referans bütünlüğü (yüklemeden hemen sonra ve bir gün sonra)
+    const integrity = () => {
+      const ids = new Set(s.characters.map((c) => c.id));
+      const bIds = new Set(s.buildings.map((b) => b.id));
+      const bad = [];
+      for (const c of s.characters) {
+        if (c.homeId !== null && !bIds.has(c.homeId)) bad.push(`${c.name} evsiz`);
+        if (c.partnerId !== null && s.characters.find((o) => o.id === c.partnerId)?.partnerId !== c.id) bad.push(`${c.name} eş`);
+        if (c.insideBuildingId !== null && !s.buildings.find((b) => b.id === c.insideBuildingId)?.occupants.has(c.id)) bad.push(`${c.name} içeride`);
+        for (const p of c.parentIds) if (!ids.has(p)) bad.push(`${c.name} ebeveyn`);
+      }
+      for (const b of s.buildings) for (const id of b.occupants) if (!ids.has(id)) bad.push(`${b.type} içeride kayıp`);
+      return bad;
+    };
+    loaded.integrity = integrity();
     window.sim.step(225 * 24); // bir gün
     game.render(0);
     offs.forEach((off) => off());
+    const integrityAfter = integrity();
     return {
+      integrityAfter,
       loaded,
       after: { day: s.time.day, pop: s.characters.length, tier: s.town.tier, assessed: s.town.assessed },
       animals: s.animals.length,
@@ -57,6 +87,11 @@ for (const { name, raw } of fixtures) {
     };
   }, raw);
   const tag = `${name} (sürüm ${data.version})`;
+  results.push({ name: `${tag}: referanslar sağlam (yüklenince ve bir gün sonra)`, ok: r.loaded.integrity.length === 0 && r.integrityAfter.length === 0, detail: [...r.loaded.integrity, ...r.integrityAfter].slice(0, 4).join(', ') });
+  results.push({ name: `${tag}: harita farkları birebir uygulandı`, ok: r.loaded.terrain === data.terrain.length, detail: `${r.loaded.terrain}/${data.terrain.length} karo` });
+  if (!data.map) results.push({ name: `${tag}: eski 48x48 biyomsuz harita`, ok: r.loaded.map.width === 48 && r.loaded.map.height === 48 && r.loaded.map.generator === 1, detail: JSON.stringify(r.loaded.map) });
+  if (data.buildings.some((b) => b.type === 'lamp')) results.push({ name: `${tag}: Sokak Lambası Sokak Feneri'ne çevrildi`, ok: !r.loaded.types.includes('lamp') && r.loaded.types.includes('lantern') });
+  if (data.buildings.some((b) => b.project)) results.push({ name: `${tag}: yarım kalan proje iş emriyle sürer`, ok: r.loaded.projects.length > 0 && r.loaded.projects.every((p) => p.job), detail: `${r.loaded.projects.length} proje` });
   results.push({ name: `${tag}: açıldı`, ok: r.loaded.pop === data.characters.length && r.loaded.buildings >= data.buildings.length, detail: `gün ${r.loaded.day}, ${r.loaded.pop} sakin, ${r.loaded.buildings} yapı` });
   results.push({ name: `${tag}: bir gün yaşadı`, ok: r.after.day === r.loaded.day + 1, detail: `gün ${r.after.day}, ${r.after.pop} sakin` });
   results.push({ name: `${tag}: yaban hayatı yerleşti`, ok: r.wild > 0, detail: `${r.wild} yaban, ${r.pets} evcil` });

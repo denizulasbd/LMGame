@@ -92,8 +92,6 @@ export const SEASONS = [
   },
 ];
 
-export const SEASON_KEYS = SEASONS.map((s) => s.key);
-
 /** Oyun gününün mevsimi: { ...mevsim, index, dayOfSeason (1..), year (1..) } */
 export function getSeason(day) {
   const perSeason = CONFIG.DAYS_PER_SEASON;

@@ -85,6 +85,7 @@ export class DayNightOverlay {
   constructor() {
     this.canvas = document.createElement('canvas');
     this.ctx = this.canvas.getContext('2d');
+    this.screenLights = [];
   }
 
   /**
@@ -114,7 +115,15 @@ export class DayNightOverlay {
     ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a.toFixed(3)})`;
     ctx.fillRect(0, 0, width, height);
 
-    const screenLights = darkness > 0.05 ? lights.map((light) => toScreen(light, camera)) : [];
+    // Işıklar ekran koordinatına yerinde çevrilir (her karede kopya üretilmez); ekranın dışında kalanlar için
+    // gradyan hiç kurulmaz
+    const screenLights = this.screenLights;
+    screenLights.length = 0;
+    if (darkness > 0.05) {
+      for (const light of lights) {
+        if (toScreen(light, camera, width, height)) screenLights.push(light);
+      }
+    }
 
     // 1. Karanlıkta delik aç
     ctx.globalCompositeOperation = 'destination-out';
@@ -144,14 +153,14 @@ export class DayNightOverlay {
       target.fillRect(light.sx - light.sr, light.sy - light.sr, light.sr * 2, light.sr * 2);
     }
     target.restore();
+    screenLights.length = 0;
   }
 }
 
-function toScreen(light, camera) {
-  return {
-    ...light,
-    sx: (light.x - camera.x) * camera.zoom,
-    sy: (light.y - camera.y) * camera.zoom,
-    sr: light.radius * camera.zoom,
-  };
+/** Işığa ekran koordinatlarını yazar (sx, sy, sr); ışık halkası ekranla kesişiyorsa true. */
+function toScreen(light, camera, width, height) {
+  light.sx = (light.x - camera.x) * camera.zoom;
+  light.sy = (light.y - camera.y) * camera.zoom;
+  light.sr = light.radius * camera.zoom;
+  return light.sx + light.sr > 0 && light.sy + light.sr > 0 && light.sx - light.sr < width && light.sy - light.sr < height;
 }

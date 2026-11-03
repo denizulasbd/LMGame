@@ -129,7 +129,8 @@ export class AudioSystem {
   update(dt, hour) {
     this.time += dt;
     const sound = this.sound;
-    if (!sound.ctx) return;
+    // Ses kapalıyken (bağlam askıda) ambiyans hesaplanmaz; açılınca döngüler kaldıkları seviyeden sürer
+    if (!sound.ready) return;
     sound.loop('rain', { color: 'pink', filters: [{ type: 'highpass', freq: 400 }, { type: 'lowpass', freq: 2600 }] });
     sound.loop('water', { color: 'brown', filters: [{ type: 'bandpass', freq: 520, q: 0.9 }], wobble: { rate: 0.35, depth: 180 } });
 

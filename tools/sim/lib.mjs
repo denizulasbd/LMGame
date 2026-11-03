@@ -55,6 +55,21 @@ export async function openGame({ seed = 42, path = '', viewport = { width: 1280,
       };
     }, randomSeed);
   }
+  if (stopLoop && !path) {
+    // Oyun döngüsü hiç kare çalıştırmasın: aksi halde sayfa açılışıyla loop.stop() arasında gerçek zamana (ve
+    // makinenin yüküne) bağlı sayıda adım geçer ve aynı tohum farklı sonuç verir. Kare isteği bir kez yutulur.
+    await page.addInitScript(() => {
+      const raf = window.requestAnimationFrame.bind(window);
+      let swallowed = false;
+      window.requestAnimationFrame = (cb) => {
+        if (!swallowed && window.game === undefined) {
+          swallowed = true;
+          return 0;
+        }
+        return raf(cb);
+      };
+    });
+  }
   await page.goto(path ? `${BASE_URL}/${path}` : `${BASE_URL}/?seed=${seed}`);
   if (!path) {
     await page.waitForFunction(() => window.game?.scenes?.current?.world);
@@ -137,16 +152,24 @@ async function installHelpers(page, stopLoop) {
   }, stopLoop);
 }
 
-/** Oyunu saat cinsinden ilerletir (her saat başı isteğe bağlı bir sayfa işlevi çağrılır). */
+/** Verilen zaman hızında bir oyun saati kaç sabit adımdır (4x: 225, 2x: 450, 1x: 900). */
+export const stepsPerHour = (speed = 4) => Math.round((STEPS_PER_HOUR * 4) / speed);
+
+/**
+ * Oyunu saat cinsinden ilerletir (her oyun saatinde isteğe bağlı bir sayfa işlevi çağrılır). Adım sayısı oyunun o anki
+ * hızına (state.time.speed) göre hesaplanır: 1x hızda aynı oyun saati dört kat daha çok (ve daha küçük) adımla geçer.
+ */
 export async function runHours(page, hours, hook = null) {
   await page.evaluate(
-    ({ steps, hook }) => {
+    ({ hours, hook, base }) => {
+      const perHour = Math.round((base * 4) / (window.game.state.time.speed || 4));
+      const steps = Math.round(hours * perHour);
       for (let i = 0; i < steps; i++) {
         window.game.update(1 / 60);
-        if (hook && i % 225 === 0) window[hook]?.();
+        if (hook && i % perHour === 0) window[hook]?.();
       }
     },
-    { steps: Math.round(hours * STEPS_PER_HOUR), hook }
+    { hours, hook, base: STEPS_PER_HOUR }
   );
 }
 

@@ -12,6 +12,7 @@
 // Olayların durumu GameState.events'te (kayda girer). Yayınladığı olaylar:
 //   'festival:started' / 'festival:ended', 'merchant:arrived' / 'merchant:left', 'trade:completed',
 //   'immigration:blocked' { reason } — günlük ve ses bunları dinler.
+import { CONFIG } from '../config.js';
 import { Character } from '../entities/Character.js';
 import { IMMIGRATION, FESTIVAL, TOWN_BUFFS } from '../data/town.js';
 import { MERCHANT, offersFor, offerStock } from '../data/trade.js';
@@ -47,7 +48,15 @@ export class EventSystem {
       }),
       game.events.on('building:removed', (building) => {
         if (building.type === 'market' && this.merchantState.present && !this.findMarket()) this.sendMerchantAway();
+        // Şenliğin yapıldığı yer yıkıldıysa şenlik başka bir yere taşınır, yer kalmadıysa biter
+        if (this.festival.active && this.festival.venueId === building.id) {
+          const venue = this.findVenue();
+          if (venue) this.festival.venueId = venue.id;
+          else this.endFestival();
+        }
       }),
+      // Tüccarın yolunun üstüne yapı kurulursa (sakinlerde olduğu gibi) yeni bir yoldan yürür
+      game.events.on('world:blocked', ({ tiles }) => this.onTilesBlocked(tiles)),
       game.events.on('ui:trade', ({ offerId }) => this.trade(offerId)),
     ];
 
@@ -169,6 +178,38 @@ export class EventSystem {
     merchant.activityLabel = 'Pazar yerine yürüyor';
     this.merchant = merchant;
     this.world.visitors = [merchant];
+  }
+
+  onTilesBlocked(tiles) {
+    const merchant = this.merchant;
+    if (!merchant?.isMoving) return;
+    const blocked = new Set(tiles.map((t) => `${t.x},${t.y}`));
+    const points = merchant.remainingWaypoints();
+    const T = CONFIG.TILE_SIZE;
+    const crossing = points.some((p) => blocked.has(`${Math.floor(p.x / T)},${Math.floor(p.y / T)}`));
+    if (!crossing) return;
+    const last = points[points.length - 1];
+    if (blocked.has(`${merchant.tileX},${merchant.tileY}`)) {
+      const free = this.nearestWalkable(merchant.tileX, merchant.tileY);
+      if (free) {
+        const p = this.world.standPoint(free.x, free.y);
+        merchant.x = p.x;
+        merchant.y = p.y;
+      }
+    }
+    this.walkMerchantTo({ x: Math.floor(last.x / T), y: Math.floor(last.y / T) });
+  }
+
+  nearestWalkable(x, y) {
+    const map = this.world.map;
+    for (let r = 1; r < 8; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) === r && map.isWalkable(x + dx, y + dy)) return { x: x + dx, y: y + dy };
+        }
+      }
+    }
+    return null;
   }
 
   /** Tüccarın duracağı yer: pazarın önündeki karolardan en soldaki boş olanı. */

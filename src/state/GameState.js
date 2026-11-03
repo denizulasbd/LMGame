@@ -278,11 +278,43 @@ export class GameState {
     // Düğün ve doğum sayaçları eski kayıtlarda yoktur: sakinlerden tahmin edilir (evli çiftler, ebeveynli sakinler)
     if (data.stats?.weddings === undefined) next.stats.weddings = Math.floor(next.characters.filter((c) => c.married).length / 2);
     if (data.stats?.births === undefined) next.stats.births = next.characters.filter((c) => c.parentIds.length > 0).length;
-    // Sabitlenmiş iş yeri artık yoksa sabitleme kalkar
-    const ids = new Set(next.buildings.map((b) => b.id));
-    for (const c of next.characters) if (c.workplaceId !== null && !ids.has(c.workplaceId)) c.workplaceId = null;
+    sanitizeReferences(next);
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
+  }
+}
+
+/**
+ * Kayıttaki kopuk referansları onarır (elle düzenlenmiş ya da yarım yazılmış kayıtlar): var olmayan iş yerine
+ * sabitleme kalkar; evi olmayan sakine boş bir yatak bulunur (yoksa evsiz kalır); karşılıksız eş / sevgili bağı
+ * çözülür; var olmayan ebeveyn kimlikleri silinir.
+ */
+function sanitizeReferences(next) {
+  const buildings = new Map(next.buildings.map((b) => [b.id, b]));
+  const people = new Map(next.characters.map((c) => [c.id, c]));
+  for (const c of next.characters) {
+    if (c.workplaceId !== null && !buildings.has(c.workplaceId)) c.workplaceId = null;
+    if (c.homeId !== null && !buildings.has(c.homeId)) c.homeId = null;
+    if (c.partnerId !== null) {
+      const p = people.get(c.partnerId);
+      if (!p || p.partnerId !== c.id || p === c) {
+        c.partnerId = null;
+        c.married = false;
+        c.partnerSince = null;
+        c.marriedAt = null;
+      }
+    }
+    if (c.parentIds.some((id) => id === c.id || !people.has(id))) c.parentIds = c.parentIds.filter((id) => id !== c.id && people.has(id));
+  }
+  const residents = new Map();
+  for (const c of next.characters) if (c.homeId !== null) residents.set(c.homeId, (residents.get(c.homeId) ?? 0) + 1);
+  for (const c of next.characters) {
+    if (c.homeId !== null) continue;
+    const home = next.buildings.find((b) => b.functional && b.capacity > (residents.get(b.id) ?? 0));
+    if (!home) continue;
+    c.homeId = home.id;
+    c.relocating = true; // yeni evine yürür
+    residents.set(home.id, (residents.get(home.id) ?? 0) + 1);
   }
 }
 

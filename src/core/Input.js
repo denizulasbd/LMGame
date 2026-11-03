@@ -71,6 +71,13 @@ export class Input {
       this.keys.add(e.code);
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
+    // Tuş basılıyken bir metin kutusuna geçilirse (ör. W basılıyken ada tıklamak) kamera yazarken kaymaya devam etmesin
+    window.addEventListener('focusin', (e) => {
+      if (isTypingTarget(e.target)) {
+        this.keys.clear();
+        this.pressedThisFrame.clear();
+      }
+    });
     window.addEventListener('blur', () => {
       this.keys.clear();
       this.stopDrag();

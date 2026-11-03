@@ -61,7 +61,6 @@ export const WEATHER_SPECIALS = {
   thunderstorm: { rollHour: 14, seasons: { summer: 0.3 }, from: ['sunny', 'cloudy'] },
 };
 
-export const WEATHER_KEYS = Object.keys(WEATHER_TYPES);
 export const STARTING_WEATHER = 'sunny';
 
 // Hava değişimi günde bir iki kez olur: iki değişim arası bu kadar oyun saati geçer

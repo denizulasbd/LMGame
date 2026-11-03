@@ -140,11 +140,27 @@ export class Brain {
   /** Boş zaman etkinliğini yarıda kesmeyi gerektiren bir durum var mı? */
   hasUrgentNeed(c, hour) {
     const { needs, profile } = c;
-    return (
-      isBedtime(profile, hour) ||
-      needs.energy < profile.thresholds.energy - 5 ||
-      needs.hunger < profile.thresholds.hunger - 5
-    );
+    // Yalnızca giderilebilecek ihtiyaç işi yarıda keser. Kıtlıkta (yiyecek, pişmiş yemek, böğürtlen yok) ya da evsizken
+    // her yürüyüşü kesmek sakini "işe git -> yolda vazgeç -> yeniden işe git" döngüsüne sokuyordu: ne çalışıyor ne yiyordu.
+    if ((isBedtime(profile, hour) || needs.energy < profile.thresholds.energy - 5) && this.canSleep(c)) return true;
+    return needs.hunger < profile.thresholds.hunger - 5 && this.canEat();
+  }
+
+  /** Uyuyabileceği bir evi var mı (planSleep bir plan döndürebilir mi)? */
+  canSleep(c) {
+    const home = this.world.getBuilding(c.homeId);
+    return Boolean(home) && (c.insideBuildingId === home.id || this.world.getSpots(home).length > 0);
+  }
+
+  /** Kasabada yenecek bir şey var mı: handa pişmiş yemek, depoda yiyecek / ekmek ya da çalıda böğürtlen? (ucuz ön kontrol) */
+  canEat() {
+    if (this.economy.canFeed(MEAL_FOOD_COST)) return true;
+    for (const b of this.world.buildings) {
+      if (!b.functional) continue;
+      if (b.type === 'inn' && b.meals > 0) return true;
+      if (b.type === 'berryBush' && b.berries > 0 && !this.jobs.jobAt(b.tileX, b.tileY)) return true; // emirli çalıdan atıştırılmaz
+    }
+    return false;
   }
 
   /**

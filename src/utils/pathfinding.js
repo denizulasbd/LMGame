@@ -64,6 +64,28 @@ class MinHeap {
   }
 }
 
+// Arama tamponları çağrılar arasında yeniden kullanılır: her aramada harita boyunda üç dizi ayırıp doldurmak
+// yerine nesil damgası tutulur (stamp[i] !== generation ise o karonun gScore / parent değeri geçersizdir).
+const buffers = { size: 0, gScore: null, parent: null, stamp: null, closed: null, generation: 0 };
+
+function acquireBuffers(total) {
+  if (buffers.size !== total) {
+    buffers.size = total;
+    buffers.gScore = new Float64Array(total);
+    buffers.parent = new Int32Array(total);
+    buffers.stamp = new Uint32Array(total);
+    buffers.closed = new Uint32Array(total);
+    buffers.generation = 0;
+  }
+  buffers.generation++;
+  if (buffers.generation >= 0xffffffff) {
+    buffers.stamp.fill(0);
+    buffers.closed.fill(0);
+    buffers.generation = 1;
+  }
+  return buffers;
+}
+
 /** Sekiz yönlü ızgarada iki nokta arası en kısa uzaklık (çapraz adım √2). */
 function octile(dx, dy) {
   const ax = Math.abs(dx);
@@ -93,22 +115,23 @@ export function findPath(grid, start, goal, options = {}) {
   const total = width * height;
   const goalIndex = goal.y * width + goal.x;
   const startIndex = start.y * width + start.x;
-  const gScore = new Float64Array(total).fill(Infinity);
-  const parent = new Int32Array(total).fill(-1);
-  const closed = new Uint8Array(total);
+  const { gScore, parent, stamp, closed, generation } = acquireBuffers(total);
   const open = new MinHeap();
+  const g = (i) => (stamp[i] === generation ? gScore[i] : Infinity);
 
   const heuristic = (x, y) => octile(goal.x - x, goal.y - y) * minCost;
 
   gScore[startIndex] = 0;
+  parent[startIndex] = -1;
+  stamp[startIndex] = generation;
   open.push(startIndex, heuristic(start.x, start.y));
 
   let iterations = 0;
   while (open.size > 0 && iterations++ < maxIterations) {
     const current = open.pop();
-    if (closed[current]) continue;
+    if (closed[current] === generation) continue;
     if (current === goalIndex) return reconstruct(parent, current, width);
-    closed[current] = 1;
+    closed[current] = generation;
 
     const cx = current % width;
     const cy = (current - cx) / width;
@@ -118,7 +141,7 @@ export function findPath(grid, start, goal, options = {}) {
       const ny = cy + dy;
       if (!inBounds(nx, ny)) continue;
       const next = ny * width + nx;
-      if (closed[next]) continue;
+      if (closed[next] === generation) continue;
 
       const diagonal = dx !== 0 && dy !== 0;
       const isGoal = next === goalIndex;
@@ -132,9 +155,10 @@ export function findPath(grid, start, goal, options = {}) {
 
       const stepCost = (isGoal && goalBlocked ? 1 : cost(nx, ny)) * (diagonal ? SQRT2 : 1);
       const tentative = gScore[current] + stepCost;
-      if (tentative < gScore[next]) {
+      if (tentative < g(next)) {
         gScore[next] = tentative;
         parent[next] = current;
+        stamp[next] = generation;
         open.push(next, tentative + heuristic(nx, ny));
       }
     }
