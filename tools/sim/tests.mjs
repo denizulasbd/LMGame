@@ -12,6 +12,8 @@
 //   14. aşama: tekne kapasitesi ve Büyük İhracat Seferi, sabah sisi ve yaz fırtınası (şimşek), dört mevsim festivali
 //              (duyuru, yer, süsleme, katılım, anı, Mevsim Coşkusu), anılar ve nostalji, hayvan sevme, öncelikli kesim,
 //              Toplanma Zili
+//   16. aşama: maceralı keşif seferi (risk, usta ve alet, kaza, dönüş, anı, hikâye), egzotik ganimetler (asma, meşale,
+//              harita, yadigâr parçası), harabe yazıtları ve imar şemaları, kayıt sürümü 14
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
 import { openGame, createChecks } from './lib.mjs';
@@ -234,7 +236,8 @@ const pageResults = await page.evaluate(async () => {
   const explorer = s.characters.find((c) => c.away);
   check('izci sefere çıkar', started && explorer && s.dilemma.expedition);
   const res0 = { ...s.resources };
-  hours(27);
+  // (16. aşama) yolda açılan macera penceresi oyunu durdurur (30 sn sonra güvenli seçenek): sefer bitene dek beklenir
+  for (let i = 0; i < 80 && (s.dilemma.expedition || s.characters.some((c) => c.away)); i++) hours(0.5);
   check('izci döner ve ganimet getirir', !s.characters.some((c) => c.away) && !s.dilemma.expedition && Object.keys(res0).some((k) => s.resources[k] > res0[k]));
 
   // --- Belediye fermanları ---
@@ -1164,7 +1167,191 @@ const pageResults = await page.evaluate(async () => {
     sc().craftsmanship.refreshOutfit(rc);
   }
 
-  // --- Kayıt gidiş-dönüşü (sürüm 13) ---
+  // ===== 16. aşama =====
+  {
+    const X = await import('/src/systems/Exploration.js');
+    const D = await import('/src/data/exploration.js');
+    const sc = () => game.scenes.current;
+    const exs = () => sc().expeditions;
+    const ex = s.exploration;
+    const adults = () => s.characters.filter((c) => !c.isChild && !c.away);
+    // --- Risk: meslek ve ekipman ---
+    const mineOpt = D.ADVENTURES.mountainPass.options.find((o) => o.id === 'mine');
+    const pathOpt = D.ADVENTURES.mountainPass.options.find((o) => o.id === 'path');
+    const fake = (skills, tool = null) => ({ name: 'Deneme', skills, equipment: { tool } });
+    check('macera riski kafilesiz tabandır', Math.abs(X.optionRisk([fake({})], mineOpt).chance - mineOpt.risk.chance) < 1e-9);
+    check('Sağlam Aletli Usta Madenci maden riskini sıfırlar', X.optionRisk([fake({}), fake({ mining: 2000 }, 'sturdyTool')], mineOpt).chance === 0);
+    check('aletsiz Usta Madenci riski sıfırlamaz, yarıya indirir', Math.abs(X.optionRisk([fake({ mining: 2000 })], mineOpt).chance - mineOpt.risk.chance * 0.5) < 1e-9);
+    check('Kalfa Şifacı patikanın riskini sıfırlar', X.optionRisk([fake({ herbalism: 600 })], pathOpt).chance === 0);
+    check('seçenek açıklaması kafilenin riskini söyler', X.describeOption([fake({ mining: 2000 }, 'sturdyTool')], mineOpt).includes('Risk yok') && X.describeOption([fake({})], mineOpt).includes('Kaza riski %35'));
+
+    // --- Sefer düzenleme ---
+    for (const c of s.characters) c.illness = null;
+    s.dilemma.expedition = null;
+    s.dilemma.active = null;
+    s.time.paused = false;
+    const hall = s.buildings.find((b) => b.type === 'townHall' && b.functional);
+    sim.give({ food: 200 });
+    ex.lastLaunchDay = -99;
+    const st0 = X.expeditionLaunchStatus(s, 'townHall');
+    check('Belediye Konağı\'ndan sefer düzenlenebilir', hall && st0.ok, st0.reason);
+    const food0 = s.resources.food;
+    game.events.emit('ui:launchExpedition', { source: 'townHall' });
+    const exp = s.dilemma.expedition;
+    check('3 kişilik kafile yola çıkar, erzak ödenir, iki macera planlanır', exp && exp.members.length === 3 && s.resources.food === food0 - D.EXPLORATION.cost.food && exp.adventures.length === 2, exp && exp.adventures.join(','));
+    check('aynı anda ikinci sefer düzenlenemez', !X.expeditionLaunchStatus(s, 'townHall').ok);
+    const team = exp.members.map((id) => s.characters.find((c) => c.id === id));
+    hours(1);
+    check('kafile harita kenarına yürür ya da ufukta kaybolur', team.every((c) => c.away));
+    // --- İlk macera ---
+    let guard = 0;
+    while (!(s.dilemma.active?.kind === 'adventure') && guard++ < 200) sim.step(50);
+    const act = s.dilemma.active;
+    game.render(0);
+    const modal = document.querySelector('.dilemma');
+    check('yolculuğun ortasında Maceracı Günlüğü penceresi açılır ve oyun durur', act?.kind === 'adventure' && s.time.paused && !modal.hidden && modal.textContent.includes('Maceracı Günlüğü'), act?.id);
+    const scen = D.ADVENTURES[act.id];
+    check('pencere kafileyi ve seçeneklerin riskini gösterir', team.every((c) => modal.textContent.includes(c.name)) && act.options.some((o) => /Kaza riski|Risk yok/.test(o.detail)));
+    // Riskli seçeneği güvenceye al: kafileye kuralı karşılayan bir usta (aletiyle) ver
+    const risky = scen.options.find((o) => o.risk && o.safeWith);
+    const rule = risky.safeWith[0];
+    const keepSkills = { ...team[0].skills };
+    const keepTool = team[0].equipment.tool;
+    team[0].skills = { [rule.skill]: 2000 };
+    if (rule.tool) team[0].equipment.tool = 'sturdyTool';
+    const resolved = [];
+    const offR = game.events.on('adventure:resolved', (p) => resolved.push(p));
+    game.events.emit('ui:chooseDilemma', { optionId: risky.id });
+    check('usta kafilede iken riskli yol kazasız geçer ve seferin adını verir', resolved[0]?.success && resolved[0].risk.chance === 0 && exp.route === risky.route && !s.time.paused && !s.dilemma.active, exp.route);
+    check('macera ganimeti seferde birikir', Object.keys(exp.loot).length > 0 && exp.log.length === 1);
+    team[0].skills = keepSkills;
+    team[0].equipment.tool = keepTool;
+    // --- İkinci macera: kaza zorlanır (risk 1) ---
+    guard = 0;
+    while (!(s.dilemma.active?.kind === 'adventure') && guard++ < 300) sim.step(50);
+    const act2 = s.dilemma.active;
+    const scen2 = D.ADVENTURES[act2.id];
+    const bold = scen2.options.find((o) => o.risk);
+    const saved = { risk: bold.risk, safeWith: bold.safeWith, easeWith: bold.easeWith };
+    bold.risk = { ...bold.risk, chance: 1 };
+    bold.safeWith = [];
+    bold.easeWith = [];
+    const lootBefore = JSON.stringify(exp.loot);
+    game.events.emit('ui:chooseDilemma', { optionId: bold.id });
+    Object.assign(bold, saved);
+    offR();
+    check('kazada bir sakin yaralanır, ganimet azalır, bulgu gelmez', resolved[1] && !resolved[1].success && exp.hurt.length === 1 && resolved[1].found.length === 0, lootBefore + ' -> ' + JSON.stringify(exp.loot));
+    const victim = s.characters.find((c) => c.id === exp.hurt[0]);
+    exp.loot.herbs = (exp.loot.herbs ?? 0) + 3; // şifalı ot ganimeti (Şifacı Kulübesi'nin stoğuna, yoksa yiyeceğe)
+    // --- Dönüş ---
+    const returned = [];
+    const offB = game.events.on('expedition:returned', (p) => returned.push(p));
+    guard = 0;
+    while (s.dilemma.expedition && guard++ < 120) hours(0.5);
+    offB();
+    const back = returned[0];
+    check('kafile döner: kimse kaybolmaz, herkes görünür ve kasabada', back && team.every((c) => s.characters.includes(c) && !c.away && c.visible !== undefined) && !s.dilemma.expedition);
+    check("maceracıların anısına seferin hikâyesi yazılır (… Seferi'nden … döndü)", team.every((c) => c.memories.some((m) => m.text.startsWith(`${back.route} Seferi'nden`))), team[0].memories.at(-1)?.text);
+    check('kazada yaralanan dönünce hasta yatar ve anısına yazılır', victim.illness && victim.memories.some((m) => m.text.includes(scen2.title)));
+    check('dönenler handa anlatacak bir hikâye taşır', team.every((c) => c.tale && c.tale.route === back.route));
+    check('şifalı ot ganimeti günlüğe yazılır', s.journal.some((j) => j.text.includes(`${back.route} Seferi'nden döndü`)));
+    check('sefer günlüğü ve sayaç', ex.log.at(-1)?.route === back.route && ex.expeditions >= 1 && s.stats.adventures >= 2);
+    // --- Hikâye anlatma ---
+    const innB = s.buildings.find((b) => b.type === 'inn' && b.functional);
+    const teller = team.find((c) => c !== victim) ?? team[0];
+    const listeners = s.characters.filter((c) => !team.includes(c) && !c.isChild && !c.away).slice(0, 2);
+    const fun0 = listeners.map((c) => c.needs.fun);
+    for (const c of [teller, ...listeners]) {
+      c.task = { activity: 'inn', buildingId: innB.id, phase: 'perform', elapsed: 0, duration: 999 };
+      c.visible = true;
+    }
+    teller.needs.fun = 50;
+    for (const c of listeners) c.needs.fun = Math.min(c.needs.fun, 80);
+    const fun1 = listeners.map((c) => c.needs.fun);
+    exs().updateTales(D.EXPLORATION.tale.minutes + 1);
+    check('maceracı handa hikâyesini anlatır: başında dağ balonu, dinleyenlerin keyfi artar', teller.bubble?.icon === 'adventure' && listeners.every((c, i) => c.needs.fun > fun1[i]) && teller.tale.told === 1 && s.stats.talesTold >= 1, `${fun0} -> ${listeners.map((c) => c.needs.fun)}`);
+    check('anlatmak maceracının anısına yazılır', teller.memories.some((m) => m.text.includes('handa ballandıra ballandıra anlattı')));
+    for (const c of [teller, ...listeners]) c.task = null;
+    // --- Ganimetler ---
+    const shards0 = ex.items.relicShard;
+    const relics0 = s.civic.relics ?? 0;
+    ex.items.relicShard = 2;
+    exs().grantFind('relicShard', 'test');
+    check('üç Kadim Yadigâr Parçası birleşince kalıcı +2 refah', ex.items.relicShard === 0 && Math.abs((s.civic.relics ?? 0) - relics0 - 1) < 1e-9);
+    ex.items.relicShard = shards0;
+    ex.cityMap = false;
+    const iv = X.merchantIntervalMultiplier(s);
+    exs().grantFind('cityMap', 'test');
+    check('Kayıp Şehir Haritası tüccarı iki kat sık getirir', iv === 1 && ex.cityMap && X.merchantIntervalMultiplier(s) === 0.5);
+    const sh = ex.items.relicShard;
+    exs().grantFind('cityMap', 'test');
+    check('ikinci harita yadigâr parçasına döner', ex.items.relicShard === (sh + 1) % 3 || ex.items.relicShard === sh + 1);
+    // Üzüm asması
+    ex.items.vineSeed = 0;
+    const gardenB = s.buildings.find((b) => b.type === 'garden' && b.functional) ?? sim.place('garden');
+    const vineSpot = [[-1, 0], [2, 0], [0, -1], [0, 2], [-1, -1], [2, 2], [-1, 1], [2, 1]].map(([dx, dy]) => ({ x: gardenB.tileX + dx, y: gardenB.tileY + dy })).find((p) => {
+      ex.items.vineSeed = 1;
+      const ok = sc().construction.checkPlacement('grapeVine', p.x, p.y).ok;
+      ex.items.vineSeed = 0;
+      return ok;
+    });
+    const noSeed = sc().construction.checkPlacement('grapeVine', vineSpot?.x ?? 0, vineSpot?.y ?? 0);
+    check('fide olmadan asma dikilemez', !noSeed.ok && noSeed.reason.includes('Üzüm Fidesi'), noSeed.reason);
+    ex.items.vineSeed = 1;
+    const far = sim.findSpot('grapeVine') ?? null;
+    const farCheck = sc().construction.checkPlacement('grapeVine', plaza.centerX, plaza.centerY + 1);
+    check('asma yalnızca bahçe / çardak kenarına dikilir', !farCheck.ok || far !== null, farCheck.reason);
+    const vine = vineSpot ? sc().construction.placeSite('grapeVine', vineSpot.x, vineSpot.y) : { ok: false };
+    if (vine.ok) {
+      const job = sc().jobs.jobs.find((j) => j.buildingId === vine.building.id);
+      if (job) sc().jobs.cancel(job);
+      sc().construction.complete(vine.building);
+    }
+    sim.step(5);
+    check('fide dikilince harcanır, yanındaki bahçenin verimi +%10', vine.ok && ex.items.vineSeed === 0 && Math.abs((gardenB.factors?.vines ?? 1) - 1.1) < 1e-9, `${vineSpot?.x},${vineSpot?.y} ${gardenB.factors?.vines}`);
+    if (vine.ok) sc().construction.demolish(vine.building);
+    check('asma sökülünce fide sandığa döner', ex.items.vineSeed === 1);
+    // Kadim Meşale
+    ex.items.ancientTorch = 1;
+    const torch = sim.place('ancientTorch');
+    check('meşale dikilir ve ganimet harcanır', torch && ex.items.ancientTorch === 0);
+    while (s.time.hour >= 6 && s.time.hour < 19) hours(1);
+    hours(0.1);
+    const lights = [];
+    torch.collectLights(lights, { time: 0, windowsLit: true, hour: 20 });
+    check('gece mavi alevle yanar (mavi ışık)', torch.lit && lights.some((l) => l.color[2] > l.color[0]));
+    const warmTest = s.characters.find((c) => !c.away && c.visible);
+    if (warmTest) {
+      warmTest.x = torch.center.x + 10;
+      warmTest.y = torch.center.y + 4;
+      warmTest.buffs.warmUntil = 0;
+      sc().heating.warmCharacters(1);
+    }
+    check('meşalenin yanındakinin içi ısınır', !warmTest || (warmTest.buffs.warmUntil ?? 0) > s.totalMinutes);
+    // --- Harabe sırları ve kadim yazıtlar ---
+    for (const k of D.INSCRIPTION_KEYS) delete ex.inscriptions[k];
+    ex.decoding = null;
+    const fountainRuin = s.buildings.find((b) => b.type === 'ancientFountain') ?? { type: 'ancientFountain' };
+    game.events.emit('ruin:restored', { building: fountainRuin, from: 'Kadim Çeşme', treasure: null });
+    check('onarılan harabenin içinden kadim yazıt çıkar', ex.inscriptions.aqueduct?.status === 'found');
+    s.research.active = null;
+    const academyB = s.buildings.find((b) => b.definition.academy && b.functional);
+    game.events.emit('ui:decodeInscription', { id: 'aqueduct' });
+    check('yazıt Bilgelik Evi\'nde çözülmeye başlar', ex.decoding?.id === 'aqueduct' && ex.inscriptions.aqueduct.status === 'decoding');
+    sc().research.work(academyB, D.INSCRIPTIONS.aqueduct.work + 1);
+    sim.step(5);
+    check('çözülen Antik Su Kemeri Şeması bahçelere kalıcı +%15', X.hasScheme(s, 'aqueduct') && X.schemeGardenMultiplier(s) === 1.15 && Math.abs((gardenB.factors?.scheme ?? 1) - 1.15) < 1e-9);
+    ex.inscriptions.steelCasting = { status: 'decoded' };
+    ex.inscriptions.millstone = { status: 'decoded' };
+    const iron0 = s.resources.iron;
+    ex.ironCredit = 0;
+    for (let i = 0; i < 5; i++) sc().crafting.saveIron(2);
+    check('Kadim Çelik Döküm: atölye demirinin %20\'si geri döner', s.resources.iron === iron0 + 2, `${iron0} -> ${s.resources.iron}`);
+    check('Kadim Değirmen Taşı: fırın %15 hızlı', X.schemeBakeMultiplier(s) === 1.15);
+    window.__x16 = { inscriptions: Object.keys(ex.inscriptions).length, map: ex.cityMap, tales: team.filter((c) => c.tale).length, teamIds: team.map((c) => c.id), expeditions: ex.expeditions };
+  }
+
+  // --- Kayıt gidiş-dönüşü (sürüm 14) ---
   const ill = s.characters.find((c) => !c.isChild);
   scene.health.fallIll(ill);
   hut.remedies = 4;
@@ -1176,7 +1363,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 13', raw.version === 13);
+  check('kayıt sürümü 14', raw.version === 14);
   check('kayıttan anılar döner', s2.characters.find((c) => c.id === window.__mem.id)?.memories.length === window.__mem.count);
   check('kayıttan festival geçmişi, kervan seferi ve sayaçlar döner', ['spring', 'summer', 'autumn', 'winter'].every((t) => s2.seasonFestival.held[t] >= 1) && s2.trade.grandVoyages >= 1 && s2.stats.rallies >= 1 && s2.stats.seasonFestivals >= 4);
   check('kayıttan yadigârlar, ipek ve fermanlar döner', RELIC_KEYS.every((id) => s2.luxury.relics[id]) && s2.luxury.silk && s2.luxury.decreeDays.goldBonus !== undefined && s2.luxury.goldSpent === s.luxury.goldSpent);
@@ -1189,8 +1376,10 @@ const pageResults = await page.evaluate(async () => {
   check('kayıttan okul mezunu döner', s2.characters.some((c) => c.educated));
   check('kayıttan hayvanlar ve adları döner', s2.animals.length === animals && s2.animals.some((a) => a.name === cat.name));
   check('kayıttan hastalık, iksir ve hasar döner', ill2?.illness && s2.buildings.find((b) => b.id === hut.id)?.remedies === 4 && s2.buildings.find((b) => b.id === farm.id)?.damaged);
-  check('kayıttan usta işi eserler (sergilenen ve satılanlar) döner', s2.masterworks.items.length === window.__mw15.count && s2.masterworks.made === window.__mw15.made && s2.masterworks.items.filter((i) => i.status === 'exhibited').length === window.__mw15.exhibited);
+  check('kayıttan usta işi eserler (sergilenen ve satılanlar) döner', s2.masterworks.items.length === raw.masterworks.items.length && s2.masterworks.made === raw.masterworks.made && raw.masterworks.made >= window.__mw15.made && s2.masterworks.items.filter((i) => i.status === 'exhibited').length === raw.masterworks.items.filter((i) => i.status === 'exhibited').length);
   check('yüklenince ustanın kıyafeti deneyiminden yeniden giyilir', s2.characters.find((c) => c.id === window.__mw15.makerId)?.outfit === 'miner:3');
+  check('kayıttan keşif ganimetleri, yazıtlar ve şemalar döner', Object.keys(s2.exploration.inscriptions).length === window.__x16.inscriptions && s2.exploration.cityMap === window.__x16.map && s2.exploration.expeditions === window.__x16.expeditions && s2.exploration.inscriptions.aqueduct?.status === 'decoded');
+  check('kayıttan maceracıların anlatacağı hikâyeler döner', s2.characters.filter((c) => window.__x16.teamIds.includes(c.id) && c.tale).length === window.__x16.tales);
   check('kayıttan ferman ve fırtına döner', s2.civic.storageLevel === 1 && s2.civic.craftGuild && s2.dilemma.storm?.fortified);
   return out;
 });

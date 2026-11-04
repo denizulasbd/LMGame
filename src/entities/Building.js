@@ -24,6 +24,7 @@ import {
   PIER_ART,
   INN_ART,
   LANTERN_ART,
+  TORCH_ART,
   MONUMENT_ART,
   STONE_HOUSE_ART,
   WATCHTOWER_ART,
@@ -77,6 +78,7 @@ const BASELINE_INSET = {
   gazebo: 2,
   marbleArch: 1,
   flowerFence: 3,
+  ancientTorch: 6,
 };
 // Çardağın çatısı kışın karla örtülür (arka katman çatı altında kalır, karlanmaz)
 const GAZEBO_WINTER_ROOF = { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 };
@@ -680,6 +682,11 @@ export class Building extends Entity {
       // (14. aşama) Işıklar Gecesi'nde bütün fenerler parıldar
       const sparkle = env.festivalTheme === 'winter' ? 1.35 + Math.sin(env.time * 4 + this.id) * 0.08 : 1;
       out.push({ x: this.x + LANTERN_ART.light.x, y: artTop + LANTERN_ART.light.y, radius: 52 * sparkle, color: [255, 214, 120], intensity: 0.85, glow: 0.34 * Math.min(1.25, sparkle) });
+    } else if (this.type === 'ancientTorch' && this.lit) {
+      // (16. aşama) Kadim Meşale: titreyen mavi alev, geniş ve serin bir ışık halkası
+      const artTop = this.y + this.height - TORCH_ART.height;
+      const flicker = Math.sin(env.time * 9 + this.id) * 3;
+      out.push({ x: this.x + TORCH_ART.light.x, y: artTop + TORCH_ART.light.y, radius: 58 + flicker, color: [90, 170, 255], intensity: 0.9, glow: 0.42 });
     } else if (this.type === 'monument' && env.windowsLit) {
       // Anıtın yıldızı gece hafifçe parlar
       const artTop = this.y + this.height - MONUMENT_ART.height;

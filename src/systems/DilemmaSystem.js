@@ -11,9 +11,15 @@
 //   Fırtına   : karardan 20-30 saat sonra gelir ('storm:struck'); güçlendirilmemiş kasabada 1-3 üretim yapısı
 //               hasar alır (onarılana kadar çalışmaz). Kurtlar ağıla dalarsa ağıl hasar alır, kasaba korkar.
 //   Sefer     : seçilen sakinler harita kenarına yürüyüp bir gün görünmez olur (BehaviorSystem); hepsi dönünce
-//               ganimet stoğa girer ('expedition:returned').
+//               ganimet stoğa girer ('expedition:returned'). (16. aşama) Seferin yolculuğu, maceraları ve dönüşü
+//               ExpeditionSystem'dedir; bu sistem kararın etkisini 'expedition:launch' ile ona iletir.
+//   Macera    : (16. aşama) seferdeki kafilenin "Maceracı Günlüğü" pencereleri de buradan açılır (openAdventure):
+//               aynı pencere, duraklatma ve süre; tanım data/exploration.js -> ADVENTURES. Seçim 'adventure:chosen'
+//               { id, optionId, auto } olarak ExpeditionSystem'e gider (olay takvimini ve geçmişini etkilemez).
 // Durum state.dilemma'dadır (kayda girer: açık pencere, yaklaşan fırtına, süren sefer).
-import { DILEMMAS, DILEMMA_KEYS, DILEMMA_SCHEDULE, STORM, EXPEDITION } from '../data/dilemmas.js';
+import { DILEMMAS, DILEMMA_KEYS, DILEMMA_SCHEDULE, STORM } from '../data/dilemmas.js';
+import { ADVENTURES } from '../data/exploration.js';
+import { idleAdults as idleAdultsOf } from './Exploration.js';
 import { DAMAGEABLE_TYPES } from '../data/buildings.js';
 import { TOWN_BUFFS } from '../data/town.js';
 import { SKILL_LEVELS, SKILL_KEYS } from '../data/skills.js';
@@ -48,7 +54,6 @@ export class DilemmaSystem {
         if (hour === DILEMMA_SCHEDULE.hour) this.maybeStart();
       }),
       game.events.on('ui:chooseDilemma', ({ optionId }) => this.choose(optionId, false)),
-      game.events.on('expedition:memberReturned', () => this.checkExpedition()),
     ];
     if (this.dilemma.nextDay === null) this.scheduleNext(DILEMMA_SCHEDULE.firstDay);
     // Kayıtta açık bir karar penceresi varsa oyun yine durur ve pencere açılır
@@ -80,7 +85,34 @@ export class DilemmaSystem {
       else this.publishOptions();
     }
     if (d.storm && this.state.totalMinutes >= d.storm.at) this.strike();
-    if (d.expedition && this.state.totalMinutes >= d.expedition.until + 120) this.checkExpedition(true);
+  }
+
+  /** Açık pencerenin tanımı: olay (DILEMMAS) ya da seferdeki macera (ADVENTURES). */
+  definitionFor(active) {
+    return active?.kind === 'adventure' ? ADVENTURES[active.id] : DILEMMAS[active?.id];
+  }
+
+  /**
+   * (16. aşama) Seferdeki kafilenin macera penceresini açar. extra: { text: kafileyle birlikte metin, details:
+   * { seçenek: bu kafileyle risk açıklaması } }. Başka bir pencere açıksa false (ExpeditionSystem sonra yeniden dener).
+   */
+  openAdventure(id, extra = {}) {
+    const d = this.dilemma;
+    if (this.attract || d.active || !ADVENTURES[id]) return false;
+    d.active = { id, kind: 'adventure', remaining: DILEMMA_SCHEDULE.timeoutSeconds, wasPaused: this.state.time.paused, text: extra.text ?? null, details: extra.details ?? {} };
+    this.publishOptions();
+    this.events.emit('time:setPaused', true);
+    this.events.emit('dilemma:opened', { active: d.active });
+    return true;
+  }
+
+  /** Sefer bitince hâlâ açık kalan macera penceresi sessizce kapanır. */
+  closeAdventure() {
+    const d = this.dilemma;
+    if (d.active?.kind !== 'adventure') return;
+    const wasPaused = d.active.wasPaused;
+    d.active = null;
+    if (!wasPaused) this.events.emit('time:setPaused', false);
   }
 
   // ---------------------------------------------------------------------------
@@ -131,7 +163,7 @@ export class DilemmaSystem {
 
   /** Seçimi bekleyen ya da sefere uygun boştaki yetişkinler: görünür, hasta değil, çocuk değil. */
   idleAdults() {
-    return this.world.characters.filter((c) => !c.isChild && !c.away && !c.illness && !c.newcomer && !c.role);
+    return idleAdultsOf(this.world.characters);
   }
 
   /** Sefere gidecekler: önce Sağlam Alet kuşananlar, sonra en az deneyimliler (kasabanın ustaları kalsın). */
@@ -173,7 +205,14 @@ export class DilemmaSystem {
   publishOptions() {
     const active = this.dilemma.active;
     if (!active) return;
-    const def = DILEMMAS[active.id];
+    const def = this.definitionFor(active);
+    if (active.kind === 'adventure') {
+      // Macera seçenekleri her zaman seçilebilir; açıklamaları bu kafileyle riski içerir
+      active.options = def.options.map((o) => ({ id: o.id, ok: true, reason: null, detail: active.details?.[o.id] ?? o.detail }));
+      active.defaultId = (def.options.find((o) => o.default) ?? def.options[def.options.length - 1]).id;
+      active.title = def.title;
+      return;
+    }
     active.options = def.options.map((o) => ({ id: o.id, ...this.optionStatus(o) }));
     active.defaultId = this.defaultOption(def).id;
     active.title = dilemmaTitle(def, this.state);
@@ -188,6 +227,10 @@ export class DilemmaSystem {
   choose(optionId, auto) {
     const d = this.dilemma;
     if (!d.active) return;
+    if (d.active.kind === 'adventure') {
+      this.chooseAdventure(optionId, auto);
+      return;
+    }
     const def = DILEMMAS[d.active.id];
     let option = def.options.find((o) => o.id === optionId);
     if (!option || !this.optionStatus(option).ok) {
@@ -208,6 +251,17 @@ export class DilemmaSystem {
     if (!wasPaused) this.events.emit('time:setPaused', false);
     this.events.emit('dilemma:resolved', { dilemma: def, id, option, auto, title: dilemmaTitle(def, this.state) });
     this.events.emit('toast', { text: `${auto ? 'Süre doldu: ' : ''}${option.result}`, tone: 'info', icon: def.icon });
+  }
+
+  chooseAdventure(optionId, auto) {
+    const d = this.dilemma;
+    const def = ADVENTURES[d.active.id];
+    const option = def.options.find((o) => o.id === optionId) ?? (auto ? def.options.find((o) => o.default) ?? def.options[def.options.length - 1] : null);
+    if (!option) return;
+    const { id, wasPaused } = d.active;
+    d.active = null;
+    if (!wasPaused) this.events.emit('time:setPaused', false);
+    this.events.emit('adventure:chosen', { id, optionId: option.id, auto });
   }
 
   apply(id, effect) {
@@ -236,49 +290,9 @@ export class DilemmaSystem {
     this.events.emit('dilemma:recruited', { character: newcomer, skill });
   }
 
+  /** Kayıp Hazine Haritası: kafileyi ExpeditionSystem yola çıkarır (maceralar ve dönüş orada). */
   sendExpedition(size, count) {
-    const explorers = this.pickExplorers(count);
-    if (explorers.length === 0) return;
-    // Aleti olmayanlara depodan Sağlam Alet verilir (seferde aşınır)
-    if (size === 'big') {
-      for (const c of explorers) if (c.equipment.tool !== 'sturdyTool' && this.state.equipment.sturdyTool > 0) this.state.equipment.sturdyTool -= 1;
-    }
-    const exit = this.world.findEntryTile(this.rng);
-    const until = this.state.totalMinutes + EXPEDITION.hours * 60;
-    this.dilemma.expedition = { members: explorers.map((c) => c.id), until, size };
-    this.events.emit('expedition:depart', { ids: explorers.map((c) => c.id), until, exit });
-    this.events.emit('expedition:departed', { members: explorers, until });
-  }
-
-  /** Seferdekilerin hepsi döndüyse ganimet stoğa girer (force: dönüş gecikirse yine de sonuçlanır). */
-  checkExpedition(force = false) {
-    const exp = this.dilemma.expedition;
-    if (!exp) return;
-    const members = exp.members.map((id) => this.world.getCharacter(id)).filter(Boolean);
-    if (!force && members.some((c) => c.away)) return;
-    this.dilemma.expedition = null;
-    const table = EXPEDITION.loot[exp.size] ?? EXPEDITION.loot.small;
-    const civic = this.state.civic;
-    // Şans sayacı: tılsımsız geçen seferler birikir; sayaç dolunca bu sefer tılsımı kesin bulur
-    const sinceTalisman = (civic.expeditionsSinceTalisman ?? 0) + 1;
-    const talismanEntry = EXPEDITION.loot.big.find((e) => e.buff === 'talisman');
-    let entry = table[this.rng.weighted(table.map((e, i) => [i, e.weight]))];
-    if (!entry.buff && sinceTalisman >= EXPEDITION.talismanPity) entry = talismanEntry;
-    civic.expeditionsSinceTalisman = entry.buff === 'talisman' ? 0 : sinceTalisman;
-    const got = {};
-    for (const [resource, [min, max]] of Object.entries(entry.get)) {
-      const added = this.economy.add(resource, this.rng.int(min, max));
-      if (added > 0) got[resource] = added;
-    }
-    if (entry.buff) this.state.buffs[entry.buff] = this.state.totalMinutes + TOWN_BUFFS[entry.buff].hours * 60;
-    if (entry.relic) this.state.civic.relics = (this.state.civic.relics ?? 0) + entry.relic / EXPEDITION.relicHappiness;
-    this.events.emit('expedition:returned', { members, loot: got, text: entry.text, buff: entry.buff ?? null, relic: Boolean(entry.relic) });
-    const list = Object.entries(got).map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`).join(', ');
-    this.events.emit('toast', {
-      text: `Keşif seferi döndü! ${entry.text}${list ? `: ${list}` : ''}${entry.buff ? ' · Kadim Tılsım: 3 gün herkes daha hızlı ve keyifli' : ''}`,
-      tone: 'success',
-      icon: 'map',
-    });
+    this.events.emit('expedition:launch', { size, count });
   }
 
   // ---------------------------------------------------------------------------

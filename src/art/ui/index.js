@@ -940,6 +940,120 @@ Object.assign(ICONS, {
   ],
 });
 
+// (16. aşama) Keşif seferleri: macera sahneleri, egzotik ganimetler, kadim yazıt ve imar şeması
+Object.assign(ICONS, {
+  mountain: [
+    '....K....',
+    '...KuK...',
+    '..KuuqK..',
+    '..KrqrK..',
+    '.KrrRrrK.',
+    '.KrRrrRK.',
+    'KRrrRrrRK',
+    'KgggggggK',
+    'KKKKKKKKK',
+  ],
+  river: [
+    '.........',
+    'gg.....gg',
+    'gKbbbbbKg',
+    'gKbcbbcKg',
+    'gKbbcbbKg',
+    'gKcbbbcKg',
+    'gKbbcbbKg',
+    'gg.....gg',
+    '.........',
+  ],
+  temple: [
+    '....K....',
+    '...KcK...',
+    '..KKKKK..',
+    '.KqqqqqK.',
+    'KKvKqKvKK',
+    '.KqKcKqK.',
+    '.KvKcKvK.',
+    'KKKKKKKKK',
+    'KqqqqqqqK',
+  ],
+  vineSeed: [
+    '...vV....',
+    '..vVv.i..',
+    '.v.x.iii.',
+    '...x..i..',
+    '..KKKKK..',
+    '.KwXXXwK.',
+    '.KXDDDXK.',
+    '.KwXXXwK.',
+    '..KKKKK..',
+  ],
+  ancientTorch: [
+    '....c....',
+    '...cac...',
+    '..caWac..',
+    '..KcacK..',
+    '..KYYYK..',
+    '...KrK...',
+    '...KcK...',
+    '...KrK...',
+    '..KKKKK..',
+  ],
+  cityMap: [
+    'KKKKKKKKK',
+    'KSssSssSK',
+    'KsoSsKsSK',
+    'KSsoSsKsK',
+    'KsSsoooSK',
+    'KSKsSsoSK',
+    'KsSsKsSxK',
+    'KSssSsxoK',
+    'KKKKKKKKK',
+  ],
+  relicShard: [
+    '.........',
+    '....K....',
+    '...KaK...',
+    '..KaucK..',
+    '.KacccaK.',
+    '..KcicK..',
+    '...KcK...',
+    '....K....',
+    '.........',
+  ],
+  inscription: [
+    '.KKKKKKK.',
+    'KqqqqqqqK',
+    'KqKqKKqqK',
+    'KqqqqqqqK',
+    'KqKKqKKqK',
+    'KqqqqqqqK',
+    'KqKqqKqqK',
+    'KqqqqqqqK',
+    '.KKKKKKK.',
+  ],
+  scheme: [
+    'KKKKKKKKK',
+    'KBBBBBBBK',
+    'KBuBBBuBK',
+    'KBuBuBuBK',
+    'KBuuuuuBK',
+    'KBuBBBuBK',
+    'KBuBBBuBK',
+    'KBBBBBBBK',
+    'KKKKKKKKK',
+  ],
+  adventure: [
+    '...K.....',
+    '..KuK..P.',
+    '.KqrqK.Y.',
+    'KrRrrRK..',
+    'KKKKKKKK.',
+    '..KxxK...',
+    '.KxPPxK..',
+    '.KxxxxK..',
+    '..KKKK...',
+  ],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);
@@ -1070,6 +1184,9 @@ const BUBBLE_ICONS = {
   // 15. aşama: barışma (iki elin sıkışması: biri ten, biri koyu ten; kollarda kumaş), usta işi eser (altın madalya)
   handshake: ['.......', 'BB...oo', 'BTTtTTo', '.TtTtT.', '..TTT..', '.......'],
   masterpiece: ['.o...o.', '..o.o..', '..PPP..', '.PYuYP.', '.PYYYP.', '..PPP..'],
+  // 16. aşama: maceracı hikâyesi (karlı dağ) ve hazine sandığı
+  adventure: ['...K...', '..KuK..', '.KqrrK.', 'KrRrRrK', 'gggggg.', '.......'],
+  treasure: ['.KKKKK.', 'KXPXPXK', 'KKKPKKK', 'KwXXXwK', 'KwwwwwK', '.KKKKK.'],
 };
 
 export const BUBBLE_WIDTH = 11;

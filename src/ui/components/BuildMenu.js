@@ -6,8 +6,9 @@ import { TOWN_TIERS } from '../../data/town.js';
 import { RESOURCES } from '../../data/resources.js';
 import { getStructureSprite } from '../../art/sprites/index.js';
 import { getTileSprite } from '../../art/tiles/index.js';
-import { getIconDataURL } from '../../art/ui/index.js';
+import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
+import { EXOTIC_ITEMS } from '../../data/exploration.js';
 
 const TOOLS = [
   { tool: 'select', label: 'Seç', key: 'Esc', icon: 'select', hint: 'Sakinlere ve yapılara tıklayarak incele.' },
@@ -53,11 +54,15 @@ export class BuildMenu {
           String(v),
         ])
       );
+      // (16. aşama) Ganimetle dikilen yapılar: bedel yerine eldeki fide / meşale sayısı
+      const itemChip = def.item
+        ? el('span', { className: 'build-cost build-item-count', dataset: { item: def.item } }, [el('img', { src: getAnyIconURL(EXOTIC_ITEMS[def.item].icon), alt: EXOTIC_ITEMS[def.item].name }), '0'])
+        : null;
       const b = this.button(
         [
           el('span', { className: 'build-thumb' }, [el('img', { src: thumbnailURL(type), alt: '' })]),
           el('span', { className: 'build-name', text: def.name }),
-          el('span', { className: 'build-costs' }, costs.length ? costs : [el('span', { className: 'build-cost', text: 'Ücretsiz' })]),
+          el('span', { className: 'build-costs' }, itemChip ? [itemChip] : costs.length ? costs : [el('span', { className: 'build-cost', text: 'Ücretsiz' })]),
         ],
         `${def.name} — ${def.description}`,
         () => this.events.emit('ui:setTool', { tool: 'build', buildType: type })
@@ -108,7 +113,8 @@ export class BuildMenu {
     const resources = game.state.resources;
     const built = new Set(game.state.buildings.filter((b) => !b.underConstruction).map((b) => b.type));
     const tier = game.state.town?.tier ?? 1;
-    const key = `${tier}|${Object.values(resources).join(',')}|${game.state.buildings.map((b) => `${b.type}${b.underConstruction ? '~' : ''}`).sort().join(',')}`;
+    const items = game.state.exploration?.items ?? {};
+    const key = `${tier}|${Object.values(resources).join(',')}|${Object.values(items).join(',')}|${game.state.buildings.map((b) => `${b.type}${b.underConstruction ? '~' : ''}`).sort().join(',')}`;
     if (key === this.affordKey) return;
     this.affordKey = key;
     for (const { type, def, button } of this.items) {
@@ -118,7 +124,13 @@ export class BuildMenu {
       const alreadyHave = def.unique && game.state.buildings.some((b) => b.type === type);
       // Kasaba seviyesiyle açılan yapılar (değirmen: Köy, belediye: Kasaba) kilit simgesiyle görünür
       const tierLocked = def.requiresTier && tier < def.requiresTier;
-      const locked = needsOther || alreadyHave || tierLocked;
+      const noItem = def.item && (items[def.item] ?? 0) < 1;
+      const locked = needsOther || alreadyHave || tierLocked || noItem;
+      const chip = button.querySelector('.build-item-count');
+      if (chip) {
+        chip.lastChild.textContent = `${items[def.item] ?? 0}`;
+        chip.classList.toggle('is-missing', Boolean(noItem));
+      }
       button.classList.toggle('is-locked', Boolean(locked));
       button.classList.toggle('is-tier-locked', Boolean(tierLocked));
       button.dataset.tier = tierLocked ? TOWN_TIERS[def.requiresTier - 1].name : '';
@@ -128,7 +140,9 @@ export class BuildMenu {
         ? `${def.name} — ${def.requiresBuilding.reason}`
         : alreadyHave
           ? `${def.name} — kasabada zaten var (yalnızca bir tane olabilir)`
-          : `${def.name} — ${def.description}`;
+          : noItem
+            ? `${def.name} — önce bir keşif seferinden ${EXOTIC_ITEMS[def.item].name} getirilmeli · ${def.description}`
+            : `${def.name} — ${def.description}`;
       button.classList.toggle('is-unaffordable', locked || Object.entries(cost).some(([r, v]) => resources[r] < v));
       for (const node of button.querySelectorAll('.build-cost[data-resource]')) {
         node.classList.toggle('is-missing', resources[node.dataset.resource] < cost[node.dataset.resource]);

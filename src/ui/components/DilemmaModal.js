@@ -3,8 +3,11 @@
 // nedeni yazılı). Oyun duraklatılmıştır; alttaki çubuk 30 saniyelik süreyi gösterir: süre dolunca varsayılan
 // güvenli seçenek uygulanır. Seçim 'ui:chooseDilemma' { optionId } olarak yayınlanır; kurallar DilemmaSystem'de.
 // Pencere yalnızca GameState'i okur: seçeneklerin uygunluğu, başlık ve varsayılan seçenek DilemmaSystem'in
-// state.dilemma.active'e yazdığı alanlardan gelir (options: [{ id, ok, reason }], defaultId, title).
+// state.dilemma.active'e yazdığı alanlardan gelir (options: [{ id, ok, reason, detail? }], defaultId, title).
+// (16. aşama) Seferdeki kafilenin maceraları (active.kind === 'adventure') da bu pencerede "Maceracı Günlüğü" olarak
+// açılır: metin kafileyi, seçenek açıklamaları bu kafileyle kaza riskini söyler.
 import { DILEMMAS, DILEMMA_SCHEDULE } from '../../data/dilemmas.js';
+import { ADVENTURES } from '../../data/exploration.js';
 import { RESOURCES } from '../../data/resources.js';
 import { getAnyIconURL, getIconDataURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
@@ -39,15 +42,17 @@ export class DilemmaModal {
       this.lastKey = '';
       return;
     }
-    const def = DILEMMAS[active.id];
+    const adventure = active.kind === 'adventure';
+    const def = adventure ? ADVENTURES[active.id] : DILEMMAS[active.id];
+    this.element.classList.toggle('is-adventure', adventure);
     const resources = game.state.resources;
     const statuses = def.options.map((o) => active.options?.find((x) => x.id === o.id) ?? { ok: true, reason: null });
-    const key = `${active.id}|${statuses.map((s) => s.ok).join(',')}|${Object.values(resources).join(',')}`;
+    const key = `${active.kind ?? ''}|${active.id}|${active.text ?? ''}|${statuses.map((s) => `${s.ok}${s.detail ?? ''}`).join(',')}|${Object.values(resources).join(',')}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       this.icon.src = getAnyIconURL(def.icon);
-      this.title.textContent = active.title ?? def.title;
-      this.text.textContent = def.text;
+      this.title.textContent = adventure ? `Maceracı Günlüğü · ${def.title}` : active.title ?? def.title;
+      this.text.textContent = active.text ?? def.text;
       this.options.replaceChildren(...def.options.map((option, i) => this.optionButton(option, statuses[i], resources)));
     }
     const left = Math.max(0, active.remaining);
@@ -65,7 +70,7 @@ export class DilemmaModal {
     );
     const button = el('button', { className: `dilemma-option${option.default ? ' is-default' : ''}`, type: 'button', tabIndex: -1 }, [
       el('span', { className: 'dilemma-option-label', text: option.label }),
-      el('span', { className: 'dilemma-option-detail', text: status.ok ? option.detail : `${option.detail} · ${status.reason}` }),
+      el('span', { className: 'dilemma-option-detail', text: status.ok ? status.detail ?? option.detail : `${option.detail} · ${status.reason}` }),
       el('span', { className: 'build-costs' }, costs.length ? costs : [el('span', { className: 'build-cost', text: 'Bedelsiz' })]),
     ]);
     button.disabled = !status.ok;

@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -213,6 +213,34 @@ const PAGE_HELPERS = () => {
       hours(0.25);
       const gathered = s.characters.filter((c) => c.task?.activity === 'rally').length;
       check('yüklenen toplanma sürer ve vaktinde biter', s.rally?.until === until && gathered > 0, `${gathered} sakin`);
+    }
+
+    // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
+    {
+      rich();
+      if (!s.buildings.some((b) => b.type === 'townHall' && b.functional)) {
+        s.town.tier = Math.max(s.town.tier, 3);
+        sim.place('townHall');
+      }
+      for (const c of s.characters) c.illness = null;
+      s.exploration.lastLaunchDay = -99;
+      s.dilemma.expedition = null;
+      game.events.emit('ui:launchExpedition', { source: 'townHall' });
+      const launched = Boolean(s.dilemma.expedition);
+      let guard = 0;
+      while (s.dilemma.active?.kind !== 'adventure' && guard++ < 400) sim.step(50);
+      const team = [...(s.dilemma.expedition?.members ?? [])];
+      const diff = A.roundtrip();
+      game.render(0);
+      const modal = document.querySelector('.dilemma');
+      check('sefer yoldayken macera penceresi açıkken kayıt -> yükleme durum kayması yok', launched && diff.length === 0, diff.join(' | '));
+      check('yüklenince macera penceresi yeniden açılır, kafile seferde kalır', s.dilemma.active?.kind === 'adventure' && s.time.paused && !modal.hidden && team.every((id) => s.characters.find((c) => c.id === id)?.away));
+      const returned = counter('expedition:returned');
+      game.events.emit('ui:chooseDilemma', { optionId: s.dilemma.active.defaultId });
+      guard = 0;
+      while (s.dilemma.expedition && guard++ < 120) hours(0.5);
+      check('yüklenen sefer bir kez döner, kimse kaybolmaz', returned.n === 1 && team.every((id) => { const c = s.characters.find((x) => x.id === id); return c && !c.away; }), `${returned.n}`);
+      returned.off();
     }
 
     // --- Kopuk referanslı (elle bozulmuş) kayıt onarılarak açılır ---

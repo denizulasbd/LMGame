@@ -7,9 +7,12 @@
 //              sırada içerideyse iki kat öğrenirler (c.schooling). Yeterince okuyan çocuk büyüyünce rastgele bir
 //              meslekte doğrudan Kalfa olur: 'school:graduated' { character, skill }.
 // Durum state.research'tedir (kayda girer): { active: { id, progress } | null, done: { id: { day, hour, minute } } }.
+//   (16. aşama) Kadim yazıt: araştırma yokken Bilge çözülmeyi bekleyen yazıtın başına oturur
+//              (state.exploration.decoding); çözülünce kalıcı imar şeması: 'inscription:decoded' { id, inscription }.
 import { RESEARCH, SCHOOL } from '../data/research.js';
 import { SKILL_LEVELS, SKILL_KEYS } from '../data/skills.js';
 import { isWithinHours } from './StructureSystem.js';
+import { INSCRIPTIONS } from '../data/exploration.js';
 
 // ---------------------------------------------------------------------------
 // Araştırmaların etkileri (saf yardımcılar)
@@ -119,8 +122,15 @@ export class ResearchSystem {
       if (!b.definition.academy) continue;
       const kids = this.world.characters.some((c) => c.isChild);
       // Bilge araştırma varken ya da ders saatinde çocuk varken gelir
-      b.idle = !b.functional || b.damaged || (!this.state.research.active && !(kids && this.schoolHours()));
-      b.processStatus = b.damaged ? 'Fırtınada hasar gördü: onarılana kadar çalışmaz' : b.idle ? 'Araştırma seçilmedi; ders saatinde çocuk da yok' : null;
+      const decoding = this.state.exploration?.decoding;
+      b.idle = !b.functional || b.damaged || (!this.state.research.active && !decoding && !(kids && this.schoolHours()));
+      b.processStatus = b.damaged
+        ? 'Fırtınada hasar gördü: onarılana kadar çalışmaz'
+        : b.idle
+          ? 'Araştırma ya da çözülecek yazıt seçilmedi; ders saatinde çocuk da yok'
+          : !this.state.research.active && decoding
+            ? `Bilge kadim yazıtı çözüyor: ${INSCRIPTIONS[decoding.id].name}`
+            : null;
     }
   }
 
@@ -136,7 +146,23 @@ export class ResearchSystem {
       if (active.progress >= def.work) this.complete(active.id);
       return true;
     }
+    const decoding = this.state.exploration?.decoding;
+    if (decoding) {
+      decoding.progress += amount;
+      if (decoding.progress >= INSCRIPTIONS[decoding.id].work) this.decode(decoding.id);
+      return true;
+    }
     return this.schoolHours() && this.world.characters.some((c) => c.isChild);
+  }
+
+  /** (16. aşama) Kadim yazıt çözüldü: imar şeması kalıcı olarak kasabanındır. */
+  decode(id) {
+    const ex = this.state.exploration;
+    const { day, hour, minute } = this.state.time;
+    ex.inscriptions[id] = { ...(ex.inscriptions[id] ?? {}), status: 'decoded', decodedAt: { day, hour, minute } };
+    ex.decoding = null;
+    this.events.emit('inscription:decoded', { id, inscription: INSCRIPTIONS[id] });
+    this.events.emit('toast', { text: `Kadim yazıt çözüldü: ${INSCRIPTIONS[id].name}! ${INSCRIPTIONS[id].description}`, tone: 'success', icon: 'scheme' });
   }
 
   complete(id) {

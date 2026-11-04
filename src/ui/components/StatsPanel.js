@@ -241,6 +241,10 @@ export class StatsPanel {
       ['map', 'Verilen karar', stats.dilemmas ?? 0],
       ['handshake', 'Barışan küsler', stats.reconciliations ?? 0],
       ['masterpiece', 'Usta işi eser', state.masterworks?.made ?? 0],
+      ['map', 'Keşif seferi', state.exploration?.expeditions ?? 0],
+      ['mountain', 'Atlatılan macera', stats.adventures ?? 0],
+      ['adventure', 'Handa anlatılan hikâye', stats.talesTold ?? 0],
+      ['scheme', 'Çözülen kadim yazıt', `${Object.values(state.exploration?.inscriptions ?? {}).filter((i) => i.status === 'decoded').length}/3`],
     ];
     this.totals.replaceChildren(
       ...rows.map(([icon, label, v]) =>

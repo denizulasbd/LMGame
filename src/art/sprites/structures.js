@@ -30,6 +30,7 @@ import { getAcademySprite } from './structuresWisdom.js';
 import { getHarborSprite, getHarborSiteSprite } from './structuresHarbor.js';
 import { getWonderSprite } from './structuresWonder.js';
 import { getCherryTreeSprite, getGazeboLayer, getMarbleArchSprite, getFlowerFenceSprite } from './structuresGarden.js';
+import { getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.js';
 import { seasonalFoliageRows, winterize } from '../seasons.js';
 
 // ---------------------------------------------------------------------------
@@ -598,7 +599,7 @@ export function getConstructionSiteSprite(w, h, stage, type = null, orientation 
 // Kışın her yapı karla örtülür (çatılar beyazlar, tepelere kar yığılır); çalı ve bahçe kendi kış
 // çizimlerini kullanır (bahçenin Seviye 2'si Cam Sera ise kışın da yeşildir, yalnızca çatısı karlanır).
 // ---------------------------------------------------------------------------
-const OWN_WINTER_ART = new Set(['berryBush', 'garden', 'sheepFarm', 'mill', 'cherryTree']);
+const OWN_WINTER_ART = new Set(['berryBush', 'garden', 'sheepFarm', 'mill', 'cherryTree', 'grapeVine', 'ancientTorch']);
 
 // Kışın karla örtülen çatı renkleri (açık / ana / koyu ton) ve çatının bittiği satır.
 // Kulübenin üç çatı tonu (kiremit, arduvaz, yosun) hepsi listede; ahırın yalnızca saçakları.
@@ -690,6 +691,10 @@ function getBaseStructureSprite(type, state) {
       return getTownHallSprite(Boolean(state.windowsLit), state.frame ?? 0, state.relics ?? 0);
     case 'cherryTree':
       return getCherryTreeSprite(state.season ?? 'spring');
+    case 'grapeVine':
+      return getGrapeVineSprite(state.season ?? 'summer');
+    case 'ancientTorch':
+      return getAncientTorchSprite(Boolean(state.lit ?? state.windowsLit), state.frame ?? 0);
     case 'gazebo':
       return getGazeboLayer('full');
     case 'marbleArch':

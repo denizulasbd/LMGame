@@ -50,6 +50,16 @@
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
 
+    // --- 16. aşama: keşif seferleri: üzüm asması, kadim meşale, ganimet ve macera simgeleri, balonlar ---
+    show('Üzüm Asması (seferden gelen egzotik fide; bahçe / çardak kenarına dikilir): dört mevsim', SEASONS.map((season) => [NAMES[season], getStructureSprite('grapeVine', { season })]), 6);
+    show('Kadim Meşale: gündüz (soluk köz), gece mavi alev üç kare, kışın', [
+      ['gündüz', getStructureSprite('ancientTorch', { lit: false })],
+      ...[0, 1, 2].map((frame) => [`gece kare ${frame}`, getStructureSprite('ancientTorch', { lit: true, frame })]),
+      ['kış gecesi', getStructureSprite('ancientTorch', { lit: true, frame: 1, season: 'winter' })],
+    ], 6);
+    show('Keşif simgeleri: maceralar (dağ, dere, tapınak), ganimetler (fide, meşale, harita, yadigâr parçası), kadim yazıt ve imar şeması, maceracı', ['mountain', 'river', 'temple', 'firefly', 'vineSeed', 'ancientTorch', 'cityMap', 'relicShard', 'inscription', 'scheme', 'adventure'].map((n) => [n, getIconSprite(n)]), 10);
+    show('Balonlar: maceracı hikâyesi (dağ) ve hazine', ['adventure', 'treasure'].map((n) => [n, getBubbleSprite(n)]), 8);
+
     // --- 15. aşama: meslek kıyafetleri (Çırak sade, Kalfa aksesuar, Usta tam kostüm), zanaat rozetleri, usta işi eserler ---
     {
       const KITS = [

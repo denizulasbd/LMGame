@@ -101,9 +101,20 @@ export class MemorySystem {
         if (!wasIll) return;
         remember(character, `${this.hardTimes()} hastalandı ama Şifacı'nın iksiriyle iyileşti`, 'remedy', { kind: 'health' });
       }),
-      on('expedition:returned', ({ members, buff }) =>
-        members.forEach((c) => remember(c, buff === 'talisman' ? 'Keşif seferinden Kadim Tılsım\'la döndü' : 'Keşif seferinden ganimetle döndü', 'map', { kind: 'expedition' }))
+      // (16. aşama) Seferin hikâyesi: yolun adı, sağ salim mi döndü, neler keşfetti (ExpeditionSystem yazar)
+      on('expedition:returned', ({ members, buff, memories }) =>
+        members.forEach((c) =>
+          remember(c, memories?.[c.id] ?? (buff === 'talisman' ? 'Keşif seferinden Kadim Tılsım\'la döndü' : 'Keşif seferinden ganimetle döndü'), 'map', { kind: 'expedition' })
+        )
       ),
+      on('adventure:resolved', ({ success, member, option, scenario }) => {
+        if (!success && member) remember(member, `${scenario.title}: ${option.risk.text}, ama kafileyle yola devam etti`, 'mountain', { kind: 'expedition', fond: false });
+      }),
+      on('expedition:taleTold', ({ teller, route }) => {
+        if (!teller.memories?.some((m) => m.text === `${route} Seferi'ni handa ballandıra ballandıra anlattı`)) {
+          remember(teller, `${route} Seferi'ni handa ballandıra ballandıra anlattı`, 'adventure', { kind: 'expedition' });
+        }
+      }),
       on('relationship:reconciled', ({ a, b, place }) => {
         const where = RECONCILE_PLACES[place] ?? '';
         both(a, b, `${where}${b.name} ile barıştı`, `${where}${a.name} ile barıştı`, 'handshake', { kind: 'reconcile' });

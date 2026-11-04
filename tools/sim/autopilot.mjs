@@ -41,6 +41,7 @@ await page.evaluate((passive) => {
   });
   game.events.on('harbor:cratePrepared', () => window.__stats.spent.crates++);
   window.__stats.weather = {};
+  game.events.on('adventure:resolved', ({ success }) => { if (!success) window.__stats.mishaps = (window.__stats.mishaps ?? 0) + 1; });
   game.events.on('weather:changed', ({ type }) => (window.__stats.weather[type] = (window.__stats.weather[type] ?? 0) + 1));
   window.__stats.festivals = [];
   game.events.on('seasonFestival:ended', ({ theme, attendees }) => window.__stats.festivals.push(`G${game.state.time.day - 1} ${theme}:${attendees.length}`));
@@ -91,6 +92,24 @@ await page.evaluate((passive) => {
     const active = game.state.dilemma.active;
     if (!active || passive) return;
     const system = scene.dilemmas;
+    // (16. aşama) Macera: kafileyle riski en çok %15 olan ganimetli yollardan en değerlisi (bulgusu çok olan), yoksa
+    // güvenli kamp. Kazasız geçen riskli yollar (usta + alet) önce gelir.
+    if (active.kind === 'adventure') {
+      const X = window.__exploration;
+      const scen = window.__adventures[active.id];
+      const members = (game.state.dilemma.expedition?.members ?? []).map((id) => scene.world.getCharacter(id)).filter(Boolean);
+      const value = (o) => (o.finds ?? []).reduce((a, f) => a + f.chance, 0) + Object.keys(o.loot ?? {}).length * 0.1;
+      const options = scen.options
+        .map((o) => ({ o, risk: X.optionRisk(members, o).chance }))
+        .filter((x) => x.risk <= 0.15)
+        .sort((a, b) => value(b.o) - value(a.o) || a.risk - b.risk);
+      const pick = options[0]?.o ?? scen.options.find((o) => o.default);
+      window.__stats.adventureChoices = window.__stats.adventureChoices ?? {};
+      const key = `${pick.risk ? (options[0].risk === 0 ? 'güvenli-riskli' : 'riskli') : 'kamp/güvenli'}`;
+      window.__stats.adventureChoices[key] = (window.__stats.adventureChoices[key] ?? 0) + 1;
+      game.events.emit('ui:chooseDilemma', { optionId: pick.id });
+      return;
+    }
     const def = window.__dilemmaDefs?.[active.id];
     for (const id of PREFER[active.id] ?? []) {
       const option = def?.options.find((o) => o.id === id);
@@ -203,6 +222,36 @@ await page.evaluate((passive) => {
       if (busy >= 2 && res.gold >= 3000 && L.goldDecreeStatus(s, 'royalArchitects').ok) game.events.emit('ui:goldDecree', { id: 'royalArchitects' });
     }
 
+    // (16. aşama) Keşif: Belediye Konağı ya da Liman varsa erzak bolken sefer düzenle; yazıtları çöz; ganimetleri dik
+    {
+      const X = window.__exploration;
+      const ex = s.exploration;
+      const source = ['townHall', 'harbor'].find((t) => X.expeditionLaunchStatus(s, t).ok);
+      if (source && res.food + res.bread > 140 && s.time.hour >= 8 && s.time.hour <= 11) game.events.emit('ui:launchExpedition', { source });
+      if (!ex.decoding) {
+        const id = Object.keys(ex.inscriptions).find((k) => X.decodeStatus(s, k).ok);
+        if (id) game.events.emit('ui:decodeInscription', { id });
+      }
+      if (ex.items.vineSeed > 0) {
+        for (const garden of world.getCompleted('garden')) {
+          if (ex.items.vineSeed <= 0) break;
+          const spots = [[-1, 0], [2, 0], [0, -1], [0, 2], [1, -1], [1, 2], [-1, 1], [2, 1]];
+          for (const [dx, dy] of spots) {
+            const x = garden.tileX + dx;
+            const y = garden.tileY + dy;
+            if (scene.construction.checkPlacement('grapeVine', x, y).ok) {
+              scene.construction.placeSite('grapeVine', x, y);
+              break;
+            }
+          }
+        }
+      }
+      if (ex.items.ancientTorch > 0) {
+        const spot = sim.findSpot('ancientTorch', 12);
+        if (spot) scene.construction.placeSite('ancientTorch', spot.x, spot.y);
+      }
+    }
+
     // (15. aşama) Usta işi eserler: vitrin dolana kadar sergile (kalıcı refah), sonra limandan / tüccara sat
     {
       const MW = window.__masterworks;
@@ -264,6 +313,8 @@ await page.evaluate(async () => {
   window.__relicKeys = (await import('/src/data/luxury.js')).RELIC_KEYS;
   window.__harbor = await import('/src/systems/HarborSystem.js');
   window.__masterworks = await import('/src/systems/Masterworks.js');
+  window.__exploration = await import('/src/systems/Exploration.js');
+  window.__adventures = (await import('/src/data/exploration.js')).ADVENTURES;
   window.__mwMax = (await import('/src/data/masterpieces.js')).MASTERWORK.maxExhibitHappiness;
 });
 
@@ -323,6 +374,17 @@ const report = await page.evaluate(() => {
     grandVoyages: s.trade.grandVoyages ?? 0,
     quarrels: s.stats.quarrels ?? 0,
     reconciliations: s.stats.reconciliations ?? 0,
+    ex: {
+      expeditions: s.exploration.expeditions,
+      adventures: s.stats.adventures ?? 0,
+      mishaps: window.__stats.mishaps ?? 0,
+      tales: s.stats.talesTold ?? 0,
+      items: s.exploration.items,
+      cityMap: s.exploration.cityMap,
+      inscriptions: Object.fromEntries(Object.entries(s.exploration.inscriptions).map(([k, v]) => [k, v.status])),
+      vines: s.buildings.filter((b) => b.type === 'grapeVine' && b.functional).length,
+      torches: s.buildings.filter((b) => b.type === 'ancientTorch' && b.functional).length,
+    },
     mw: { made: s.masterworks.made, exhibited: s.masterworks.exhibited, sold: s.masterworks.sold, goldEarned: s.masterworks.goldEarned },
     outfits: s.characters.reduce((acc, c) => {
       const k = c.outfit ? c.outfit.split(':')[1] === '3' ? 'usta' : 'kalfa' : c.isChild ? 'çocuk' : 'çırak';
@@ -348,6 +410,7 @@ console.log(`mevsim festivalleri: ${JSON.stringify(report.held)} · ${report.sta
 const mem = report.memories;
 console.log(`anılar: sakin başına ${Math.min(...mem)}-${Math.max(...mem)} (ortalama ${(mem.reduce((a, b) => a + b, 0) / mem.length).toFixed(1)}), ${report.recollections} kez hatırlandı · Büyük İhracat Seferi: ${report.grandVoyages}`);
 console.log(`hava değişimleri: ${JSON.stringify(report.stats.weather)}`);
+console.log(`(16. aşama) sefer ${report.ex.expeditions} · macera ${report.ex.adventures} (${JSON.stringify(report.stats.adventureChoices ?? {})}) · kaza ${report.ex.mishaps} · anlatılan hikâye ${report.ex.tales} · ganimet ${JSON.stringify(report.ex.items)} harita ${report.ex.cityMap} · yazıt ${JSON.stringify(report.ex.inscriptions)} · asma ${report.ex.vines} meşale ${report.ex.torches}`);
 console.log(`(15. aşama) atışma ${report.quarrels} · barışma ${report.reconciliations} (oran %${report.quarrels ? Math.round((report.reconciliations / report.quarrels) * 100) : 0}) · usta işi eser ${report.mw.made} (sergilenen ${report.mw.exhibited}, satılan ${report.mw.sold}, +${report.mw.goldEarned} altın) · kıyafet ${JSON.stringify(report.outfits)}`);
 console.log(`${report.sampleName} anıları:\n  ${report.sampleMemories.join('\n  ')}`);
 console.log(`harika: aşama ${report.wonder}/3, ${sum(spent.wonder)} birim (${fmt(spent.wonder)}); hazinede ${report.gold} altın`);

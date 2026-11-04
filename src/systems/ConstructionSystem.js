@@ -16,6 +16,8 @@ import { Building } from '../entities/Building.js';
 import { assignBridgeVariants } from '../world/WorldGenerator.js';
 import { accessTiles, hasAccessRule } from '../world/footprint.js';
 import { TOWN_TIERS } from '../data/town.js';
+import { EXOTIC_ITEMS } from '../data/exploration.js';
+import { itemCount } from './Exploration.js';
 
 const DEMOLISH_REFUND = 0.5;
 
@@ -68,6 +70,10 @@ export class ConstructionSystem {
     if (!reason && def.requiresTier && (this.world.state.town?.tier ?? 1) < def.requiresTier) {
       reason = `${TOWN_TIERS[def.requiresTier - 1].name} seviyesine ulaşınca açılır`;
     }
+    // (16. aşama) Seferden gelen egzotik ganimetle dikilen yapılar (üzüm asması, kadim meşale)
+    if (!reason && def.item && itemCount(this.world.state, def.item) < 1) {
+      reason = `Önce bir keşif seferinden ${EXOTIC_ITEMS[def.item].name} getirilmeli`;
+    }
     let orientation = 'right';
 
     for (let y = tileY; y < tileY + def.size.h; y++) {
@@ -89,6 +95,10 @@ export class ConstructionSystem {
     // Önce başka bir yapı gerektirenler (pazar yeri -> kiler)
     if (!reason && def.requiresBuilding && this.world.getCompleted(def.requiresBuilding.type).length === 0) {
       reason = def.requiresBuilding.reason;
+    }
+    // Asma: bir Sebze Bahçesi'nin ya da Ahşap Çardak'ın hemen yanına dikilir
+    if (!reason && def.placement === 'nearGarden' && !this.touchesAny(tileX, tileY, def.size, ['garden', 'gazebo'])) {
+      reason = 'Sebze Bahçesi ya da Ahşap Çardak kenarına dikilmeli';
     }
 
     // İskele: bir sütun kum, yanındaki sütun su olmalı; su yönü belirler
@@ -185,12 +195,24 @@ export class ConstructionSystem {
     return null;
   }
 
+  /** Ayak izi, verilen türlerden bir yapıya (şantiye dahil) bitişik mi (çaprazlar dahil)? */
+  touchesAny(tileX, tileY, size, types) {
+    return this.world.buildings.some((b) => {
+      if (!types.includes(b.type)) return false;
+      const { w, h } = b.definition.size;
+      const dx = Math.max(b.tileX - (tileX + size.w - 1), 0, tileX - (b.tileX + w - 1));
+      const dy = Math.max(b.tileY - (tileY + size.h - 1), 0, tileY - (b.tileY + h - 1));
+      return Math.max(dx, dy) === 1;
+    });
+  }
+
   /** Şantiye kurar. Dönüş: { ok, reason, building } */
   placeSite(type, tileX, tileY) {
     const check = this.checkPlacement(type, tileX, tileY);
     if (!check.ok) return check;
     const def = BUILDINGS[type];
     this.economy.spend(def.cost);
+    if (def.item) this.world.state.exploration.items[def.item] -= 1; // (16. aşama) egzotik ganimet harcanır
 
     const cabins = this.world.getBuildingsOfType('cabin').length;
     // tone: kulübede çatı rengi, çiçek tarhında renk düzeni; yapı sayısına göre dönüşür
@@ -278,6 +300,8 @@ export class ConstructionSystem {
     this.jobs.cancelForBuilding(building.id);
     this.world.removeBuilding(building);
     this.economy.refund(def.cost, ratio);
+    // (16. aşama) Asma / meşale sökülünce fide / meşale sandığa geri döner
+    if (def.item) this.world.state.exploration.items[def.item] = (this.world.state.exploration.items[def.item] ?? 0) + 1;
     // Yükseltilmiş ya da yükseltilmekte olan yapıda yükseltme maliyetinin de yarısı geri gelir
     if (def.upgrade && (building.upgraded || building.project)) this.economy.refund(def.upgrade.cost, DEMOLISH_REFUND);
     this.events.emit('building:removed', building);

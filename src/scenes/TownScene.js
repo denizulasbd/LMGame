@@ -54,6 +54,7 @@ import { SeasonFestivalSystem } from '../systems/SeasonFestivalSystem.js';
 import { MemorySystem } from '../systems/MemorySystem.js';
 import { RallySystem } from '../systems/RallySystem.js';
 import { CraftsmanshipSystem } from '../systems/CraftsmanshipSystem.js';
+import { ExpeditionSystem } from '../systems/ExpeditionSystem.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -154,6 +155,7 @@ export class TownScene extends Scene {
     this.milestones = new MilestoneSystem(this.game, this.world, TILE_TYPES.cobble.id);
     this.townLevel = new TownLevelSystem(this.game, this.world, this.economy, { attract: this.attract });
     this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population }, { attract: this.attract });
+    this.expeditions = new ExpeditionSystem(this.game, this.world, { economy: this.economy, health: this.health, dilemmas: this.dilemmas }, new Random(state.seed + 17));
 
     // Sıra önemlidir: hava, yapı durumu ve kapasite, Bilgelik Evi ve liman durumu, iş temizliği, atölye durumu, ihtiyaç azalması,
     // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar, kasaba seviyesi ve doğa
@@ -183,6 +185,7 @@ export class TownScene extends Scene {
       this.milestones,
       this.townLevel,
       this.dilemmas,
+      this.expeditions,
       this.nature,
     ];
 
@@ -216,6 +219,7 @@ export class TownScene extends Scene {
       this.memories,
       this.rally,
       this.craftsmanship,
+      this.expeditions,
     ];
 
     this.camera = new Camera();

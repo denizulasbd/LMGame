@@ -575,6 +575,12 @@ export class Brain {
     const inn = this.world.getCompleted('inn').find((b) => b.lit);
     if (!inn) weights.inn = 0;
     else if (evening) weights.inn *= 5;
+    // (16. aşama) Seferden dönen maceracı anlatacak hikâyesiyle hana koşar (han yoksa ateş başına / meydana)
+    if (c.tale) {
+      weights.inn = (weights.inn ?? 0) * 6;
+      weights.campfire = (weights.campfire ?? 0) * 2;
+      weights.fountain = (weights.fountain ?? 0) * 1.5;
+    }
     // Anıt, kadim çeşme ve erzak kampı yalnızca kullanılabilir hâldeyse
     for (const [activity, type] of LANDMARK_LEISURE) {
       if (this.world.getCompleted(type).length === 0) weights[activity] = 0;

@@ -142,6 +142,14 @@ export async function installMonitor(page) {
           const residents = homeCount.get(b.id) ?? 0;
           if (b.capacity && residents > b.capacity) m.overfull.push(`G${s.time.day} ${b.type}#${b.id} ${residents}/${b.capacity}`);
         }
+        // (16. aşama) Seferde kaybolan ya da takılan kafile
+        const exp = s.dilemma.expedition;
+        for (const c of s.characters) if (c.away && !exp?.members.includes(c.id)) broke(`${c.name}: seferde sanılıyor ama süren sefer yok`);
+        if (exp) {
+          for (const id of exp.members) if (!ids.has(id)) broke(`sefer: kafileden ${id} kayıp`);
+          if (now > exp.until + 240 && !s.dilemma.active) broke(`sefer: dönüş vakti çoktan geçti (${Math.round((now - exp.until) / 60)} saat)`);
+        }
+        if (s.dilemma.active?.kind === 'adventure' && !exp) broke('macera penceresi açık ama süren sefer yok');
         for (const [key, cid] of world.reservations) if (!ids.has(cid)) broke(`rezervasyon ${key}: var olmayan sakin ${cid}`);
         for (const job of scene.jobs.jobs) {
           for (const a of job.assignees ?? []) if (!ids.has(a)) broke(`iş ${job.type}#${job.id}: atanan sakin yok (${a})`);
