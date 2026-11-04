@@ -46,6 +46,8 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 | Karakter panelinde sakinin **adına** tık | Sakinin adını değiştir (Enter kaydeder, Esc vazgeçer) |
 | Yapı panelinde **İşçi Ata** / **Sabitle** / **Sabitlemeyi Kaldır** | Bir sakini o iş yerine sabit çalışan yap (yalnızca orada çalışır) ya da serbest bırak |
 | `I` / sol sütunda **Arşiv** | Kasaba Arşivi'ni aç / kapat: son 32 günün grafikleri ve kasabanın tarihi |
+| Liman / Belediye Konağı panelinde **Sefere Çıkar** | 3 kişilik keşif kafilesini bir günlük sefere gönder (yolda iki kez kararını isterler) |
+| Bilgelik Evi panelinde **Çöz** | Harabeden ya da seferden gelen kadim yazıtı Bilge'ye çözdür (kalıcı imar şeması) |
 | Arşivde **Usta İşi Eserler** · **Sergile** / **Sat** | Ustaların eserini vitrinde sergile (kalıcı +1 refah) ya da limandan / tüccara sat (200-400 altın) |
 | Bir kediye ya da köpeğe sol tık | Hayvanı sev: sevinçle zıplar, kalpler uçuşur, miyavlar / havlar |
 | Seç aracıyla bir ağaca ya da kayaya sol tık | Öncelikli kesme / kırma emri: boştaki işçiler ilk iş olarak oraya koşar (kırmızı ünlem) |
@@ -138,6 +140,7 @@ LMGame/
     │       ├── structuresWonder.js Büyük Vadi Saat Kulesi: üç aşama (Temel, Gövde, Görkemli Kule) ve iskele kademeleri
     │       ├── structuresGarden.js Kiraz Çiçeği Ağacı (dört mevsim), iki katmanlı Ahşap Çardak, Mermer Kemer, birleşen Çiçekli Çit
     │       ├── festival.js   Mevsim festivali süslemeleri (çiçek kemeri, ziyafet sofrası, hasat sepeti, kardan adam...), saç çiçeği
+    │       ├── structuresExplore.js (16. aşama) Üzüm Asması (dört mevsim) ve mavi alevli Kadim Meşale
     │       ├── outfits.js    (15. aşama) Meslek kıyafetleri: on kit, Kalfa aksesuarı ve Usta kostümü (başlık + gövde katmanı)
     │       └── animals.js    Tavşan, geyik, kedi ve köpek (otomatik konturlu, poz ve renk çeşitleri)
     ├── data/               Saf veri tanımları (oyun kuralları, denge değerleri)
@@ -149,6 +152,8 @@ LMGame/
     │   │                   değerinde), Kasaba Hazinesi (Altın, depo sınırı yok), başlangıç stoğu, depo kapasitesi,
     │   │                   öğün maliyeti
     │   ├── festivals.js    Dört mevsim kapanış festivali: saatler, yerler, bonuslar, süslemeler, anı cümleleri
+    │   ├── exploration.js  (16. aşama) Sefer kuralları, dört macera ve seçenekleri (risk, usta / alet kuralları, ganimet),
+    │   │                   egzotik ganimetler, üç kadim yazıt ve imar şemaları, üzüm asması
     │   ├── masterpieces.js (15. aşama) Usta işi eserler: altı eser, meslekleri, iş yerleri, fiyatları; şans ve sergi kuralları
     │   ├── luxury.js       Altın harcama kanalları: lüks mallar (baharat, ipek ve mermer), beş kasaba yadigârı ve artan
     │   │                   fiyatları, altın fermanları (ikramiye, kraliyet mimarları)
@@ -225,6 +230,9 @@ LMGame/
     │   ├── SeasonFestivalSystem.js Mevsim festivalleri: duyuru, yer ve süsleme, katılım, Mevsim Coşkusu
     │   ├── MemorySystem.js Sakinlerin anıları (yaşam günlüğü) ve sakin anlarda güzel bir anıyı hatırlama
     │   ├── RallySystem.js  Toplanma Zili: sakinleri bir saatliğine meydanda toplar
+    │   ├── ExpeditionSystem.js (16. aşama) Keşif seferleri: yola çıkış, maceralar, kaza, dönüş, ganimet, anılar, handa
+    │   │                   hikâye anlatma; harabe yazıtları ve çözme
+    │   ├── Exploration.js  (16. aşama) Keşfin saf hesapları: kafile seçimi, risk, sefer durumu, şema etkileri
     │   ├── CraftsmanshipSystem.js (15. aşama) Meslek kıyafetlerini giydirir; ustaların eserlerini üretir, sergiler, satar
     │   ├── Masterworks.js  (15. aşama) Usta işi eserlerin saf hesapları: fiyat, satış / sergi durumu, refah katkısı
     │   ├── WeatherSystem.js Güneşli / bulutlu / yağmurlu arası yumuşak geçişler
@@ -371,8 +379,13 @@ Büyük İhracat Seferi (`trade.grandDay`, `grandPending`, `grandVoyages`, tekne
 (`stats.seasonFestivals`, `recollections`, `rallies`) eklendi. 15. aşamada usta işi eserler (`masterworks`: eserler,
 türleri, ustaları, durumları — depoda / sergide / satıldı — ve satış fiyatları, sayaçlar, ustanın son eser günü) ve atışma /
 barışma sayaçları (`stats.quarrels`, `reconciliations`) eklendi; meslek kıyafetleri deneyimden türetildiği için kayda
-girmez, yüklenince her sakin kademesine göre yeniden giyinir. Kayıt sürümü 13'tür; 4.–14. aşamanın (sürüm 2–12)
-kayıtları da açılır (usta işi eser vitrini boş başlar) (anısı olmayan sakinin anı defteri ilk açılışta "Kasabada yaşamaya başladı" ile açılır): eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
+girmez, yüklenince her sakin kademesine göre yeniden giyinir. 16. aşamada keşif durumu (`exploration`: egzotik ganimetler,
+Kayıp Şehir Haritası, kadim yazıtlar ve çözülme durumları, çözülen yazıt, sefer sayısı, son seferlerin günlüğü, atölyenin demir
+kırıntısı), süren seferin maceraları (`dilemma.expedition`: planlanan maceralar, sıradaki macera zamanı, macera günlüğü,
+biriken ganimet, bulgular, yaralananlar, seferin adı), açık macera penceresi (`dilemma.active.kind = 'adventure'`, kafileyle
+risk açıklamaları) ve maceracıların anlatacağı hikâye (`tale`) eklendi. Kayıt sürümü 14'tür; 4.–15. aşamanın (sürüm 2–13)
+kayıtları da açılır (usta işi eser vitrini ve keşif ganimetleri boş başlar; eski biçimde yarım kalmış bir sefer maceralar
+açmadan sürer ve döner) (anısı olmayan sakinin anı defteri ilk açılışta "Kasabada yaşamaya başladı" ile açılır): eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
 ve ekipmansız başlar; yün, demir, ekmek ve altın 0 olur; araştırma, ihracat ve yadigâr boş başlar; arşiv ilk açılışta
 kurulur, düğün ve doğum sayaçları evli çiftlerden ve ebeveynli sakinlerden tahmin edilir; yaban hayatı ilk açılışta
 yerleşir), adı olmayan kasabaya tohumdan bir ad önerilir. Açık bir karar penceresiyle kaydedilen oyun
@@ -1537,6 +1550,61 @@ Otopilot 4 haritada (tohum 42, 7, 3 ve kararlara dokunmayan "pasif" 2024) **40 g
 - sabah sisini, Toplanma Zili'ni ve şimşek anını;
 - bir sakinin anılar panelini.
 
+## Genişletilmiş keşif: maceracı seferleri, mini maceralar ve harabe sırları (16. aşama)
+
+### Keşif seferleri ve "Maceracı Günlüğü"
+Keşif seferi artık arka planda işleyen bir sayaç değil (`systems/ExpeditionSystem.js`, `data/exploration.js`):
+
+- **Yola çıkış:** Büyük Ticaret Limanı'nın ya da Belediye Konağı'nın panelinde **Sefere Çıkar** (30 yiyecek; iki sefer
+  arasında en az 2 gün). Kafile 3 kişidir: maceralarda işe yarayacak ustalar (madenci, taşçı, bilge, oduncu, şifacı...) ve
+  Sağlam Aletliler önce seçilir, sabit işçiler kasabada kalır. "Kayıp Hazine Haritası" kararının seferi de aynı yoldan geçer.
+- **Mini maceralar:** Yolculuğun %30'unda (büyük seferde %65'inde de) karar penceresi "Maceracı Günlüğü" olarak açılır
+  (oyun durur; 30 saniyede seçilmezse güvenli kamp):
+
+| Macera | Riskli yol | Güvenli yol | Kamp |
+|---|---|---|---|
+| Keşif Kafilesi Dağ Geçidinde | Maden girişi: bol demir, Kadim Yadigâr Parçası, yazıt (%35 kaza) | Dik patika: Egzotik Üzüm Fidesi, şifalı ot (%12) | standart erzak |
+| Azgın Dere | Sal: Kayıp Şehir Haritası (%30 üşüme) | Sığ geçit: balık, yaban meyvesi (%10) | standart erzak |
+| Sarmaşıklı Tapınak | İçeri gir: Kadim Meşale, yazıt (%30 tuzak) | Avlu: egzotik fideler, şifalı ot (%8) | standart erzak |
+| Yıldızlı Gecede Işıklar | Işıkları izle: harita ya da meşale (%28) | — | masal: kafile dinç döner |
+
+- **Meslek ve ekipman:** Pencerede her seçeneğin bu kafileyle riski yazar. **Sağlam Aletli Usta Madenci** (ya da Usta Taşçı)
+  maden kazasını, **Usta Oduncu / Yapı Ustası** salın devrilmesini, **Usta Bilge** tapınak tuzaklarını ve gecede yolunu
+  kaybetmeyi **sıfırlar**; Kalfa Madenci, Kalfa Şifacı, Kalfa Balıkçı gibileri riski azaltır. Kazada bir sakin yaralanır ya
+  da üşür (dönünce hasta yatar), o maceranın ganimeti yarıya iner, bulgu gelmez.
+- **Seferin adı:** seçilen yol seferin adını verir: "Karanlık Maden Seferi", "Kayıp Tapınak Seferi", "Azgın Dere Seferi"...
+
+### Egzotik ganimetler
+| Ganimet | Ne yapar? |
+|---|---|
+| Egzotik Üzüm Fidesi | İnşa menüsünde **Üzüm Asması** olarak Sebze Bahçesi ya da Ahşap Çardak kenarına dikilir: yanındaki bahçe +%10 verim (en çok iki asma), handa yemek yiyenler soğuk üzüm şerbeti içer (keyif +5), çevresine keyif aurası; dört mevsim ayrı çizilir |
+| Kadim Meşale | 18:00–06:00 mavi alevle yanan mistik sokak ışığı: çevresindekilerin içini ısıtır (kışın üşütmez), keyif aurası |
+| Kayıp Şehir Haritası | Gezgin tüccar kasabanın yolunu iki kat sık bulur (ikinci harita yadigâr parçasına döner) |
+| Kadim Yadigâr Parçası | Üç parça birleşince kalıcı +2 refah |
+
+Fide ve meşale sökülünce sandığa geri döner; inşa menüsü eldeki sayıyı gösterir.
+
+### Kadim harabe sırları ve imar şemaları
+Kadim harabe onarılınca içinden o harabenin **kadim yazıtı** çıkar (seferlerden de gelebilir). Yazıt, Bilgelik Evi'nin
+panelinde **Çöz** ile Bilge'ye verilir; Bilge araştırma yokken yazıtın başına oturur. Çözülen yazıt kalıcı bir **imar şeması**
+kazandırır:
+
+| Harabe | Yazıt | Kalıcı etki |
+|---|---|---|
+| Kadim Çeşme | Antik Su Kemeri Şeması | Sebze bahçelerinin verimi +%15 |
+| Gözetleme Kulesi | Kadim Çelik Döküm Tekniği | Zanaat Atölyesi demiri %20 daha az tüketir |
+| Erzak Kampı | Kadim Değirmen Taşı | Yel Değirmeni ve Fırın %15 daha hızlı ekmek çıkarır |
+
+### Maceracı anıları ve hikâyeler
+Dönen her maceracının anısına seferin hikâyesi yazılır ("Karanlık Maden Seferi'nden sağ salim döndü ve Kadim Yazıt'ı
+keşfetti"); kazaya uğrayanın anısına o an da yazılır. Dönenler iki gün boyunca akşamları hana (yoksa ateş başına / meydana)
+koşar ve maceralarını anlatır: başlarında dağ ya da hazine balonu çıkar, dinleyenlerin keyfi +8, anlatanın +5 artar
+(her maceracı üç kez anlatır). Liman ve Belediye Konağı panelleri yoldaki kafileyi, maceralarını ve ganimet sandığını
+gösterir; Kasaba Arşivi'nde sefer, macera, hikâye ve çözülen yazıt sayaçları vardır.
+
+### Denge ve test (simülasyon)
+STRESS_PLACEHOLDER
+
 ## Derinleşen yaşam: sosyal denge, meslek kıyafetleri ve usta işi eserler (15. aşama)
 
 ### Sosyal denge: atışma ve barışma
@@ -1653,8 +1721,8 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (220; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 13'e) açar, bir gün yaşatır; referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (259; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 14'e) açar, bir gün yaşatır; referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
 | `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |

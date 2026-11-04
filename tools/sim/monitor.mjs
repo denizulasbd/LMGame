@@ -35,7 +35,7 @@ export async function installMonitor(page) {
         maxPop: 0,
         maxFeuds: 0, // (15. aşama) aynı anda en çok küs (eksi puanlı) çift
         minNeeds: { hunger: 100, energy: 100, social: 100, fun: 100 },
-        events: { weddings: 0, births: 0, grownUp: 0, quarrels: 0, reconciled: 0, ill: 0, cured: 0, cold: 0, warmed: 0, masterworks: 0, exhibited: 0, sold: 0 },
+        events: { weddings: 0, births: 0, grownUp: 0, quarrels: 0, reconciled: 0, ill: 0, cured: 0, cold: 0, warmed: 0, masterworks: 0, exhibited: 0, sold: 0, expeditions: 0, adventures: 0, mishaps: 0, tales: 0, returned: 0 },
         outfitErrors: [], // (15. aşama) çizilemeyen ya da yanlış kademede kıyafet
       };
       const on = (name, key) => game.events.on(name, () => m.events[key]++);
@@ -51,6 +51,13 @@ export async function installMonitor(page) {
       on('masterwork:created', 'masterworks');
       on('masterwork:exhibited', 'exhibited');
       on('masterwork:sold', 'sold');
+      on('expedition:departed', 'expeditions');
+      on('expedition:returned', 'returned');
+      on('expedition:taleTold', 'tales');
+      game.events.on('adventure:resolved', ({ success }) => {
+        m.events.adventures++;
+        if (!success) m.events.mishaps++;
+      });
 
       const stamp = () => ({ day: game.state.time.day, hour: game.state.time.hour });
       // Takılan sakinin ayrıntısı: görevi, bulunduğu karodaki yapı, konumu (hata ayıklamak için)
@@ -209,6 +216,8 @@ export async function installMonitor(page) {
           stalledWorkplaces: stalled,
           minNeeds: m.minNeeds,
           outfitErrors: m.outfitErrors,
+          decoded: Object.values(s.exploration?.inscriptions ?? {}).filter((i) => i.status === 'decoded').length,
+          exotic: s.buildings.filter((b) => (b.type === 'grapeVine' || b.type === 'ancientTorch') && b.functional).length,
           outfits: s.characters.filter((c) => c.outfit).map((c) => c.outfit),
           feuds: Object.values(s.relationships).filter((v) => v < 0).length,
           maxFeuds: m.maxFeuds,
