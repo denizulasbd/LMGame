@@ -4,9 +4,12 @@
 //   'ui:newGame' -> rastgele yeni bir tohumla sıfırdan başlar
 // Ayrıca her sabah 06:00'da otomatik kaydeder, sayfa kapanırken / gizlenirken 'session'
 // yuvasına yazar (F5 oyunu kaldığı yerden sürdürür). Durum değişince 'save:changed' yayınlar:
-//   { exists, label, savedAt } -> HUD "Yükle" düğmesini ve kayıt bilgisini günceller.
+//   { exists, label, townName, townTitle, population, savedAt } -> HUD "Yükle" düğmesini ve kayıt bilgisini,
+//   başlangıç ekranı "Kaldığın Yerden Devam Et" satırını ("Yeşilvadi Kasabası · Gün 12, 06:00") günceller.
 import { CONFIG } from '../config.js';
 import { SaveManager } from '../state/SaveManager.js';
+import { TOWN_TIERS } from '../data/town.js';
+import { formatTownTitle } from './TownStatus.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -135,6 +138,7 @@ export class SaveSystem {
       exists: info !== null,
       label: info ? this.label(info) : null,
       townName: info?.townName ?? null,
+      townTitle: info?.tier ? formatTownTitle(info.townName, TOWN_TIERS[info.tier - 1]) : info?.townName ?? null,
       population: info?.population ?? null,
       savedAt: info?.savedAt ?? null,
     });

@@ -33,6 +33,25 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 | Yapı panelinde **Yükselt** / **Onarımı Başlat** | Yapıyı Seviye 2'ye yükselt ya da harabeyi onar (maliyet peşin) |
 | Yapı panelinde **İşten Çıkar** / **Geri Al** | Çalışanı o iş yerinden çıkar (başka iş arar) / yeniden çalışabilsin |
 | Zanaat Atölyesi panelinde **Otomatik / Alet / Palto / Çanta** | Atölyenin ne üreteceğini seç |
+| HUD'da **Mallar** satırındaki ▸ / ▾ | İşlenmiş malları (Yün, Demir, Ekmek) ve Kasaba Hazinesi'ni (Altın) özet ya da açık görünüme al (seçim hatırlanır) |
+| HUD'da kasaba unvanının yanındaki dört pip | Kasaba seviyesi; üzerine gelince sonraki seviyenin koşulları ve ödülleri |
+| Karar penceresindeki seçenekler | Sürpriz olayda kararını ver (oyun durur; 30 sn içinde seçmezsen varsayılan güvenli seçenek) |
+| Belediye Konağı panelinde **Fermanı İlan Et** | Büyük Ziyafet, Depo Genişletmesi ya da Zanaat Loncası fermanını ilan et |
+| Hasarlı yapının panelinde **Onarımı Başlat** | Fırtınada / kurt saldırısında hasar gören yapıyı onar |
+| Bilgelik Evi panelinde **Araştır** | Kasaba araştırmasını başlat (maliyet peşin; Bilge çalıştıkça ilerler) |
+| Liman panelinde **Kapalı / 250+ / 400+ / 550+** ve **İhracat Sandığı Hazırla** | Otomatik fazlalık ihracatının stok sınırını seç; rıhtıma bir ihracat sandığı koy |
+| Harikanın panelinde **Aşamayı Başlat** | Büyük Vadi Saat Kulesi'nin sıradaki aşamasını (Gövde, Görkemli Kule) başlat |
+| Takas penceresinin **Lüks Mallar (Altın)** sekmesi / limanın paneli | Altınla baharat sandığı, ipek ve mermer ya da kasaba yadigârı satın al |
+| Belediye Konağı panelinde **Altın Fermanları** | Ustalara Altın İkramiye ya da Kraliyet Mimarları fermanını ilan et |
+| Karakter panelinde sakinin **adına** tık | Sakinin adını değiştir (Enter kaydeder, Esc vazgeçer) |
+| Yapı panelinde **İşçi Ata** / **Sabitle** / **Sabitlemeyi Kaldır** | Bir sakini o iş yerine sabit çalışan yap (yalnızca orada çalışır) ya da serbest bırak |
+| `I` / sol sütunda **Arşiv** | Kasaba Arşivi'ni aç / kapat: son 32 günün grafikleri ve kasabanın tarihi |
+| Arşivde **Usta İşi Eserler** · **Sergile** / **Sat** | Ustaların eserini vitrinde sergile (kalıcı +1 refah) ya da limandan / tüccara sat (200-400 altın) |
+| Bir kediye ya da köpeğe sol tık | Hayvanı sev: sevinçle zıplar, kalpler uçuşur, miyavlar / havlar |
+| Seç aracıyla bir ağaca ya da kayaya sol tık | Öncelikli kesme / kırma emri: boştaki işçiler ilk iş olarak oraya koşar (kırmızı ünlem) |
+| Meydan havuzunun ya da Belediye Konağı'nın panelinde **Zili Çal** | Toplanma Zili: uyanık bütün sakinler bir saatliğine meydanda toplanır |
+| Liman panelinde **Büyük İhracat Seferi** | Altınla kervan teknesi çağır: 2,5 kat yük, 350'yi aşan mallar gider |
+| `F` / sol sütunda **Fotoğraf** | Fotoğraf modu: bütün arayüz gizlenir; kamerayı gezdirip kasabayı seyret (`F`, `Esc` ya da sağ alttaki ipucu geri getirir) |
 | Karakter panelinde eşin, çocuğun, ebeveynin ya da bir ilişkinin adı | O sakini seç |
 | `B` | İnşa et aracı (alt çubuktan yapı seç, haritada tıkla; yolu sürükleyerek döşe) |
 | `H` | Kaynak topla aracı (ağaç, kaya, çalı üzerinde sürükle; emirliden başlarsan kaldırır) |
@@ -60,6 +79,8 @@ LMGame/
 ├── index.html              Tek sayfa: canvas + HTML arayüz katmanı
 ├── tools/serve.py          Önbelleksiz geliştirme sunucusu
 ├── tools/art-preview.html  Yapı ve simgeleri büyütülmüş gösteren sanat önizleme sayfası (/tools/art-preview.html)
+├── tools/sim/              Başsız simülasyon ve test araçları (Playwright): otopilot, hedefli testler, eski kayıt
+│                           uyumluluğu, önizleme ve vitrin ekran görüntüleri; fixtures/ eski sürüm kayıtları
 ├── styles/
 │   ├── main.css            Sayfa düzeni, pixel-perfect canvas ayarları
 │   └── ui.css              Arayüz (HUD, paneller) stilleri
@@ -89,8 +110,7 @@ LMGame/
     │   ├── FestivalEffects.js Şenlikte renkli fener dizisi ve havada süzülen notalar
     │   ├── SeasonalEffects.js Sonbaharda ağaçlardan süzülen yapraklar (kar yağışı WeatherEffects'te)
     │   ├── RenderQueue.js  Y-sıralı çizim kuyruğu (ağacın arkasındaki gerçekten arkada kalır)
-    │   ├── TileCursor.js   Karo / alan vurgusu (köşe parantezleri; seçili yapı, hayalet önizleme)
-    │   └── Animation.js    Kare tabanlı animasyon oynatıcı
+    │   └── TileCursor.js   Karo / alan vurgusu (köşe parantezleri; seçili yapı, hayalet önizleme)
     ├── art/                Kodla çizilen pixel art
     │   ├── palette.js      Tek renk paleti (karakter → renk)
     │   ├── PixelSprite.js  Metin ızgarasını canvas'a çevirir, önbellekler; ızgara yardımcıları, CharGrid
@@ -107,23 +127,49 @@ LMGame/
     │       │                 tabela), pazar yeri (tüccar gelince flama), fener, anıt
     │       ├── structuresTier2.js Seviye 2 yapılar (Taş Ev, Kereste Atölyesi, Cam Sera, Derin Maden
     │       │                 Ocağı) ve kadim harabeler (yıkık / onarılmış kule, erzak kampı, çeşme)
-    │       └── structuresCraft.js Zanaat Atölyesi (tezgâh, alet askısı, mankende palto, kıvılcımlı örs)
+    │       ├── structuresCraft.js Zanaat Atölyesi (tezgâh, alet askısı, mankende palto, kıvılcımlı örs)
+    │       ├── structuresFarm.js Koyun Ağılı (iki katman: otlak + ahır / ön çit) ve koyunlar, kuzu
+    │       ├── structuresIndustry.js Yel Değirmeni ve Fırın (dönen kanatlar, alevli fırın), Demir Madeni
+    │       │                 (kayalık tepe, tünel, raylarda gidip gelen cevher vagonu)
+    │       ├── structuresCivic.js Belediye Konağı (saat kulesi, dalgalanan bayrak, sütunlu revak)
+    │       ├── structuresHealth.js Şifacı Kulübesi (saman çatıda kurutulan otlar, havan, kaynayan kazan)
+    │       ├── structuresWisdom.js Bilgelik Evi (kitaplıklı pencereler, saat kadranı, dürbünlü gözlem kubbesi)
+    │       ├── structuresHarbor.js Büyük Ticaret Limanı (rıhtım, ambar, yük vinci, fener; şantiye) ve ticaret teknesi
+    │       ├── structuresWonder.js Büyük Vadi Saat Kulesi: üç aşama (Temel, Gövde, Görkemli Kule) ve iskele kademeleri
+    │       ├── structuresGarden.js Kiraz Çiçeği Ağacı (dört mevsim), iki katmanlı Ahşap Çardak, Mermer Kemer, birleşen Çiçekli Çit
+    │       ├── festival.js   Mevsim festivali süslemeleri (çiçek kemeri, ziyafet sofrası, hasat sepeti, kardan adam...), saç çiçeği
+    │       ├── outfits.js    (15. aşama) Meslek kıyafetleri: on kit, Kalfa aksesuarı ve Usta kostümü (başlık + gövde katmanı)
+    │       └── animals.js    Tavşan, geyik, kedi ve köpek (otomatik konturlu, poz ve renk çeşitleri)
     ├── data/               Saf veri tanımları (oyun kuralları, denge değerleri)
     │   ├── tiles.js        Karo/nesne kuralları: yürünebilir, inşa edilebilir, yol bulma maliyeti;
     │   │                   mikro-biyom karoları ve yapı bonusları
     │   ├── buildings.js    Yapı kuralları: boyut, maliyet, inşaat süresi, üretim, kapasite; inşa menüsü;
     │   │                   Seviye 2 yükseltmeleri (upgrade) ve kadim harabeler (ruin)
-    │   ├── resources.js    Odun / Taş / Yiyecek, başlangıç stoğu, depo kapasitesi, öğün maliyeti
+    │   ├── resources.js    Odun / Taş / Yiyecek ve işlenmiş mallar Yün / Demir / Ekmek (ekmek 2,5 yiyecek
+    │   │                   değerinde), Kasaba Hazinesi (Altın, depo sınırı yok), başlangıç stoğu, depo kapasitesi,
+    │   │                   öğün maliyeti
+    │   ├── festivals.js    Dört mevsim kapanış festivali: saatler, yerler, bonuslar, süslemeler, anı cümleleri
+    │   ├── masterpieces.js (15. aşama) Usta işi eserler: altı eser, meslekleri, iş yerleri, fiyatları; şans ve sergi kuralları
+    │   ├── luxury.js       Altın harcama kanalları: lüks mallar (baharat, ipek ve mermer), beş kasaba yadigârı ve artan
+    │   │                   fiyatları, altın fermanları (ikramiye, kraliyet mimarları)
+    │   ├── research.js     Bilgelik Evi araştırmaları (maliyet, iş, etki) ve okul kuralları (ders saati, Kalfa eşiği)
     │   ├── jobs.js         İş emri türleri (inşaat, kesim, kırma, toplama), öncelik, işçi sayısı
     │   ├── weather.js      Hava türleri ve geçiş olasılıkları, yağmurun etkileri, ateşböceği saatleri
     │   ├── relationships.js İlişki seviyeleri (Rakip … En İyi Arkadaş), puan hızları, aşk ve evlilik kuralları
     │   ├── family.js       Mutlu Yuva, çocuklar ve büyüme, çocuk adları; atışma ve barışma olasılıkları
-    │   ├── equipment.js    Ekipman yuvaları, Sağlam Alet / Kışlık Palto / Sırt Çantası, atölye üretim modları
-    │   ├── town.js         Refah ağırlıkları, göç koşulları, şenlik kuralları, kasaba bonusları, sıcak yemek
-    │   ├── trade.js        Takas teklifleri (sonbahara özel olanlar dahil) ve gezgin tüccarın ziyaret düzeni
+    │   ├── health.js       Üşütme / halsizlik: maruziyet kaynakları, olasılık, etkiler; Dinçlik bonusu
+    │   ├── animals.js      Yaban hayatı (tavşan, geyik) ve kasaba hayvanları (kedi, köpek): sayı, hız, ürkme, sevme
+    │   ├── dilemmas.js     İkilem / karar olayları, seçenekleri, fırtına hasarı, keşif seferi ganimetleri
+    │   ├── equipment.js    Ekipman yuvaları, Sağlam Alet / Kışlık Palto / Sırt Çantası, asıl (demir / yün) ve
+    │   │                   eski usul tarifler, atölye üretim modları
+    │   ├── town.js         Refah ağırlıkları, göç koşulları, şenlik kuralları, kasaba bonusları, sıcak yemek,
+    │   │                   kasaba seviyeleri (Mezra -> Gelişmiş Şehir), belediyenin erzak dengesi ve fermanları
+    │   ├── trade.js        Takas teklifleri (sonbahara ve kasaba seviyesine özel olanlar dahil), seviyeye göre
+    │   │                   stok ve gezgin tüccarın ziyaret düzeni; nehir ihracatı (altın değerleri, sınırlar,
+    │   │                   sandık, tekne aralığı ve kapasitesi)
     │   ├── seasons.js      4 mevsim: bahçe / çalı / büyüme çarpanları, kış, hava ağırlıkları, ışık tonu; ısınma
     │   ├── skills.js       Meslekler, etkinlik -> meslek eşlemesi, Çırak / Kalfa / Usta kademeleri
-    │   ├── milestones.js   8 kasaba hedefi: ad, açıklama, simge, ölçüm türü ve hedef sayı
+    │   ├── milestones.js   9 kasaba hedefi: ad, açıklama, simge, ölçüm türü ve hedef sayı
     │   ├── characters.js   İhtiyaçlar, kişilik özellikleri, mesai ve günlük düzen, sakin havuzu
     │   └── activities.js   Etkinlikler: süre, ihtiyaç kazanımı, poz, balonlar, durum metinleri
     ├── world/              Harita ve dünya sorguları
@@ -138,7 +184,10 @@ LMGame/
     ├── entities/           Dünyadaki nesneler (veri + çizim)
     │   ├── Entity.js       Temel sınıf
     │   ├── Character.js    Kasaba sakini: kimlik, ihtiyaçlar, konum, poz, balon, çizim
-    │   └── Building.js     Yapı: şantiye ilerlemesi, içindekiler, çalışanlar, üretim, ışıklar, çizim
+    │   ├── Building.js     Yapı: şantiye ilerlemesi, içindekiler, çalışanlar, üretim, ışıklar, çizim
+    │   ├── Flock.js        Koyun ağılındaki sürü (yalnızca görsel): otlama, dolaşma, gece ahır önünde uyku
+    │   ├── Boat.js         Nehirdeki ticaret teknesi (yalnızca çizim): yön, yük, köpük izi; yolculuğu HarborSystem yönetir
+    │   └── Animal.js       Hayvan: tür, ad, renk, yuva, anlık poz ve sevilince çıkan kalp
     ├── ai/                 Karar verme
     │   ├── TraitProfile.js Kişilik özelliklerini tek profile birleştirir (iş hızı, mola, yorulma dahil)
     │   └── Brain.js        "Sırada ne yapayım?" — öncelikler, yemek, iş, taşıma, davet, boş zaman
@@ -149,7 +198,8 @@ LMGame/
     │   ├── BehaviorSystem.js Karakter durum makinesi: yürü → yap → bitir; sohbet, çalışma, taşıma
     │   ├── StructureSystem.js Ateş / fener yanması, böğürtlen yenilenmesi, üretim verimi çarpanları
     │   │                   (mevsim, ağaç, yağmur, biyom, seviye)
-    │   ├── EconomySystem.js Kaynak bankası: harca / ekle / iade, depo kapasitesi, uyarılar
+    │   ├── EconomySystem.js Kaynak bankası: harca / ekle / iade, depo kapasitesi, uyarılar; yiyecek değeri
+    │   │                   (öğünler önce ekmek yer), işlenmiş malların üretim sayacı
     │   ├── JobSystem.js    İş kuyruğu: toplama ve inşaat emirleri, kime hangi iş, tamamlanma
     │   ├── ConstructionSystem.js Yerleşim kontrolü, şantiye, yol/köprü döşeme, yıkım; yükseltme ve
     │   │                   harabe onarımı (proje başlat / iptal / tamamla, erzak hazinesi)
@@ -157,11 +207,26 @@ LMGame/
     │   ├── PopulationSystem.js Göçmen üretir, boş eve yerleştirir ve harita kenarından yürütür
     │   ├── EventSystem.js  Dinamik olaylar: göç koşulları, gezgin tüccar ve takas, akşam şenliği
     │   ├── TownStatus.js   Saf hesaplar: refah (anıt ve gözetleme kulesi bonusu dahil), konut kapasitesi,
-    │   │                   göç durumu, kasaba bonusları
+    │   │                   göç durumu, kasaba bonusları, toplam yiyecek değeri, kasaba seviyesi ölçütleri ve unvanı
     │   ├── AudioSystem.js  Olayları seslere bağlar; yağmur, su, kuş, cırcır, kış rüzgârı, şenlik ezgisi
     │   ├── HeatingSystem.js Kışın odun yakma, odun bitince soğuk evler, üşüme ve "İçi Isındı"
     │   ├── SkillSystem.js  Meslek deneyimi, kademe atlama, ustalık iş hızı bonusu
     │   ├── MilestoneSystem.js Kasaba hedefleri: ilerleme, tamamlanma, kış sınavı takibi, anıt kutlaması
+    │   ├── TownLevelSystem.js Kasaba seviyesi: ortalama refah, seviye atlama ve kutlama, belediyenin erzak dengesi
+    │   ├── HealthSystem.js Maruziyet, üşütme, kendiliğinden iyileşme, şifacıda tedavi ve Dinçlik
+    │   ├── AnimalSystem.js Yaban hayatı (dolaşma, ürküp kaçma, gece yuva) ve kedi / köpek (gelme, dolaşma, uyku, sevilme)
+    │   ├── DilemmaSystem.js Karar olayları: zamanlama, seçenek koşulları, zaman aşımı, fırtına, kurtlar, keşif seferi
+    │   ├── CivicSystem.js  Belediye fermanları: Büyük Ziyafet, Depo Genişletmesi (+150 kapasite, taş yollar), Zanaat Loncası
+    │   ├── ResearchSystem.js Bilgelik Evi: araştırma başlatma / ilerletme, etkilerin saf yardımcıları, okul ve Kalfa mezun
+    │   ├── HarborSystem.js Liman: fazlalık ihracatı sınırı, ihracat sandığı, teknenin nehir yolu, yükleme ve Kasaba Hazinesi
+    │   ├── Luxury.js       Altın ekonomisinin saf hesapları: satın alınabilirlik, yadigâr fiyatı, kalıcı ve geçici etkiler
+    │   ├── LuxurySystem.js Lüks mal, yadigâr ve altın fermanı alımları (altını öder, etkiyi başlatır)
+    │   ├── StatsSystem.js  Kasaba Arşivi: her sabah nüfus / refah / stok / altın özeti, düğün ve doğum sayaçları
+    │   ├── SeasonFestivalSystem.js Mevsim festivalleri: duyuru, yer ve süsleme, katılım, Mevsim Coşkusu
+    │   ├── MemorySystem.js Sakinlerin anıları (yaşam günlüğü) ve sakin anlarda güzel bir anıyı hatırlama
+    │   ├── RallySystem.js  Toplanma Zili: sakinleri bir saatliğine meydanda toplar
+    │   ├── CraftsmanshipSystem.js (15. aşama) Meslek kıyafetlerini giydirir; ustaların eserlerini üretir, sergiler, satar
+    │   ├── Masterworks.js  (15. aşama) Usta işi eserlerin saf hesapları: fiyat, satış / sergi durumu, refah katkısı
     │   ├── WeatherSystem.js Güneşli / bulutlu / yağmurlu arası yumuşak geçişler
     │   ├── RelationshipSystem.js Sohbet ve birlikte çalışmayla artan ilişki puanları, aşk ve düğün
     │   ├── ConflictSystem.js Zıt kişiliklilerin atışması, handa / şenlikte barışma
@@ -180,10 +245,15 @@ LMGame/
     │   └── components/     Hud (zaman, hava, kaynaklar, kayıt düğmeleri), ResidentList, CharacterPanel
     │                       (ihtiyaçlar, aile, ilişkiler, ekipman, meslekler), BuildingPanel (Yapı Bilgi
     │                       Paneli: evdeki aile, çalışanlar + İşten Çıkar, atölye üretimi, verim
-    │                       çarpanları, Yükselt / Onar), BuildMenu (alt araç çubuğu),
+    │                       çarpanları, yan ürün, değirmenin işleme satırları, Yükselt / Onar), BuildMenu (alt
+    │                       araç çubuğu; seviye kilitli yapılar),
     │                       Toasts (bildirimler), TownJournal (Kasaba Günlüğü), TradePanel
-    │                       (takas penceresi), MilestonePanel (hedefler), CelebrationModal (anıt
-    │                       kutlaması), TitleMenu (başlangıç ekranı), ControlsHint
+    │                       (takas penceresi), MilestonePanel (hedefler + kasaba seviyesi kartı),
+    │                       CelebrationModal (anıt, seviye ve altın çağ kutlaması), DilemmaModal (karar
+    │                       penceresi; yalnızca GameState'teki aktif ikilemi okur), BuildingPanel'in araştırma,
+    │                       ihracat ve harika bölümleri, (13. aşama) StatsPanel (Kasaba Arşivi grafikleri ve
+    │                       Arşiv / Fotoğraf düğmeleri), luxuryCards (lüks mal, yadigâr ve altın fermanı kartları),
+    │                       TitleMenu (başlangıç ekranı), ControlsHint
     ├── state/              Kaydedilebilir oyun durumu
     │   ├── GameState.js    Tek doğruluk kaynağı; toJSON / restore ile kayıt dönüşümü
     │   └── SaveManager.js  localStorage yuvaları ('main' ve 'session'), sürüm kontrolü
@@ -223,7 +293,9 @@ iki kişi aynı yere yönelmez.
 ## Ekonomi ve yönetim
 
 **Kaynaklar:** Odun, Taş, Yiyecek. Başlangıçta 30 / 20 / 25; her biri için depo kapasitesi
-100'dür, her Kiler +100 ekler. Değişiklikler HUD'da +5 / -10 olarak belirir.
+100'dür, her Kiler +100 ekler. Değişiklikler HUD'da +5 / -10 olarak belirir. 10. aşamadan beri bunlara üretim
+zincirlerinden gelen **işlenmiş mallar** eklenir: Yün, Demir Cevheri ve Ekmek (bkz. *Üretim zincirleri,
+hayvancılık ve kasaba seviyesi*); onların da depo kapasitesi aynıdır.
 
 **İş kuyruğu:** Oyuncu toplama emri verir ya da şantiye kurar; sakinler mesai saatinde
 (08:00–17:00) acil ihtiyaçları yoksa kendileri iş seçer:
@@ -240,11 +312,13 @@ enerji ve keyif tüketir. *Çalışkan* daha hızlı çalışır, daha az yorulu
 17:00'den sonra herkes sosyal hayata döner.
 
 **Yemek:** Handa pişmiş yemek varsa sakin oraya gider (bkz. *Kasaba Hanı*). Yoksa stokta yiyecek
-olduğunda evinde ya da Kilerde hızlıca yer (öğün başı 3 yiyecek); stok bitince böğürtlen çalılarına yönelir.
+olduğunda evinde ya da Kilerde hızlıca yer (öğün başı 3 yiyecek değeri; kilerde ekmek varsa önce ekmek yenir);
+stok bitince böğürtlen çalılarına yönelir.
 
 **Göç:** Her sabah 08:00'de şu üç koşul birlikte sağlanırsa haritanın kenarındaki yoldan yeni sakinler
-gelir (sabah başına en fazla 2, kasabada en fazla 24 kişi; 8. aşamada 15'ten çıkarıldı): **boş yatak**, **güvenli yiyecek stoğu**
-(en az 15 ve sakin başı 3) ve **refah en az %55**. Başlangıçta 3 kulübe ve 6 sakin vardır, her yatak
+gelir (sabah başına en fazla 2, kasabada en fazla 24 kişi; 8. aşamada 15'ten çıkarıldı; Kasaba seviyesinde sabah
+başına 3, Gelişmiş Şehir'de en çok 30 kişi): **boş yatak**, **güvenli yiyecek stoğu**
+(en az 15 ve sakin başı 3; ekmek 2,5 yiyecek sayılır) ve **refah en az %55**. Başlangıçta 3 kulübe ve 6 sakin vardır, her yatak
 doludur. Boş yatak olduğu hâlde göçmen gelmezse nedeni bildirim ve günlükte yazar; HUD'daki
 **6/8 Sakin** yazısının üzerine gelince koşulların durumu görünür.
 9. aşamadan beri evli çiftlerin evlerindeki boş yataklar çocuklara ayrılır: göçmenler oraya yerleşmez
@@ -272,9 +346,39 @@ eklendi; yarım kalan bir yükseltme yüklenince inşaatçılar kaldığı yerde
 sakinlerin sevgilisi / eşi ve evlilik tarihleri (`partnerId`, `married`, `partnerSince`, `marriedAt`), aile
 bağları (`parentIds`), çocukların büyüme zamanı (`growsUpAt`), kuşanılan ekipman (`equipment`), eksiye inen
 ilişki puanları, kasabanın ekipman deposu (`equipment`), atölyenin üretim seçimi ve yarım işi
-(`craftMode`, `craft`) ve iş yerlerinden çıkarılan çalışanlar (`excludedWorkers`) eklendi. Kayıt sürümü
-7'dir; 4.–8. aşamanın (sürüm 2–6) kayıtları da açılır: eksik alanlar varsayılanla dolar (herkes bekâr,
-yetişkin ve ekipmansız başlar), adı olmayan kasabaya tohumdan bir ad önerilir. Harita boyutu yazılmamış eski kayıtlar **48x48, biyomsuz** haritalarıyla açılır
+(`craftMode`, `craft`) ve iş yerlerinden çıkarılan çalışanlar (`excludedWorkers`) eklendi. 10. aşamada
+işlenmiş mallar (`resources.wool / iron / bread`), dilimlenmiş ekmekten artan yiyecek değeri (`pantry.credit`),
+kasaba seviyesi (`town`: seviye, her seviyeye ulaşılan an, ortalama refah, belediyenin son erzak dengesi günü),
+işlenmiş malların toplam üretimi (`stats.goods`), atölyedeki işin tarifi (`craft.recipe`: demir / yün ya da eski
+usul) ve yeni yapılar (Koyun Ağılı, Yel Değirmeni ve Fırın, Demir Madeni, Belediye Konağı) eklendi. 11. aşamada
+hayvanlar (`animals`: tür, ad, renk, yuva; `animalMeta`), sakinlerin hastalığı ve maruziyeti (`illness`, `exposure`),
+Dinçlik bonusu (`buffs.vigor`), keşif seferindekiler (`away`), şifacı kulübesinin ot ve iksir stoğu (`herbs`,
+`remedies`), yapıların fırtına hasarı (`damaged`), belediye fermanları (`civic`: depo kademesi, lonca, son ziyafet,
+kadim tılsımlar) ve karar olayları (`dilemma`: açık pencere ve kalan süresi, yaklaşan fırtına, süren sefer, olay
+geçmişi) eklendi. 12. aşamada araştırmalar (`research`: süren araştırma ve ilerlemesi, biten araştırmalar ve
+tarihleri), çocukların okulu (`schooling`, `schoolDay`, `schoolToday`) ve okul mezunları (`educated`), Kasaba
+Hazinesi (`resources.gold`), nehir ihracatı (`trade`: nehirdeki tekne ve yolculuğu, sıradaki teknenin zamanı,
+toplam sefer, altın ve kaynak başına ihraç, son sefer), limanın fazlalık sınırı ve rıhtımdaki sandık
+(`exportThreshold`, `crate`), harikanın tamamlanan aşaması (`wonderStage`) ve keşif seferlerinin Kadim Tılsım şans
+sayacı (`civic.expeditionsSinceTalisman`) eklendi; aktif ikilemin seçenekleri (`dilemma.active.options`) de kayda
+girer. 13. aşamada sergilenen yadigârlar, ipek ve mermer, altın fermanlarının son ilan günü ve harcanan altın
+(`luxury`), Kasaba Arşivi'nin günlük özetleri (`history`, en çok 64 gün), düğün ve doğum sayaçları (`stats.weddings`,
+`stats.births`), sakinin oyuncunun verdiği adı (`customName`) ve sabit iş yeri (`workplaceId`), handaki baharatlı
+yemeğin kişisel bonusu (`buffs.spiced`) ve yeni süs yapıları (kiraz, çardak, kemer, çit) eklendi. 14. aşamada
+sakinlerin anıları (`memories`), mevsim festivalinin durumu ve süslemeleri (`seasonFestival`; şenliğin teması
+`events.festival.theme`), Toplanma Zili (`rally`), sisin yoğunluğu (`weather.mist`), öncelikli işler (`jobs[].urgent`),
+Büyük İhracat Seferi (`trade.grandDay`, `grandPending`, `grandVoyages`, teknenin `grand`'ı) ve yeni sayaçlar
+(`stats.seasonFestivals`, `recollections`, `rallies`) eklendi. 15. aşamada usta işi eserler (`masterworks`: eserler,
+türleri, ustaları, durumları — depoda / sergide / satıldı — ve satış fiyatları, sayaçlar, ustanın son eser günü) ve atışma /
+barışma sayaçları (`stats.quarrels`, `reconciliations`) eklendi; meslek kıyafetleri deneyimden türetildiği için kayda
+girmez, yüklenince her sakin kademesine göre yeniden giyinir. Kayıt sürümü 13'tür; 4.–14. aşamanın (sürüm 2–12)
+kayıtları da açılır (usta işi eser vitrini boş başlar) (anısı olmayan sakinin anı defteri ilk açılışta "Kasabada yaşamaya başladı" ile açılır): eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
+ve ekipmansız başlar; yün, demir, ekmek ve altın 0 olur; araştırma, ihracat ve yadigâr boş başlar; arşiv ilk açılışta
+kurulur, düğün ve doğum sayaçları evli çiftlerden ve ebeveynli sakinlerden tahmin edilir; yaban hayatı ilk açılışta
+yerleşir), adı olmayan kasabaya tohumdan bir ad önerilir. Açık bir karar penceresiyle kaydedilen oyun
+yüklenince pencere yeniden açılır ve oyun durur; sefere yola çıkmışken kaydedilen sakin yüklenince seferde sayılır.
+Seviyesi yazılmamış eski bir kasaba yüklenince seviyesi **sessizce** belirlenir: hak ettiği seviyeden başlar,
+günlüğe "Kasaba seviyesi belirlendi" yazılır, art arda kutlama penceresi açılmaz. Harita boyutu yazılmamış eski kayıtlar **48x48, biyomsuz** haritalarıyla açılır
 (`config.js` → `LEGACY_MAP_SIZE`); üretici o yolda rastgele sayı sırası değişmeden eski haritayı birebir
 yeniden kurar, yapılar da eskisi gibi Seviye 1'dir ve yükseltilebilir.
 Kaldırılan yapı türleri kayıt okunurken yenisine çevrilir (`data/buildings.js` → `LEGACY_BUILDING_TYPES`,
@@ -307,7 +411,10 @@ aynı hava dizisi sürer. Hava HUD'da saatin yanında küçük bir simgeyle gör
 | Bulutlu | Gri örtü, yere düşen bulut gölgeleri | — |
 | Yağmurlu | Çapraz piksel damlalar, suda ve zeminde sıçrama halkaları, kararan gökyüzü | Sebze Bahçesi **+%25** verim, kütük ve fidanlar **2 kat** hızlı büyür, dışarıdaki sakinlerin keyfi **1,7 kat** hızlı düşer (içeridekiler ıslanmaz; **Doğa Sever**'ler yağmuru sever ve keyif kazanır) |
 | Açık gece (20:00–04:00) | HUD'da "Ateşböcekleri" simgesi; orman ve nehir kıyısında sarı-yeşil yanıp sönen sürüler | — |
+| (14. aşama) Sabah Sisi — nadir | Bütün manzarayı yumuşatan hafif beyaz örtü, yavaşça süzülen sis şeritleri, nehrin üstünde dalgalanan pus | İlkbahar (%40) ve sonbahar (%18) sabahları 05:00'te, hava açık ya da bulutluysa çöker, 2,5–4,5 saat sürer. Dinlendirir: dışarıdakilerin keyfi %20 yavaş düşer |
+| (14. aşama) Gök Gürültülü Fırtına — nadir | Bardaktan boşanırcasına (2,2 kat yoğun) yağmur, ekranda anlık çift şimşek parıltısı, ardından uzaktan gelen yumuşak gök gürültüsü | Yaz öğleden sonraları 14:00'te (%30) başlar, 1,5–2,5 saat sürer; yağmurun etkileri geçerlidir |
 
+Nadir olayların zarı `data/weather.js` → `WEATHER_SPECIALS`'tadır.
 Kulübelerin bacasından, içinde yaşayan olan her evde duman tüter (içeride biri varsa daha yoğun).
 Etkilerin sayıları `data/weather.js` → `RAIN_EFFECTS`, bahçenin bonusu `data/buildings.js` →
 `production.rainBonus`'tadır.
@@ -394,6 +501,19 @@ ne çalacağı `systems/AudioSystem.js`'tedir:
 | Ateşböceği geceleri | cırcır böceği |
 | Kamera nehre yakınken | dalgalanan kahverengi gürültü su şırıltısı |
 | Şenlik boyunca | pentatonik ezgi |
+| (12. aşama) Ticaret teknesi rıhtıma yanaştı / yükünü alıp gitti | çan / sikke |
+| (12. aşama) Araştırma tamamlandı, harikanın bir aşaması bitti | ustalık ezgisi |
+| (12. aşama) Okulu bitiren çocuk Kalfa oldu | hedef ezgisi |
+| (12. aşama) Harika tamamlandı | büyük kutlama ezgisi |
+| (12. aşama) Altın çağda saat başı (07:00–22:00) | saat kulesi: dört notalı melodi ve en çok üç derin çan vuruşu |
+| (13. aşama) Yadigâr sergilendi | büyük kutlama ezgisi |
+| (13. aşama) Lüks mal alındı / altın fermanı ilan edildi | sikke / neşeli arpej |
+| (14. aşama) Mevsim festivali sürerken | temaya özgü ezgi: ilkbaharda sekerek, yazın panayır havası, sonbaharda halk havası, kışın çanlı ve yavaş |
+| (14. aşama) Festival duyurusu / bitişi | çan / büyük kutlama ezgisi |
+| (14. aşama) Kediye / köpeğe tıklayınca | kısa bir miyav / iki havlama |
+| (14. aşama) Toplanma Zili | ağır kasaba çanı, üç vuruş |
+| (14. aşama) Yaz fırtınasında şimşek | gecikmeli, uzaktan gelen yumuşak gök gürültüsü |
+| (14. aşama) Sakin bir anısını hatırlayınca | yumuşak çan |
 
 Tarayıcılar sesi ancak bir kullanıcı etkileşiminden sonra başlatır: motor ilk tıklamada ya da tuşta
 açılır. Sessiz tercihi `localStorage`'da (`config.js` → `AUDIO_MUTE_KEY`) saklanır.
@@ -482,7 +602,7 @@ rastgele) kasaba yavaşça yaşar ve kamera meydanın çevresinde süzülür. Or
 | Sokak Feneri | 1x1 | Odun 1, Taş 1 | Kıvrık direkli fener. 19:00–06:00 arası sıcak sarı geniş bir ışık halkası yayar, yanından geçenlerin keyfini korur. |
 | Kasaba Anıtı | 2x2 | Odun 40, Taş 40 | Mermer kaide üstünde elinde yıldız tutan bronz heykel. Kasabada yalnızca bir tane olur. Tamamlanınca refaha kalıcı **+6**, keyif %12 daha yavaş düşer; sakinler önünde gururla durup seyreder, gece yıldızı parlar, büyük bir kutlama ezgisi çalar ve "Tebrikler, Kasabanız Efsaneleşti!" penceresi açılır (oyun sürer). |
 
-**Kasaba Hedefleri** (`G`): sırayla 8 hedef. Her biri ilerleme çubuğuyla görünür; tamamlanınca bildirim, ses
+**Kasaba Hedefleri** (`G`): sırayla 9 hedef (dokuzuncusu 12. aşamada eklendi). Her biri ilerleme çubuğuyla görünür; tamamlanınca bildirim, ses
 ve günlük kaydı gelir.
 
 | Hedef | Koşul |
@@ -495,6 +615,7 @@ ve günlük kaydı gelir.
 | Kış Sınavı | Bir kışı nüfus eksilmeden ve refah **%65**'in altına düşmeden atlat. Kış boyunca panelde bu kışın en düşük refahı görünür; başaramazsan gelecek kış yeniden denenir |
 | Işıltılı Sokaklar | En az 6 Sokak Feneri ve 15 karo Taş Yol |
 | Kasabanın Tacı | Kasaba Anıtı'nı inşa et |
+| Vadinin İncisi | Büyük Vadi Saat Kulesi Harikası'nı üç aşamasıyla tamamla (12. aşama; panelde tamamlanan ve sıradaki aşama yazar) |
 
 ## Büyük harita, biyomlar, harabeler ve Seviye 2 (8. aşama)
 
@@ -645,12 +766,13 @@ Her yetişkinin üç ekipman yuvası vardır: **Alet**, **Kıyafet**, **Çanta**
 
 | Ekipman | Yuva | Malzeme | Üretim işi | Etki | Görünüm |
 |---|---|---|---|---|---|
-| Sağlam Alet | Alet | 4 odun + 4 taş | 70 | Üretim ve inşaat hızı **+%25** | Elindeki baltanın / kazmanın / çekicin başı çelik, sapı koyu |
-| Kalın Kışlık Palto | Kıyafet | 6 odun + 4 yiyecek | 80 | Kışın dışarıda üşümenin enerji ve keyif etkisi **%60 az**; üşüme balonu da seyrekleşir | Sonbahar ve kışta beyaz yakalı lacivert palto |
-| Sırt Çantası | Çanta | 5 odun + 3 yiyecek | 60 | Yürürken **%40 daha az** yorulur, çalışma verimi **+%15** | Sırtında deri çanta (önden askıları görünür) |
+| Sağlam Alet | Alet | 2 demir + 2 odun (eski usul: 4 odun + 4 taş) | 70 | Üretim ve inşaat hızı **+%25** | Elindeki baltanın / kazmanın / çekicin başı çelik, sapı koyu |
+| Kalın Kışlık Palto | Kıyafet | 3 yün + 1 odun (eski usul: 6 odun + 4 yiyecek) | 80 | Kışın dışarıda üşümenin enerji ve keyif etkisi **%60 az**; üşüme balonu da seyrekleşir | Sonbahar ve kışta beyaz yakalı lacivert palto |
+| Sırt Çantası | Çanta | 2 yün + 2 odun (eski usul: 5 odun + 3 yiyecek) | 60 | Yürürken **%40 daha az** yorulur, çalışma verimi **+%15** | Sırtında deri çanta (önden askıları görünür) |
 
-Kasabada lif kaynağı yoktur. Bu yüzden paltonun malzemesi odun (düğme, astar, kalıp) ve yiyecektir (kürk ve
-yağlı deri karşılığı).
+9. aşamada kasabada lif kaynağı yoktu; paltonun malzemesi odun ve yiyecekti. 10. aşamadan beri asıl tarifler
+demir ve yündür; **eski usul** tarif yalnızca kasabada o malzemeyi üreten tamamlanmış bir yapı (Demir Madeni /
+Koyun Ağılı) yokken kullanılır, böylece erken oyunda atölye tıkanmaz (bkz. *Üretim zincirleri*).
 
 - **Üretim seçimi** (atölyenin yapı panelinde):
   - **Otomatik:** Depoda en çok eksik olanı sırayla üretir. Sonbahar ve kışta palto önceliklidir.
@@ -703,6 +825,848 @@ yağlı deri karşılığı).
 sakinler, yeni balonlar (aşk, öfke, somurtma, yüzük), ekipman simgeleri, normal ve sağlam aletler ve Zanaat
 Atölyesi (boşta, çalışırken, kışın, şantiye) var.
 
+## Üretim zincirleri, hayvancılık ve kasaba seviyesi (10. aşama)
+
+Sayılar `data/resources.js`, `data/buildings.js`, `data/equipment.js`, `data/town.js` ve `data/trade.js`
+dosyalarındadır; mantık `EconomySystem`, `BehaviorSystem`, `CraftingSystem`, `StructureSystem` ve
+`TownLevelSystem`'dedir.
+
+### İşlenmiş mallar
+
+| Mal | Nereden gelir? | Ne işe yarar? |
+|---|---|---|
+| **Yün** (Yün ve Kumaş) | Koyun Ağılı | Kışlık palto (3 yün + 1 odun) ve sırt çantası (2 yün + 2 odun) |
+| **Demir** (Demir Cevheri) | Demir Madeni | Sağlam (çelik başlı) alet (2 demir + 2 odun), Belediye Konağı (8 demir) |
+| **Ekmek** (Un ve Ekmek) | Yel Değirmeni ve Fırın | Öğünlerde önce ekmek yenir: 1 ekmek **2,5 yiyecek** değerindedir |
+
+- **HUD:** Odun / Taş / Yiyecek satırının altında **Mallar** satırı vardır. Özet görünümde yalnızca simge ve miktar,
+  ▸ ile açılınca her malın depo doluluğu, kaç yapının ürettiği ve bugünkü üretimi görünür. Seçim tarayıcıda
+  hatırlanır. Yiyecek kutusunun ipucunda ekmek dahil toplam besin değeri yazar.
+- **Ekmekle yemek:** Öğün 3 yiyecek değeridir. Kilerde ekmek varsa sakin önce ekmek yer ("Evinde taze ekmekle
+  yemek yiyor") ve sofradaki sıcak ekmek dakikada +0,25 keyif de verir. Bir ekmek dilimlenince artan yiyecek
+  değeri kilerde pay olarak saklanır (`pantry.credit`), hiçbir şey kaybolmaz. Handaki aşçı önce ham yiyecek
+  kullanır, kilerde yalnızca ekmek kaldıysa onu sofraya koyar. Göç koşulu da ekmeği yiyecek değeriyle sayar.
+- **İlk ürün:** Kasabanın ilk yünü, demiri ve ekmeği çıkınca günlüğe yazılır ve kısa bir başarı ezgisi çalar.
+  Fırın ham yiyeceği una çevirdikçe "Yiyecek stoğu tükendi" yazılmaz; kilerde ekmek varsa kasaba aç değildir.
+
+### Yeni yapılar
+
+| Yapı | Boyut | Maliyet | Ne işe yarar? |
+|---|---|---|---|
+| Koyun Ağılı | 3x3 | Odun 30, Taş 8, Yiyecek 10 | 1 **çoban** kapının önünde değneğiyle durur. Kişi başı saatte **+2 yün** ve yan ürün olarak **+1 yiyecek** (süt-peynir). İlkbaharda kırkım bereketi **%125**, kışın koyunlar ahırda: **%60**. Bereketli toprakta **+%20**. |
+| Yel Değirmeni ve Fırın | 3x3 | Odun 40, Taş 35 | **Köy** seviyesinde açılır; önce bir Sebze Bahçesi gerekir. 1 **fırıncı** fırının ağzında çalışır: saatte **4 yiyecek → 4 ekmek** (10 yiyecek değeri). Kışın da çalışır. Kilerde yiyecek yoksa ya da ekmek deposu doluysa boşta kalır, panel nedenini yazar. |
+| Demir Madeni | 3x3 | Odun 40, Taş 20 | **Kayalık Tepe**'ye (ayak izinin en az 3 karosu) ya da kayaların yanına (6 karo içinde en az 3 kaya / çakıl) kurulur. 2 **madenci** tünelin iki yanında kazma sallar: kişi başı saatte **+1,5 demir** ve **+1 taş**. Kayalık tepede **+%20**. |
+| Belediye Konağı | 3x3 | Odun 60, Taş 80, Demir 8 | **Kasaba** seviyesinde açılır; kasabada yalnızca bir tane olur. Tüm iş ve inşaat verimi **+%15**, refaha kalıcı **+3**. Her sabah 07:00'de vergi ve erzak defterini tutar: temel kaynaklardan deposu en az %50 dolu olanın %15'ini (en çok 12) deposu %30'un altına düşene 1'e 1 aktarır; bildirim ve günlüğe yazılır. |
+
+- **Koyunlar:** Ağıl iki katmanda çizilir (otlak ve ahır / ön çit); dört koyun aradaki derinlik sırasıyla
+  dolaşır. Otlar (baş eğik, çiğner), kısa yürüyüşler yapar, durup bakınır, birbirinin içine girmez. Akşam
+  20:30'da ahırın önündeki yerlerine yürüyüp yatarlar, başlarının üstünde küçük "z"ler yükselir; sabah kalkarlar.
+  Kışın ve yağmurda ahıra yakın dolaşırlar. İlkbaharda bir **kuzu** annesinin peşinden koşturur. Kamera ağıla
+  yakınken gündüz ara sıra meleme sesi gelir (yakınlığa göre yüksek).
+- **Değirmen:** Dört yelkenli kanat altı karede çeyrek tur döner: rüzgârda ağır ağır, fırıncı çalışırken hızlı
+  (hız yumuşakça değişir). Fırının ağzında alev titrer, gece turuncu ışık verir; fırıncı çalışırken baca yoğun,
+  gündüz fırın sıcakken ince tüter. Kışın başlık ve fırın karlanır, dönen kanatlara kar tutmaz.
+- **Maden:** Madenciler çalışırken cevher vagonu raylarda tünelden dolu çıkar, boş döner; girişteki fener
+  18:30-06:30 yanar.
+- **Belediye:** Saat kulesinin tepesinde bayrak dalgalanır; gece pencereler ve basamakların iki yanındaki
+  fenerler yanar.
+- **Meslekler:** Hayvancılık (Çoban), Fırıncılık (Fırıncı), Madencilik (Madenci). *Hırslı* madenciliği, *Doğa
+  Sever* çobanlığı sever.
+
+### Zanaat Atölyesi ve tarifler
+
+Alet demirden, palto ve çanta yünden yapılır. Kasabada o malzemeyi üreten tamamlanmış bir yapı **yoksa**
+zanaatkâr eski usul (odun / taş / yiyecek) tarifle üretir; üreten yapı **varsa** malzemenin gelmesini bekler
+(panel "Yün bekleniyor" der). Tezgâhtaki iş ve sıradaki ekipman eski usulse panelde "(eski usul)" yazar;
+ekipmanın ipucunda iki tarif de görünür.
+
+### Kasaba seviyesi (Mezra → Köy → Kasaba → Gelişmiş Şehir)
+
+Kasaba büyüdükçe kendiliğinden seviye atlar; seviye **hiç düşmez** (oyuncu cezalandırılmaz, büyüme ödüllendirilir).
+Bir seviyenin koşullarının hepsi aynı anda sağlanmalıdır. *Ortalama refah*, kasaba refahının yaklaşık yarım
+günlük yürüyen ortalamasıdır: bir anlık şenlik coşkusu yetmez, kasaba bir süre mutlu kalmalıdır. *Yapı*
+sayısına süsleme (bank, fener, çiçek tarhı) ve haritanın doğal parçaları girmez, onarılmış kadim yapılar girer.
+
+| Seviye | Unvan | Nüfus | Yapı | Seviye 2 yapı | Ortalama refah | Ödüller |
+|---|---|---|---|---|---|---|
+| 1 | Mezra ("Yeşilvadi Mezrası") | — | — | — | — | — |
+| 2 | Köy ("Yeşilvadi Köyü") | 13 | 8 | 1 | %63 | Yel Değirmeni ve Fırın; Bilgelik Evi (12. aşama); bir kedi ve bir köpek; tüccar yün balyası ve demir külçesi getirir; her maldan +1 stok |
+| 3 | Kasaba ("Yeşilvadi Kasabası") | 20 | 17 | 3 | %68 | Belediye Konağı; Büyük Ticaret Limanı (12. aşama); bir kedi daha; tüccar (Kervancı) ekmek sepeti getirir, yün ve demir alır; +2 stok; sabah 3 göçmen |
+| 4 | Gelişmiş Şehir ("Yeşilvadi Şehri") | 25 | 28 | 8 | %75 ve **Belediye Konağı** kurulmuş | Kasaba Harikası (12. aşama); refaha kalıcı +4; göç sınırı 30; bir köpek daha; Kervanbaşı Şehir Kervanı ve Lonca Ustaları (1 gün %20 hızlı çalışma) getirir; +3 stok |
+
+11. aşamada eşikler yaklaşık %25-30 zorlaştırıldı (10. aşamada Köy 10 / 6 / 0 / %60, Kasaba 16 / 13 / 2 / %65,
+Şehir 24 / 22 / 6 / %72 idi). Otopilotla şehir olmak 13.–16. günden 18.–24. güne uzadı. 12. aşamada şehrin nüfus
+eşiği 28'den **25**'e indi: göç sınırının (24) üstünde en az bir doğum yine şarttır ama oyuncu çok uzun beklemez.
+28 yapı için de kadim harabelerin onarımına ya da ikinci ağıl, sera, şifacı gibi yatırımlara gerek vardır. Eski bir kasabanın ulaştığı seviye düşmez.
+
+- **Seviye atlayınca:** büyük kutlama ezgisi, bildirim, günlük kaydı ve yeni unvanı, açılan yapının görselini ve
+  ödülleri gösteren kutlama penceresi (oyun durmaz). HUD'daki kasaba adı unvanla yazılır ("Yeşilvadi
+  Kasabası"); ad zaten unvanla bitiyorsa ("Ayışığı Köyü") unvan ayrıca eklenir: "Ayışığı Köyü · Kasaba".
+- **İzleme:** HUD'da adın yanında seviye arması ve dört pip; üzerine gelince sonraki seviyenin koşulları
+  (✓ / ✗) ve ödülleri. Koşulların hepsi sağlanınca pip çerçevesi yanıp söner. Hedefler panelinin (`G`) başında
+  **Kasaba Seviyesi** kartı her koşulu ilerleme çubuğuyla gösterir.
+- **Kilitli yapılar:** İnşa menüsünde soluk görünür, köşelerinde açılacakları seviyenin adı yazar; ipucu ve
+  yerleştirme gerekçesi "Kasaba Köy seviyesine ulaşınca açılır" der.
+- **Gezgin tüccar:** Seviye arttıkça mal çeşitliliği (`minTier`) ve her teklifin stoğu (`merchantBonus`) artar,
+  unvanı da büyür: Gezgin Tüccar → Kervancı → Kervanbaşı. Takas penceresinde seviyeyle gelen mallar altın tonla
+  vurgulanır.
+- **Başlangıç ekranı:** "Kaldığın Yerden Devam Et" satırında kasabanın unvanı yazar ("Yeşilvadi Kasabası · Gün 12").
+
+### Yerleşim güvenliği
+
+Bir yapı, başka bir yapının girişini ya da çalışma yerini kasabadan **tamamen koparacak** şekilde (araya geçit
+bırakmadan) kurulamaz: "Yel Değirmeni ve Fırın kasabadan kopar: aradaki geçidi kapatma". Yeni yapının kendi önü de
+yapı **kurulduktan sonra** kasabaya bağlı olmalıdır (önü yalnızca kendi ayak izinin içinden bağlanan yere kurulamaz). Kesilen ağacın kütüğünden
+yetişen fidan da bir yapının girişini kapatacaksa ağaca dönüşmez, kurur. Böylece sık kurulan kasabalarda
+değirmen, maden ya da ev kapalı bir cepte kalıp sessizce durmaz.
+
+### Denge ve test (simülasyon)
+
+Başsız simülasyonda (Chromium, sabit 1/60 sn adım, 4x hız) hilesiz bir otopilot oynadı: toplama emri verir,
+sırayla yapı kurar ve yükseltir. 4 harita (tohum 42, 7, 2024, 3), 32 gün; `Math.random` da tohumlanarak
+deterministik koşuldu.
+
+- **Seviyeler:** Köy 3.–5., Kasaba 8.–10., Gelişmiş Şehir 13.–16. günde (Belediye Konağı tamamlanınca) geldi.
+  Eski koşullarda (belediyesiz) şehir 11. günde geliyordu; belediye koşulu temposu kervan ve demir zincirine bağladı.
+- **Zincirler:** İlk yün 4., ilk demir 4.–5., ilk ekmek 5.–6. günde çıktı. 32 günde ağıl 440–450 yün, maden
+  360–370 demir, fırın 675–735 ekmek üretti.
+- **Atölye:** 88–90 ekipmanın tamamına yakını asıl tarifle (yün / demir) yapıldı; eski usul tarif yalnızca ağıl
+  ya da maden kurulmadan önce 0–2 kez kullanıldı. 30 sakinin hepsi alet, palto ve çantalı.
+- **Kış:** Dört haritada da Kış Sınavı ilk kışta (17. gün) geçildi; kasabanın ortalama refahı en düşük %69–73'te
+  kaldı. Ekmek kışın yiyecek stoğunu 2,5 kat uzattığı için donmuş bahçelere rağmen kimse aç kalmadı.
+- **Belediye:** Erzak dengesi her sabah bir kez çalıştı (ör. 12 yiyecek → 12 odun); iş verimi 1,15 kat.
+- **Koyunlar:** Gündüz otlayıp dolaştılar, 20:30'da ahır önündeki yerlerine yürüyüp yattılar; ilkbaharda kuzu
+  annesini izledi. Değirmen kanatları rüzgârda ağır, fırıncı çalışırken hızlı döndü; maden vagonu raylarda gidip geldi.
+- **Hata bulundu ve düzeltildi:** Sık kurulan kasabalarda yeni bir yapı, önü yalnızca kendi ayak izinin içinden
+  kasabaya bağlanan bir yerde kurulabiliyor ya da başka bir yapıyı kapalı cepte bırakabiliyordu (değirmen, maden ve
+  atölye sessizce duruyordu). Yerleşim artık yapı kurulduktan sonraki ulaşılabilirliğe bakar (bkz. *Yerleşim güvenliği*).
+- **Hedefli testler (33):** ekmekli öğün ve dilim payı, aşçının önce ham yiyecek kullanması, göç koşulunda ekmek,
+  seviye kilitleri, eski usul → asıl tarif geçişi, tüccarın seviye malları ve stokları, yün satışı, belediye
+  çarpanı ve günde bir erzak dengesi, unvan biçimleri, kendi girişini koparan yapının reddi.
+- **Kayıt:** 9. aşamanın oyunu (sürüm 7) ile büyütülüp kaydedilen kasaba açıldı: seviyesi sessizce Köy belirlendi
+  (kutlama penceresi açılmadı), ertesi sabah göçle Kasaba'ya çıkınca kutlandı. Sürüm 8 kaydında yün / demir /
+  ekmek, dilim payı ve kasaba seviyesi kaydet-yükle döngüsünde aynen döndü.
+
+**Önizleme:** `/tools/art-preview.html` sayfasının başında işlenmiş mal ve seviye simgeleri, taşınan yükler,
+çoban değneği ve fırın küreği, koyunlar ve kuzu (tüm pozlar), Koyun Ağılı (dört mevsim, iki katman, şantiye),
+Yel Değirmeni (altı kanat karesi, fırın alevi, gece, kış), Demir Madeni (vagon kareleri, gece, kış) ve Belediye
+Konağı (bayrak kareleri, gece, kış, şantiye) var.
+
+## Yaşayan doğa, sağlık, karar olayları ve belediye fermanları (11. aşama)
+
+Sayılar `data/animals.js`, `data/health.js`, `data/dilemmas.js` ve `data/town.js` (`CIVIC_PROJECTS`) dosyalarındadır;
+mantık `AnimalSystem`, `HealthSystem`, `DilemmaSystem` ve `CivicSystem`'dedir.
+
+### Yaban hayatı
+
+İlk açılışta (ya da hayvansız eski bir kayıt yüklenince) haritanın sakin köşelerine, tohumdan hep aynı yerlere
+**9 tavşan** ve **4 geyik** yerleşir (48x48 haritada orantılı az). Yuvaları meydandan uzak (tavşan 13, geyik 17
+karo) bereketli toprak, orman zemini ve çimendedir.
+
+- **Gündüz:** Yuvalarının çevresinde dolaşır, otlar. Tavşanlar zıplayarak koşar, ot kemirir. Geyikler başlarını
+  eğip otlar; erkeklerin boynuzu vardır.
+- **Ürkme:** Bir sakin yaklaşınca (tavşan 38, geyik 62 piksel) ürküp ondan uzağa, yürünebilir bir yöne kaçarlar.
+  Sakin uzaklaşınca yeniden otlarlar.
+- **Gece:** Tavşan yuvasına girer, geyik yuvasında yatar.
+- **Kış:** Tavşanlar beyaz kürk giyer.
+- **Yuva:** Yuvası yapıyla ya da yolla kaplanırsa yakında yeni bir yuva bulurlar.
+
+### Kasaba kedileri ve köpekleri
+
+Kasaba **Köy** olunca (ya da bir Kasaba Hanı veya Belediye Konağı tamamlanınca) sabah 09:00'da harita kenarından
+birer birer hayvan gelir (günde en çok bir tane). Gelince bildirim çıkar ve günlüğe yazılır: "Kasabaya Tekir adında
+bir kedi yerleşti".
+
+| Seviye | Kedi | Köpek |
+|---|---|---|
+| Köy | 1 | 1 |
+| Kasaba | 2 | 1 |
+| Gelişmiş Şehir | 2 | 2 |
+
+- **Görünüm:** Kediler tekir, sarman ya da kara-beyaz; köpekler kahverengi ya da alacalı.
+- **Gündüz:** Meydanda ve evlerin önünde dolaşır, oturur. Köpekler ara sıra bir sakinin peşine takılır, kediler
+  gündüz de kestirir.
+- **Gece, yağmurda ve kışın:** Yanan kamp ateşinin başına, hanın önüne ya da en yakın evin saçağının altına
+  kıvrılıp uyurlar.
+- **Sevme:** Yanından geçen sakin onu sever. Sakinin başında kalp balonu, hayvanın başında küçük bir kalp çıkar,
+  sakine anlık **+6 keyif** gelir (çocuklara +9). Aynı sakin 2 saat içinde yeniden sevmez.
+
+### Sağlık: üşütme ve Şifacı Kulübesi
+
+**Maruziyet:** Her sakinin 0-100 arası bir maruziyeti vardır.
+- **Biriken:** Kışın dışarıda üşürken (kışlık palto korur), yağmurda ıslanırken (Doğa Sever ıslanmaz),
+  enerjisi ya da tokluğu 12'nin altındayken birikir.
+- **Azalan:** Evde, handa ya da ateş başında içi ısınmışken hızlı, iyi durumdayken yavaş azalır.
+- **Üşütme:** 45'i aşınca küçük bir olasılıkla **üşütür** ("Üşütmek üzere" etiketi uyarır).
+
+| Durum | Etki |
+|---|---|
+| Üşütmüş / halsiz | Yürüme ve çalışma **%35 yavaş**, enerji 1,2 kat hızlı düşer; başında ara sıra hapşırma ya da ateş balonu, hapşırma sesi |
+| Kendiliğinden iyileşme | ~40 oyun saati (sıcak evinde uyurken iki kat hızlı) |
+| Şifacıda tedavi | Bir iksirle hemen iyileşir ve 12 saat **Dinçlik** kazanır: iş ve yürüme **+%15**, enerji %15 yavaş düşer |
+
+| Yapı | Boyut | Maliyet | Ne işe yarar? |
+|---|---|---|---|
+| Şifacı Kulübesi | 2x2 | Odun 30, Taş 15 | Saman çatısında ot demetleri kurutulan aktar kulübesi. 1 **şifacı**, kulübenin 7 karo çevresindeki ağaçların dibinde ve çiçekli çimende **şifalı ot toplar** (çevrede 6 ağaç varsa tam hız, hiç yoksa %35), sonra kulübenin önündeki taş havanda döverek **iksir** hazırlar (2 ot = 1 iksir; rafta en çok 6 iksir, sepette 10 ot). Çalışırken kazanda yeşil iksir kaynar, buhar tüter; gece penceresi yeşilimsi yanar. |
+
+- **Tedaviye gitme:** Hasta sakin, iksiri olan en yakın kulübeye kendiliğinden gider ("Şifacıya gidiyor"). İçeride
+  tedavi olur. Yolda olanlar iksirleri paylaşmaz.
+- **Şifacı yoksa:** Hasta sakin gündüz yorulunca evinde kestirir.
+- **Paneller ve HUD:** Kulübenin panelinde iksir rafı, ot sepeti, ot toplama verimi ve kasabadaki hastalar görünür.
+  HUD'da "N hasta", karakter panelinde "Üşütmüş" / "Dinçlik" etiketleri çıkar.
+- **Meslek:** Yeni meslek Şifacılık (Şifacı).
+
+### İkilem ve karar olayları
+
+İlk olay en erken 4. günde gelir, sonra 2-4 günde bir sabah 10:00'da koşulu tutan olaylardan biri gelir. Aynı olay
+6 gün içinde tekrarlanmaz.
+- **Pencere:** Oyun durur, ortada bir karar penceresi açılır (bkz. aşağıdaki tablo). Koşulu tutmayan seçenek
+  soluk görünür ve nedeni yazar ("Kasabada boş yatak yok", "Yetersiz demir").
+- **Süre:** Alttaki çubuk 30 saniyelik süreyi gösterir. Süre dolunca varsayılan güvenli seçenek uygulanır, oyun
+  önceki hâline döner.
+- **Kayıt:** Seçim günlüğe yazılır.
+
+| Olay | Seçenekler (varsayılan **kalın**) |
+|---|---|
+| Sığınmacı Kafilesi | 40 yiyecek + 20 odun: doyur → 2 gün **İyilik Şöhreti** (refah +5), herkese keyif +10 · En yeteneklisini al → boş bir yatağa bir meslekte **Usta** bir göçmen · **Kibarca geri çevir** (keyif −3) |
+| Gezgin Ozanlar | 30 ekmek + 20 yün: **Büyük Panayır** → 2 gün keyif çok yavaş düşer, arkadaşlık 1,6 kat hızlı, refah +4, hemen keyif +20 · 15 yiyecek: bir akşamlık gösteri (keyif +10) · **Uğurla** |
+| Sert Fırtına (kışın Kar Fırtınası) | 35 odun + 25 demir ya da **35 odun + 25 taş**: güçlendir → hasarsız · **Şansına güven** (taşla güçlendirmeye gücün yetmiyorsa) → fırtınada 1-3 üretim yapısı hasar alır |
+| Kurt Sürüsü (sonbahar-kış, ağıl varsa) | 30 odun + 20 taş: **ağıl çitini yükselt** · Köpekleri nöbete koy (köpek varsa; %75 başarı) · Önlem alma → kurtlar ağıla dalarsa ağıl hasar alır, kasabanın keyfi −6 |
+| Kayıp Hazine Haritası | 30 yiyecek + 2 Sağlam Alet: 2 kişilik sefer → bol demir, yün, işlenmiş taş ya da **Kadim Tılsım** (3 gün +%15 iş hızı, keyif yavaş düşer, refaha kalıcı +2; şans sayacıyla en geç 3. başarılı seferde kesin) · 15 yiyecek: tek izci → küçük ganimet · **Haritayı sandığa kaldır** |
+
+- **Fırtına:** Karardan 20-30 saat sonra gelir. Hava birden kararır, gök gürler. Güçlendirilmemiş kasabada
+  rastgele üretim yapıları hasar alır:
+  - **Görünüm:** Yapının dibine kırık tahtalar saçılır, üstünde fırtına simgesi sallanır.
+  - **Çalışma:** Hasarlı yapı onarılana kadar çalışmaz.
+  - **Onarım:** Panelde yapının maliyetinin %30'u (yalnızca odun ve taş) ile 90 iş: **Onarımı Başlat**.
+  - **Ağıl:** Kurtların bastığı ağılda koyunların çoğu dağılır, onarılana kadar iki koyun kalır.
+  - **HUD:** "Fırtına yaklaşıyor" / "Kurt tehlikesi" ve "N hasarlı yapı" uyarıları görünür.
+- **Keşif seferi:** Seçilen sakinler elindekini bırakır ve harita kenarına yürüyüp bir gün ufukta kaybolur.
+  - **Seçim:** Önce Sağlam Alet kuşananlar, sonra en az deneyimliler seçilir; kasabanın ustaları kalır.
+  - **Yoldayken:** İhtiyaçları donar. Aleti olmayana depodan alet verilir, alet seferde aşınır.
+  - **Dönüş:** Kenardan döner ve ganimet stoğa girer. Bildirim, günlük ve kutlama ezgisi gelir.
+  - **Kadim Tılsım şans sayacı (12. aşama):** Tılsım büyük ganimet tablosunda artık daha sık çıkar (ağırlık 1 → 2).
+    Tılsımsız dönen her sefer sayacı (`civic.expeditionsSinceTalisman`) artırır; sayaç 3'e ulaştığı sefer (büyük ya da
+    tek izcili) tılsımı **kesin** bulur ve sayaç sıfırlanır. Yani tılsım en geç 3. başarılı seferde gelir.
+- **Mimari (12. aşama):** Karar penceresi seçeneklerin koşullarını sisteme sormaz. `DilemmaSystem` her karede aktif
+  ikilemin seçeneklerini (`id`, `ok`, `reason`), varsayılan seçeneği ve başlığı `state.dilemma.active`'e yazar;
+  `DilemmaModal` yalnızca bunu okur (arayüz yalnızca GameState okur kuralı).
+
+### Belediye fermanları (geç oyun yatırımları)
+
+Belediye Konağı'nın panelinde **Belediye Fermanları** bölümü vardır. Her fermanın açıklaması, maliyeti ve durumu
+görünür; **Fermanı İlan Et** düğmesiyle ilan edilir. Ferman ilan edilince büyük kutlama ezgisi çalar, bildirim ve
+günlük kaydı düşer.
+
+| Ferman | Maliyet | Etki |
+|---|---|---|
+| Büyük Kışlık Ziyafet | 40 odun + 80 erzak (önce ekmek, yetmezse yiyecek) | Herkes doyar (tokluk +45, keyif +30); 3 gün **Büyük Ziyafet**: refah +6, iş şevki +%20, keyif yarı hızda düşer. 5 günde bir tekrarlanabilir |
+| Altyapı ve Depo Genişletmesi (2 kademe) | 100 odun + 100 taş + 40 demir; sonra 150 + 150 + 60 | Tüm kaynakların depo sınırı kalıcı **+150** (300 → 450 → 600); meydana en yakın 30 / 40 toprak yol karosu arnavut kaldırımına döner |
+| Zanaat Loncası Desteği (bir kez) | 50 yün + 50 demir | Meslek deneyimi kazanma hızı ve üretim yapılarındaki çalışma verimi kalıcı **+%15** |
+
+### Denge ve test (simülasyon)
+
+Otopilot (`tools/sim/autopilot.mjs`) 4 haritada (tohum 42, 7, 2024, 3) 32 gün oynadı. Hiçbir koşuda sayfa hatası
+olmadı, girişi kopuk üretim yapısı kalmadı.
+- **Seviyeler:** Köy 6.–8., Kasaba 9.–12., Gelişmiş Şehir 18.–24. günde geldi.
+- **Sağlık:** 32 günde 4-9 kişi üşüttü (çoğu kışın), hepsi şifacıda iksirle iyileşip dinçleşti.
+  - İlk ayarda kış akşamlarında bir günde 11 kişi birden hastalanıyordu.
+  - Soğuk ve yağmur maruziyeti ile üşütme olasılığı düşürüldü.
+- **Hayvanlar:** 13 yaban hayvanı yerleşti. Şehirde 4 kedi-köpek oldu; sakinler onları 32 günde 1400-1700 kez sevdi.
+- **Kararlar:** Her koşuda 10-11 karar verildi.
+  - Bir haritada fırtına ağıl, taş ocağı ve pazarı vurdu, üçü de aynı gün onarıldı. Güçlendirilmiş kasabalar
+    fırtınayı hasarsız atlattı.
+  - Seferler 2-3 kez çıktı ve ganimetle döndü (Kadim Tılsım nadir sonuçtur, bu koşularda çıkmadı).
+  - Karar pencerelerine hiç dokunmayan "pasif" koşuda (tohum 3) her olay 30 saniye sonra varsayılan seçenekle
+    kapandı. Taşla güçlendirmeye gücü yettiğinde kasaba fırtınayı hasarsız atlattı; yetmediğinde riske girdi ve
+    hasar onarıldı.
+- **Fermanlar:** 6-7 ferman ilan edildi (iki depo kademesi, lonca, 5 günde bir ziyafet); depo sınırı 600-740'a
+  çıktı. Kış Sınavı dört haritada da ilk kışta geçildi.
+- **Hedefli testler (`tools/sim/tests.mjs`, 51):** Önceki aşamanın kuralları ve 11. aşamanın kuralları test edildi:
+  - hastanın yavaşlaması, şifacıya gitmesi, iyileşip dinçleşmesi, kendiliğinden iyileşme, soğukta maruziyet;
+  - ot toplama ve iksir hazırlama;
+  - kedi ve köpeğin gelişi (günde bir), sevme, yaban hayatının yerleşmesi ve tavşanın ürküp kaçması;
+  - karar penceresinin oyunu durdurması ve 30 saniyede varsayılanla kapanması;
+  - fırtına hasarı, hasarlı yapının durması, onarımı, güçlendirilmiş kasabanın hasarsız kalması;
+  - izcinin sefere çıkıp ganimetle dönmesi;
+  - üç ferman (+150 depo, lonca, ziyafet ve bekleme süresi);
+  - sürüm 9 kaydının gidiş-dönüşü (hayvanlar, hastalık, iksir, hasar, ferman, fırtına).
+- **Uyumluluk (`tools/sim/compat.mjs`, 12):** 9. aşamanın (sürüm 7) ve 10. aşamanın (sürüm 8) kayıtları açıldı ve
+  bir gün sorunsuz yaşadı. Yaban hayatı yerleşti, fermanlar boş başladı, olay takvimi kuruldu, eski kasabanın
+  seviyesi korundu ya da sessizce belirlendi.
+
+**Önizleme:** `/tools/art-preview.html` sayfasının başında 11. aşamanın çizimleri var:
+- tavşanlar (kış kürkü dahil), geyikler (dişi / boynuzlu erkek);
+- kedi ve köpeklerin tüm renkleri ve pozları;
+- Şifacı Kulübesi (kazan kareleri, gece, kış, şantiye);
+- sağlık ve olay simgeleri, hapşırma / ateş balonları ve havan eli.
+
+## Bilgelik, Ar-Ge, nehir ihracatı ve Kasaba Harikası (12. aşama)
+
+Geç oyunda depolarda biriken yüzlerce birimlik stok artık üç yere akar: Bilgelik Evi'nin araştırmalarına, nehir
+limanından ihracata (karşılığında **Kasaba Hazinesi**'ne altın) ve üç aşamalı **Kasaba Harikası**'na. Ayrıca 11.
+aşamanın üç rötuşu yapıldı (Gelişmiş Şehir nüfus eşiği 25, Kadim Tılsım şans sayacı, karar penceresinin yalnızca
+GameState okuması; bkz. ilgili bölümler).
+
+### Yeni yapılar
+
+| Yapı | Boyut | Maliyet | Açılış | Ne yapar? |
+|---|---|---|---|---|
+| Bilgelik Evi | 3x3 | Odun 70, Taş 60, Yün 15 | **Köy** | Krem sıvalı kanatlar, kitap sırtları görünen raflı pencereler, saat kadranlı kasnak ve bakır-turkuaz gözlem kubbesi. 1 **Bilge** çalışır (yeni meslek: Bilgelik). Bilge araştırma yürütür, ders saatinde çocuklara ders verir. Bilge çalışırken kubbenin yarığından dürbün uzanır; geceleri kitaplıklar ve kapı fenerleri yanar. |
+| Büyük Ticaret Limanı | 3x2 | Odun 120, Taş 80, Demir 20 | **Kasaba** | Nehir kıyısına kurulur: bir sütun kum, iki sütun su, önünde teknelerin geçeceği açık su kalmalı (nehri kapatamaz). Kesme taş rıhtım, kırmızı kiremitli liman ambarı, sandık-fıçı-çuval yığınları, kalın kazıklı iskele, ahşap yük vinci ve liman feneri. Kasabada yalnızca bir tane olur. |
+| Büyük Vadi Saat Kulesi (Kasaba Harikası) | 4x4 | Aşama başına (aşağıda) | **Gelişmiş Şehir** | Üç aşamada yükselen taş külliye. Kasabada yalnızca bir tane olur, yıkılamaz. |
+
+### Kasaba araştırmaları (Ar-Ge)
+
+Bilgelik Evi'nin panelindeki **Kasaba Araştırmaları** bölümünde dört kart vardır: açıklama, maliyet, durum ve
+**Araştır** düğmesi. Maliyet peşin ödenir; Bilge içeride çalıştıkça ilerleme birikir, ilerleme çubuğu panelde
+görünür. Aynı anda tek araştırma yürür; bitince teknoloji kalıcıdır (bildirim, günlük, ustalık ezgisi).
+
+| Araştırma | Maliyet | İş | Kalıcı etki |
+|---|---|---|---|
+| Gelişmiş Çarklar ve Vinçler | Odun 160, Taş 80, Demir 90 | 600 | Oduncu / Kereste Atölyesi, Taş Ocağı, Demir Madeni ve Yel Değirmeni **+%20** üretir |
+| Mimarlık Loncası | Odun 160, Taş 220, Demir 50 | 700 | Tüm inşaat, yükseltme, onarım ve harika aşamaları **+%35** hızlı; fırtına / kurt hasarı alan yapı sayısı **yarıya** iner |
+| Şifalı Bitki Yetiştiriciliği | Odun 80, Yün 60, Ekmek 90 | 500 | Şifacıda tedavi ve iksir hazırlama **iki kat** hızlı; Dinçlik 12 yerine **24 saat** sürer |
+| Kışlık Yalıtım Teknikleri | Odun 140, Taş 90, Yün 120 | 550 | Evlerin kışlık odun tüketimi **%25** azalır (Taş Ev yalıtımıyla çarpılır) |
+
+### Okul: çocuklar ve Kalfa mezunlar
+
+- **Ders saati:** 09:00–15:00 arası çocuklar en yakın Bilgelik Evi'ne yürür, içeride ders dinler (günde en çok 2 saat).
+  Bilge o sırada içerideyse iki kat öğrenirler.
+- **Mezuniyet:** Toplam 6 saat (Bilgeyle 3 saat) ders dinleyen çocuk büyüyünce rastgele bir meslekte doğrudan
+  **Kalfa (Sv. 2)** olarak başlar. Bildirim ve günlüğe "okulda öğrendikleriyle doğrudan Kalfa ... olarak başladı" yazar.
+- **Paneller:** Bilgelik Evi'nin panelinde o an derste olan çocuklar ve her öğrencinin ilerlemesi ("Ela %60 · Can
+  hazır") görünür. Karakter panelinde "Okula gidiyor: %60", "Okulu bitirdi" ve yetişkinlerde "Bilgelik Evi mezunu"
+  etiketleri çıkar.
+
+### Nehir ihracatı ve Kasaba Hazinesi
+
+- **Kasaba Hazinesi (Altın):** Yeni bir kaynak. Depo sınırı yoktur. HUD'un Mallar satırında altın simgesiyle görünür;
+  açık görünümde toplam sefer ve kazanılan altın yazar. Altın, Harika'nın aşamalarında harcanır.
+- **Otomatik fazlalık ihracatı:** Limanın panelinde stok sınırı seçilir: **Kapalı / 250+ / 400+ / 550+** (varsayılan 400).
+  Tekne yanaşınca sınırı aşan her kaynak (altın hariç) orantılı olarak yüklenir; teknenin kapasitesi 640 birimdir.
+- **İhracat Sandığı Hazırla:** Her kaynaktan en çok 40 birim, stokta en az 100 kalacak şekilde rıhtıma bir sandık
+  konur (panelde ne kadarının gideceği görünür). Sıradaki tekne önce sandığı yükler. Sandık rıhtımda beklerken
+  panelde içeriği ve altın değeri yazar.
+- **Ticaret teknesi:** 06:00–20:00 arası, bir seferi bitince 4 saat sonra nehrin üst ucundan yola çıkar.
+  - **Yol:** Nehirde (su ve köprü altları) süzülür. Köprünün altından geçerken görünmez olur, ardında köpüklü iz bırakır.
+  - **Rıhtımda:** Limanın önündeki açık suya yanaşır, 1,5 saat yükler. Bu sırada vinç kancadaki sandığı indirip kaldırır.
+  - **Dönüş:** Yükünü alıp nehrin alt ucunda kaybolur.
+  - **Görünüm:** Krem yelkenli, kırmızı şeritli; kıçında şapkalı dümenci var, yüklüyken güvertede sandık ve çuvallar görünür.
+- **Altın değeri:** Birim başına odun 1, taş 1, yiyecek 1, yün 3, ekmek 3, demir 4. Tekne ayrılırken yükün değeri
+  hazineye girer. Bildirim gelir ("Ticaret teknesi yüklendi: … → +X altın"), sikke sesi çalar, günlüğe yazılır.
+- **Ticaret Bereketi:** Yüklü seferlerin %20'si nadir bir bonus getirir: 1 gün refah +3 ve iş hızı +%10.
+- **Panel:** Teknenin durumu (geliyor / rıhtımda yükleniyor / gidiyor / sıradaki teknenin saati), şu an sınırı aşan
+  mallar, hazine, toplam sefer ve altın, son seferin yükü görünür.
+
+### Kasaba Harikası: Büyük Vadi Saat Kulesi
+
+Gelişmiş Şehir olunca inşa menüsünde açılır. İlk şantiye **Temel** aşamasıdır. Sonraki aşamalar yapının panelinden
+**Aşamayı Başlat** ile başlatılır (maliyet peşin; iptalde çalışılmadıysa tamamı, yoksa yarısı iade edilir).
+İnşaatçılar her aşamayı emekleriyle yükseltir.
+
+| Aşama | Maliyet | İş | Görünüm |
+|---|---|---|---|
+| 1. Temel | Odun 200, Taş 300, Ekmek 80, Altın 300 | 600 | Geniş kesme taş kaide, basamaklar, kulenin temel çukuru ve altın köşe taşı, köşelerde sütun kaideleri, taş ve kereste yığınları |
+| 2. Gövde | Odun 150, Taş 400, Demir 150, Yün 80, Ekmek 120, Altın 800 | 900 | Mazgallı taş salon: demir kuşaklar, kemerli pencereler, yün kilimli flamalar, renkli camlı gül pencere, perçinli kapı; arduvaz başlıklı köşe kuleleri; yarım kule gövdesi |
+| 3. Görkemli Kule | Taş 300, Demir 250, Yün 150, Ekmek 150, Altın 1600 | 1200 | Altın çerçeveli saat kadranı, açık kemerli çan odasında bronz çan, altın kubbe ve tepelik; köşe kulelerine altın başlık ve flama |
+
+- **İskele:** Aşama sürerken sıradaki aşama aşağıdan yukarı dört kademede yükselir. Önünde ahşap iskele, kat kalasları
+  ve makarayla çekilen taş blok görünür.
+- **Altın çağ:** Üçüncü aşama bitince "Altın Çağ: Vadinin İncisi!" kutlama penceresi açılır ve büyük kutlama
+  ezgisi çalar. Ardından:
+  - kasaba refahına kalıcı **+12** gelir;
+  - geceleri çan odası vadiyi aydınlatan bir fener gibi parlar (230 piksel ışık; mangallar ve pencereler de yanar);
+  - kulenin ışığındaki (yaklaşık 26 karo) sakinler kışın üşümez;
+  - kule 07:00–22:00 arası **saat başı çan çalar**: dört notalı melodi ve saate göre en çok üç derin vuruş.
+- **9. hedef "Vadinin İncisi":** Harika'yı üç aşamasıyla tamamla. Hedef panelinde tamamlanan ve sıradaki aşama görünür.
+
+### Denge ve test (simülasyon)
+
+Otopilot (`tools/sim/autopilot.mjs`) 4 haritada (tohum 42, 7, 3 ve kararlara dokunmayan "pasif" 2024) 34 gün oynadı.
+Otopilot Bilgelik Evi'nde kaynak yettikçe araştırma seçer. Limanda harika için biriktirirken sınırı 550, sonra
+250 tutar. Harika yükselmiyorken mal birikince sandık hazırlar. Şehir olunca harikanın aşamalarını kaynak yettikçe
+başlatır. Hiçbir koşuda sayfa hatası olmadı, girişi kopuk üretim yapısı kalmadı.
+- **Seviyeler:** Köy 5.–8., Kasaba 9.–10., Gelişmiş Şehir **16.–19.** günde geldi (eşik 28 iken 18.–24.).
+- **Bilgelik Evi:** 13.–17. günde kuruldu. Dört araştırmanın hepsi 18.–25. günde bitti (toplam 1340 birim: odun
+  540, taş 390, yün 180, demir 140, ekmek 90). Her koşuda 1-3 çocuk okulu bitirip büyüyünce doğrudan Kalfa oldu.
+- **Liman ve ihracat:** Liman 18.–21. günde kuruldu. 34. güne kadar 15-28 sefer **6.000-13.600 birim** mal
+  götürdü. Hazineye 10.800-23.800 altın girdi. Hazinede kalan altın kasabanın prestij puanı olarak birikir.
+- **Harika:** Temel 20.–25. günde atıldı, Görkemli Kule **25.–30.** günde tamamlandı. Dört koşuda da altın çağ ve
+  Vadinin İncisi hedefi geldi. Harika toplam 2.330 birim mal ve 2.700 altın yuttu.
+- **Geç oyun stokları:** 11. aşamada son günlerde odun, taş ve yiyecek 600-740'lık depo sınırına dayanıp
+  kalıyordu. Şimdi son 12 günün ortalaması 390-550, deponun dolduğu gün sayısı 12 günde 0-2.
+  - İlk ayarda tekne 320 birim taşıyor ve 9 saatte bir geliyordu; depo 12 günün 5-9'unda doluydu.
+  - Ayar 640 birim, 4 saat aralık ve biraz daha hızlı tekne yapıldı.
+- **Otopilot dersleri:** Tek demir madeni zanaatkârın aletlerine yetişip harikanın 400 demirini karşılayamadı.
+  Tek fırın da ekmeği harikanın 350 ekmeğine yetiştiremedi. Otopilot bunun için ikinci bir demir madeni ve
+  değirmen kurar; oyuncu da panelde "Yetersiz demir" görünce aynısını yapar.
+- **Önceki aşamalar:**
+  - 0-11 kişi üşüttü, hepsi şifacıda iyileşti. 34 günde 10-11 karar verildi, 6-7 ferman ilan edildi.
+  - En düşük ortalama refah %68-73'tü.
+- **Hedefli testler (`tools/sim/tests.mjs`, 100):** Önceki aşamaların 51 testine 49 test eklendi:
+  - Gelişmiş Şehir eşiğinin 25 olduğu ve karar seçeneklerinin (`ok`, `reason`, varsayılan, başlık) GameState'te
+    durduğu.
+  - Kadim Tılsım şans sayacı: sıfırdan üç seferde (en geç 3.'sünde) tılsım çıkar; sayaç 2 iken sefer tılsımı kesin
+    bulur ve sayaç sıfırlanır; tılsımsız sefer sayacı artırır.
+  - Bilgelik Evi: Köy kilidi, Bilgelik Evi olmadan araştırma yapılamaması, maliyetin ödenmesi, aynı anda tek
+    araştırma, Bilge'nin gerçekten çalışıp ilerletmesi.
+  - Dört araştırmanın etkileri; yalıtımlı evlerin gerçekten %25 az odun yakması; Dinçlik'in 24 saat sürmesi.
+  - Okul: çocuğun ders saatinde okula gitmesi, günlük ders sınırı, mezunun Kalfa olması, az okuyanın olmaması.
+  - Liman: Kasaba kilidi, karada kurulamaması, tek liman, hazinenin depo sınırına takılmaması, sandığın stokta 100
+    bırakması, sınır ayarı ve kapatma.
+  - Tekne seferi: geliş → yanaşma → yükleme sırası, fazlalık ve sandığın yüklenmesi, altının hazineye girmesi,
+    kapasite, teknenin nehrin öteki ucunda kaybolması.
+  - Harika: Şehir kilidi, şantiyesinin iptal edilebilmesi, bitmiş harikanın yıkılamaması, aşama maliyeti,
+    inşaatçıların aşamayı yükseltmesi, üç aşama, altın çağ, 9. hedef, refah +12, tek harika.
+  - Sürüm 10 kaydının gidiş-dönüşü: araştırmalar, liman ve hazine, harika aşaması, okul mezunu.
+- **Uyumluluk (`tools/sim/compat.mjs`, 21):** 9., 10. ve 11. aşamanın kayıtları (sürüm 7, 8 ve 9) açıldı ve bir
+  gün sorunsuz yaşadı.
+  - Sürüm 9 kaydı (33. gün, 30 sakin, şehir) fermanlarını korudu.
+  - Hepsinde araştırma, liman ve hazine boş başladı.
+
+**Önizleme:** `/tools/art-preview.html` sayfasının başında 12. aşamanın çizimleri var:
+- Bilgelik Evi (flama kareleri, Bilge çalışırken dürbün, gece, kış, şantiye);
+- liman (iki yön, vinç kareleri, gece, kış, kazık çakılan şantiye);
+- ticaret teknesi (boş / yüklü, iki kare, iki yön);
+- harikanın üç aşaması gündüz ve gece, kış, iskeleli dört yükselme kademesi;
+- yeni simgeler (kitap, dişli, tekne, harika).
+
+`node tools/sim/showcase.mjs` oyun içinde şunları çeker:
+- rıhtıma yanaşmış tekneyi, Bilgelik Evi'ni ve harikayı;
+- üç yapının bilgi panellerini;
+- geceleri vadiyi aydınlatan saat kulesini.
+
+## Altın ekonomisi, peyzaj, mikro-yönetim, Kasaba Arşivi ve fotoğraf modu (13. aşama)
+
+Harika bittikten sonra hazinede binlerce altın birikiyordu. Artık bu altının sürekli harcanabileceği yerler var:
+lüks ve egzotik mallar, Belediye Konağı'nda sergilenen beş kasaba yadigârı ve altın fermanları. Kasabayı süslemek
+için dört peyzaj yapısı geldi. Oyuncu sakinlerine ad verebilir ve onları istediği iş yerine sabitleyebilir. Kasabanın
+geçmişi grafiklerle izlenebilir, kasaba arayüzsüz bir tablo gibi seyredilebilir.
+
+### Lüks ve egzotik mallar
+
+Yalnızca **altınla** alınır. Gezgin tüccar tezgâhtayken takas penceresinin **Lüks Mallar (Altın)** sekmesinden, ya da
+Büyük Ticaret Limanı kuruluysa limanın panelinden (limandan sipariş) her zaman alınabilir.
+
+| Mal | Fiyat | Etki |
+|---|---|---|
+| Baharat ve Kahve Sandığı | 400 altın | Hana teslim edilir (önce bir Kasaba Hanı gerekir). 4 gün boyunca handa yemek yiyen herkes 10 saat **%25 hızlı çalışır ve yürür**. Tekrar alınırsa süre uzar. |
+| İpek Kumaş ve Mermer Sütunlar | 600 altın (bir kez) | Kalıcı prestij: her Seviye 2 yapı refaha **+0,5** (en çok +8). Hemen: herkesin keyfi +25 ve Şenlik Coşkusu. |
+
+### Kasaba yadigârları
+
+Beş eşsiz eser, tüccardan ya da limandan alınır ve **Belediye Konağı'nda sergilenir** (önce konak gerekir). Fiyat
+sergilenen yadigâr sayısıyla artar: **1.500 → 3.000 → 5.000 → 7.000 → 9.000** altın.
+- **Görünüm:** Alınan yadigâr konağın basamaklarının iki yanındaki taş kaidelerde durur. Ebedi Ateş Kandili gelince
+  basamak fenerleri gece gündüz turkuaz yanar.
+- **Panel:** Konağın panelindeki **Kasaba Yadigârları** rafında beş yuva görünür; alınmamışlar soluk durur.
+
+| Yadigâr | Kalıcı etki |
+|---|---|
+| Güneş Saati Küresi | Tüm üretim ve işleme yapılarında verim +%10 |
+| Bereket Boynuzu | Yiyecek üreten yapılar (bahçe, ağıl, iskele) +%25 |
+| Usta Lonca Mührü | Meslek deneyimi kazanma +%30 |
+| Denizci Pusulası | Ticaret teknesi %50 fazla yük alır, ihracatın altın değeri +%20 |
+| Ebedi Ateş Kandili | Evler kışın %30 az odun yakar, dışarıdakiler yarı yarıya az üşür |
+
+### Altın fermanları
+
+Belediye Konağı'nın panelindeki **Altın Fermanları** bölümünden ilan edilir. Her biri 4 günde bir ilan edilebilir.
+
+| Ferman | Fiyat | Etki |
+|---|---|---|
+| Ustalara Altın İkramiye | 1.000 altın | Herkesin keyfi +15. 3 gün boyunca iş hızı +%20, keyif yavaş düşer, refah +5 |
+| Kraliyet Mimarları | 1.500 altın | 2 gün boyunca bütün şantiyeler, yükseltmeler, onarımlar ve harika aşamaları **3 kat** hızlı |
+
+Etkin bonuslar HUD'daki bonus satırında kalan süreleriyle görünür. Her alım bildirim, ses ve günlük kaydı bırakır.
+
+### Peyzaj ve süsleme
+
+| Yapı | Boyut | Maliyet | Ne yapar? |
+|---|---|---|---|
+| Kiraz Çiçeği Ağacı | 1x1 | Odun 12, Yiyecek 6, Altın 15 | İlkbaharda pembe-beyaz çiçek bulutu, yazın yeşil yapraklar arasında pembe çiçekler, sonbaharda altın-kehribar, kışın karlı dallarda pembe tomurcuklar. Rüzgârda yaprakları savrulur (kışın dökülmez). Yanından geçenin keyfi biraz dolar. |
+| Ahşap Çardak | 2x2 | Odun 45, Taş 10, Altın 60 | Sarmaşıklı, çiçek saçaklı kameriye; içinde iki kişilik bank. Sakinler önünden girip banka oturur, çatının altında sohbet eder. Burada arkadaşlık **%60 hızlı** gelişir, bekârlar **2,5 kat** daha kolay aşık olur, çiftler daha kolay evlenir. Sevgilisi / eşi olan sakin sohbete çağırınca çardağı seçer, dostlar da arada bir orada buluşur. |
+| Mermer Kemer | 1x1 | Taş 20, Altın 30 | Sarmaşıklı beyaz mermer kemer. Yolların (toprak, taş, meydan) ve bahçe girişlerinin üstüne kurulur. Altındaki yol olduğu gibi kalır, sakinler altından geçer, yolu kapatmaz. |
+| Çiçekli Çit | 1x1 | Odun 5 | Beyaz kazıklı, saksı çiçekli alçak çit. Yan yana (ve alt alta) kurulan çitler birleşir. |
+
+### Sakin adı ve işçi atama
+
+- **Ad değiştirme:** Karakter panelinde sakinin adına tıklanır, yeni ad yazılıp Enter'a basılır (en çok 16 harf).
+  - Boş ad ya da başka bir sakinin adı kabul edilmez.
+  - Günlüğe "X artık Y adıyla anılıyor" yazılır.
+  - Ad bütün panellerde, ilişkilerde ve durum metinlerinde hemen değişir.
+- **İşçi atama / sabitleme:** Her iş yerinin panelinde **İşçi Ata** düğmesi vardır.
+  - **Liste:** Yetişkin sakinler bu işteki ustalıklarına göre (Usta → Kalfa → Çırak) listelenir; başka yere sabitliyse
+    o da yazar. Birine tıklamak onu sabitler. Çalışan satırlarında da **Sabitle** / **Sabitlemeyi Kaldır** düğmeleri var.
+  - **Sabit sakin:** Mesaide yalnızca kendi iş yerinde çalışır, şantiyelere ya da başka işlere kaymaz, orada ustalaşır.
+    Elindeki başka işi bırakıp gelir; yapı sabit olmayan çalışanlarla doluysa biri ona yer açar. Yapı boştaysa ya
+    da hasarlıysa dinlenir.
+  - **Yuvalar:** Sabit çalışanın yuvası başkasına verilmez. Yuva sayısından fazla sakin sabitlenemez. Yapı yıkılınca
+    ya da sakin oradan işten çıkarılınca sabitleme kalkar.
+  - **Karakter paneli:** "Sabit iş yeri: …" etiketi görünür.
+
+### Kasaba Arşivi (`I`)
+
+Sol sütundaki **Arşiv** düğmesi (ya da `I`) ekranın ortasında bir pencere açar:
+- **Grafikler:** Son 32 günün dört piksel grafiği: Nüfus, Ortalama Refah, Stok Toplamı ve Kasaba Hazinesi.
+  - Her grafikte bugünkü değer, dönemdeki artış / azalış (▲ / ▼) ve en düşük / en yüksek değer yazar.
+  - Grafiğin son noktası her zaman bugünün anlık değeridir.
+- **Kasabanın tarihi:** Fırından çıkan ekmek, kırkılan yün, çıkarılan demir, pişen sıcak yemek, kıyılan düğün, doğan
+  çocuk, atlatılan kış, tamamlanan yapı, takas, ihracat seferi ve kazanılan altın, lüks mallara harcanan altın,
+  sergilenen yadigâr, araştırma, şifacıda iyileşen ve verilen karar sayısı.
+- **Veri:** Arşiv her sabah bir özet yazar ve en çok 64 gün saklar; kayda girer.
+
+### Fotoğraf / sinematik mod (`F`)
+
+`F` ya da sol sütundaki **Fotoğraf** düğmesi bütün arayüzü yumuşakça gizler. Sağ altta küçük bir "Arayüzü Göster (F)"
+ipucu kalır.
+- **Kontroller:** Kamera (WASD, sürükleme, tekerlek) ve zaman tuşları çalışır.
+- **Görüntü:** Haritada imleç, seçim halkası, iş işaretleri ve araç önizlemesi çizilmez. Yağan kar, yanan fenerler ve
+  gezinen sakinler bir tablo gibi seyredilir.
+- **Çıkış:** `F`, `Esc` ya da ipucu arayüzü geri getirir. Karar penceresi ya da kutlama açılırsa mod kendiliğinden
+  biter, böylece önemli bir an kaçmaz.
+
+### Denge ve test (simülasyon)
+
+Otopilot 4 haritada (tohum 42, 7, 3 ve kararlara dokunmayan "pasif" 2024) **40 gün** oynadı.
+- **Otopilotun harcama düzeni:** Harika bitene kadar altını biriktirir. Bittikten sonra hazineyi şu sırayla harcar:
+  - kaynak yettikçe sıradaki yadigâr (fiyatın 300 altın fazlası varsa);
+  - bir kez ipek ve mermer;
+  - handa baharat bitince yeni sandık;
+  - 4 günde bir altın ikramiye;
+  - iki şantiye birden sürerken kraliyet mimarları.
+
+  Planın sonunda iki kiraz ağacı, bir çardak, yolun üstüne bir mermer kemer ve iki çiçekli çit kurar.
+- **Hata yok:** Hiçbir koşuda sayfa hatası olmadı, girişi kopuk üretim yapısı kalmadı.
+- **Önceki aşamalar:**
+  - Köy 7.–8., Kasaba 9.–11., Gelişmiş Şehir 15.–18. günde geldi.
+  - Dört araştırma bitti. Harika 27.–32. günde tamamlandı.
+- **Altın harcaması:**
+  - Harika bittikten sonraki 5-13 günde **12.900-30.700 altın** harcandı: 3-5 yadigâr (9.500-25.500), lüks mallar
+    (1.400-2.200), altın fermanları (2.000-3.000).
+  - 12. aşamada harika sonrası hazine 8.000-21.000 altına birikip kalıyordu. Şimdi son günlerde 4.000-8.000
+    altında dolanıyor: ihracat getirir, yadigâr ve fermanlar götürür.
+  - Bir haritada (tohum 3) beş yadigârın hepsi 40. günden önce sergilendi.
+- **İhracat:** 29-39 sefer 12.100-22.000 birim mal götürdü, 20.900-39.400 altın getirdi. Denizci Pusulası'ndan sonra
+  tekne seferde 1.800-2.000 altın getiriyor.
+- **Stoklar:** Son 12 günün ortalama odun / taş / yiyecek stoğu 545-630.
+  - 12. aşamanın 34 günlük koşularında bu band 390-550 idi.
+  - Artışın kaynağı yadigârların (+%10 üretim, +%25 yiyecek) ve altın ikramiyenin üretimi artırmasıdır.
+  - Yine de deponun 740 sınırına dayandığı gün 12 günde 0-3; tekne fazlayı götürmeye devam ediyor.
+- **Diğer:** 3-7 kişi üşüttü, hepsi iyileşti. 11-13 karar verildi, 8 ferman ilan edildi. En düşük ortalama refah
+  %69-71'di.
+- **Hedefli testler (`tools/sim/tests.mjs`, 147):** Önceki aşamaların 100 testine 47 test eklendi:
+  - Lüks mallar: satıcı ve altın koşulu, baharat sandığının limandan alınıp hana teslimi, handa yiyen sakinin %25
+    hızlanması, ipek ve mermerin kalıcı prestiji ve tek seferliği.
+  - Yadigârlar:
+    - fiyatların 1.500 → 9.000 artışı, tüccar yokken alınamama, aynı yadigârın iki kez alınamaması;
+    - beş etkinin hepsi (Ebedi Ateş'in gerçekten %30 az odun yakması, Güneş Saati Küresi'nin taş ocağında gerçekten
+      %10 fazla üretmesi dahil).
+  - Altın fermanları: ikramiye, bekleme süresi, Kraliyet Mimarları'nda aynı inşaatçının gerçekten 3 kat ilerletmesi.
+  - Peyzaj:
+    - Mermer kemer: yolun üstüne kurulur, yol karosu kalır, altından geçilir, yol bulma içinden geçer, üstüne yapı
+      kurulamaz.
+    - Çitlerin birleşmesi, kirazın dört mevsimi.
+    - Çardak: iki oturak; iki sakin gerçekten oturup sohbet eder, arkadaşlıkları gelişir.
+  - Sakin adı: değiştirme, boş ya da başkasının adını reddetme, 16 harf sınırı.
+  - İşçi sabitleme:
+    - yalnızca kendi iş yerine gitme, yuvanın başkasına verilmemesi, yuva sınırı;
+    - mesaide gerçekten oraya gitme, sabitlemeyi kaldırma.
+  - Arşiv: günlük özet, düğün / doğum sayaçları, 64 gün sınırı, pencerenin 4 grafikle açılması.
+  - Fotoğraf modu: açılır, kapanır, karar penceresinde kendiliğinden biter.
+  - Sürüm 11 kaydının gidiş-dönüşü: yadigârlar, ipek, fermanlar, arşiv, sakin adı, sabit işçi, kemerin yürünebilirliği.
+- **Uyumluluk (`tools/sim/compat.mjs`, 32):** Sürüm 7, 8, 9 ve 10 kayıtları açılıp bir gün yaşadı.
+  - 12. aşamanın sürüm 10 kaydı (31. gün, şehir, harika ve dört araştırma) araştırmalarını, hazinesini ve harikasını
+    korudu.
+  - Hepsinde yadigâr ve sabit işçi boş başladı, arşiv kuruldu, düğün sayacı evli çiftlerden doğru tahmin edildi.
+
+**Önizleme:** `/tools/art-preview.html` sayfasının başında 13. aşamanın çizimleri var:
+- kiraz ağacının dört mevsimi;
+- çardağın tam görünümü, iki katmanı ve kışı;
+- mermer kemer ve çitin bütün birleşme biçimleri;
+- yadigârlarıyla Belediye Konağı (Ebedi Ateş ve gece dahil);
+- yeni simgeler.
+
+`node tools/sim/showcase.mjs` oyun içinde şunları çeker:
+- kirazlarla çevrili, içinde oturan sakinli çardağı;
+- yadigârları sergileyen konağı;
+- konağın ve limanın altın bölümlerini;
+- Kasaba Arşivi penceresini ve fotoğraf modunu.
+
+## Anılar, mevsim festivalleri, dünyayla etkileşim ve nadir hava olayları (14. aşama)
+
+Kasaba artık yaşadıklarını hatırlıyor: her sakinin kendi anı defteri var. Her mevsimin son günü büyük bir festival
+kutlanıyor. Oyuncu hayvanları sevebiliyor, öncelikli hedef gösterebiliyor ve zil çalıp herkesi meydana toplayabiliyor.
+Gökyüzü de iki nadir olayla zenginleşti: sabah sisi ve yaz fırtınası.
+
+### Rötuş: stok dengesi
+
+- **Tekne kapasitesi:** Yadigârlarla artan üretim stokları yükseltmişti. Ticaret teknesinin taban kapasitesi %35
+  arttı: 640 → **864** birim.
+- **Büyük İhracat Seferi:** Limanın panelinde yeni bir ferman var (250 altın, 2 günde bir).
+  - Kervan teknesi saati beklemeden, gece bile, hemen yola çıkar. Nehirde henüz yük almamış bir tekne varsa o
+    kervana dönüşür.
+  - Normalin **2,5 katı** yük alır ve sınırı **350**'ye indirerek fazlalığı boşaltır. Yükün altın değeri %10 fazladır.
+  - Yelkeninde altın şerit ve arma vardır. Panelde ve günlükte "Kervan teknesi" olarak görünür.
+
+### Anılar ve Hatıralar
+
+Her sakinin hayat yolculuğu kendi **anı defterinde** saklanır: en çok 40 anı, ilk anı hep kalır. Aynı anı iki kez
+yazılmaz. Defter dolunca önce küçük anılar (dostluklar, kasaba olayları, festivaller) silinir; aşk, düğün, çocuk ve
+unvanlar kalır.
+
+- **Yazılan anılar:**
+  - Kasabaya göçmen olarak katılma; yeni oyunun ilk sakinleri için "Kasabanın ilk sakinlerinden biri oldu".
+  - Dost ve en iyi arkadaş olma; barışma.
+  - Aşık olma: "Çardakta Nilay ile birbirlerine aşık oldular" (handa, meydanda, ateş başında, şenlikte).
+  - Düğün ("Nilay ile şenlikte evlendi"); çocuğun doğumu (anne babaya ve çocuğa); büyüme.
+  - Okulu bitirip Kalfa olma; Kalfa ve Usta unvanları ("Usta Taşçı unvanını kazandı").
+  - Hastalanıp iyileşme: "Kış günlerinde hastalandı ama Şifacı'nın iksiriyle iyileşti"; fırtınada "Fırtınalı günlerde".
+  - Keşif seferinden dönüş (Kadim Tılsım'la); kasabanın kedisi ya da köpeğiyle can dostu olma.
+  - Mevsim festivalleri, Saat Kulesi'nin tamamlanışı, kasabanın seviye atlaması, yeni ad.
+- **Nostalji:** Sakin çardakta, bankta, nehir kenarında, çiçeklerin, ateşin, anıtın ya da kadim çeşmenin başında
+  otururken (dakikada %0,4) ya da sabah uyanınca (%15) güzel bir anısını hatırlar.
+  - Önemli anılar (aşk, düğün, çocuk, festival, dostluk) üç kat sık hatırlanır.
+  - Başında çerçeveli anı balonu çıkar; keyfi +8, sosyalliği +3 artar. İki hatırlama arası en az 6 saattir.
+- **Karakter Paneli:** Yeni **Anılar ve Hatıralar** bölümü.
+  - En yeni 5 anı listelenir; **Tümünü Göster** hepsini açar.
+  - Hatırlanan anı vurgulanır. Durum satırında "Anılara daldı: "…"" etiketi çıkar.
+
+### Dört mevsimin büyük festivalleri
+
+Her mevsimin son günü (4., 8., 12., 16. gün döngüsü) kutlanır:
+- **Akış:** Sabah 08:00'de duyurulur (bildirim, günlük, HUD'da yanıp sönen festival etiketi). 15:00'te başlar ve
+  gece yarısına kadar sürer. Sakinler festival yerinde toplanıp dans eder; festival boyunca temaya özgü ezgi çalar.
+- **Varış:** Sakin festivale ilk vardığında bir kez ziyafet, elma şırası ya da keyif alır.
+- **Kapanış:** Gece yarısı katılanların anısına yazılır. Bütün kasaba keyif +35 ve 24 saatlik **Mevsim Coşkusu**
+  ile yeni mevsime başlar (iş hızı +%15, refah +6, keyif yavaş düşer).
+- **Süslemeler:** Festival yerinin çevresindeki boş karolara kurulur, yol kapatmaz; festival bitince kaldırılır.
+
+| Festival | Yer | Süslemeler ve görünüm | Etki |
+|---|---|---|---|
+| İlkbahar: Çiçek Şenliği | Meydan havuzu | İki çiçek kemeri, çiçek sepetleri, süzülen çiçek yaprakları; **herkes saçına çiçek takar** | Arkadaşlık 1,8 kat, aşk 2,5 kat ("aşk ve dostluk patlaması"); varışta keyif ve sosyallik |
+| Yaz: Güneş ve Nehir Panayırı | Büyük Ticaret Limanı (yoksa iskele, yoksa meydan) | Nehir kıyısında rengârenk üçgen flamalar, flama direkleri, ziyafet sofraları (karpuz, ekmek, balık) | Varışta tokluk +30; arkadaşlık 1,4 kat, refah +4 |
+| Sonbahar: Büyük Hasat Bayramı | Meydan havuzu | Dev hasat sepeti, kabaklar, elma şırası fıçıları, dökülen sonbahar yaprakları | Varışta keyif +20 ve elma şırası; refah +5 |
+| Kış: Işıklar Gecesi ve Kardan Adam Şöleni | Kamp ateşi | Sakinlerin el birliğiyle yaptığı kardan adam üç kademede yükselir; kamp ateşi şölen ateşine dönüşür (geniş ışık, büyük alevler); bütün sokak fenerleri parıldar, kıvılcımlar | Festivaldekiler üşümez; refah +6 |
+
+### Oyuncunun dünyayla doğrudan etkileşimi
+
+- **Hayvan sevme:** Haritadaki bir kediye ya da köpeğe sol tıklanınca hayvan sevinçle iki kez zıplar, başında üç kalp
+  uçuşur, kedi miyavlar, köpek havlar; uyuyorsa uyanır. Fare üstüne gelince işaretçi el olur.
+- **Öncelikli kesme / kırma:** Seç aracıyla bir ağaca ya da kayaya tıklanınca orası öncelikli hedef olur.
+  - Emir yoksa verilir; simgesinin yanında yanıp sönen kırmızı ünlem çıkar.
+  - Öncelikli hedef bütün işlerden (şantiyeler dahil) önce seçilir.
+  - Boştaki (dinlenen, gezen, sohbet eden) en yakın ve en usta işçiler elindekini bırakıp oraya koşar.
+- **Toplanma Zili:** Meydan havuzunun ya da Belediye Konağı'nın panelinde **Zili Çal**.
+  - Kasaba çanı üç kez çalar. Uyanık bütün sakinler elindekini bırakıp 1 oyun saatliğine meydanda toplanır, havuza
+    dönüp birbirleriyle sohbet eder; uyuyanlar uyanmaz.
+  - HUD'da "Meydanda toplanma" etiketi görünür. Zil 3 saatte bir çalınabilir.
+
+### Nadir hava olayları
+
+Ayrıntılar *Hava durumu ve atmosfer* bölümünün tablosunda.
+- **Sabah sisi:** İlkbahar ve sonbahar sabahları çöker.
+- **Gök gürültülü fırtına:** Yaz öğleden sonraları kısa sürer. Şimşek aralığı oyun zamanına bağlıdır; böylece hangi
+  hızda oynanırsa oynansın fırtına başına birkaç şimşek çakar.
+
+### Denge ve test (simülasyon)
+
+Otopilot 4 haritada (tohum 42, 7, 3 ve kararlara dokunmayan "pasif" 2024) **40 gün** oynadı.
+- **Otopilotun ihracat düzeni:** Harika bittikten sonra limanın sınırını oyunun varsayılanı 400'de tutar. Stok
+  400'ün toplamda 900 birimden fazla üstüne çıkınca Büyük İhracat Seferi ilan eder.
+- **Hata yok:** Hiçbir koşuda sayfa hatası olmadı, girişi kopuk üretim yapısı kalmadı. Gelişmiş Şehir 15.–16.,
+  harika 28.–30. günde geldi.
+- **Mevsim festivalleri:**
+  - Her koşuda 9-10 festival kutlandı ve dördünün de her biri en az iki kez geldi: ilkbahar 3, yaz 2-3, sonbahar 2,
+    kış 2.
+  - Katılım: Çiçek Şenliği 10-22, Panayır 15-22, Hasat Bayramı 19-25, Işıklar Gecesi 8-10 sakin. Kış festivali
+    akşamüstü soğukta uyuyanlar yüzünden daha sakin geçiyor.
+- **Anılar:** Sakin başına ortalama 35 anı birikti (en az 20, en çok 40). Sakinler 40 günde 440-560 kez güzel bir
+  anılarını hatırladı.
+  - Örnek bir sakinin son anıları: "Çiçek Şenliği'nde saçına çiçek takıp dans etti", "Kalfa Taşçı oldu", "Güneş ve
+    Nehir Panayırı'nda nehir kıyısında ziyafet çekti", "Kasabanın kedisi Pamuk ile can dostu oldu".
+  - İlk ayarda 30 kişilik kasabada defter dostluk anılarıyla doluyordu. Bu yüzden "dost oldu" anısı en çok 4 kez
+    yazılır, en iyi arkadaşlık eski dostluk anısının yerini alır, defter dolunca önce küçük anılar silinir.
+- **Stoklar (rötuşun hedefi 390-500):** Son 12 günün ortalama odun / taş / yiyecek stoğu:
+  - tohum 42: 380-434 (iki koşuda);
+  - tohum 7: 398-408;
+  - tohum 3: 381-386;
+  - pasif koşu: 467-544 (yiyecek en yüksekte).
+
+  13. aşamada bu band 545-630 idi. Deponun dolduğu gün 12 günde 0-1. Her koşuda 4-6 Büyük İhracat Seferi ilan edildi.
+  - İlk denemede otopilot harika sonrası sınırı 250'de tutuyordu ve sefer sınırı da 250'ydi. Stoklar 200-370'e,
+    hedefin altına indi.
+  - Seferin sınırı 350'ye, otopilotun sınırı 400'e çekildi.
+- **Altın:** Harika sonrası yadigâr, lüks mal ve fermanlara 21.500-31.800 altın harcandı. Seferler yüzünden hazine
+  biraz daha bol: son günlerde 5.000-12.600 altın.
+- **Nadir hava:** 40 günde 2-9 sabah sisi ve 1-5 yaz fırtınası görüldü.
+- **Ad havuzu:** Kalabalık kasabalarda ad havuzu tükenince çocuklar artık "Arda 30" gibi sayılı adlar değil, "Defne
+  Su" gibi iki parçalı adlar alıyor.
+- **Hedefli testler (`tools/sim/tests.mjs`, 190):** Önceki aşamaların 147 testine 43 test eklendi:
+  - Tekne kapasitesi 864. Büyük İhracat Seferi: altın koşulu, hemen yola çıkma, bekleme süresi; gerçek bir seferde
+    kervanın normal kapasiteden fazla, 2,5 katından az yük alması ve %10 değer.
+  - Sis: yoğunluk ve süre. Yaz fırtınasının yalnızca yazın ve ara sıra çıkması (kışın hiç). Fırtınada gerçekten şimşek
+    çakması ve gök gürültüsü olayı.
+  - Dört festivalin her biri:
+    - festival günleri; sabah duyurusu;
+    - doğru yer (yazın liman) ve süslemeler;
+    - sakinlerin katılması; Çiçek Şenliği'nde herkesin saçında çiçek, aşk 2,5 ve dostluk 1,8 kat;
+    - Işıklar Gecesi'nde şölen ateşinin ısıtması ve kardan adam;
+    - bitiş, anılara yazılma, Mevsim Coşkusu, taçların ve süslemelerin kaldırılması.
+  - Anılar: düğün iki sakine de yazılır; Usta unvanı ve hastalıktan iyileşme anıları; 40 sınırı ve ilk anının
+    korunması; aynı anının yinelenmemesi ve önce küçük anıların silinmesi; dostluk sınırı.
+  - Nostalji: bankta otururken anıyı hatırlama, keyif kazancı, bekleme süresi. Karakter Paneli'nde 5 anı ve "Tümünü
+    Göster".
+  - Gerçek fare tıklamaları:
+    - kediye tıklayınca sevinçle zıplaması;
+    - ağaca tıklayınca öncelikli kesim emri, emrin bütün işlerden önce seçilmesi, boştaki işçinin elindekini bırakması.
+  - Toplanma Zili: çalma, bir saatlik süre, uyanık sakinlerin en az %60'ının meydanda toplanması, bekleme süresi, bitiş.
+  - Sürüm 12 kaydının gidiş-dönüşü: anılar, festival geçmişi, kervan seferi, sayaçlar.
+- **Uyumluluk (`tools/sim/compat.mjs`, 45):** Sürüm 7, 8, 9, 10 ve 11 kayıtları açılıp bir gün yaşadı.
+  - 13. aşamanın sürüm 11 kaydı (37. gün, üç yadigâr) yadigârlarını ve arşivini korudu.
+  - Hepsinde her sakine anı defteri açıldı; festival ve hava geçerli başladı.
+
+**Önizleme:** `/tools/art-preview.html` sayfasının başında 14. aşamanın çizimleri var:
+- festival süslemelerinin hepsi, kardan adamın üç kademesi ve saç çiçekleri;
+- altın şeritli kervan teknesi;
+- dört festival, zil, sis ve fırtına simgeleri, anı balonu.
+
+`node tools/sim/showcase.mjs` oyun içinde şunları çeker:
+- dört festivali (Işıklar Gecesi'nde kardan adam ve şölen ateşi, Panayır'da limanın flamaları);
+- sabah sisini, Toplanma Zili'ni ve şimşek anını;
+- bir sakinin anılar panelini.
+
+## Derinleşen yaşam: sosyal denge, meslek kıyafetleri ve usta işi eserler (15. aşama)
+
+### Sosyal denge: atışma ve barışma
+Denetimde 50 günlük koşularda 5330 atışmaya 128 barışma düşüyordu. Sürtüşmeler törpülendi, barışmanın yolları açıldı
+(`data/family.js` -> `CONFLICT`, `RECONCILE`):
+
+- **Daha seyrek atışma:** çalışırken, sohbette ve karşılaşınca atışma olasılıkları düştü; aynı çift en az 10 saat ara
+  verir. **Küsler birbirini görmezden gelir:** zaten küs olan çiftin yeniden atışma olasılığı dörtte birdir.
+- **Küs:** atışıp eksiye düşen her çift (eskiden yalnızca -10'un altı). Küs iki sakin aynı yerde sohbet ederken barışabilir.
+- **Gönül alma yerleri:** Kasaba Hanı, Ahşap Çardak, Kamp Ateşi ve şenlik / mevsim festivalleri. Buralarda barışma
+  olasılığı **4 kat (+%300)**, kimse atışmaz.
+- Barışınca iki sakinin başında **el sıkışma balonu** çıkar; anılarına ve günlüğe yeriyle yazılır ("Han'da Deniz ile
+  barıştı", "Çardakta...", "Ateş başında...", "Şenlikte..."). Kasaba Arşivi'nde "Barışan küsler" sayacı.
+
+### Meslek kıyafetleri ve zanaat rozeti
+Sakin, en çok deneyimi olan mesleğinin kademesini üzerinde taşır (`data/skills.js` -> `OUTFIT_KITS`,
+`art/sprites/outfits.js`):
+
+| Meslek | Kalfa (Lv.2) | Usta (Lv.3) |
+|---|---|---|
+| Oduncu | deri yelek ve eldiven | kırmızı ekose gömlek ve bere |
+| Çiftçi | hasır şapka | çiçekli hasır şapka ve kot tulum |
+| Madenci / Taşçı | bandana ve bel feneri | fenerli kask ve koruyucu zırh |
+| Şifacı | omuzdan asılı ot çantası | bilge cübbesi ve yaprak çelengi |
+| Fırıncı / Aşçı | beyaz önlük | kabarık aşçı şapkası, önlük, boyun mendili |
+| Çoban | kırmızı boyun mendili | keçe şapka ve yün yelek |
+| Balıkçı | kova şapka | sarı yağmurluk ve şapkası |
+| Yapı Ustası | alet kemeri | baret ve alet kemeri |
+| Zanaatkâr | deri önlük | koruyucu gözlük ve deri önlük |
+| Bilge | mor atkı | kep ve bilge cübbesi |
+
+Çıraklar sade köylü giysisi giyer. Kıyafet bütün yönlerde, yürürken ve otururken çizilir; kışlık palto gövdeyi örter ama
+başlık görünür; çocuklar giymez. Kıyafet deneyimden türetilir (kayda girmez): kademe atlayınca hemen, ana meslek
+değişince saat başı giyilir. Karakter Paneli'nde adın altında **zanaat rozeti** durur: Çırak bronz, Kalfa gümüş, Usta altın
+("Usta Madenci"); üzerine gelince giydiği kıyafet yazar.
+
+### Usta işi eserler
+Usta (Lv.3) bir sakin kendi iş yerinde bir mesaiyi bitirince **%4** (sabit iş yerinde +%2, Sağlam Alet'le +%2: en çok
+**%8**) şansla eşsiz bir eser ortaya koyar (`data/masterpieces.js`, `systems/CraftsmanshipSystem.js`):
+
+| Usta | İş yeri | Eser | Liman / Tüccar |
+|---|---|---|---|
+| Oduncu | Kereste Atölyesi | İşlemeli Yadigâr Sandık | 280 / 238 altın |
+| Taşçı | Taş Ocağı | Görkemli Taş Figür | 260 / 221 |
+| Madenci | Demir Madeni | Kusursuz Demir Heykel | 360 / 306 |
+| Fırıncı | Yel Değirmeni ve Fırın | Kraliyet Ziyafet Ekmeği | 240 / 204 |
+| Çoban | Koyun Ağılı | İnce Dokuma Kasaba Halısı | 320 / 272 |
+| Şifacı | Şifacı Kulübesi | Mucizevi Hayat İksiri | 400 / 340 |
+
+Eser çıkınca ustanın başında altın kıvılcımlar ve madalya balonu belirir, kutlama ezgisi çalar; günlüğe ve ustanın
+anılarına yazılır. Nadir kalsın diye bir usta iki eser arasında en az 3 gün dinlenir ve kasabada günde en çok bir eser
+çıkar; vitrinde 12 eser bekliyorsa yenisi yapılmaz. Eserler **Kasaba Arşivi'nin "Usta İşi Eserler" vitrininde** listelenir:
+
+- **Sergile:** kasaba refahına kalıcı **+1** (en çok +12). Belediye Konağı'nın paneli vitrindekileri gösterir.
+- **Sat:** limandan tam değerine ihraç edilir, gezgin tüccar %85'ini öder (200-400 altın). Liman paneli ihraca hazır eserleri
+  ve değerlerini gösterir.
+
+Üretim yapılarının panelinde o iş yerinde çıkabilecek eser ve şansı yazar.
+
+### Denge ve test (simülasyon)
+- **Stres matrisi** (6 tohum x 1x / 2x / 4x x 50 gün = 18 koşu): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0,
+  üretmeyen iş yeri 0, sayfa hatası 0, kıyafet hatası 0. Atışma 5330'dan 2362'ye indi (-%56); açık barışma 128'den 312'ye
+  çıktı (barışma / atışma %2,4 -> %13). Küslük kalıcı değil: 4x koşularının sonunda 2608 ilişki çiftinden yalnızca 1'i küs
+  (koşu başına aynı anda en çok ~4); diğerleri gönül alma yerlerinde ya da birlikte çalışıp sohbet ederek düzeliyor.
+- **Usta işi eserler:** koşu başına ~30 eser (18 koşuda 547; 216 sergilendi, 331 satıldı); 50. günde kasabaların
+  yarıdan çoğu Usta kostümü giyiyor (18 koşuda 457 Usta, 79 Kalfa).
+- **Hedefli testler** (`tests.mjs`, 220): barışma olasılığı gönül alma yerlerinde 4 kat, el sıkışma balonu, yerli anı ve
+  günlük, gönül alma yerinde atışılmaz; Çırak / Kalfa / Usta kıyafeti, kademe atlayınca anında giyilir, palto ve çocuk,
+  12 meslek x 4 yön x 3 kare çizimi, bronz / gümüş / altın rozet; Kalfa eser yapmaz, Usta %4, sabit iş yeri ve Sağlam Alet'le
+  %8, usta başına bekleme ve kasabada günlük sınır, anı / günlük / kutlama, sergileme (+1 refah, en çok +12), liman ve tüccar
+  satışı, 200-400 altın, Arşiv vitrinindeki Sergile düğmesi, kayıttan eserlerin ve kıyafetlerin dönmesi.
+- **Uyumluluk** (`compat.mjs`, sürüm 2-13, 165): eski kayıtlar boş vitrinle açılır, sakinler deneyimlerine göre giyinir;
+  sürüm 13 kaydının eserleri korunur. **Denetim** (`audit.mjs`): 49/49.
+
+## Kod denetimi (15. aşama öncesi)
+
+Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
+
+**Düzeltilen hatalar**
+- **Dinleyici sızıntısı:** `WeatherSystem` sahne yeniden kurulunca temizlenmiyordu; her Yükle / Yeni Harita'da bir
+  `time:hour` dinleyicisi birikiyordu. `TownScene.exit` artık güncelleme listesindeki sistemleri de temizler.
+- **Takılma döngüsü:** Kıtlıkta (yiyecek, pişmiş yemek, böğürtlen yok) ya da evsizken sakin "işe git -> yolda acil
+  açlık -> yine işe git" döngüsüne giriyor, ne çalışıyor ne yiyordu. `Brain.hasUrgentNeed` yalnızca giderilebilecek
+  ihtiyaçta işi keser.
+- **Ad kutusu:** Sakinin adı düzenlenirken sağdaki listeden başka sakin seçilince Enter yeni seçilenin adını
+  değiştiriyordu; basılı bir tuşla metin kutusuna geçilince kamera yazarken kaymaya devam ediyordu.
+- **Tüccar ve şenlik:** Tüccar yoluna kurulan yapının içinden yürüyordu; şenlik yeri yıkılınca şenlik yersiz sürüyordu.
+- **İş gücü:** Hasta ya da seferdeki usta "bekleyen usta" sayılıp son iş yuvasını kilitliyordu.
+- **Kayıt:** Kopuk referanslı kayıtlar (var olmayan ev, karşılıksız eş, kayıp ebeveyn) yüklenirken onarılır.
+- **Arayüz:** Telefon genişliğinde araç çubuğu ekrandan taşıyordu (artık sarılır, kısayol etiketleri gizlenir).
+- **Ses:** Sessizde yalnızca kazanç 0'a iniyor, döngüler ve LFO'lar işlemci harcamaya devam ediyordu. Artık bağlam
+  askıya alınır, açılınca kazanç 0'dan yumuşakça yükselir; sessiz başlanan oyunda bağlam hiç kurulmaz.
+
+**Performans:** A* arama tamponları yeniden kullanılır (her aramada üç harita boyu dizi ayrılmaz); ilişki puanı
+ekleme, keyif auraları, yürüme, çizim ortamı, ışık listesi ve çizim kuyruğu karesel çöp üretmez; ekran dışındaki
+ışıklara gradyan kurulmaz; kışın her karedeki `JSON.stringify` kaldırıldı. 30 sakinli geç oyunda simülasyon adımı
+~%26 hızlandı. Ölü kod (`Animation.js` ve dört kullanılmayan dışa aktarım) silindi.
+
+**Test altyapısı:** Testler artık makinenin yükünden bağımsız deterministiktir (eskiden sayfa açılışıyla döngünün
+durması arasında gerçek zamana bağlı sayıda adım geçiyordu). Uzun koşuların bekçisi örneği saat buçuğunda alır.
+
+**Metrikler**
+- Stres matrisi (`stress.mjs`): 6 tohum (7, 13, 21, 42, 77, 101) x 1x / 2x / 4x x 50 gün = 18 koşu: takılma 0,
+  kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0. Her koşu Gelişmiş Şehir'e ve
+  30 sakine ulaştı; toplam 237 düğün, 93 doğum, 93 büyüme, 55 hastalık.
+- Denetim (`audit.mjs`): 49/49 · hedefli testler (`tests.mjs`): 190/190 · uyumluluk (`compat.mjs`, sürüm 2-12): 130/130.
+
+## Simülasyon ve test araçları (`tools/sim/`)
+
+Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngüsünü durdurup sabit adımlarla ilerletir.
+`Math.random` tohumlanır, bu yüzden aynı tohum her seferinde aynı sonucu verir. Önce sunucu açılır
+(`python3 tools/serve.py`); Playwright genel olarak kurulu olmalıdır (`npm i -g playwright`). Başka bir adres için
+`LMGAME_URL` ortam değişkeni kullanılır. Hepsi başarıda 0, hatada 1 ile çıkar.
+
+| Komut | Ne yapar? |
+|---|---|
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (220; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 13'e) açar, bir gün yaşatır; referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
+| `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi |
+| `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |
+| `node tools/sim/autopilot.mjs 42 40` | Hilesiz otopilotla 40 günlük oyun: günlük özet (araştırma, altın, sefer, harika aşaması, yadigâr ve harcanan altın dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya, altının yadigâr / lüks mal / fermanlara ne kadar harcandığı, peyzaj ve son 12 günün ortalama stoğu; (14. aşama) mevsim festivalleri ve katılımcıları, anı sayıları ve örnek bir sakinin anıları, nadir hava olayları, Büyük İhracat Seferi sayısı. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar, `--speed 1\|2\|4` oyun hızını seçer, `--json rapor.json` bekçi raporunu yazar (takılma ya da kopuk referans varsa çıkış 1) |
+| `node tools/sim/preview.mjs ["başlık"]` | Sanat önizleme sayfasının bölümlerinin ekran görüntüleri (`tools/sim/out/`) |
+| `node tools/sim/showcase.mjs 11` | Oyun içi vitrin: yeni yapılar ve hayvanlar, liman ve yanaşan tekne, Bilgelik Evi, harika, peyzaj ve çardak, yadigârlı konak, yapı panelleri, Kasaba Arşivi, fotoğraf modu, karar penceresi, fermanlar, gece görünümü, dört mevsim festivali, sabah sisi, Toplanma Zili, yaz fırtınası, anılar paneli |
+
+`tools/sim/lib.mjs` ortak yardımcıları içerir: oyunu açma, saat saat ilerletme (oyunun hızına göre adım sayısı),
+`window.sim` (yapı kurma, kaynak verme, olay günlüğü) ve test kaydı. `tools/sim/monitor.mjs` uzun koşuların bekçisidir:
+saat başı sakinlerin takılıp takılmadığını (boşta / yolda aynı karoda 150 dakika, yürünemez karoda 120 dakika), referans
+bütünlüğünü ve iş gücünü denetler.
+
 ## Arayüz yerleşimi ve dar pencereler
 
 Sol sütunda HUD, Günlük, Hedefler ve en altta kontrol ipuçları; sağ sütunda takas penceresi, sakin listesi,
@@ -738,6 +1702,29 @@ karakter ve yapı panelleri durur. İki sütun aynı esnek kapsayıcıdadır (`.
 | Çocuklar, Mutlu Yuva, atışma / barışma olasılıkları | `data/family.js` |
 | Zıt kişilik çiftleri | `data/characters.js` → `OPPOSING_TRAITS` |
 | Yeni ekipman ya da maliyeti / etkisi | `data/equipment.js` (+ simge `art/ui/index.js`, görünüm `art/sprites/characters.js`) |
+| Yeni kaynak / işlenmiş mal | `data/resources.js` (+ simge ve taşıma yükü `art/ui/index.js`, başlangıç `STARTING_RESOURCES`) |
+| Yan ürün, işleme (girdi -> ürün) | `data/buildings.js` → `production.extra`, `processing` (mantık `systems/BehaviorSystem.js`) |
+| Kasaba seviyesi koşulları ve ödülleri | `data/town.js` → `TOWN_TIERS` (ölçüm `systems/TownStatus.js`, akış `systems/TownLevelSystem.js`) |
+| Seviyeyle açılan yapı | `data/buildings.js` → `requiresTier` |
+| Belediyenin erzak dengesi | `data/town.js` → `TOWN_HALL` |
+| Tüccarın seviyeye göre malları | `data/trade.js` → `minTier`, `offerStock` (+ `TOWN_TIERS.merchantBonus`) |
+| Hastalık olasılığı, etkileri, Dinçlik | `data/health.js` → `ILLNESS`, `VIGOR` (mantık `systems/HealthSystem.js`) |
+| Hayvan sayısı, hızı, ürkme ve sevme | `data/animals.js` → `WILDLIFE`, `PETS` (görsel `art/sprites/animals.js`) |
+| Yeni karar olayı ya da seçeneği | `data/dilemmas.js` → `DILEMMAS` (+ özel etki `systems/DilemmaSystem.js` → `apply`) |
+| Fırtına hasarı, onarım maliyeti, sefer ganimeti | `data/dilemmas.js` → `STORM`, `EXPEDITION` |
+| Belediye fermanları | `data/town.js` → `CIVIC_PROJECTS` (mantık `systems/CivicSystem.js`) |
+| Yeni araştırma ya da etkisi, okul kuralları | `data/research.js` → `RESEARCH`, `SCHOOL` (etkilerin saf yardımcıları `systems/ResearchSystem.js`) |
+| İhracat değerleri, sınırlar, tekne aralığı / kapasitesi / hızı | `data/trade.js` → `EXPORT` (mantık `systems/HarborSystem.js`) |
+| Harikanın aşamaları, maliyetleri, ışığı ve ısıttığı alan | `data/buildings.js` → `wonder.wonder` (görsel `art/sprites/structuresWonder.js`) |
+| Proje türlerinin sözcükleri (Yükselt / Onar / Aşama) | `data/buildings.js` → `PROJECT_WORDS` |
+| Lüks malların, yadigârların, altın fermanlarının fiyatı ve etkisi | `data/luxury.js` (etkiler `systems/Luxury.js`, simgeler `art/ui/index.js`) |
+| Arşivde saklanan gün sayısı, grafiklerin gün sayısı | `config.js` → `HISTORY_DAYS`, `HISTORY_CHART_DAYS` |
+| Mevsim festivalinin yeri, süslemeleri, bonusu, anı cümlesi | `data/festivals.js` (bonuslar `data/town.js` → `TOWN_BUFFS`, süsleme görselleri `art/sprites/festival.js`) |
+| Yeni anı türü ya da nostalji olasılığı | `systems/MemorySystem.js` (olayı dinle, `addMemory`; sayılar `MEMORY`) |
+| Nadir hava olayının mevsimi, saati, olasılığı | `data/weather.js` → `WEATHER_TYPES`, `WEATHER_SPECIALS` (çizim `rendering/WeatherEffects.js`) |
+| Büyük İhracat Seferi'nin fiyatı, bekleme süresi, yükü | `data/trade.js` → `EXPORT.grandVoyage` |
+| Yeni süs yapısı (altından geçilen, birleşen, oturulan) | `data/buildings.js` → `walkable`, `connects`, `gazebo` (+ `art/sprites/structuresGarden.js`) |
+| Simülasyon / test | `tools/sim/` (bkz. *Simülasyon ve test araçları*) |
 | Günlüğe yeni olay | `systems/JournalSystem.js` (olayı dinle, metnini yaz) |
 | Kayda yeni alan | `state/GameState.js` → `toJSON` / `restore` (+ `SAVE_VERSION`) |
 | Mevsim uzunluğu | `config.js` → `DAYS_PER_SEASON` |

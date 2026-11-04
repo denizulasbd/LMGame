@@ -9,13 +9,14 @@
 // "Mutlu Yuva" morali keyfin yavaş düşmesini sağlar, oynayan çocuklar yanındaki yetişkinleri keyiflendirir.
 import { NEEDS, NEED_KEYS, SLEEP_DECAY_MULTIPLIER } from '../data/characters.js';
 import { BUILDINGS } from '../data/buildings.js';
-import { RAIN_EFFECTS, isRainActive } from '../data/weather.js';
+import { RAIN_EFFECTS, isRainActive, WEATHER_TYPES } from '../data/weather.js';
 import { WARM_MEAL } from '../data/town.js';
 import { HAPPY_HOME, CHILD_JOY } from '../data/family.js';
 import { buffMultiplier, prestige } from './TownStatus.js';
 import { HEATING, getSeason } from '../data/seasons.js';
 import { isShivering, isFreezing } from './HeatingSystem.js';
 import { coldProtection, travelFatigue } from './Equipment.js';
+import { healthEnergyMultiplier } from './HealthSystem.js';
 import { clamp } from '../utils/math.js';
 
 /** Üşüme çarpanının fazlası paltoyla azalır: 1 + (m - 1) × (1 - koruma). */
@@ -33,13 +34,16 @@ export class NeedsSystem {
     if (tick.gameMinutes <= 0) return;
     const state = this.world.state;
     const raining = isRainActive(state.weather);
+    const weatherFun = WEATHER_TYPES[state.weather.type]?.funDecay ?? 1;
     // Kasaba İkramı, Şenlik Coşkusu ve anıtın kalıcı gururu keyfin yavaş düşmesini sağlar
     const funBuff = buffMultiplier(state, 'funDecay') * (prestige(state)?.funDecay ?? 1);
     const now = state.totalMinutes;
     const season = getSeason(state.time.day);
     const freezing = isFreezing(state);
     for (const c of this.world.characters) {
+      if (c.away) continue; // keşif seferindekiler kendi erzaklarıyla yaşar (ihtiyaçları donar)
       const sleeping = c.isSleeping;
+      const healthEnergy = healthEnergyMultiplier(c, now); // üşüten çabuk, dinç yavaş yorulur
       const rainy = raining && c.visible; // yağmur yalnızca dışarıdakileri ıslatır
       const shivering = isShivering(c, state);
       const winter = season.cold;
@@ -51,6 +55,8 @@ export class NeedsSystem {
         const perMinute = NEEDS[need].decayPerHour / 60;
         let multiplier = c.profile.decay[need] * (sleeping ? SLEEP_DECAY_MULTIPLIER[need] : 1);
         if (rainy && need === 'fun' && !c.profile.rainLover) multiplier *= RAIN_EFFECTS.funDecayMultiplier;
+        // (14. aşama) Sisli sabah dinlendirir: dışarıdakilerin keyfi yavaş düşer
+        if (need === 'fun' && c.visible && weatherFun !== 1) multiplier *= weatherFun;
         if (need === 'fun') multiplier *= funBuff;
         if (need === 'hunger' && (c.buffs.warmMeal ?? -1) > now) multiplier *= WARM_MEAL.hungerDecay;
         // Kışın üşüyen sakin daha çabuk yorulur ve keyfi kaçar; odun bitince evler de soğuktur ve
@@ -64,6 +70,7 @@ export class NeedsSystem {
         // Sırt çantalı sakin uzun yollarda daha az yorulur; eşiyle mutlu uyanan güne keyifle başlar
         if (walking && need === 'energy') multiplier *= travelFatigue(c);
         if (happyHome && need === 'fun') multiplier *= HAPPY_HOME.funDecay;
+        if (need === 'energy') multiplier *= healthEnergy;
         c.needs[need] = clamp(c.needs[need] - perMinute * multiplier * tick.gameMinutes, 0, 100);
       }
       if (rainy && c.profile.rainLover) {
@@ -92,10 +99,13 @@ export class NeedsSystem {
    * sakinlerin keyfi yavaşça artar; kadim çeşme enerjiyi de doldurur. Fener yalnızca yanarken etki eder.
    */
   applyFunAuras(minutes) {
-    const sources = this.world.getCompleted().filter((b) => {
+    // Kaynaklar her adımda yeniden kullanılan bir diziye toplanır (filtre dizisi çöp üretmesin)
+    const sources = this.auraSources ?? (this.auraSources = []);
+    sources.length = 0;
+    for (const b of this.world.buildings) {
       const def = BUILDINGS[b.type];
-      return def.funAura && (!def.litHours || b.lit);
-    });
+      if (def.funAura && b.functional && (!def.litHours || b.lit)) sources.push(b);
+    }
     if (sources.length === 0) return;
     for (const c of this.world.characters) {
       if (!c.visible) continue;

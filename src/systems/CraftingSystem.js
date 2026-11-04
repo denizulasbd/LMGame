@@ -9,10 +9,15 @@
 //   Kuşanma: depoda boşta ekipman varsa ona en çok ihtiyacı olan yetişkin (itemFor) atölyeye ya da kilere
 //            yürüyüp kuşanır (Brain -> planEquip, BehaviorSystem -> equip): 'equipment:equipped'.
 //   Görünüş: paltosu olan sonbahar ve kışın paltosunu giyer (Character.coatVisible).
+//   Tarif  : (10. aşama) alet demir + odundan, palto ve çanta yünden yapılır (asıl tarif). Kasabada o malzemeyi
+//            üreten tamamlanmış bir yapı (Demir Madeni / Koyun Ağılı) yoksa eski usul odun / taş / yiyecek
+//            tarifiyle (fallbackCost) üretilir; üreten yapı varsa zanaatkâr malzemeyi bekler. Tezgâhtaki işin
+//            hangi tarifle yapıldığı building.craft.recipe'tedir ('material' | 'fallback').
 // Ekipmanın etkileri src/systems/Equipment.js'teki saf yardımcılarla hesaplanır.
 import { EQUIPMENT, EQUIPMENT_KEYS, CRAFTING, CRAFT_MODES } from '../data/equipment.js';
+import { BUILDINGS } from '../data/buildings.js';
 import { lacking } from './Equipment.js';
-import { formatCost } from '../data/resources.js';
+import { RESOURCES, formatCost } from '../data/resources.js';
 import { getSeason } from '../data/seasons.js';
 import { isShivering } from './HeatingSystem.js';
 
@@ -57,9 +62,9 @@ export class CraftingSystem {
     for (const c of this.world.characters) c.coatVisible = coatSeason && c.equipment.clothing === 'winterCoat';
     for (const building of this.world.buildings) {
       if (!building.definition.crafting) continue;
-      if (!building.functional) {
+      if (!building.functional || building.damaged) {
         building.idle = true;
-        building.craftStatus = null;
+        building.craftStatus = building.damaged ? 'Fırtınada hasar gördü: onarılana kadar çalışmaz' : null;
         continue;
       }
       if (building.craft) {
@@ -69,7 +74,8 @@ export class CraftingSystem {
       }
       const choice = this.chooseItem(building);
       building.idle = !choice.item;
-      building.craftStatus = choice.reason ?? `Sıradaki: ${EQUIPMENT[choice.item].name}`;
+      building.craftStatus =
+        choice.reason ?? `Sıradaki: ${EQUIPMENT[choice.item].name}${choice.recipe.kind === 'fallback' ? ' (eski usul)' : ''}`;
     }
   }
 
@@ -87,17 +93,41 @@ export class CraftingSystem {
       const demand = lacking(this.world.characters, item).length;
       const need = demand - this.stock[item] + (mode === 'auto' ? 0 : CRAFTING.spareStock);
       if (need <= 0) continue;
-      const cost = EQUIPMENT[item].cost;
-      if (!this.economy.canAfford(cost)) {
-        reason ??= `Malzeme bekleniyor: ${EQUIPMENT[item].name} (${formatCost(cost)})`;
+      const recipe = this.recipeFor(item);
+      if (!recipe.cost) {
+        reason ??= recipe.reason;
         continue;
       }
       const priority = need + (item === 'winterCoat' && coatSeason ? 100 : 0);
-      if (!best || priority > best.priority) best = { item, priority };
+      if (!best || priority > best.priority) best = { item, priority, recipe };
     }
-    if (best) return { item: best.item };
+    if (best) return { item: best.item, recipe: best.recipe };
     if (reason) return { reason };
     return { reason: mode === 'auto' ? 'Herkesin ekipmanı tamam: sipariş bekleniyor' : `Depoda yeterince ${EQUIPMENT[mode].shortName.toLowerCase()} var` };
+  }
+
+  /** Kasabada bu malzemeyi (yün, demir) üreten tamamlanmış bir yapı var mı? */
+  hasProducer(material) {
+    return this.world.getCompleted().some((b) => {
+      const production = BUILDINGS[b.type].production;
+      return production && (production.resource === material || production.extra?.[material] !== undefined);
+    });
+  }
+
+  /**
+   * Bu ekipmanın şimdi hangi tarifle yapılabileceği:
+   *   { cost, kind: 'material' } asıl tarif (demir / yün), { cost, kind: 'fallback' } eski usul tarif ya da
+   *   { reason } neden yapılamadığı. Eski usul tarif yalnızca malzemeyi üreten yapı yokken kullanılır.
+   */
+  recipeFor(item) {
+    const def = EQUIPMENT[item];
+    if (this.economy.canAfford(def.cost)) return { cost: def.cost, kind: 'material' };
+    const material = RESOURCES[def.material];
+    if (def.fallbackCost && !this.hasProducer(def.material)) {
+      if (this.economy.canAfford(def.fallbackCost)) return { cost: def.fallbackCost, kind: 'fallback' };
+      return { reason: `Malzeme bekleniyor: ${def.name} (${formatCost(def.cost)} ya da eski usul ${formatCost(def.fallbackCost)})` };
+    }
+    return { reason: `${material.name} bekleniyor: ${def.name} (${formatCost(def.cost)})` };
   }
 
   /**
@@ -106,17 +136,18 @@ export class CraftingSystem {
    */
   work(building, amount) {
     if (!building.craft) {
-      const { item } = this.chooseItem(building);
-      if (!item || !this.economy.spend(EQUIPMENT[item].cost)) return false;
-      building.craft = { item, progress: 0 };
+      const { item, recipe } = this.chooseItem(building);
+      if (!item || !this.economy.spend(recipe.cost)) return false;
+      building.craft = { item, progress: 0, recipe: recipe.kind };
     }
     building.craft.progress += amount;
     const item = building.craft.item;
     if (building.craft.progress < EQUIPMENT[item].work) return true;
+    const recipe = building.craft.recipe ?? 'material';
     building.craft = null;
     this.stock[item] += 1;
     building.producedToday += 1;
-    this.events.emit('equipment:crafted', { item, building });
+    this.events.emit('equipment:crafted', { item, building, recipe });
     return true;
   }
 

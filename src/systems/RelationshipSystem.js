@@ -29,6 +29,7 @@ import {
 import { CONFLICT } from '../data/family.js';
 import { clashingTraits } from '../ai/TraitProfile.js';
 import { clamp } from '../utils/math.js';
+import { buffMultiplier } from './TownStatus.js';
 
 const FESTIVAL_NEAR_PIXELS = 34; // şenlikte iki karodan yakın olanlar
 
@@ -52,9 +53,7 @@ export function getFriendship(state, a, b) {
 
 export function levelIndexFor(score) {
   let index = 0;
-  RELATIONSHIP_LEVELS.forEach((level, i) => {
-    if (score >= level.min) index = i;
-  });
+  for (let i = 0; i < RELATIONSHIP_LEVELS.length; i++) if (score >= RELATIONSHIP_LEVELS[i].min) index = i;
   return index;
 }
 
@@ -164,6 +163,11 @@ function groupKey(c) {
   return null;
 }
 
+/** Sohbet edilen yerin aşk / evlilik olasılığı çarpanı (13. aşama: çardak). */
+function romanceMultiplier(group) {
+  return ACTIVITIES[group.activity]?.romanceMultiplier ?? 1;
+}
+
 export class RelationshipSystem {
   /**
    * @param {import('../core/Game.js').Game} game
@@ -195,14 +199,21 @@ export class RelationshipSystem {
   /** Çifte puan ekler (eksi olabilir); zıt kişilikliler yarı puan kazanır. Seviye değişirse olayı yayınlar. */
   add(a, b, amount) {
     const gain = amount > 0 && clashingTraits(a.traits, b.traits) ? amount * CONFLICT.clashGainMultiplier : amount;
-    this.set(a, b, this.get(a, b) + gain);
+    // Her adımda her çift için çağrılır: anahtar bir kez kurulur, önceki puan bir kez okunur
+    const key = pairKey(a.id, b.id);
+    const stored = this.state.relationships[key];
+    const before = stored !== undefined ? stored : getFriendship(this.state, a, b);
+    this.write(a, b, key, before, before + gain);
   }
 
   /** Puanı doğrudan ayarlar (barışma); seviye değişirse olayı yayınlar. */
   set(a, b, score) {
-    const before = this.get(a, b);
+    this.write(a, b, pairKey(a.id, b.id), this.get(a, b), score);
+  }
+
+  write(a, b, key, before, score) {
     const after = clamp(score, MIN_FRIENDSHIP, MAX_FRIENDSHIP);
-    this.state.relationships[pairKey(a.id, b.id)] = after;
+    this.state.relationships[key] = after;
     const from = levelIndexFor(before);
     const to = levelIndexFor(after);
     if (to === from) return;
@@ -219,7 +230,9 @@ export class RelationshipSystem {
     this.groups = activityGroups(this.world.characters);
     const evening = isEvening(tick.hour, MARRIAGE.eveningFrom, MARRIAGE.eveningTo);
     for (const group of this.groups) {
-      const { rate, members, near } = group;
+      const { members, near } = group;
+      // Büyük Panayır (11. aşama) sohbetlerde arkadaşlığı hızlandırır
+      const rate = group.rate * (group.kind === 'work' ? 1 : buffMultiplier(this.state ?? this.world.state, 'friendship'));
       for (let i = 0; i < members.length; i++) {
         for (let j = i + 1; j < members.length; j++) {
           const a = members[i];
@@ -238,7 +251,7 @@ export class RelationshipSystem {
   /** Yakın iki bekâr sohbet ederken / dans ederken aşık olabilir. */
   tryRomance(a, b, group, minutes) {
     if (!canRomance(a, b) || this.get(a, b) < ROMANCE.minScore) return;
-    if (this.rng.next() >= ROMANCE.chancePerMinute * minutes) return;
+    if (this.rng.next() >= ROMANCE.chancePerMinute * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance')) return;
     const now = this.state.totalMinutes;
     a.partnerId = b.id;
     b.partnerId = a.id;
@@ -253,7 +266,7 @@ export class RelationshipSystem {
   tryMarriage(a, b, group, minutes) {
     if (!arePartners(a, b) || a.married) return;
     if (this.state.totalMinutes - a.partnerSince < MARRIAGE.minPartnerDays * 1440) return;
-    if (this.rng.next() >= MARRIAGE.chancePerMinute * minutes) return;
+    if (this.rng.next() >= MARRIAGE.chancePerMinute * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance')) return;
     this.marry(a, b, this.world.getBuilding(group.buildingId), group.kind === 'festival');
   }
 

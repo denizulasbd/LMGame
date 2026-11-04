@@ -1,5 +1,6 @@
 // Kasaba yapılarının kuralları (görselden bağımsız). Görseller: src/art/sprites/structures.js
-// (8. aşamanın Seviye 2 yapıları ve harabeleri: src/art/sprites/structuresTier2.js)
+// (8. aşamanın Seviye 2 yapıları ve harabeleri: src/art/sprites/structuresTier2.js; 10. aşamanın ağılı,
+// değirmeni, madeni ve belediyesi: structuresFarm.js, structuresIndustry.js, structuresCivic.js)
 import { GROUND_TILES } from './tiles.js';
 //
 //   size        : kapladığı karo sayısı (bu karolar yürünemez ve inşa edilemez)
@@ -39,6 +40,43 @@ import { GROUND_TILES } from './tiles.js';
 //   crafting     : { recipes } zanaatkâr stoktan kaynak harcayıp kişisel ekipman üretir (zanaat atölyesi;
 //                  tarifler data/equipment.js'te)
 //   chimney      : { x, y } çalışırken tüten ocak bacasının görsel üstündeki yeri (zanaat atölyesi)
+//
+// 10. aşama — üretim zincirleri, hayvancılık ve kasaba seviyesi:
+//   production.extra : { kaynak: saatlik } ana ürünün yanında aynı verimle gelen yan ürün (ağılda yiyecek,
+//                      madende taş)
+//   processing   : { perHour, input, output } işleme yapısı: çalışan saatte perHour kez stoktan input'u alıp
+//                  output'u üretir (değirmen: 1 yiyecek -> 1 ekmek). Malzeme yoksa ya da depo doluysa boşta kalır
+//   flock        : { sheep, lambSeasons } ağılda dolaşan koyun sayısı ve kuzuların görüldüğü mevsimler (görsel)
+//   requires.biome : { tile, min } yakında yeterli nesne yoksa ayak izinde en az min karo bu biyomsa da olur
+//                  (demir madeni: kayalık tepe ya da kayaların yanı)
+//   requiresTier : kasaba bu seviyeye ulaşınca kilidi açılır (data/town.js -> TOWN_TIERS; değirmen Köy,
+//                  belediye Kasaba)
+//   civic        : { workSpeed } tamamlanınca kasabanın tüm iş ve inşaat hızı çarpanı (belediye); her sabahki
+//                  erzak dengesi data/town.js -> TOWN_HALL'da, belediye fermanları data/town.js -> CIVIC_PROJECTS'te
+//
+// 11. aşama — sağlık:
+//   apothecary   : { herbsPerHour, brewPerHour, herbsPerRemedy, maxHerbs, maxRemedies, natureRadius, natureIdeal }
+//                  şifacı doğadan (yakındaki ağaç ve çiçek tarlası) şifalı ot toplar, kulübede iksir ve merhem
+//                  hazırlar; hasta sakinler gelip bir iksirle iyileşir (data/health.js). Çevresinde ağaç azsa ot
+//                  toplamak yavaşlar (natureIdeal ağaçta tam hız)
+//
+// 12. aşama — bilgi, ticaret ve harika:
+//   academy      : Bilgelik Evi: Bilge araştırma yapar (data/research.js), çocuklar ders dinler
+//   placement 'harbor' : nehir kıyısına; ayak izinin kara yanı kum, kalanı su ve suyun ötesinde teknelerin
+//                  geçeceği açık bir su şeridi olmalı (ihracat teknesi oraya yanaşır; data/trade.js -> EXPORT)
+//   wonder       : { stages: [{ name, description, cost, work }] } çok aşamalı harika: ilk aşama şantiye olarak
+//                  kurulur, sonrakiler Yapı Bilgi Paneli'nden başlatılır (project 'stage'); son aşama bitince
+//                  townBonus, light ve warmRadius etkin olur (systems/TownStatus.js, HeatingSystem.js)
+//   (DAMAGEABLE_TYPES) fırtınada ya da kurt saldırısında hasar alabilen yapılar; hasarlı yapı onarılana kadar
+//                  çalışmaz (bkz. data/dilemmas.js -> STORM)
+//
+// 13. aşama — peyzaj ve süsleme:
+//   walkable     : sakinler yapının karosundan geçebilir (Mermer Kemer; yolun üstüne de kurulur). Yapı karoyu
+//                  kaplar ama yürünebilirliği bozmaz; altındaki yol / zemin olduğu gibi kalır
+//   gazebo       : { seats: [{ x, y }] } Çardak: önündeki iki karodan içeri girilip banklara oturulur; çiftlerin ve
+//                  dostların sevdiği sohbet köşesi (data/activities.js -> gazebo)
+//   connects     : (Çiçekli Çit) yanındaki aynı türden çitlerle görsel olarak birleşir
+//   seasonalFoliage : (Kiraz Ağacı) dört mevsim kendi görünümü ve rüzgârda dökülen yaprakları vardır
 //
 // Seviye 2 (8. aşama) — upgrade: yapı yıkılmadan Yapı Bilgi Paneli'nden geliştirilir:
 //   { name, description, cost, buildWork, capacity?, workers?, productionBonus?, seasonalFloor?,
@@ -218,13 +256,187 @@ export const BUILDINGS = {
     demolishable: true,
     category: 'Zanaat',
     description:
-      'Zanaatkâr stoktaki odun, taş ve yiyecekten kişisel ekipman üretir: Sağlam Alet, Kışlık Palto, Sırt Çantası. Boşta kalan ekipmanı en çok ihtiyacı olan sakin gelip kuşanır.',
+      'Zanaatkâr kişisel ekipman üretir: demir ve odundan Sağlam Alet, yünden Kışlık Palto ve Sırt Çantası. Kasabada henüz demir ya da yün üreten yapı yoksa eski usulle odun, taş ve yiyecekten yapar. Boşta kalan ekipmanı en çok ihtiyacı olan sakin gelip kuşanır.',
     cost: { wood: 25, stone: 20 },
     buildWork: 180,
     workers: 1,
     workActivity: 'craft',
     workFacing: 'up',
     crafting: { recipes: ['sturdyTool', 'winterCoat', 'backpack'] },
+  },
+  // --- 10. aşama: üretim zincirleri ve hayvancılık ---
+  sheepFarm: {
+    name: 'Koyun Ağılı',
+    size: { w: 3, h: 3 },
+    spots: 'front',
+    buildable: true,
+    demolishable: true,
+    category: 'Hayvancılık',
+    description:
+      'Çitle çevrili ağılda koyunlar otlar. Çoban düzenli yün (kumaş malzemesi) ve biraz süt-peynir (yiyecek) getirir. İlkbaharda kırkım bereketlidir; kışın koyunlar ahırda daha az yün verir.',
+    cost: { wood: 30, stone: 8, food: 10 },
+    buildWork: 170,
+    workers: 1,
+    workActivity: 'herd',
+    // Çoban ağılın kapısının önünde, koyunlara dönük durur
+    workPoints: [{ x: 24, y: 52 }],
+    workFacing: 'up',
+    production: { resource: 'wool', perHour: 2, extra: { food: 1 }, seasonal: 'pasture' },
+    flock: { sheep: 4, lambSeasons: ['spring'] },
+  },
+  mill: {
+    name: 'Yel Değirmeni ve Fırın',
+    size: { w: 3, h: 3 },
+    spots: 'front',
+    buildable: true,
+    demolishable: true,
+    category: 'Üretim',
+    description:
+      'Rüzgârla dönen yelkenli taş değirmen ve taş fırın. Fırıncı bahçelerden gelen yiyeceği una, unu sıcak ekmeğe çevirir: 1 yiyecek, 2,5 yiyecek değerinde 1 ekmek olur. Kışın da çalışır.',
+    cost: { wood: 40, stone: 35 },
+    buildWork: 260,
+    workers: 1,
+    workActivity: 'bake',
+    // Fırıncı taş fırının ağzının önünde çalışır
+    workPoints: [{ x: 38, y: 51 }],
+    workFacing: 'up',
+    processing: { perHour: 4, input: { food: 1 }, output: { bread: 1 } },
+    requiresBuilding: { type: 'garden', reason: 'Önce bir Sebze Bahçesi tamamlanmalı (değirmen tahıl ister)' },
+    requiresTier: 2,
+  },
+  ironMine: {
+    name: 'Demir Madeni',
+    size: { w: 3, h: 3 },
+    spots: 'front',
+    buildable: true,
+    demolishable: true,
+    category: 'Üretim',
+    description:
+      'Kayalık tepeye açılmış derin maden. Madenciler kızıl demir cevheri ve yanında bir miktar taş çıkarır; girişteki fener geceleri yanar.',
+    cost: { wood: 40, stone: 20 },
+    buildWork: 240,
+    workers: 2,
+    workActivity: 'mineIron',
+    production: { resource: 'iron', perHour: 1.5, extra: { stone: 1 } },
+    // Madenciler tünel ağzının iki yanında kaya yüzüne dönük kazma sallar
+    workPoints: [
+      { x: 13, y: 39 },
+      { x: 35, y: 39 },
+    ],
+    workFacing: 'up',
+    sortLine: 37,
+    litHours: { from: 18.5, to: 6.5 },
+    requires: {
+      nearObjects: ['rock', 'pebbles'],
+      radius: 6,
+      min: 3,
+      biome: { tile: 'rocky', min: 3 },
+      reason: 'Kayalık Tepe biyomuna ya da kayaların yanına kurulmalı (6 karo içinde en az 3 kaya / çakıl)',
+    },
+  },
+  // --- 11. aşama: sağlık ---
+  healerHut: {
+    name: 'Şifacı Kulübesi',
+    size: { w: 2, h: 2 },
+    spots: 'door',
+    doorTiles: [
+      { dx: 0, dy: 2 },
+      { dx: 1, dy: 2 },
+    ],
+    entrance: { x: 21, y: 31 },
+    buildable: true,
+    demolishable: true,
+    category: 'Sağlık',
+    description:
+      'Çatısında şifalı otlar kurutulan aktar kulübesi. Şifacı doğadan ot toplar, havanda döverek iksir ve merhem hazırlar. Üşüten sakinler buraya gelip çabucak iyileşir ve "Dinçlik" kazanır. Ormana yakın kurulursa ot toplamak hızlanır.',
+    cost: { wood: 30, stone: 15 },
+    buildWork: 150,
+    workers: 1,
+    workActivity: 'brew',
+    // Şifacı kulübenin önündeki tezgâhta havan döver
+    workPoints: [{ x: 9, y: 36 }],
+    workFacing: 'up',
+    apothecary: { herbsPerHour: 4, brewPerHour: 1.5, herbsPerRemedy: 2, maxHerbs: 10, maxRemedies: 6, natureRadius: 7, natureIdeal: 6 },
+  },
+  // --- 12. aşama: Bilgelik Evi, Büyük Ticaret Limanı, Büyük Saat Kulesi ---
+  academy: {
+    name: 'Bilgelik Evi',
+    size: { w: 3, h: 3 },
+    spots: 'door',
+    doorTiles: [{ dx: 1, dy: 3 }],
+    entrance: { x: 24, y: 47 },
+    buildable: true,
+    demolishable: true,
+    category: 'Bilgi',
+    description:
+      'Kitaplıkları ve gözlem kubbesiyle kasabanın okulu ve kütüphanesi. Bilge burada kalıcı kasaba teknolojileri araştırır; çocuklar ders saatlerinde gelip ders dinler ve büyüyünce bir meslekte doğrudan Kalfa olarak başlar.',
+    cost: { wood: 70, stone: 60, wool: 15 },
+    buildWork: 320,
+    workers: 1,
+    workActivity: 'teach',
+    academy: true,
+    requiresTier: 2,
+  },
+  harbor: {
+    name: 'Büyük Ticaret Limanı',
+    size: { w: 3, h: 2 },
+    spots: 'pier',
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Ticaret',
+    description:
+      'Nehre uzanan büyük taş-ahşap rıhtım, yük vinci ve sandık yığınları. Ticaret tekneleri nehirden süzülüp yanaşır; depoda belirlenen sınırı aşan fazla malları ya da hazırlanan ihracat sandığını yükleyip götürür, karşılığında Kasaba Hazinesi\'ne altın bırakır.',
+    cost: { wood: 120, stone: 80, iron: 20 },
+    buildWork: 300,
+    allowedTiles: ['sand', 'water'],
+    placement: 'harbor',
+    requiresTier: 3,
+    litHours: { from: 18.5, to: 6.5 },
+  },
+  wonder: {
+    name: 'Büyük Vadi Saat Kulesi',
+    size: { w: 4, h: 4 },
+    spots: 'ring',
+    buildable: true,
+    demolishable: false,
+    unique: true,
+    category: 'Harika',
+    description:
+      'Vadinin her yerinden görünen, saat kuleli taş külliye. Üç aşamada yükselir (Temel, Gövde, Görkemli Kule). Tamamlanınca kasaba altın çağını yaşar: refah +12, geceleri kulesi bir fener gibi vadiyi aydınlatıp ısıtır, saat başı çan çalar.',
+    cost: { wood: 200, stone: 300, bread: 80, gold: 300 },
+    buildWork: 600,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 4,
+    wonder: {
+      stages: [
+        { name: 'Temel', description: 'Kesme taş temel ve geniş basamaklar atılır.', cost: { wood: 200, stone: 300, bread: 80, gold: 300 }, work: 600 },
+        { name: 'Gövde', description: 'Kemerli taş gövde, demir kuşaklar ve yün kilimli iç salonlar yükselir.', cost: { wood: 150, stone: 400, iron: 150, wool: 80, bread: 120, gold: 800 }, work: 900 },
+        { name: 'Görkemli Kule', description: 'Saat kulesi, bronz çan ve altın kubbeli fener tamamlanır.', cost: { stone: 300, iron: 250, wool: 150, bread: 150, gold: 1600 }, work: 1200 },
+      ],
+      light: { radius: 230 },
+      warmRadius: 420, // tamamlanınca bu yarıçaptaki (≈26 karo: kasabanın neredeyse tamamı) dışarıdaki sakinlerin içi ısınır (piksel)
+    },
+    townBonus: { happiness: 12 },
+  },
+  townHall: {
+    name: 'Belediye Konağı',
+    size: { w: 3, h: 3 },
+    spots: 'door',
+    doorTiles: [{ dx: 1, dy: 3 }],
+    entrance: { x: 24, y: 47 },
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Yönetim',
+    description:
+      'Saat kuleli, sütunlu görkemli meydan konağı. Bürokrasiyi düzene sokar: kasabanın tüm iş ve inşaat verimi +%15. Her sabah vergi ve erzak defterini tutar, bolca olan temel kaynağın bir kısmını azalan kaynağa aktarır.',
+    cost: { wood: 60, stone: 80, iron: 8 },
+    buildWork: 420,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 3,
+    civic: { workSpeed: 1.15 },
+    townBonus: { happiness: 3 },
   },
   market: {
     name: 'Pazar Yeri',
@@ -264,6 +476,65 @@ export const BUILDINGS = {
     cost: { wood: 4 },
     buildWork: 20,
     allowedTiles: [...GROUND_TILES, 'plaza'],
+  },
+  // --- 13. aşama: peyzaj ve süsleme ---
+  cherryTree: {
+    name: 'Kiraz Çiçeği Ağacı',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Süsleme',
+    description:
+      'Zarif bir süs ağacı: ilkbahar ve yazın pembe çiçekli, sonbaharda altın yapraklı, kışın karlı pembe dallı. Rüzgârda yaprakları savrulur; yanından geçenlerin keyfi biraz yerine gelir.',
+    cost: { wood: 12, food: 6, gold: 15 },
+    buildWork: 30,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    seasonalFoliage: true,
+    funAura: { radius: 26, perMinute: 0.04 },
+  },
+  gazebo: {
+    name: 'Ahşap Çardak',
+    size: { w: 2, h: 2 },
+    spots: 'front',
+    buildable: true,
+    demolishable: true,
+    category: 'Süsleme',
+    description:
+      'Sarmaşık ve çiçeklerle örülü, içinde iki bankı olan şirin bir kameriye. Çiftlerin ve dostların en sevdiği sohbet köşesi: burada sohbet edenlerin arkadaşlığı ve aşkı daha hızlı gelişir.',
+    cost: { wood: 45, stone: 10, gold: 60 },
+    buildWork: 120,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    gazebo: { seats: [{ x: 10, y: 25 }, { x: 22, y: 25 }] },
+    funAura: { radius: 30, perMinute: 0.04 },
+  },
+  marbleArch: {
+    name: 'Mermer Kemer',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Süsleme',
+    description: 'Sarmaşıklı beyaz mermer kemer. Yolların ve bahçe girişlerinin üstüne kurulur; sakinler altından geçer.',
+    cost: { stone: 20, gold: 30 },
+    buildWork: 50,
+    allowedTiles: [...GROUND_TILES, 'path', 'cobble', 'plaza'],
+    walkable: true,
+    sortLine: 7,
+  },
+  flowerFence: {
+    name: 'Çiçekli Çit',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Süsleme',
+    description: 'Beyaz boyalı, saksı çiçekli alçak bahçe çiti. Yan yana kurulan çitler birleşir; bahçe kenarlarını süsler.',
+    cost: { wood: 5 },
+    buildWork: 15,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    connects: true,
+    funAura: { radius: 18, perMinute: 0.015 },
   },
   lantern: {
     name: 'Sokak Feneri',
@@ -409,21 +680,58 @@ export const BUILD_MENU = [
   'cabin',
   'lumberHut',
   'quarry',
+  'ironMine',
   'garden',
+  'sheepFarm',
+  'mill',
   'fishingPier',
   'storage',
   'inn',
   'workshop',
+  'healerHut',
   'market',
+  'harbor',
+  'academy',
+  'townHall',
   'flowerBed',
+  'flowerFence',
+  'cherryTree',
+  'marbleArch',
+  'gazebo',
   'bench',
   'lantern',
   'monument',
+  'wonder',
 ];
 
 /** Bir menü öğesinin tanımı (yapı ya da zemin). */
 export function getBuildDefinition(type) {
   return BUILDINGS[type] ?? TILE_BUILDS[type] ?? null;
+}
+
+// Fırtınada / kurt saldırısında hasar alabilen yapılar (11. aşama; data/dilemmas.js -> STORM)
+export const DAMAGEABLE_TYPES = ['lumberHut', 'garden', 'quarry', 'fishingPier', 'sheepFarm', 'mill', 'ironMine', 'workshop', 'market', 'healerHut'];
+
+// Yapı projelerinin metinleri (yükseltme, harabe onarımı, fırtına onarımı, harika aşaması)
+export const PROJECT_WORDS = {
+  upgrade: { noun: 'Yükseltme', ing: 'Yükseltiliyor', doing: 'Yükseltiyor', start: 'Yükselt', cancel: 'Yükseltmeyi İptal Et', busy: 'Yükseltme sürüyor' },
+  repair: { noun: 'Onarım', ing: 'Onarılıyor', doing: 'Onarıyor', start: 'Onarımı Başlat', cancel: 'Onarımı İptal Et', busy: 'Onarım sürüyor' },
+  mend: { noun: 'Onarım', ing: 'Onarılıyor', doing: 'Onarıyor', start: 'Onarımı Başlat', cancel: 'Onarımı İptal Et', busy: 'Onarım sürüyor' },
+  stage: { noun: 'Aşama', ing: 'Yükseliyor', doing: 'Harikayı yükseltiyor', start: 'Aşamayı Başlat', cancel: 'Aşamayı İptal Et', busy: 'Aşama sürüyor' },
+};
+
+/**
+ * Fırtınada hasar gören yapının onarım projesi: yapının maliyetinin bir oranı ve sabit iş (11. aşama).
+ * mend: { costRatio, buildWork } (data/dilemmas.js -> STORM.mend)
+ */
+export function mendSpec(type, mend) {
+  const def = BUILDINGS[type];
+  const cost = Object.fromEntries(
+    Object.entries(def.cost ?? {})
+      .map(([r, v]) => [r, Math.max(1, Math.ceil(v * mend.costRatio))])
+      .filter(([r]) => r === 'wood' || r === 'stone')
+  );
+  return { name: def.name, description: 'Fırtınanın kırdığı kirişler, uçan kiremitler ve yıkılan çitler onarılır; yapı yeniden çalışır.', cost, buildWork: mend.buildWork };
 }
 
 // Kaldırılan yapı türlerinin yerini alanlar. Eski kayıtlar yüklenirken (state/SaveManager.js)

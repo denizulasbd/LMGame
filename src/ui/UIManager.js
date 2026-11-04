@@ -20,6 +20,8 @@ import { TradePanel } from './components/TradePanel.js';
 import { MilestonePanel } from './components/MilestonePanel.js';
 import { CelebrationModal } from './components/CelebrationModal.js';
 import { TitleMenu } from './components/TitleMenu.js';
+import { DilemmaModal } from './components/DilemmaModal.js';
+import { StatsPanel } from './components/StatsPanel.js';
 
 const BOTTOM_GAP = 12; // inşa çubuğu ile pencere kenarı / sütunlar arasındaki boşluk (piksel)
 
@@ -49,12 +51,46 @@ export class UIManager {
       new Toasts(game),
       new TownJournal(game),
       new MilestonePanel(game),
+      new StatsPanel(game),
       new CelebrationModal(game),
+      new DilemmaModal(game),
       new TitleMenu(game),
     ];
     for (const component of this.components) {
       (this.slots[component.slot] ?? root).appendChild(component.element);
+      // Bazı bileşenlerin başka yuvada duran ikinci bir öğesi vardır (ör. arşiv düğmeleri solda, penceresi ortada)
+      for (const { slot, element } of component.extra ?? []) (this.slots[slot] ?? root).appendChild(element);
     }
+    this.setupCinematic();
+  }
+
+  /**
+   * (13. aşama) Fotoğraf / sinematik mod (F ya da Fotoğraf düğmesi): bütün arayüz yumuşakça gizlenir, yalnızca sağ
+   * altta küçük bir "Arayüzü Göster (F)" ipucu kalır. Karar penceresi ya da kutlama açılınca mod kendiliğinden biter.
+   * Sahne 'ui:setCinematic' ile haber alır (imleç ve seçim çizilmez).
+   */
+  setupCinematic() {
+    const events = this.game.events;
+    this.cinematic = false;
+    const hint = el('button', { className: 'hud-btn cinematic-hint ui-interactive', type: 'button', tabIndex: -1, title: 'Arayüzü yeniden göster' }, [
+      el('span', { text: 'Arayüzü Göster' }),
+      el('kbd', { text: 'F' }),
+    ]);
+    hint.addEventListener('mousedown', (e) => e.preventDefault());
+    hint.addEventListener('click', () => this.setCinematic(false));
+    this.root.appendChild(hint);
+    events.on('ui:toggleCinematic', () => this.setCinematic(!this.cinematic));
+    for (const name of ['dilemma:opened', 'town:tierUp', 'town:legendary', 'wonder:completed', 'title:show']) {
+      events.on(name, () => this.setCinematic(false));
+    }
+  }
+
+  setCinematic(on) {
+    if (on && this.root.classList.contains('is-title')) return; // başlangıç ekranında olmaz
+    if (on === this.cinematic) return;
+    this.cinematic = on;
+    this.root.classList.toggle('is-cinematic', on);
+    this.game.events.emit('ui:setCinematic', on);
   }
 
   /** İnşa çubuğu büyüyüp küçüldükçe (ör. yapı listesi açılınca) sütunların alt sınırını günceller. */

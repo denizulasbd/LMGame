@@ -17,8 +17,8 @@
   <p>Geliştirme aracı: <code>python3 tools/serve.py</code> çalışırken <code>/tools/art-preview.html</code> adresinden açılır. Yapılar 5 kat büyütülmüş çizilir.</p>
   <div id="root"></div>
   <script type="module">
-    import { getStructureSprite, getConstructionSiteSprite } from '../src/art/sprites/index.js';
-    import { getIconSprite, getBackpackSprite, getNoteSprite, getBubbleSprite, getHeldToolSprite } from '../src/art/ui/index.js';
+    import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite, getBoatSprite, getGazeboLayer, getFestivalDecorSprite, getFlowerCrownSprite } from '../src/art/sprites/index.js';
+    import { getIconSprite, getBackpackSprite, getNoteSprite, getBubbleSprite, getHeldToolSprite, getCarrySprite } from '../src/art/ui/index.js';
     import { getCharacterSprite } from '../src/art/sprites/index.js';
     import { getTileSprite, getObjectSprite, getEdgeSprite } from '../src/art/tiles/index.js';
     import { TILE_TYPES } from '../src/data/tiles.js';
@@ -49,6 +49,195 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 15. aşama: meslek kıyafetleri (Çırak sade, Kalfa aksesuar, Usta tam kostüm), zanaat rozetleri, usta işi eserler ---
+    {
+      const KITS = [
+        ['lumberjack', 'Oduncu'], ['farmer', 'Çiftçi'], ['miner', 'Madenci / Taşçı'], ['healer', 'Şifacı'], ['baker', 'Fırıncı / Aşçı'],
+        ['shepherd', 'Çoban'], ['fisher', 'Balıkçı'], ['builder', 'Yapı Ustası'], ['artisan', 'Zanaatkâr'], ['scholar', 'Bilge'],
+      ];
+      const person = { hair: 'short', hairColor: 'brown', skin: 'medium', shirt: 'teal', pants: 'navy' };
+      const look = (outfit, extra = {}) => ({ child: false, coat: false, bag: false, outfit, ...extra });
+      for (const [kit, name] of KITS) {
+        show(`Meslek kıyafeti: ${name} (Çırak · Kalfa · Usta; Usta arkadan, yandan, yürürken ve paltolu)`, [
+          ['Çırak', getCharacterSprite(person, 'down', 'idle0', look(null))],
+          ['Kalfa', getCharacterSprite(person, 'down', 'idle0', look(`${kit}:2`))],
+          ['Kalfa yandan', getCharacterSprite(person, 'right', 'walk0', look(`${kit}:2`))],
+          ['Usta', getCharacterSprite(person, 'down', 'idle0', look(`${kit}:3`))],
+          ['Usta arkadan', getCharacterSprite(person, 'up', 'walk1', look(`${kit}:3`))],
+          ['Usta yandan', getCharacterSprite(person, 'right', 'walk0', look(`${kit}:3`))],
+          ['Usta sola', getCharacterSprite(person, 'left', 'idle0', look(`${kit}:3`))],
+          ['Usta oturur', getCharacterSprite(person, 'down', 'sit0', look(`${kit}:3`))],
+          ['Usta paltolu', getCharacterSprite(person, 'down', 'idle0', look(`${kit}:3`, { coat: true }))],
+        ], 6);
+      }
+      const people = [
+        { hair: 'long', hairColor: 'blonde', skin: 'light', shirt: 'rose', pants: 'denim' },
+        { hair: 'spiky', hairColor: 'black', skin: 'deep', shirt: 'mustard', pants: 'brown' },
+        { hair: 'bun', hairColor: 'auburn', skin: 'tan', shirt: 'lavender', pants: 'navy' },
+      ];
+      show('Usta kostümleri farklı sakinlerde (saç, ten, giysi rengi)', people.flatMap((p, i) =>
+        ['lumberjack', 'miner', 'healer', 'baker'].map((kit) => [`${i + 1}: ${kit}`, getCharacterSprite(p, 'down', 'idle0', look(`${kit}:3`))])
+      ), 6);
+      show('Zanaat rozetleri ve usta işi eserler (simgeler)', ['badgeBronze', 'badgeSilver', 'badgeGold', 'masterpiece', 'handshake', 'mwChest', 'mwFigure', 'mwStatue', 'mwLoaf', 'mwRug', 'mwElixir'].map((n) => [n, getIconSprite(n)]), 10);
+      show('Balonlar: barışma (el sıkışma) ve usta işi eser', ['handshake', 'masterpiece'].map((n) => [n, getBubbleSprite(n)]), 8);
+    }
+
+    // --- 14. aşama: mevsim festivallerinin süslemeleri, kervan teknesi, yeni simgeler ve anı balonu ---
+    show('Mevsim festivali süslemeleri: Çiçek Şenliği (kemer, sepet), Panayır (sofra, flama iki kare), Hasat Bayramı (dev sepet, kabak, şıra fıçısı)', [
+      ['çiçek kemeri', getFestivalDecorSprite('flowerArch')],
+      ['çiçek sepeti', getFestivalDecorSprite('flowerBasket')],
+      ['ziyafet sofrası', getFestivalDecorSprite('feastTable')],
+      ...[0, 1].map((f) => [`flama ${f}`, getFestivalDecorSprite('flagPole', { frame: f })]),
+      ['hasat sepeti', getFestivalDecorSprite('harvestBasket')],
+      ['kabak', getFestivalDecorSprite('pumpkin')],
+      ['şıra fıçısı', getFestivalDecorSprite('ciderBarrel')],
+    ], 5);
+    show('Işıklar Gecesi: kardan adam üç kademede yükselir; Çiçek Şenliği saç çiçekleri', [
+      ...[0, 1, 2].map((stage) => [`kardan adam ${stage + 1}/3`, getFestivalDecorSprite('snowman', { stage })]),
+      ...[0, 1, 2].map((v) => [`saç çiçeği ${v + 1}`, getFlowerCrownSprite(v)]),
+    ], 8);
+    show('Büyük İhracat Seferi: kervan teknesi (altın şeritli yelken), boş / yüklü, sola giden', [
+      ...[0, 1].map((f) => [`kervan ${f}`, getBoatSprite('right', false, f, true)]),
+      ['kervan yüklü', getBoatSprite('right', true, 0, true)],
+      ['sola, yüklü', getBoatSprite('left', true, 1, true)],
+    ], 6);
+    show('Yeni simgeler: dört festival, toplanma zili, sabah sisi, gök gürültülü fırtına; anı balonu', [
+      ...['blossom', 'sunfair', 'harvest', 'snowman', 'bell', 'mist', 'thunder'].map((n) => [n, getIconSprite(n)]),
+      ['anı balonu', getBubbleSprite('memory')],
+    ], 10);
+
+    // --- 13. aşama: peyzaj, kasaba yadigârları, lüks mallar ve yeni arayüz simgeleri ---
+    show('Kiraz Çiçeği Ağacı (1x1): ilkbahar, yaz, sonbahar, kış (yaprakları oyunda rüzgârla savrulur)', SEASONS.map((season) => [NAMES[season], getStructureSprite('cherryTree', { season })]), 6);
+    show('Ahşap Çardak (2x2): tam görünüm, oyundaki iki katman (arka: döşeme ve banklar / ön: direkler ve çatı), kış', [
+      ['çardak', getStructureSprite('gazebo', {})],
+      ['arka katman', getGazeboLayer('back')],
+      ['ön katman', getGazeboLayer('front')],
+      ['kış', getStructureSprite('gazebo', { season: 'winter' })],
+    ], 4);
+    show('Mermer Kemer (1x1, altından geçilir) ve Çiçekli Çit (yanındakilerle birleşir)', [
+      ['kemer', getStructureSprite('marbleArch', {})],
+      ['kemer kış', getStructureSprite('marbleArch', { season: 'winter' })],
+      ['çit tek', getStructureSprite('flowerFence', {})],
+      ['sol uç', getStructureSprite('flowerFence', { connect: { right: true } })],
+      ['orta', getStructureSprite('flowerFence', { connect: { left: true, right: true } })],
+      ['sağ uç', getStructureSprite('flowerFence', { connect: { left: true } })],
+      ['dikey', getStructureSprite('flowerFence', { connect: { up: true, down: true } })],
+      ['köşe', getStructureSprite('flowerFence', { connect: { right: true, down: true } })],
+      ['kış', getStructureSprite('flowerFence', { connect: { left: true, right: true }, season: 'winter' })],
+    ], 6);
+    show('Belediye Konağı ve kasaba yadigârları: hiç yok, iki yadigâr, dördü kaidelerde, Ebedi Ateş (turkuaz fenerler), gece', [
+      ['yadigârsız', getStructureSprite('townHall', { frame: 1 })],
+      ['küre + boynuz', getStructureSprite('townHall', { frame: 1, relics: 0b00011 })],
+      ['dört yadigâr', getStructureSprite('townHall', { frame: 1, relics: 0b01111 })],
+      ['hepsi', getStructureSprite('townHall', { frame: 0, relics: 0b11111 })],
+      ['hepsi gece', getStructureSprite('townHall', { frame: 2, relics: 0b11111, windowsLit: true })],
+    ], 4);
+    show('Yadigâr ve lüks mal simgeleri: Güneş Saati Küresi, Bereket Boynuzu, Lonca Mührü, Denizci Pusulası, Ebedi Ateş, baharat sandığı, ipek ve mermer; arşiv, fotoğraf, sabitleme', ['relicSun', 'relicHorn', 'relicSeal', 'relicCompass', 'relicFlame', 'spice', 'silk', 'chart', 'camera', 'pin'].map((n) => [n, getIconSprite(n)]), 10);
+
+    // --- 12. aşama: Bilgelik Evi, Büyük Ticaret Limanı ve tekne, üç aşamalı Kasaba Harikası, yeni simgeler ---
+    show('Bilgelik Evi (3x3): flama dalgalanır, Bilge çalışırken kubbeden dürbün uzanır, gece kitaplıklar yanar, kış', [
+      ...[0, 1, 2].map((f) => [`flama ${f}`, getStructureSprite('academy', { frame: f })]),
+      ['Bilge çalışıyor', getStructureSprite('academy', { active: true, frame: 1 })],
+      ['gece', getStructureSprite('academy', { windowsLit: true, frame: 2 })],
+      ['kış', getStructureSprite('academy', { season: 'winter' })],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(3, 3, stage, 'academy')]),
+    ], 4);
+    show('Büyük Ticaret Limanı (3x2): su sağda / solda, tekne yanaşınca vinç sandık indirir (iki kare), gece feneri, kış, şantiye', [
+      ['su sağda', getStructureSprite('harbor', {})],
+      ['su solda', getStructureSprite('harbor', { orientation: 'left' })],
+      ...[0, 1].map((f) => [`vinç ${f}`, getStructureSprite('harbor', { active: true, frame: f })]),
+      ['gece', getStructureSprite('harbor', { lit: true })],
+      ['kış', getStructureSprite('harbor', { season: 'winter' })],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(3, 2, stage, 'harbor')]),
+    ], 4);
+    show('Ticaret teknesi (30x22): boş / yüklü, iki kare (yelken şişer, flama, köpük), sola giden', [
+      ...[0, 1].map((f) => [`boş ${f}`, getBoatSprite('right', false, f)]),
+      ...[0, 1].map((f) => [`yüklü ${f}`, getBoatSprite('right', true, f)]),
+      ['sola, yüklü', getBoatSprite('left', true, 0)],
+    ], 6);
+    show('Kasaba Harikası (4x4): Temel, Gövde, Görkemli Kule; gece (mangallar, pencereler, çan odası feneri), kış', [
+      ...[1, 2, 3].map((stage) => [`aşama ${stage}`, getStructureSprite('wonder', { wonderStage: stage, frame: 1 })]),
+      ...[1, 2, 3].map((stage) => [`aşama ${stage} gece`, getStructureSprite('wonder', { wonderStage: stage, windowsLit: true, frame: 2 })]),
+      ['kış', getStructureSprite('wonder', { wonderStage: 3, season: 'winter' })],
+    ], 3);
+    show('Harika: aşama sürerken iskele ve yükselen yapı (4 kademe), ilk şantiye', [
+      ...[0, 1, 2, 3].map((step) => [`Gövde ${step + 1}/4`, getStructureSprite('wonder', { wonderStage: 1, scaffold: true, step })]),
+      ...[0, 1, 2, 3].map((step) => [`Kule ${step + 1}/4`, getStructureSprite('wonder', { wonderStage: 2, scaffold: true, step, frame: step })]),
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(4, 4, stage, 'wonder')]),
+    ], 3);
+    show('Yeni simgeler: kitap (Bilgelik), dişli (araştırma), tekne (liman), harika, altın (hazine)', ['book', 'gears', 'boat', 'wonder', 'coin'].map((n) => [n, getIconSprite(n)]), 10);
+
+    // --- 11. aşama: hayvanlar, Şifacı Kulübesi, sağlık ve olay simgeleri ---
+    show('Tavşanlar (9x8): oturma, zıplama, kemirme; gri kürk, kışın beyaz; sola bakan', [
+      ...['sit', 'hop0', 'hop1', 'eat'].map((p) => [p, getRabbitSprite(p, 'right', 0)]),
+      ['gri', getRabbitSprite('sit', 'right', 1)],
+      ['kış', getRabbitSprite('sit', 'right', 0, true)],
+      ['kış zıplama', getRabbitSprite('hop1', 'left', 0, true)],
+    ], 8);
+    show('Geyikler (16x16): dişi ve boynuzlu erkek; ayakta, yürüme, otlama, yatma', [
+      ...['stand', 'walk0', 'walk1', 'graze', 'lie'].map((p) => [`dişi ${p}`, getDeerSprite(p, 'right', false)]),
+      ...['stand', 'walk1', 'graze', 'lie'].map((p) => [`erkek ${p}`, getDeerSprite(p, 'left', true)]),
+    ], 6);
+    show('Kasaba kedileri (10x8): tekir, sarman, kara-beyaz; oturma, yürüme, kıvrılıp uyuma', [0, 1, 2].flatMap((v) =>
+      ['sit', 'walk0', 'walk1', 'sleep'].map((p) => [`${['tekir', 'sarman', 'kara-beyaz'][v]} ${p}`, getCatSprite(p, 'right', v)])
+    ), 7);
+    show('Kasaba köpekleri (12x10): kahverengi ve alacalı; oturma, yürüme, uyuma', [0, 1].flatMap((v) =>
+      ['sit', 'walk0', 'walk1', 'sleep'].map((p) => [`${['kahverengi', 'alacalı'][v]} ${p}`, getDogSprite(p, v ? 'left' : 'right', v)])
+    ), 7);
+    show('Şifacı Kulübesi (2x2): boşta, kazan kaynıyor (iki kare), gece, kış, şantiye', [
+      ['boşta', getStructureSprite('healerHut', {})],
+      ['kazan 0', getStructureSprite('healerHut', { active: true, frame: 0 })],
+      ['kazan 1', getStructureSprite('healerHut', { active: true, frame: 1 })],
+      ['gece', getStructureSprite('healerHut', { windowsLit: true })],
+      ['kış', getStructureSprite('healerHut', { season: 'winter' })],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(2, 2, stage, 'healerHut')]),
+    ], 6);
+    show('Sağlık ve olay simgeleri: şifalı ot, iksir, hasta, fırtına, kurt, hazine haritası, pati', ['herb', 'remedy', 'sick', 'storm', 'wolf', 'map', 'paw'].map((n) => [n, getIconSprite(n)]), 10);
+    show('Yeni balonlar ve alet: hapşırma, ateş, şifalı ot; havan eli', [
+      ...['sneeze', 'fever', 'herb'].map((n) => [n, getBubbleSprite(n)]),
+      ['havan eli', getHeldToolSprite('pestle', false)],
+    ], 8);
+
+    // --- 10. aşama: işlenmiş mallar, koyun ağılı ve koyunlar, yel değirmeni ve fırın, demir madeni, belediye ---
+    show('İşlenmiş mallar ve kasaba seviyesi armaları (HUD)', ['wool', 'iron', 'bread', 'tierHamlet', 'tierVillage', 'tierTown', 'tierCity'].map((n) => [n, getIconSprite(n)]), 10);
+    show('Taşınan yükler ve yeni aletler', [
+      ...['wool', 'iron', 'bread'].map((r) => [`yük: ${r}`, getCarrySprite(r)]),
+      ['fırın küreği', getHeldToolSprite('peel', false)],
+      ['çoban değneği', getHeldToolSprite('crook', false)],
+      ['değnek (sola)', getHeldToolSprite('crook', true)],
+    ], 8);
+    show('Koyunlar (12x9) ve kuzu (9x7): ayakta, yürüme, otlama (çiğneme), uyku; sola bakan', [
+      ...['stand', 'walk0', 'walk1', 'graze0', 'graze1', 'sleep'].map((p) => [p, getSheepSprite(p, 'right')]),
+      ['sola', getSheepSprite('stand', 'left')],
+      ['sola otlar', getSheepSprite('graze0', 'left')],
+      ...['stand', 'walk1', 'graze0', 'sleep'].map((p) => [`kuzu ${p}`, getSheepSprite(p, 'right', true)]),
+    ], 8);
+    show('Koyun Ağılı (3x3): tam görsel, oyundaki iki katman (arka / ön çit), mevsimler', [
+      ...SEASONS.map((season) => [`ağıl ${NAMES[season]}`, getStructureSprite('sheepFarm', { season })]),
+      ['arka katman', getSheepFarmLayer('back', 'summer')],
+      ['ön katman', getSheepFarmLayer('front', 'summer')],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(3, 3, stage, 'sheepFarm')]),
+    ], 4);
+    show('Yel Değirmeni ve Fırın (3x3): kanatlar 6 karede çeyrek tur döner', [0, 1, 2, 3, 4, 5].map((f) => [`kanat ${f}`, getStructureSprite('mill', { sailFrame: f })]), 4);
+    show('Değirmen: fırın yanıyor, gece, kış', [
+      ['fırın alevi 0', getStructureSprite('mill', { sailFrame: 2, active: true, frame: 0 })],
+      ['fırın alevi 1', getStructureSprite('mill', { sailFrame: 3, active: true, frame: 1 })],
+      ['gece (pencere)', getStructureSprite('mill', { sailFrame: 4, windowsLit: true })],
+      ['kış', getStructureSprite('mill', { sailFrame: 1, season: 'winter' })],
+    ], 4);
+    show('Demir Madeni (3x3): boşta, vagon raylarda gidip gelir (çalışırken), gece feneri, kış', [
+      ['boşta', getStructureSprite('ironMine', {})],
+      ...[0, 1, 2, 3].map((f) => [`vagon ${f}`, getStructureSprite('ironMine', { active: true, frame: f })]),
+      ['gece', getStructureSprite('ironMine', { lit: true })],
+      ['kış', getStructureSprite('ironMine', { season: 'winter' })],
+    ], 4);
+    show('Belediye Konağı (3x3): bayrak dalgalanır, gece pencereler ve fenerler yanar, kış', [
+      ...[0, 1, 2].map((f) => [`bayrak ${f}`, getStructureSprite('townHall', { frame: f })]),
+      ['gece', getStructureSprite('townHall', { windowsLit: true, frame: 1 })],
+      ['kış', getStructureSprite('townHall', { season: 'winter' })],
+      ...[0, 1, 2].map((stage) => [`şantiye ${stage}`, getConstructionSiteSprite(3, 3, stage, 'townHall')]),
+    ], 4);
 
     // --- 9. aşama: çocuklar, palto ve sırt çantası, balonlar, ekipman, Zanaat Atölyesi ---
     const looks = [
@@ -247,7 +436,7 @@
       ['çanta yandan', getBackpackSprite('right')],
       ...['P', 'p', 'i', 'a', 'O'].map((c) => [`nota ${c}`, getNoteSprite(c)]),
     ], 8);
-    show('HUD simgeleri', ['sound', 'mute', 'smile', 'frown', 'coin', 'spring', 'summer', 'autumn', 'winter', 'snow', 'star', 'starEmpty'].map((n) => [n, getIconSprite(n)]), 10);
+    show('HUD simgeleri', ['wood', 'stone', 'food', 'wool', 'iron', 'bread', 'sound', 'mute', 'smile', 'frown', 'coin', 'spring', 'summer', 'autumn', 'winter', 'snow', 'star', 'starEmpty'].map((n) => [n, getIconSprite(n)]), 10);
     show('Hava simgeleri', ['sun', 'cloud', 'rain', 'firefly', 'moon', 'journal'].map((n) => [n, getIconSprite(n)]), 10);
   </script>
 </body>

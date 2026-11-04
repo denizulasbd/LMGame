@@ -2,6 +2,7 @@
 // haritanın kenarındaki yoldan yürüterek getirir. NE ZAMAN geleceğine EventSystem karar verir
 // (sabah 08:00, boş yatak + yeterli yiyecek + yüksek refah; bkz. data/town.js -> IMMIGRATION).
 import { Character } from '../entities/Character.js';
+import { compoundName } from '../utils/names.js';
 import { RESIDENT_POOL, EXTRA_NAMES, APPEARANCE_PARTS, TRAITS, NEED_KEYS } from '../data/characters.js';
 import { clashesWithOwn } from '../ai/TraitProfile.js';
 
@@ -80,7 +81,7 @@ export class PopulationSystem {
     if (available.length > 0) return structuredClone(this.rng.pick(available));
 
     const freeNames = EXTRA_NAMES.filter((n) => !taken.has(n));
-    const name = freeNames.length ? this.rng.pick(freeNames) : `${this.rng.pick(EXTRA_NAMES)} ${taken.size + 1}`;
+    const name = freeNames.length ? this.rng.pick(freeNames) : compoundName(this.rng, EXTRA_NAMES, taken);
     // İki özellik; birbirinin zıddı olanlar (Çalışkan ve Uykucu gibi) aynı kişide bulunmaz
     const traitKeys = [];
     for (const key of this.rng.shuffle(Object.keys(TRAITS))) {

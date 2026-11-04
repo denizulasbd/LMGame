@@ -4,8 +4,13 @@
 // src/systems/CraftingSystem.js'te; etkileri BehaviorSystem (iş hızı), NeedsSystem (üşüme, yol
 // yorgunluğu) ve HeatingSystem (üşüme balonu) uygular.
 //
+// 10. aşama — gerçek üretim zinciri: alet demirden, palto ve çanta yünden yapılır.
 //   slot     : hangi yuvaya takılır
-//   cost     : üretimde stoktan harcanan kaynak
+//   cost     : asıl tarif: üretimde stoktan harcanan kaynak (demir / yün içerir)
+//   material : asıl tarifin özel malzemesi (bunu üreten yapı: Demir Madeni / Koyun Ağılı)
+//   fallbackCost : eski usul tarif (9. aşamanın odun / taş / yiyecek maliyeti). Kasabada henüz o malzemeyi
+//              üreten tamamlanmış bir yapı yoksa kullanılır; böylece erken oyunda atölye tıkanmaz.
+//              Üreten yapı varsa zanaatkâr malzemenin gelmesini bekler (yedek tarif daha pahalıdır).
 //   work     : üretim süresi (oyun dakikası × iş hızı)
 //   workSpeed: kuşananın üretim ve inşaat hızı çarpanı
 //   coldProtection : kışın dışarıda üşümenin etkisini bu oranda azaltır (0,6 = %60 daha az üşür)
@@ -24,7 +29,9 @@ export const EQUIPMENT = {
     shortName: 'Alet',
     icon: 'sturdyTool',
     description: 'Çelik başlı, sağlam saplı alet takımı: tüm üretim ve inşaat hızı +%25.',
-    cost: { wood: 4, stone: 4 },
+    cost: { iron: 2, wood: 2 },
+    material: 'iron',
+    fallbackCost: { wood: 4, stone: 4 },
     work: 70,
     workSpeed: 1.25,
   },
@@ -33,8 +40,10 @@ export const EQUIPMENT = {
     name: 'Kalın Kışlık Palto',
     shortName: 'Palto',
     icon: 'winterCoat',
-    description: 'Kürk yakalı kalın palto: kışın dışarıda %60 daha az üşür.',
-    cost: { wood: 6, food: 4 },
+    description: 'Yün kumaştan, kürk yakalı kalın palto: kışın dışarıda %60 daha az üşür.',
+    cost: { wool: 3, wood: 1 },
+    material: 'wool',
+    fallbackCost: { wood: 6, food: 4 },
     work: 80,
     coldProtection: 0.6,
   },
@@ -43,8 +52,10 @@ export const EQUIPMENT = {
     name: 'Sırt Çantası',
     shortName: 'Çanta',
     icon: 'backpack',
-    description: 'Deri sırt çantası: uzak yollarda %40 daha az yorulur, çalışma verimi +%15.',
-    cost: { wood: 5, food: 3 },
+    description: 'Kalın yün keçeden, ahşap çerçeveli sırt çantası: uzak yollarda %40 daha az yorulur, çalışma verimi +%15.',
+    cost: { wool: 2, wood: 2 },
+    material: 'wool',
+    fallbackCost: { wood: 5, food: 3 },
     work: 60,
     workSpeed: 1.15,
     travelFatigue: 0.6,

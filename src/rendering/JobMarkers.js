@@ -13,6 +13,13 @@ export function drawJobMarkers(renderer, jobs, time) {
     const x = job.x * 16 + 3;
     const y = job.y * 16 + offsetY + bob;
     renderer.drawImage(getIconSprite(JOBS[job.type].marker), x, y);
+    // (14. aşama) Öncelikli hedef: simgenin yanında yanıp sönen kırmızı ünlem
+    if (job.urgent && Math.floor(time * 4) % 2 === 0) {
+      renderer.fillRect(x + 10, y - 1, 2, 5, '#1b1423');
+      renderer.fillRect(x + 10, y + 5, 2, 2, '#1b1423');
+      renderer.fillRect(x + 10, y, 1, 3, '#e8463c');
+      renderer.fillRect(x + 10, y + 5, 1, 1, '#e8463c');
+    }
 
     if (job.progress > 0) {
       const ratio = Math.min(1, job.progress / job.work);

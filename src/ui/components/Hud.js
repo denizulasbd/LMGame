@@ -2,22 +2,82 @@
 // kasaba kaynakları (miktar / depo kapasitesi, değişince +5 / -10 vurgusu), Kaydet / Yükle /
 // Yeni Harita düğmeleri, ses aç / kapat, kasaba refahı (ortalama mutluluk), nüfus / konut kapasitesi,
 // etkin kasaba bonusları ve farenin altındaki karonun bilgisi.
+// 10. aşama: kasaba adının yanında seviye unvanı ("Yeşilvadi Kasabası"), seviye armaları (4 pip, üzerine
+// gelince sonraki seviyenin koşulları) ve kaynak çubuğunun altında işlenmiş mallar satırı (Yün, Demir, Ekmek):
+// özet görünümde yalnızca simge ve miktar, açılınca depo kapasitesi ve her malın üreticileri ile bugünkü
+// üretimi. Seçim tarayıcıda hatırlanır.
 import { CONFIG } from '../../config.js';
 import { getDayPhase } from '../../systems/TimeSystem.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
-import { RESOURCES, RESOURCE_KEYS } from '../../data/resources.js';
+import { RESOURCES, RESOURCE_KEYS, BASE_RESOURCE_KEYS, GOODS_KEYS } from '../../data/resources.js';
+import { BUILDINGS } from '../../data/buildings.js';
+import { TOWN_TIERS } from '../../data/town.js';
 import { JOBS } from '../../data/jobs.js';
 import { describeWeather } from '../../data/weather.js';
+import { currentSeasonFestival } from '../../systems/SeasonFestivalSystem.js';
+import { isRallyActive } from '../../systems/RallySystem.js';
 import { IMMIGRATION, TOWN_NAME_MAX_LENGTH } from '../../data/town.js';
 import { getSeason } from '../../data/seasons.js';
 import { heatingPerDay } from '../../systems/HeatingSystem.js';
-import { townHappiness, happinessLevel, housingCapacity, immigrationStatus, activeBuffs } from '../../systems/TownStatus.js';
+import {
+  townHappiness,
+  happinessLevel,
+  housingCapacity,
+  immigrationStatus,
+  activeBuffs,
+  townTier,
+  nextTownTier,
+  tierChecks,
+  formatTownTitle,
+  foodSupply,
+} from '../../systems/TownStatus.js';
 import { el } from '../dom.js';
 
 const DELTA_MERGE_MS = 500; // bu süre içindeki değişiklikler tek vurguda toplanır
 const DELTA_VISIBLE_MS = 1400;
 const WELFARE_REFRESH_MS = 500; // refah ve nüfus bilgisinin yenilenme aralığı
 const CONFIRM_TIMEOUT_MS = 6000; // "Yeni Harita" onayı bu sürede verilmezse vazgeçilir
+const GOODS_PREF_KEY = 'lmgame.hud.goodsExpanded'; // işlenmiş mallar satırı açık mı (tarayıcıda hatırlanır)
+
+function readGoodsPreference() {
+  try {
+    return localStorage.getItem(GOODS_PREF_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeGoodsPreference(expanded) {
+  try {
+    localStorage.setItem(GOODS_PREF_KEY, expanded ? '1' : '0');
+  } catch {
+    /* depolama erişilemez: tercih yalnızca bu oturumda geçerli */
+  }
+}
+
+/**
+ * Bir malın üreticileri ve bugünkü üretimi: { count, today }. Üretim yapısının ana ürünü (producedToday),
+ * yan ürünü (extraToday) ve işleme yapısının ürünü sayılır.
+ */
+function producersOf(state, resource) {
+  let count = 0;
+  let today = 0;
+  for (const b of state.buildings) {
+    if (!b.functional) continue;
+    const def = BUILDINGS[b.type];
+    if (def.production?.resource === resource) {
+      count++;
+      today += b.producedToday;
+    } else if (def.production?.extra?.[resource] !== undefined) {
+      count++;
+      today += b.extraToday ?? 0;
+    } else if (def.processing?.output[resource] !== undefined) {
+      count++;
+      today += b.producedToday;
+    }
+  }
+  return { count, today };
+}
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -33,6 +93,7 @@ export class Hud {
     this.lastControls = '';
 
     this.build(game);
+    this.setGoodsExpanded(readGoodsPreference());
 
     game.events.on('map:hover', (info) => {
       this.hoverInfo = info;
@@ -73,7 +134,15 @@ export class Hud {
     const buffs = activeBuffs(state);
     const heating = Math.round(heatingPerDay(state) * 10) / 10;
     const freezing = state.heating.cold && heating > 0;
-    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}`;
+    // 11. aşama: hasta sakinler, seferdekiler, yaklaşan fırtına ve hasarlı yapılar da bu satırda
+    const sick = state.characters.filter((c) => c.illness).map((c) => c.name);
+    const away = state.characters.filter((c) => c.away).map((c) => c.name);
+    const storm = state.dilemma?.storm;
+    const damaged = state.buildings.filter((b) => b.damaged).map((b) => b.name);
+    // 14. aşama: duyurulan / süren mevsim festivali ve toplanma zili
+    const festival = currentSeasonFestival(state);
+    const rally = isRallyActive(state) ? Math.ceil((state.rally.until - state.totalMinutes) / 10) : 0;
+    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}`;
     if (buffKey !== this.lastBuffs) {
       this.lastBuffs = buffKey;
       const chips = buffs.map((b) =>
@@ -91,10 +160,81 @@ export class Hud {
           ])
         );
       }
+      const chip = (icon, text, title, cls = '') =>
+        el('span', { className: `buff-chip${cls}`, title }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
+      if (festival?.stage === 'announced') chips.unshift(chip(festival.festival.icon, `${festival.festival.name} · 15:00`, festival.festival.announce, ' is-festival'));
+      if (rally) chips.push(chip('bell', 'Meydanda toplanma', 'Toplanma Zili çaldı: sakinler bir saatliğine meydanda'));
+      if (sick.length) chips.push(chip('sneeze', `${sick.length} hasta`, `Üşütenler: ${sick.join(', ')}. Şifacı Kulübesi'nde iksirle hemen iyileşirler.`, ' is-freezing'));
+      if (away.length) chips.push(chip('map', `Seferde: ${away.length}`, `Keşif seferindekiler: ${away.join(', ')}`));
+      if (storm) {
+        const label = storm.kind === 'wolves' ? 'Kurt tehlikesi' : 'Fırtına yaklaşıyor';
+        chips.push(chip(storm.kind === 'wolves' ? 'wolf' : 'storm', `${label}${storm.fortified ? ' · hazır' : ''}`, storm.fortified ? 'Kasaba güçlendirildi' : 'Güçlendirilmedi: hasar verebilir', storm.fortified ? '' : ' is-freezing'));
+      }
+      if (damaged.length) chips.push(chip('storm', `${damaged.length} hasarlı yapı`, `Onarılmalı: ${damaged.join(', ')}`, ' is-freezing'));
       this.buffs.hidden = chips.length === 0;
       this.buffs.replaceChildren(...chips);
-      this.resources.wood.box.title = heating > 0 ? `Odun · ısınma gideri −${heating}/gün` : 'Odun';
+      this.resources.wood.box.title = heating > 0 ? `Odun · ısınma gideri −${heating}/gün\n${RESOURCES.wood.hint}` : `Odun\n${RESOURCES.wood.hint}`;
     }
+  }
+
+  /**
+   * Kasaba adı + unvan ("Yeşilvadi Kasabası"), seviye armaları ve ipucunda sonraki seviyenin koşulları.
+   */
+  renderTitle(state) {
+    const tier = townTier(state);
+    const next = nextTownTier(state);
+    const checks = next ? tierChecks(state, next) : [];
+    const key = `${state.townName}|${tier.tier}|${checks.map((c) => `${c.current}:${c.ok}`).join(',')}`;
+    if (key === this.lastTitle) return;
+    this.lastTitle = key;
+    this.townName.textContent = formatTownTitle(state.townName, tier);
+    this.tierIcon.src = getIconDataURL(tier.icon);
+    this.tierPips.forEach((pip, i) => pip.classList.toggle('is-on', i < tier.tier));
+    const lines = [`${tier.name} (${tier.tier}/${TOWN_TIERS.length})`];
+    if (next) {
+      lines.push(`Sonraki seviye: ${next.name}`);
+      for (const c of checks) lines.push(`${c.ok ? '✓' : '✗'} ${c.text}`);
+      lines.push(`Ödül: ${next.perks.join(' · ')}`);
+    } else {
+      lines.push('En yüksek seviye: kasaban artık gelişmiş bir şehir!');
+    }
+    lines.push('', 'Adı değiştirmek için tıkla · Ayrıntılar: Hedefler (G)');
+    this.townName.title = lines.join('\n');
+    this.tierBadge.title = lines.slice(0, -2).join('\n');
+    this.tierBadge.classList.toggle('is-ready', Boolean(next) && checks.every((c) => c.ok));
+  }
+
+  /** İşlenmiş mallar satırı: açıkken her malın üreticileri ve bugünkü üretimi; Yiyecek ipucunda toplam besin. */
+  renderGoodsDetail(state) {
+    const supply = Math.floor(foodSupply(state));
+    const bread = state.resources.bread ?? 0;
+    this.resources.food.box.title = bread > 0
+      ? `Yiyecek · kilerdeki toplam besin değeri ${supply} (${bread} ekmek × 2,5 dahil)\n${RESOURCES.food.hint}`
+      : `Yiyecek\n${RESOURCES.food.hint}`;
+    for (const key of GOODS_KEYS) {
+      const slot = this.resources[key];
+      if (RESOURCES[key].treasury) {
+        // Kasaba Hazinesi (12. aşama): depo sınırı yok; liman teknelerinin getirdiği altın
+        const trade = state.trade;
+        const text = trade.shipments ? `${trade.shipments} sefer · +${trade.goldEarned}` : 'liman teknesi bekleniyor';
+        if (slot.detail.textContent !== text) slot.detail.textContent = text;
+        slot.box.title = `${RESOURCES[key].longName}: ${state.resources[key]} (sınırsız)\n${RESOURCES[key].hint}\n${trade.shipments ? `${trade.shipments} ihracat seferinden toplam ${trade.goldEarned} altın` : 'Henüz ihracat yapılmadı'}`;
+        continue;
+      }
+      const { count, today } = producersOf(state, key);
+      const text = count ? `${count} yapı · bugün +${today}` : 'üreten yapı yok';
+      if (slot.detail.textContent !== text) slot.detail.textContent = text;
+      slot.box.title = `${RESOURCES[key].longName}: ${state.resources[key]}/${state.storageCapacity}\n${RESOURCES[key].hint}\n${count ? `${count} yapı üretiyor, bugün +${today}` : 'Henüz üreten yapı yok'}`;
+    }
+  }
+
+  setGoodsExpanded(expanded) {
+    this.goodsExpanded = expanded;
+    this.goodsRow.classList.toggle('is-expanded', expanded);
+    this.goodsToggle.textContent = expanded ? '▾' : '▸';
+    this.goodsToggle.title = expanded ? 'İşlenmiş malları özet görünüme al' : 'İşlenmiş malları aç: depo ve üreticiler';
+    for (const key of GOODS_KEYS) this.resources[key].last = ''; // miktar metni yeniden yazılsın
+    writeGoodsPreference(expanded);
   }
 
   /** Kayıt var mı / ne zaman alındı: "Yükle" düğmesini ve bilgi satırını günceller. */
@@ -145,12 +285,13 @@ export class Hud {
       if (e.key === 'Escape') this.editTownName(false, false);
     });
     this.townInput.addEventListener('blur', () => this.editTownName(false, true));
-    this.townRow = el('div', { className: 'hud-row hud-town' }, [
-      el('img', { className: 'hud-icon', src: getAnyIconURL('heart'), alt: '' }),
-      this.townName,
-      this.townInput,
-    ]);
-    this.lastTownName = '';
+    // Seviye: arması ve dört pip (Mezra, Köy, Kasaba, Gelişmiş Şehir)
+    this.tierIcon = el('img', { className: 'hud-icon hud-tier-icon', alt: '' });
+    this.tierPips = TOWN_TIERS.map(() => el('span', { className: 'tier-pip' }));
+    this.tierBadge = el('span', { className: 'hud-tier' }, this.tierPips);
+    this.townRow = el('div', { className: 'hud-row hud-town' }, [this.tierIcon, this.townName, this.townInput, this.tierBadge]);
+    this.lastTitle = '';
+    this.lastTownName = null;
     this.game = game;
     this.seasonIcon = el('img', { className: 'hud-icon', alt: '' });
     this.seasonText = el('span', { className: 'hud-season' });
@@ -215,15 +356,29 @@ export class Hud {
     this.statusText = el('span');
 
     this.resources = {};
-    const resourceBoxes = RESOURCE_KEYS.map((key) => {
+    const resourceBox = (key, goods) => {
       const amount = el('span', { className: 'resource-amount' });
-      const box = el('span', { className: 'resource', title: RESOURCES[key].name }, [
+      const detail = el('span', { className: 'resource-detail' });
+      const box = el('span', { className: `resource${goods ? ' is-goods' : ''}`, title: `${RESOURCES[key].name}\n${RESOURCES[key].hint}` }, [
         el('img', { className: 'resource-icon', src: getIconDataURL(RESOURCES[key].icon), alt: '' }),
-        amount,
+        el('span', { className: 'resource-text' }, [
+          el('span', { className: 'resource-name', text: RESOURCES[key].name }),
+          amount,
+          ...(goods ? [detail] : []),
+        ]),
       ]);
-      this.resources[key] = { box, amount, last: '' };
+      this.resources[key] = { box, amount, detail, last: '' };
       return box;
-    });
+    };
+    const resourceBoxes = BASE_RESOURCE_KEYS.map((key) => resourceBox(key, false));
+    // İşlenmiş mallar: özet (simge + miktar) ya da açık (kapasite, üreticiler, bugünkü üretim)
+    this.goodsToggle = button('▸', '', () => this.setGoodsExpanded(!this.goodsExpanded));
+    this.goodsToggle.classList.add('goods-toggle');
+    this.goodsRow = el('div', { className: 'hud-row hud-goods' }, [
+      this.goodsToggle,
+      el('span', { className: 'goods-label', text: 'Mallar' }),
+      ...GOODS_KEYS.map((key) => resourceBox(key, true)),
+    ]);
 
     this.element = el('div', { className: 'panel hud ui-interactive' }, [
       this.townRow,
@@ -233,6 +388,7 @@ export class Hud {
       this.welfareRow,
       this.buffs,
       el('div', { className: 'hud-row hud-resources' }, resourceBoxes),
+      this.goodsRow,
       this.saveButtons,
       this.confirmRow,
       this.saveInfo,
@@ -260,23 +416,25 @@ export class Hud {
 
   render(game) {
     this.weatherState = game.state.weather;
-    if (game.state.townName !== this.lastTownName) {
-      this.lastTownName = game.state.townName;
-      this.townName.textContent = game.state.townName;
-    }
     this.renderTime(game.state.time);
     const now = performance.now();
-    if (now - this.welfareAt >= WELFARE_REFRESH_MS) {
+    // Unvan ve seviye ipucu yarım saniyede bir (ad değişince hemen) yenilenir
+    if (now - this.welfareAt >= WELFARE_REFRESH_MS || game.state.townName !== this.lastTownName) {
       this.welfareAt = now;
+      this.lastTownName = game.state.townName;
+      this.renderTitle(game.state);
       this.renderWelfare(game.state);
+      this.renderGoodsDetail(game.state);
     }
     for (const key of RESOURCE_KEYS) {
       const slot = this.resources[key];
-      const text = `${game.state.resources[key]}/${game.state.storageCapacity}`;
+      const treasury = Boolean(RESOURCES[key].treasury); // hazinenin (altın) depo sınırı yok
+      const compact = (RESOURCES[key].processed && !this.goodsExpanded) || treasury;
+      const text = compact ? String(game.state.resources[key]) : `${game.state.resources[key]}/${game.state.storageCapacity}`;
       if (text !== slot.last) {
         slot.last = text;
         slot.amount.textContent = text;
-        slot.box.classList.toggle('is-full', game.state.resources[key] >= game.state.storageCapacity);
+        slot.box.classList.toggle('is-full', !treasury && game.state.resources[key] >= game.state.storageCapacity);
         slot.box.classList.toggle('is-empty', game.state.resources[key] === 0);
       }
     }

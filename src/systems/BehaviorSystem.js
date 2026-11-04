@@ -9,6 +9,14 @@
 // "İçeride" geçen etkinlikler (uyku, evde yemek, yeni eve yerleşme): karakter kapıdan girip
 // görünmez olur, bir sonraki planda kapıdan çıkar.
 //
+// 10. aşama: üretim yapılarının yan ürünü (ağılda yiyecek, madende taş: production.extra), değirmen-fırında
+// işleme (processing: 1 yiyecek -> 1 ekmek), öğünlerin yiyecek değeriyle ödenmesi (önce ekmek: "taze ekmekle
+// yemek", biraz da keyif verir) ve belediyenin iş verimi (townWorkMultiplier).
+//
+// 11. aşama: hasta sakinin şifacıda tedavisi (heal: içeride bir iksir, bitince Dinçlik), şifacının işi (doğadan ot
+// toplama gatherHerbs, kulübede iksir hazırlama brew), hastalığın / Dinçliğin çalışma hızına etkisi, Zanaat Loncası
+// fermanının üretim ve deneyim çarpanı ve keşif seferi (expedition: harita kenarına yürüyüp bir gün görünmez olur).
+//
 // Uyku bitince 'character:woke' { character } yayınlanır (FamilySystem Mutlu Yuva'yı verir). Oyuncu bir
 // çalışanı işten çıkarınca ('ui:dismissWorker') görevi biter ve o yapıda bir daha çalışmaz
 // ('ui:rehireWorker' geri alır).
@@ -16,16 +24,26 @@ import { ACTIVITIES, LEAVING_HOME_LABEL, BREAK_PREFIX, LOVE_BUBBLES, RIVAL_BUBBL
 import { RESOURCES, MEAL_FOOD_COST } from '../data/resources.js';
 import { EQUIPMENT } from '../data/equipment.js';
 import { RECONCILE } from '../data/family.js';
+import { PROJECT_WORDS } from '../data/buildings.js';
 import { DEFAULT_WORK } from '../data/characters.js';
 import { Brain } from '../ai/Brain.js';
 import { isBedtime, isWorkHours } from '../ai/TraitProfile.js';
 import { WARM_MEAL } from '../data/town.js';
-import { buffMultiplier } from './TownStatus.js';
+import { townWorkMultiplier, civicProductionMultiplier, civicXpMultiplier } from './TownStatus.js';
+import { healthWorkMultiplier } from './HealthSystem.js';
+import { researchProductionMultiplier, researchBuildMultiplier, healSpeedMultiplier } from './ResearchSystem.js';
+import { spiceWorkMultiplier, relicProductionMultiplier, relicXpMultiplier } from './Luxury.js';
+import { buffMultiplier, isBuffActive } from './TownStatus.js';
+import { LUXURY_GOODS } from '../data/luxury.js';
 import { workBonus, addExperience } from './SkillSystem.js';
 import { isFreezing } from './HeatingSystem.js';
 import { equipmentWorkSpeed } from './Equipment.js';
 import { arePartners } from './RelationshipSystem.js';
 import { HEATING } from '../data/seasons.js';
+import { JOBS } from '../data/jobs.js';
+import { ACTIVITY_SKILLS } from '../data/skills.js';
+
+const JOBS_MAX = Object.fromEntries(Object.entries(JOBS).map(([k, v]) => [k, v.maxWorkers]));
 import { clamp } from '../utils/math.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
@@ -47,12 +65,30 @@ export class BehaviorSystem {
     this.jobs = services.jobs;
     this.relationships = services.relationships;
     this.crafting = services.crafting;
+    this.health = services.health;
+    this.research = services.research;
+    this.state = game.state;
     this.brain = new Brain(world, rng, services);
     this.unsubscribers = [
       game.events.on('world:blocked', ({ tiles }) => this.onTilesBlocked(tiles)),
       game.events.on('ui:dismissWorker', ({ buildingId, characterId }) => this.dismissWorker(buildingId, characterId)),
       game.events.on('ui:rehireWorker', ({ buildingId, characterId }) => this.rehireWorker(buildingId, characterId)),
+      game.events.on('ui:pinWorker', ({ buildingId, characterId }) => this.pinWorker(buildingId, characterId)),
+      game.events.on('ui:unpinWorker', ({ characterId }) => this.unpinWorker(characterId)),
+      game.events.on('building:removed', (building) => {
+        for (const c of this.world.characters) if (c.workplaceId === building.id) c.workplaceId = null;
+      }),
+      game.events.on('expedition:depart', ({ ids, until, exit }) => this.departExpedition(ids, until, exit)),
       // Şenlik başlayınca boş zamanı olanlar elindekini bırakıp şenliğe katılır
+      // (14. aşama) Toplanma Zili: uyanık herkes elindekini bırakır (uyuyanlar uyanmaz)
+      game.events.on('rally:rung', () => {
+        for (const c of this.world.characters) {
+          const kind = c.task ? ACTIVITIES[c.task.activity].kind : 'idle';
+          if (c.visible && !c.away && INTERRUPTIBLE_KINDS.has(kind)) this.endTask(c);
+        }
+      }),
+      // (14. aşama) Öncelikli hedef: boştaki en uygun işçiler hemen oraya koşar
+      game.events.on('job:urgent', ({ job }) => this.sendToUrgentJob(job)),
       game.events.on('festival:started', () => {
         for (const c of this.world.characters) {
           const kind = c.task ? ACTIVITIES[c.task.activity].kind : 'idle';
@@ -73,6 +109,11 @@ export class BehaviorSystem {
 
   updateCharacter(c, tick) {
     this.updateBubble(c, tick.simDt);
+    // Keşif seferi: harita dışındayken hiçbir şey yapmaz; vakit gelince kenardan geri döner
+    if (c.away?.stage === 'away') {
+      if (this.state.totalMinutes >= c.away.until) this.returnFromExpedition(c);
+      return;
+    }
     const task = c.task;
 
     if (!task) {
@@ -244,9 +285,12 @@ export class BehaviorSystem {
     const building = task.buildingId ? this.world.getBuilding(task.buildingId) : null;
     let label = activity.label;
     if (task.activity === 'sleep' && task.nap) label = activity.napLabel;
-    if (task.activity === 'meal' && building?.type === 'storage') label = activity.storageLabel;
-    if (task.activity === 'build' && building?.project) label = building.project.kind === 'repair' ? 'Onarıyor: {target}' : 'Yükseltiyor: {target}';
+    if (task.activity === 'meal' && building?.type === 'storage') label = task.bread ? activity.breadStorageLabel : activity.storageLabel;
+    else if (task.activity === 'meal' && task.bread) label = activity.breadLabel;
+    if (task.activity === 'bake' && building?.idle) label = activity.idleLabel;
+    if (task.activity === 'build' && building?.project) label = `${PROJECT_WORDS[building.project.kind].doing}: {target}`;
     if (task.activity === 'craft') label = building?.craft ? label.replace('{item}', this.crafting.currentItemName(building)) : activity.idleLabel;
+    if (task.activity === 'teach' && !this.state.research?.active) label = activity.teachLabel;
     if (task.item) label = label.replace('{item}', EQUIPMENT[task.item].name);
     if (building) label = label.replace('{target}', building.name);
     return task.onBreak ? `${BREAK_PREFIX}${label}` : label;
@@ -266,6 +310,16 @@ export class BehaviorSystem {
 
     if (activity.indoor) {
       this.enterIndoor(c, task, building);
+      return;
+    }
+    if (task.activity === 'expedition') {
+      // Harita kenarına vardı: bir gün boyunca ufukta kaybolur
+      c.away = { ...(c.away ?? {}), stage: 'away' };
+      c.visible = false;
+      c.pose = 'hidden';
+      c.bubble = null;
+      c.activityLabel = activity.label;
+      c.task = null;
       return;
     }
 
@@ -302,10 +356,19 @@ export class BehaviorSystem {
       }
       building.meals -= 1;
     }
-    if (task.activity === 'meal' && !this.economy.spend({ food: MEAL_FOOD_COST })) {
-      // Yolda stok bitti: kapıdan çıkıp başka çare arasın
+    if (task.activity === 'heal' && !this.health.takeRemedy(building)) {
+      // Kapıya vardığında iksir kalmamış: başka çare arar
       this.endTask(c);
       return;
+    }
+    if (task.activity === 'meal') {
+      const paid = this.economy.consumeFood(MEAL_FOOD_COST);
+      if (!paid.ok) {
+        // Yolda stok bitti: kapıdan çıkıp başka çare arasın
+        this.endTask(c);
+        return;
+      }
+      task.bread = paid.bread; // taze ekmekle yemek: biraz da keyif verir
     }
     c.visible = false;
     c.pose = 'hidden';
@@ -327,6 +390,11 @@ export class BehaviorSystem {
     const minutes = tick.gameMinutes;
     task.elapsed += minutes;
     this.applyEffects(c, activity.effects, minutes, activity);
+    if (task.bread) this.applyEffects(c, activity.breadEffects, minutes, activity);
+    if (task.activity === 'school' && task.phase === 'perform') {
+      const school = this.world.getBuilding(task.buildingId);
+      if (school) this.research.learn(c, school, minutes);
+    }
     if (task.activity === 'sleep') this.applyHomeComfort(c, minutes);
 
     let bubbles = activity.bubbles;
@@ -343,9 +411,21 @@ export class BehaviorSystem {
       if (task.activity === 'moveIn') c.newcomer = false;
       if (task.activity === 'relocate') c.relocating = false;
       if (task.activity === 'equip') this.crafting.equip(c, task.item);
+      if (task.activity === 'heal') this.health.cure(c, this.world.getBuilding(task.buildingId));
       if (task.activity === 'sleep' && !task.nap) this.events.emit('character:woke', { character: c });
+      // (15. aşama) Üretim yapısında bir mesai bitti: ustalar nadiren usta işi bir eser çıkarır (CraftsmanshipSystem)
+      if (activity.kind === 'work' && task.workBuildingId) {
+        this.events.emit('work:finished', { character: c, activity: task.activity, building: this.world.getBuilding(task.workBuildingId) });
+      }
       // Sıcak yemek bir süre tok tutar (NeedsSystem acıkmayı yavaşlatır)
-      if (task.activity === 'innMeal') c.buffs.warmMeal = this.world.state.totalMinutes + WARM_MEAL.hours * 60;
+      if (task.activity === 'innMeal') {
+        c.buffs.warmMeal = this.world.state.totalMinutes + WARM_MEAL.hours * 60;
+        // (13. aşama) Handa baharat ve kahve varken yiyen sakin bir süre hızlı çalışır ve yürür
+        if (isBuffActive(this.state, LUXURY_GOODS.spiceCrate.buff)) {
+          c.buffs.spiced = this.state.totalMinutes + LUXURY_GOODS.spiceCrate.personal.hours * 60;
+          if (c.visible) c.showBubble('sparkle', 2);
+        }
+      }
       this.endTask(c);
     }
   }
@@ -397,11 +477,23 @@ export class BehaviorSystem {
     const work = c.profile.work;
     c.needs.energy = clamp(c.needs.energy - DEFAULT_WORK.energyCost * work.fatigue * minutes, 0, 100);
     c.needs.fun = clamp(c.needs.fun - DEFAULT_WORK.funCost * minutes, 0, 100);
-    // Kasaba bonusları (Alet Paketi, Şenlik Coşkusu) herkesi, meslek ustalığı ustayı, kişisel ekipman
-    // (Sağlam Alet, Sırt Çantası) da kuşananı hızlandırır
-    const amount =
-      minutes * work.speed * buffMultiplier(this.world.state, 'workSpeed') * workBonus(c, task.activity) * equipmentWorkSpeed(c);
-    addExperience(this.events, c, task.activity, minutes);
+    // Kasaba bonusları (Alet Paketi, Şenlik Coşkusu, Lonca Ustaları) ve Belediye Konağı herkesi, meslek
+    // ustalığı ustayı, kişisel ekipman (Sağlam Alet, Sırt Çantası) da kuşananı hızlandırır
+    // Üşüten sakin %35 yavaş, şifacıdan Dinçlik alan %15 hızlı çalışır
+    let amount =
+      minutes *
+      work.speed *
+      townWorkMultiplier(this.state) *
+      workBonus(c, task.activity) *
+      equipmentWorkSpeed(c) *
+      healthWorkMultiplier(c, this.state.totalMinutes) *
+      spiceWorkMultiplier(c, this.state.totalMinutes);
+    // Zanaat Loncası fermanı üretim yapılarında (inşaat ve toplama emirleri hariç) verimi artırır
+    if (task.workBuildingId) amount *= civicProductionMultiplier(this.state);
+    // (12. aşama) Mimarlık Loncası inşaatı, yükseltmeyi ve onarımı hızlandırır
+    // (13. aşama) Kraliyet Mimarları fermanı inşaatları 3 kat hızlandırır
+    if (task.jobId && task.activity === 'build') amount *= researchBuildMultiplier(this.state) * buffMultiplier(this.state, 'buildSpeed');
+    addExperience(this.events, c, task.activity, minutes, civicXpMultiplier(this.state) * relicXpMultiplier(this.state));
 
     if (task.jobId) {
       const job = this.jobs.getJob(task.jobId);
@@ -413,7 +505,11 @@ export class BehaviorSystem {
     }
 
     const building = this.world.getBuilding(task.workBuildingId);
-    if (!building || building.frozen) return false; // tarla dondu: iş biter
+    if (!building || building.frozen || building.damaged) return false; // tarla dondu / fırtına yıktı: iş biter
+    if (building.definition.academy) return this.research.work(building, amount);
+    // (12. aşama) Gelişmiş Çarklar: oduncu, taş ocağı, maden ve değirmende verim +%20
+    amount *= researchProductionMultiplier(this.state, building.type);
+    if (building.definition.apothecary) return this.apothecaryWork(building, task, amount * (task.activity === 'brew' ? healSpeedMultiplier(this.state) : 1));
     if (building.definition.kitchen) {
       this.cook(building, amount);
       return true;
@@ -423,14 +519,114 @@ export class BehaviorSystem {
       if (working) c.activityLabel = this.performLabel(c, task, ACTIVITIES[task.activity]);
       return working;
     }
+    // (13. aşama) Güneş Saati Küresi üretim ve işleme yapılarında verimi artırır
+    if (building.definition.processing) return this.process(building, amount * relicProductionMultiplier(this.state));
     const production = building?.definition.production;
     if (!production) return false;
-    // Verim (oduncu için çevredeki ağaç sayısı) StructureSystem'de hesaplanır
-    building.productionBuffer += (production.perHour / 60) * amount * building.efficiency;
+    // Verim (oduncu için çevredeki ağaç sayısı) StructureSystem'de hesaplanır; Bereket Boynuzu yiyeceği artırır
+    building.productionBuffer += (production.perHour / 60) * amount * building.efficiency * relicProductionMultiplier(this.state, production.resource);
     const whole = Math.floor(building.productionBuffer);
     if (whole > 0) {
       building.productionBuffer -= whole;
-      building.producedToday += this.economy.add(production.resource, whole);
+      building.producedToday += this.economy.produce(production.resource, whole, building);
+    }
+    // Yan ürün (ağılda süt-peynir, madende taş): aynı verimle, kendi küsuratıyla
+    for (const [resource, perHour] of Object.entries(production.extra ?? {})) {
+      const buffers = (building.extraBuffers ??= {});
+      buffers[resource] = (buffers[resource] ?? 0) + (perHour / 60) * amount * building.efficiency * relicProductionMultiplier(this.state, resource);
+      const extra = Math.floor(buffers[resource]);
+      if (extra > 0) {
+        buffers[resource] -= extra;
+        const added = this.economy.produce(resource, extra, building);
+        building.extraToday = (building.extraToday ?? 0) + added;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Şifacı: doğada şifalı ot toplar (gatherHerbs; çevresinde ağaç azsa yavaş) ya da kulübede otları havanda
+   * döverek iksir hazırlar (brew). Toplanacak / dövülecek bir şey kalmayınca iş biter.
+   */
+  apothecaryWork(building, task, amount) {
+    const spec = building.definition.apothecary;
+    if (task.activity === 'gatherHerbs') {
+      if (building.herbs >= spec.maxHerbs) return false;
+      const factor = building.natureFactor ?? 1; // çevredeki ağaçlar (StructureSystem hesaplar)
+      building.herbs = Math.min(spec.maxHerbs, building.herbs + (spec.herbsPerHour / 60) * amount * factor);
+      return true;
+    }
+    if (building.remedies >= spec.maxRemedies || building.herbs < spec.herbsPerRemedy) return false;
+    building.productionBuffer += (spec.brewPerHour / 60) * amount;
+    while (building.productionBuffer >= 1) {
+      if (building.remedies >= spec.maxRemedies || building.herbs < spec.herbsPerRemedy) {
+        building.productionBuffer = 0;
+        return false;
+      }
+      building.productionBuffer -= 1;
+      building.herbs -= spec.herbsPerRemedy;
+      building.remedies += 1;
+      building.producedToday += 1;
+      this.events.emit('apothecary:brewed', { building });
+    }
+    return true;
+  }
+
+  /** Keşif seferine çıkanlar ellerindekini bırakıp harita kenarına yürür (yol yoksa hemen yola koyulur). */
+  departExpedition(ids, until, exit) {
+    for (const id of ids) {
+      const c = this.world.getCharacter(id);
+      if (!c) continue;
+      this.endTask(c);
+      c.away = { stage: 'leaving', until, exit };
+      this.startPlan(c, { activity: 'expedition', spot: exit, duration: 0 }, this.state.time.hour);
+      if (c.task?.activity !== 'expedition') {
+        // Kenara yol bulunamadı: doğrudan sefere çıkmış sayılır
+        this.endTask(c);
+        c.away.stage = 'away';
+        c.visible = false;
+        c.pose = 'hidden';
+        c.insideBuildingId = null;
+        c.activityLabel = ACTIVITIES.expedition.label;
+      }
+    }
+  }
+
+  /** Keşif seferinden dönüş: harita kenarında belirir, evine yürür; ganimeti DilemmaSystem dağıtır. */
+  returnFromExpedition(c) {
+    const exit = c.away.exit ?? this.world.findEntryTile(this.rng);
+    c.away = null;
+    c.visible = true;
+    c.pose = 'stand';
+    c.task = null;
+    if (exit) {
+      const p = this.world.standPoint(exit.x, exit.y);
+      c.x = p.x;
+      c.y = p.y;
+    }
+    c.needs.fun = clamp(c.needs.fun + 15, 0, 100);
+    c.showBubble('sparkle', 2.4);
+    this.events.emit('expedition:memberReturned', { character: c });
+  }
+
+  /**
+   * İşleme (değirmen-fırın): saatte perHour kez stoktan malzemeyi (1 yiyecek) alıp ürünü (1 ekmek) üretir.
+   * Malzeme biter ya da ürünün deposu dolarsa iş biter (fırıncı başka işe geçer; yapı boşta kalır).
+   */
+  process(building, amount) {
+    const processing = building.definition.processing;
+    building.productionBuffer += (processing.perHour / 60) * amount;
+    while (building.productionBuffer >= 1) {
+      const room = Object.keys(processing.output).every((r) => this.economy.room(r) > 0);
+      if (!room || !this.economy.spend(processing.input)) {
+        building.productionBuffer = 0;
+        return false;
+      }
+      building.productionBuffer -= 1;
+      for (const [resource, value] of Object.entries(processing.output)) {
+        building.producedToday += this.economy.produce(resource, value, building);
+      }
+      this.events.emit('processing:made', { building });
     }
     return true;
   }
@@ -444,7 +640,8 @@ export class BehaviorSystem {
     if (building.meals >= kitchen.capacity) return;
     building.mealBuffer += (kitchen.perHour / 60) * amount;
     while (building.mealBuffer >= 1 && building.meals < kitchen.capacity) {
-      if (!this.economy.spend({ food: kitchen.foodPerMeal })) {
+      // Aşçı önce ham yiyecek kullanır; kilerde yalnızca ekmek kaldıysa onu da sofraya koyar
+      if (!this.economy.consumeFood(kitchen.foodPerMeal, { preferRaw: true }).ok) {
         building.mealBuffer = 0;
         return;
       }
@@ -551,6 +748,7 @@ export class BehaviorSystem {
     const c = this.world.getCharacter(characterId);
     if (!building || !c || building.excludedWorkers.has(c.id)) return;
     building.excludedWorkers.add(c.id);
+    if (c.workplaceId === building.id) c.workplaceId = null; // işten çıkarılan sabit çalışanın sabitlemesi kalkar
     if (c.task?.workBuildingId === building.id) {
       this.endTask(c);
       c.activityLabel = 'İşten çıkarıldı, kendine başka iş arıyor';
@@ -565,6 +763,64 @@ export class BehaviorSystem {
     const c = this.world.getCharacter(characterId);
     if (!building || !c || !building.excludedWorkers.delete(c.id)) return;
     this.events.emit('toast', { text: `${c.name} yeniden ${building.name} işinde çalışabilir`, tone: 'info', icon: 'hammer' });
+  }
+
+  /** Öncelikli işaretlenen hedefe boştaki (dinlenen, gezen, sohbet eden) en uygun yetişkinleri gönderir. */
+  sendToUrgentJob(job) {
+    const skill = ACTIVITY_SKILLS[job.type];
+    const idle = this.world.characters.filter((c) => {
+      if (c.isChild || !c.visible || c.away || c.newcomer || c.workplaceId !== null) return false;
+      const kind = c.task ? ACTIVITIES[c.task.activity].kind : 'idle';
+      return kind === 'leisure' || kind === 'idle' || kind === 'social';
+    });
+    const score = (c) => Math.hypot(c.tileX - job.x, c.tileY - job.y) - (skill ? (c.skills?.[skill] ?? 0) / 100 : 0);
+    idle.sort((a, b) => score(a) - score(b));
+    const sent = idle.slice(0, Math.max(0, JOBS_MAX[job.type] - job.assignees.length));
+    for (const c of sent) {
+      this.endTask(c);
+      c.activityLabel = 'Öncelikli işe koşuyor';
+    }
+    return sent;
+  }
+
+  /**
+   * (13. aşama) Oyuncu bir sakini bu iş yerine sabitler: yalnızca orada çalışır, başka işlere kaymaz. Başka bir işte
+   * çalışıyorsa elindekini bırakıp gelir; yapı sabit olmayan çalışanlarla doluysa biri yer açar.
+   */
+  pinWorker(buildingId, characterId) {
+    const building = this.world.getBuilding(buildingId);
+    const c = this.world.getCharacter(characterId);
+    if (!building || !c || !building.workerSlots || c.isChild || c.workplaceId === building.id) return false;
+    const pinned = this.world.characters.filter((o) => o.workplaceId === building.id);
+    if (pinned.length >= building.workerSlots) {
+      this.events.emit('toast', { text: `${building.name}: bütün yuvalar sabit çalışanlara ayrılmış`, tone: 'warn', icon: 'pin' });
+      return false;
+    }
+    c.workplaceId = building.id;
+    building.excludedWorkers.delete(c.id);
+    // Başka bir işteyse bırakır; yapı doluysa sabit olmayan bir çalışan yer açar
+    if (c.task && ACTIVITIES[c.task.activity].kind === 'work' && c.task.workBuildingId !== building.id && c.visible) this.endTask(c);
+    if (building.workerIds.size >= building.workerSlots && !building.workerIds.has(c.id)) {
+      const loose = [...building.workerIds].map((id) => this.world.getCharacter(id)).find((o) => o && o.workplaceId !== building.id);
+      if (loose) {
+        this.endTask(loose);
+        loose.activityLabel = 'Yerini sabit çalışana bıraktı, başka iş arıyor';
+      }
+    }
+    if (c.visible) c.showBubble('sparkle', 2);
+    this.events.emit('worker:pinned', { building, character: c });
+    this.events.emit('toast', { text: `${c.name} artık yalnızca ${building.name} işinde çalışacak`, tone: 'info', icon: 'pin' });
+    return true;
+  }
+
+  unpinWorker(characterId) {
+    const c = this.world.getCharacter(characterId);
+    if (!c || c.workplaceId === null) return false;
+    const building = this.world.getBuilding(c.workplaceId);
+    c.workplaceId = null;
+    this.events.emit('worker:unpinned', { building, character: c });
+    this.events.emit('toast', { text: `${c.name} artık istediği işi seçebilir`, tone: 'info', icon: 'pin' });
+    return true;
   }
 
   nearestFreeTile(x, y) {

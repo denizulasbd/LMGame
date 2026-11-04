@@ -3,20 +3,23 @@
 //   Göç      : her sabah 08:00'de boş yatak, güvenli yiyecek stoğu ve yüksek refah varsa haritanın
 //              kenarındaki yoldan yeni sakinler gelir (en fazla IMMIGRATION.maxPopulation)
 //   Tüccar   : Pazar Yeri varsa iki üç günde bir 09:00'da sırt çantalı gezgin tüccar gelir, pazarın
-//              önünde 18:00'e kadar durur; oyuncu ona (ya da pazara) tıklayıp takas eder ('ui:trade')
+//              önünde 18:00'e kadar durur; oyuncu ona (ya da pazara) tıklayıp takas eder ('ui:trade').
+//              (10. aşama) Kasaba seviyesi arttıkça tüccar daha çok çeşit (yün, demir, ekmek, kervan) ve
+//              her maldan daha çok stok getirir; unvanı da büyür (Gezgin Tüccar -> Kervancı -> Kervanbaşı)
 //   Şenlik   : meydan / ateş / han varsa, kasabanın keyfi yüksekse ve yağmur yoksa birkaç günde bir
 //              19:00-22:00 arası şenlik olur; bitince herkes "Şenlik Coşkusu" bonusuyla uyanır
 //
 // Olayların durumu GameState.events'te (kayda girer). Yayınladığı olaylar:
 //   'festival:started' / 'festival:ended', 'merchant:arrived' / 'merchant:left', 'trade:completed',
 //   'immigration:blocked' { reason } — günlük ve ses bunları dinler.
+import { CONFIG } from '../config.js';
 import { Character } from '../entities/Character.js';
 import { IMMIGRATION, FESTIVAL, TOWN_BUFFS } from '../data/town.js';
-import { TRADE_OFFERS, MERCHANT, offersFor } from '../data/trade.js';
+import { MERCHANT, offersFor, offerStock } from '../data/trade.js';
 import { getSeason } from '../data/seasons.js';
 import { RESOURCES } from '../data/resources.js';
 import { isRainActive } from '../data/weather.js';
-import { immigrationStatus, townFun } from './TownStatus.js';
+import { immigrationStatus, townFun, townTier } from './TownStatus.js';
 import { Random } from '../utils/random.js';
 import { clamp } from '../utils/math.js';
 
@@ -45,7 +48,15 @@ export class EventSystem {
       }),
       game.events.on('building:removed', (building) => {
         if (building.type === 'market' && this.merchantState.present && !this.findMarket()) this.sendMerchantAway();
+        // Şenliğin yapıldığı yer yıkıldıysa şenlik başka bir yere taşınır, yer kalmadıysa biter
+        if (this.festival.active && this.festival.venueId === building.id) {
+          const venue = this.findVenue();
+          if (venue) this.festival.venueId = venue.id;
+          else this.endFestival();
+        }
       }),
+      // Tüccarın yolunun üstüne yapı kurulursa (sakinlerde olduğu gibi) yeni bir yoldan yürür
+      game.events.on('world:blocked', ({ tiles }) => this.onTilesBlocked(tiles)),
       game.events.on('ui:trade', ({ offerId }) => this.trade(offerId)),
     ];
 
@@ -86,7 +97,7 @@ export class EventSystem {
   tryImmigration() {
     const status = immigrationStatus(this.state);
     if (status.ok) {
-      this.population.welcomeNewcomers(Math.min(status.freeBeds, IMMIGRATION.maxPerMorning));
+      this.population.welcomeNewcomers(Math.min(status.freeBeds, status.maxPerMorning));
       return;
     }
     // Boş yatak var ama başka bir koşul tutmuyor: oyuncu nedenini bir kez görsün
@@ -127,11 +138,14 @@ export class EventSystem {
 
     const rng = this.rngFor(2);
     const index = rng.int(0, MERCHANT.names.length - 1);
+    // Kasaba büyüdükçe tüccar daha çok çeşit ve her maldan daha çok stok getirir (bu mevsimin teklifleri)
+    const tier = townTier(this.state).tier;
     m.present = true;
     m.leaving = false;
-    m.name = `Gezgin Tüccar ${MERCHANT.names[index]}`;
+    m.tier = tier;
+    m.name = `${MERCHANT.titles[tier - 1] ?? MERCHANT.titles[0]} ${MERCHANT.names[index]}`;
     m.appearance = MERCHANT.appearances[index % MERCHANT.appearances.length];
-    m.stock = Object.fromEntries(TRADE_OFFERS.map((o) => [o.id, o.stock]));
+    m.stock = Object.fromEntries(offersFor(getSeason(this.state.time.day).key, tier).map((o) => [o.id, offerStock(o, tier)]));
     const point = this.world.standPoint(entry.x, entry.y);
     m.x = point.x;
     m.y = point.y;
@@ -164,6 +178,38 @@ export class EventSystem {
     merchant.activityLabel = 'Pazar yerine yürüyor';
     this.merchant = merchant;
     this.world.visitors = [merchant];
+  }
+
+  onTilesBlocked(tiles) {
+    const merchant = this.merchant;
+    if (!merchant?.isMoving) return;
+    const blocked = new Set(tiles.map((t) => `${t.x},${t.y}`));
+    const points = merchant.remainingWaypoints();
+    const T = CONFIG.TILE_SIZE;
+    const crossing = points.some((p) => blocked.has(`${Math.floor(p.x / T)},${Math.floor(p.y / T)}`));
+    if (!crossing) return;
+    const last = points[points.length - 1];
+    if (blocked.has(`${merchant.tileX},${merchant.tileY}`)) {
+      const free = this.nearestWalkable(merchant.tileX, merchant.tileY);
+      if (free) {
+        const p = this.world.standPoint(free.x, free.y);
+        merchant.x = p.x;
+        merchant.y = p.y;
+      }
+    }
+    this.walkMerchantTo({ x: Math.floor(last.x / T), y: Math.floor(last.y / T) });
+  }
+
+  nearestWalkable(x, y) {
+    const map = this.world.map;
+    for (let r = 1; r < 8; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) === r && map.isWalkable(x + dx, y + dy)) return { x: x + dx, y: y + dy };
+        }
+      }
+    }
+    return null;
   }
 
   /** Tüccarın duracağı yer: pazarın önündeki karolardan en soldaki boş olanı. */
@@ -247,7 +293,7 @@ export class EventSystem {
   }
 
   trade(offerId) {
-    const offer = offersFor(getSeason(this.state.time.day).key).find((o) => o.id === offerId);
+    const offer = offersFor(getSeason(this.state.time.day).key, townTier(this.state).tier).find((o) => o.id === offerId);
     const m = this.merchantState;
     const warn = (text) => this.events.emit('toast', { text, tone: 'warn', icon: 'demolish' });
     if (!offer) return;
@@ -315,10 +361,17 @@ export class EventSystem {
 
   endFestival() {
     const f = this.festival;
+    const theme = f.theme ?? null;
     f.active = false;
+    f.theme = null;
+    // (14. aşama) Mevsim festivalinin kapanışını (Mevsim Coşkusu, anılar) SeasonFestivalSystem yapar
+    if (theme) {
+      this.events.emit('festival:ended', { theme });
+      return;
+    }
     for (const c of this.state.characters) c.needs.fun = clamp(c.needs.fun + FESTIVAL.afterglowFun, 0, 100);
     this.applyBuff('festival');
-    this.events.emit('festival:ended', {});
+    this.events.emit('festival:ended', { theme: null });
     this.events.emit('toast', { text: 'Şenlik sona erdi. Kasaba yarına tam motivasyonla başlayacak!', tone: 'info', icon: 'sparkle' });
   }
 }

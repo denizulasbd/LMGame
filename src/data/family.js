@@ -46,17 +46,30 @@ export const CHILD_HAIR_STYLES = ['short', 'long', 'bun', 'spiky'];
 // olasılıkla atışır. Atışmada ilişki scoreLoss puan, ikisinin keyfi funLoss düşer; aynı çift
 // cooldownMinutes boyunca yeniden atışmaz. Zıt kişilikliler sohbet ve çalışmadan yarı puan kazanır.
 export const CONFLICT = {
-  workChancePerMinute: 0.03,
-  chatChancePerMinute: 0.0008,
-  encounterChancePerMinute: 0.012,
+  // (15. aşama) Sosyal denge: 50 günlük stres koşularında 5330 atışmaya 128 barışma düşüyordu; sürtüşmeler
+  // törpülendi (olasılıklar düştü, aynı çift en az 10 saat ara verir), barışma yerleri çoğaldı
+  workChancePerMinute: 0.012,
+  chatChancePerMinute: 0.0005,
+  encounterChancePerMinute: 0.004,
   encounterRadius: 12,
-  cooldownMinutes: 180,
+  cooldownMinutes: 600,
   scoreLoss: 8,
   funLoss: 6,
   clashGainMultiplier: 0.5,
+  feudQuarrelMultiplier: 0.25, // küs çift birbirini görmezden gelir: yeniden atışma olasılığı dörtte bir
 };
 
-// Barışma: puanı below'un altında olan iki sakin akşam (eveningFrom'dan sonra) aynı handa (sıcak
-// yemek ya da han önünde sohbet) ya da şenlikte denk gelirse dakikada chancePerMinute olasılıkla
-// barışır; puanları resetTo olur
-export const RECONCILE = { below: -10, chancePerMinute: 0.03, resetTo: 12, eveningFrom: 17 };
+// Barışma: puanı below'un altında olan (küs: atışıp eksiye düşmüş) iki sakin aynı toplanma yerinde sohbet ederken dakikada chancePerMinute
+// olasılıkla barışır; puanları resetTo olur. (15. aşama) Gönül alma yerlerinde (Kasaba Hanı, Ahşap Çardak, Kamp Ateşi,
+// şenlik ve mevsim festivalleri) olasılık venueMultiplier kat (+%300) olur ve bu yerlerde kimse atışmaz.
+// Akşam (eveningFrom'dan sonra) handa sıcak yemek yiyenler de içeride barışabilir.
+export const RECONCILE = {
+  below: 0, // (15. aşama) atışıp eksiye düşen her çift küstür (eskiden yalnızca -10'un altı)
+  chancePerMinute: 0.05,
+  venueMultiplier: 4,
+  venues: ['inn', 'gazebo', 'campfire', 'festival'],
+  resetTo: 12,
+  eveningFrom: 17,
+};
+// Barışılan yer -> anı cümlesinin başı ("Han'da Deniz ile barıştı")
+export const RECONCILE_PLACES = { inn: "Han'da ", gazebo: 'Çardakta ', campfire: 'Ateş başında ', festival: 'Şenlikte ', chat: '' };

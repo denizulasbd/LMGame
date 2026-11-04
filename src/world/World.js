@@ -4,7 +4,7 @@
 import { CONFIG } from '../config.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { findPath, pathCost } from '../utils/pathfinding.js';
-import { pierLandingTiles } from './footprint.js';
+import { pierLandingTiles, accessTiles } from './footprint.js';
 
 const CARDINALS = [
   [0, -1],
@@ -27,6 +27,7 @@ export class World {
     this.landmarks = landmarks;
     this.reservations = new Map(); // "x,y" -> karakter kimliği
     this.visitors = []; // kasabalı olmayan, haritada yürüyen karakterler (tüccar)
+    this.boats = []; // nehirdeki ticaret teknesi (HarborSystem, 12. aşama; yalnızca çizim)
 
     this.pathGrid = {
       width: map.width,
@@ -101,6 +102,37 @@ export class World {
     return this.map.inBounds(x, y) && this.reachable[this.map.index(x, y)] === 1;
   }
 
+  /**
+   * Bu karolar yürünemez olsaydı (yeni yapı, yeniden büyüyen ağaç) kasabaya bağlı karolar: her karo için 1 / 0.
+   * Yerleşim kontrolü yeni yapının kendi girişini de bununla ölçer: önü yalnızca kendi ayak izinin içinden
+   * kasabaya bağlanan bir yapı, kurulunca kendi girişini koparmasın.
+   */
+  reachabilityWithout(tiles) {
+    const blocked = new Set(tiles.filter((t) => this.map.inBounds(t.x, t.y)).map((t) => this.map.index(t.x, t.y)));
+    if (blocked.size === 0) return this.reachable;
+    const seed = this.findReachabilitySeed();
+    return seed ? this.map.computeReachable(seed.x, seed.y, blocked) : new Uint8Array(this.map.width * this.map.height);
+  }
+
+  /**
+   * Bu karolar yürünemez olsaydı kasabaya bağlantısı tamamen kopacak bir yapı var mı? Bugün girişine / çalışma
+   * yerine ulaşılabilen ama sonra hiçbir giriş karosu kasabaya bağlı kalmayacak ilk yapıyı döndürür (yoksa null).
+   * Böylece yapılar arasında kapalı ceplerde kalan değirmen, maden ya da ev oluşmaz.
+   * after: (isteğe bağlı) önceden hesaplanmış reachabilityWithout(tiles) sonucu
+   */
+  wouldIsolate(tiles, after = this.reachabilityWithout(tiles)) {
+    if (after === this.reachable) return null;
+    for (const b of this.buildings) {
+      // Fener ve çiçek tarhı gibi kullanılmayan süs yapıları sayılmaz
+      if (BUILDINGS[b.type].spots === 'none') continue;
+      const access = accessTiles(b.type, b.tileX, b.tileY, b.orientation).filter((t) => this.map.inBounds(t.x, t.y));
+      const before = access.some((t) => this.isReachable(t.x, t.y));
+      if (!before) continue;
+      if (!access.some((t) => after[this.map.index(t.x, t.y)] === 1)) return b;
+    }
+    return null;
+  }
+
   // ---------------------------------------------------------------------------
   // Koordinat yardımcıları
   // ---------------------------------------------------------------------------
@@ -138,9 +170,10 @@ export class World {
   /** Haritaya yapı ekler ve kapladığı karoları doldurur (üzerindeki çakıl/kütük temizlenir). */
   addBuilding(building) {
     const { w, h } = BUILDINGS[building.type].size;
+    const passable = Boolean(BUILDINGS[building.type].walkable);
     for (let y = building.tileY; y < building.tileY + h; y++) {
       for (let x = building.tileX; x < building.tileX + w; x++) {
-        this.map.setOccupant(x, y, building.id);
+        this.map.setOccupant(x, y, building.id, passable);
         this.map.setObject(x, y, null);
       }
     }
@@ -246,7 +279,7 @@ export class World {
     } else if (kind === 'front') {
       for (let x = tileX; x < tileX + w; x++) if (usable(x, tileY + h)) spots.push({ x, y: tileY + h });
     } else if (kind === 'pier') {
-      spots = pierLandingTiles(tileX, tileY, building.orientation).filter((s) => usable(s.x, s.y));
+      spots = pierLandingTiles(tileX, tileY, building.orientation, w).filter((s) => usable(s.x, s.y));
     } else if (kind === 'adjacent') {
       spots = CARDINALS.map(([dx, dy]) => ({ x: tileX + dx, y: tileY + dy })).filter((s) => usable(s.x, s.y));
     } else if (kind === 'self') {
@@ -307,6 +340,14 @@ export class World {
           if (!inside && usable(x, y)) spots.push({ x, y });
         }
       }
+    } else if (def.gazebo) {
+      // Çardak: önündeki iki karodan içeri girilip banklara oturulur (her karo bir oturak)
+      spots = [];
+      def.gazebo.seats.forEach((seat, i) => {
+        const x = tileX + Math.min(i, w - 1);
+        const y = tileY + h;
+        if (usable(x, y)) spots.push({ x, y, seat: { x: building.x + seat.x, y: building.y + seat.y } });
+      });
     } else if (def.gatherSpots === 'terrace') {
       spots = [];
       for (let y = tileY + h; y <= tileY + h + 1; y++) {

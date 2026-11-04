@@ -1,6 +1,8 @@
 // Doğanın kendini yenilemesi: kesilen ağacın yerinde kalan kütükten zamanla fidan,
 // fidandan da yeniden ağaç çıkar; kasaba tamamen çölleşmez. Yağmur yağarken büyüme hızlanır.
 // Kayıtlar GameState.regrowth'ta tutulur: { x, y, tree, stage: 'stump'|'sapling', hours }
+// Yetişecek ağaç bir yapının girişini (ya da ona giden tek geçidi) kapatacaksa fidan gelişemez, kurur:
+// kesilen ağacın kütüğü bir değirmenin, madenin, evin önünü sonradan tıkamasın.
 import { TREE_REGROWTH } from '../data/tiles.js';
 import { RAIN_EFFECTS, isRainActive } from '../data/weather.js';
 import { getSeason } from '../data/seasons.js';
@@ -41,6 +43,11 @@ export class NatureSystem {
       } else if (entry.stage === 'sapling' && entry.hours >= TREE_REGROWTH.saplingHours) {
         // Üzerinde biri duruyorsa ağaç onun içinden çıkmasın; bir sonraki adımda tekrar dener
         if (this.world.charactersOnTile(entry.x, entry.y).length > 0) return true;
+        // Bir yapının girişini kapatacak fidan kurur (sakinler ayaklarıyla ezer)
+        if (this.world.wouldIsolate([{ x: entry.x, y: entry.y }])) {
+          map.setObject(entry.x, entry.y, null);
+          return false;
+        }
         map.setObject(entry.x, entry.y, entry.tree);
         changed = true;
         return false;

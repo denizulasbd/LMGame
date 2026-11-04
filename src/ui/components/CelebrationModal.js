@@ -1,6 +1,9 @@
-// Kasaba Anıtı tamamlanınca ('town:legendary') ekranın ortasında açılan kutlama penceresi.
+// Kasaba Anıtı tamamlanınca ('town:legendary') ve (10. aşama) kasaba seviye atlayınca ('town:tierUp')
+// ekranın ortasında açılan kutlama penceresi. Seviye penceresinde yeni unvan, açılan yapılar ve ödüller yazar.
+// (12. aşama) Kasaba Harikası tamamlanınca ('wonder:completed') altın çağ penceresi açılır.
 // Oyun durmaz; "Oynamaya Devam Et" pencereyi kapatır.
 import { getStructureSprite } from '../../art/sprites/index.js';
+import { BUILDINGS } from '../../data/buildings.js';
 import { el } from '../dom.js';
 
 export class CelebrationModal {
@@ -8,6 +11,8 @@ export class CelebrationModal {
     this.slot = 'free';
     this.art = el('canvas', { className: 'celebration-art', width: 32 * 4, height: 56 * 4 });
     this.message = el('p', { className: 'celebration-text' });
+    this.title = el('h2', { className: 'celebration-title' });
+    this.perks = el('ul', { className: 'celebration-perks' });
     const ok = el('button', { className: 'hud-btn title-btn is-primary', type: 'button', text: 'Oynamaya Devam Et', tabIndex: -1 });
     ok.addEventListener('click', () => (this.element.hidden = true));
     this.confetti = el('div', { className: 'celebration-confetti' });
@@ -17,23 +22,69 @@ export class CelebrationModal {
     this.element = el('div', { className: 'celebration ui-interactive', hidden: true }, [
       this.confetti,
       el('div', { className: 'panel celebration-panel' }, [
-        el('h2', { className: 'celebration-title', text: 'Tebrikler, Kasabanız Efsaneleşti!' }),
+        this.title,
         this.art,
         this.message,
+        this.perks,
         ok,
       ]),
     ]);
     game.events.on('town:legendary', ({ townName }) => this.show(townName, game.state));
+    game.events.on('town:tierUp', (info) => this.showTier(info, game.state));
+    game.events.on('wonder:completed', ({ townName }) => this.showWonder(townName, game.state));
   }
 
-  show(townName, state) {
+  /**
+   * Görseli tam sayı ölçekle çizer: tuval görselin ölçeklenmiş boyutunu alır, ekranda da (CSS) piksel
+   * piksel aynı boyutta görünür (oranı bozulmaz, bulanıklaşmaz).
+   */
+  drawArt(sprite, scale) {
+    this.art.width = sprite.width * scale;
+    this.art.height = sprite.height * scale;
+    this.art.style.width = `${this.art.width}px`;
+    this.art.style.height = `${this.art.height}px`;
     const ctx = this.art.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, this.art.width, this.art.height);
-    ctx.drawImage(getStructureSprite('monument', {}), 0, 0, this.art.width, this.art.height);
+    ctx.drawImage(sprite, 0, 0, this.art.width, this.art.height);
+  }
+
+  show(townName, state) {
+    this.title.textContent = 'Tebrikler, Kasabanız Efsaneleşti!';
+    this.drawArt(getStructureSprite('monument', {}), 3);
     this.message.textContent =
       `${townName}, ${state.time.day} günde ${state.characters.length} sakinli, mutlu bir kasabaya dönüştü. ` +
       'Kasaba Anıtı artık meydanın gururu. (Oynamaya devam edebilirsiniz.)';
+    this.perks.replaceChildren();
+    this.perks.hidden = true;
+    this.element.hidden = false;
+  }
+
+  /** (12. aşama) Büyük Vadi Saat Kulesi tamamlandı: altın çağ. */
+  showWonder(townName, state) {
+    this.title.textContent = 'Altın Çağ: Vadinin İncisi!';
+    this.drawArt(getStructureSprite('wonder', { wonderStage: 3, windowsLit: true, frame: 1 }), 2);
+    this.message.textContent =
+      `${townName}, ${state.time.day}. günde Büyük Vadi Saat Kulesi'ni üç aşamasıyla tamamladı. ` +
+      'Kulenin çanı artık saat başı çalıyor; vadinin dört bir yanından görünüyor.';
+    this.perks.replaceChildren(
+      ...['Kasaba refahına kalıcı +12', 'Geceleri kule bir fener gibi vadiyi aydınlatır', 'Kulenin ışığındaki sakinler kışın üşümez', 'Saat başı çan çalar'].map((text) => el('li', { text }))
+    );
+    this.perks.hidden = false;
+    this.element.hidden = false;
+  }
+
+  /** Kasaba seviye atladı: yeni unvan, açılan yapının görseli (yoksa belediye / anıt) ve ödüller. */
+  showTier({ tier, title }, state) {
+    this.title.textContent = `Kasabanız büyüdü: ${tier.name}!`;
+    const unlocked = tier.unlocks?.[0];
+    this.drawArt(getStructureSprite(unlocked ?? (tier.tier >= 4 ? 'townHall' : 'cabin'), { level: unlocked ? 1 : 2, frame: 1, sailFrame: 1 }), 2);
+    const unlocks = (tier.unlocks ?? []).map((type) => BUILDINGS[type].name);
+    this.message.textContent =
+      `${title}: ${state.characters.length} sakin, ${state.time.day}. gün. ` +
+      (unlocks.length ? `Artık ${unlocks.join(', ')} inşa edebilirsin.` : 'Kasabanın şanı uzak diyarlara yayıldı.');
+    this.perks.replaceChildren(...tier.perks.map((text) => el('li', { text })));
+    this.perks.hidden = false;
     this.element.hidden = false;
   }
 }

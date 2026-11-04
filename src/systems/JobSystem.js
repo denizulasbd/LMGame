@@ -43,6 +43,18 @@ export class JobSystem {
     return this.jobs.find((j) => (j.buildingId ? j.buildingId === occupant && occupant !== 0 : j.x === x && j.y === y)) ?? null;
   }
 
+  /**
+   * (14. aşama) Öncelikli toplama / kırma: oyuncu seç aracıyla bir ağaca, kayaya ya da çalıya tıklar. Emir yoksa verilir
+   * ve öne alınır; boştaki işçiler ilk iş olarak oraya koşar ('job:urgent' { job }). Dönüş: iş ya da null.
+   */
+  prioritize(x, y) {
+    const job = this.jobAt(x, y) ?? this.designate(x, y);
+    if (!job || job.type === 'build') return null;
+    job.urgent = true;
+    this.events.emit('job:urgent', { job });
+    return job;
+  }
+
   /** Bu karoya toplama emri verilebilir mi? */
   isHarvestable(x, y) {
     const building = this.world.getBuilding(this.world.map.getOccupant(x, y));
@@ -195,6 +207,22 @@ export class JobSystem {
    * Bu üretim binasındaki son boş yer için daha deneyimli (en az Kalfa) ve şu an çalışmayan biri
    * varsa acemi beklesin: işi usta alsın. Son yer değilse ya da usta yoksa false.
    */
+  /** Bu yapıya sabitlenmiş ama şu an içinde çalışmayan sakin sayısı (onların yuvası boş bekletilir). */
+  reservedForPinned(building) {
+    return this.world.characters.filter((o) => o.workplaceId === building.id && !building.workerIds.has(o.id) && !o.away).length;
+  }
+
+  /** Sabitlenmiş sakinin işi: kendi iş yerinde boş bir çalışma yeri (yapı kullanılamıyorsa null). */
+  pinnedWork(c, origin) {
+    const building = this.world.getBuilding(c.workplaceId);
+    if (!building || !building.functional || !building.workerSlots || building.frozen || building.idle || building.damaged) return null;
+    if (building.workerIds.size >= building.workerSlots && !building.workerIds.has(c.id)) return null;
+    const free = this.world.getSpots(building).filter((s) => !this.world.isReserved(s.x, s.y, c.id));
+    if (free.length === 0) return null;
+    const spot = free.reduce((best, s) => (dist(s, origin) < dist(best, origin) ? s : best));
+    return this.world.findPath(origin, spot) ? { building, spot } : null;
+  }
+
   expertWaiting(c, building) {
     const def = BUILDINGS[building.type];
     if (building.workerIds.size < building.workerSlots - 1) return false;
@@ -202,7 +230,9 @@ export class JobSystem {
     if (!skill) return false;
     const mine = skillLevel(c, skill).level;
     return this.world.characters.some((other) => {
-      if (other === c || !other.visible || other.newcomer || other.isChild || building.excludedWorkers.has(other.id)) return false;
+      // Hasta ya da seferdeki usta beklenmez: yoksa son yuva o iyileşene kadar boş kalırdı
+      if (other === c || !other.visible || other.newcomer || other.isChild || other.illness || other.away || building.excludedWorkers.has(other.id)) return false;
+      if (other.workplaceId !== null && other.workplaceId !== undefined && other.workplaceId !== building.id) return false; // başka yere sabitli
       if (other.task?.workBuildingId || other.task?.jobId) return false; // zaten çalışıyor
       const level = skillLevel(other, skill).level;
       return level >= 2 && level > mine;
@@ -217,6 +247,8 @@ export class JobSystem {
    */
   findWorkFor(c, origin) {
     if (c.isChild) return null;
+    // (13. aşama) Oyuncunun sabitlediği sakin yalnızca kendi iş yerinde çalışır (orası boştaysa dinlenir)
+    if (c.workplaceId !== null && c.workplaceId !== undefined) return this.pinnedWork(c, origin);
     const candidates = [];
     const freeSpot = (spots) => {
       const free = spots.filter((s) => !this.world.isReserved(s.x, s.y, c.id));
@@ -234,7 +266,8 @@ export class JobSystem {
       const full = job.assignees.length >= JOBS[job.type].maxWorkers && !job.assignees.includes(c.id);
       if (full || !this.isValid(job)) continue;
       const spot = freeSpot(this.spotsFor(job));
-      if (spot) candidates.push({ priority: JOBS[job.type].priority, d: dist(spot, origin) - preference(job.type), job, spot });
+      // Öncelikli işaretlenen hedef her işten önce gelir
+      if (spot) candidates.push({ priority: job.urgent ? -1 : JOBS[job.type].priority, d: dist(spot, origin) - preference(job.type), job, spot });
     }
     for (const building of this.world.getCompleted()) {
       const def = BUILDINGS[building.type];
@@ -242,6 +275,7 @@ export class JobSystem {
       if (!workers || (building.workerIds.size >= workers && !building.workerIds.has(c.id))) continue;
       if (building.frozen || building.idle) continue; // kışın donmuş tarlada, malzemesiz atölyede iş yok
       if (building.excludedWorkers.has(c.id)) continue; // oyuncu bu işten çıkardı
+      if (!building.workerIds.has(c.id) && this.reservedForPinned(building) >= workers - building.workerIds.size) continue; // yuvalar sabit çalışanlara ayrılmış
       if (!building.workerIds.has(c.id) && this.expertWaiting(c, building)) continue;
       const spot = freeSpot(this.world.getSpots(building));
       if (spot) candidates.push({ priority: PRODUCTION_PRIORITY, d: dist(spot, origin) - preference(def.workActivity), building, spot });

@@ -3,8 +3,12 @@
 //   - drawClouds : bulutların yere düşen yumuşak gölgeleri (dünya katmanı, gece örtüsünün altında)
 //   - drawRain   : ekranda çapraz düşen piksel yağmur damlaları (ekran katmanı); kışın bunların
 //                  yerine yavaşça salınarak süzülen lapa lapa kar taneleri çizilir
+//   (14. aşama) drawMist  : sabah sisi: haritada yavaşça süzülen yumuşak beyaz şeritler, suyun üstünde daha yoğun
+//               drawLightning: gök gürültülü fırtınada ekranda anlık beyaz şimşek parıltısı (çift çakma); şimşek
+//               çaktığında takeLightning() true döner ve sahne gök gürültüsünü duyurur ('weather:lightning')
 // Animasyon gerçek zamanla işler, oyun duraklasa da yağmur yağmaya devam eder.
 import { CONFIG } from '../config.js';
+import { WEATHER_TYPES } from '../data/weather.js';
 import { Random } from '../utils/random.js';
 
 const T = CONFIG.TILE_SIZE;
@@ -21,6 +25,11 @@ const SHADOW_COLOR = '18, 28, 56';
 // Gölge bulutları: deterministik; dünya üstünde süzülür ve kenarlardan taşınca öbür uçtan girer
 const CLOUD_COUNT = 11;
 const CLOUD_SHAPE_SEED = 90210;
+// Şimşek: iki çakma arası oyun dakikası (hızdan bağımsız: fırtına başına birkaç şimşek) ve parıltının sönme hızı
+const LIGHTNING_GAP = [8, 20];
+const FLASH_DECAY = 3.2;
+// Sis şeritleri
+const MIST_BANDS = 9;
 
 export class WeatherEffects {
   constructor() {
@@ -28,6 +37,9 @@ export class WeatherEffects {
     this.drops = [];
     this.splashes = [];
     this.splashBudget = 0;
+    this.flash = 0; // şimşek parıltısı 0-1
+    this.lightningTimer = 3;
+    this.lightningPending = false;
     this.clouds = Array.from({ length: CLOUD_COUNT }, (_, i) => ({
       x: this.rng.next(),                // dünya genişliğine oranla başlangıç
       y: this.rng.next(),
@@ -40,10 +52,21 @@ export class WeatherEffects {
   }
 
   /** Gerçek zaman adımı: damlaları ve sıçramaları ilerletir, yenilerini üretir. */
-  update(dt, weather, camera, renderer, map, season = 'summer') {
+  update(dt, weather, camera, renderer, map, season = 'summer', gameMinutes = 0) {
     const rain = weather.rain;
     this.snowing = season === 'winter';
-    const targetDrops = Math.round(renderer.width * renderer.height * DROP_DENSITY * rain);
+    const type = WEATHER_TYPES[weather.type] ?? {};
+    const targetDrops = Math.round(renderer.width * renderer.height * DROP_DENSITY * rain * (type.downpour ?? 1));
+    // Gök gürültülü fırtına: arada bir şimşek çakar
+    this.flash = Math.max(0, this.flash - dt * FLASH_DECAY);
+    if (type.thunder && rain > 0.6) {
+      this.lightningTimer -= gameMinutes;
+      if (this.lightningTimer <= 0) {
+        this.flash = 1;
+        this.lightningPending = true;
+        this.lightningTimer = LIGHTNING_GAP[0] + Math.random() * (LIGHTNING_GAP[1] - LIGHTNING_GAP[0]);
+      }
+    }
     while (this.drops.length < targetDrops) this.drops.push(this.newDrop(renderer, true));
     if (this.drops.length > targetDrops) this.drops.length = targetDrops;
 
@@ -152,6 +175,63 @@ export class WeatherEffects {
       for (let dy = -cloud.ry; dy <= cloud.ry; dy += 2) {
         const half = cloud.rx * Math.sqrt(1 - (dy / cloud.ry) ** 2) * (0.82 + 0.18 * Math.sin(dy * 0.4 + cloud.lobe * 6));
         renderer.fillRect(Math.round(cx - half), Math.round(cy + dy), Math.round(half * 2), 2, `rgba(${SHADOW_COLOR}, ${alpha})`);
+      }
+    }
+  }
+
+  /** Bu karede şimşek çaktı mı? (bir kez true döner; sahne gök gürültüsü olayını yayınlar) */
+  takeLightning() {
+    const pending = this.lightningPending;
+    this.lightningPending = false;
+    return pending;
+  }
+
+  /** Şimşek parıltısı (ekran katmanı, en üstte): hızlı sönen beyaz örtü, ortasında ikinci kısa çakma. */
+  drawLightning(renderer) {
+    if (this.flash <= 0.01) return;
+    const flicker = this.flash > 0.55 && this.flash < 0.7 ? 0.25 : 1;
+    const ctx = renderer.ctx;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = `rgba(236, 244, 255, ${(this.flash * 0.55 * flicker).toFixed(3)})`;
+    ctx.fillRect(0, 0, renderer.width, renderer.height);
+    ctx.restore();
+  }
+
+  /**
+   * Sabah sisi (dünya katmanı): yavaşça yana süzülen, kenarları yumuşak beyaz şeritler; nehrin üstünde ayrıca
+   * dalgalanan ince bir pus. Yoğunluk state.weather.mist (0-1).
+   */
+  drawMist(renderer, camera, weather, map, time) {
+    const mist = weather.mist ?? 0;
+    if (mist <= 0.02) return;
+    const view = camera.getViewBounds(renderer.width, renderer.height);
+    const height = view.bottom - view.top;
+    // Bütün manzarayı yumuşatan hafif beyaz örtü
+    renderer.fillRect(Math.floor(view.left), Math.floor(view.top), Math.ceil(view.right - view.left) + 1, Math.ceil(height) + 1, `rgba(232, 238, 246, ${(0.2 * mist).toFixed(3)})`);
+    for (let i = 0; i < MIST_BANDS; i++) {
+      const baseY = view.top + ((i + 0.5) / MIST_BANDS) * height + Math.sin(time * 0.15 + i * 1.7) * 10;
+      const drift = (time * (4 + (i % 3) * 2) + i * 97) % (view.right - view.left + 240);
+      const cx = view.left - 120 + drift;
+      const rx = 90 + (i % 4) * 30;
+      for (let dy = -12; dy <= 12; dy += 2) {
+        const half = rx * Math.sqrt(1 - (dy / 13) ** 2);
+        const alpha = (0.12 + 0.12 * (1 - Math.abs(dy) / 12)) * mist;
+        renderer.fillRect(Math.round(cx - half), Math.round(baseY + dy), Math.round(half * 2), 2, `rgba(238, 244, 250, ${alpha.toFixed(3)})`);
+      }
+    }
+    // Nehrin üstünde süzülen pus
+    const x0 = Math.max(0, Math.floor(view.left / T));
+    const y0 = Math.max(0, Math.floor(view.top / T));
+    const x1 = Math.min(map.width - 1, Math.floor(view.right / T));
+    const y1 = Math.min(map.height - 1, Math.floor(view.bottom / T));
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (map.get(x, y) !== 'water') continue;
+        const wave = Math.sin(time * 0.6 + x * 0.9 + y * 0.5);
+        const alpha = (0.3 + 0.12 * wave) * mist;
+        renderer.fillRect(x * T, y * T + 2 + Math.round(wave * 2), T, 9, `rgba(242, 247, 252, ${alpha.toFixed(3)})`);
+        renderer.fillRect(x * T + 3, y * T + Math.round(wave * 3), T - 6, 3, `rgba(250, 252, 255, ${(alpha * 0.6).toFixed(3)})`);
       }
     }
   }

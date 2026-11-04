@@ -1,7 +1,7 @@
 // Mesleki ustalık hesapları. Deneyim Character.skills içinde ({ meslek: dakika }) tutulur ve kayda
 // girer. BehaviorSystem çalışma sırasında addExperience çağırır; kademe atlanınca 'skill:levelUp'
 // { character, skill, level } yayınlanır (günlük, ses ve bildirim dinler).
-import { SKILLS, SKILL_LEVELS, ACTIVITY_SKILLS } from '../data/skills.js';
+import { SKILLS, SKILL_LEVELS, ACTIVITY_SKILLS, OUTFIT_KITS } from '../data/skills.js';
 
 /** Deneyime göre kademe kaydı ({ level, name, xp, bonus }). */
 export function levelFor(xp) {
@@ -43,12 +43,34 @@ export function topSkills(character, count) {
     .map(([skill, xp]) => ({ skill, def: SKILLS[skill], xp, level: levelFor(xp) }));
 }
 
-/** Deneyim ekler; kademe atlarsa olayı yayınlar. */
-export function addExperience(events, character, activity, minutes) {
+/**
+ * Deneyim ekler; kademe atlarsa olayı yayınlar. multiplier: (11. aşama) Zanaat Loncası fermanı deneyim
+ * kazanma hızını artırır.
+ */
+export function addExperience(events, character, activity, minutes, multiplier = 1) {
   const skill = skillForActivity(activity);
   if (!skill || minutes <= 0) return;
+  minutes *= multiplier;
   const before = levelFor(character.skills[skill] ?? 0);
   character.skills[skill] = (character.skills[skill] ?? 0) + minutes;
   const after = levelFor(character.skills[skill]);
   if (after.level > before.level) events.emit('skill:levelUp', { character, skill, level: after });
+}
+
+/** (15. aşama) Sakinin ana mesleği: en çok deneyimi olan meslek { skill, def, xp, level } ya da null. */
+export function primarySkill(character) {
+  let best = null;
+  for (const [skill, xp] of Object.entries(character.skills ?? {})) {
+    if (!(xp > 0) || !SKILLS[skill]) continue;
+    if (!best || xp > best.xp) best = { skill, xp };
+  }
+  return best ? { ...best, def: SKILLS[best.skill], level: levelFor(best.xp) } : null;
+}
+
+/** (15. aşama) Meslek kıyafeti 'kit:kademe' (Kalfa ve Usta) ya da null (Çırak, çocuk, mesleği yok). */
+export function outfitFor(character) {
+  if (character.isChild || character.role) return null;
+  const main = primarySkill(character);
+  const kit = main && OUTFIT_KITS[main.skill];
+  return kit && main.level.level >= 2 ? `${kit.kit}:${main.level.level}` : null;
 }

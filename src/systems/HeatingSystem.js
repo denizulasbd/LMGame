@@ -13,6 +13,11 @@
 import { BUILDINGS } from '../data/buildings.js';
 import { HEATING, getSeason } from '../data/seasons.js';
 import { coldProtection } from './Equipment.js';
+import { researchHeatingMultiplier } from './ResearchSystem.js';
+import { relicHeatingMultiplier } from './Luxury.js';
+
+/** Evlerin kışlık odun çarpanı: Kışlık Yalıtım araştırması × Ebedi Ateş Kandili. */
+const homeHeating = (state) => researchHeatingMultiplier(state) * relicHeatingMultiplier(state);
 
 const COLD_BUBBLE_CHANCE = 0.004; // dakika başına "üşüyorum" balonu olasılığı
 
@@ -29,7 +34,7 @@ export function heatingSources(state) {
   const homes = new Set(state.characters.map((c) => c.homeId));
   for (const b of state.buildings) {
     if (b.underConstruction) continue;
-    if (b.type === 'cabin' && homes.has(b.id)) sources.push({ building: b, perMinute: (HEATING.homePerDay * b.stat('heatingFactor', 1)) / 1440 });
+    if (b.type === 'cabin' && homes.has(b.id)) sources.push({ building: b, perMinute: (HEATING.homePerDay * b.stat('heatingFactor', 1) * homeHeating(state)) / 1440 });
     if (b.type === 'campfire' && b.lit) sources.push({ building: b, perMinute: HEATING.campfirePerDay / (litFraction(BUILDINGS.campfire.litHours) * 1440) });
     if (b.type === 'inn' && b.lit) sources.push({ building: b, perMinute: HEATING.innPerDay / (litFraction(BUILDINGS.inn.litHours) * 1440) });
   }
@@ -43,7 +48,7 @@ export function heatingPerDay(state) {
   let total = 0;
   for (const b of state.buildings) {
     if (b.underConstruction) continue;
-    if (b.type === 'cabin' && homes.has(b.id)) total += HEATING.homePerDay * b.stat('heatingFactor', 1);
+    if (b.type === 'cabin' && homes.has(b.id)) total += HEATING.homePerDay * b.stat('heatingFactor', 1) * homeHeating(state);
     if (b.type === 'campfire') total += HEATING.campfirePerDay;
     if (b.type === 'inn') total += HEATING.innPerDay;
   }
@@ -129,10 +134,15 @@ export class HeatingSystem {
     if (state.heating.cold) return;
     const until = state.totalMinutes + HEATING.warmHours * 60;
     const fires = this.world.buildings.filter((b) => b.type === 'campfire' && b.lit);
+    // (12. aşama) Tamamlanmış Büyük Saat Kulesi geniş bir yarıçapta herkesi ısıtır
+    const wonders = this.world.buildings.filter((b) => b.wonderComplete);
     for (const c of this.world.characters) {
       const inside = c.insideBuildingId ? this.world.getBuilding(c.insideBuildingId) : null;
-      const warmIndoors = inside && (inside.type === 'cabin' || inside.type === 'inn');
-      const nearFire = c.visible && fires.some((f) => Math.hypot(f.center.x - c.x, f.center.y - c.y) <= HEATING.warmRadius);
+      const warmIndoors = inside && (inside.type === 'cabin' || inside.type === 'inn' || inside.type === 'academy');
+      const nearFire =
+        c.visible &&
+        (fires.some((f) => Math.hypot(f.center.x - c.x, f.center.y - c.y) <= HEATING.warmRadius) ||
+          wonders.some((w) => Math.hypot(w.center.x - c.x, w.center.y - c.y) <= w.definition.wonder.warmRadius));
       if (warmIndoors || nearFire) {
         const wasCold = (c.buffs.warmUntil ?? -1) <= state.totalMinutes;
         c.buffs.warmUntil = until;

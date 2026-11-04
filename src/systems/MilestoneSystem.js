@@ -42,6 +42,13 @@ export function milestoneProgress(milestone, state) {
     }
     case 'monument':
       return { current: completed('monument'), target: milestone.target };
+    case 'wonder': {
+      // Harikanın tamamlanan aşaması (12. aşama): Temel -> Gövde -> Görkemli Kule
+      const stage = state.buildings.filter((b) => b.type === 'wonder' && b.functional).reduce((m, b) => Math.max(m, b.wonderStage ?? 0), 0);
+      const names = ['Temel', 'Gövde', 'Görkemli Kule'];
+      const detail = stage > 0 && stage < milestone.target ? `Tamamlanan: ${names.slice(0, stage).join(', ')} · sıradaki: ${names[stage]}` : undefined;
+      return { current: Math.min(stage, milestone.target), target: milestone.target, detail };
+    }
     default:
       return { current: 0, target: milestone.target };
   }
@@ -75,6 +82,8 @@ export class MilestoneSystem {
         stats.trades++;
         this.check();
       }),
+      on('wonder:stageCompleted', () => this.check()),
+      on('wonder:completed', () => this.check()),
       on('time:seasonChanged', ({ season, previous }) => this.onSeasonChanged(season, previous)),
     ];
   }

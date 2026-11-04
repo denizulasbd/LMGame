@@ -56,7 +56,7 @@ export const SaveManager = {
     return this.read(slot) !== null;
   },
 
-  /** Arayüzde göstermek için kısa özet: { day, hour, minute, population, savedAt } ya da null. */
+  /** Arayüzde göstermek için kısa özet: { day, hour, minute, population, townName, tier, savedAt } ya da null. */
   describe(slot = 'main') {
     const data = this.read(slot);
     if (!data) return null;
@@ -66,6 +66,7 @@ export const SaveManager = {
       minute: data.time.minute,
       population: data.characters.length,
       townName: data.townName ?? defaultTownName(data.seed), // eski kayıtlarda ad tohumdan önerilir
+      tier: Number.isInteger(data.town?.tier) ? data.town.tier : null, // 10. aşamadan eski kayıtlarda yok
       savedAt: data.savedAt,
     };
   },

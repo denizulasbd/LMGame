@@ -1,6 +1,7 @@
 // Oyun saatini ilerletir. Dinlediği olaylar:
 //   'time:togglePause'          -> durdur / devam
 //   'time:setSpeed' (sayı)      -> hızı değiştirir ve duraklatmayı kaldırır
+//   'time:setPaused' (bool)     -> durdurur / sürdürür (karar penceresi oyunu durdurur)
 // Yayınladığı olaylar:
 //   'time:hour'   (saat)  -> her oyun saati başında
 //   'time:newDay' (gün)   -> her yeni günde
@@ -26,6 +27,7 @@ export class TimeSystem {
     this.unsubscribers = [
       game.events.on('time:togglePause', () => this.setPaused(!game.state.time.paused)),
       game.events.on('time:setSpeed', (speed) => this.setSpeed(speed)),
+      game.events.on('time:setPaused', (paused) => this.setPaused(Boolean(paused))),
     ];
   }
 

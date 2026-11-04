@@ -7,6 +7,8 @@
 //                      gecelerinde cırcır böceği; kamera suya yaklaştıkça kahverengi gürültü su şırıltısı;
 //                      kışın hafif rüzgâr uğultusu (kar yağarken güçlenir)
 //   Mevsim ve ustalık: mevsim değişince yumuşak bir akor, bir sakin usta olunca kutlama ezgisi
+//   10. aşama        : kamera bir koyun ağılına yakınken gündüz ara sıra meleyen koyunlar; kasaba seviye atlayınca
+//                      büyük kutlama ezgisi; ilk yün / demir / ekmek çıkınca kısa bir başarı ezgisi
 //
 // 'ui:toggleMute' ile ses açılıp kapanır (tercih localStorage'da), 'audio:muteChanged' yayınlanır.
 import { fireflyIntensity, isRainActive } from '../data/weather.js';
@@ -14,10 +16,19 @@ import { getSeason } from '../data/seasons.js';
 
 const NOTE = { C4: 262, E4: 330, G4: 392, A4: 440, B4: 494, C5: 523, D5: 587, E5: 659, G5: 784, A5: 880, C6: 1047 };
 const FESTIVAL_MELODY = ['C5', 'E5', 'G5', 'A5', 'G5', 'E5', 'D5', 'E5', 'G5', 'C6', 'A5', 'G5', 'E5', 'D5', 'C5', null];
+// (14. aşama) Mevsim festivallerinin ezgileri: ilkbahar hafif ve sekerek, yaz panayır neşesi, sonbahar ağır bir halk
+// havası, kış çan sesli ve yavaş
+const SEASON_MELODIES = {
+  spring: { notes: ['E5', 'G5', 'A5', 'G5', 'E5', 'D5', 'E5', null, 'G5', 'A5', 'C6', 'A5', 'G5', 'E5', 'D5', null], type: 'triangle', bass: 'C4' },
+  summer: { notes: ['C5', 'C5', 'G5', 'G5', 'A5', 'A5', 'G5', null, 'E5', 'E5', 'D5', 'D5', 'C5', 'E5', 'G5', null], type: 'square', bass: 'C4' },
+  autumn: { notes: ['A4', 'C5', 'E5', 'C5', 'D5', 'B4', 'A4', null, 'E5', 'D5', 'C5', 'B4', 'A4', 'B4', 'A4', null], type: 'triangle', bass: 'A4' },
+  winter: { notes: ['G5', null, 'E5', null, 'C5', 'D5', 'E5', null, 'A5', null, 'G5', null, 'E5', 'D5', 'C5', null], type: 'sine', bass: 'C4', bell: true },
+};
 const FESTIVAL_STEP_SECONDS = 0.3;
 const CHIME_COOLDOWN = 0.6;      // art arda gelen günlük kayıtları tek çan çalsın
 const WATER_SAMPLE_SECONDS = 0.5;
 const WATER_RADIUS_TILES = 6;    // kameranın ortasına bu kadar yakın su karoları duyulur
+const SHEEP_HEARING_TILES = 10;  // kameranın ortası koyun ağılına bu kadar yakınsa meleme duyulur
 
 export class AudioSystem {
   /**
@@ -39,6 +50,7 @@ export class AudioSystem {
     this.time = 0;
     this.waterTimer = 0;
     this.waterLevel = 0;
+    this.sheepTimer = 4;
 
     const on = (name, handler) => game.events.on(name, handler);
     this.unsubscribers = [
@@ -51,6 +63,33 @@ export class AudioSystem {
       on('milestone:completed', () => this.playMilestone()),
       on('building:upgraded', () => this.playMastery()),
       on('ruin:restored', () => this.playGrandFanfare()),
+      on('town:tierUp', () => this.playGrandFanfare()),
+      on('wonder:completed', () => this.playGrandFanfare()),
+      on('relic:exhibited', () => this.playGrandFanfare()),
+      on('luxury:bought', () => this.playCoin()),
+      on('masterwork:created', () => this.playMastery()),
+      on('masterwork:exhibited', () => this.playFanfare()),
+      on('masterwork:sold', () => this.playCoin()),
+      on('goldDecree:issued', () => this.playFanfare()),
+      on('wonder:stageCompleted', () => this.playMastery()),
+      on('research:completed', () => this.playMastery()),
+      on('school:graduated', () => this.playMilestone()),
+      on('harbor:shipped', ({ gold }) => gold > 0 && this.playCoin()),
+      on('harbor:boatDocked', () => this.playBell()),
+      on('harbor:grandVoyage', () => this.playFanfare()),
+      on('weather:lightning', () => this.playRumble()),
+      on('pet:cheered', ({ animal }) => (animal.kind === 'cat' ? this.playMeow() : this.playBark())),
+      on('rally:rung', () => this.playTownBell()),
+      on('seasonFestival:announced', () => this.playBell()),
+      on('memory:recalled', () => this.playChime()),
+      on('civic:decreed', () => this.playGrandFanfare()),
+      on('dilemma:opened', () => this.playBell()),
+      on('storm:struck', ({ kind, safe }) => (kind === 'wolves' ? this.playHowl() : this.playThunder(safe))),
+      on('pet:arrived', () => this.playChime()),
+      on('health:fellIll', () => this.playSneeze()),
+      on('health:cured', () => this.playMilestone()),
+      on('expedition:returned', () => this.playFanfare()),
+      on('goods:firstProduced', () => this.playMilestone()),
       on('relationship:married', () => this.playWedding()),
       on('relationship:partnered', () => this.playChime()),
       on('family:childBorn', () => this.playLullaby()),
@@ -62,10 +101,13 @@ export class AudioSystem {
       on('journal:added', () => this.playChime()),
       on('time:hour', (hour) => {
         if (hour === 6) this.playMorning();
+        // Altın çağ (12. aşama): Büyük Vadi Saat Kulesi saat başı çan çalar (gece yarısından sabaha susar)
+        else if (hour >= 7 && hour <= 22 && this.world.getCompleted('wonder').some((b) => b.wonderComplete)) this.playClockTower(hour);
       }),
       on('merchant:arrived', () => this.playBell()),
       on('trade:completed', () => this.playCoin()),
       on('festival:started', () => this.playFanfare()),
+      on('seasonFestival:ended', () => this.playGrandFanfare()),
       on('time:seasonChanged', () => this.playSeasonChord()),
       on('skill:levelUp', ({ level }) => (level.level === 3 ? this.playMastery() : this.playChime())),
     ];
@@ -90,7 +132,8 @@ export class AudioSystem {
   update(dt, hour) {
     this.time += dt;
     const sound = this.sound;
-    if (!sound.ctx) return;
+    // Ses kapalıyken (bağlam askıda) ambiyans hesaplanmaz; açılınca döngüler kaldıkları seviyeden sürer
+    if (!sound.ready) return;
     sound.loop('rain', { color: 'pink', filters: [{ type: 'highpass', freq: 400 }, { type: 'lowpass', freq: 2600 }] });
     sound.loop('water', { color: 'brown', filters: [{ type: 'bandpass', freq: 520, q: 0.9 }], wobble: { rate: 0.35, depth: 180 } });
 
@@ -117,6 +160,15 @@ export class AudioSystem {
         this.birdTimer = 4 + Math.random() * 9;
       }
     }
+    // Ağıldaki koyunlar gündüz ara sıra meler (kamera yakınsa, yakınlığa göre yüksek sesle)
+    if (hour >= 6 && hour < 20.5) {
+      this.sheepTimer -= dt;
+      if (this.sheepTimer <= 0) {
+        const near = this.sheepProximity();
+        if (near > 0) this.playBleat(near);
+        this.sheepTimer = 5 + Math.random() * 9;
+      }
+    }
     if (fireflyIntensity(weather, hour) * season.fireflies > 0.2) {
       this.cricketTimer -= dt;
       if (this.cricketTimer <= 0) {
@@ -131,6 +183,17 @@ export class AudioSystem {
         this.festivalTimer = FESTIVAL_STEP_SECONDS;
       }
     }
+  }
+
+  /** Kameranın ortasına en yakın koyun ağılının yakınlığı (0: duyulmaz, 1: tam önünde). */
+  sheepProximity() {
+    const center = this.getListener();
+    let best = 0;
+    for (const farm of this.world.getCompleted('sheepFarm')) {
+      const d = Math.hypot(farm.center.x - center.x, farm.center.y - center.y) / 16;
+      best = Math.max(best, 1 - d / SHEEP_HEARING_TILES);
+    }
+    return best;
   }
 
   /** Kameranın ortasına yakın su karolarının oranı (0-1); yakın olanlar daha çok sayılır. */
@@ -199,6 +262,18 @@ export class AudioSystem {
     this.sound.tone({ freq: NOTE.A5, type: 'triangle', duration: 0.9, volume: 0.06 });
     this.sound.tone({ freq: NOTE.A5 * 1.5, duration: 0.7, volume: 0.03, delay: 0.02 });
     this.sound.tone({ freq: NOTE.E5, type: 'triangle', duration: 0.9, volume: 0.05, delay: 0.25 });
+  }
+
+  /** Saat kulesi: dört notalı kısa melodi, ardından saate göre (en çok üç) derin çan vuruşu. */
+  playClockTower(hour) {
+    this.lastChime = this.time;
+    ['E5', 'C5', 'D5', 'G4'].forEach((n, i) => this.sound.tone({ freq: NOTE[n], type: 'triangle', duration: 0.6, attack: 0.01, volume: 0.045, delay: i * 0.32 }));
+    const strikes = Math.min(3, hour % 12 || 12);
+    for (let i = 0; i < strikes; i++) {
+      const delay = 1.5 + i * 0.7;
+      this.sound.tone({ freq: NOTE.G4 / 2, type: 'triangle', duration: 1.4, attack: 0.005, volume: 0.06, delay });
+      this.sound.tone({ freq: (NOTE.G4 / 2) * 2.4, duration: 0.9, volume: 0.02, delay });
+    }
   }
 
   playCoin() {
@@ -277,15 +352,79 @@ export class AudioSystem {
     }
   }
 
+  /** "Meee": titreşimli, genizden gelen kısa meleme; kuzu daha ince sesle karşılık verebilir. */
+  playBleat(proximity) {
+    const volume = 0.05 * proximity;
+    const base = 330 + Math.random() * 90;
+    this.sound.tone({ freq: base, to: base * 0.86, type: 'triangle', duration: 0.55, attack: 0.04, volume, vibrato: 22 });
+    this.sound.tone({ freq: base * 2, to: base * 1.7, type: 'square', duration: 0.5, attack: 0.04, volume: volume * 0.12, vibrato: 30 });
+    if (Math.random() < 0.35) {
+      const lamb = base * 1.6;
+      this.sound.tone({ freq: lamb, to: lamb * 0.9, type: 'triangle', duration: 0.35, attack: 0.03, volume: volume * 0.7, delay: 0.75, vibrato: 30 });
+    }
+  }
+
+  /** Hapşırma: kısa, genizden bir nefes ve patlama. */
+  playSneeze() {
+    this.sound.noise({ filter: 'bandpass', freq: 2400, q: 1.5, duration: 0.12, volume: 0.05, attack: 0.08 });
+    this.sound.noise({ filter: 'highpass', freq: 3000, duration: 0.18, volume: 0.09, delay: 0.16 });
+  }
+
+  /** Gök gürültüsü (güçlendirilmiş kasabada daha uzak ve boğuk). */
+  playThunder(far) {
+    this.sound.noise({ color: 'brown', filter: 'lowpass', freq: far ? 300 : 700, to: 90, duration: 1.6, volume: far ? 0.25 : 0.45, attack: 0.02 });
+    this.sound.noise({ color: 'brown', filter: 'lowpass', freq: 200, duration: 1.2, volume: 0.2, delay: 0.5 });
+  }
+
+  /** (14. aşama) Kedi: inceden kalına kayan kısa bir miyav. */
+  playMeow() {
+    this.sound.tone({ freq: 880, to: 620, type: 'triangle', duration: 0.32, attack: 0.03, volume: 0.06, vibrato: 6 });
+    this.sound.tone({ freq: 1320, to: 900, duration: 0.25, volume: 0.025, delay: 0.02 });
+  }
+
+  /** (14. aşama) Köpek: iki kısa havlama. */
+  playBark() {
+    for (const delay of [0, 0.22]) {
+      this.sound.noise({ color: 'pink', filter: 'bandpass', freq: 700, q: 2, duration: 0.09, volume: 0.22, delay });
+      this.sound.tone({ freq: 320, to: 220, type: 'square', duration: 0.09, volume: 0.03, delay });
+    }
+  }
+
+  /** (14. aşama) Toplanma Zili: ağır kasaba çanı, üç vuruş. */
+  playTownBell() {
+    this.lastChime = this.time;
+    for (let i = 0; i < 3; i++) {
+      this.sound.tone({ freq: NOTE.C4, type: 'triangle', duration: 1.3, attack: 0.005, volume: 0.07, delay: i * 0.55 });
+      this.sound.tone({ freq: NOTE.C4 * 2.4, duration: 0.8, volume: 0.025, delay: i * 0.55 });
+    }
+  }
+
+  /** (14. aşama) Yaz fırtınasında şimşekten sonra uzaktan gelen yumuşak gök gürültüsü. */
+  playRumble() {
+    const delay = 0.5 + Math.random() * 1.2;
+    this.sound.noise({ color: 'brown', filter: 'lowpass', freq: 260, to: 70, duration: 2.2, volume: 0.22, attack: 0.08, delay });
+    this.sound.noise({ color: 'brown', filter: 'lowpass', freq: 160, duration: 1.4, volume: 0.14, delay: delay + 0.6 });
+  }
+
+  /** Uzaktan kurt uluması. */
+  playHowl() {
+    this.sound.tone({ freq: 420, to: 620, type: 'sine', duration: 0.6, attack: 0.25, volume: 0.05, vibrato: 8 });
+    this.sound.tone({ freq: 620, to: 380, type: 'sine', duration: 1.1, attack: 0.05, volume: 0.05, delay: 0.6, vibrato: 10 });
+  }
+
   playCrickets() {
     const freq = 4200 + Math.random() * 400;
     for (let i = 0; i < 4; i++) this.sound.tone({ freq, duration: 0.03, volume: 0.012, delay: i * 0.045 });
   }
 
   playFestivalStep() {
-    const note = FESTIVAL_MELODY[this.festivalStep % FESTIVAL_MELODY.length];
-    if (note) this.sound.tone({ freq: NOTE[note], type: 'triangle', duration: 0.24, volume: 0.035 });
-    if (this.festivalStep % 4 === 0) this.sound.tone({ freq: NOTE.C4 / (this.festivalStep % 8 === 0 ? 2 : 1.5), duration: 0.3, volume: 0.04 });
+    const theme = SEASON_MELODIES[this.state.events.festival.theme];
+    const melody = theme?.notes ?? FESTIVAL_MELODY;
+    const note = melody[this.festivalStep % melody.length];
+    if (note) this.sound.tone({ freq: NOTE[note], type: theme?.type ?? 'triangle', duration: theme?.bell ? 0.6 : 0.24, volume: theme?.type === 'square' ? 0.018 : 0.035 });
+    if (note && theme?.bell) this.sound.tone({ freq: NOTE[note] * 2, duration: 0.5, volume: 0.012 });
+    const bass = NOTE[theme?.bass ?? 'C4'];
+    if (this.festivalStep % 4 === 0) this.sound.tone({ freq: bass / (this.festivalStep % 8 === 0 ? 2 : 1.5), duration: 0.3, volume: 0.04 });
     this.festivalStep++;
   }
 }

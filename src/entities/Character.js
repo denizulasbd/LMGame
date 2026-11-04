@@ -9,7 +9,9 @@ import { Entity } from './Entity.js';
 import { NEED_KEYS } from '../data/characters.js';
 import { CHILDREN } from '../data/family.js';
 import { buildTraitProfile } from '../ai/TraitProfile.js';
-import { getCharacterSprite, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../art/sprites/index.js';
+import { getCharacterSprite, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT, getFlowerCrownSprite } from '../art/sprites/index.js';
+
+const CELEBRATION_SECONDS = 2.6; // (15. aşama) usta işi eser kutlamasının süresi
 import {
   getBubbleSprite,
   getHeldToolSprite,
@@ -63,6 +65,16 @@ export class Character extends Entity {
     lastChildAt = null,
     equipment = null,
     relocating = false,
+    illness = null,
+    exposure = 0,
+    away = null,
+    schooling = 0,
+    schoolDay = 0,
+    schoolToday = 0,
+    educated = false,
+    workplaceId = null,
+    customName = false,
+    memories = [],
   }) {
     super({ id, x, y });
     this.name = name;
@@ -81,11 +93,28 @@ export class Character extends Entity {
     this.lastChildAt = lastChildAt; // ailesine son çocuğun katıldığı oyun dakikası
     this.relocating = relocating; // evlenince eşiyle paylaşacağı yeni eve taşınacak
     this.equipment = { ...EMPTY_EQUIPMENT, ...(equipment ?? {}) };
+    // 11. aşama: sağlık ve keşif seferi
+    this.illness = illness ? { ...illness } : null; // üşütme: { since, remaining (oyun dakikası) }
+    this.exposure = exposure; // hastalığa yakınlık 0-100 (soğuk, yağmur, açlık, bitkinlik; data/health.js)
+    this.away = away ? { ...away } : null; // keşif seferinde: { stage: 'leaving' | 'away', until, exit }
+    // 12. aşama: okul (çocukken Bilgelik Evi'nde dinlenen ders dakikası; yeterliyse büyüyünce Kalfa başlar)
+    this.schooling = schooling;
+    this.schoolDay = schoolDay;
+    this.schoolToday = schoolToday;
+    this.educated = educated; // okulu bitirip meslekte Kalfa olarak başladı
+    // 13. aşama: oyuncunun sabitlediği iş yeri (yalnızca orada çalışır) ve oyuncunun verdiği ad
+    this.workplaceId = workplaceId;
+    this.customName = customName;
+    // 14. aşama: hayat yolculuğu (MemorySystem): { day, hour, text, icon, kind, fond }; o an hatırladığı anı ve
+    // Çiçek Şenliği'nde saça takılan çiçek (bu ikisi kaydedilmez)
+    this.memories = (memories ?? []).filter((m) => m && typeof m.text === 'string').map((m) => ({ ...m }));
+    this.recall = null;
+    this.flowerCrown = false;
     this.profile = buildTraitProfile(traits, { child: this.isChild });
 
     // Anlık durum (kaydedilmez, yapay zekâ yeniden kurar)
     this.facing = 'down';
-    this.pose = 'stand'; // stand | walk | sit | gather | work | fish | hidden
+    this.pose = 'stand'; // stand | walk | sit | gather | work | fish | tend | hidden
     this.visible = true;
     this.insideBuildingId = null;
     this.activityLabel = 'Etrafa bakınıyor';
@@ -104,6 +133,8 @@ export class Character extends Entity {
     this.role = null; // 'merchant' gibi kasabalı olmayan ziyaretçiler için
     this.backpack = false; // gezgin tüccarın sırt çantası
     this.coatVisible = false; // paltosu varsa sonbahar ve kışın giyer (CraftingSystem günceller)
+    this.celebrateAt = null; // (15. aşama) usta işi eser kutlamasının başladığı gerçek zaman (çizim)
+    this.outfit = null; // (15. aşama) meslek kıyafeti 'kit:kademe' (deneyimden türetilir, kaydedilmez)
     this.lookCache = null;
   }
 
@@ -117,8 +148,9 @@ export class Character extends Entity {
     const child = this.isChild;
     const coat = !child && this.coatVisible;
     const bag = !child && this.equipment.bag === 'backpack';
+    const outfit = child ? null : this.outfit; // (15. aşama) meslek kıyafeti (CraftsmanshipSystem yazar)
     const cached = this.lookCache;
-    if (!cached || cached.child !== child || cached.coat !== coat || cached.bag !== bag) this.lookCache = { child, coat, bag };
+    if (!cached || cached.child !== child || cached.coat !== coat || cached.bag !== bag || cached.outfit !== outfit) this.lookCache = { child, coat, bag, outfit };
     return this.lookCache;
   }
 
@@ -217,6 +249,11 @@ export class Character extends Entity {
     const x = Math.round(this.x);
     const y = Math.round(this.y);
     queue.addImage(this.sortY, sprite, x - HALF_WIDTH, y - sprite.height + 1);
+    // (14. aşama) Çiçek Şenliği: saçta küçük bir çiçek
+    if (this.flowerCrown) {
+      const side = this.facing === 'left' ? -4 : this.facing === 'right' ? 1 : this.id % 2 === 0 ? -4 : 1;
+      queue.addImage(this.sortY + 0.02, getFlowerCrownSprite(this.id % 3), x + side, y - sprite.height + 1);
+    }
 
     // Gezgin tüccarın sırt çantası: yukarı bakarken önde (sırtı görünür), diğer yönlerde arkada
     if (this.backpack) {
@@ -232,6 +269,12 @@ export class Character extends Entity {
       const [dx, dy] = ROD_OFFSETS[side];
       const lift = this.animTime % 2.6 > 2.3 ? -1 : 0; // ara sıra oltayı kaldırıp indirir
       queue.addImage(this.sortY + 0.01, getHeldToolSprite('rod', side === 'left', this.hasSturdyTool), x + dx, y + dy + lift);
+    }
+    // Çoban değneği: yere dayalı, dik tutulur; elinin olduğu yanda, gövdenin önünde görünür
+    else if (this.tool && this.pose === 'tend') {
+      const sprite = getHeldToolSprite(this.tool, this.facing === 'left', false);
+      const dx = this.facing === 'left' ? -8 : 3;
+      queue.addImage(this.sortY + 0.01, sprite, x + dx, y - sprite.height + 1);
     }
     // Alet: yukarı bakarken karakterin arkasında, diğer yönlerde önünde
     else if (this.tool && this.pose === 'work') {
@@ -254,9 +297,38 @@ export class Character extends Entity {
 
   /** Dünya katmanında, gece örtüsünün altında çizilen efektler: kazma tozu, olta ipi. */
   drawEffects(renderer, time) {
+    if (this.celebrateAt !== null && this.visible) this.drawCelebration(renderer, time);
     if (!this.visible || this.waypoints) return;
     if (this.workEffect === 'dust' && this.pose === 'work') this.drawWorkDust(renderer);
     if (this.tool === 'rod' && this.pose === 'fish') this.drawFishingLine(renderer, time);
+  }
+
+  /** (15. aşama) Usta işi bir eser çıkınca başının çevresinde altın kıvılcımlar yükselir (birkaç saniye). */
+  celebrate() {
+    this.celebrateAt = -1; // ilk çizimde gerçek zamanla başlar
+  }
+
+  drawCelebration(renderer, time) {
+    if (this.celebrateAt < 0) this.celebrateAt = time;
+    const t = (time - this.celebrateAt) / CELEBRATION_SECONDS;
+    if (t >= 1 || t < 0) {
+      this.celebrateAt = null;
+      return;
+    }
+    const cx = Math.round(this.x);
+    const top = Math.round(this.y) - this.spriteHeight;
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 + t * 3;
+      const r = 5 + t * 7;
+      const px = Math.round(cx + Math.cos(angle) * r);
+      const py = Math.round(top + 6 - t * 10 + Math.sin(angle) * r * 0.5);
+      const alpha = (1 - t).toFixed(2);
+      renderer.fillRect(px, py, 1, 1, `rgba(255, 243, 176, ${alpha})`);
+      if (i % 2 === 0) {
+        renderer.fillRect(px - 1, py, 3, 1, `rgba(255, 210, 63, ${alpha})`);
+        renderer.fillRect(px, py - 1, 1, 3, `rgba(255, 210, 63, ${alpha})`);
+      }
+    }
   }
 
   /**
@@ -363,6 +435,16 @@ export class Character extends Entity {
       lastChildAt: this.lastChildAt,
       relocating: this.relocating,
       equipment: this.equipment,
+      illness: this.illness,
+      exposure: this.exposure,
+      away: this.away,
+      schooling: this.schooling,
+      schoolDay: this.schoolDay,
+      schoolToday: this.schoolToday,
+      educated: this.educated,
+      workplaceId: this.workplaceId,
+      customName: this.customName,
+      memories: this.memories,
     };
   }
 
@@ -381,6 +463,13 @@ export class Character extends Entity {
     if (data.activityLabel) c.activityLabel = data.activityLabel;
     c.buffs = { ...(data.buffs ?? {}) };
     c.skills = { ...(data.skills ?? {}) };
+    // Sefere yola çıkmışken kaydedildiyse yüklenince doğrudan seferde sayılır (görünmez)
+    if (c.away) {
+      c.away.stage = 'away';
+      c.visible = false;
+      c.pose = 'hidden';
+      c.insideBuildingId = null;
+    }
     return c;
   }
 }

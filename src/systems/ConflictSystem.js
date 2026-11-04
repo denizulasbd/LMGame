@@ -5,9 +5,10 @@
 //            atışabilir: başlarında öfke şimşeği / somurtma bulutu belirir, keyifleri düşer, ilişki
 //            puanları azalır (eksiye inebilir: Hoşlanmıyor, Rakip). Sevgililer ve eşler atışmaz.
 //            'relationship:quarrel' { a, b, traits, kind: 'work' | 'chat' | 'encounter', place, firstToday }
-//   Barışma: puanı eksiye düşmüş iki sakin akşam aynı handa (sıcak yemekte ya da han önünde sohbette)
-//            ya da şenlikte denk gelirse barışabilir; ilişkileri normale döner.
-//            'relationship:reconciled' { a, b, place: 'inn' | 'festival' }
+//   Barışma: küs (puanı RECONCILE.below altında) iki sakin aynı yerde sohbet ederken barışabilir; ilişkileri
+//            normale döner, başlarında el sıkışma balonu çıkar. (15. aşama) Kasaba Hanı, Ahşap Çardak, Kamp Ateşi ve
+//            şenlik / mevsim festivali gönül alma yerleridir: barışma olasılığı 4 kat, orada kimse atışmaz.
+//            'relationship:reconciled' { a, b, place: 'inn' | 'gazebo' | 'campfire' | 'festival' | 'chat' }
 // Sayılar src/data/family.js -> CONFLICT, RECONCILE. Gruplar RelationshipSystem'den okunur.
 import { CONFLICT, RECONCILE } from '../data/family.js';
 import { clashingTraits } from '../ai/TraitProfile.js';
@@ -35,25 +36,29 @@ export class ConflictSystem {
     this.rng = rng;
     this.cooldowns = new Map(); // çift -> yeniden atışabileceği oyun dakikası (kaydedilmez)
     this.lastQuarrelDay = new Map(); // çift -> günlüğe en son yazıldığı gün
+    this.grouped = new Set(); // bu adımda bir gruba dahil olanlar (her adımda yeniden kullanılır)
   }
 
   update(tick) {
     const minutes = tick.gameMinutes;
     if (minutes <= 0) return;
     const evening = tick.hour >= RECONCILE.eveningFrom || tick.hour < 2;
-    const grouped = new Set();
+    const grouped = this.grouped;
+    grouped.clear();
 
     for (const group of this.relationships.groups) {
       for (const c of group.members) grouped.add(c.id);
+      if (group.members.length < 2) continue;
       const building = group.buildingId ? this.world.getBuilding(group.buildingId) : null;
-      const reconcilePlace = group.kind === 'festival' ? 'festival' : group.activity === 'inn' && evening ? 'inn' : null;
+      const place = reconcilePlace(group);
       this.forPairs(group.members, (a, b) => {
-        if (reconcilePlace) {
-          this.tryReconcile(a, b, reconcilePlace, minutes);
+        // Küs iki sakin aynı sohbette denk gelince önce barışmayı dener
+        if (place && this.relationships.get(a, b) < RECONCILE.below) {
+          this.tryReconcile(a, b, place, minutes);
           return;
         }
-        const kind = group.kind === 'work' ? 'work' : 'chat';
-        this.tryQuarrel(a, b, kind, minutes, building);
+        if (VENUES.has(place)) return; // gönül alma yerlerinde atışılmaz
+        this.tryQuarrel(a, b, group.kind === 'work' ? 'work' : 'chat', minutes, building);
       });
     }
 
@@ -94,7 +99,9 @@ export class ConflictSystem {
     const now = this.state.totalMinutes;
     if ((this.cooldowns.get(key) ?? -1) > now) return;
     const temper = Math.max(a.profile.quarrelChance, b.profile.quarrelChance);
-    if (this.rng.next() >= QUARREL_RATES[kind] * temper * minutes) return;
+    // (15. aşama) küsler birbirini görmezden gelir: aynı çiftin üst üste atışması seyrekleşir
+    const feud = this.relationships.get(a, b) < RECONCILE.below ? CONFLICT.feudQuarrelMultiplier : 1;
+    if (this.rng.next() >= QUARREL_RATES[kind] * temper * feud * minutes) return;
     this.quarrel(a, b, clash, kind, building);
   }
 
@@ -111,16 +118,28 @@ export class ConflictSystem {
     const day = this.state.time.day;
     const firstToday = this.lastQuarrelDay.get(key) !== day;
     this.lastQuarrelDay.set(key, day);
+    this.state.stats.quarrels = (this.state.stats.quarrels ?? 0) + 1;
     this.events.emit('relationship:quarrel', { a, b, traits: clash, kind, place: building?.name ?? null, firstToday });
   }
 
   tryReconcile(a, b, place, minutes) {
-    if (this.relationships.get(a, b) >= RECONCILE.below) return;
-    if (this.rng.next() >= RECONCILE.chancePerMinute * minutes) return;
+    if (a.isChild || b.isChild || this.relationships.get(a, b) >= RECONCILE.below) return;
+    const chance = RECONCILE.chancePerMinute * (VENUES.has(place) ? RECONCILE.venueMultiplier : 1);
+    if (this.rng.next() >= chance * minutes) return;
     this.relationships.set(a, b, RECONCILE.resetTo);
     this.cooldowns.set(pairKey(a.id, b.id), this.state.totalMinutes + CONFLICT.cooldownMinutes);
-    if (a.visible) a.showBubble('heart', 2.6);
-    if (b.visible) b.showBubble('heart', 2.6);
+    this.state.stats.reconciliations = (this.state.stats.reconciliations ?? 0) + 1;
+    if (a.visible) a.showBubble('handshake', 2.8);
+    if (b.visible) b.showBubble('handshake', 2.8);
     this.events.emit('relationship:reconciled', { a, b, place });
   }
+}
+
+const VENUES = new Set(RECONCILE.venues);
+
+/** Sohbet grubunun barışma yeri: 'inn' | 'gazebo' | 'campfire' | 'festival' | 'chat'; çalışma grubunda null. */
+function reconcilePlace(group) {
+  if (group.kind === 'festival') return 'festival';
+  if (group.kind === 'work') return null;
+  return VENUES.has(group.activity) ? group.activity : 'chat';
 }

@@ -89,7 +89,7 @@ export class TitleMenu {
     const exists = Boolean(this.save?.exists);
     this.continueButton.disabled = !exists;
     this.continueInfo.textContent = exists
-      ? `${this.save.townName ?? 'Kasaban'} · ${this.save.label}${this.save.population ? ` · ${this.save.population} sakin` : ''}`
+      ? `${this.save.townTitle ?? this.save.townName ?? 'Kasaban'} · ${this.save.label}${this.save.population ? ` · ${this.save.population} sakin` : ''}`
       : 'Henüz kayıt yok';
   }
 

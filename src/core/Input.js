@@ -26,6 +26,8 @@ const KEY_BINDINGS = {
   toolDemolish: ['KeyX'],
   toggleJournal: ['KeyJ'],
   toggleGoals: ['KeyG'],
+  toggleStats: ['KeyI'],
+  toggleCinematic: ['KeyF'],
 };
 
 const BOUND_CODES = new Set(Object.values(KEY_BINDINGS).flat());
@@ -69,6 +71,13 @@ export class Input {
       this.keys.add(e.code);
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
+    // Tuş basılıyken bir metin kutusuna geçilirse (ör. W basılıyken ada tıklamak) kamera yazarken kaymaya devam etmesin
+    window.addEventListener('focusin', (e) => {
+      if (isTypingTarget(e.target)) {
+        this.keys.clear();
+        this.pressedThisFrame.clear();
+      }
+    });
     window.addEventListener('blur', () => {
       this.keys.clear();
       this.stopDrag();

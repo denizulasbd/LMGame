@@ -6,20 +6,28 @@
 // Öncelik sırası:
 //   0. Kasabaya yeni geldiyse ya da evlenip eşinin evine taşınacaksa önce yeni evine yerleşmek
 //   1. Çok açsa (Tokluk < 15) her şeyden önce yemek
+//   1b. (11. aşama) Üşüttüyse iksiri olan Şifacı Kulübesi'ne gidip tedavi olmak; şifacı yoksa gündüz yorulunca
+//       evinde kestirmek
 //   2. Uyku saati geldiyse ya da enerjisi bittiyse eve dönüp uyumak
 //   3. Sırtında yük varsa kilere bırakmak
 //   2b. Akşam şenliği varsa (ve çok yorgun değilse) meydana koşmak
-//   4. Acıktıysa (kişiye özel eşik) handa sıcak yemek, kilerden / evden yemek, stok yoksa böğürtlen
+//   4. Acıktıysa (kişiye özel eşik) handa sıcak yemek, kilerden / evden yemek (ekmek varsa taze ekmekle),
+//      stok yoksa böğürtlen
 //   4b. Depoda ona ayrılmış boşta ekipman varsa atölyeye / kilere gidip kuşanmak (yetişkinler)
 //   5. Mesai saatindeyse iş kuyruğu: şantiye > toplama emri > üretim binası
 //      (kişiliğe göre ara sıra mola verir; çocuklar çalışmaz)
 //   6. Yalnız hissediyorsa toplanma yerine gitmek, gerekirse birini davet etmek (çocuklar oynar)
+//   6b. (12. aşama) Çocuk: ders saatinde (09:00-15:00) günlük dersini dinlemediyse Bilgelik Evi'ne gitmek
 //   7. Değilse kişiliğine göre ağırlıklı bir boş zaman etkinliği (çocuklar: oyun, çiçekler, yürüyüş)
 import { ACTIVITIES } from '../data/activities.js';
 import { MEAL_FOOD_COST } from '../data/resources.js';
 import { WORK_SESSION } from '../data/jobs.js';
 import { isBedtime, isWorkHours } from './TraitProfile.js';
 import { getSeason } from '../data/seasons.js';
+import { ILLNESS } from '../data/health.js';
+import { SCHOOL } from '../data/research.js';
+import { isRallyActive } from '../systems/RallySystem.js';
+import { healSpeedMultiplier } from '../systems/ResearchSystem.js';
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
 const PLAYGROUND_TYPES = ['fountain', 'campfire', 'inn', 'monument'];
@@ -32,7 +40,9 @@ const LANDMARK_LEISURE = new Map([
   ['campRest', 'supplyCamp'],
 ]);
 
-const GATHERING_ACTIVITIES = ['campfire', 'fountain', 'inn'];
+const GATHERING_ACTIVITIES = ['campfire', 'fountain', 'inn', 'gazebo'];
+const ALWAYS_OPEN_GATHERINGS = ['fountain', 'gazebo']; // ateş yanarken, han akşamları açıkken; bunlar hep açık
+const GAZEBO_INVITE_CHANCE = 0.35; // davet edenin çardağı seçme olasılığı (sevgilisi / eşi varsa her zaman)
 const INN_MEAL_PREFERENCE = 0.5; // handaki sıcak yemek, yol maliyeti yarıymış gibi tercih edilir
 const EVENING_START = 17;
 const EVENING_END = 2;
@@ -47,7 +57,9 @@ export class Brain {
    *   relationships: import('../systems/RelationshipSystem.js').RelationshipSystem,
    *   crafting: import('../systems/CraftingSystem.js').CraftingSystem }} services
    */
-  constructor(world, rng, { economy, jobs, relationships, crafting }) {
+  constructor(world, rng, { economy, jobs, relationships, crafting, health, research }) {
+    this.health = health;
+    this.research = research;
     this.world = world;
     this.rng = rng;
     this.economy = economy;
@@ -70,8 +82,21 @@ export class Brain {
       const plan = this.planEat(c);
       if (plan) return plan;
     }
+    if (c.illness) {
+      const plan = this.planHeal(c);
+      if (plan) return plan;
+      if (!bedtime && needs.energy < ILLNESS.restBelow) {
+        const nap = this.planSleep(c, true);
+        if (nap) return nap;
+      }
+    }
     if (this.world.state.events.festival.active && needs.energy > FESTIVAL_MIN_ENERGY) {
       const plan = this.planFestival(c);
+      if (plan) return plan;
+    }
+    // (14. aşama) Toplanma Zili çaldıysa uyanık herkes meydana koşar
+    if (isRallyActive(this.world.state)) {
+      const plan = this.planRally(c);
       if (plan) return plan;
     }
     if (bedtime || needs.energy < profile.thresholds.energy) {
@@ -104,6 +129,10 @@ export class Brain {
       const plan = this.planSocial(c, hour);
       if (plan) return { ...plan, onBreak };
     }
+    if (c.isChild) {
+      const plan = this.planSchool(c, hour);
+      if (plan) return plan;
+    }
     const leisure = this.planLeisure(c, hour);
     return leisure ? { ...leisure, onBreak } : this.planWait();
   }
@@ -111,11 +140,27 @@ export class Brain {
   /** Boş zaman etkinliğini yarıda kesmeyi gerektiren bir durum var mı? */
   hasUrgentNeed(c, hour) {
     const { needs, profile } = c;
-    return (
-      isBedtime(profile, hour) ||
-      needs.energy < profile.thresholds.energy - 5 ||
-      needs.hunger < profile.thresholds.hunger - 5
-    );
+    // Yalnızca giderilebilecek ihtiyaç işi yarıda keser. Kıtlıkta (yiyecek, pişmiş yemek, böğürtlen yok) ya da evsizken
+    // her yürüyüşü kesmek sakini "işe git -> yolda vazgeç -> yeniden işe git" döngüsüne sokuyordu: ne çalışıyor ne yiyordu.
+    if ((isBedtime(profile, hour) || needs.energy < profile.thresholds.energy - 5) && this.canSleep(c)) return true;
+    return needs.hunger < profile.thresholds.hunger - 5 && this.canEat();
+  }
+
+  /** Uyuyabileceği bir evi var mı (planSleep bir plan döndürebilir mi)? */
+  canSleep(c) {
+    const home = this.world.getBuilding(c.homeId);
+    return Boolean(home) && (c.insideBuildingId === home.id || this.world.getSpots(home).length > 0);
+  }
+
+  /** Kasabada yenecek bir şey var mı: handa pişmiş yemek, depoda yiyecek / ekmek ya da çalıda böğürtlen? (ucuz ön kontrol) */
+  canEat() {
+    if (this.economy.canFeed(MEAL_FOOD_COST)) return true;
+    for (const b of this.world.buildings) {
+      if (!b.functional) continue;
+      if (b.type === 'inn' && b.meals > 0) return true;
+      if (b.type === 'berryBush' && b.berries > 0 && !this.jobs.jobAt(b.tileX, b.tileY)) return true; // emirli çalıdan atıştırılmaz
+    }
+    return false;
   }
 
   /**
@@ -170,7 +215,8 @@ export class Brain {
     const origin = this.originTile(c);
     const places = [];
     for (const inn of this.world.getCompleted('inn')) if (inn.meals > 0) places.push({ place: inn, activity: 'innMeal' });
-    if (this.economy.amount('food') >= MEAL_FOOD_COST) {
+    // Kilerde yiyecek ya da ekmek (2,5 yiyecek değerinde) varsa evde / kilerde oturup yenir
+    if (this.economy.canFeed(MEAL_FOOD_COST)) {
       for (const storage of this.world.getCompleted('storage')) places.push({ place: storage, activity: 'meal' });
       const home = this.world.getBuilding(c.homeId);
       if (home && !home.underConstruction) places.push({ place: home, activity: 'meal' });
@@ -223,6 +269,109 @@ export class Brain {
     };
   }
 
+  /** Çocuk: ders saatinde, bugünkü dersini dinlemediyse en yakın Bilgelik Evi'ne gider (yoksa null). */
+  planSchool(c, hour) {
+    if (!this.research || !this.research.schoolHours(hour)) return null;
+    const today = c.schoolDay === this.world.state.time.day ? c.schoolToday : 0;
+    if (today >= SCHOOL.minutesPerDay - 10) return null; // bugünkü dersini (neredeyse) dinledi
+    const origin = this.originTile(c);
+    for (const school of this.research.academies()) {
+      const doors = this.world.getSpots(school);
+      if (doors.length === 0) continue;
+      const spot = this.nearest(doors, c);
+      if (!this.world.findPath(origin, spot)) continue;
+      return { activity: 'school', buildingId: school.id, spot, finalPoint: school.entrancePoint, duration: Math.min(this.durationFor('school'), SCHOOL.minutesPerDay - today) };
+    }
+    return null;
+  }
+
+  /** Hasta sakin: iksiri olan en yakın şifacı kulübesine gidip içeride tedavi olur (yoksa null). */
+  planHeal(c) {
+    if (!this.health) return null;
+    const origin = this.originTile(c);
+    let best = null;
+    for (const clinic of this.health.clinics()) {
+      if (clinic.remedies - this.health.claims(clinic, c) <= 0) continue;
+      const doors = this.world.getSpots(clinic);
+      if (doors.length === 0) continue;
+      const spot = this.nearest(doors, c);
+      const path = this.world.findPath(origin, spot);
+      if (!path) continue;
+      const cost = this.world.pathCost(path);
+      if (!best || cost < best.cost) best = { clinic, spot, cost };
+    }
+    if (!best) return null;
+    return {
+      activity: 'heal',
+      buildingId: best.clinic.id,
+      spot: best.spot,
+      finalPoint: best.clinic.entrancePoint,
+      // Şifalı Bitki Yetiştiriciliği araştırması tedaviyi hızlandırır
+      duration: Math.ceil(this.durationFor('heal') / healSpeedMultiplier(this.world.state)),
+    };
+  }
+
+  /**
+   * Şifacının işi: kulübede yeterince ot yoksa yakındaki ağaçların ya da çiçeklerin dibinde ot toplar,
+   * varsa kulübenin önündeki tezgâhta iksir hazırlar.
+   */
+  planHerbalist(c, building, found, duration) {
+    const spec = building.definition.apothecary;
+    const brewing = building.herbs >= spec.herbsPerRemedy && building.remedies < spec.maxRemedies;
+    const gathering = building.herbs < spec.maxHerbs && (!brewing || building.herbs < spec.herbsPerRemedy * 2);
+    if (gathering) {
+      const spot = this.herbSpot(c, building);
+      if (spot) {
+        return {
+          activity: 'gatherHerbs',
+          buildingId: building.id,
+          workBuildingId: building.id,
+          spot,
+          reserve: true,
+          facing: spot.facing ?? 'down',
+          faceTarget: spot.face,
+          duration,
+        };
+      }
+    }
+    return {
+      activity: 'brew',
+      buildingId: building.id,
+      workBuildingId: building.id,
+      spot: found.spot,
+      reserve: true,
+      faceTarget: building.center,
+      finalPoint: this.freeWorkPoint(building, c),
+      facing: building.workFacing,
+      duration,
+    };
+  }
+
+  /** Kulübenin yakınında ot toplanacak yer: bir ağacın dibi ya da çiçekli çimen (yoksa null). */
+  herbSpot(c, building) {
+    const spec = building.definition.apothecary;
+    const cx = building.tileX + 1;
+    const cy = building.tileY + 1;
+    const options = [];
+    const map = this.world.map;
+    for (let y = cy - spec.natureRadius; y <= cy + spec.natureRadius; y++) {
+      for (let x = cx - spec.natureRadius; x <= cx + spec.natureRadius; x++) {
+        const object = map.getObject(x, y);
+        if (object !== 'oak' && object !== 'pine') continue;
+        for (const s of this.world.getApproachSpots(x, y)) {
+          if (!this.world.isReserved(s.x, s.y, c.id)) options.push({ ...s, face: { x: x * 16 + 8, y: y * 16 + 8 } });
+        }
+      }
+    }
+    for (const s of this.world.flowerSpots) {
+      if (Math.abs(s.x - cx) <= spec.natureRadius && Math.abs(s.y - cy) <= spec.natureRadius && !this.world.isReserved(s.x, s.y, c.id)) options.push(s);
+    }
+    if (options.length === 0) return null;
+    const origin = this.originTile(c);
+    options.sort((a, b) => distanceSq(a, origin) - distanceSq(b, origin));
+    return this.rng.pick(options.slice(0, 6));
+  }
+
   /** İş kuyruğundan bir iş ya da üretim binasında boş bir koltuk. */
   planWork(c) {
     const found = this.jobs.findWorkFor(c, this.originTile(c));
@@ -240,6 +389,7 @@ export class Brain {
       };
     }
     const building = found.building;
+    if (building.definition.apothecary) return this.planHerbalist(c, building, found, duration);
     return {
       activity: building.definition.workActivity,
       buildingId: building.id,
@@ -338,7 +488,7 @@ export class Brain {
     for (const building of gatherings) {
       const count = this.participants(building, c).length;
       if (count === 0 || this.world.freeGatherSpots(building, c.id).length === 0) continue;
-      const rank = count + (building.type === 'inn' ? 1.5 : building.type === 'campfire' ? 0.5 : 0);
+      const rank = count + (building.type === 'inn' ? 1.5 : building.type === 'campfire' ? 0.5 : building.type === 'gazebo' ? 1 : 0);
       const better = !best || rank > best.count;
       if (better) best = { building, count: rank };
     }
@@ -350,12 +500,16 @@ export class Brain {
     const inn = gatherings.find((b) => b.type === 'inn');
     const evening = hour >= EVENING_START || hour < EVENING_END;
     // Akşamları han kamp ateşinden de çok sevilir
-    const place = evening ? inn ?? campfire ?? fountain : fountain ?? campfire ?? inn;
+    let place = evening ? inn ?? campfire ?? fountain : fountain ?? campfire ?? inn;
+    // (13. aşama) Çiftler çardakta baş başa oturmayı, dostlar da arada bir orada sohbeti sever
+    const gazebo = gatherings.find((b) => b.type === 'gazebo' && this.world.freeGatherSpots(b, c.id).length >= 2);
+    const lover = c.partnerId !== null && c.partnerId !== undefined ? this.world.getCharacter(c.partnerId) : null;
+    if (gazebo && ((lover && this.isAvailableForChat(lover, hour)) || this.rng.next() < GAZEBO_INVITE_CHANCE)) place = gazebo;
     if (!place) return null;
 
     const plan = this.planGathering(c, place);
     if (!plan) return null;
-    const partner = this.findPartner(c, hour);
+    const partner = place === gazebo && lover && this.isAvailableForChat(lover, hour) ? lover : this.findPartner(c, hour);
     if (partner) plan.inviteId = partner.id;
     return plan;
   }
@@ -368,7 +522,7 @@ export class Brain {
   planGathering(c, building, nearSpot = null, mode = 'gather') {
     const spots = this.world.freeGatherSpots(building, c.id, mode);
     if (spots.length === 0) return null;
-    const spread = mode === 'festival' || Boolean(ACTIVITIES[building.type].faceBuilding);
+    const spread = mode === 'festival' || Boolean(ACTIVITIES[building.type]?.faceBuilding);
     const reference = spread || !nearSpot ? this.originTile(c) : nearSpot;
     const taken = spread ? this.world.getGatherSpots(building, mode).filter((s) => this.world.isReserved(s.x, s.y, c.id)) : [];
     const crowding = (spot) => taken.filter((t) => Math.max(Math.abs(t.x - spot.x), Math.abs(t.y - spot.y)) <= 1).length;
@@ -377,13 +531,27 @@ export class Brain {
       .filter((s) => !nearSpot || s.x !== nearSpot.x || s.y !== nearSpot.y)
       .sort((a, b) => score(a) - score(b));
     if (ordered.length === 0) return null;
+    const spot = ordered[0];
     return {
       activity: building.type,
       buildingId: building.id,
-      spot: ordered[0],
+      spot,
       reserve: true,
-      duration: this.durationFor(building.type),
+      // Çardakta önündeki karodan içeri, bankına oturur
+      ...(spot.seat ? { finalPoint: spot.seat, facing: 'down' } : {}),
+      // Liman ve iskele gibi toplanma etkinliği olmayan festival yerlerinde süreyi çağıran belirler
+      duration: ACTIVITIES[building.type] ? this.durationFor(building.type) : 60,
     };
+  }
+
+  /** Toplanma Zili: meydanın çevresinde zil süresi bitene kadar beklemek. */
+  planRally(c) {
+    const rally = this.world.state.rally;
+    const venue = this.world.getBuilding(rally.venueId);
+    if (!venue) return null;
+    const plan = this.planGathering(c, venue, null, 'festival');
+    if (!plan) return null;
+    return { ...plan, activity: 'rally', duration: Math.max(5, rally.until - this.world.state.totalMinutes) };
   }
 
   /** Şenlik yerine gidip bitene kadar dans etmek. */
@@ -411,8 +579,10 @@ export class Brain {
     for (const [activity, type] of LANDMARK_LEISURE) {
       if (this.world.getCompleted(type).length === 0) weights[activity] = 0;
     }
+    // (13. aşama) Çardak: meydandaki havuz kadar sevilir; sevgilisi / eşi olan için iki kat
+    if (this.availableGatherings().some((b) => b.type === 'gazebo')) weights.gazebo = (weights.fountain ?? 1) * (c.partnerId !== null && c.partnerId !== undefined ? 1.8 : 0.9);
     for (const building of this.availableGatherings()) {
-      if (this.participants(building, c).length > 0) weights[building.type] *= 1.6;
+      if (this.participants(building, c).length > 0) weights[building.type] = (weights[building.type] ?? 0) * 1.6;
     }
 
     const options = Object.entries(weights).filter(([name, w]) => w > 0 && ACTIVITIES[name]);
@@ -468,6 +638,11 @@ export class Brain {
       case 'campfire': {
         const building = this.availableGatherings().find((b) => b.type === activity);
         return building ? this.planGathering(c, building) : null;
+      }
+      case 'gazebo': {
+        const gazebos = this.availableGatherings().filter((b) => b.type === 'gazebo' && this.world.freeGatherSpots(b, c.id).length > 0);
+        if (gazebos.length === 0) return null;
+        return this.planGathering(c, this.nearest(gazebos.map((b) => ({ x: b.tileX, y: b.tileY, b })), c).b);
       }
       case 'play': {
         // Çocuklar meydanda, havuzun, ateşin ve hanın çevresinde koşuşturur
@@ -542,7 +717,7 @@ export class Brain {
   availableGatherings() {
     return this.world
       .getCompleted()
-      .filter((b) => GATHERING_ACTIVITIES.includes(b.type) && (b.type === 'fountain' || b.lit));
+      .filter((b) => GATHERING_ACTIVITIES.includes(b.type) && (ALWAYS_OPEN_GATHERINGS.includes(b.type) || b.lit));
   }
 
   /** Bir toplanma yerinde olan ya da oraya giden diğer karakterler. */

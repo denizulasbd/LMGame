@@ -2,7 +2,7 @@
 // src/ai/Brain.js) bu tabloyu okur; yeni etkinlik eklemek çoğunlukla buraya bir kayıt
 // ve Brain içinde bir hedef seçici eklemekten ibarettir.
 //
-//   kind        : need (ihtiyaç gidermek) | rest (uyku) | social | leisure | idle | work | festival
+//   kind        : need (ihtiyaç gidermek) | rest (uyku) | social | leisure | idle | work | festival | away (sefer)
 //                 festival yarıda kesilmez (uyku saati gelse de şenlik bitene kadar sürer).
 //                 social/leisure/idle/work etkinlikleri acil bir ihtiyaç doğunca yarıda kesilir.
 //   indoor      : hedefe varınca kapıdan girip görünmez olur (uyku, evde yemek)
@@ -12,10 +12,11 @@
 //   travelEffects: hedefe yürürken dakika başına kazanç (yürüyüş keyfi)
 //   socialGain / aloneSocialGain: toplanma yerinde biriyle / yalnızken dakika başına sosyallik
 //   nature      : true ise 'Doğa Sever' kazanç çarpanı uygulanır
-//   pose        : stand | sit | gather | work | fish
+//   pose        : stand | sit | gather | work | fish | tend (aletini dik tutup bekler: çoban değneği)
 //   tool        : çalışırken elde tutulan alet (art/ui -> held tools)
 //   effect      : çalışırken karakterin önünde çizilen efekt ('dust': kazma darbesinde toz ve kıymık)
 //   friendshipMultiplier: bu yerde sohbet edenlerin arkadaşlık puanı kazanç çarpanı
+//   romanceMultiplier   : (13. aşama, çardak) burada sohbet eden bekârların aşık olma ve çiftlerin evlenme olasılığı çarpanı
 //   dance       : şenlikte karakter ritimle sağa sola döner
 //   bubbles     : etkinlik sırasında çıkan ifade balonları; partnerBubbles: sohbet ederken
 //                 (sevgilisi / eşiyle sohbet ederken LOVE_BUBBLES, anlaşamadığıyla RIVAL_BUBBLES)
@@ -38,6 +39,9 @@ export const ACTIVITIES = {
     travelLabel: 'Yemek yemeye gidiyor',
     label: 'Evinde yemek yiyor',
     storageLabel: 'Kilerde yemek yiyor',
+    breadLabel: 'Evinde taze ekmekle yemek yiyor',
+    breadStorageLabel: 'Kilerde taze ekmekle yemek yiyor',
+    breadEffects: { fun: 0.25 }, // sıcak ekmekli öğün biraz da keyif verir
     duration: [12, 18],
     effects: { hunger: 4 },
     urgentBubble: 'apple',
@@ -79,6 +83,38 @@ export const ACTIVITIES = {
     aloneSocialGain: 0.1,
     bubbles: ['sparkle'],
     partnerBubbles: ['chat', 'laugh', 'heart', 'note'],
+  },
+  // 13. aşama: Ahşap Çardak — çiftlerin ve dostların sevdiği sohbet köşesi (arkadaşlık ve aşk daha hızlı gelişir)
+  gazebo: {
+    kind: 'social',
+    target: 'gazebo',
+    travelLabel: 'Çardağa yürüyor',
+    label: 'Çardakta oturup çiçekleri seyrediyor',
+    partnerLabel: '{partner} ile çardakta sohbet ediyor',
+    duration: [45, 80],
+    effects: { fun: 0.6, energy: 0.08 },
+    socialGain: 1.4,
+    aloneSocialGain: 0.15,
+    pose: 'sit',
+    friendshipMultiplier: 1.6,
+    romanceMultiplier: 2.5,
+    bubbles: ['note', 'sparkle'],
+    partnerBubbles: ['heart', 'chat', 'laugh', 'note'],
+  },
+  // 14. aşama: Toplanma Zili — sakinler meydanda toplanıp bekler
+  rally: {
+    kind: 'social',
+    target: 'fountain',
+    travelLabel: 'Toplanma zilini duyup meydana koşuyor',
+    label: 'Meydanda toplandı, kalabalığı seyrediyor',
+    partnerLabel: '{partner} ile meydanda merakla bekliyor',
+    duration: [60, 60],
+    effects: { fun: 0.2 },
+    socialGain: 0.9,
+    aloneSocialGain: 0.4,
+    faceBuilding: true,
+    bubbles: ['note', 'chat'],
+    partnerBubbles: ['chat', 'laugh', 'note'],
   },
   bench: {
     kind: 'leisure',
@@ -219,6 +255,82 @@ export const ACTIVITIES = {
     indoor: true,
     travelLabel: 'Hana aşçılığa gidiyor',
     label: 'Handa sıcak yemek pişiriyor',
+  },
+  // --- 10. aşama: hayvancılık, değirmen-fırın ve demir madeni ---
+  herd: {
+    kind: 'work',
+    travelLabel: 'Koyun ağılına gidiyor',
+    label: 'Ağılda koyunları otlatıyor',
+    pose: 'tend',
+    tool: 'crook',
+    bubbles: ['note', 'heart', 'sparkle'],
+  },
+  bake: {
+    kind: 'work',
+    travelLabel: 'Değirmene ve fırına gidiyor',
+    label: 'Fırında sıcak ekmek pişiriyor',
+    idleLabel: 'Fırının başında un bekliyor',
+    pose: 'work',
+    tool: 'peel',
+    bubbles: ['fire', 'sparkle', 'note'],
+  },
+  mineIron: {
+    kind: 'work',
+    travelLabel: 'Demir madenine gidiyor',
+    label: 'Madende demir cevheri kazıyor',
+    pose: 'work',
+    tool: 'pickaxe',
+    effect: 'dust',
+    bubbles: ['sweat', 'note'],
+  },
+  // --- 11. aşama: şifacılık, tedavi ve keşif seferi ---
+  brew: {
+    kind: 'work',
+    travelLabel: 'Şifacı kulübesine gidiyor',
+    label: 'Havanda şifalı ot dövüp iksir hazırlıyor',
+    pose: 'work',
+    tool: 'pestle',
+    bubbles: ['herb', 'sparkle', 'note'],
+  },
+  gatherHerbs: {
+    kind: 'work',
+    travelLabel: 'Şifalı ot toplamaya gidiyor',
+    label: 'Doğadan şifalı ot topluyor',
+    pose: 'gather',
+    bubbles: ['herb', 'sparkle'],
+  },
+  // Hasta sakin şifacıya gidip iksirle tedavi olur (içeride)
+  heal: {
+    kind: 'need',
+    indoor: true,
+    travelLabel: 'Şifacıya gidiyor',
+    label: 'Şifacıda iksirle tedavi oluyor',
+    duration: [25, 35],
+    effects: { energy: 0.4 },
+    urgentBubble: 'fever',
+  },
+  // --- 12. aşama: Bilgelik Evi ---
+  teach: {
+    kind: 'work',
+    indoor: true,
+    travelLabel: 'Bilgelik Evi\'ne gidiyor',
+    label: 'Bilgelik Evi\'nde araştırma yapıyor',
+    teachLabel: 'Bilgelik Evi\'nde çocuklara ders veriyor',
+  },
+  // Çocuklar ders saatlerinde Bilgelik Evi'nde ders dinler (içeride)
+  school: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: 'Okula koşuyor',
+    label: 'Bilgelik Evi\'nde ders dinliyor',
+    duration: [50, 80],
+    effects: { social: 0.3, fun: 0.15 },
+  },
+  // Keşif seferine çıkan sakin harita kenarına yürür ve bir gün ortadan kaybolur
+  expedition: {
+    kind: 'away',
+    travelLabel: 'Keşif seferine yola çıkıyor',
+    label: 'Keşif seferinde',
   },
   // Zanaat atölyesinde ekipman üretimi ({item}: yapılan ekipman)
   craft: {

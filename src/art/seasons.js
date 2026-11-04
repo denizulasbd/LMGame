@@ -98,6 +98,16 @@ export function snowCapRows(rows, depth = 2) {
 // Tuval düzeyinde kış dönüşümü (yapılar için)
 // ---------------------------------------------------------------------------
 const winterCache = new WeakMap();
+// Çatı tanımının önbellek anahtarı: her karede JSON.stringify çöp üretmesin diye tanım nesnesine bağlı saklanır
+const roofKeys = new WeakMap();
+const roofKey = (roof) => {
+  let key = roofKeys.get(roof);
+  if (key === undefined) {
+    key = JSON.stringify(roof);
+    roofKeys.set(roof, key);
+  }
+  return key;
+};
 
 const hex = (color) => [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
 const OUTLINE = hex(PALETTE.K);
@@ -113,7 +123,7 @@ const SNOW_SIDE = hex(PALETTE[6]);
  */
 export function winterize(canvas, roof = null) {
   let perCanvas = winterCache.get(canvas);
-  const key = roof ? JSON.stringify(roof) : '-';
+  const key = roof ? roofKey(roof) : '-';
   if (perCanvas?.has(key)) return perCanvas.get(key);
   const out = document.createElement('canvas');
   out.width = canvas.width;

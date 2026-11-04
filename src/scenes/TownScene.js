@@ -40,8 +40,26 @@ import { SaveSystem } from '../systems/SaveSystem.js';
 import { EventSystem } from '../systems/EventSystem.js';
 import { HeatingSystem } from '../systems/HeatingSystem.js';
 import { MilestoneSystem } from '../systems/MilestoneSystem.js';
-import { TILE_TYPES, TILE_BY_ID, isGround } from '../data/tiles.js';
+import { TownLevelSystem } from '../systems/TownLevelSystem.js';
+import { HealthSystem } from '../systems/HealthSystem.js';
+import { AnimalSystem } from '../systems/AnimalSystem.js';
+import { CivicSystem } from '../systems/CivicSystem.js';
+import { DilemmaSystem } from '../systems/DilemmaSystem.js';
+import { ResearchSystem } from '../systems/ResearchSystem.js';
+import { HarborSystem } from '../systems/HarborSystem.js';
+import { LuxurySystem } from '../systems/LuxurySystem.js';
+import { StatsSystem } from '../systems/StatsSystem.js';
+import { relicMask } from '../systems/Luxury.js';
+import { SeasonFestivalSystem } from '../systems/SeasonFestivalSystem.js';
+import { MemorySystem } from '../systems/MemorySystem.js';
+import { RallySystem } from '../systems/RallySystem.js';
+import { CraftsmanshipSystem } from '../systems/CraftsmanshipSystem.js';
+import { getFestivalDecorSprite } from '../art/sprites/index.js';
+import { SNOWMAN_STAGES } from '../data/festivals.js';
+import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
+import { JOBS } from '../data/jobs.js';
 import { TOWN_NAME_MAX_LENGTH } from '../data/town.js';
+import { CHARACTER_NAME_MAX_LENGTH } from '../data/characters.js';
 import { AudioSystem } from '../systems/AudioSystem.js';
 import { FestivalEffects } from '../rendering/FestivalEffects.js';
 import { Random } from '../utils/random.js';
@@ -76,6 +94,7 @@ export class TownScene extends Scene {
       applyTerrain(map, state.pendingTerrain);
       state.pendingTerrain = null;
       map.occupants.fill(0);
+      map.passable.fill(0);
       for (const building of state.buildings) this.occupyFootprint(building);
     } else {
       state.buildings = structures.map((record) => new Building(record));
@@ -107,12 +126,25 @@ export class TownScene extends Scene {
     this.conflicts = new ConflictSystem(this.game, this.world, this.relationships, new Random(state.seed + 6));
     this.family = new FamilySystem(this.game, this.world, new Random(state.seed + 7));
     this.crafting = new CraftingSystem(this.game, this.world, this.economy);
+    this.health = new HealthSystem(this.game, this.world, new Random(state.seed + 8));
+    this.animals = new AnimalSystem(this.game, this.world, new Random(state.seed + 9));
+    this.civic = new CivicSystem(this.game, this.world, this.economy);
     this.journal = new JournalSystem(this.game);
+    this.research = new ResearchSystem(this.game, this.world, this.economy, new Random(state.seed + 12));
+    this.harbor = new HarborSystem(this.game, this.world, this.economy, new Random(state.seed + 13));
+    this.luxury = new LuxurySystem(this.game, this.economy);
+    this.stats = new StatsSystem(this.game);
+    this.seasonFestivals = new SeasonFestivalSystem(this.game, this.world, new Random(state.seed + 14), { attract: this.attract });
+    this.memories = new MemorySystem(this.game, this.world, new Random(state.seed + 15));
+    this.rally = new RallySystem(this.game);
+    this.craftsmanship = new CraftsmanshipSystem(this.game, this.world, this.economy, new Random(state.seed + 16));
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       economy: this.economy,
       jobs: this.jobs,
       relationships: this.relationships,
       crafting: this.crafting,
+      health: this.health,
+      research: this.research,
     });
     this.saves = new SaveSystem(this.game, {
       captureTerrain: () => diffTerrain(this.baseTerrain, this.map),
@@ -120,26 +152,37 @@ export class TownScene extends Scene {
       attract: this.attract,
     });
     this.milestones = new MilestoneSystem(this.game, this.world, TILE_TYPES.cobble.id);
+    this.townLevel = new TownLevelSystem(this.game, this.world, this.economy, { attract: this.attract });
+    this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population }, { attract: this.attract });
 
-    // Sıra önemlidir: hava, yapı durumu ve kapasite, iş temizliği, atölye durumu, ihtiyaç azalması,
-    // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar ve doğa
+    // Sıra önemlidir: hava, yapı durumu ve kapasite, Bilgelik Evi ve liman durumu, iş temizliği, atölye durumu, ihtiyaç azalması,
+    // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar, kasaba seviyesi ve doğa
     this.structures = new StructureSystem(this.game, this.world);
     this.heating = new HeatingSystem(this.game, this.world, this.economy);
     this.systems = [
       this.weather,
       this.structures,
+      this.research,
+      this.harbor,
       this.economy,
       this.jobs,
       this.crafting,
       new NeedsSystem(this.world),
+      this.health,
       new MovementSystem(this.world),
       this.behavior,
+      this.animals,
       this.relationships,
       this.conflicts,
       this.family,
       this.townEvents,
+      this.seasonFestivals,
+      this.memories,
+      this.rally,
       this.heating,
       this.milestones,
+      this.townLevel,
+      this.dilemmas,
       this.nature,
     ];
 
@@ -161,6 +204,18 @@ export class TownScene extends Scene {
       this.relationships,
       this.family,
       this.crafting,
+      this.townLevel,
+      this.animals,
+      this.civic,
+      this.dilemmas,
+      this.research,
+      this.harbor,
+      this.luxury,
+      this.stats,
+      this.seasonFestivals,
+      this.memories,
+      this.rally,
+      this.craftsmanship,
     ];
 
     this.camera = new Camera();
@@ -184,8 +239,13 @@ export class TownScene extends Scene {
     this.selectedBuildingId = null;
     this.followId = null;
     this.focusId = null;
+    this.cinematic = false; // (13. aşama) fotoğraf modu: arayüz gizli, haritada imleç ve seçim çizilmez
 
     this.unsubscribers = [
+      events.on('ui:setCinematic', (on) => {
+        this.cinematic = Boolean(on);
+        if (this.cinematic) this.tools.setTool('select');
+      }),
       events.on('ui:selectCharacter', (id) => {
         this.select(id);
         this.focusId = id; // listeden seçilince kamera bir kez karaktere kayar
@@ -204,6 +264,21 @@ export class TownScene extends Scene {
       events.on('ui:cancelProject', (id) => this.construction.cancelProject(this.world.getBuilding(id))),
       events.on('building:removed', (building) => {
         if (building.id === this.selectedBuildingId) this.selectBuilding(null);
+      }),
+      // (13. aşama) Sakinin adını değiştirmek: boş ya da başka bir sakinin adıyla aynı olamaz
+      events.on('ui:renameCharacter', ({ id, name }) => {
+        const c = this.world.getCharacter(id);
+        const clean = String(name ?? '').trim().replace(/\s+/g, ' ').slice(0, CHARACTER_NAME_MAX_LENGTH);
+        if (!c || !clean || clean === c.name) return;
+        const taken = state.characters.some((o) => o !== c && o.name.toLocaleLowerCase('tr') === clean.toLocaleLowerCase('tr'));
+        if (taken) {
+          events.emit('toast', { text: `Kasabada zaten ${clean} adında biri var`, tone: 'warn', icon: 'heart' });
+          return;
+        }
+        const from = c.name;
+        c.name = clean;
+        c.customName = true;
+        events.emit('character:renamed', { character: c, from });
       }),
       events.on('ui:renameTown', (name) => {
         const clean = String(name ?? '').trim().slice(0, TOWN_NAME_MAX_LENGTH);
@@ -224,14 +299,20 @@ export class TownScene extends Scene {
 
   exit() {
     this.unsubscribers?.forEach((off) => off());
-    this.disposables?.forEach((system) => system.destroy());
+    // Olay aboneliği olan her sistem (güncelleme listesindekiler dahil) bir kez temizlenir; listeye eklemeyi
+    // unutmak sahne her yeniden kurulduğunda (Yükle / Yeni Harita) dinleyici sızdırırdı.
+    const owners = new Set([...(this.disposables ?? []), ...(this.systems ?? [])]);
+    for (const system of owners) system?.destroy?.();
+    this.unsubscribers = null;
+    this.disposables = null;
+    this.systems = null;
   }
 
   /** Kayıttan gelen yapının kapladığı karoları haritada işaretler. */
   occupyFootprint(building) {
     const { w, h } = BUILDINGS[building.type].size;
     for (let y = building.tileY; y < building.tileY + h; y++) {
-      for (let x = building.tileX; x < building.tileX + w; x++) this.map.setOccupant(x, y, building.id);
+      for (let x = building.tileX; x < building.tileX + w; x++) this.map.setOccupant(x, y, building.id, Boolean(BUILDINGS[building.type].walkable));
     }
   }
 
@@ -305,13 +386,23 @@ export class TownScene extends Scene {
 
     const { renderer } = this.game;
     const season = getSeason(this.game.state.time.day);
-    this.weatherFx.update(dt, this.game.state.weather, this.camera, renderer, this.map, season.key);
+    this.weatherFx.update(dt, this.game.state.weather, this.camera, renderer, this.map, season.key, tick.gameMinutes);
+    if (this.weatherFx.takeLightning()) this.game.events.emit('weather:lightning', {});
     this.leaves.update(dt, season.key === 'autumn', this.camera, renderer, this.map);
     this.fireflies.update(dt, this.map);
     this.audio.update(dt, tick.hour);
 
     if (this.attract) {
       this.drainInput();
+      return;
+    }
+    // (13. aşama) Fotoğraf modu: kamera ve zaman kullanılır, haritaya tıklamak bir şey seçmez; Esc ya da F çıkar
+    if (this.cinematic) {
+      if (this.game.input.wasPressed('cancel')) this.game.events.emit('ui:toggleCinematic');
+      this.game.input.consumeClick();
+      this.game.input.consumeLeftPress();
+      this.game.input.consumeLeftRelease();
+      this.updateCameraTarget(dt);
       return;
     }
     const hovered = this.hoveredTile();
@@ -353,6 +444,8 @@ export class TownScene extends Scene {
     if (input.wasPressed('pause')) events.emit('time:togglePause');
     if (input.wasPressed('toggleJournal')) events.emit('ui:toggleJournal');
     if (input.wasPressed('toggleGoals')) events.emit('ui:toggleGoals');
+    if (input.wasPressed('toggleStats')) events.emit('ui:toggleStats');
+    if (input.wasPressed('toggleCinematic')) events.emit('ui:toggleCinematic');
     ['speed1', 'speed2', 'speed3'].forEach((action, i) => {
       if (input.wasPressed(action)) events.emit('time:setSpeed', CONFIG.TIME_SPEEDS[i]);
     });
@@ -421,6 +514,12 @@ export class TownScene extends Scene {
       this.game.events.emit('ui:openTrade');
       return;
     }
+    // (14. aşama) Kediye / köpeğe tıklamak onu sever: sevinçle zıplar, kalpler uçuşur
+    const pet = this.game.state.animals.find((a) => a.hitTest?.(point.x, point.y));
+    if (pet) {
+      this.game.events.emit('ui:petAnimal', { id: pet.id });
+      return;
+    }
     const character = this.world.findCharacterAt(point.x, point.y);
     if (character) {
       this.select(character.id);
@@ -430,6 +529,20 @@ export class TownScene extends Scene {
     if (buildingId) {
       this.selectBuilding(buildingId);
       if (this.world.getBuilding(buildingId)?.open) this.game.events.emit('ui:openTrade');
+      return;
+    }
+    // (14. aşama) Ağaca ya da kayaya tıklamak onu öncelikli kesme / kırma hedefi yapar
+    const tx = Math.floor(point.x / CONFIG.TILE_SIZE);
+    const ty = Math.floor(point.y / CONFIG.TILE_SIZE);
+    const object = this.map.getObject(tx, ty);
+    if (object && OBJECT_TYPES[object]?.harvest) {
+      const job = this.jobs.prioritize(tx, ty);
+      if (job) {
+        const verb = job.type === 'chop' ? 'kesilecek' : job.type === 'mine' ? 'kırılacak' : 'toplanacak';
+        this.game.events.emit('toast', { text: `Öncelikli hedef: bu ${OBJECT_TYPES[object].name.toLocaleLowerCase('tr')} ilk iş olarak ${verb}; boştaki işçiler koşuyor`, tone: 'info', icon: JOBS[job.type].marker });
+      }
+      this.select(null);
+      this.selectBuilding(null);
       return;
     }
     this.select(null);
@@ -465,7 +578,8 @@ export class TownScene extends Scene {
     const point = input.getWorldPosition(this.camera);
     const visitor = point && !this.tools.isActive ? this.world.findVisitorAt(point.x, point.y) : null;
     const character = visitor ?? (point && !this.tools.isActive ? this.world.findCharacterAt(point.x, point.y) : null);
-    renderer.canvas.classList.toggle('is-pointing', Boolean(character));
+    const pet = point && !this.tools.isActive && this.game.state.animals.some((a) => a.hitTest?.(point.x, point.y));
+    renderer.canvas.classList.toggle('is-pointing', Boolean(character) || Boolean(pet));
 
     this.hovered = hovered;
     this.hoveredCharacterId = character?.id ?? null;
@@ -491,25 +605,29 @@ export class TownScene extends Scene {
     const weather = this.game.state.weather;
     const season = getSeason(this.game.state.time.day);
     const freezing = this.game.state.heating.cold; // kışın odun bitti: ocaklar söndü
-    const env = {
-      time: this.animationTime,
-      hour,
-      season: season.key,
-      butterflies: season.butterflies,
-      windowsLit: hour >= 18.5 || hour < 6.5,
-      raining: isRainActive(weather),
-      sleepingHomes: new Set(
-        this.world.characters.filter((c) => c.isSleeping && c.insideBuildingId).map((c) => c.insideBuildingId)
-      ),
-      // Odun bitince bacalardan duman tütmez
-      smokingHomes: freezing ? new Set() : new Set(this.world.characters.map((c) => c.homeId).filter((id) => id !== null)),
-    };
+    // Çizim ortamı kareler arasında yeniden kullanılır (her karede yeni nesne ve küme üretilmez)
+    const env = this.renderEnv ?? (this.renderEnv = { sleepingHomes: new Set(), smokingHomes: new Set() });
+    env.time = this.animationTime;
+    env.hour = hour;
+    env.season = season.key;
+    env.butterflies = season.butterflies;
+    env.windowsLit = hour >= 18.5 || hour < 6.5;
+    env.raining = isRainActive(weather);
+    env.sleepingHomes.clear();
+    env.smokingHomes.clear(); // odun bitince bacalardan duman tütmez
+    for (const c of this.world.characters) {
+      if (c.isSleeping && c.insideBuildingId) env.sleepingHomes.add(c.insideBuildingId);
+      if (!freezing && c.homeId !== null) env.smokingHomes.add(c.homeId);
+    }
+    env.relics = relicMask(this.game.state); // (13. aşama) Belediye Konağı'nda sergilenen yadigârlar
+    // (14. aşama) süren mevsim festivalinin teması (kışın fenerler parıldar, şölen ateşi harlanır)
+    env.festivalTheme = this.game.state.events.festival.active ? this.game.state.events.festival.theme ?? null : null;
     const view = this.camera.getViewBounds(renderer.width, renderer.height);
 
     renderer.applyCamera(this.camera);
     this.map.renderGround(renderer, this.camera, this.animationTime, season.key);
     this.weatherFx.drawGround(renderer);
-    this.drawSelectionGround(renderer);
+    if (!this.cinematic) this.drawSelectionGround(renderer);
 
     // Derinlik sıralı katman: ağaçlar, kayalar, yapılar ve karakterler birlikte sıralanır
     this.map.queueObjects(this.queue, renderer, this.camera, season.key);
@@ -518,31 +636,43 @@ export class TownScene extends Scene {
     }
     for (const character of this.world.characters) character.queueDraw(this.queue);
     for (const visitor of this.world.visitors) visitor.queueDraw(this.queue);
+    for (const animal of this.game.state.animals) animal.queueDraw(this.queue, env);
+    for (const boat of this.world.boats ?? []) boat.queueDraw(this.queue, env);
+    this.queueFestivalDecor(env);
     this.queue.flush(renderer);
 
     for (const building of this.world.buildings) building.drawEffects(renderer, env);
     for (const character of this.world.characters) character.drawEffects(renderer, this.animationTime);
+    for (const boat of this.world.boats ?? []) boat.drawEffects(renderer, this.animationTime);
     this.leaves.draw(renderer);
     this.weatherFx.drawClouds(renderer, this.camera, weather, this.map, this.animationTime);
+    this.weatherFx.drawMist(renderer, this.camera, weather, this.map, this.animationTime);
 
-    const lights = [];
+    const lights = this.lights ?? (this.lights = []);
+    lights.length = 0;
     for (const building of this.world.buildings) building.collectLights(lights, env);
     const festivalVenue = this.festivalVenue();
-    if (festivalVenue) this.festivalFx.collectLights(lights, festivalVenue);
+    if (festivalVenue) this.festivalFx.collectLights(lights, festivalVenue, env.festivalTheme, this.game.state.seasonFestival);
     this.dayNight.render(renderer, this.camera, hour, lights, weather, season.tint);
 
     // Atmosferin üstü: ateşböcekleri, yağmur, balonlar, iş işaretleri, araç önizlemesi ve imleç gece de net görünsün
     renderer.applyCamera(this.camera);
     this.fireflies.draw(renderer, view, fireflyIntensity(weather, hour), this.animationTime, season.fireflies);
-    if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime);
+    if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime, env.festivalTheme, this.game.state.seasonFestival);
     renderer.resetCamera();
     const daylight = 1 - Math.min(1, getAmbientColor(hour).a / 0.55);
     this.weatherFx.drawRain(renderer, this.camera, weather, daylight);
+    this.weatherFx.drawLightning(renderer);
     renderer.applyCamera(this.camera);
     for (const building of this.world.buildings) building.drawOverlay(renderer, env);
-    drawJobMarkers(renderer, this.jobs.jobs, this.animationTime);
+    if (!this.cinematic) drawJobMarkers(renderer, this.jobs.jobs, this.animationTime);
     for (const character of this.world.characters) character.drawOverlay(renderer);
     for (const visitor of this.world.visitors) visitor.drawOverlay(renderer);
+    for (const animal of this.game.state.animals) animal.drawOverlay(renderer);
+    if (this.cinematic) {
+      renderer.resetCamera();
+      return; // fotoğraf modunda imleç, seçim ve araç önizlemesi çizilmez
+    }
     this.drawSelectedBuilding(renderer);
 
     if (this.tools.isActive) {
@@ -552,6 +682,19 @@ export class TownScene extends Scene {
       drawTileCursor(renderer, tileX, tileY, this.animationTime, this.map.isBuildable(tileX, tileY));
     }
     renderer.resetCamera();
+  }
+
+  /** (14. aşama) Mevsim festivalinin süslemeleri: çiçek kemerleri, sofralar, hasat sepeti, kardan adam... */
+  queueFestivalDecor(env) {
+    const sf = this.game.state.seasonFestival;
+    if (sf.stage !== 'active') return;
+    const elapsed = this.game.state.totalMinutes - (sf.startedAt ?? 0);
+    const snowStage = SNOWMAN_STAGES.filter((m) => elapsed >= m).length - 1;
+    for (const d of sf.decor) {
+      const sprite = getFestivalDecorSprite(d.kind, { frame: Math.floor(env.time * 3), stage: snowStage, season: env.season });
+      if (!sprite) continue;
+      this.queue.addImage(d.y, sprite, Math.round(d.x - sprite.width / 2), Math.round(d.y - sprite.height + 2));
+    }
   }
 
   /** Şenlik sürüyorsa yapıldığı yer, yoksa null. */

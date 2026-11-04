@@ -2,6 +2,7 @@
 // (yapı küçük resimleri ve maliyetleri) ve fare altındaki duruma göre ipucu satırı.
 // Araç değişikliği 'ui:setTool' olarak istenir; asıl mantık scenes/ToolController.js'te.
 import { BUILD_MENU, getBuildDefinition, TILE_BUILDS } from '../../data/buildings.js';
+import { TOWN_TIERS } from '../../data/town.js';
 import { RESOURCES } from '../../data/resources.js';
 import { getStructureSprite } from '../../art/sprites/index.js';
 import { getTileSprite } from '../../art/tiles/index.js';
@@ -106,7 +107,8 @@ export class BuildMenu {
     if (this.itemRow.hidden) return;
     const resources = game.state.resources;
     const built = new Set(game.state.buildings.filter((b) => !b.underConstruction).map((b) => b.type));
-    const key = `${Object.values(resources).join(',')}|${game.state.buildings.map((b) => `${b.type}${b.underConstruction ? '~' : ''}`).sort().join(',')}`;
+    const tier = game.state.town?.tier ?? 1;
+    const key = `${tier}|${Object.values(resources).join(',')}|${game.state.buildings.map((b) => `${b.type}${b.underConstruction ? '~' : ''}`).sort().join(',')}`;
     if (key === this.affordKey) return;
     this.affordKey = key;
     for (const { type, def, button } of this.items) {
@@ -114,9 +116,15 @@ export class BuildMenu {
       // Önce başka bir yapı gerektiren (pazar -> kiler) kilitli görünür
       const needsOther = def.requiresBuilding && !built.has(def.requiresBuilding.type);
       const alreadyHave = def.unique && game.state.buildings.some((b) => b.type === type);
-      const locked = needsOther || alreadyHave;
+      // Kasaba seviyesiyle açılan yapılar (değirmen: Köy, belediye: Kasaba) kilit simgesiyle görünür
+      const tierLocked = def.requiresTier && tier < def.requiresTier;
+      const locked = needsOther || alreadyHave || tierLocked;
       button.classList.toggle('is-locked', Boolean(locked));
-      button.title = needsOther
+      button.classList.toggle('is-tier-locked', Boolean(tierLocked));
+      button.dataset.tier = tierLocked ? TOWN_TIERS[def.requiresTier - 1].name : '';
+      button.title = tierLocked
+        ? `${def.name} — kasaba ${TOWN_TIERS[def.requiresTier - 1].name} seviyesine ulaşınca açılır · ${def.description}`
+        : needsOther
         ? `${def.name} — ${def.requiresBuilding.reason}`
         : alreadyHave
           ? `${def.name} — kasabada zaten var (yalnızca bir tane olabilir)`
