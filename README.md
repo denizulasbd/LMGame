@@ -1603,7 +1603,24 @@ koşar ve maceralarını anlatır: başlarında dağ ya da hazine balonu çıkar
 gösterir; Kasaba Arşivi'nde sefer, macera, hikâye ve çözülen yazıt sayaçları vardır.
 
 ### Denge ve test (simülasyon)
-STRESS_PLACEHOLDER
+- **Stres matrisi** (6 tohum x 1x / 2x / 4x x 50 gün = 18 koşu): takılma 0, kopuk referans 0 (seferde kaybolan ya da dönüşü
+  geciken kafile dahil), taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0, kıyafet hatası 0. Otopilot 328 sefer
+  düzenledi (318'i döndü; kalan 10 kafile koşu bittiğinde yoldaydı), 648 macera yaşandı ve yalnızca 24'ünde kaza oldu
+  (otopilot riski %15'i aşan yola girmez; usta ve aletle sıfırlanan riskli yolları seçer). Handa 1948 hikâye anlatıldı,
+  her koşuda üç yazıt da çözüldü (54), 103 asma ve meşale dikildi.
+- **Hedefli testler** (`tests.mjs`, 259): risk kuralları (taban, Sağlam Aletli Usta Madenci sıfırlar, aletsiz usta yarıya
+  indirir, Kalfa Şifacı patikayı güvenli kılar), sefer düzenleme ve maliyet, ikinci seferin engellenmesi, macera
+  penceresinin açılması ve oyunu durdurması, kafile ve risk metni, usta kafilede iken kazasız riskli yol ve seferin adı,
+  zorlanan kaza (yaralanma, yarım ganimet), dönüş (kimse kaybolmaz, anı, hasta yatan yaralı, hikâye), şifalı ot ganimeti,
+  handa hikâye anlatma ve dinleyenlerin keyfi, üç yadigâr parçasının birleşmesi, Kayıp Şehir Haritası, asmanın kuralları
+  ve bahçeye +%10, sökülen asmanın fidesi, meşalenin mavi ışığı ve ısıtması, harabeden yazıt, yazıtın çözülmesi ve üç
+  şemanın etkisi, kayıttan keşif durumunun ve hikâyelerin dönmesi.
+- **Denetim** (`audit.mjs`, 52): sefer yoldayken macera penceresi açıkken kayıt -> yükleme birebir aynı; pencere yeniden
+  açılır, kafile seferde kalır, sefer bir kez döner.
+- **Uyumluluk** (`compat.mjs`, sürüm 2-14, 192): eski kayıtlar boş ganimet sandığıyla açılır; sürüm 13 kaydında eski
+  biçimde yarım kalmış sefer maceralar açmadan sürer ve döner; sürüm 14 kaydının ganimetleri, yazıtları ve sefer sayısı korunur.
+- **Bulunup düzeltilen hata:** seferden şifalı ot gelince Kasaba Günlüğü çöküyordu (otlar kaynak değil, Şifacı Kulübesi
+  stoğu); 30 günlük otopilot koşusu yakaladı, hedefli teste eklendi.
 
 ## Derinleşen yaşam: sosyal denge, meslek kıyafetleri ve usta işi eserler (15. aşama)
 
@@ -1724,7 +1741,7 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 | `node tools/sim/tests.mjs` | Hedefli kural testleri (259; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
 | `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 14'e) açar, bir gün yaşatır; referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
-| `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi |
+| `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |
 | `node tools/sim/autopilot.mjs 42 40` | Hilesiz otopilotla 40 günlük oyun: günlük özet (araştırma, altın, sefer, harika aşaması, yadigâr ve harcanan altın dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya, altının yadigâr / lüks mal / fermanlara ne kadar harcandığı, peyzaj ve son 12 günün ortalama stoğu; (14. aşama) mevsim festivalleri ve katılımcıları, anı sayıları ve örnek bir sakinin anıları, nadir hava olayları, Büyük İhracat Seferi sayısı. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar, `--speed 1\|2\|4` oyun hızını seçer, `--json rapor.json` bekçi raporunu yazar (takılma ya da kopuk referans varsa çıkış 1) |
 | `node tools/sim/preview.mjs ["başlık"]` | Sanat önizleme sayfasının bölümlerinin ekran görüntüleri (`tools/sim/out/`) |
