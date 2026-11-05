@@ -25,7 +25,7 @@ const KEY_BINDINGS = {
   toolHarvest: ['KeyH'],
   toolDemolish: ['KeyX'],
   toggleJournal: ['KeyJ'],
-  toggleGoals: ['KeyG'],
+  toggleGoals: ['KeyO', 'KeyG'], // O; eski kısayol G de çalışır
   toggleStats: ['KeyI'],
   toggleCinematic: ['KeyF'],
 };

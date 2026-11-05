@@ -63,7 +63,7 @@ const percent = (value) => `%${Math.round(value * 100)}`;
 
 export class BuildingPanel {
   constructor(game) {
-    this.slot = 'right';
+    this.slot = 'cards'; // (17. aşama) sağ alt köşedeki bağımsız bilgi kartı
     this.events = game.events;
     this.buildingId = null;
     this.lastKey = '';

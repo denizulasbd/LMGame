@@ -8,12 +8,16 @@
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
 //   4. Referans bütünlüğü: sabit işçinin iş yeri yıkılır, şantiye iptal edilir, şenlik yeri yıkılır, tüccarın yoluna
 //      yapı kurulur; kopuk referans kalmaz
-//   5. Metin kutuları: kasaba ve sakin adı yazılırken WASD / B / H / X / F / Boşluk oyuna kaçmaz; ad kutusu açıkken
+//   5. Metin kutuları: kasaba ve sakin adı yazılırken WASD / B / H / X / F / J / O / I / Boşluk oyuna kaçmaz; ad kutusu açıkken
 //      listeden başka sakin seçilince yazılan ad yanlış sakine gitmez
 //   6. Ses: sessizde AudioContext askıya alınır (işlemci harcamaz), açılınca kazanç 0'dan yumuşakça yükselir;
 //      sessiz başlanan oyunda bağlam hiç kurulmaz
-//   7. Arayüz yerleşimi: geniş ekran, 1366x768, 1024x768, tablet ve telefon genişliğinde bütün paneller açıkken yatay
-//      kaydırma yok, sütunlar birbirine ve inşa çubuğuna binmez, paneller ekrandan taşmaz, pencereler ekrana sığar
+//   7. Arayüz yerleşimi (17. aşama): geniş ekran, 1366x768, 1024x768, tablet ve telefon genişliğinde kartlar, çekmece,
+//      yapı listesi, ortalanmış pencereler ve karar penceresi açıkken yatay kaydırma yok; üst çubuk, sakinler, kart, dock
+//      birbirine binmez; kart çekmeceyle aynı hizada sağ altta, pencere üst çubukla dock arasında ortadadır
+//   8. Arayüz etkileşimi (17. aşama): gerçek tıklama ve tuşlarla sakinler çekmecesi (▸ / sekme), dock sırası ve
+//      ipuçları, pencereler (✕ / Esc / dışına tıklama, tek pencere, O / J / I / G), Ayarlar (kaydet, yeni harita onayı),
+//      üst çubuk (hız, duraklatma), harita ipucu, listeden seçilen sakinin kartı
 //
 // Kullanım: node tools/sim/audit.mjs [--shots klasör]   (sunucu: python3 tools/serve.py)
 import fs from 'fs';
@@ -420,7 +424,8 @@ const PAGE_HELPERS = () => {
         paused: window.game.state.time.paused,
         cinematic: scene.cinematic,
         town: window.game.state.townName,
-        journal: !document.querySelector('.town-journal .journal-panel')?.hidden,
+        // (17. aşama) Ortalanmış pencerelerden herhangi biri (Günlük, Hedefler, Arşiv, Ayarlar) açıldı mı?
+        modal: document.getElementById('ui-layer').classList.contains('has-modal'),
       };
     });
   await page.evaluate(() => (window.game.state.time.paused = true));
@@ -428,7 +433,7 @@ const PAGE_HELPERS = () => {
   await page.waitForTimeout(200);
   let before = await state();
   await page.click('.hud-town-name');
-  await page.keyboard.type('Kasaba wasd bhxf jg');
+  await page.keyboard.type('Kasaba wasd bhxf jgoi');
   await page.keyboard.press('Space');
   await page.keyboard.down('KeyW');
   await page.waitForTimeout(300);
@@ -438,10 +443,10 @@ const PAGE_HELPERS = () => {
   let after = await state();
   results.push({
     name: 'kasaba adı yazılırken oyun tuşları kaçmaz (kamera, araç, duraklatma, fotoğraf modu)',
-    ok: after.cam.join() === before.cam.join() && after.tool === 'select' && after.paused === before.paused && !after.cinematic && after.journal === before.journal,
+    ok: after.cam.join() === before.cam.join() && after.tool === 'select' && after.paused === before.paused && !after.cinematic && !after.modal,
     detail: JSON.stringify({ before, after }),
   });
-  results.push({ name: 'kasaba adı yazılan metinle kaydedilir', ok: after.town === 'Kasaba wasd bhxf jg w' /* basılı W kutuya yazılır, kameraya gitmez */, detail: after.town });
+  results.push({ name: 'kasaba adı yazılan metinle kaydedilir', ok: after.town === 'Kasaba wasd bhxf jgoi w' /* basılı W kutuya yazılır, kameraya gitmez */, detail: after.town });
   // Sakin adı: aynı denetim + listeden başka sakin seçilince ad doğru sakine gider
   const ids = await page.evaluate(() => window.game.state.characters.slice(0, 2).map((c) => ({ id: c.id, name: c.name })));
   await page.evaluate((id) => window.game.events.emit('ui:selectCharacter', id), ids[0].id);
@@ -453,10 +458,10 @@ const PAGE_HELPERS = () => {
   await page.keyboard.press('Space');
   await page.keyboard.type('fhb');
   after = await state();
-  results.push({ name: 'sakin adı yazılırken oyun tuşları kaçmaz', ok: after.cam.join() === before.cam.join() && after.tool === 'select' && after.paused === before.paused && !after.cinematic, detail: JSON.stringify(after) });
+  results.push({ name: 'sakin adı yazılırken oyun tuşları kaçmaz', ok: after.cam.join() === before.cam.join() && after.tool === 'select' && after.paused === before.paused && !after.cinematic && !after.modal, detail: JSON.stringify(after) });
   // Ad kutusu açıkken sağdaki listeden ikinci sakini seç (liste odağı çalmaz), sonra Enter
-  const rowCount = await page.locator('.residents .resident-row, .residents button').count();
-  const row = page.locator('.residents [data-id], .residents .resident-row').nth(1);
+  const rowCount = await page.locator('.residents .resident-row').count();
+  const row = page.locator('.residents .resident-row').nth(1);
   if ((await row.count()) > 0) await row.click();
   else await page.evaluate((id) => window.game.events.emit('ui:selectCharacter', id), ids[1].id);
   await page.keyboard.press('Enter');
@@ -524,7 +529,9 @@ const PAGE_HELPERS = () => {
 }
 
 // =====================================================================================================================
-// 7. Arayüz yerleşimi
+// 7. Arayüz yerleşimi (17. aşama): ince üst çubuk, sağ sütun (sakinler çekmecesi + sağ alt kart), birleşik alt dock ve
+//    ortalanmış pencereler. Beş çözünürlükte, her senaryoda: yatay kaydırma yok, paneller ve düğmeler ekrandan taşmaz,
+//    bölgeler birbirine binmez, kart çekmeceyle aynı hizada sağ alttadır, pencere üst çubukla dock arasında ortalanır.
 // =====================================================================================================================
 {
   const viewports = [
@@ -537,6 +544,7 @@ const PAGE_HELPERS = () => {
   const { browser, page, errors } = await openGame({ seed: 12 });
   await page.evaluate(() => {
     const sim = window.sim;
+    localStorage.removeItem('lmgame.ui.residentsCollapsed');
     sim.give({ wood: 400, stone: 400, food: 300 });
     for (const t of ['storage', 'market', 'inn', 'lumberHut', 'garden']) sim.place(t);
     sim.step(225 * 3);
@@ -550,96 +558,165 @@ const PAGE_HELPERS = () => {
       const scene = game.scenes.current;
       const s = game.state;
       const E = game.events;
-      const shown = (sel) => [...document.querySelectorAll(sel)].filter((e) => !e.hidden && e.offsetParent !== null);
-      const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const rect = (e) => e.getBoundingClientRect();
       const W = window.innerWidth;
       const H = window.innerHeight;
       const problems = [];
-      const area = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-      // Bir sütunun ekranda görünen kısmı (kayan sütun kendi kutusuyla kırpılır)
-      const columnBox = (sel) => {
-        const col = document.querySelector(sel);
-        const kids = [...col.children].filter((k) => k.offsetParent !== null);
-        if (!kids.length) return null;
-        const c = rect(col);
-        const top = Math.max(c.top, Math.min(...kids.map((k) => rect(k).top)));
-        const bottom = Math.min(c.bottom, Math.max(...kids.map((k) => rect(k).bottom)));
-        return { left: c.left, right: c.right, top, bottom };
+      const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const rect = (e) => e.getBoundingClientRect();
+      const visible = (e) => Boolean(e) && !e.hidden && e.offsetParent !== null && rect(e).width > 0;
+      const shown = (sel) => [...document.querySelectorAll(sel)].filter(visible);
+      const q = (sel) => document.querySelector(sel);
+      const area = (a, b) => (a && b ? Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)) : 0);
+      const clip = (a, b) => ({ left: Math.max(a.left, b.left), right: Math.min(a.right, b.right), top: Math.max(a.top, b.top), bottom: Math.min(a.bottom, b.bottom), width: a.width });
+      const px = (b) => `${Math.round(b.left)},${Math.round(b.top)}-${Math.round(b.right)},${Math.round(b.bottom)}`;
+      const regions = () => {
+        const collapsed = q('.resident-drawer').classList.contains('is-collapsed');
+        // Kart sütunundaki görünen kartların birleşimi (ör. takas penceresi ve altında sakin kartı)
+        const cardEls = shown('.ui-cards > .panel');
+        const union = cardEls.length
+          ? cardEls.map(rect).reduce((a, b) => ({ left: Math.min(a.left, b.left), right: Math.max(a.right, b.right), top: Math.min(a.top, b.top), bottom: Math.max(a.bottom, b.bottom), width: Math.max(a.width, b.width) }))
+          : null;
+        return {
+          collapsed,
+          top: visible(q('.hud.topbar')) ? rect(q('.hud.topbar')) : null,
+          drawer: visible(q(collapsed ? '.resident-tab' : '.residents')) ? rect(q(collapsed ? '.resident-tab' : '.residents')) : null,
+          card: union ? clip(union, rect(q('.ui-cards'))) : null,
+          cards: rect(q('.ui-cards')),
+          column: rect(q('.ui-right')),
+          dock: visible(q('.dock.build-bar')) ? rect(q('.dock.build-bar')) : null,
+          items: visible(q('.build-items')) ? rect(q('.build-items')) : null,
+          hint: visible(q('.build-hint')) ? rect(q('.build-hint')) : null,
+          modals: shown('.modal-window'),
+        };
       };
       const inspect = (label) => {
         const doc = document.scrollingElement;
         if (doc.scrollWidth > W + 1) problems.push(`${label}: sayfa yatay kayıyor (${doc.scrollWidth}>${W})`);
-        for (const p of shown('.ui-column .panel, .ui-column .town-journal, .ui-column .archive-buttons')) {
-          const b = rect(p);
-          if (b.left < -1 || b.right > W + 1) problems.push(`${label}: ${p.className} ekrandan taşıyor (${Math.round(b.left)}..${Math.round(b.right)})`);
-          if (p.scrollWidth > p.clientWidth + 2) problems.push(`${label}: ${p.className.split(' ').slice(-2).join('.')} içeriği yatay taşıyor (${p.scrollWidth}>${p.clientWidth})`);
+        const g = regions();
+        // Paneller ekranda ve içerikleri yatay taşmıyor (kayan kartlar sütunun görünen kısmıyla kırpılır)
+        for (const p of shown('#ui-layer .panel')) {
+          if (p.closest('.title-screen')) continue;
+          const b = p.closest('.ui-cards') ? clip(rect(p), g.cards) : rect(p);
+          if (b.left < -1 || b.right > W + 1 || b.top < -1 || b.bottom > H + 1) problems.push(`${label}: ${p.className.split(' ').slice(1, 3).join('.')} ekrandan taşıyor (${px(b)})`);
+          if (p.scrollWidth > p.clientWidth + 2) problems.push(`${label}: ${p.className.split(' ').slice(1, 3).join('.')} içeriği yatay taşıyor (${p.scrollWidth}>${p.clientWidth})`);
         }
-        for (const btn of shown('.ui-column button, .build-bar button')) {
+        for (const btn of shown('.hud button, .dock-wrap button, .ui-right button, .modal-layer button')) {
           const b = rect(btn);
-          if (b.width > 0 && (b.right > W + 1 || b.left < -1)) problems.push(`${label}: düğme ekran dışında "${btn.textContent.trim().slice(0, 20)}"`);
+          if (b.right > W + 1 || b.left < -1) problems.push(`${label}: düğme ekran dışında "${btn.textContent.trim().slice(0, 20)}"`);
         }
-        const left = columnBox('.ui-column-left');
-        const right = columnBox('.ui-column-right');
-        const bar = document.querySelector('.build-bar');
-        if (left && right && area(left, right) > 4) problems.push(`${label}: sol ve sağ sütun üst üste biniyor`);
-        if (bar && bar.offsetParent !== null) {
-          const bb = rect(bar);
-          if (bb.right > W + 1 || bb.left < -1) problems.push(`${label}: inşa çubuğu ekrandan taşıyor`);
-          for (const col of [left, right]) if (col && area(col, bb) > 4) problems.push(`${label}: sütun inşa çubuğuna biniyor`);
+        // Bölgeler birbirine binmez
+        const pairs = [
+          ['üst çubuk', g.top, 'sakinler', g.drawer],
+          ['üst çubuk', g.top, 'kart', g.card],
+          ['üst çubuk', g.top, 'dock', g.dock],
+          ['üst çubuk', g.top, 'yapı listesi', g.items],
+          ['sakinler', g.drawer, 'kart', g.card],
+          ['sakinler', g.drawer, 'dock', g.dock],
+          ['sakinler', g.drawer, 'yapı listesi', g.items],
+          ['kart', g.card, 'dock', g.dock],
+          ['kart', g.card, 'yapı listesi', g.items],
+          ['kart', g.card, 'araç ipucu', g.hint],
+          ['yapı listesi', g.items, 'dock', g.dock],
+        ];
+        for (const [an, a, bn, b] of pairs) if (area(a, b) > 4) problems.push(`${label}: ${an} ile ${bn} üst üste biniyor (${px(a)} / ${px(b)})`);
+        // Üst çubuk: geniş ekranda tek satır, dar ekranda bile ince
+        if (g.top && g.top.height > (W >= 1240 ? 52 : 150)) problems.push(`${label}: üst çubuk çok yüksek (${Math.round(g.top.height)} px)`);
+        // Dock: tek satır ve ortada
+        if (g.dock) {
+          if (g.dock.height > 62) problems.push(`${label}: dock birden çok satıra bölünmüş (${Math.round(g.dock.height)} px)`);
+          if (Math.abs((g.dock.left + g.dock.right) / 2 - W / 2) > 2) problems.push(`${label}: dock ortada değil`);
         }
-        for (const sel of ['.archive-panel', '.dilemma-panel', '.trade-panel']) {
-          for (const p of shown(sel)) {
-            const b = rect(p);
-            if (b.left < -1 || b.right > W + 1 || b.top < -1 || b.bottom > H + 1) problems.push(`${label}: ${sel} ekrana sığmıyor`);
-            if (p.scrollWidth > p.clientWidth + 2) problems.push(`${label}: ${sel} içeriği yatay taşıyor`);
-          }
+        // Kart: çekmeceyle aynı sağ kenarda, onun altında ve sütunun dibinde
+        if (g.card) {
+          // Açık liste kartla aynı sağ kenarda; kapalıyken kalan sekme çekmece kulpu gibi ekran kenarına yaslanır
+          if (g.drawer && !g.collapsed && Math.abs(g.drawer.right - g.card.right) > 1) problems.push(`${label}: kart ile sakinler sağ kenarı hizasız (${Math.round(g.drawer.right)} / ${Math.round(g.card.right)})`);
+          if (g.drawer && g.collapsed && Math.abs(g.drawer.right - W) > 1) problems.push(`${label}: kapalı çekmecenin sekmesi ekran kenarında değil (${Math.round(g.drawer.right)})`);
+          if (g.drawer && !g.collapsed && Math.abs(g.drawer.width - g.card.width) > 1) problems.push(`${label}: kart ile sakinler genişliği farklı (${Math.round(g.drawer.width)} / ${Math.round(g.card.width)})`);
+          if (g.drawer && g.card.top < g.drawer.bottom - 1 && !g.collapsed) problems.push(`${label}: kart sakinler listesinin altında değil`);
+          if (Math.abs(g.cards.bottom - g.column.bottom) > 2 || g.card.bottom < g.cards.bottom - 2) problems.push(`${label}: kart sütunun dibine oturmuyor`);
+          if (W > 620 && g.card.left < W / 2) problems.push(`${label}: kart sağ yarıda değil`);
+        }
+        // Ortalanmış pencere: tek, ortada, üst çubuğun ve dock'un arasında
+        if (g.modals.length > 1) problems.push(`${label}: aynı anda ${g.modals.length} pencere açık`);
+        for (const m of g.modals) {
+          const b = rect(m);
+          if (Math.abs((b.left + b.right) / 2 - W / 2) > 2) problems.push(`${label}: ${m.dataset.modal} penceresi ortada değil`);
+          if (g.top && b.top < g.top.bottom - 1) problems.push(`${label}: ${m.dataset.modal} penceresi üst çubuğa biniyor`);
+          if (g.dock && b.bottom > g.dock.top + 1) problems.push(`${label}: ${m.dataset.modal} penceresi dock'a biniyor`);
+          if (!visible(q('.modal-backdrop'))) problems.push(`${label}: pencere açıkken zemin karartması yok`);
+          if (!m.querySelector('.modal-close') || !visible(m.querySelector('.modal-close'))) problems.push(`${label}: ${m.dataset.modal} penceresinde ✕ yok`);
+        }
+        for (const p of shown('.dilemma-panel')) {
+          const b = rect(p);
+          if (b.left < -1 || b.right > W + 1 || b.top < -1 || b.bottom > H + 1) problems.push(`${label}: karar penceresi ekrana sığmıyor`);
         }
       };
-      // Sol sütun: günlük + hedefler açık
-      E.emit('ui:toggleJournal');
-      E.emit('ui:toggleGoals');
-      // Sağ sütun: yapı paneli (han), sonra sakin paneli, sonra takas penceresi
-      const inn = s.buildings.find((b) => b.type === 'inn');
-      E.emit('ui:selectBuilding', inn.id);
+      const select = (id) => {
+        E.emit('ui:selectCharacter', id);
+      };
+      // 1. Yapı kartı (han) ve sakin kartı
+      E.emit('ui:selectBuilding', s.buildings.find((b) => b.type === 'inn').id);
       await frame();
-      inspect('yapı paneli');
-      E.emit('ui:selectCharacter', s.characters[0].id);
+      inspect('yapı kartı');
+      select(s.characters[0].id);
       await frame();
-      inspect('sakin paneli');
+      inspect('sakin kartı');
+      // 2. Takas penceresi (kart sütununda)
       E.emit('ui:openTrade');
       await frame();
-      inspect('takas penceresi');
-      // Pencereler: arşiv, karar
-      E.emit('ui:toggleStats');
+      inspect('takas kartı');
+      select(s.characters[0].id);
+      // 3. Çekmece kapalıyken sakin kartı
+      q('.resident-toggle').click();
+      await wait(260); // kapanma animasyonu bitsin
+      inspect('çekmece kapalı + sakin kartı');
+      if (!visible(q('.resident-tab')) || visible(q('.residents'))) problems.push('çekmece kapanınca yalnızca sekme kalmıyor');
+      q('.resident-tab').click();
+      await wait(320); // açılma animasyonu bitsin
+      if (!visible(q('.residents')) || visible(q('.resident-tab'))) problems.push('sekmeye tıklayınca liste geri açılmıyor');
+      // 4. İnşa aracı: yapı listesi dock'un üstünde
+      E.emit('ui:setTool', { tool: 'build', buildType: 'cabin' });
       await frame();
-      inspect('arşiv');
-      E.emit('ui:toggleStats');
+      inspect('inşa listesi + kart');
+      E.emit('ui:setTool', { tool: 'select' });
+      // 5. Ortalanmış pencereler (kart açıkken)
+      for (const [event, name] of [['ui:toggleGoals', 'Hedefler'], ['ui:toggleJournal', 'Günlük'], ['ui:toggleStats', 'Arşiv'], ['ui:toggleSettings', 'Ayarlar']]) {
+        E.emit(event);
+        await frame();
+        inspect(`${name} penceresi`);
+      }
+      // Hepsi sırayla açıldı: yalnızca sonuncusu (Ayarlar) açık kalmalı
+      const open = shown('.modal-window').map((m) => m.dataset.modal);
+      if (open.join() !== 'settings') problems.push(`pencereler tek tek açılmıyor (${open.join(',')})`);
+      E.emit('ui:toggleSettings');
+      // 6. Karar penceresi
       s.dilemma.history = {};
       scene.dilemmas.maybeStart('bards');
       await frame();
       inspect('karar penceresi');
       if (s.dilemma.active) E.emit('ui:chooseDilemma', { optionId: 'decline' });
-      // Bildirim HUD'un üstüne biner mi?
-      E.emit('toast', { text: 'Denetim bildirimi: kasabaya yeni bir sakin geldi', tone: 'info', icon: 'sparkle' });
-      await frame();
-      const toast = shown('.toast')[0];
-      const hud = shown('.hud')[0];
-      if (toast && hud && area(rect(toast), rect(hud)) > 4) problems.push('bildirim HUD panelinin üstüne biniyor');
-      // Kapat
-      E.emit('ui:toggleJournal');
-      E.emit('ui:toggleGoals');
-      E.emit('ui:selectCharacter', null);
+      // 7. Bildirim: üst çubuğa binmez; orta genişlikte sakinler listesine de binmez
+      E.emit('toast', { text: 'Denetim bildirimi: kasabaya yeni bir sakin geldi, karşılamaya hazırlanın', tone: 'info', icon: 'sparkle' });
+      await wait(400); // giriş animasyonu bitsin
+      const g = regions();
+      for (const t of shown('.toast')) {
+        if (area(rect(t), g.top) > 4) problems.push('bildirim üst çubuğa biniyor');
+        if (W > 620 && !g.collapsed && area(rect(t), g.drawer) > 4) problems.push(`bildirim sakinler listesine biniyor (${px(rect(t))})`);
+        if (rect(t).left < -1 || rect(t).right > W + 1) problems.push('bildirim ekrandan taşıyor');
+      }
+      select(null);
       game.render(0);
       return problems;
     });
     if (shots) {
       await page.evaluate(() => {
-        window.game.events.emit('ui:toggleJournal');
         window.game.events.emit('ui:selectCharacter', window.game.state.characters[0].id);
         window.game.render(0);
       });
       await page.screenshot({ path: `${shots}/ui-${vp.width}x${vp.height}.png` });
+      await page.evaluate(() => window.game.events.emit('ui:toggleJournal'));
+      await page.screenshot({ path: `${shots}/ui-${vp.width}x${vp.height}-journal.png` });
       await page.evaluate(() => {
         window.game.events.emit('ui:toggleJournal');
         window.game.events.emit('ui:selectCharacter', null);
@@ -647,6 +724,227 @@ const PAGE_HELPERS = () => {
     }
     results.push({ name: `arayüz yerleşimi ${vp.name}: çakışma ya da taşma yok`, ok: r.length === 0, detail: r.slice(0, 6).join(' | ') });
   }
+  allErrors.push(...errors);
+  await browser.close();
+}
+
+// =====================================================================================================================
+// 8. Arayüz etkileşimi (17. aşama): gerçek fare tıklamaları ve tuşlarla sakinler çekmecesi, dock ve ipuçları,
+//    ortalanmış pencereler (✕ / Esc / dışına tıklama), Ayarlar, üst çubuk ve harita ipucu
+// =====================================================================================================================
+{
+  const W = 1366;
+  const H = 768;
+  const { browser, page, errors } = await openGame({ seed: 8, stopLoop: false, viewport: { width: W, height: H } });
+  await page.evaluate(() => {
+    localStorage.removeItem('lmgame.ui.residentsCollapsed');
+    window.game.state.time.paused = true;
+  });
+  const ui = () =>
+    page.evaluate(() => {
+      const scene = window.game.scenes.current;
+      // Sabit konumlu öğelerin (ipuçları) offsetParent'ı yoktur: görünürlüğü kutusundan anlaşılır
+      const vis = (e) => Boolean(e) && !e.hidden && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0;
+      const q = (sel) => document.querySelector(sel);
+      return {
+        modals: [...document.querySelectorAll('.modal-window')].filter(vis).map((m) => m.dataset.modal),
+        backdrop: vis(q('.modal-backdrop')),
+        list: vis(q('.residents')) && vis(q('.resident-list')),
+        tab: vis(q('.resident-tab')),
+        tabCount: q('.resident-tab-count')?.textContent ?? '',
+        selected: scene.selectedId,
+        tool: scene.tools.tool,
+        tooltip: vis(q('.map-tooltip')),
+        tooltipName: q('.map-tip-name')?.textContent ?? '',
+        dockTip: vis(q('.dock-tip')) ? `${q('.dock-tip-title').textContent} | ${q('.dock-tip-text').textContent}` : '',
+      };
+    });
+  const until = async (fn, ms = 1500) => {
+    const t0 = Date.now();
+    let v = await ui();
+    while (!fn(v) && Date.now() - t0 < ms) {
+      await page.waitForTimeout(50);
+      v = await ui();
+    }
+    return v;
+  };
+  const pass = (name, ok, detail = '') => results.push({ name, ok: Boolean(ok), detail });
+
+  // --- Sakinler çekmecesi: ▸ kapatır, sekme açar, tercih hatırlanır ---
+  let u = await ui();
+  const residents = await page.evaluate(() => window.game.state.characters.filter((c) => !c.visitor).length);
+  pass('sakinler listesi açık başlar', u.list && !u.tab);
+  await page.click('.resident-toggle');
+  u = await until((v) => v.tab && !v.list);
+  pass('▸ düğmesi sakinler listesini kapatır, yalnızca ince sekme kalır (kişi simgesi ve sayı)', !u.list && u.tab && u.tabCount === String(residents), `${u.tabCount}/${residents}`);
+  const tabBox = await page.evaluate(() => {
+    const t = document.querySelector('.resident-tab').getBoundingClientRect();
+    return { w: t.width, h: t.height, right: t.right };
+  });
+  pass('kapalı çekmecenin sekmesi küçük ve sağ kenarda', tabBox.w < 90 && tabBox.h < 50 && W - tabBox.right < 12, JSON.stringify(tabBox));
+  pass('çekmece tercihi hatırlanır', (await page.evaluate(() => localStorage.getItem('lmgame.ui.residentsCollapsed'))) === '1');
+  await page.click('.resident-tab');
+  u = await until((v) => v.list);
+  pass('sekmeye tıklayınca liste sağdan açılır', u.list && !u.tab && (await page.evaluate(() => document.querySelector('.residents').classList.contains('is-opening') || document.querySelector('.resident-drawer').classList.contains('is-opening'))));
+  pass('çekmece düğmeleri haritaya tıklama geçirmez', u.tool === 'select' && u.selected === null, JSON.stringify(u));
+
+  // --- Dock: sıra, kısayollar, ipuçları ---
+  const dock = await page.evaluate(() =>
+    [...document.querySelectorAll('.dock .dock-btn')].map((b) => ({ label: b.querySelector('.dock-label').textContent, key: b.querySelector('.dock-key')?.textContent ?? '' }))
+  );
+  pass(
+    'dock tek çubukta: İnşa Et, Topla, Yık | Hedefler, Günlük, Arşiv, Fotoğraf, Ayarlar',
+    dock.map((d) => d.label).join(',') === 'İnşa Et,Topla,Yık,Hedefler,Günlük,Arşiv,Fotoğraf,Ayarlar' && dock.map((d) => d.key).join(',') === 'B,H,X,O,J,I,F,',
+    dock.map((d) => `${d.label}(${d.key})`).join(' ')
+  );
+  await page.hover('.dock .journal-toggle');
+  u = await until((v) => v.dockTip);
+  pass('dock düğmesinin üzerine gelince kısayol ve açıklama ipucu belirir', u.dockTip.startsWith('Günlük · J') && u.dockTip.length > 20, u.dockTip);
+  const tipBoxes = [];
+  for (const sel of ['.dock .tool-btn[data-tool="build"]', '.dock .settings-toggle']) {
+    await page.hover(sel);
+    await page.waitForTimeout(60);
+    tipBoxes.push(
+      await page.evaluate((sel) => {
+        const t = document.querySelector('.dock-tip').getBoundingClientRect();
+        const b = document.querySelector(sel).getBoundingClientRect();
+        return { left: t.left, right: t.right, bottom: t.bottom, btnTop: b.top };
+      }, sel)
+    );
+  }
+  pass('dock ipucu düğmenin üstünde ve ekranın içinde', tipBoxes.every((t) => t.left >= 0 && t.right <= W && t.bottom <= t.btnTop), JSON.stringify(tipBoxes));
+  await page.mouse.move(W / 2, H / 2);
+  u = await until((v) => !v.dockTip);
+  pass('fare dock\'tan çıkınca ipucu kaybolur', !u.dockTip);
+
+  // --- Ortalanmış pencereler ---
+  await page.evaluate(() => window.game.events.emit('ui:selectCharacter', window.game.state.characters[0].id));
+  await page.waitForTimeout(100);
+  const chosen = (await ui()).selected;
+  await page.click('.dock .goals-toggle');
+  u = await until((v) => v.modals.length);
+  const goalsBox = await page.evaluate(() => document.querySelector('[data-modal="goals"]').getBoundingClientRect().toJSON());
+  pass('Hedefler düğmesi pencereyi ekranın ortasında açar', u.modals.join() === 'goals' && u.backdrop && Math.abs((goalsBox.left + goalsBox.right) / 2 - W / 2) <= 2, JSON.stringify(u.modals));
+  await page.click('.dock .journal-toggle');
+  u = await until((v) => v.modals.join() === 'journal');
+  pass('pencere açıkken başkasını açmak öncekini kapatır (aynı anda tek pencere)', u.modals.join() === 'journal' && u.backdrop, u.modals.join());
+  await page.keyboard.press('Escape');
+  u = await until((v) => !v.modals.length);
+  pass('Esc açık pencereyi kapatır, seçili sakine dokunmaz', !u.modals.length && !u.backdrop && u.selected === chosen && u.tool === 'select', JSON.stringify({ sel: u.selected, chosen }));
+  await page.keyboard.press('Escape');
+  u = await until((v) => v.selected === null);
+  pass('pencere yokken Esc eskisi gibi seçimi bırakır', u.selected === null);
+  await page.keyboard.press('KeyI');
+  u = await until((v) => v.modals.length);
+  pass('I tuşu Kasaba Arşivi\'ni açar', u.modals.join() === 'archive');
+  await page.click('[data-modal="archive"] .modal-close');
+  u = await until((v) => !v.modals.length);
+  pass('✕ düğmesi pencereyi kapatır', !u.modals.length && !u.backdrop);
+  await page.click('.dock .settings-toggle');
+  u = await until((v) => v.modals.length);
+  pass('Ayarlar düğmesi Ayarlar penceresini açar', u.modals.join() === 'settings');
+  await page.mouse.click(40, H / 2);
+  u = await until((v) => !v.modals.length);
+  pass('pencerenin dışına tıklamak pencereyi kapatır, tıklama haritaya geçmez', !u.modals.length && u.selected === null && u.tool === 'select', JSON.stringify(u));
+  await page.keyboard.press('KeyO');
+  u = await until((v) => v.modals.length);
+  pass('O tuşu Kasaba Hedefleri\'ni açar', u.modals.join() === 'goals');
+  await page.keyboard.press('KeyO');
+  u = await until((v) => !v.modals.length);
+  pass('O tuşuna yeniden basmak Hedefler\'i kapatır', !u.modals.length);
+  await page.keyboard.press('KeyG');
+  u = await until((v) => v.modals.length);
+  pass('eski G kısayolu da Hedefler\'i açar', u.modals.join() === 'goals');
+  await page.keyboard.press('KeyJ');
+  u = await until((v) => v.modals.join() === 'journal');
+  pass('J tuşu Hedefler açıkken Günlük\'e geçer', u.modals.join() === 'journal');
+  await page.keyboard.press('Escape');
+  await until((v) => !v.modals.length);
+  // Karar penceresi açıkken Esc pencereleri ve kararı kapatmaz
+  await page.evaluate(async () => {
+    const s = window.game.state;
+    const { DILEMMAS } = await import('/src/data/dilemmas.js');
+    s.dilemma.history = {};
+    for (const id of Object.keys(DILEMMAS)) if (window.game.scenes.current.dilemmas.maybeStart(id)) break;
+  });
+  await page.waitForTimeout(100);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(100);
+  const dilemmaOpen = await page.evaluate(() => Boolean(window.game.state.dilemma.active) && !document.querySelector('.dilemma').hidden);
+  pass('karar penceresi Esc ile kaybolmaz (seçim beklenir)', dilemmaOpen);
+  await page.evaluate(() => window.game.events.emit('ui:chooseDilemma', { optionId: window.game.state.dilemma.active.defaultId }));
+  await page.evaluate(() => (window.game.state.time.paused = true));
+
+  // --- Ayarlar: kaydet / yükle / yeni harita onayı ---
+  await page.click('.dock .settings-toggle');
+  await until((v) => v.modals.length);
+  await page.evaluate(() => localStorage.removeItem('lmgame.save.v2'));
+  await page.click('.settings-save');
+  await page.waitForTimeout(150);
+  const saved = await page.evaluate(() => ({ save: Boolean(localStorage.getItem('lmgame.save.v2')), load: !document.querySelector('.settings-load').disabled, info: document.querySelector('.settings-save-info').textContent }));
+  pass('Ayarlar > Kaydet oyunu kaydeder, Yükle etkinleşir', saved.save && saved.load && saved.info.startsWith('Son kayıt'), JSON.stringify(saved));
+  await page.click('.settings-new');
+  const confirm = await page.evaluate(() => ({ confirm: !document.querySelector('.settings-confirm').hidden, row: !document.querySelector('.settings-save').closest('.settings-row').hidden }));
+  await page.click('.settings-confirm button:not(.is-danger)');
+  const back = await page.evaluate(() => ({ confirm: !document.querySelector('.settings-confirm').hidden, seed: window.game.state.seed }));
+  pass('Yeni Harita önce onay ister, Vazgeç geri döner', confirm.confirm && !confirm.row && !back.confirm, JSON.stringify({ confirm, back }));
+  await page.keyboard.press('Escape');
+  await until((v) => !v.modals.length);
+
+  // --- Üst çubuk: tek satır, hız ve duraklatma düğmeleri, temel kaynaklar ---
+  const bar = await page.evaluate(() => {
+    const hud = document.querySelector('.hud.topbar');
+    const b = hud.getBoundingClientRect();
+    return {
+      h: b.height,
+      zones: ['.hud-zone-town', '.hud-zone-time', '.hud-zone-res'].map((z) => Boolean(hud.querySelector(z))),
+      town: hud.querySelector('.hud-town-name')?.textContent,
+      speeds: [...hud.querySelectorAll('.hud-speed button[data-speed]')].map((x) => x.textContent.trim()),
+      pause: Boolean(hud.querySelector('.hud-speed button:not([data-speed])')),
+      resources: hud.querySelectorAll('.hud-zone-res .resource:not(.is-goods)').length,
+      welfare: Boolean(hud.querySelector('.hud-welfare')),
+      mute: Boolean(hud.querySelector('.hud-mute')),
+    };
+  });
+  pass(
+    'üst çubuk tek satır: kasaba adı, zaman ve hız, kaynaklar ve refah',
+    bar.h <= 52 && bar.zones.every(Boolean) && bar.town && bar.speeds.join() === '1x,2x,4x' && bar.pause && bar.resources >= 4 && bar.welfare && bar.mute,
+    JSON.stringify(bar)
+  );
+  await page.click('.hud-speed [data-speed="2"]');
+  await page.waitForTimeout(100);
+  const sp = await page.evaluate(() => ({ speed: window.game.state.time.speed, paused: window.game.state.time.paused }));
+  pass('üst çubuktaki 2x düğmesi hızı ayarlar ve oyunu sürdürür', sp.speed === 2 && !sp.paused, JSON.stringify(sp));
+  await page.click('.hud-speed button:first-child');
+  await page.waitForTimeout(100);
+  pass('üst çubuktaki duraklat düğmesi oyunu durdurur', await page.evaluate(() => window.game.state.time.paused));
+
+  // --- Harita ipucu: yalnızca Seç aracında, pencere yokken, imlecin yanında ---
+  await page.mouse.move(W / 2 - 80, H / 2 + 30);
+  await page.mouse.move(W / 2 - 70, H / 2 + 40);
+  u = await until((v) => v.tooltip, 1500);
+  const tipAt = await page.evaluate(() => document.querySelector('.map-tooltip').getBoundingClientRect().toJSON());
+  pass('harita ipucu imlecin altındaki karoyu gösterir', u.tooltip && u.tooltipName.length > 1 && Math.abs(tipAt.left - (W / 2 - 70)) < 60 && Math.abs(tipAt.top - (H / 2 + 40)) < 60, `${u.tooltipName} @${Math.round(tipAt.left)},${Math.round(tipAt.top)}`);
+  await page.keyboard.press('KeyB');
+  u = await until((v) => !v.tooltip);
+  pass('inşa aracı seçilince harita ipucu gizlenir (araç ipucu dock\'ta)', !u.tooltip && u.tool === 'build');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('KeyJ');
+  u = await until((v) => v.modals.length && !v.tooltip);
+  pass('pencere açıkken harita ipucu gizlenir', !u.tooltip && u.tool === 'select' && u.modals.join() === 'journal', JSON.stringify(u));
+  await page.keyboard.press('Escape');
+
+  // --- Sakin kartı: listedeki satıra tıklayınca sağ altta bağımsız kart ---
+  await page.click('.residents .resident-row');
+  await page.waitForTimeout(150);
+  const card = await page.evaluate(() => {
+    const c = document.querySelector('.ui-cards .character-panel:not(.trade-panel)');
+    const l = document.querySelector('.residents').getBoundingClientRect();
+    const b = c && !c.hidden ? c.getBoundingClientRect() : null;
+    return b && { right: b.right, left: b.left, top: b.top, listRight: l.right, listBottom: l.bottom };
+  });
+  pass('listeden seçilen sakinin kartı sağ altta, listeyle aynı hizada açılır', card && Math.abs(card.right - card.listRight) <= 1 && card.top >= card.listBottom && card.left > W / 2, JSON.stringify(card));
+  pass('etkileşim boyunca sayfa hatası yok', errors.length === 0, errors.slice(0, 2).join(' | '));
   allErrors.push(...errors);
   await browser.close();
 }

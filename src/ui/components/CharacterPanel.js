@@ -32,7 +32,7 @@ const SLOT_PLACEHOLDER = { tool: 'sturdyTool', clothing: 'winterCoat', bag: 'bac
 
 export class CharacterPanel {
   constructor(game) {
-    this.slot = 'right';
+    this.slot = 'cards'; // (17. aşama) sağ alt köşedeki bağımsız bilgi kartı
     this.events = game.events;
     this.characterId = null;
     this.editingId = null; // adı düzenlenen sakin (düzenleme başladığı andaki seçim)

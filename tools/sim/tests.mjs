@@ -733,9 +733,16 @@ const pageResults = await page.evaluate(async () => {
     s.history = saved;
     game.events.emit('ui:toggleStats');
     game.render(0);
-    const archive = document.querySelector('.archive');
-    check('Kasaba Arşivi açılır: 4 grafik ve tarih', archive && !archive.hidden && archive.querySelectorAll('canvas').length === 4 && archive.querySelectorAll('.archive-total').length >= 12);
+    // (17. aşama) Arşiv ortalanmış bir penceredir: arkasında karartılmış zemin, köşede ✕
+    const archive = document.querySelector('.archive-panel');
+    const layerEl = document.getElementById('ui-layer');
+    check(
+      'Kasaba Arşivi ortalanmış pencerede açılır: 4 grafik ve tarih',
+      archive && !archive.hidden && archive.classList.contains('modal-window') && layerEl.classList.contains('has-modal') && archive.querySelector('.modal-close') &&
+        archive.querySelectorAll('canvas').length === 4 && archive.querySelectorAll('.archive-total').length >= 12
+    );
     game.events.emit('ui:toggleStats');
+    check('Arşiv kapanınca zemin karartması kalkar', archive.hidden && !layerEl.classList.contains('has-modal') && document.querySelector('.modal-backdrop').hidden);
     // Fotoğraf modu
     game.events.emit('ui:toggleCinematic');
     const layer = document.getElementById('ui-layer');

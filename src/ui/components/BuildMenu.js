@@ -1,5 +1,8 @@
-// Alt ortadaki yönetim araç çubuğu: Seç / İnşa et / Topla / Yık araçları, inşa menüsü
-// (yapı küçük resimleri ve maliyetleri) ve fare altındaki duruma göre ipucu satırı.
+// (17. aşama) Alt ortadaki birleşik araç çubuğu (dock): İnşa Et (B) / Topla (H) / Yık (X) araçları ve pencere
+// düğmeleri (Hedefler, Günlük, Arşiv, Fotoğraf, Ayarlar; UIManager addDockButtons ile ekler). Aracın düğmesine
+// yeniden basmak ya da Esc aracı bırakır (Seç). İnşa aracı seçiliyken dock'un üstünde yapı listesi (küçük resimler ve
+// maliyetler), bir araç seçiliyken fare altındaki duruma göre kısa bir ipucu satırı belirir. Düğmelerin üzerine
+// gelince kısayol ve açıklama küçük bir ipucunda (.dock-tip) görünür; ipucu pencere kenarından taşmaz.
 // Araç değişikliği 'ui:setTool' olarak istenir; asıl mantık scenes/ToolController.js'te.
 import { BUILD_MENU, getBuildDefinition, TILE_BUILDS } from '../../data/buildings.js';
 import { TOWN_TIERS } from '../../data/town.js';
@@ -8,13 +11,14 @@ import { getStructureSprite } from '../../art/sprites/index.js';
 import { getTileSprite } from '../../art/tiles/index.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
+import { dockButton } from '../dockButton.js';
 import { EXOTIC_ITEMS } from '../../data/exploration.js';
 
 const TOOLS = [
   { tool: 'select', label: 'Seç', key: 'Esc', icon: 'select', hint: 'Sakinlere ve yapılara tıklayarak incele.' },
-  { tool: 'build', label: 'İnşa Et', key: 'B', icon: 'hammer', hint: 'Bir yapı seç, haritada yerini göster ve tıkla.' },
-  { tool: 'harvest', label: 'Topla', key: 'H', icon: 'axe', hint: 'Ağaç, kaya ve çalıların üzerinde sürükleyerek toplama emri ver.' },
-  { tool: 'demolish', label: 'Yık', key: 'X', icon: 'demolish', hint: 'Yapıyı yık, şantiyeyi ya da toplama emrini iptal et.' },
+  { tool: 'build', label: 'İnşa Et', key: 'B', icon: 'hammer', hint: 'Bir yapı seç, haritada yerini göster ve tıkla.', tip: 'Yapı, yol ve köprü kur' },
+  { tool: 'harvest', label: 'Topla', key: 'H', icon: 'axe', hint: 'Ağaç, kaya ve çalıların üzerinde sürükleyerek toplama emri ver.', tip: 'Ağaç, kaya ve çalılara toplama emri ver' },
+  { tool: 'demolish', label: 'Yık', key: 'X', icon: 'demolish', hint: 'Yapıyı yık, şantiyeyi ya da toplama emrini iptal et.', tip: 'Yapıyı yık, şantiyeyi ya da emri iptal et' },
 ];
 
 const thumbnailCache = new Map();
@@ -35,13 +39,15 @@ export class BuildMenu {
     this.buildType = null;
     this.affordKey = '';
 
-    this.toolButtons = TOOLS.map((t) => {
-      const b = this.button(
-        [el('img', { className: 'tool-icon', src: getIconDataURL(t.icon), alt: '' }), el('span', { text: t.label }), el('kbd', { text: t.key })],
-        `${t.label} (${t.key})`,
-        () => this.events.emit('ui:setTool', { tool: this.tool === t.tool && t.tool !== 'select' ? 'select' : t.tool })
-      );
-      b.classList.add('tool-btn');
+    this.toolButtons = TOOLS.filter((t) => t.tool !== 'select').map((t) => {
+      const b = dockButton({
+        icon: t.icon,
+        label: t.label,
+        key: t.key,
+        tip: `${t.tip} · yeniden basınca ya da Esc ile bırakılır`,
+        onClick: () => this.events.emit('ui:setTool', { tool: this.tool === t.tool ? 'select' : t.tool }),
+        className: 'tool-btn',
+      });
       b.dataset.tool = t.tool;
       return b;
     });
@@ -72,13 +78,23 @@ export class BuildMenu {
       return { type, def, button: b };
     });
 
-    this.itemRow = el('div', { className: 'build-items', hidden: true }, this.items.map((i) => i.button));
-    this.hint = el('div', { className: 'build-hint' });
-    this.element = el('div', { className: 'panel build-bar ui-interactive' }, [
-      this.itemRow,
-      el('div', { className: 'tool-row' }, this.toolButtons),
-      this.hint,
+    this.itemRow = el('div', { className: 'panel build-items ui-interactive', hidden: true }, this.items.map((i) => i.button));
+    this.hint = el('div', { className: 'build-hint', hidden: true });
+    this.extras = el('div', { className: 'dock-group dock-windows' });
+    this.bar = el('div', { className: 'panel dock build-bar ui-interactive' }, [
+      el('div', { className: 'dock-group dock-tools tool-row' }, this.toolButtons),
+      el('span', { className: 'dock-divider' }),
+      this.extras,
     ]);
+    this.element = el('div', { className: 'dock-wrap' }, [this.itemRow, this.hint, this.bar]);
+    // Dock düğmesi ipucu: kısayol ve açıklama düğmenin üstünde, ekran kenarına taşmadan (UIManager serbest katmana ekler)
+    this.tipTitle = el('div', { className: 'dock-tip-title' });
+    this.tipText = el('div', { className: 'dock-tip-text' });
+    this.tip = el('div', { className: 'dock-tip', hidden: true }, [this.tipTitle, this.tipText]);
+    this.floating = [this.tip];
+    this.bar.addEventListener('mouseover', (e) => this.showTip(e.target.closest?.('.dock-btn')));
+    this.bar.addEventListener('mouseleave', () => this.showTip(null));
+    this.bar.addEventListener('click', () => this.showTip(null));
 
     game.events.on('tool:changed', ({ tool, buildType }) => {
       this.tool = tool;
@@ -86,12 +102,39 @@ export class BuildMenu {
       for (const b of this.toolButtons) b.classList.toggle('is-active', b.dataset.tool === tool);
       for (const item of this.items) item.button.classList.toggle('is-active', item.type === buildType);
       this.itemRow.hidden = tool !== 'build';
+      this.hint.hidden = tool === 'select';
       this.setHint(TOOLS.find((t) => t.tool === tool).hint, null);
     });
     game.events.on('tool:preview', ({ ok, text }) => {
       if (this.tool === 'select') return;
       this.setHint(text || TOOLS.find((t) => t.tool === this.tool).hint, text ? ok : null);
     });
+  }
+
+  /** Düğmenin ipucunu düğmenin hemen üstünde, pencere kenarlarına sığacak biçimde gösterir (null: gizle). */
+  showTip(button) {
+    if (!button) {
+      this.tip.hidden = true;
+      this.tipFor = null;
+      return;
+    }
+    if (button === this.tipFor && !this.tip.hidden) return;
+    this.tipFor = button;
+    this.tipTitle.textContent = button.dataset.tipTitle ?? '';
+    this.tipText.textContent = button.dataset.tip ?? '';
+    this.tipText.hidden = !button.dataset.tip;
+    this.tip.hidden = false;
+    const r = button.getBoundingClientRect();
+    const w = this.tip.offsetWidth;
+    const h = this.tip.offsetHeight;
+    const x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+    const y = Math.max(8, r.top - h - 10);
+    this.tip.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  }
+
+  /** Pencere düğmelerini (Hedefler, Günlük, Arşiv, Fotoğraf, Ayarlar) dock'un sağ grubuna ekler. */
+  addDockButtons(buttons) {
+    this.extras.replaceChildren(...buttons);
   }
 
   button(children, title, onClick) {

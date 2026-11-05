@@ -1,4 +1,4 @@
-// Ekranın üst ortasında beliren, birkaç saniye sonra kaybolan bildirimler.
+// Üst bilgi çubuğunun hemen altında ortada beliren, birkaç saniye sonra kaybolan bildirimler.
 // Herhangi bir sistem 'toast' olayı yayınlayabilir: { text, tone: info|success|warn, icon? }
 import { getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
@@ -9,7 +9,7 @@ const MAX_TOASTS = 4;
 
 export class Toasts {
   constructor(game) {
-    this.slot = 'top';
+    this.slot = 'toasts'; // (17. aşama) üst çubuğun hemen altında ortada
     this.element = el('div', { className: 'toasts' });
     this.lastText = '';
     this.lastAt = 0;

@@ -1,40 +1,32 @@
-// Kasaba Günlüğü: sol sütunda HUD'un altında açılıp kapanan olay kaydı. Önemli olayları ("Gün 2, 08:00 -
-// Leyla kasabaya katıldı") saatleriyle, en yenisi üstte listeler. Kayıtları JournalSystem yazar
-// (GameState.journal); burası yalnızca okur. Kapalıyken yeni olay sayısı düğmede görünür.
-// J tuşu ya da düğme açar / kapatır.
+// Kasaba Günlüğü: önemli olayları ("Gün 2, 08:00 - Leyla kasabaya katıldı") saatleriyle, en yenisi üstte listeleyen
+// olay kaydı. Kayıtları JournalSystem yazar (GameState.journal); burası yalnızca okur. (17. aşama) Ekranın ortasında
+// açılan bir penceredir (ModalHost); dock'taki "Günlük" düğmesi ya da J tuşu açar / kapatır, ✕ / Esc / dışına
+// tıklamak kapatır. Kapalıyken okunmamış olay sayısı dock düğmesinde görünür.
 import { getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
+import { dockButton, modalHeader } from '../dockButton.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 const VISIBLE_ENTRIES = 60;
 
 export class TownJournal {
   constructor(game) {
-    this.slot = 'left';
     this.open = false;
     this.unread = 0;
     this.lastKey = '';
+    this.modalHost = null; // UIManager bağlar
 
-    this.badge = el('span', { className: 'journal-badge', hidden: true });
-    this.toggle = el('button', { className: 'hud-btn journal-toggle', type: 'button', title: 'Kasaba Günlüğü (J)', tabIndex: -1 }, [
-      el('img', { className: 'tool-icon', src: getAnyIconURL('journal'), alt: '' }),
-      el('span', { text: 'Günlük' }),
-      el('kbd', { text: 'J' }),
-      this.badge,
-    ]);
-    this.toggle.addEventListener('mousedown', (e) => e.preventDefault());
-    this.toggle.addEventListener('click', () => this.setOpen(!this.open));
-
-    const close = el('button', { className: 'hud-btn journal-close', type: 'button', text: '✕', title: 'Kapat (J)', tabIndex: -1 });
-    close.addEventListener('mousedown', (e) => e.preventDefault());
-    close.addEventListener('click', () => this.setOpen(false));
+    this.badge = el('span', { className: 'dock-badge journal-badge', hidden: true });
+    this.toggle = dockButton({ icon: 'journal', label: 'Günlük', key: 'J', tip: 'Kasaba Günlüğü: önemli olaylar saatleriyle', onClick: () => this.setOpen(!this.open), className: 'journal-toggle' });
+    this.toggle.append(this.badge);
+    this.dockButtons = [this.toggle];
 
     this.list = el('div', { className: 'journal-list' });
     this.panel = el('div', { className: 'panel journal-panel ui-interactive', hidden: true }, [
-      el('div', { className: 'journal-header' }, [el('span', { text: 'Kasaba Günlüğü' }), close]),
+      modalHeader('Kasaba Günlüğü', () => this.setOpen(false), { icon: 'journal' }),
       this.list,
     ]);
-    this.element = el('div', { className: 'town-journal ui-interactive' }, [this.toggle, this.panel]);
+    this.modal = { id: 'journal', element: this.panel };
 
     game.events.on('ui:toggleJournal', () => this.setOpen(!this.open));
     game.events.on('journal:added', () => {
@@ -52,6 +44,8 @@ export class TownJournal {
     if (open) this.unread = 0;
     this.updateBadge();
     this.lastKey = '';
+    if (open) this.modalHost?.opened('journal');
+    else this.modalHost?.closed('journal');
   }
 
   updateBadge() {

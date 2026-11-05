@@ -940,6 +940,32 @@ Object.assign(ICONS, {
   ],
 });
 
+// (17. aşama) Arayüz: sakinler çekmecesinin sekmesi (iki kişi) ve Ayarlar (dişli)
+Object.assign(ICONS, {
+  people: [
+    '..KK.....',
+    '.KTTK.KK.',
+    '.KTTKKTTK',
+    '..KK.KTTK',
+    '.KooK.KK.',
+    'KooooKBBK',
+    'KooooKBBK',
+    'KooooKBBK',
+    '.KKKK.KK.',
+  ],
+  gear: [
+    '...KK....',
+    '.K.Kq.K..',
+    '.KKqqKqK.',
+    '..KqRRqK.',
+    'KKqR.RqKK',
+    '.KqRRqK..',
+    '.KqKqqKK.',
+    '..K.qK.K.',
+    '....KK...',
+  ],
+});
+
 // (16. aşama) Keşif seferleri: macera sahneleri, egzotik ganimetler, kadim yazıt ve imar şeması
 Object.assign(ICONS, {
   mountain: [
