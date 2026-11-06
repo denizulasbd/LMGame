@@ -116,6 +116,17 @@ export const ACTIVITIES = {
     bubbles: ['note', 'chat'],
     partnerBubbles: ['chat', 'laugh', 'note'],
   },
+  // 18. aşama: ulu süs ağacının gölgesinde dinlenmek
+  shade: {
+    kind: 'leisure',
+    target: 'tree',
+    travelLabel: 'Ağaç gölgesine yürüyor',
+    label: 'Ağaç gölgesinde dinleniyor',
+    duration: [30, 55],
+    effects: { fun: 0.45, energy: 0.1 },
+    pose: 'sit',
+    bubbles: ['note', 'sparkle'],
+  },
   bench: {
     kind: 'leisure',
     target: 'bench',

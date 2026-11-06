@@ -4,7 +4,10 @@
 // maliyetler), bir araç seçiliyken fare altındaki duruma göre kısa bir ipucu satırı belirir. Düğmelerin üzerine
 // gelince kısayol ve açıklama küçük bir ipucunda (.dock-tip) görünür; ipucu pencere kenarından taşmaz.
 // Araç değişikliği 'ui:setTool' olarak istenir; asıl mantık scenes/ToolController.js'te.
-import { BUILD_MENU, getBuildDefinition, TILE_BUILDS } from '../../data/buildings.js';
+// (18. aşama) Yapı listesi üç sekmeye ayrılır: Yapılar, Yol & Zemin (fırçalar), Peyzaj & Dekorasyon. Sekme seçimi
+// tarayıcıda hatırlanır; bir öğe seçilince (ör. kısayolla) onun sekmesine geçilir.
+import { BUILD_MENU, getBuildDefinition, TILE_BUILDS, buildTabFor } from '../../data/buildings.js';
+import { BUILD_TABS } from '../../data/landscape.js';
 import { TOWN_TIERS } from '../../data/town.js';
 import { RESOURCES } from '../../data/resources.js';
 import { getStructureSprite } from '../../art/sprites/index.js';
@@ -22,6 +25,16 @@ const TOOLS = [
 ];
 
 const thumbnailCache = new Map();
+const TAB_KEY = 'lmgame.ui.buildTab';
+
+function readTab() {
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    return BUILD_TABS.some((t) => t.id === saved) ? saved : 'buildings';
+  } catch {
+    return 'buildings';
+  }
+}
 
 function thumbnailURL(type) {
   if (!thumbnailCache.has(type)) {
@@ -75,10 +88,27 @@ export class BuildMenu {
       );
       b.classList.add('build-item');
       b.dataset.type = type;
-      return { type, def, button: b };
+      b.dataset.tab = buildTabFor(type);
+      return { type, def, button: b, tab: buildTabFor(type) };
     });
 
-    this.itemRow = el('div', { className: 'panel build-items ui-interactive', hidden: true }, this.items.map((i) => i.button));
+    // (18. aşama) Sekmeler
+    this.tab = readTab();
+    this.tabButtons = BUILD_TABS.map((t) => {
+      const count = this.items.filter((i) => i.tab === t.id).length;
+      const b = this.button(
+        [el('img', { src: getIconDataURL(t.icon), alt: '' }), el('span', { className: 'build-tab-name', text: t.name }), el('span', { className: 'build-tab-count', text: String(count) })],
+        t.name,
+        () => this.setTab(t.id)
+      );
+      b.classList.add('build-tab');
+      b.dataset.tab = t.id;
+      return b;
+    });
+    this.tabRow = el('div', { className: 'build-tabs' }, this.tabButtons);
+    this.itemList = el('div', { className: 'build-item-list' }, this.items.map((i) => i.button));
+    this.itemRow = el('div', { className: 'panel build-items ui-interactive', hidden: true }, [this.tabRow, this.itemList]);
+    this.setTab(this.tab);
     this.hint = el('div', { className: 'build-hint', hidden: true });
     this.extras = el('div', { className: 'dock-group dock-windows' });
     this.bar = el('div', { className: 'panel dock build-bar ui-interactive' }, [
@@ -101,6 +131,7 @@ export class BuildMenu {
       this.buildType = buildType;
       for (const b of this.toolButtons) b.classList.toggle('is-active', b.dataset.tool === tool);
       for (const item of this.items) item.button.classList.toggle('is-active', item.type === buildType);
+      if (tool === 'build' && buildType && buildTabFor(buildType) !== this.tab) this.setTab(buildTabFor(buildType), false);
       this.itemRow.hidden = tool !== 'build';
       this.hint.hidden = tool === 'select';
       this.setHint(TOOLS.find((t) => t.tool === tool).hint, null);
@@ -109,6 +140,19 @@ export class BuildMenu {
       if (this.tool === 'select') return;
       this.setHint(text || TOOLS.find((t) => t.tool === this.tool).hint, text ? ok : null);
     });
+  }
+
+  /** (18. aşama) Görünen sekmeyi seçer; remember: tarayıcıda hatırla. */
+  setTab(id, remember = true) {
+    this.tab = id;
+    for (const b of this.tabButtons) b.classList.toggle('is-active', b.dataset.tab === id);
+    for (const item of this.items) item.button.hidden = item.tab !== id;
+    if (!remember) return;
+    try {
+      localStorage.setItem(TAB_KEY, id);
+    } catch {
+      /* depolama erişilemez */
+    }
   }
 
   /** Düğmenin ipucunu düğmenin hemen üstünde, pencere kenarlarına sığacak biçimde gösterir (null: gizle). */

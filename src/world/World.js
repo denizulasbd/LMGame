@@ -13,7 +13,7 @@ const CARDINALS = [
   [-1, 0],
 ];
 
-const MIN_MOVE_COST = 0.4; // en ucuz karo maliyeti; A* tahmininin doğru kalması için
+const MIN_MOVE_COST = 0.35; // en ucuz karo maliyeti (parke taş yol); A* tahmininin doğru kalması için
 
 export class World {
   /**
@@ -73,8 +73,8 @@ export class World {
       }
     }
 
-    // Kurulmuş çiçek tarhlarının çevresi de çiçek koklama noktasıdır (yüz tarhına dönük)
-    for (const bed of this.getCompleted('flowerBed')) {
+    // Kurulmuş çiçek tarhlarının ve (18. aşama) çiçek saksılarının çevresi de çiçek koklama noktasıdır (yüz tarhına dönük)
+    for (const bed of this.buildings.filter((b) => b.functional && (b.type === 'flowerBed' || b.type === 'planter'))) {
       const { w, h } = BUILDINGS[bed.type].size;
       for (let y = bed.tileY - 1; y <= bed.tileY + h; y++) {
         for (let x = bed.tileX - 1; x <= bed.tileX + w; x++) {
@@ -394,7 +394,9 @@ export class World {
     const info = this.map.getTileInfo(x, y);
     if (!info) return null;
     const building = info.occupantId ? this.getBuilding(info.occupantId) : null;
-    info.building = building ? building.describe(this) : null;
+    info.building = building ? { ...building.describe(this), type: building.type, sign: building.type === 'signpost' } : null;
+    info.aesthetic = this.aesthetics ? this.aesthetics[this.map.index(x, y)] : 0; // (18. aşama) çevre estetiği
+    info.muddy = this.map.wet && info.tile === 'path';
     return info;
   }
 }

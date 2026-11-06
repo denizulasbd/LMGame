@@ -2,7 +2,8 @@
 // Veri sorgulama (yürünebilir mi, inşa edilebilir mi, adım maliyeti) ve görünen alanı çizme burada.
 import { CONFIG } from '../config.js';
 import { TILE_TYPES, TILE_BY_ID, OBJECT_TYPES, OBJECT_BY_ID } from '../data/tiles.js';
-import { getTileSprite, getEdgeSprite, getObjectSprite } from '../art/tiles/index.js';
+import { getTileSprite, getEdgeSprite, getObjectSprite, getCornerSprite, getMudSprite } from '../art/tiles/index.js';
+import { MUD } from '../data/landscape.js';
 import { AUTUMN_FOLIAGE_VARIANTS } from '../art/seasons.js';
 
 // Kenar yönleri: 0 üst, 1 sağ, 2 alt, 3 sol (art/tiles döndürme sırasıyla aynı)
@@ -20,6 +21,17 @@ const EDGE_OVERLAYS = Object.fromEntries(
     .map(([name, def]) => [name, [].concat(def.edgeOverlay)])
 );
 
+// (18. aşama) Yol köşeleri: köşe k, kenar k ile kenar (k+3)%4 arasındadır (0 sol üst, 1 sağ üst, 2 sağ alt, 3 sol alt)
+const CORNER_DIAGONALS = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+];
+const isRoad = (tile) => Boolean(tile && TILE_TYPES[tile].road && tile !== 'bridge');
+const isGroundTile = (tile) => Boolean(tile && TILE_TYPES[tile].ground);
+const MUDDY = new Set(MUD.tiles);
+
 // Ağaç gibi uzun nesneler üstteki karolara taşar; görünür alanın altına bu kadar
 // fazladan satır eklenir ki ekranın altından taşan tepeler kesilmesin.
 const OBJECT_OVERDRAW_ROWS = 1;
@@ -33,6 +45,7 @@ export class TileMap {
     this.objects = new Uint8Array(width * height); // 0 = nesne yok
     this.occupants = new Uint16Array(width * height); // üzerindeki yapının kimliği, 0 = boş
     this.passable = new Uint8Array(width * height); // 1: üzerindeki yapının altından / içinden geçilebilir (kemer)
+    this.wet = false; // (18. aşama) yağmur yağıyor: toprak patika çamurlu (LandscapeSystem her adımda yazar)
   }
 
   get pixelWidth() {
@@ -120,12 +133,15 @@ export class TileMap {
   getMoveCost(x, y) {
     const tile = this.get(x, y);
     const object = this.getObject(x, y);
-    return (TILE_TYPES[tile]?.moveCost ?? 1) + (object ? OBJECT_TYPES[object].extraMoveCost ?? 0 : 0);
+    const mud = this.wet && MUDDY.has(tile) ? MUD.extraMoveCost : 0; // (18. aşama) çamurlu patika
+    return (TILE_TYPES[tile]?.moveCost ?? 1) + (object ? OBJECT_TYPES[object].extraMoveCost ?? 0 : 0) + mud;
   }
 
-  /** Karakterin bu karo üzerindeki yürüme hızı çarpanı. */
+  /** Karakterin bu karo üzerindeki yürüme hızı çarpanı (yağmurda çamurlu patikada yavaş). */
   getSpeedMultiplier(x, y) {
-    return TILE_TYPES[this.get(x, y)]?.speedMultiplier ?? 1;
+    const tile = this.get(x, y);
+    const base = TILE_TYPES[tile]?.speedMultiplier ?? 1;
+    return this.wet && MUDDY.has(tile) ? base * MUD.speedMultiplier : base;
   }
 
   /**
@@ -189,8 +205,11 @@ export class TileMap {
     };
   }
 
-  /** Zemin karoları ve kenar geçişleri. time: animasyon için saniye; season: mevsim anahtarı. */
-  renderGround(renderer, camera, time, season = 'summer') {
+  /**
+   * Zemin karoları, kenar geçişleri ve (18. aşama) yol köşeleri. time: animasyon için saniye; season: mevsim anahtarı;
+   * wet: yağmur yağıyor (toprak patikada çamur birikintileri).
+   */
+  renderGround(renderer, camera, time, season = 'summer', { wet = false } = {}) {
     const size = CONFIG.TILE_SIZE;
     const { x0, y0, x1, y1 } = this.getVisibleRange(camera, renderer);
 
@@ -212,7 +231,31 @@ export class TileMap {
           const overlay = overlays.find((o) => o.neighbors.includes(neighbor));
           if (overlay) renderer.drawImage(getEdgeSprite(overlay.sprite, dir, time, season), px, py);
         }
+        if (isRoad(tile)) this.drawRoadCorners(renderer, x, y, px, py, season);
+        if (wet && MUDDY.has(tile) && (x * 3 + y * 5) % 3 !== 0) renderer.drawImage(getMudSprite((x + y * 7) % 2), px, py);
       }
+    }
+  }
+
+  /**
+   * (18. aşama) Otomatik yol köşeleri: iki yanı zemin olan köşe yuvarlanır (viraj), iki yanı yol olup çaprazı zemin
+   * olan köşeye küçük bir çimen tutamı taşar (kavşak). Köşenin rengi komşu zeminden (çimen, bereketli toprak...).
+   */
+  drawRoadCorners(renderer, x, y, px, py, season) {
+    for (let corner = 0; corner < 4; corner++) {
+      const [ax, ay] = NEIGHBOR_OFFSETS[corner];
+      const [bx, by] = NEIGHBOR_OFFSETS[(corner + 3) % 4];
+      const a = this.get(x + ax, y + ay);
+      const b = this.get(x + bx, y + by);
+      if (!a || !b) continue;
+      let kind = null;
+      if (isGroundTile(a) && isGroundTile(b)) kind = `${a}CornerOuter`;
+      else if (isRoad(a) && isRoad(b)) {
+        const [dx, dy] = CORNER_DIAGONALS[corner];
+        const diagonal = this.get(x + dx, y + dy);
+        if (isGroundTile(diagonal)) kind = `${diagonal}CornerInner`;
+      }
+      if (kind) renderer.drawImage(getCornerSprite(kind, corner, season), px, py);
     }
   }
 

@@ -8,6 +8,8 @@
 //   moveCost  : yol bulmada bu karoya adım atmanın maliyeti (düşük = tercih edilir).
 //               Yollar ve köprü ucuz olduğu için sakinler doğal olarak patikalardan yürür.
 //   speedMultiplier: karakterin bu karo üzerindeki yürüme hızı çarpanı
+//   road      : (18. aşama) döşenmiş yol (patika, parke, taş plaka, köprü): kenarları birbirine bağlanır (otomatik
+//               viraj ve kavşak köşeleri), otopilot ve sakinler yolları öncelikli kullanır
 //   biome     : (mikro-biyom karoları) { hint, buildingBonus: { yapıTürü: oran } }; üstüne kurulan
 //               yapının verimi ayak izindeki bu karoların oranıyla artar (bkz. systems/StructureSystem.js)
 
@@ -37,11 +39,12 @@ export const TILE_TYPES = {
   },
   path: {
     id: 1,
-    name: 'Toprak Yol',
+    name: 'Toprak Patika',
     walkable: true,
     buildable: false,
     moveCost: 0.4,
-    speedMultiplier: 1.3,
+    speedMultiplier: 1.1, // (18. aşama) +%10; yağmurda çamurlanır (data/landscape.js -> MUD)
+    road: true,
     variants: ['Sade'],
     edgeOverlay: GROUND_FRINGES,
   },
@@ -65,11 +68,12 @@ export const TILE_TYPES = {
   },
   plaza: {
     id: 4,
-    name: 'Meydan Taşı',
+    name: 'Taş Plaka',
     walkable: true,
     buildable: false,
-    moveCost: 0.45,
+    moveCost: 0.38,
     speedMultiplier: 1.2,
+    road: true,
     variants: ['Sade'],
     edgeOverlay: GROUND_FRINGES,
   },
@@ -80,15 +84,17 @@ export const TILE_TYPES = {
     buildable: false,
     moveCost: 0.4,
     speedMultiplier: 1.2,
+    road: true,
     variants: ['Kuzey', 'Güney', 'Tek', 'Orta'],
   },
   cobble: {
     id: 6,
-    name: 'Taş Yol',
+    name: 'Parke Taş Yol',
     walkable: true,
     buildable: false,
     moveCost: 0.35,
-    speedMultiplier: 1.5, // toprak yoldan %15 daha hızlı (1,3 x 1,15)
+    speedMultiplier: 1.25, // (18. aşama) +%25; yağmurda çamur olmaz
+    road: true,
     variants: ['Sade'],
     edgeOverlay: GROUND_FRINGES,
   },

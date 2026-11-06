@@ -109,14 +109,16 @@ export class Hud {
     const population = state.characters.length;
     const capacity = housingCapacity(state);
     const status = immigrationStatus(state);
-    const key = `${happiness}|${population}|${capacity}|${status.checks.map((c) => c.text).join('|')}`;
+    const key = `${happiness}|${population}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}`;
     if (key !== this.lastWelfare) {
       this.lastWelfare = key;
       this.welfareFill.style.width = `${happiness}%`;
       this.welfareFill.className = `need-fill welfare-fill is-${level.key}`;
       this.welfareValue.textContent = `%${happiness}`;
       this.welfareIcon.src = getIconDataURL(level.key === 'bad' ? 'frown' : 'smile');
-      this.welfareRow.title = `Refah (ortalama mutluluk): ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.`;
+      // (18. aşama) Kasabanın estetiği refaha kalıcı küçük bir çarpan ekler
+      const beauty = state.landscape?.percent ? ` Kasaba estetiği (${state.landscape.score} puan): refah +%${state.landscape.percent}.` : ' Süs, fener, ağaç ve taş plakalarla kasabayı güzelleştirdikçe refah +%5\'e kadar artar.';
+      this.welfareRow.title = `Refah (ortalama mutluluk): ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.${beauty}`;
       this.population.textContent = `${population}/${capacity}`;
       this.populationWrap.classList.toggle('is-full', population >= capacity);
       this.population.classList.toggle('is-full', population >= capacity);

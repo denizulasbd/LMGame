@@ -5,7 +5,10 @@
 // yadigârlara, lüks mallara ve altın fermanlarına harcar; planın sonunda peyzaj yapıları (kiraz, çardak, kemer, çit)
 // kurar. (14. aşama) Harika bittikten sonra Büyük İhracat Seferi'ni bekleme süresi dolunca ilan eder; sonunda mevsim
 // festivallerini, sakinlerin anılarını ve nadir hava olaylarını raporlar. Günlük özet, olay günlüğü ve sonunda stokların
-// nereye harcandığını (araştırma, ihracat, harika) basar.
+// nereye harcandığını (araştırma, ihracat, harika) basar. (18. aşama) İmar: her yeni yapının kapısını en yakın yola
+// toprak patikayla bağlar (en kısa yol BFS ile, yalnızca doğal zemin döşenir), taş bolken meydana yakın patikaları parke
+// taşa çevirir, mahalle tabelası, park bankı, saksı, fener ve süs ağaçları diker, bir bahçeyi ahşap çitle çevirir;
+// sonunda döşenen yolu, estetik puanını ve yürüyüşlerin yollardan geçme oranını raporlar.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
@@ -116,6 +119,137 @@ await page.evaluate((passive) => {
       if (option && system.optionStatus(option).ok) {
         game.events.emit('ui:chooseDilemma', { optionId: id });
         return;
+      }
+    }
+  };
+
+
+  // (18. aşama) İmar ve peyzaj otopilotu
+  window.__landscapeStats = { pathTiles: 0, cobbleTiles: 0, plazaTiles: 0, linked: 0, onRoad: 0, walked: 0, decor: {} };
+  game.events.on('terrain:painted', ({ type }) => {
+    if (type === 'path') window.__landscapeStats.pathTiles++;
+    if (type === 'stonePath') window.__landscapeStats.cobbleTiles++;
+    if (type === 'plazaTile') window.__landscapeStats.plazaTiles++;
+  });
+  const linked = new Set();
+  const ROADS = new Set(['path', 'cobble', 'plaza', 'bridge']);
+  const DECOR_PLAN = [
+    { type: 'signpost', count: 1, tier: 1, wood: 20 },
+    { type: 'planter', count: 4, tier: 1, wood: 30 },
+    { type: 'parkBench', count: 2, tier: 2, wood: 40 },
+    { type: 'oakTree', count: 2, tier: 2, wood: 40 },
+    { type: 'birchTree', count: 2, tier: 2, wood: 40 },
+    { type: 'pineTree', count: 2, tier: 2, wood: 40 },
+    { type: 'ironLantern', count: 3, tier: 3, wood: 30 },
+    { type: 'lantern', count: 2, tier: 2, wood: 40 },
+    { type: 'signpost', count: 2, tier: 3, wood: 40 },
+  ];
+  /** Bir karodan en yakın yol karosuna en kısa yürünebilir rota (BFS, en çok 30 adım); rota üzerindeki doğal zemin. */
+  const routeToRoad = (world, sx, sy) => {
+    const map = world.map;
+    const key = (x, y) => y * map.width + x;
+    const prev = new Map([[key(sx, sy), null]]);
+    const queue = [[sx, sy, 0]];
+    while (queue.length) {
+      const [x, y, d] = queue.shift();
+      if (ROADS.has(map.get(x, y)) && (x !== sx || y !== sy)) {
+        const tiles = [];
+        let k = prev.get(key(x, y));
+        while (k !== null && k !== undefined) {
+          const tx = k % map.width;
+          const ty = Math.floor(k / map.width);
+          tiles.push({ x: tx, y: ty });
+          k = prev.get(k);
+        }
+        return tiles;
+      }
+      if (ROADS.has(map.get(x, y))) return [];
+      if (d >= 30) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (!map.inBounds(nx, ny) || prev.has(key(nx, ny)) || !map.isWalkable(nx, ny)) continue;
+        prev.set(key(nx, ny), key(x, y));
+        queue.push([nx, ny, d + 1]);
+      }
+    }
+    return null;
+  };
+  window.__imar = (scene, s, res) => {
+    const world = scene.world;
+    const map = world.map;
+    const L = window.__landscapeStats;
+    // Yürüyenlerin rotalarının ne kadarı yollardan geçiyor?
+    for (const c of s.characters) {
+      if (!c.visible || !c.waypoints) continue;
+      for (const p of c.remainingWaypoints()) {
+        const tx = Math.floor(p.x / 16);
+        const ty = Math.floor(p.y / 16);
+        L.walked++;
+        if (ROADS.has(map.get(tx, ty))) L.onRoad++;
+      }
+    }
+    if (s.time.hour !== 9 && s.time.hour !== 14) return;
+    // 1) Kapıları yola bağla (yapı başına bir kez; odun yedekte kalsın)
+    let painted = 0;
+    for (const b of world.getCompleted()) {
+      if (linked.has(b.id) || painted >= 12 || res.wood < 30) continue;
+      const def = b.definition;
+      if (def.spots === 'none' || !def.buildable || def.size.w * def.size.h < 2) continue;
+      const doors = world.getSpots(b);
+      if (!doors.length) continue;
+      const d = doors[0];
+      const route = routeToRoad(world, d.x, d.y);
+      linked.add(b.id);
+      if (!route) continue;
+      for (const t of [{ x: d.x, y: d.y }, ...route]) {
+        if (painted >= 12 || res.wood < 25) break;
+        if (scene.construction.checkPaint('path', t.x, t.y).ok && scene.construction.paintTile('path', t.x, t.y).ok) painted++;
+      }
+      L.linked++;
+    }
+    if (painted) world.refreshStaticData();
+    // 2) Taş bolken meydana yakın patikaları parke taşa çevir (günde en çok 8 karo)
+    if (res.stone > 80) {
+      const plaza = world.landmarks.plaza;
+      let paved = 0;
+      for (let r = 1; r < 14 && paved < 8; r++) {
+        for (let dy = -r; dy <= r && paved < 8; dy++) {
+          for (let dx = -r; dx <= r && paved < 8; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+            const x = plaza.centerX + dx;
+            const y = plaza.centerY + dy;
+            if (map.get(x, y) === 'path' && scene.construction.checkPaint('stonePath', x, y).ok && scene.construction.paintTile('stonePath', x, y).ok) paved++;
+          }
+        }
+      }
+      if (paved) world.refreshStaticData();
+    }
+    // 3) Sokak eşyaları ve süs ağaçları (sırayla; her çağrıda en çok bir tane)
+    const have = (t) => s.buildings.filter((b) => b.type === t).length;
+    const planned = {};
+    for (const item of DECOR_PLAN) {
+      planned[item.type] = (planned[item.type] ?? 0) + item.count;
+      if (have(item.type) >= planned[item.type] || s.town.tier < item.tier || res.wood < item.wood) continue;
+      if (!scene.economy.canAfford(window.__buildings[item.type].cost)) continue;
+      const spot = sim.findSpot(item.type, 14);
+      if (spot && scene.construction.placeSite(item.type, spot.x, spot.y, { quiet: true }).ok) {
+        L.decor[item.type] = (L.decor[item.type] ?? 0) + 1;
+        break;
+      }
+    }
+    // 4) Bir bahçenin üst kenarına ahşap çit (bir kez; yerleşim kuralı geçitleri kapatmayı engeller)
+    if (!window.__fenced && s.town.tier >= 2 && res.wood > 60) {
+      const garden = world.getCompleted('garden')[0];
+      if (garden) {
+        window.__fenced = true;
+        const { w } = garden.definition.size;
+        for (let x = garden.tileX - 1; x <= garden.tileX + w; x++) {
+          if (scene.construction.checkPlacement('woodFence', x, garden.tileY - 1).ok) {
+            scene.construction.placeSite('woodFence', x, garden.tileY - 1, { quiet: true });
+            L.decor.woodFence = (L.decor.woodFence ?? 0) + 1;
+          }
+        }
       }
     }
   };
@@ -264,6 +398,9 @@ await page.evaluate((passive) => {
       }
     }
 
+    // (18. aşama) İmar: kapıları yola bağla, meydanı parke taşa çevir, sokak eşyaları ve ağaçlar
+    window.__imar(scene, s, res);
+
     const sites = s.buildings.filter((b) => (b.underConstruction || b.project) && b.type !== 'wonder').length;
     if (sites >= 2) return;
     const beds = s.buildings.filter((b) => b.functional && b.capacity).reduce((n, b) => n + b.capacity, 0);
@@ -316,6 +453,7 @@ await page.evaluate(async () => {
   window.__exploration = await import('/src/systems/Exploration.js');
   window.__adventures = (await import('/src/data/exploration.js')).ADVENTURES;
   window.__mwMax = (await import('/src/data/masterpieces.js')).MASTERWORK.maxExhibitHappiness;
+  window.__buildings = BUILDINGS;
 });
 
 function summary() {
@@ -363,6 +501,7 @@ const report = await page.evaluate(() => {
     gold: s.resources.gold,
     goldSpent: s.luxury.goldSpent,
     relics: Object.keys(s.luxury.relics),
+    landscape: { ...window.__landscapeStats, score: s.landscape.score, percent: s.landscape.percent, strolls: s.landscape.strolls, painted: s.landscape.roadsPainted, strollMemories: s.characters.reduce((a, c) => a + c.memories.filter((m) => m.kind === 'stroll').length, 0), grown: s.buildings.filter((b) => b.definition.ornamentalTree && b.growthStage === 2).length },
     decor: ['cherryTree', 'gazebo', 'marbleArch', 'flowerFence'].map((t) => `${t}:${s.buildings.filter((b) => b.type === t && b.functional).length}`).join(' '),
     pinned: s.characters.filter((c) => c.workplaceId !== null).length,
     history: s.history.map((h) => `${h.day}:${h.gold}`).slice(-12).join(' '),
@@ -406,6 +545,13 @@ console.log(`ihracat: ${report.trade.shipments} sefer, ${sum(report.trade.export
 const g = report.stats.gold;
 console.log(`altın harcaması (harika sonrası): ${report.goldSpent} altın · yadigârlar ${g.relics} (${report.relics.length}/5), lüks mallar ${g.goods}, fermanlar ${g.decrees}; ${g.items.length} alım`);
 console.log(`peyzaj: ${report.decor} · arşiv (gün:altın) ${report.history}`);
+{
+  const L = report.landscape;
+  console.log(
+    `(18. aşama) imar: patika ${L.pathTiles} karo, parke ${L.cobbleTiles}, taş plaka ${L.plazaTiles} · yola bağlanan yapı ${L.linked} · süsler ${JSON.stringify(L.decor)} · ulu ağaç ${L.grown} · ` +
+      `estetik ${L.score} puan (refah +%${L.percent}) · güzel sokak anısı ${L.strollMemories} · yürüyüş rotalarının %${L.walked ? Math.round((L.onRoad / L.walked) * 100) : 0}'i yollardan`
+  );
+}
 console.log(`mevsim festivalleri: ${JSON.stringify(report.held)} · ${report.stats.festivals.join(', ')}`);
 const mem = report.memories;
 console.log(`anılar: sakin başına ${Math.min(...mem)}-${Math.max(...mem)} (ortalama ${(mem.reduce((a, b) => a + b, 0) / mem.length).toFixed(1)}), ${report.recollections} kez hatırlandı · Büyük İhracat Seferi: ${report.grandVoyages}`);

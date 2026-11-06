@@ -31,6 +31,15 @@ import { getHarborSprite, getHarborSiteSprite } from './structuresHarbor.js';
 import { getWonderSprite } from './structuresWonder.js';
 import { getCherryTreeSprite, getGazeboLayer, getMarbleArchSprite, getFlowerFenceSprite } from './structuresGarden.js';
 import { getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.js';
+import {
+  getWoodFenceSprite,
+  getFenceGateSprite,
+  getIronLanternSprite,
+  getSignpostSprite,
+  getParkBenchSprite,
+  getPlanterSprite,
+  getOrnamentalTreeSprite,
+} from './structuresLandscape.js';
 import { seasonalFoliageRows, winterize } from '../seasons.js';
 
 // ---------------------------------------------------------------------------
@@ -599,7 +608,7 @@ export function getConstructionSiteSprite(w, h, stage, type = null, orientation 
 // Kışın her yapı karla örtülür (çatılar beyazlar, tepelere kar yığılır); çalı ve bahçe kendi kış
 // çizimlerini kullanır (bahçenin Seviye 2'si Cam Sera ise kışın da yeşildir, yalnızca çatısı karlanır).
 // ---------------------------------------------------------------------------
-const OWN_WINTER_ART = new Set(['berryBush', 'garden', 'sheepFarm', 'mill', 'cherryTree', 'grapeVine', 'ancientTorch']);
+const OWN_WINTER_ART = new Set(['berryBush', 'garden', 'sheepFarm', 'mill', 'cherryTree', 'grapeVine', 'ancientTorch', 'birchTree', 'oakTree', 'pineTree']);
 
 // Kışın karla örtülen çatı renkleri (açık / ana / koyu ton) ve çatının bittiği satır.
 // Kulübenin üç çatı tonu (kiremit, arduvaz, yosun) hepsi listede; ahırın yalnızca saçakları.
@@ -701,6 +710,25 @@ function getBaseStructureSprite(type, state) {
       return getMarbleArchSprite();
     case 'flowerFence':
       return getFlowerFenceSprite(state.connect ?? {});
+    // 18. aşama: sokak eşyaları ve süs ağaçları
+    case 'woodFence':
+      return getWoodFenceSprite(state.connect ?? {});
+    case 'fenceGate':
+      return getFenceGateSprite(state.connect ?? {});
+    case 'ironLantern':
+      return getIronLanternSprite(Boolean(state.lit ?? state.windowsLit));
+    case 'signpost':
+      return getSignpostSprite();
+    case 'parkBench':
+      return getParkBenchSprite();
+    case 'planter':
+      return getPlanterSprite(state.tone ?? 0, state.frame ?? 0);
+    case 'birchTree':
+      return getOrnamentalTreeSprite('birch', state.growthStage ?? 2, state.season ?? 'summer');
+    case 'oakTree':
+      return getOrnamentalTreeSprite('oak', state.growthStage ?? 2, state.season ?? 'summer');
+    case 'pineTree':
+      return getOrnamentalTreeSprite('pine', state.growthStage ?? 2, state.season ?? 'summer');
     case 'healerHut':
       return getHealerHutSprite(Boolean(state.active), state.frame ?? 0, Boolean(state.windowsLit));
     case 'monument':

@@ -22,6 +22,7 @@
     import { getCharacterSprite } from '../src/art/sprites/index.js';
     import { getTileSprite, getObjectSprite, getEdgeSprite } from '../src/art/tiles/index.js';
     import { TILE_TYPES } from '../src/data/tiles.js';
+    import { TileMap } from '../src/world/TileMap.js';
 
     const root = document.getElementById('root');
     const SCALE = 5;
@@ -49,6 +50,92 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 18. aşama: serbest imar, peyzaj fırçası ve kasaba estetiği ---
+    /** Gerçek TileMap kuralıyla (kenar geçişleri + otomatik yol köşeleri, isteğe bağlı çamur) çizilen küçük harita. */
+    function roadMosaic(rows, season = 'summer', wet = false) {
+      const legend = { '.': 'grass', ',': 'meadow', F: 'forest', '#': 'path', '=': 'cobble', P: 'plaza', ':': 'sand' };
+      const map = new TileMap(rows[0].length, rows.length);
+      rows.forEach((row, y) => [...row].forEach((ch, x) => map.set(x, y, legend[ch], (x * 3 + y) % 2)));
+      const canvas = document.createElement('canvas');
+      canvas.width = map.width * 16;
+      canvas.height = map.height * 16;
+      const ctx = canvas.getContext('2d');
+      const renderer = { width: canvas.width, height: canvas.height, drawImage: (img, x, y) => ctx.drawImage(img, x, y) };
+      const camera = { getViewBounds: () => ({ left: 0, top: 0, right: canvas.width, bottom: canvas.height }) };
+      map.renderGround(renderer, camera, 0, season, { wet });
+      return canvas;
+    }
+    const ROADS = [
+      '..........,,,,',
+      '.####.....,,,,',
+      '.#..#######,,,',
+      '.#..#..=..#,,,',
+      '.####..=..#...',
+      '....#==PPP=====',
+      '....#..PPP#...F',
+      '....#..PPP#..FF',
+      '.......=..#.FFF',
+    ].map((r) => r.slice(0, 15).padEnd(15, '.'));
+    show('Yol & Zemin fırçası: toprak patika, parke taş yol ve taş plaka meydan; virajlar ve kavşaklar otomatik köşelenir (yaz, sonbahar, kış)', ['summer', 'autumn', 'winter'].map((sn) => [NAMES[sn], roadMosaic(ROADS, sn)]), 3);
+    show('Yağmurda toprak patika çamurlanır (parke ve taş plaka çamurlanmaz)', [['kuru', roadMosaic(ROADS.slice(0, 6))], ['yağmurda', roadMosaic(ROADS.slice(0, 6), 'summer', true)]], 3);
+    show('Zemin fırçaları (tek karo)', [
+      ['Toprak Patika', getTileSprite('path', 0, 0)],
+      ['Parke Taş Yol', getTileSprite('cobble', 0, 0)],
+      ['Taş Plaka', getTileSprite('plaza', 0, 0)],
+      ['yol simgesi', getIconSprite('road')],
+      ['peyzaj simgesi', getIconSprite('flower')],
+      ['çit simgesi', getIconSprite('fence')],
+      ['tabela simgesi', getIconSprite('signpost')],
+      ['estetik simgesi', getIconSprite('aesthetic')],
+    ], 5);
+    /** Çit düzeni: her çit dört yanındaki çite / kapıya göre birleşir (StructureSystem.connectFences kuralı). */
+    function fenceLayout(rows) {
+      const h = rows.length;
+      const w = rows[0].length;
+      const canvas = document.createElement('canvas');
+      canvas.width = w * 16;
+      canvas.height = h * 16 + 8;
+      const ctx = canvas.getContext('2d');
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) ctx.drawImage(getTileSprite('grass', 0, 0), x * 16, y * 16 + 8);
+      const isFence = (x, y) => rows[y] && (rows[y][x] === 'f' || rows[y][x] === 'g');
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const ch = rows[y][x];
+          if (ch !== 'f' && ch !== 'g') continue;
+          const connect = { left: isFence(x - 1, y), right: isFence(x + 1, y), up: isFence(x, y - 1), down: isFence(x, y + 1) };
+          const sprite = getStructureSprite(ch === 'f' ? 'woodFence' : 'fenceGate', { connect });
+          ctx.drawImage(sprite, x * 16, (y + 1) * 16 + 8 - sprite.height);
+        }
+      }
+      return canvas;
+    }
+    show('Ahşap Çit ve Çit Kapısı: yönüne göre birleşir (köşe, T, dört yol); kapı çitin yönünü alır', [
+      ['ağıl', fenceLayout(['ffgff', 'f...f', 'f...g', 'fffff'])],
+      ['T ve kavşak', fenceLayout(['..f..', 'ffgff', '..f..', '..f..'])],
+      ['tek çit', getStructureSprite('woodFence', {})],
+      ['yatay kapı', getStructureSprite('fenceGate', { connect: { left: true, right: true } })],
+      ['dikey kapı', getStructureSprite('fenceGate', { connect: { up: true, down: true } })],
+    ], 4);
+    show('Sokak eşyaları: demir fener (gündüz / gece), ahşap fener, mahalle tabelası, park bankı, çiçek saksısı', [
+      ['demir fener gündüz', getStructureSprite('ironLantern', { lit: false })],
+      ['demir fener gece', getStructureSprite('ironLantern', { lit: true })],
+      ['demir fener kış', getStructureSprite('ironLantern', { lit: true, season: 'winter' })],
+      ['ahşap fener gece', getStructureSprite('lantern', { lit: true })],
+      ['mahalle tabelası', getStructureSprite('signpost', {})],
+      ['tabela kış', getStructureSprite('signpost', { season: 'winter' })],
+      ['park bankı', getStructureSprite('parkBench', {})],
+      ['ahşap bank', getStructureSprite('bench', {})],
+      ...[0, 1, 2].map((tone) => [`saksı ${tone}`, getStructureSprite('planter', { tone, frame: tone % 2 })]),
+    ], 6);
+    for (const kind of ['birchTree', 'oakTree', 'pineTree']) {
+      const names = { birchTree: 'Huş', oakTree: 'Meşe', pineTree: 'Çam' };
+      show(`Süs ağacı: ${names[kind]} — fidan, genç ağaç, ulu ağaç ve dört mevsim`, [
+        ['fidan', getStructureSprite(kind, { growthStage: 0 })],
+        ['genç', getStructureSprite(kind, { growthStage: 1 })],
+        ...SEASONS.map((season) => [`ulu · ${NAMES[season]}`, getStructureSprite(kind, { growthStage: 2, season })]),
+      ], 5);
+    }
 
     // --- 16. aşama: keşif seferleri: üzüm asması, kadim meşale, ganimet ve macera simgeleri, balonlar ---
     show('Üzüm Asması (seferden gelen egzotik fide; bahçe / çardak kenarına dikilir): dört mevsim', SEASONS.map((season) => [NAMES[season], getStructureSprite('grapeVine', { season })]), 6);

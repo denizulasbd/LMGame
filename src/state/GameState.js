@@ -125,6 +125,9 @@ export class GameState {
     // Keşif (ExpeditionSystem, 16. aşama): egzotik ganimetler, kadim yazıtlar ve imar şemaları, sefer günlüğü
     // (bkz. systems/Exploration.js; süren sefer state.dilemma.expedition'da)
     this.exploration = emptyExploration();
+    // (18. aşama) Serbest imar ve kasaba estetiği (LandscapeSystem): yıkım fırçasının küsuratlı iade birikimi,
+    // kasabanın toplam estetik puanı ve refaha eklediği yüzde (+%0-5), sokak yürüyüşü ve gece sayaçları
+    this.landscape = emptyLandscape();
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -188,6 +191,7 @@ export class GameState {
       rally: this.rally,
       masterworks: this.masterworks,
       exploration: this.exploration,
+      landscape: this.landscape,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -273,6 +277,8 @@ export class GameState {
     next.masterworks = restoreMasterworks(data.masterworks);
     // 16. aşamadan eski kayıtlarda keşif ganimeti ve yazıt yoktur; yarım kalmış eski sefer maceralarsız sürer
     next.exploration = restoreExploration(data.exploration);
+    // 18. aşamadan eski kayıtlarda peyzaj durumu yoktur: estetik ilk adımda yapılardan ve zeminden yeniden hesaplanır
+    next.landscape = restoreLandscape(data.landscape);
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
@@ -298,6 +304,25 @@ export class GameState {
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
+}
+
+function emptyLandscape() {
+  return { refundCredit: {}, score: 0, percent: 0, strolls: 0, roadsPainted: 0 };
+}
+
+/** Kayıttaki peyzaj durumu: sayılar sınırlanır; estetik puanı yüklenince yeniden hesaplanır. */
+function restoreLandscape(data) {
+  const out = emptyLandscape();
+  if (!data || typeof data !== 'object') return out;
+  for (const [r, v] of Object.entries(data.refundCredit ?? {})) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0 && n < 1) out.refundCredit[r] = n;
+  }
+  out.score = Math.max(0, Number(data.score) || 0);
+  out.percent = Math.min(5, Math.max(0, Math.floor(Number(data.percent) || 0)));
+  out.strolls = Math.max(0, Math.floor(Number(data.strolls) || 0));
+  out.roadsPainted = Math.max(0, Math.floor(Number(data.roadsPainted) || 0));
+  return out;
 }
 
 const INSCRIPTION_STATUSES = new Set(['found', 'decoding', 'decoded']);

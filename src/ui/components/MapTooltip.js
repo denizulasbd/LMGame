@@ -4,6 +4,7 @@
 // arayüzün üstündeyken, canvas dışındayken, sağ tıkla sürüklerken, bir araç (inşa / topla / yık) seçiliyken, pencere
 // açıkken ya da fotoğraf modunda görünmez (araçların kendi ipucu dock'tadır).
 import { JOBS } from '../../data/jobs.js';
+import { aestheticLevel } from '../../systems/Landscape.js';
 import { el } from '../dom.js';
 
 const OFFSET_X = 16;
@@ -22,7 +23,8 @@ export class MapTooltip {
     this.name = el('span', { className: 'map-tip-name' });
     this.dot = el('span', { className: 'status-dot' });
     this.status = el('span', { className: 'map-tip-status' });
-    this.element = el('div', { className: 'map-tooltip', hidden: true }, [this.name, el('div', { className: 'map-tip-row' }, [this.dot, this.status])]);
+    this.beauty = el('div', { className: 'map-tip-beauty', hidden: true }); // (18. aşama) çevre estetiği
+    this.element = el('div', { className: 'map-tooltip', hidden: true }, [this.name, el('div', { className: 'map-tip-row' }, [this.dot, this.status]), this.beauty]);
 
     game.events.on('map:hover', (info) => {
       this.info = info;
@@ -76,6 +78,13 @@ export class MapTooltip {
       }
       if (info.biomeHint) status = `${status} · ${info.biomeHint}`;
     }
+    if (info.muddy) status = `${status} · Çamurlu (yağmur)`;
+    // (18. aşama) Mahalle tabelası: ad küçük ahşap bir tabelada; güzel köşelerde çevre estetiği
+    this.element.classList.toggle('is-sign', Boolean(info.building?.sign) && !info.character);
+    const level = aestheticLevel(info.aesthetic ?? 0);
+    const beauty = level ? `✿ Çevre estetiği: ${level}` : '';
+    if (this.beauty.textContent !== beauty) this.beauty.textContent = beauty;
+    this.beauty.hidden = !beauty;
     if (this.name.textContent !== name) this.name.textContent = name;
     if (this.status.textContent !== status) this.status.textContent = status;
     this.dot.className = `status-dot ${tone}`;

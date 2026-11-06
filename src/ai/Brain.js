@@ -20,6 +20,7 @@
 //   6b. (12. aşama) Çocuk: ders saatinde (09:00-15:00) günlük dersini dinlemediyse Bilgelik Evi'ne gitmek
 //   7. Değilse kişiliğine göre ağırlıklı bir boş zaman etkinliği (çocuklar: oyun, çiçekler, yürüyüş)
 import { ACTIVITIES } from '../data/activities.js';
+import { BENCH_TYPES, BUILDINGS } from '../data/buildings.js';
 import { MEAL_FOOD_COST } from '../data/resources.js';
 import { WORK_SESSION } from '../data/jobs.js';
 import { isBedtime, isWorkHours } from './TraitProfile.js';
@@ -34,6 +35,14 @@ const PLAYGROUND_TYPES = ['fountain', 'campfire', 'inn', 'monument'];
 const PLAZA_PLAY_RADIUS = 8; // meydan merkezine bu kadar karo yakın yollar da oyun yeridir
 
 // Boş zamanda gidilen yapılar: etkinlik -> yapı türü (yalnızca kullanılabilir hâldeyse seçilir)
+// (18. aşama) Süs ağacının çevresinde gölgede oturulan yanlar: [dx, dy, ağaca dönük yüz]
+const SHADE_SIDES = [
+  [0, 1, 'up'],
+  [-1, 0, 'right'],
+  [1, 0, 'left'],
+  [0, -1, 'down'],
+];
+
 const LANDMARK_LEISURE = new Map([
   ['monument', 'monument'],
   ['ancientSpring', 'ancientFountain'],
@@ -590,6 +599,11 @@ export class Brain {
     for (const building of this.availableGatherings()) {
       if (this.participants(building, c).length > 0) weights[building.type] = (weights[building.type] ?? 0) * 1.6;
     }
+    // (18. aşama) Ulu süs ağaçlarının gölgesinde dinlenmek: bankı ve çiçekleri sevenler daha çok sever (kışın az)
+    if (this.shadeTrees().length > 0) {
+      const winter = getSeason(this.world.state.time.day).key === 'winter';
+      weights.shade = ((weights.bench ?? 1) + (weights.flowers ?? 1)) * (winter ? 0.15 : 0.5);
+    }
 
     const options = Object.entries(weights).filter(([name, w]) => w > 0 && ACTIVITIES[name]);
     while (options.length > 0) {
@@ -605,9 +619,10 @@ export class Brain {
     const duration = this.durationFor(activity);
     switch (activity) {
       case 'bench': {
+        // (18. aşama) Ahşap bank ve park bankı
         const benches = this.world
-          .getCompleted('bench')
-          .filter((b) => this.world.freeSpots(b, c.id).length > 0);
+          .getCompleted()
+          .filter((b) => BENCH_TYPES.includes(b.type) && this.world.freeSpots(b, c.id).length > 0);
         if (benches.length === 0) return null;
         const bench = this.nearest(benches.map((b) => ({ x: b.tileX, y: b.tileY, bench: b })), c).bench;
         return {
@@ -650,6 +665,20 @@ export class Brain {
         if (gazebos.length === 0) return null;
         return this.planGathering(c, this.nearest(gazebos.map((b) => ({ x: b.tileX, y: b.tileY, b })), c).b);
       }
+      case 'shade': {
+        // (18. aşama) Ulu süs ağacının yanındaki boş bir karoya oturup gölgede dinlenir (yüzü ağaca dönük)
+        const spots = [];
+        for (const tree of this.shadeTrees()) {
+          for (const [dx, dy, facing] of SHADE_SIDES) {
+            const x = tree.tileX + dx;
+            const y = tree.tileY + dy;
+            if (this.world.map.isWalkable(x, y) && this.world.isReachable(x, y) && !this.world.isReserved(x, y, c.id)) spots.push({ x, y, facing });
+          }
+        }
+        const spot = this.pickNearby(spots, c, 26);
+        if (!spot) return null;
+        return { activity, spot, reserve: true, facing: spot.facing, duration };
+      }
       case 'play': {
         // Çocuklar meydanda, havuzun, ateşin ve hanın çevresinde koşuşturur
         const spot = this.pickNearby(this.playSpots(), c, 30);
@@ -673,6 +702,11 @@ export class Brain {
   // ---------------------------------------------------------------------------
   // Yardımcılar
   // ---------------------------------------------------------------------------
+
+  /** (18. aşama) Gölgesinde dinlenilebilen ulu süs ağaçları. */
+  shadeTrees() {
+    return this.world.buildings.filter((b) => b.functional && BUILDINGS[b.type].ornamentalTree && b.growthStage === 2);
+  }
 
   durationFor(activity) {
     const range = ACTIVITIES[activity].duration;

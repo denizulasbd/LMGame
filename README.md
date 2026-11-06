@@ -30,6 +30,10 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 |---|---|
 | Sol tık (karakterin / yapının üstüne) | Sakini ya da yapıyı (harabe dahil) seç, bilgi panelini aç |
 | Yapı panelinde bir isme tık | O sakini seç ve kamerayı ona kaydır |
+| İnşa Et → **Yol & Zemin** fırçasıyla sürükle | Patika / parke / taş plaka kesintisiz çizilir; virajlar ve kavşaklar kendiliğinden köşelenir |
+| İnşa Et → çit, saksı ya da fidanla sürükle | Art arda dikilir |
+| Yık (X) ile sürükle | Yolları, çitleri ve küçük süsleri geri dönüştürür (%50 iade); tıklanan yapı yıkılır |
+| Mahalle tabelasına tıkla → paneldeki kutu | Sokağa / semte ad ver (Enter) |
 | Yapı panelinde **Yükselt** / **Onarımı Başlat** | Yapıyı Seviye 2'ye yükselt ya da harabeyi onar (maliyet peşin) |
 | Yapı panelinde **İşten Çıkar** / **Geri Al** | Çalışanı o iş yerinden çıkar (başka iş arar) / yeniden çalışabilsin |
 | Zanaat Atölyesi panelinde **Otomatik / Alet / Palto / Çanta** | Atölyenin ne üreteceğini seç |
@@ -146,6 +150,8 @@ LMGame/
     │       ├── structuresGarden.js Kiraz Çiçeği Ağacı (dört mevsim), iki katmanlı Ahşap Çardak, Mermer Kemer, birleşen Çiçekli Çit
     │       ├── festival.js   Mevsim festivali süslemeleri (çiçek kemeri, ziyafet sofrası, hasat sepeti, kardan adam...), saç çiçeği
     │       ├── structuresExplore.js (16. aşama) Üzüm Asması (dört mevsim) ve mavi alevli Kadim Meşale
+    │       ├── structuresLandscape.js (18. aşama) Ahşap çit ve kapısı (16 bağlantı), demir fener, mahalle tabelası,
+    │       │                 park bankı, çiçek saksısı, huş / meşe / çam süs ağaçları (üç büyüme kademesi, dört mevsim)
     │       ├── outfits.js    (15. aşama) Meslek kıyafetleri: on kit, Kalfa aksesuarı ve Usta kostümü (başlık + gövde katmanı)
     │       └── animals.js    Tavşan, geyik, kedi ve köpek (otomatik konturlu, poz ve renk çeşitleri)
     ├── data/               Saf veri tanımları (oyun kuralları, denge değerleri)
@@ -159,6 +165,8 @@ LMGame/
     │   ├── festivals.js    Dört mevsim kapanış festivali: saatler, yerler, bonuslar, süslemeler, anı cümleleri
     │   ├── exploration.js  (16. aşama) Sefer kuralları, dört macera ve seçenekleri (risk, usta / alet kuralları, ganimet),
     │   │                   egzotik ganimetler, üç kadim yazıt ve imar şemaları, üzüm asması
+    │   ├── landscape.js    (18. aşama) Çevre estetiği değerleri ve yarıçapı, refah çarpanı eşikleri, karanlık ve ışıklar,
+    │   │                   çamur, süs ağaçlarının büyümesi, sokak adları, inşa menüsü sekmeleri
     │   ├── masterpieces.js (15. aşama) Usta işi eserler: altı eser, meslekleri, iş yerleri, fiyatları; şans ve sergi kuralları
     │   ├── luxury.js       Altın harcama kanalları: lüks mallar (baharat, ipek ve mermer), beş kasaba yadigârı ve artan
     │   │                   fiyatları, altın fermanları (ikramiye, kraliyet mimarları)
@@ -238,6 +246,9 @@ LMGame/
     │   ├── ExpeditionSystem.js (16. aşama) Keşif seferleri: yola çıkış, maceralar, kaza, dönüş, ganimet, anılar, handa
     │   │                   hikâye anlatma; harabe yazıtları ve çözme
     │   ├── Exploration.js  (16. aşama) Keşfin saf hesapları: kafile seçimi, risk, sefer durumu, şema etkileri
+    │   ├── LandscapeSystem.js (18. aşama) Çamur, süs fidanlarının büyümesi, çevre estetiği haritası ve kasaba puanı,
+    │   │                   güzel sokak / bank / çiçek keyfi ve anıları, gece karanlığı
+    │   ├── Landscape.js    (18. aşama) Peyzajın saf hesapları: estetik alanı, toplam puan, refah çarpanı, ışık altında mı
     │   ├── CraftsmanshipSystem.js (15. aşama) Meslek kıyafetlerini giydirir; ustaların eserlerini üretir, sergiler, satar
     │   ├── Masterworks.js  (15. aşama) Usta işi eserlerin saf hesapları: fiyat, satış / sergi durumu, refah katkısı
     │   ├── WeatherSystem.js Güneşli / bulutlu / yağmurlu arası yumuşak geçişler
@@ -392,8 +403,9 @@ girmez, yüklenince her sakin kademesine göre yeniden giyinir. 16. aşamada ke�
 Kayıp Şehir Haritası, kadim yazıtlar ve çözülme durumları, çözülen yazıt, sefer sayısı, son seferlerin günlüğü, atölyenin demir
 kırıntısı), süren seferin maceraları (`dilemma.expedition`: planlanan maceralar, sıradaki macera zamanı, macera günlüğü,
 biriken ganimet, bulgular, yaralananlar, seferin adı), açık macera penceresi (`dilemma.active.kind = 'adventure'`, kafileyle
-risk açıklamaları) ve maceracıların anlatacağı hikâye (`tale`) eklendi. Kayıt sürümü 14'tür; 4.–15. aşamanın (sürüm 2–13)
-kayıtları da açılır (usta işi eser vitrini ve keşif ganimetleri boş başlar; eski biçimde yarım kalmış bir sefer maceralar
+risk açıklamaları) ve maceracıların anlatacağı hikâye (`tale`) eklendi. 18. aşamada mahalle tabelasının adı (`label`), süs
+fidanının dikiliş anı (`plantedAt`) ve peyzaj durumu (`landscape`: yıkım iadesinin küsuratı, estetik puanı ve refah yüzdesi,
+sayaçlar) eklendi. Kayıt sürümü 15'tir; 4.–17. aşamanın (sürüm 2–14) kayıtları da açılır (peyzaj durumu boş başlar) (usta işi eser vitrini ve keşif ganimetleri boş başlar; eski biçimde yarım kalmış bir sefer maceralar
 açmadan sürer ve döner) (anısı olmayan sakinin anı defteri ilk açılışta "Kasabada yaşamaya başladı" ile açılır): eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
 ve ekipmansız başlar; yün, demir, ekmek ve altın 0 olur; araştırma, ihracat ve yadigâr boş başlar; arşiv ilk açılışta
 kurulur, düğün ve doğum sayaçları evli çiftlerden ve ebeveynli sakinlerden tahmin edilir; yaban hayatı ilk açılışta
@@ -1746,6 +1758,91 @@ grafikleri de koyu zemine geçti. Bütün renkler `styles/ui.css` başındaki de
   duraklatma, harita ipucu, listeden seçilen sakinin kartı.
 - Sonuç: `tests.mjs` 260/260, `audit.mjs` 85/85, `compat.mjs` 192/192, sayfa hatası yok.
 
+## Serbest imar, peyzaj fırçası ve kasaba estetiği (18. aşama)
+
+Oyuncu artık yalnızca tek tek bina kurmuyor; kasabanın sokaklarını, meydanlarını ve bahçelerini serbestçe tasarlıyor.
+Kurallar `data/landscape.js`, mantık `systems/LandscapeSystem.js` (saf hesaplar `systems/Landscape.js`), görseller
+`art/sprites/structuresLandscape.js` ve `art/tiles/index.js` içindedir.
+
+### İnşa menüsünün sekmeleri
+Alt dock'taki **İnşa Et** listesi üç sekmeye ayrıldı: **Yapılar**, **Yol & Zemin** ve **Peyzaj & Dekorasyon** (her sekmede
+öğe sayısı yazar). Sekme seçimi tarayıcıda hatırlanır; bir öğe seçilince onun sekmesi açılır
+(`data/buildings.js` → `buildTabFor`, `data/landscape.js` → `BUILD_TABS`).
+
+### Yol & Zemin fırçası
+| Fırça | Bedel | Ne yapar? |
+|---|---|---|
+| Toprak Patika | 1 odun | Sakinler patikayı yeğler, üzerinde **%10** hızlı yürür. Yağmurda **çamurlanır**: %20 yavaş yürünür, yol bulma çamurlu patikadan kaçınır, karoda su birikintileri görünür. |
+| Parke Taş Yol | 1 taş | Arnavut kaldırımı: **%25** hızlı, yağmurda çamur olmaz. Patikanın üstüne de döşenir. |
+| Taş Plaka (Meydan Zemini) | 2 taş | En şık döşeme: %20 hızlı, çamurlanmaz, çevresine estetik katar; bank, fener ve süsler üstüne kurulur. |
+| Ahşap Köprü | 2 odun | Suyun üzerinden geçit (değişmedi). |
+
+- **Tıklayıp sürükleyerek kesintisiz çizim:** fare hızlı gitse de aradaki karolar dolar (4 yönlü bağlı çizgi;
+  `ToolController.lineTiles`); tek tıklama tek karo döşer.
+- **Otomatik kenarlık (autotile):** yollar birbirine bağlandığında viraj köşeleri yuvarlanır, kavşak ve L dönüşlerinin iç
+  köşelerine küçük bir çimen tutamı taşar; köşenin rengi komşu zeminden (çimen, bereketli toprak, kayalık, orman) gelir,
+  mevsimle boyanır (`TileMap.drawRoadCorners`, `art/tiles` → `CORNER_ART`).
+- Yol hızları bu aşamada yeniden dengelendi: haritanın kendi toprak yolları da artık +%10 (önce +%30), taş yollar +%25
+  (önce +%50). Yol bulma maliyetleri değişmedi (parke 0,35, taş plaka 0,38, patika 0,4); A* tahmini en ucuz karoya (0,35)
+  göre düzeltildi.
+
+### Peyzaj & Dekorasyon
+| Yapı | Bedel | Ne yapar? |
+|---|---|---|
+| Ahşap Çit | 2 odun | Kazıklı rustik çit; dört yandaki çit ve kapılara göre birleşir (yatay, dikey, köşe, T, kavşak). Geçilemez; yerleşim kuralı bir yapıyı kasabadan koparmasına izin vermez. Sürükleyerek dizilir. |
+| Çit Kapısı | 4 odun | Çitlerle birleşir, çitin yönünü alır; sakinler kapıdan geçer (yolların üstüne de kurulur). |
+| Ahşap / Demir Sokak Feneri | 1 odun + 1 taş / 2 demir + 2 taş | Geceleri yanar (demir fener 18:30-06:30, daha geniş ışık). Gece ışıksız sokakta yürüyen sakin **karanlıktan ürker** (keyfi biraz hızlı kaçar); fenerin ışığı altında ürkmez. |
+| Mahalle Tabelası | 3 odun | Önerilen bir sokak adıyla dikilir (Gül Sokağı, Çınar Yolu...); Yapı Bilgi Paneli'ndeki kutuya yazıp Enter ile semte ad verilir. İmleçle üzerine gelince ad küçük ahşap bir tabelada okunur; yakınındaki yürüyüş anılarında sokağın adı geçer. |
+| Park Bankı | 5 odun + 1 demir | Oturulabilen bank (ahşap bank gibi); güzel bir köşedeyse oturan manzarayı izler, keyfi çok daha hızlı dolar. |
+| Çiçek Saksısı | 1 odun + 2 taş | Çevresi çiçek koklama noktasıdır; yanından geçenler çiçek kokusunu içine çeker. Sürükleyerek dizilir. |
+| Huş / Meşe / Çam Fidanı | 2 odun + 2 yiyecek | Dikildikten sonra **iki günde** büyür (fidan → genç ağaç → ulu ağaç; adı Huş Ağacı / Süs Meşesi / Süs Çamı olur). Ulu ağacın gölgesinde sakinler oturup dinlenir (yeni etkinlik: `shade`). Kesilmez, odun vermez; mevsimle renk değiştirir. |
+
+Çiçek tarhı, çiçekli çit, kiraz, kemer, çardak, ahşap bank, asma ve kadim meşale de bu sekmeye taşındı.
+
+### Çevre Estetiği ve refah
+- Her süsün bir estetik değeri vardır (`AESTHETIC.values`; çardak ve anıt 4, kiraz ve çiçek tarhı 3, saksı 2,2...).
+  Değer, süsün çevresindeki **4-5 karoluk** bölgeye merkezde tam, kenara doğru azalarak yayılır; taş plaka ve parke
+  döşemenin de küçük katkısı vardır (`computeAestheticField`). Harita ipucu güzel köşelerde "✿ Çevre estetiği: Güzel /
+  Çok güzel / Büyüleyici" yazar; süs kurarken dock ipucu süsün katkısını ve oranın güzelliğini gösterir.
+- Güzel bir sokaktan geçen sakinin keyfi dolar; bankta oturanın keyfi manzarayla artar. Arada bir hafif güzel anılar
+  yazılır: "Güzel bir sokakta yürüdü (Gül Sokağı)", "Çiçek kokusunu içine çekti", "Bankta oturup manzarayı izledi",
+  "Ağaç gölgesinde serinleyip dinlendi" (sakin başına en çok iki günde bir; defter dolunca önce bunlar silinir).
+- Kasabanın toplam estetik puanı refaha **kalıcı küçük bir çarpan** ekler: 12 puanda +%1, 30'da +%2, 55'te +%3, 85'te +%4,
+  120'de +%5 (`townHappiness`: sakinlerin ortalaması × çarpan + bonuslar). Puan ve yüzde üst çubuktaki refahın ipucunda,
+  süslerin Yapı Bilgi Paneli'nde yazar; yüzde arttıkça günlüğe "Kasaba güzelleşiyor" düşer.
+
+### Akıllı yıkım fırçası (X)
+Tıklanan yapı her boyutta yıkılır (şantiye iptal edilir); **sürüklenince** yollar, köprüler, taş plakalar, çitler ve 1x1
+süsler art arda geri dönüştürülür (büyük yapılar sürüklerken yıkılmaz). Oyuncunun döşediği zemin, harita üretildiğindeki
+hâline döner (taş plakanın altından çimen ya da patika çıkar) ve **harcananın yarısı** depoya iade edilir; küsurat birikir
+(iki karo patika = 1 odun; `landscape.refundCredit`). Fırça bitince tek bir özet bildirimi çıkar. Fırçayla dizilen çit,
+saksı ve fidanlar günlüğü ve bildirimleri doldurmaz.
+
+### Kayıt
+Kayıt sürümü **15**. Yeni alanlar: tabelanın adı (`buildings[].label`), süs fidanının dikiliş anı (`plantedAt`) ve
+`landscape` (iade küsuratı, estetik puanı ve yüzdesi, yürüyüş ve döşenen yol sayaçları). Çit bağlantıları ve estetik
+haritası kaydedilmez, yüklenince yapılardan ve zeminden yeniden hesaplanır. 4.-17. aşamanın (sürüm 2-14) kayıtları
+sorunsuz açılır: peyzaj durumu boş başlar, estetik ilk adımda hesaplanır (günlüğe yazılmaz), dikiliş anı bilinmeyen
+fidanlar büyümüş sayılır.
+
+### Denge ve test (simülasyon)
+- **Otopilot** artık imar da yapar: her yeni yapının kapısını en kısa rotayla (BFS) en yakın yola toprak patikayla
+  bağlar, taş bolken meydana yakın patikaları parke taşa çevirir, tabela, saksı, park bankı, fener ve süs ağaçları diker,
+  bir bahçenin kenarına çit çeker; sonunda döşenen yolu, estetik puanını, güzel sokak anılarını ve **yürüyüş rotalarının
+  ne kadarının yollardan geçtiğini** raporlar. Bekçi takılma, kopuk referans ve taşan evleri denetlemeye devam eder.
+- **Hedefli testler** (`tests.mjs`, 52 yeni): sekmeler ve görünen öğeler, fırça maliyetleri ve hızlar, kesintisiz
+  sürükleme ve viraj, otomatik dış / iç köşeler, parke ve taş plaka, çamur (hız, yol bulma, ipucu), A*'ın yeni yolu
+  öncelikli kullanması, yıkım fırçası ve %50 iade (küsurat), taş plakanın altından zeminin geri gelmesi, çit ve kapı
+  bağlantıları, çit fırçası, tabela adı ve paneli, estetik alanının yayılması ve yarıçapı, toplam puan, refah çarpanı,
+  güzel sokak / çiçek anısı ve sokak adı, karanlık ve fener, park bankında manzara, saksının çiçek noktaları, fidanın
+  iki günde büyümesi, gölgede dinlenme planı, kesilemeyen süs ağacı, sürükleyen yıkımın büyük yapıyı yıkmaması, kayıt
+  sürümü 15 ve gidiş-dönüş.
+- **Uyumluluk** (`compat.mjs`, sürüm 2-15, 220): `save-v15.json` 18. aşamanın otopilotuyla 34 günlük oyundur (3 tabela,
+  6 süs ağacı, çitler, 113 karo patika ve 137 karo parke; estetik 92 puan, refah +%4). 34 günlük koşuda bekçi: takılma 0,
+  kopuk referans 0; yürüyüş rotalarının %80'i yollardan geçer.
+- Sonuç: `tests.mjs` 312/312, `audit.mjs` 85/85, `compat.mjs` 220/220, sayfa hatası yok. **Sanat önizleme** (`tools/art-preview.html`): gerçek `TileMap` kuralıyla çizilen yol
+  mozaiği (üç mevsim ve yağmur), çit düzenleri, sokak eşyaları ve üç süs ağacının büyüme kademeleriyle dört mevsimi.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -1788,12 +1885,12 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (260; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 14'e) açar, bir gün yaşatır; referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (312; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 15'e) açar, bir gün yaşatır; referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
 | `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |
-| `node tools/sim/autopilot.mjs 42 40` | Hilesiz otopilotla 40 günlük oyun: günlük özet (araştırma, altın, sefer, harika aşaması, yadigâr ve harcanan altın dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya, altının yadigâr / lüks mal / fermanlara ne kadar harcandığı, peyzaj ve son 12 günün ortalama stoğu; (14. aşama) mevsim festivalleri ve katılımcıları, anı sayıları ve örnek bir sakinin anıları, nadir hava olayları, Büyük İhracat Seferi sayısı. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar, `--speed 1\|2\|4` oyun hızını seçer, `--json rapor.json` bekçi raporunu yazar (takılma ya da kopuk referans varsa çıkış 1) |
+| `node tools/sim/autopilot.mjs 42 40` | Hilesiz otopilotla 40 günlük oyun (18. aşama: kapıları yola bağlar, parke döşer, süs ve ağaç diker; döşenen yol, estetik ve yürüyüşlerin yoldan geçme oranı raporlanır): günlük özet (araştırma, altın, sefer, harika aşaması, yadigâr ve harcanan altın dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya, altının yadigâr / lüks mal / fermanlara ne kadar harcandığı, peyzaj ve son 12 günün ortalama stoğu; (14. aşama) mevsim festivalleri ve katılımcıları, anı sayıları ve örnek bir sakinin anıları, nadir hava olayları, Büyük İhracat Seferi sayısı. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar, `--speed 1\|2\|4` oyun hızını seçer, `--json rapor.json` bekçi raporunu yazar (takılma ya da kopuk referans varsa çıkış 1) |
 | `node tools/sim/preview.mjs ["başlık"]` | Sanat önizleme sayfasının bölümlerinin ekran görüntüleri (`tools/sim/out/`) |
 | `node tools/sim/showcase.mjs 11` | Oyun içi vitrin: yeni yapılar ve hayvanlar, liman ve yanaşan tekne, Bilgelik Evi, harika, peyzaj ve çardak, yadigârlı konak, yapı panelleri, Kasaba Arşivi, fotoğraf modu, karar penceresi, fermanlar, gece görünümü, dört mevsim festivali, sabah sisi, Toplanma Zili, yaz fırtınası, anılar paneli |
 
@@ -1877,6 +1974,11 @@ bütünlüğünü ve iş gücünü denetler.
 | Nadir hava olayının mevsimi, saati, olasılığı | `data/weather.js` → `WEATHER_TYPES`, `WEATHER_SPECIALS` (çizim `rendering/WeatherEffects.js`) |
 | Büyük İhracat Seferi'nin fiyatı, bekleme süresi, yükü | `data/trade.js` → `EXPORT.grandVoyage` |
 | Yeni süs yapısı (altından geçilen, birleşen, oturulan) | `data/buildings.js` → `walkable`, `connects`, `gazebo` (+ `art/sprites/structuresGarden.js`) |
+| Zemin fırçası (bedel, sonuç karo) | `data/buildings.js` → `TILE_BUILDS` (hız / maliyet `data/tiles.js`, köşeler `art/tiles` → `CORNER_ART`) |
+| Süsün estetik değeri, yarıçap, refah çarpanı eşikleri | `data/landscape.js` → `AESTHETIC` (mantık `systems/LandscapeSystem.js`) |
+| Karanlıkta ürkme, ışık yarıçapları, çamur | `data/landscape.js` → `DARKNESS`, `MUD` |
+| Süs ağacının büyüme süresi, sokak adları, inşa sekmeleri | `data/landscape.js` → `ORNAMENTAL_TREES`, `STREET_NAMES`, `BUILD_TABS` |
+| Birleşen (çit) ya da fırçayla dizilen yeni süs | `data/buildings.js` → `connects: 'grup'`, `brush: true` (+ `art/sprites/structuresLandscape.js`) |
 | Simülasyon / test | `tools/sim/` (bkz. *Simülasyon ve test araçları*) |
 | Günlüğe yeni olay | `systems/JournalSystem.js` (olayı dinle, metnini yaz) |
 | Kayda yeni alan | `state/GameState.js` → `toJSON` / `restore` (+ `SAVE_VERSION`) |

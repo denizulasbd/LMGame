@@ -10,7 +10,7 @@
 // oyun zamanıyla otlar, dolaşır, gece ahırın önünde yatar.
 // 11. aşama: şifacı kulübesi otlar ve iksir raflar doluysa boşta kalır; fırtınada / kurt saldırısında hasar alan
 // yapı onarılana kadar boşta kalır (building.damaged), hasarlı ağılda koyunların bir kısmı kaçmıştır.
-import { BUILDINGS } from '../data/buildings.js';
+import { BUILDINGS, connectGroup } from '../data/buildings.js';
 import { RESOURCES } from '../data/resources.js';
 import { Flock } from '../entities/Flock.js';
 import { TILE_TYPES } from '../data/tiles.js';
@@ -130,10 +130,12 @@ export class StructureSystem {
   /** Birleşen yapıların (çit) dört yandaki komşu bağlantıları: building.connect = { left, right, up, down }. */
   connectFences() {
     const map = this.world.map;
-    const types = new Map(this.world.buildings.map((b) => [b.id, b.type]));
+    // (18. aşama) Aynı bağlantı grubundakiler birleşir: ahşap çit ile çit kapısı (connects: 'woodFence')
+    const groups = new Map(this.world.buildings.map((b) => [b.id, connectGroup(b.type)]));
     for (const b of this.world.buildings) {
-      if (!BUILDINGS[b.type].connects) continue;
-      const same = (x, y) => types.get(map.getOccupant(x, y)) === b.type;
+      const group = connectGroup(b.type);
+      if (!group) continue;
+      const same = (x, y) => groups.get(map.getOccupant(x, y)) === group;
       b.connect = { left: same(b.tileX - 1, b.tileY), right: same(b.tileX + 1, b.tileY), up: same(b.tileX, b.tileY - 1), down: same(b.tileX, b.tileY + 1) };
     }
   }

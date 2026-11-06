@@ -3651,3 +3651,125 @@ kbd {
 .cinematic-hint {
   z-index: 75;
 }
+
+/* ===========================================================================
+   18. aşama: serbest imar — inşa menüsü sekmeleri, tabela ipucu, estetik
+   =========================================================================== */
+.build-items.panel {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.build-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  position: sticky;
+  top: -6px;
+  z-index: 1;
+  padding: 2px 0 4px;
+  background: var(--ui-paper-solid);
+  border-bottom: 1px solid var(--ui-frame);
+}
+
+.build-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  color: var(--ui-ink-soft);
+  background: var(--ui-card);
+  border: 1px solid var(--ui-wood-dark);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.build-tab img {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+}
+
+.build-tab:hover {
+  color: var(--ui-ink);
+  border-color: var(--ui-wood-light);
+}
+
+.build-tab.is-active {
+  color: var(--ui-ink-dark);
+  background: var(--ui-highlight);
+  border-color: var(--ui-highlight);
+}
+
+.build-tab-count {
+  min-width: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  text-align: center;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.build-item-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.build-item[hidden] {
+  display: none;
+}
+
+/* Mahalle tabelası: imleç üstüne gelince ad küçük ahşap bir tabelada okunur */
+.map-tooltip.is-sign {
+  color: #2a1a10;
+  background: linear-gradient(#d9a066, #b37a45);
+  border: 2px solid #4f2d1a;
+  border-radius: 3px;
+  box-shadow: 0 2px 0 #4f2d1a, 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+
+.map-tooltip.is-sign .map-tip-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.map-tooltip.is-sign .map-tip-status {
+  color: #4f2d1a;
+}
+
+.map-tooltip.is-sign .status-dot {
+  display: none;
+}
+
+.map-tip-beauty {
+  font-size: 11px;
+  color: var(--ui-highlight);
+}
+
+.map-tip-beauty[hidden] {
+  display: none;
+}
+
+.sign-name-input {
+  width: 100%;
+  font-family: var(--ui-font);
+  font-size: 13px;
+  padding: 3px 6px;
+  color: var(--ui-ink-dark);
+  background: #f2e4c4;
+  border: 2px solid var(--ui-wood);
+  border-radius: 4px;
+}
+
+@media (max-width: 620px) {
+  .build-tab-name {
+    display: none;
+  }
+}

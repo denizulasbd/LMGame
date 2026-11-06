@@ -1080,6 +1080,65 @@ Object.assign(ICONS, {
   ],
 });
 
+// (18. aşama) Serbest imar ve peyzaj: inşa menüsü sekmeleri (yol, çiçek), çit, tabela, estetik
+Object.assign(ICONS, {
+  road: [
+    '.gd...dg.',
+    '.gdd.ddg.',
+    '..dddddg.',
+    '.gdeddeg.',
+    '.gddddd..',
+    '.gdeqedg.',
+    '..dqrqd..',
+    '.gdqrqdg.',
+    '.gdd.ddg.',
+  ],
+  flower: [
+    '...pp....',
+    '..pPPp...',
+    '..pPPp.u.',
+    '...pp.uPu',
+    '....v..u.',
+    '.v..v.v..',
+    '..v.vv...',
+    '..KKKKK..',
+    '..KCCCK..',
+  ],
+  fence: [
+    '.K...K...',
+    'KuK.KuK.K',
+    'KuKKKuKKu',
+    'KuqqKuqqu',
+    'KuKKKuKKu',
+    'KuqqKuqqu',
+    'KuK.KuK.K',
+    'KuK.KuK.K',
+    '.k...k...',
+  ],
+  signpost: [
+    'KKKKKKKK.',
+    'KXEEEEXKK',
+    'KXwwwwXXK',
+    'KKKKKKKK.',
+    '...KwK...',
+    '...KwK...',
+    '...KwK...',
+    '..gKwKg..',
+    '.gggggg..',
+  ],
+  aesthetic: [
+    '....P....',
+    '...PYP...',
+    'PPPYuYPPP',
+    '.PYuuuYP.',
+    '..PYuYP..',
+    '.PYP.PYP.',
+    '.PP...PP.',
+    'P.......P',
+    '.........',
+  ],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);

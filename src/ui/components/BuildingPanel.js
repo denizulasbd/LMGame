@@ -44,6 +44,8 @@ import { storedMasterworks, exhibitedMasterworks, masterworkHappiness, masterwor
 import { MASTERPIECE_BY_ACTIVITY, MASTERPIECES, MASTERWORK } from '../../data/masterpieces.js';
 import { EXPLORATION, EXOTIC_ITEMS, INSCRIPTIONS, INSCRIPTION_KEYS, VINE } from '../../data/exploration.js';
 import { expeditionLaunchStatus, pickParty, decodeStatus } from '../../systems/Exploration.js';
+import { AESTHETIC, ORNAMENTAL_TREES, DARKNESS } from '../../data/landscape.js';
+import { aestheticLevel } from '../../systems/Landscape.js';
 
 const thumbnailCache = new Map();
 
@@ -84,6 +86,20 @@ export class BuildingPanel {
     this.expedition = el('div', { className: 'building-decrees building-expedition' });
     this.inscriptions = el('div', { className: 'building-decrees building-inscriptions' });
     this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
+    // (18. aşama) Mahalle tabelasının adı: yazıp Enter (ya da kutudan çıkınca) kaydedilir, Esc vazgeçer
+    this.signInput = el('input', { className: 'sign-name-input', type: 'text', maxLength: 24, placeholder: 'Sokağa / semte bir ad ver' });
+    this.signInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.signInput.blur();
+      if (e.key === 'Escape') {
+        this.signInput.value = this.signLabel ?? '';
+        this.signInput.blur();
+      }
+      e.stopPropagation();
+    });
+    this.signInput.addEventListener('blur', () => {
+      if (this.buildingId !== null && this.signInput.value.trim()) this.events.emit('ui:renameSign', { id: this.buildingId, name: this.signInput.value });
+    });
+    this.sign = el('div', { className: 'building-decrees building-sign', hidden: true }, [el('div', { className: 'decree-title', text: 'Tabelanın adı' }), this.signInput]);
     this.lines = el('div', { className: 'building-lines' });
     this.upgrade = el('div', { className: 'building-upgrade' });
     this.tradeButton = this.button('Takas Penceresini Aç', 'Gezgin tüccarla takas et', () => this.events.emit('ui:openTrade'));
@@ -112,6 +128,7 @@ export class BuildingPanel {
       this.bell,
       this.expedition,
       this.inscriptions,
+      this.sign,
       this.lines,
       this.upgrade,
       this.tradeButton,
@@ -242,6 +259,10 @@ export class BuildingPanel {
     this.renderBell(building, state);
     this.renderExpedition(building, state);
     this.renderInscriptions(building, state);
+    // (18. aşama) Mahalle tabelası: ad kutusu (yazılırken üzerine yazılmaz)
+    this.sign.hidden = building.type !== 'signpost';
+    this.signLabel = building.label;
+    if (building.type === 'signpost' && document.activeElement !== this.signInput) this.signInput.value = building.label ?? '';
     this.lines.replaceChildren(...lines.map((text) => el('div', { className: 'building-line', text })));
     this.lines.hidden = lines.length === 0;
     this.renderUpgrade(building, next, state);
@@ -873,6 +894,40 @@ export class BuildingPanel {
       case 'flowerFence':
         lines.push('Yan yana kurulan çitler birleşir; bahçe kenarlarını süsler');
         break;
+      // 18. aşama: sokak eşyaları ve süs ağaçları
+      case 'woodFence': {
+        const c = building.connect ?? {};
+        const n = ['left', 'right', 'up', 'down'].filter((k) => c[k]).length;
+        lines.push(n ? `${n} yönde komşu çite / kapıya bağlı` : 'Tek başına duruyor: yanına çit ekleyince birleşir');
+        lines.push('Sakinler çitten geçemez; içeri girilecek yere bir Çit Kapısı koy');
+        break;
+      }
+      case 'fenceGate':
+        lines.push('Sakinler kapıyı itip geçer; çitlerle birleşir, yolu kapatmaz');
+        break;
+      case 'ironLantern':
+        lines.push(building.lit ? 'Yanıyor: sokak yumuşak sarı ışıkla aydınlık' : '18:30\'da yanar, 06:30\'da söner');
+        lines.push(`Işığı ${Math.round(DARKNESS.lights.ironLantern / 16)} karoya ulaşır: gece buradan geçenler karanlıktan ürkmez`);
+        break;
+      case 'signpost':
+        lines.push('İmleçle üzerine gelince adı tabelada okunur');
+        lines.push('Yakınında güzel bir sokakta yürüyenlerin anılarında sokağın adı geçer');
+        break;
+      case 'parkBench':
+        lines.push('Sakinler oturup manzarayı izler; çevresi güzelleştikçe keyifleri daha hızlı dolar');
+        break;
+      case 'planter':
+        lines.push('Yanından geçenler çiçek kokusunu içine çeker; çevresindekiler burada çiçek koklar');
+        break;
+      case 'birchTree':
+      case 'oakTree':
+      case 'pineTree': {
+        const left = building.plantedAt === null ? 0 : Math.max(0, Math.ceil(ORNAMENTAL_TREES.growHours - (state.totalMinutes - building.plantedAt) / 60));
+        const stage = ['Fidan', 'Genç ağaç', 'Ulu ağaç'][building.growthStage];
+        lines.push(building.growthStage === 2 ? `${stage}: gölgesinde sakinler oturup dinlenir` : `${stage} · büyüme %${Math.floor(building.growth * 100)} · ulu ağaç olmasına ${left} saat`);
+        lines.push('Süs ağacıdır: kesilmez, odun vermez');
+        break;
+      }
       case 'flowerBed':
         lines.push('Yanından geçenlerin ve etrafında dinlenenlerin keyfi artar');
         lines.push('Gündüzleri çiçeklerin üstünde kelebekler uçar');
@@ -928,7 +983,7 @@ export class BuildingPanel {
         lines.push('Gündüzleri sakinlerin buluşup sohbet ettiği yer');
         break;
       case 'bench':
-        lines.push('Sakinler burada oturup dinlenir');
+        lines.push('Sakinler burada oturup dinlenir; çevresi güzelse manzarayı izleyip keyiflenir');
         break;
       // 16. aşama: keşif ganimetleri
       case 'grapeVine': {
@@ -943,6 +998,13 @@ export class BuildingPanel {
         break;
       default:
         break;
+    }
+    // (18. aşama) Süsün çevreye kattığı estetik ve bulunduğu köşenin güzelliği
+    if (AESTHETIC.values[building.type] && building.functional) {
+      const here = state.landscapeField?.[building.tileY * state.map.width + building.tileX] ?? null;
+      const level = here !== null ? aestheticLevel(here) : null;
+      lines.push(`Çevre estetiği: +${AESTHETIC.values[building.type]} (yaklaşık ${Math.round(AESTHETIC.radius)} karoya yayılır)${level ? ` · burası ${level.toLocaleLowerCase('tr')}` : ''}`);
+      lines.push(`Kasabanın estetiği ${state.landscape?.score ?? 0} puan · refah +%${state.landscape?.percent ?? 0}`);
     }
     // (15. aşama) Ustaların bu iş yerinde çıkarabileceği usta işi eser
     const masterpiece = MASTERPIECES[MASTERPIECE_BY_ACTIVITY[def.workActivity]];

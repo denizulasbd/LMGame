@@ -53,9 +53,15 @@ export class JournalSystem {
     const on = (name, handler) => game.events.on(name, handler);
     this.unsubscribers = [
       on('population:joined', ({ character }) => this.log(`${character.name} kasabaya katıldı`, 'heart')),
-      on('building:placed', ({ building }) => this.log(`${building.name} için şantiye kuruldu`, 'hammer')),
+      // (18. aşama) Fırçayla art arda dikilen çit, saksı ve fidanlar günlüğü doldurmasın
+      on('building:placed', ({ building }) => !building.definition.brush && this.log(`${building.name} için şantiye kuruldu`, 'hammer')),
       on('building:completed', (building) => {
-        if (!building.definition.wonder) this.log(`${building.name} tamamlandı`, 'hammer'); // harikanın ilk aşaması aşağıda
+        if (!building.definition.wonder && !building.definition.brush) this.log(`${building.name} tamamlandı`, 'hammer'); // harikanın ilk aşaması aşağıda
+      }),
+      on('sign:renamed', ({ from, name }) => this.log(from ? `${from} tabelasının adı değişti: ${name}` : `Yeni mahalle tabelası: ${name}`, 'signpost')),
+      on('tree:grown', ({ building }) => this.log(`${building.name} ulu bir ağaç oldu; gölgesinde dinlenilebilir`, 'flower')),
+      on('landscape:aestheticChanged', ({ percent, before }) => {
+        if (percent > before) this.log(`Kasaba güzelleşiyor: estetik refaha +%${percent} katıyor`, 'aesthetic');
       }),
       on('building:projectStarted', ({ building, kind }) =>
         this.log(kind === 'upgrade' ? `${building.name} yükseltiliyor` : kind === 'stage' ? `${building.name}: yeni aşamanın inşaatı başladı` : `${building.name} için onarım başladı`, 'hammer')
@@ -66,7 +72,7 @@ export class JournalSystem {
         this.log(`${from} onarıldı, ${building.name} yeniden hayat buldu${loot}`, 'star');
       }),
       on('building:removed', (building) => {
-        if (!building.underConstruction) this.log(`${building.name} yıkıldı`, 'demolish');
+        if (!building.underConstruction && !building.definition.brush) this.log(`${building.name} yıkıldı`, 'demolish');
       }),
       on('relationship:levelUp', ({ a, b, level }) => {
         if (level.key === 'friend') this.log(`${a.name} ve ${b.name} dost oldu`, 'heart');

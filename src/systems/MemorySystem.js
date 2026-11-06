@@ -22,13 +22,13 @@ export const MEMORY = {
   fun: 8,
   social: 3,
   // Hatırlamanın geldiği sakin anlar (etkinlik anahtarları)
-  calmActivities: ['gazebo', 'bench', 'river', 'flowers', 'campfire', 'monument', 'ancientSpring'],
+  calmActivities: ['gazebo', 'bench', 'river', 'flowers', 'campfire', 'monument', 'ancientSpring', 'shade'],
 };
 
 const PLACE_PHRASES = { gazebo: 'Çardakta ', inn: 'Handa ', fountain: 'Meydanda ', campfire: 'Ateş başında ' };
 
 // Defter dolunca önce bunlar silinir (en eskisinden): dostluklar, kasaba olayları, hayvanlar, festivaller, ad
-const MINOR_KINDS = new Set(['friend', 'town', 'pet', 'festival', 'name', 'reconcile']);
+const MINOR_KINDS = new Set(['friend', 'town', 'pet', 'festival', 'name', 'reconcile', 'stroll']); // stroll: (18. aşama) güzel sokak, çiçek kokusu
 
 /**
  * Sakinin anılarına yeni bir satır ekler. Aynı cümle zaten yazılıysa yinelenmez (ör. bozulup yeniden kurulan dostluk;

@@ -37,6 +37,8 @@ import {
   HARBOR_ART,
   WONDER_ART,
   CHERRY_ART,
+  IRON_LANTERN_ART,
+  SIGNPOST_ART,
   getGazeboLayer,
   getSheepFarmLayer,
 } from '../art/sprites/index.js';
@@ -79,6 +81,16 @@ const BASELINE_INSET = {
   marbleArch: 1,
   flowerFence: 3,
   ancientTorch: 6,
+  // 18. aşama
+  woodFence: 3,
+  fenceGate: 3,
+  ironLantern: 3,
+  signpost: 3,
+  parkBench: 3,
+  planter: 3,
+  birchTree: 3,
+  oakTree: 3,
+  pineTree: 3,
 };
 // Çardağın çatısı kışın karla örtülür (arka katman çatı altında kalır, karlanmaz)
 const GAZEBO_WINTER_ROOF = { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 };
@@ -86,7 +98,7 @@ const SITE_BASELINE_INSET = 2;
 const RECENT_WORKERS_EXTRA = 2; // panelde çalışan yuvasından bu kadar fazla "son çalışan" hatırlanır
 
 // Animasyon kare hızı (kare / saniye): ateş titrer, tabela ve flama sallanır, çiçekler eğilir
-const FRAME_RATES = { campfire: 8, flowerBed: 1.4, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3, academy: 2.5, harbor: 1.6, wonder: 2.4 };
+const FRAME_RATES = { campfire: 8, flowerBed: 1.4, planter: 1.2, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3, academy: 2.5, harbor: 1.6, wonder: 2.4 };
 const DEFAULT_FRAME_RATE = 3;
 const MAX_OVERHANG = 70; // yapıların karolarının üstüne taşabileceği en fazla piksel (görünürlük testi; harika 64)
 // Değirmen kanatları: saniyede kaç kare (çeyrek tur = MILL_ART.sailFrames kare) döner
@@ -121,6 +133,8 @@ export class Building extends Entity {
     wonderStage = 0,
     exportThreshold = undefined,
     crate = null,
+    label = null,
+    plantedAt = null,
   }) {
     super({ id, x: tileX * T, y: tileY * T });
     this.type = type;
@@ -168,6 +182,17 @@ export class Building extends Entity {
     this.wonderStage = wonderStage;
     this.exportThreshold = exportThreshold === undefined ? null : exportThreshold;
     this.crate = crate ? { ...crate } : null;
+    // 18. aşama: mahalle tabelasının adı (oyuncu verir) ve süs fidanının dikildiği an (oyun dakikası; büyüme buna göre)
+    this.label = typeof label === 'string' && label.trim() ? label.trim() : null;
+    this.plantedAt = Number.isFinite(plantedAt) ? plantedAt : null;
+    this.growth = 1; // süs fidanı: 0-1 büyüme (LandscapeSystem her adımda yazar)
+  }
+
+  /** (18. aşama) Süs fidanının büyüme kademesi: 0 fidan, 1 genç ağaç, 2 ulu ağaç. */
+  get growthStage() {
+    if (!this.definition.ornamentalTree) return 2;
+    if (this.underConstruction) return 0;
+    return this.growth >= 1 ? 2 : this.growth >= 0.4 ? 1 : 0;
   }
 
   /** Burada çalışmaya başlayan sakini son çalışanlar listesine ekler. */
@@ -216,6 +241,8 @@ export class Building extends Entity {
 
   get name() {
     if (this.ruined) return this.definition.ruin.name;
+    if (this.label && this.type === 'signpost') return this.label;
+    if (this.definition.grownName && this.functional && this.growthStage === 2) return this.definition.grownName;
     return this.upgraded ? this.definition.upgrade.name : this.definition.name;
   }
 
@@ -361,6 +388,17 @@ export class Building extends Entity {
     if (this.type === 'gazebo') return { name: this.name, detail: 'Çiftlerin ve dostların sohbet köşesi' };
     if (this.type === 'cherryTree') return { name: this.name, detail: 'Rüzgârda yaprakları savrulan süs ağacı' };
     if (this.type === 'marbleArch') return { name: this.name, detail: 'Altından geçilebilir' };
+    // 18. aşama: sokak eşyaları ve süs ağaçları
+    if (this.type === 'signpost') return { name: this.name, detail: 'Mahalle tabelası · tıkla ve adını değiştir' };
+    if (this.type === 'fenceGate') return { name: this.name, detail: 'Sakinler kapıdan geçer' };
+    if (this.type === 'woodFence') return { name: this.name, detail: 'Geçilemez · bir Çit Kapısı bırak' };
+    if (this.type === 'ironLantern' || this.type === 'lantern') return { name: this.name, detail: this.lit ? 'Yanıyor · sokağı aydınlatıyor' : 'Akşam yanacak' };
+    if (this.type === 'parkBench' || this.type === 'bench') return { name: this.name, detail: 'Sakinler oturup manzarayı izler' };
+    if (this.type === 'planter') return { name: this.name, detail: 'Yanından geçenler çiçek kokusunu içine çeker' };
+    if (this.definition.ornamentalTree) {
+      const stage = ['Fidan', 'Genç ağaç', 'Ulu ağaç · gölgesinde dinlenilir'][this.growthStage];
+      return { name: this.name, detail: this.growthStage === 2 ? stage : `${stage} · büyüyor %${Math.floor(this.growth * 100)}` };
+    }
     if (this.type === 'healerHut') {
       return { name: this.name, detail: `İksir ${this.remedies}/${this.definition.apothecary.maxRemedies} · şifalı ot ${Math.floor(this.herbs)}` };
     }
@@ -408,6 +446,7 @@ export class Building extends Entity {
       wonderStage: this.wonderStage,
       relics: env.relics ?? 0,
       connect: this.connect,
+      growthStage: this.growthStage,
       scaffold: this.project?.kind === 'stage',
       step: Math.min(3, Math.floor(this.projectRatio * 4)),
     });
@@ -682,6 +721,11 @@ export class Building extends Entity {
       // (14. aşama) Işıklar Gecesi'nde bütün fenerler parıldar
       const sparkle = env.festivalTheme === 'winter' ? 1.35 + Math.sin(env.time * 4 + this.id) * 0.08 : 1;
       out.push({ x: this.x + LANTERN_ART.light.x, y: artTop + LANTERN_ART.light.y, radius: 52 * sparkle, color: [255, 214, 120], intensity: 0.85, glow: 0.34 * Math.min(1.25, sparkle) });
+    } else if (this.type === 'ironLantern' && this.lit) {
+      // (18. aşama) Demir sokak feneri: ahşap fenerden geniş, yumuşak sarı ışık
+      const artTop = this.y + this.height - IRON_LANTERN_ART.height;
+      const sparkle = env.festivalTheme === 'winter' ? 1.3 : 1;
+      out.push({ x: this.x + IRON_LANTERN_ART.light.x, y: artTop + IRON_LANTERN_ART.light.y, radius: 68 * sparkle, color: [255, 222, 140], intensity: 0.85, glow: 0.3 });
     } else if (this.type === 'ancientTorch' && this.lit) {
       // (16. aşama) Kadim Meşale: titreyen mavi alev, geniş ve serin bir ışık halkası
       const artTop = this.y + this.height - TORCH_ART.height;
@@ -813,6 +857,8 @@ export class Building extends Entity {
       wonderStage: this.wonderStage,
       exportThreshold: this.exportThreshold,
       crate: this.crate,
+      label: this.label,
+      plantedAt: this.plantedAt,
     };
   }
 }

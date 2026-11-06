@@ -35,7 +35,7 @@ export function milestoneProgress(milestone, state) {
       return { current: state.stats.wintersSurvived, target: milestone.target, detail };
     }
     case 'streets': {
-      const lights = completed('lantern');
+      const lights = completed('lantern') + completed('ironLantern'); // (18. aşama) demir fenerler de sayılır
       const cobbles = state.stats.cobbles ?? 0;
       const done = (lights >= milestone.lights ? 1 : 0) + (cobbles >= milestone.cobbles ? 1 : 0);
       return { current: done, target: milestone.target, detail: `Fener ${lights}/${milestone.lights} · Taş yol ${cobbles}/${milestone.cobbles}` };

@@ -2,13 +2,15 @@
 //   - checkPlacement : hayalet önizleme için "buraya kurulabilir mi, neden olmaz?"
 //   - placeSite      : maliyeti öder, şantiye kurar ve inşaat işi açar
 //   - paintTile      : yol ve köprü gibi zeminleri anında döşer
-//   - demolishAt     : yapıyı yıkar (iade ile) ya da yolu/köprüyü kaldırır
+//   - demolishAt     : yapıyı yıkar (iade ile) ya da yolu/köprüyü kaldırır; (18. aşama) oyuncunun döşediği zemin
+//                      harita üretildiğindeki hâline döner ve harcananın yarısı depoya iade edilir (küsurat birikir)
 //   - inşaat işi bitince ('job:completed') şantiyeyi gerçek binaya çevirir
 //   - startProject   : (8. aşama) var olan yapıyı Seviye 2'ye yükseltir ya da harabeyi onarır; maliyet
 //                      peşin ödenir, inşaatçılar yapının çevresinde çalışır, yapı bu sırada işlemeye devam eder
 //   - proje bitince yapı Seviye 2 olur ('building:upgraded') ya da harabe onarılır ('ruin:restored';
 //     erzak kampının hazinesi stoğa eklenir)
-import { BUILDINGS, TILE_BUILDS, TILE_REMOVAL, mendSpec, PROJECT_WORDS } from '../data/buildings.js';
+import { BUILDINGS, TILE_BUILDS, TILE_REMOVAL, TILE_BUILD_BY_RESULT, mendSpec, PROJECT_WORDS } from '../data/buildings.js';
+import { STREET_NAMES } from '../data/landscape.js';
 import { STORM } from '../data/dilemmas.js';
 import { OBJECT_TYPES, TILE_TYPES, GROUND_TILES } from '../data/tiles.js';
 import { formatCost } from '../data/resources.js';
@@ -27,15 +29,17 @@ export class ConstructionSystem {
    * @param {import('../world/World.js').World} world
    * @param {import('./EconomySystem.js').EconomySystem} economy
    * @param {import('./JobSystem.js').JobSystem} jobs
-   * @param {{ groundAt?: (x: number, y: number) => string|null }} options
+   * @param {{ groundAt?: (x: number, y: number) => string|null, baseTileAt?: (x: number, y: number) => string|null }} options
    *   groundAt: harita üretildiğinde o karoda olan doğal zemin (yol kaldırılınca biyom geri gelsin)
+   *   baseTileAt: (18. aşama) harita üretildiğinde o karoda olan zemin (oyuncunun döşediği zemin kaldırılınca geri gelir)
    */
-  constructor(game, world, economy, jobs, { groundAt = null } = {}) {
+  constructor(game, world, economy, jobs, { groundAt = null, baseTileAt = null } = {}) {
     this.events = game.events;
     this.world = world;
     this.economy = economy;
     this.jobs = jobs;
     this.groundAt = groundAt;
+    this.baseTileAt = baseTileAt;
     this.unsubscribe = game.events.on('job:completed', ({ job }) => {
       if (job.type !== 'build') return;
       const building = this.world.getBuilding(job.buildingId);
@@ -206,8 +210,8 @@ export class ConstructionSystem {
     });
   }
 
-  /** Şantiye kurar. Dönüş: { ok, reason, building } */
-  placeSite(type, tileX, tileY) {
+  /** Şantiye kurar. quiet: (18. aşama fırçası) bildirim çıkmaz. Dönüş: { ok, reason, building } */
+  placeSite(type, tileX, tileY, { quiet = false } = {}) {
     const check = this.checkPlacement(type, tileX, tileY);
     if (!check.ok) return check;
     const def = BUILDINGS[type];
@@ -217,13 +221,22 @@ export class ConstructionSystem {
     const cabins = this.world.getBuildingsOfType('cabin').length;
     // tone: kulübede çatı rengi, çiçek tarhında renk düzeni; yapı sayısına göre dönüşür
     const tone = type === 'flowerBed' ? this.world.getBuildingsOfType('flowerBed').length : cabins;
-    const building = new Building({ type, tileX, tileY, tone, orientation: check.orientation, underConstruction: true });
+    // (18. aşama) Mahalle tabelası önerilen bir sokak adıyla dikilir (oyuncu panelden değiştirir)
+    const label = type === 'signpost' ? this.suggestStreetName() : null;
+    const building = new Building({ type, tileX, tileY, tone, orientation: check.orientation, underConstruction: true, label });
     this.world.addBuilding(building);
     this.jobs.createBuildJob(building);
     this.events.emit('world:blocked', { tiles: check.footprint });
     this.events.emit('building:placed', { building });
-    this.events.emit('toast', { text: `Şantiye kuruldu: ${def.name} (${formatCost(def.cost)})`, tone: 'info', icon: 'hammer' });
+    if (!quiet) this.events.emit('toast', { text: `Şantiye kuruldu: ${def.name} (${formatCost(def.cost)})`, tone: 'info', icon: 'hammer' });
     return { ok: true, building };
+  }
+
+  /** Kasabada henüz kullanılmayan ilk sokak adı (hepsi kullanıldıysa numaralı). */
+  suggestStreetName() {
+    const used = new Set(this.world.getBuildingsOfType('signpost').map((b) => b.label));
+    const free = STREET_NAMES.find((n) => !used.has(n));
+    return free ?? `${STREET_NAMES[used.size % STREET_NAMES.length]} ${Math.floor(used.size / STREET_NAMES.length) + 1}`;
   }
 
   /** Yol / köprü döşenebilir mi? */
@@ -250,6 +263,7 @@ export class ConstructionSystem {
     this.world.map.setObject(x, y, null);
     this.world.map.set(x, y, def.result);
     if (def.result === 'bridge') assignBridgeVariants(this.world.map);
+    this.events.emit('terrain:painted', { x, y, type, tile: def.result });
     return { ok: true };
   }
 
@@ -258,14 +272,56 @@ export class ConstructionSystem {
     const building = this.world.getBuilding(this.world.map.getOccupant(x, y));
     if (building) {
       const reason = this.demolishBlocker(building);
-      return { ok: !reason, reason: reason ?? `${building.underConstruction ? 'Şantiyeyi iptal et' : 'Yık'}: ${building.name}` };
+      return { ok: !reason, reason: reason ?? `${building.underConstruction ? 'Şantiyeyi iptal et' : 'Yık'}: ${building.name}`, building };
     }
     const tile = this.world.map.get(x, y);
-    if (TILE_REMOVAL[tile]) {
+    const removed = this.tileAfterRemoval(x, y);
+    if (removed) {
       if (this.world.charactersOnTile(x, y).length > 0) return { ok: false, reason: 'Üzerinde biri var' };
-      return { ok: true, reason: `Kaldır: ${TILE_TYPES[tile].name}` };
+      const refund = this.tileRefund(x, y);
+      const back = Object.keys(refund).length ? ` (%50 iade: ${formatCost(refund)})` : '';
+      return { ok: true, reason: `Kaldır: ${TILE_TYPES[tile].name}${back}`, tile };
     }
     return { ok: false, reason: 'Burada yıkılacak bir şey yok' };
+  }
+
+  /**
+   * (18. aşama) Kaldırılınca karonun döneceği zemin ya da null (kaldırılacak bir şey yok). Oyuncunun döşediği zemin
+   * harita üretildiğindeki hâline döner (taş plakanın altından patika ya da çimen); haritayla gelen yollar eski
+   * kurala göre bir alt kademeye iner (parke -> patika -> doğal zemin, köprü -> su).
+   */
+  tileAfterRemoval(x, y) {
+    const tile = this.world.map.get(x, y);
+    const base = this.baseTileAt?.(x, y) ?? null;
+    if (base && base !== tile && TILE_BUILD_BY_RESULT[tile]) return base;
+    if (!TILE_REMOVAL[tile]) return null;
+    return TILE_REMOVAL[tile] === 'grass' ? this.groundAt?.(x, y) ?? 'grass' : TILE_REMOVAL[tile];
+  }
+
+  /** (18. aşama) Oyuncunun döşediği zemin kaldırılınca harcananın yarısı: { kaynak: miktar (küsuratlı) } */
+  tileRefund(x, y) {
+    const tile = this.world.map.get(x, y);
+    const base = this.baseTileAt?.(x, y) ?? null;
+    const build = TILE_BUILDS[TILE_BUILD_BY_RESULT[tile]];
+    if (!build || base === tile) return {};
+    return Object.fromEntries(Object.entries(build.cost).map(([r, v]) => [r, v * DEMOLISH_REFUND]));
+  }
+
+  /** Küsuratlı iadeyi biriktirir; birikim bir birimi geçince depoya ekler (iki karo patika = 1 odun). */
+  refundFractional(cost) {
+    const credit = (this.world.state.landscape ??= { refundCredit: {} }).refundCredit ??= {};
+    const added = {};
+    for (const [r, v] of Object.entries(cost)) {
+      credit[r] = (credit[r] ?? 0) + v;
+      const whole = Math.floor(credit[r] + 1e-9);
+      if (whole > 0) {
+        credit[r] -= whole;
+        this.economy.add(r, whole);
+        added[r] = whole;
+      }
+      if (credit[r] < 1e-9) delete credit[r];
+    }
+    return added;
   }
 
   demolishBlocker(building) {
@@ -277,23 +333,27 @@ export class ConstructionSystem {
     return null;
   }
 
-  /** Yıkım aracı: yapıyı yıkar ya da yolu / köprüyü kaldırır. Dönüş: { ok, reason } */
-  demolishAt(x, y) {
+  /**
+   * Yıkım aracı: yapıyı yıkar ya da yolu / köprüyü kaldırır. (18. aşama) options: { quiet: bildirim çıkmaz (fırça),
+   * refresh: false ise ulaşılabilirlik fırça bitince bir kez yenilenir }. Dönüş: { ok, reason, kind, refund }
+   */
+  demolishAt(x, y, { quiet = false, refresh = true } = {}) {
     const check = this.describeDemolish(x, y);
     if (!check.ok) return check;
     const building = this.world.getBuilding(this.world.map.getOccupant(x, y));
-    if (building) return this.demolish(building);
+    if (building) return { ...this.demolish(building, { quiet }), kind: 'building', building };
 
     const tile = this.world.map.get(x, y);
-    // Toprak yol, harita üretildiğinde altında olan biyom zeminine (yoksa çimene) döner
-    const removed = TILE_REMOVAL[tile] === 'grass' ? this.groundAt?.(x, y) ?? 'grass' : TILE_REMOVAL[tile];
+    const removed = this.tileAfterRemoval(x, y);
+    const refund = this.refundFractional(this.tileRefund(x, y));
     this.world.map.set(x, y, removed);
-    if (tile === 'bridge') assignBridgeVariants(this.world.map);
-    this.world.refreshStaticData();
-    return { ok: true };
+    if (tile === 'bridge' || removed === 'bridge') assignBridgeVariants(this.world.map);
+    if (refresh) this.world.refreshStaticData();
+    this.events.emit('terrain:painted', { x, y, type: null, tile: removed, removed: tile });
+    return { ok: true, kind: 'tile', tile, refund };
   }
 
-  demolish(building) {
+  demolish(building, { quiet = false } = {}) {
     const def = BUILDINGS[building.type];
     const ratio = building.underConstruction && building.buildProgress === 0 ? 1 : DEMOLISH_REFUND;
     const name = building.name;
@@ -305,12 +365,14 @@ export class ConstructionSystem {
     // Yükseltilmiş ya da yükseltilmekte olan yapıda yükseltme maliyetinin de yarısı geri gelir
     if (def.upgrade && (building.upgraded || building.project)) this.economy.refund(def.upgrade.cost, DEMOLISH_REFUND);
     this.events.emit('building:removed', building);
-    this.events.emit('toast', {
-      text: `${building.underConstruction ? 'Şantiye iptal edildi' : 'Yıkıldı'}: ${name} (%${Math.round(ratio * 100)} iade)`,
-      tone: 'info',
-      icon: 'demolish',
-    });
-    return { ok: true };
+    if (!quiet) {
+      this.events.emit('toast', {
+        text: `${building.underConstruction ? 'Şantiye iptal edildi' : 'Yıkıldı'}: ${name} (%${Math.round(ratio * 100)} iade)`,
+        tone: 'info',
+        icon: 'demolish',
+      });
+    }
+    return { ok: true, ratio };
   }
 
   /** İnşaat işi bitti: şantiye gerçek binaya dönüşür. */
@@ -318,6 +380,11 @@ export class ConstructionSystem {
     if (!building || !building.underConstruction) return;
     building.underConstruction = false;
     building.buildProgress = building.definition.buildWork;
+    // (18. aşama) Süs fidanı dikildiği andan itibaren iki günde büyür
+    if (building.definition.ornamentalTree) {
+      building.plantedAt = this.world.state.totalMinutes;
+      building.growth = 0;
+    }
     // Çok aşamalı harika: şantiye ilk aşamaydı (Temel); sonraki aşamalar panelden başlatılır
     if (building.definition.wonder) building.wonderStage = 1;
     this.world.refreshStaticData();
@@ -329,6 +396,7 @@ export class ConstructionSystem {
       return;
     }
     const extra = building.type === 'cabin' ? ' Yarın sabah yeni sakinler gelebilir.' : '';
+    if (building.definition.brush) return; // (18. aşama) fırçayla dizilen çit, saksı ve fidanlar tek tek bildirilmez
     this.events.emit('toast', { text: `İnşaat tamamlandı: ${building.name}!${extra}`, tone: 'success', icon: 'hammer' });
   }
 

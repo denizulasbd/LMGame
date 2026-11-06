@@ -296,6 +296,66 @@ const EDGE_ART = {
 EDGE_ART.meadowFringe = recolorRows(EDGE_ART.grassFringe, { g: '=', G: '!', h: '~' });
 EDGE_ART.rockyFringe = recolorRows(EDGE_ART.grassFringe, { g: '(', G: ')', h: ':' });
 EDGE_ART.forestFringe = recolorRows(EDGE_ART.grassFringe, { g: ']', G: '[', h: '^' });
+// (18. aşama) Yol köşeleri (otomatik kenarlık / autotile): hepsi sol üst köşe için çizilir, döndürülerek diğerleri elde
+// edilir. Dış köşe: yolun iki yanı da zeminse köşe yuvarlanır (viraj). İç köşe: iki yanı yol ama çaprazı zeminse
+// köşeye küçük bir çimen tutamı taşar (kavşak ve L dönüşleri doğal görünür).
+const CORNER_ART = {
+  grassCornerOuter: [
+    'ggggghG.........',
+    'gggGgG..........',
+    'ggGgG...........',
+    'gGgG............',
+    'hgG.............',
+    'gG..............',
+    'G...............',
+    ...emptyRows(9, 16),
+  ],
+  grassCornerInner: [
+    'gGG.............',
+    'GG..............',
+    'G...............',
+    ...emptyRows(13, 16),
+  ],
+};
+for (const [ground, colors] of [['meadow', { g: '=', G: '!', h: '~' }], ['rocky', { g: '(', G: ')', h: ':' }], ['forest', { g: ']', G: '[', h: '^' }]]) {
+  CORNER_ART[`${ground}CornerOuter`] = recolorRows(CORNER_ART.grassCornerOuter, colors);
+  CORNER_ART[`${ground}CornerInner`] = recolorRows(CORNER_ART.grassCornerInner, colors);
+}
+
+// (18. aşama) Yağmurda çamurlanan toprak patikanın su birikintileri (iki desen, karonun konumuna göre seçilir)
+const MUD_ART = [
+  [
+    ...emptyRows(3, 16),
+    '....DDDD........',
+    '...DDccDD.......',
+    '....DDDD........',
+    '..........DD....',
+    '.........DcbD...',
+    '..........DD....',
+    ...emptyRows(1, 16),
+    '..DD............',
+    '.DbcD...........',
+    '..DD.....DDD....',
+    '........DDDDD...',
+    ...emptyRows(2, 16),
+  ],
+  [
+    ...emptyRows(1, 16),
+    '.........DDD....',
+    '........DbcbD...',
+    '.........DDD....',
+    ...emptyRows(3, 16),
+    '...DDDDD........',
+    '..DDcbbDD.......',
+    '...DDDDD........',
+    ...emptyRows(2, 16),
+    '..........DD....',
+    '.........DccD...',
+    '..........DD....',
+    ...emptyRows(1, 16),
+  ],
+];
+
 const ANIMATED_EDGES = { waterFoam: 2 }; // kenar adı -> kare sayısı (2 kare = aynalı)
 // Mevsimle boyanan (zeminden taşan) kenarlar; köpük boyanmaz
 const GROUND_EDGES = new Set(['grassFringe', 'meadowFringe', 'rockyFringe', 'forestFringe']);
@@ -493,6 +553,16 @@ export function getEdgeSprite(kind, dir, time = 0, season = 'summer') {
     const base = frame === 1 ? flipRowsHorizontal(EDGE_ART[kind]) : EDGE_ART[kind];
     return rotateRows(seasonalGroundRows(base, tinted), dir);
   });
+}
+
+/** (18. aşama) Yol köşesi görseli. kind: '<zemin>CornerOuter' | '<zemin>CornerInner'; corner: 0 sol üst, 1 sağ üst, 2 sağ alt, 3 sol alt. */
+export function getCornerSprite(kind, corner, season = 'summer') {
+  return getSprite(`corner:${kind}:${corner}:${season}`, () => rotateRows(seasonalGroundRows(CORNER_ART[kind], season), corner));
+}
+
+/** (18. aşama) Yağmurda çamurlu patikanın birikintileri (variant 0/1). */
+export function getMudSprite(variant = 0) {
+  return getSprite(`mud:${variant % MUD_ART.length}`, () => MUD_ART[variant % MUD_ART.length]);
 }
 
 // Mevsimde görünümü değişen nesneler: ağaçlar ve fidan yaprak döker / karlanır; kaya ve kütük karlanır
