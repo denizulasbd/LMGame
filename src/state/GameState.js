@@ -2,6 +2,8 @@
 // Sistemler durumu burada değiştirir; çizim ve UI yalnızca okur.
 // Harita kaydedilmez: aynı tohumdan (seed) yeniden üretilir, yalnızca değişen karolar
 // kayda eklenir (bkz. world/TerrainSnapshot.js; kayıt dosyasını SaveManager yazar).
+import { emptyGoldenAge, emptyChronicle } from '../systems/GoldenAge.js';
+import { GOLDEN_AGE } from '../data/goldenAge.js';
 import { CONFIG } from '../config.js';
 import { STARTING_RESOURCES, BASE_STORAGE_CAPACITY } from '../data/resources.js';
 import { STARTING_WEATHER } from '../data/weather.js';
@@ -14,6 +16,12 @@ import { RELICS } from '../data/luxury.js';
 import { MASTERPIECES } from '../data/masterpieces.js';
 import { INSCRIPTIONS } from '../data/exploration.js';
 import { emptyExploration } from '../systems/Exploration.js';
+import { emptyTrust, emptyPetitions } from '../systems/Citizens.js';
+import { PETITION_KINDS, TRUST } from '../data/citizens.js';
+import { emptyTax, emptyCrown, emptyExodus } from '../systems/Crown.js';
+import { TAX_RATES, DECREES, REPUTATION } from '../data/crown.js';
+import { emptyCrisis } from '../systems/Crisis.js';
+import { CRISIS_DIFFICULTY, CRISIS } from '../data/crisis.js';
 import { SEASON_FESTIVALS } from '../data/festivals.js';
 import { WEATHER_TYPES } from '../data/weather.js';
 import { Character } from '../entities/Character.js';
@@ -87,6 +95,27 @@ export class GameState {
       rallies: 0, // çalınan toplanma zili
       quarrels: 0, // (15. aşama) atışma
       reconciliations: 0, // (15. aşama) barışan küs çiftler
+      dates: 0, // (19. aşama) randevular
+      weddingParties: 0, // meydanda kutlanan düğünler
+      familyDinners: 0, // evli çiftlerin evde birlikte yediği akşam yemekleri
+      gossipHeard: 0, // kulaktan kulağa aktarılan haberler
+      serenades: 0, // müzisyenlerin çaldığı akşamlar
+      petCuddles: 0, // hayvanseverlerin kedi / köpek okşaması
+      booksRead: 0, // kitap kurtlarının okuma molaları
+      homesFreed: 0, // evlenen çift taşınınca göçmenlere açılan evler
+      wagesPaid: 0, // (21. aşama) sakinlerin keselerine ödenen toplam yevmiye
+      purchases: 0, // pazardan / handan alınan eşyalar
+      bagMeals: 0, // çantadan yenen yiyecekler
+      revolts: 0, // çıkan isyanlar
+      raids: 0, // yağma baskınları
+      lootedGoods: 0, // yağmalanan mal (birim)
+      lootedGold: 0, // yağmalanan altın
+      reliefs: 0, // acil erzak / altın dağıtımı
+      emigrants: 0, // (22. aşama) köyü terk eden sakinler
+      fires: 0, // (23. aşama) çıkan yangınlar
+      firesPutOut: 0, // el birliğiyle söndürülenler
+      raidsRepelled: 0, // püskürtülen haydut baskınları
+      repairs: 0, // yapılan tamirler
     };
     // Hayvanlar (AnimalSystem, 11. aşama): yaban hayatı (tavşan, geyik) ve kasaba kedileri / köpekleri.
     // animalMeta: wildlifeSeeded yaban hayatı yerleştirildi mi, lastPetDay son evcil hayvanın geldiği gün
@@ -128,6 +157,26 @@ export class GameState {
     // (18. aşama) Serbest imar ve kasaba estetiği (LandscapeSystem): yıkım fırçasının küsuratlı iade birikimi,
     // kasabanın toplam estetik puanı ve refaha eklediği yüzde (+%0-5), sokak yürüyüşü ve gece sayaçları
     this.landscape = emptyLandscape();
+    // (19. aşama) Sosyal yaşam (SocialSystem): süren düğün kutlaması { venueId, coupleIds, guestIds, names, until } ve
+    // kasaba dedikodusu (dolaşan haberler: { id, kind, text, story, icon, day, hour, heardBy, spread })
+    this.social = emptySocial();
+    // (20. aşama) Altın Çağ (GoldenAgeSystem): başladığı an, çan sayısı, süren Çağ Kutlaması, kitaplıktaki antik kitaplar;
+    // Tarihçe Kütüğü: kurucular, ilk evlenen çift, ilk usta işi eser, kuleye verilen emek ve baş usta, kulenin aşamaları
+    this.goldenAge = emptyGoldenAge();
+    this.chronicle = emptyChronicle();
+    // (21. aşama) Yönetim Güveni ve isyan (TrustSystem): { value 0-100, lowSince, revolt: { since, rioters, raids, ... },
+    // revolts, relief: { tür: son dağıtım dakikası }, eventDays, min } ve vatandaş dilekçeleri (PetitionSystem):
+    // { list: açık dilekçeler, nextId, nextAt, log: sonuçlananlar, sayaçlar }
+    this.trust = emptyTrust();
+    this.petitions = emptyPetitions();
+    // (22. aşama) İç vergi (TaxSystem): kademe, sıradaki tahsilat, toplamlar ve son tahsilatlar; Krallık (CrownSystem):
+    // itibar, sıradaki Krallık Vergisi ve yoldaki tahsildar, süren Kraliyet Fermanı, Kraliyet Beratı; terk ediş
+    // (DesertionSystem): umutsuzluğun başladığı an, süren terk ediş, ayrılanlar
+    this.tax = emptyTax();
+    this.crown = emptyCrown();
+    this.exodus = emptyExodus();
+    // (23. aşama) Krizler (CrisisSystem): tehlike sıklığı ayarı, sıradaki haydut izi ve bekleyen baskın, sayaçlar
+    this.crisis = emptyCrisis();
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -192,6 +241,15 @@ export class GameState {
       masterworks: this.masterworks,
       exploration: this.exploration,
       landscape: this.landscape,
+      social: this.social,
+      goldenAge: this.goldenAge,
+      chronicle: this.chronicle,
+      trust: this.trust,
+      petitions: this.petitions,
+      tax: this.tax,
+      crown: this.crown,
+      exodus: this.exodus,
+      crisis: this.crisis,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -279,6 +337,22 @@ export class GameState {
     next.exploration = restoreExploration(data.exploration);
     // 18. aşamadan eski kayıtlarda peyzaj durumu yoktur: estetik ilk adımda yapılardan ve zeminden yeniden hesaplanır
     next.landscape = restoreLandscape(data.landscape);
+    // 19. aşamadan eski kayıtlarda sosyal durum yoktur: dedikodu boş başlar, huylar ilk açılışta dağıtılır (SocialSystem)
+    next.social = restoreSocial(data.social);
+    // 20. aşamadan eski kayıtlarda Altın Çağ ve Tarihçe yoktur: tamamlanmış kule varsa Altın Çağ sessizce başlar,
+    // Tarihçe sakinlerden, evliliklerden ve eserlerden çıkarılır (GoldenAgeSystem)
+    next.goldenAge = restoreGoldenAge(data.goldenAge);
+    next.chronicle = restoreChronicle(data.chronicle);
+    // 21. aşamadan eski kayıtlarda güven ve dilekçe yoktur: güven %75 başlar (sakinlere başlangıç harçlığı Character'da)
+    next.trust = restoreTrust(data.trust);
+    next.petitions = restorePetitions(data.petitions);
+    // 22. aşamadan eski kayıtlarda vergi, Krallık ve terk ediş yoktur: Standart Vergi, itibar 50, takvim yüklenince kurulur
+    next.tax = restoreTax(data.tax);
+    next.crown = restoreCrown(data.crown);
+    next.exodus = restoreExodus(data.exodus);
+    // 23. aşamadan eski kayıtlarda kriz yoktur: Dengeli, hiçbir yapı hasarlı / yanıyor değil, kimse yaralı değil; yüklemeden
+    // sonraki ilk 24 saatte (aktif kriz kaydedilmediyse) doğal kriz çıkmaz
+    next.crisis = restoreCrisis(data.crisis);
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
@@ -304,6 +378,180 @@ export class GameState {
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
+}
+
+const NUM = (v) => (Number.isFinite(v) ? v : null);
+const COUNT = (v) => Math.max(0, Math.floor(Number(v) || 0));
+
+/** (22. aşama) Kayıttaki iç vergi: bilinmeyen kademe Standart olur. */
+function restoreTax(data) {
+  const out = emptyTax();
+  if (!data || typeof data !== 'object') return out;
+  if (TAX_RATES[data.rate]) out.rate = data.rate;
+  out.nextAt = NUM(data.nextAt);
+  out.collections = COUNT(data.collections);
+  out.totalGold = COUNT(data.totalGold);
+  out.totalGoods = COUNT(data.totalGoods);
+  out.last = data.last && typeof data.last === 'object' ? { ...data.last } : null;
+  out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && Number.isFinite(l.day)).slice(-8);
+  return out;
+}
+
+/** (22. aşama) Kayıttaki Krallık durumu: bilinmeyen ferman atlanır, itibar sınırlanır. */
+function restoreCrown(data) {
+  const out = emptyCrown();
+  if (!data || typeof data !== 'object') return out;
+  out.reputation = Number.isFinite(data.reputation) ? Math.min(100, Math.max(0, data.reputation)) : REPUTATION.start;
+  out.nextLevyAt = NUM(data.nextLevyAt);
+  out.notice = data.notice && Number.isFinite(data.notice.amount) ? { ...data.notice } : null;
+  for (const k of ['levies', 'paid', 'failed', 'delivered', 'decreesFailed']) out[k] = COUNT(data[k]);
+  out.lastLevy = data.lastLevy && typeof data.lastLevy === 'object' ? { ...data.lastLevy } : null;
+  const d = data.decree;
+  out.decree = d && DECREES[d.kind] && Number.isFinite(d.deadline) ? { ...d, need: { ...(d.need ?? {}) }, baseline: { ...(d.baseline ?? {}) }, reward: d.reward ? { ...d.reward } : null } : null;
+  out.nextDecreeAt = NUM(data.nextDecreeAt);
+  out.nextDecreeId = Math.max(1, COUNT(data.nextDecreeId), (out.decree?.id ?? 0) + 1);
+  out.decreeLog = (Array.isArray(data.decreeLog) ? data.decreeLog : []).filter((l) => l && DECREES[l.kind]).slice(-10);
+  out.statueRight = Boolean(data.statueRight);
+  return out;
+}
+
+/**
+ * (23. aşama) Kayıttaki kriz durumu: bilinmeyen tehlike sıklığı Dengeli olur; bekleyen baskın yalnızca geçerliyse sürer. (Kayıt
+ * yüklendikten sonraki ilk CRISIS.graceHours saatin korunması CrisisSystem'de tutulur, kayda girmez.)
+ */
+function restoreCrisis(data) {
+  const out = emptyCrisis();
+  if (data && typeof data === 'object') {
+    if (CRISIS_DIFFICULTY[data.difficulty]) out.difficulty = data.difficulty;
+    out.nextRaidWarnAt = NUM(data.nextRaidWarnAt);
+    const r = data.raid;
+    out.raid = r && Number.isFinite(r.arriveAt) && Number.isFinite(r.warnedAt) ? { id: COUNT(r.id) || 1, warnedAt: r.warnedAt, arriveAt: r.arriveAt, early: Boolean(r.early), tribute: Math.max(1, COUNT(r.tribute)) } : null;
+    out.nextRaidId = Math.max(1, COUNT(data.nextRaidId), (out.raid?.id ?? 0) + 1);
+    out.lastFireDay = NUM(data.lastFireDay);
+    for (const k of ['fires', 'extinguished', 'burned', 'raids', 'repelled', 'tributes', 'caught', 'injuries', 'treated', 'repairs']) out[k] = COUNT(data[k]);
+    out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && Number.isFinite(l.day) && typeof l.text === 'string').slice(-CRISIS.logSize);
+  }
+  return out;
+}
+
+/** (22. aşama) Kayıttaki terk ediş durumu. */
+function restoreExodus(data) {
+  const out = emptyExodus();
+  if (!data || typeof data !== 'object') return out;
+  out.lowSince = NUM(data.lowSince);
+  out.lastAt = NUM(data.lastAt);
+  out.active = Boolean(data.active);
+  out.startedAt = NUM(data.startedAt);
+  for (const k of ['left', 'coins', 'items']) out[k] = COUNT(data[k]);
+  out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && typeof l.name === 'string').slice(-12);
+  return out;
+}
+
+/** (21. aşama) Kayıttaki Yönetim Güveni: değer sınırlanır, isyan yalnızca geçerliyse sürer. */
+function restoreTrust(data) {
+  const out = emptyTrust();
+  if (!data || typeof data !== 'object') return out;
+  const n = Number(data.value);
+  out.value = Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : TRUST.start;
+  out.min = Number.isFinite(data.min) ? Math.min(100, Math.max(0, data.min)) : out.value;
+  out.lowSince = Number.isFinite(data.lowSince) ? data.lowSince : null;
+  out.revolts = Math.max(0, Math.floor(Number(data.revolts) || 0));
+  for (const [k, v] of Object.entries(data.relief ?? {})) if (Number.isFinite(v)) out.relief[k] = v;
+  for (const [k, v] of Object.entries(data.eventDays ?? {})) if (Number.isFinite(v)) out.eventDays[k] = v;
+  const r = data.revolt;
+  if (r && Number.isFinite(r.since) && Array.isArray(r.rioters)) {
+    const ids = (list) => (Array.isArray(list) ? list.filter(Number.isFinite) : []);
+    out.revolt = {
+      since: r.since,
+      rioters: ids(r.rioters),
+      raids: (Array.isArray(r.raids) ? r.raids : []).filter((x) => x && Number.isFinite(x.targetId) && Array.isArray(x.members)).map((x) => ({ ...x, members: ids(x.members), done: ids(x.done) })),
+      nextRaidAt: Number.isFinite(r.nextRaidAt) ? r.nextRaidAt : r.since,
+      nextJoinAt: Number.isFinite(r.nextJoinAt) ? r.nextJoinAt : r.since,
+      nextRaidId: Math.max(1, Math.floor(Number(r.nextRaidId) || 1)),
+      looted: { ...(r.looted ?? {}) },
+    };
+  }
+  out.lastLoot = data.lastLoot && typeof data.lastLoot === 'object' ? { ...data.lastLoot } : null;
+  return out;
+}
+
+/** (21. aşama) Kayıttaki dilekçeler: bilinmeyen türler atlanır. */
+function restorePetitions(data) {
+  const out = emptyPetitions();
+  if (!data || typeof data !== 'object') return out;
+  out.list = (Array.isArray(data.list) ? data.list : [])
+    .filter((p) => p && PETITION_KINDS[p.kind] && Number.isFinite(p.id) && Number.isFinite(p.characterId) && Number.isFinite(p.deadline))
+    .map((p) => ({ ...p, status: p.status === 'accepted' ? 'accepted' : 'open', baseline: { ...(p.baseline ?? {}) } }));
+  const maxId = out.list.reduce((m, p) => Math.max(m, p.id), 0);
+  out.nextId = Math.max(maxId + 1, Number(data.nextId) || 1);
+  out.nextAt = Number.isFinite(data.nextAt) ? data.nextAt : null;
+  out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && typeof l.text === 'string').slice(-12);
+  for (const k of ['fulfilled', 'rejected', 'expired', 'accepted', 'made']) out[k] = Math.max(0, Math.floor(Number(data[k]) || 0));
+  return out;
+}
+
+const STAMP = (v) => (v && Number.isFinite(v.day) ? { ...v } : null);
+
+/** Kayıttaki Altın Çağ: sayılar sınırlanır, kutlama yalnızca geçerliyse sürer. */
+function restoreGoldenAge(data) {
+  const out = emptyGoldenAge();
+  if (!data || typeof data !== 'object') return out;
+  out.since = STAMP(data.since);
+  out.chimes = Math.max(0, Math.floor(Number(data.chimes) || 0));
+  out.books = Math.min(GOLDEN_AGE.maxBooks, Math.max(0, Math.floor(Number(data.books) || 0)));
+  out.lastChime = data.lastChime && Number.isFinite(data.lastChime.at) ? { ...data.lastChime } : null;
+  const c = data.celebration;
+  if (out.since && c && Number.isFinite(c.until)) {
+    out.celebration = { venueId: c.venueId ?? null, x: Number(c.x) || 0, y: Number(c.y) || 0, startedAt: Number.isFinite(c.startedAt) ? c.startedAt : c.until, until: c.until, attended: Array.isArray(c.attended) ? c.attended.filter(Number.isFinite) : [] };
+  }
+  return out;
+}
+
+/** Kayıttaki Tarihçe Kütüğü: bozuk satırlar atlanır (eksikleri GoldenAgeSystem çıkarır). */
+function restoreChronicle(data) {
+  const out = emptyChronicle();
+  if (!data || typeof data !== 'object') return out;
+  out.founders = (Array.isArray(data.founders) ? data.founders : []).filter((f) => f && Number.isFinite(f.id) && typeof f.name === 'string').map((f) => ({ id: f.id, name: f.name }));
+  const named = (v, keys) => (v && keys.every((k) => typeof v[k] === 'string') ? { ...v } : null);
+  out.firstCouple = named(data.firstCouple, ['a', 'b']);
+  out.firstMasterwork = named(data.firstMasterwork, ['maker', 'piece']);
+  for (const [id, v] of Object.entries(data.towerWork ?? {})) if (Number.isFinite(Number(id)) && Number(v) > 0) out.towerWork[id] = Number(v);
+  out.towerMaster = named(data.towerMaster, ['name']);
+  for (const [k, v] of Object.entries(data.towerStages ?? {})) if (v && typeof v.name === 'string') out.towerStages[k] = { ...v };
+  out.goldenAge = STAMP(data.goldenAge);
+  return out;
+}
+
+function emptySocial() {
+  return { party: null, gossip: [], nextNewsId: 1, reconcileNewsDay: null };
+}
+
+/** Kayıttaki sosyal durum: bozuk haberler atlanır, kutlama yalnızca geçerliyse sürer. */
+function restoreSocial(data) {
+  const out = emptySocial();
+  if (!data || typeof data !== 'object') return out;
+  const p = data.party;
+  if (p && Number.isFinite(p.until) && Array.isArray(p.coupleIds) && p.coupleIds.length === 2) {
+    const ids = (list) => (Array.isArray(list) ? list.filter(Number.isFinite) : []);
+    out.party = {
+      venueId: p.venueId ?? null,
+      x: Number(p.x) || 0,
+      y: Number(p.y) || 0,
+      coupleIds: [...p.coupleIds],
+      guestIds: ids(p.guestIds),
+      attended: ids(p.attended),
+      names: String(p.names ?? ''),
+      startedAt: Number.isFinite(p.startedAt) ? p.startedAt : p.until,
+      until: p.until,
+    };
+  }
+  out.gossip = (Array.isArray(data.gossip) ? data.gossip : [])
+    .filter((n) => n && Number.isFinite(n.id) && typeof n.text === 'string' && typeof n.story === 'string')
+    .map((n) => ({ ...n, heardBy: Array.isArray(n.heardBy) ? n.heardBy.filter(Number.isFinite) : [], selfStories: { ...(n.selfStories ?? {}) }, spread: Boolean(n.spread) }));
+  const maxId = out.gossip.reduce((m, n) => Math.max(m, n.id), 0);
+  out.nextNewsId = Math.max(maxId + 1, Number(data.nextNewsId) || 1);
+  out.reconcileNewsDay = Number.isFinite(data.reconcileNewsDay) ? data.reconcileNewsDay : null;
+  return out;
 }
 
 function emptyLandscape() {
@@ -393,6 +641,13 @@ function sanitizeReferences(next) {
       }
     }
     if (c.parentIds.some((id) => id === c.id || !people.has(id))) c.parentIds = c.parentIds.filter((id) => id !== c.id && people.has(id));
+  }
+  // (21. aşama) kayıp sakine ait dilekçe ve isyancılar atlanır; yağma hedefi yıkılmışsa baskın biter
+  next.petitions.list = next.petitions.list.filter((p) => people.has(p.characterId));
+  const revolt = next.trust.revolt;
+  if (revolt) {
+    revolt.rioters = revolt.rioters.filter((id) => people.has(id));
+    revolt.raids = revolt.raids.filter((r) => buildings.has(r.targetId)).map((r) => ({ ...r, members: r.members.filter((id) => people.has(id)) })).filter((r) => r.members.length > 0);
   }
   const residents = new Map();
   for (const c of next.characters) if (c.homeId !== null) residents.set(c.homeId, (residents.get(c.homeId) ?? 0) + 1);

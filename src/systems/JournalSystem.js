@@ -10,6 +10,12 @@
 //   townHall:balanced (belediyenin erzak dengesi)
 //   11. aşama: pet:arrived, health:fellIll / recovered / cured, dilemma:resolved / recruited, storm:struck,
 //   expedition:departed / returned, civic:decreed, building:mended
+//   19. aşama: social:partyStarted (düğün kutlaması), social:homeFreed (boşalan ev), gossip:spread (yayılan haber)
+//   21. aşama: petition:opened / resolved (dilekçeler), revolt:started / ended / raidEnded (isyan ve yağma), relief:given
+//   22. aşama: tax:rateChanged / collected (iç vergi), crown:levyNotice / levyPaid / levyFailed (Krallık Vergisi), crown:decree /
+//              decreeDelivered / decreeFailed (Kraliyet Fermanları), exodus:started / ended, exodus:leaving, population:left
+//   23. aşama: crisis:fireStarted / fireOut / burnedDown (yangın), crisis:raidWarning / raidResolved (haydut baskını), crisis:injured /
+//              healed (hafif yaralanma), crisis:repaired, building:mended (nedene göre)
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
@@ -19,6 +25,9 @@ import { describeOffer } from './EventSystem.js';
 import { SKILLS } from '../data/skills.js';
 import { formatTownTitle } from './TownStatus.js';
 import { cargoValue } from './HarborSystem.js';
+import { PETITION_KINDS } from '../data/citizens.js';
+import { TAX_RATES, DECREE_ITEMS } from '../data/crown.js';
+import { genitive } from '../utils/turkish.js';
 
 // İşlenmiş malların ilk üretimi
 const FIRST_GOODS_TEXT = {
@@ -102,6 +111,19 @@ export class JournalSystem {
         const swap = swapped ? `; ${swapped.name} onların eski evine geçti` : '';
         this.log(`${a.name} ile ${b.name} artık aynı evde (${home.name}) yaşıyor${swap}`, 'heart');
       }),
+      // (19. aşama) Sosyal yaşam: meydandaki düğün kutlaması, boşalan ev, kasabaya yayılan dedikodu
+      on('social:partyStarted', ({ party, guests }) =>
+        this.log(`Meydanda düğün kutlaması: ${party.names} için konfetiler havada uçuşuyor${guests.length ? ` (${guests.length} dostu el çırpıyor)` : ''}`, 'ring')
+      ),
+      on('social:homeFreed', ({ home, a, b }) => this.log(`${a.name} ile ${b.name} ortak evlerine taşındı; ${home.name} boşaldı ve yeni göçmenlere açık`, 'heart')),
+      on('gossip:spread', ({ news }) => this.log(`Kasabada dilden dile dolaşıyor: ${news.text}`, 'whisper')),
+      // (20. aşama) Altın Çağ
+      on('goldenAge:began', ({ master }) =>
+        this.log(`Çağ Dönüm Noktası! Ulu Saat Kulesi tamamlandı, kasaba Altın Çağ'a girdi${master ? `; baş usta ${master.name} Tarihçe Kütüğü'ne yazıldı` : ''}`, 'wonder')
+      ),
+      on('goldenAge:celebrationEnded', ({ attended }) => this.log(`Meydandaki Çağ Kutlaması sona erdi: ${attended} sakin ilk çanı birlikte dinledi`, 'bell')),
+      on('goldenAge:gearCast', ({ gears }) => gears === 1 && this.log("Zanaat Atölyesi ilk Kadim Dişli'yi döktü: kulenin mekanizması yolda", 'gears')),
+      on('goldenAge:book', ({ books }) => this.log(`Bilgelik Evi'nin kitaplığına antik bir kitap girdi (${books} kitap: araştırmalar +%${books * 5})`, 'book')),
       on('family:madeRoom', ({ character, to }) => this.log(`${character.name}, ailenin büyümesi için başka bir eve (${to.name}) taşındı`, 'heart')),
       on('family:childBorn', ({ child, parents }) => this.log(`${parents[0].name} ve ${parents[1].name} ailesine küçük ${child.name} katıldı`, 'love')),
       on('family:grownUp', ({ character }) => this.log(`${character.name} büyüdü ve kasabanın genç bir sakini oldu`, 'star')),
@@ -156,10 +178,45 @@ export class JournalSystem {
       on('adventure:resolved', ({ scenario, option, success, member }) =>
         this.log(`Maceracı Günlüğü · ${scenario.title}: ${option.label}${success ? '' : ` (${member?.name} ${option.risk.text})`}`, scenario.icon)
       ),
-      on('exotic:found', ({ def }) => this.log(`Seferden ${def.name} geldi`, def.icon)),
+      on('exotic:found', ({ def, source }) => this.log(`${source === 'merchant' ? 'Gezgin tüccardan' : 'Seferden'} ${def.name} geldi`, def.icon)),
       on('inscription:found', ({ inscription, source }) => this.log(`${source === 'ruin' ? 'Onarılan harabenin içinden' : 'Seferden'} kadim bir yazıt çıktı: ${inscription.name}`, 'inscription')),
       on('inscription:decoded', ({ inscription }) => this.log(`Bilge kadim yazıtı çözdü: ${inscription.name} (${inscription.description})`, 'scheme')),
       on('expedition:taleTold', ({ teller, listeners, route }) => this.log(`${teller.name} ${route} Seferi'ni anlattı; ${listeners.length} kişi soluksuz dinledi`, 'adventure')),
+      // 21. aşama: vatandaş dilekçeleri, isyan ve yağma, yatıştırma
+      on('petition:opened', ({ petition }) => this.log(`Dilekçe · ${petition.name}: "${petition.text}"`, 'scroll')),
+      on('petition:resolved', ({ petition, outcome }) => {
+        const what = PETITION_KINDS[petition.kind].name;
+        if (outcome === 'fulfilled') this.log(`${genitive(petition.name)} dilekçesi karşılandı (${what}): yönetime güven arttı`, 'scroll');
+        else if (outcome === 'rejected') this.log(`${genitive(petition.name)} dilekçesi reddedildi (${what})`, 'sulk');
+        else this.log(`${genitive(petition.name)} dilekçesi yanıtsız kaldı, süresi doldu (${what})`, 'sulk');
+      }),
+      on('revolt:started', ({ names }) => this.log(`ALARM · İsyan çıktı! ${names.join(', ')} işi bıraktı, meydanda öfkeyle toplanıyor`, 'torch')),
+      on('revolt:raidEnded', ({ raid, names }) => {
+        const parts = Object.entries(raid.goods).map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`);
+        if (raid.gold) parts.push(`${raid.gold} altın`);
+        if (parts.length) this.log(`ALARM · Yağma: ${names.join(', ')} ${raid.target} yapısını yağmaladı; ${parts.join(', ')} kasaba deposundan yağmacıların çantalarına geçti`, 'loot');
+      }),
+      on('revolt:ended', ({ hours }) => this.log(`İsyan yatıştı (${hours} saat sürdü); sakinler işlerinin başına döndü`, 'trust')),
+      on('relief:given', ({ kind, cost }) => this.log(kind === 'food' ? `Halka acil erzak dağıtıldı (${cost} yiyecek değeri)` : `Halka altın dağıtıldı (${cost} altın)`, kind === 'food' ? 'food' : 'coin')),
+      // 22. aşama: iç vergi, Krallık Vergisi, Kraliyet Fermanları, terk ediş
+      on('tax:rateChanged', ({ def }) => this.log(`Belediye iç vergiyi değiştirdi: ${def.name}`, def.icon)),
+      on('tax:collected', ({ def, gold, goods }) => {
+        const units = Object.values(goods).reduce((a, b) => a + b, 0);
+        this.log(def.percent ? `İç vergi tahsil edildi (${def.name}): Kasaba Hazinesi'ne +${gold} altın${units ? `, kilere ${units} birim öşür` : ''}` : `${def.name}: bu dönem kimseden vergi alınmadı`, 'coin');
+      }),
+      on('crown:levyNotice', ({ amount }) => this.log(`Kraliyet Tahsildarı yolda: iki gün sonra Krallık Vergisi ${amount} altın`, 'collector')),
+      on('crown:levyPaid', ({ amount, goods }) => this.log(`Krallık Vergisi ödendi (${amount} altın${Object.keys(goods).length ? `; bir kısmı ${Object.entries(goods).map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`).join(', ')} ile` : ''})`, 'collector')),
+      on('crown:levyFailed', ({ amount, seized, goods }) => {
+        const taken = Object.entries(goods).map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`).join(', ');
+        this.log(`ALARM · Krallık Vergisi (${amount} altın) ödenemedi: tahsildar hazinedeki ${seized} altına el koydu${taken ? `, depodan ${taken} çekti` : ''}`, 'collector');
+      }),
+      on('crown:decree', ({ def }) => this.log(`Kraliyet Fermanı geldi: ${def.name}`, 'decree')),
+      on('crown:decreeDelivered', ({ def, gold, item }) => this.log(`Ferman teslim edildi: ${def.name} · Krallık ödülü +${gold} altın${item ? ` ve ${DECREE_ITEMS[item].name}` : ''}`, 'decree')),
+      on('crown:decreeFailed', ({ def, outcome, gold, food }) => this.log(`Ferman ${outcome === 'rejected' ? 'reddedildi' : 'yerine getirilmedi'}: ${def.name} · Krallık cezası ${gold} altın${food ? `, ${food} yiyecek` : ''}`, 'decree')),
+      on('exodus:started', () => this.log('ALARM · Umut tükendi: sakinler köyü terk etmeyi konuşuyor, göçmenler artık gelmiyor', 'bundle')),
+      on('exodus:ended', () => this.log('Kasabaya umut döndü: terk edişler durdu', 'heart')),
+      on('exodus:leaving', ({ names }) => this.log(`${names.join(' ve ')} bohçasını topladı, köyü terk etmek için yola çıktı`, 'bundle')),
+      on('population:left', ({ character, coins, items }) => this.log(`${character.name} kesesindeki ${coins} altın ve çantasındaki ${items} eşyayla köyden temelli ayrıldı. Geride boş bir ev ve hüzün kaldı`, 'bundle')),
       // 12. aşama: Bilgelik Evi, okul, liman ve harika
       on('research:started', ({ research }) => this.log(`Bilgelik Evi'nde araştırma başladı: ${research.name}`, 'book')),
       on('research:completed', ({ research }) => this.log(`Araştırma tamamlandı: ${research.name}`, research.icon)),
@@ -184,7 +241,15 @@ export class JournalSystem {
       on('character:renamed', ({ character, from }) => this.log(`${from} artık ${character.name} adıyla anılıyor`, 'heart')),
       on('worker:pinned', ({ building, character }) => this.log(`${character.name} ${building.name} işine sabitlendi`, 'pin')),
       on('civic:decreed', ({ project }) => this.log(`Belediye fermanı: ${project.name}`, project.icon)),
-      on('building:mended', ({ building }) => this.log(`${building.name} fırtına hasarından onarıldı`, 'hammer')),
+      on('building:mended', ({ building, kind }) => this.log(`${building.name} ${kind === 'fire' ? 'yangın' : kind === 'raid' ? 'baskın' : 'fırtına'} hasarından onarıldı`, 'hammer')),
+      // 23. aşama: yangın, haydut baskını, yaralanma
+      on('crisis:fireStarted', ({ building, natural }) => this.log(`ALARM · ${building.name} yangın çıktı${natural ? '' : ' (yangın çıkarıldı)'}! Sakinler kovalarla koşuyor`, 'fire')),
+      on('crisis:fireOut', ({ building, byPlayer }) => this.log(byPlayer ? `${building.name} yangını acil kova zinciriyle söndürüldü` : `${building.name} yangını el birliğiyle söndürüldü; yapı hasar görmedi`, 'bucket')),
+      on('crisis:burnedDown', ({ building }) => this.log(`${building.name} söndürülemedi, yanıp hasar gördü (haritadan silinmedi; onarılana kadar çalışmaz)`, 'repair')),
+      on('crisis:raidWarning', ({ raid, early }) => this.log(`Ormanda haydut izleri görüldü${early ? ' (Gözcü Kulesi 2 gün önceden haber verdi)' : ''}: baskın bekleniyor`, 'bandit')),
+      on('crisis:raidResolved', ({ choice, auto, text }) => this.log(`${choice === 'defend' ? 'Haydutlar püskürtüldü' : choice === 'tribute' ? 'Haydutlara haraç verildi' : 'Haydutlar hazırlıksız yakaladı'}${auto ? ' (karar verilmedi, kendiliğinden)' : ''}: ${text}`, choice === 'defend' ? 'shield' : 'bandit')),
+      on('crisis:injured', ({ character, cause }) => this.log(`${character.name} ${cause === 'raid' ? 'haydutlarla çarpışırken' : 'yangını söndürürken'} hafif yaralandı`, 'bandage')),
+      on('crisis:healed', ({ character, how }) => this.log(how === 'healer' ? `${character.name}'in yaraları Şifacı Kulübesi'nde sarıldı` : `${character.name}'in yarası kendiliğinden iyileşti`, 'herb')),
       on('townHall:balanced', ({ building, from, to, amount }) =>
         this.log(`${building.name} erzak dengesini sağladı: ${amount} ${RESOURCES[from].name.toLocaleLowerCase('tr')} ambarlardan ${RESOURCES[to].name.toLocaleLowerCase('tr')} ambarına geçti`, RESOURCES[to].icon)
       ),

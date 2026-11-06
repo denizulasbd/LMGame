@@ -115,14 +115,18 @@ export class SaveSystem {
   /** Başlangıç ekranı: verilen adla (ve isteğe bağlı tohumla) yeni kasaba. */
   startNewTown(name, seed) {
     SaveManager.clear('session');
+    const difficulty = this.game.state.crisis?.difficulty;
     this.game.state.reset(Number.isFinite(seed) ? seed : undefined, name);
+    if (difficulty && this.game.state.crisis) this.game.state.crisis.difficulty = difficulty; // (23. aşama) tehlike sıklığı tercihi yeni kasabaya taşınır
     this.reloadScene();
     this.events.emit('toast', { text: `${this.state.townName} kuruldu. Kolay gelsin!`, tone: 'success', icon: 'sun' });
   }
 
   newGame() {
     SaveManager.clear('session');
+    const difficulty = this.game.state.crisis?.difficulty;
     this.game.state.reset();
+    if (difficulty && this.game.state.crisis) this.game.state.crisis.difficulty = difficulty; // (23. aşama) tercih yeni haritaya taşınır
     this.reloadScene();
     this.events.emit('toast', { text: 'Yeni harita başladı', tone: 'info', icon: 'sun' });
   }

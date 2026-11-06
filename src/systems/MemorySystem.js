@@ -22,13 +22,13 @@ export const MEMORY = {
   fun: 8,
   social: 3,
   // Hatırlamanın geldiği sakin anlar (etkinlik anahtarları)
-  calmActivities: ['gazebo', 'bench', 'river', 'flowers', 'campfire', 'monument', 'ancientSpring', 'shade'],
+  calmActivities: ['gazebo', 'bench', 'river', 'flowers', 'campfire', 'monument', 'ancientSpring', 'shade', 'readBench', 'viewpoint'],
 };
 
 const PLACE_PHRASES = { gazebo: 'Çardakta ', inn: 'Handa ', fountain: 'Meydanda ', campfire: 'Ateş başında ' };
 
 // Defter dolunca önce bunlar silinir (en eskisinden): dostluklar, kasaba olayları, hayvanlar, festivaller, ad
-const MINOR_KINDS = new Set(['friend', 'town', 'pet', 'festival', 'name', 'reconcile', 'stroll']); // stroll: (18. aşama) güzel sokak, çiçek kokusu
+const MINOR_KINDS = new Set(['friend', 'town', 'pet', 'festival', 'name', 'reconcile', 'stroll', 'gossip']); // gossip: (19. aşama) kulaktan kulağa duyulan haber // stroll: (18. aşama) güzel sokak, çiçek kokusu
 
 /**
  * Sakinin anılarına yeni bir satır ekler. Aynı cümle zaten yazılıysa yinelenmez (ör. bozulup yeniden kurulan dostluk;
@@ -126,7 +126,7 @@ export class MemorySystem {
       on('seasonFestival:ended', ({ festival, attendees }) => {
         for (const id of attendees) remember(this.world.getCharacter(id), festival.memory, festival.icon, { kind: 'festival' });
       }),
-      on('wonder:completed', () => all('Büyük Vadi Saat Kulesi\'nin tamamlanışını gördü', 'wonder')),
+      on('wonder:completed', () => all("Ulu Saat Kulesi'nin tamamlanışını ve Altın Çağ'ın başlangıcını gördü", 'wonder')),
       on('town:tierUp', ({ tier }) => all(`Kasaba ${tier.name} oldu; o gün meydanda kutlama vardı`, tier.icon)),
       on('character:renamed', ({ character, from }) => remember(character, `Artık ${character.name} adıyla anılıyor (eskiden ${from})`, 'heart', { kind: 'name', fond: false })),
       on('character:woke', ({ character }) => {

@@ -13,9 +13,15 @@
 // 10. aşama: koyun ağılı iki katmanda çizilir, aradaki koyunlar (flock, entities/Flock.js) derinlik sırasıyla
 // girer; değirmenin kanatları rüzgârda ağır ağır, fırıncı çalışırken hızlı döner (sailPhase); fırın ve
 // belediye geceleri ışık verir; madenin girişinde fener yanar.
+//
+// 23. aşama: yangın (isBurning, fireProgress 0-100, fireWater atılan kova) ve hasar nedeni (damageKind 'storm' | 'fire' |
+// 'raid', damagedAt). Hasarlı yapı haritadan silinmez: onarılana kadar çalışmaz (isDamaged, damaged ile aynı bayrak).
+// Gözcü Kulesi'nin nöbet yeri sayısı (guardSlots) CrisisSystem'den gelir.
+import { CLOCK_GEAR } from '../data/goldenAge.js';
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { BUILDINGS, PROJECT_WORDS } from '../data/buildings.js';
+import { DAMAGE_KINDS } from '../data/crisis.js';
 import { EQUIPMENT } from '../data/equipment.js';
 import {
   getStructureSprite,
@@ -28,6 +34,7 @@ import {
   MONUMENT_ART,
   STONE_HOUSE_ART,
   WATCHTOWER_ART,
+  GUARD_TOWER_ART,
   WORKSHOP_ART,
   MILL_ART,
   IRON_MINE_ART,
@@ -38,6 +45,7 @@ import {
   WONDER_ART,
   CHERRY_ART,
   IRON_LANTERN_ART,
+  GOLDEN_LANTERN_ART,
   SIGNPOST_ART,
   getGazeboLayer,
   getSheepFarmLayer,
@@ -85,12 +93,18 @@ const BASELINE_INSET = {
   woodFence: 3,
   fenceGate: 3,
   ironLantern: 3,
+  marbleFountain: 3,
+  goldenLantern: 3,
   signpost: 3,
   parkBench: 3,
   planter: 3,
   birchTree: 3,
   oakTree: 3,
   pineTree: 3,
+  royalStatue: 3,
+  // 23. aşama
+  well: 3,
+  guardTower: 2,
 };
 // Çardağın çatısı kışın karla örtülür (arka katman çatı altında kalır, karlanmaz)
 const GAZEBO_WINTER_ROOF = { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 };
@@ -98,7 +112,7 @@ const SITE_BASELINE_INSET = 2;
 const RECENT_WORKERS_EXTRA = 2; // panelde çalışan yuvasından bu kadar fazla "son çalışan" hatırlanır
 
 // Animasyon kare hızı (kare / saniye): ateş titrer, tabela ve flama sallanır, çiçekler eğilir
-const FRAME_RATES = { campfire: 8, flowerBed: 1.4, planter: 1.2, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3, academy: 2.5, harbor: 1.6, wonder: 2.4 };
+const FRAME_RATES = { campfire: 8, flowerBed: 1.4, planter: 1.2, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3, academy: 2.5, harbor: 1.6, wonder: 2.4, marbleFountain: 4, well: 1.5 };
 const DEFAULT_FRAME_RATE = 3;
 const MAX_OVERHANG = 70; // yapıların karolarının üstüne taşabileceği en fazla piksel (görünürlük testi; harika 64)
 // Değirmen kanatları: saniyede kaç kare (çeyrek tur = MILL_ART.sailFrames kare) döner
@@ -129,6 +143,12 @@ export class Building extends Entity {
     herbs = 0,
     remedies = 0,
     damaged = false,
+    isDamaged = false,
+    isBurning = false,
+    fireProgress = 0,
+    fireWater = 0,
+    damageKind = null,
+    damagedAt = null,
     treatedToday = 0,
     wonderStage = 0,
     exportThreshold = undefined,
@@ -176,7 +196,14 @@ export class Building extends Entity {
     this.herbs = herbs;
     this.remedies = remedies;
     this.treatedToday = treatedToday;
-    this.damaged = damaged; // hasarlı yapı onarılana (project 'mend') kadar çalışmaz
+    this.damaged = Boolean(damaged || isDamaged); // hasarlı yapı onarılana (project 'mend') kadar çalışmaz
+    // 23. aşama: yangın (söndürülmezse fireProgress 100'de yapı hasar alır) ve hasarın nedeni
+    this.isBurning = Boolean(isBurning);
+    this.fireProgress = Number.isFinite(fireProgress) ? Math.min(100, Math.max(0, fireProgress)) : 0;
+    this.fireWater = Math.max(0, Math.floor(Number(fireWater) || 0));
+    this.damageKind = (this.damaged || this.isBurning) && DAMAGE_KINDS[damageKind] ? damageKind : null; // null = fırtına (eski kayıtlar)
+    this.damagedAt = Number.isFinite(damagedAt) ? damagedAt : null;
+    this.guardSlots = 1; // Gözcü Kulesi: nöbet tutabilecek bekçi sayısı (CrisisSystem yetişkin sayısına göre günceller)
     // 12. aşama: harikanın tamamlanan aşaması (0 şantiye, 1 temel, 2 gövde, 3 tamamlandı); limanın fazlalık
     // ihracatı sınırı (null = kapalı) ve rıhtımda bekleyen ihracat sandığı { kaynak: birim }
     this.wonderStage = wonderStage;
@@ -205,7 +232,7 @@ export class Building extends Entity {
 
   /** Atölyede yapılan işin ilerlemesi 0-1. */
   get craftRatio() {
-    return this.craft ? Math.min(1, this.craft.progress / EQUIPMENT[this.craft.item].work) : 0;
+    return this.craft ? Math.min(1, this.craft.progress / (EQUIPMENT[this.craft.item] ?? CLOCK_GEAR).work) : 0; // (20. aşama) Kadim Dişli
   }
 
   get definition() {
@@ -256,9 +283,23 @@ export class Building extends Entity {
     return this.stat('capacity', 0);
   }
 
-  /** Aynı anda çalışabilecek kişi sayısı (Kereste Atölyesi 2). */
+  /** Aynı anda çalışabilecek kişi sayısı (Kereste Atölyesi 2; Gözcü Kulesi 1-2 bekçi). */
   get workerSlots() {
+    if (this.definition.guard) return this.functional && !this.damaged && !this.isBurning ? this.guardSlots : 0;
     return this.stat('workers', 0);
+  }
+
+  /** (23. aşama) Hasarlı mı? `damaged` ile aynı bayrak (fırtına, yangın ya da baskın hasarı). */
+  get isDamaged() {
+    return this.damaged;
+  }
+
+  set isDamaged(value) {
+    this.damaged = Boolean(value);
+    if (!this.damaged) {
+      this.damageKind = null;
+      this.damagedAt = null;
+    }
   }
 
   /** Yükseltme ya da onarım ilerlemesi 0-1. */
@@ -359,7 +400,7 @@ export class Building extends Entity {
       return { name: this.name, detail: 'Yanındakilerin keyfi artıyor' };
     }
     if (this.type === 'workshop') {
-      if (this.craft) return { name: this.name, detail: `${EQUIPMENT[this.craft.item].name}: %${Math.floor(this.craftRatio * 100)}` };
+      if (this.craft) return { name: this.name, detail: `${(EQUIPMENT[this.craft.item] ?? CLOCK_GEAR).name}: %${Math.floor(this.craftRatio * 100)}` };
       return { name: this.name, detail: this.craftStatus ?? 'Zanaatkâr bekleniyor' };
     }
     if (this.type === 'mill') {
@@ -392,7 +433,7 @@ export class Building extends Entity {
     if (this.type === 'signpost') return { name: this.name, detail: 'Mahalle tabelası · tıkla ve adını değiştir' };
     if (this.type === 'fenceGate') return { name: this.name, detail: 'Sakinler kapıdan geçer' };
     if (this.type === 'woodFence') return { name: this.name, detail: 'Geçilemez · bir Çit Kapısı bırak' };
-    if (this.type === 'ironLantern' || this.type === 'lantern') return { name: this.name, detail: this.lit ? 'Yanıyor · sokağı aydınlatıyor' : 'Akşam yanacak' };
+    if (this.type === 'ironLantern' || this.type === 'lantern' || this.type === 'goldenLantern') return { name: this.name, detail: this.lit ? 'Yanıyor · sokağı aydınlatıyor' : 'Akşam yanacak' };
     if (this.type === 'parkBench' || this.type === 'bench') return { name: this.name, detail: 'Sakinler oturup manzarayı izler' };
     if (this.type === 'planter') return { name: this.name, detail: 'Yanından geçenler çiçek kokusunu içine çeker' };
     if (this.definition.ornamentalTree) {
@@ -493,6 +534,8 @@ export class Building extends Entity {
   drawEffects(renderer, env) {
     if (this.underConstruction) return;
     if (this.damaged) this.drawDamage(renderer);
+    if (this.isBurning) this.drawFlames(renderer, env);
+    else if (this.type === 'well') this.drawWellDrip(renderer, env);
     switch (this.type) {
       case 'cabin':
         if (env.smokingHomes?.has(this.id)) {
@@ -612,6 +655,10 @@ export class Building extends Entity {
       this.drawProgressBar(renderer, env, this.buildRatio);
       return;
     }
+    if (this.isBurning) {
+      this.drawFireWarning(renderer, env);
+      return;
+    }
     if (this.project) {
       // Yükseltme / onarım: çekiç ve ilerleme çubuğu yapının tepesinde (yıkık harabe alçaktır:
       // çubuk ayak izinin üstünde durur)
@@ -620,9 +667,10 @@ export class Building extends Entity {
       return;
     }
     if (this.damaged) {
-      // Hasarlı yapının üstünde sallanan fırtına uyarısı
+      // Hasarlı yapının üstünde sallanan uyarı: fırtına bulutu ya da (yangın / baskın) kırık-çekiç simgesi
       const bob = Math.sin(env.time * 3) > 0 ? 0 : 1;
-      renderer.drawImage(getIconSprite('storm'), Math.round(this.center.x) - 4, this.y + this.height - this.currentSprite(env).height - 6 + bob);
+      const icon = this.damageKind === 'fire' || this.damageKind === 'raid' ? 'repair' : 'storm';
+      renderer.drawImage(getIconSprite(icon), Math.round(this.center.x) - 4, this.y + this.height - this.currentSprite(env).height - 6 + bob);
     }
     if (this.type === 'sheepFarm' && this.flock) {
       this.drawSleepingSheep(renderer, env);
@@ -683,6 +731,56 @@ export class Building extends Entity {
     for (let i = 0; i < 6; i++) renderer.fillRect(Math.round(this.x + this.width * 0.25) + i, base - 4 + Math.floor(i / 2), 1, 1, '#4f2d1a');
   }
 
+  /** (23. aşama) Yanan yapı: ilerlemeyle büyüyen alev dilleri ve yükselen duman. */
+  drawFlames(renderer, env) {
+    const sprite = this.currentSprite(env);
+    const top = this.y + this.height - sprite.height;
+    const grow = 0.45 + 0.55 * (this.fireProgress / 100);
+    const tongues = Math.max(3, Math.floor(this.width / 7));
+    const span = this.width - 6;
+    for (let i = 0; i < tongues; i++) {
+      const t = env.time * 11 + i * 1.9 + this.id;
+      const flick = Math.sin(t) * 0.5 + Math.sin(t * 2.3) * 0.3;
+      const x = Math.round(this.x + 3 + (span * (i + 0.5)) / tongues);
+      const baseY = Math.round(top + sprite.height * (0.55 + 0.12 * ((i * 5) % 3)));
+      const h = Math.max(4, Math.round((9 + (i % 3) * 3 + flick * 3) * grow));
+      renderer.fillRect(x - 2, baseY - h, 5, h, '#e8463c');
+      renderer.fillRect(x - 1, baseY - h - 2, 3, h + 1, '#ff9a3c');
+      renderer.fillRect(x, baseY - h - 3, 1, Math.max(2, Math.round(h * 0.6)), '#ffd23f');
+    }
+    for (let i = 0; i < 4; i++) {
+      const phase = (env.time * 0.5 + i / 4 + this.id * 0.17) % 1;
+      const x = Math.round(this.x + this.width * (0.25 + 0.17 * i) + Math.sin(phase * 6 + i) * 2);
+      const y = Math.round(top + 2 - phase * 22);
+      const size = phase < 0.4 ? 3 : 4;
+      renderer.fillRect(x, y, size, size, `rgba(70, 64, 80, ${(0.55 * (1 - phase)).toFixed(2)})`);
+    }
+  }
+
+  /** (23. aşama) Yangın uyarısı: yapının tepesinde zıplayan alev simgesi ve ilerleme çubuğu (dolarsa yapı hasar alır). */
+  drawFireWarning(renderer, env) {
+    const top = this.y + this.height - this.currentSprite(env).height;
+    const bob = Math.sin(env.time * 7) > 0 ? 0 : 1;
+    const cx = Math.round(this.center.x);
+    renderer.drawImage(getIconSprite('fire'), cx - 4, top - 14 + bob);
+    const w = Math.max(14, this.width - 10);
+    const x = cx - Math.round(w / 2);
+    const y = top - 3;
+    renderer.fillRect(x - 1, y - 1, w + 2, 4, '#1b1423');
+    renderer.fillRect(x, y, w, 2, '#5a2a20');
+    renderer.fillRect(x, y, Math.round((w * this.fireProgress) / 100), 2, '#ff9a3c');
+  }
+
+  /** (23. aşama) Su Kuyusu: kovadan ara sıra düşen su damlası. */
+  drawWellDrip(renderer, env) {
+    if (!this.functional || this.damaged) return;
+    const phase = (env.time * 0.7 + this.id * 0.37) % 1;
+    if (phase > 0.5) return;
+    const x = this.x + 8;
+    const y = Math.round(this.y + 10 + phase * 14);
+    renderer.fillRect(x, y, 1, 2, '#9be3f2');
+  }
+
   /** Uyuyan koyunların başının üstünde yavaşça yükselen küçük "z" harfleri. */
   drawSleepingSheep(renderer, env) {
     const sleepers = this.flock.sleepers();
@@ -726,6 +824,10 @@ export class Building extends Entity {
       const artTop = this.y + this.height - IRON_LANTERN_ART.height;
       const sparkle = env.festivalTheme === 'winter' ? 1.3 : 1;
       out.push({ x: this.x + IRON_LANTERN_ART.light.x, y: artTop + IRON_LANTERN_ART.light.y, radius: 68 * sparkle, color: [255, 222, 140], intensity: 0.85, glow: 0.3 });
+    } else if (this.type === 'goldenLantern' && this.lit) {
+      // (20. aşama) Altın Çağ Feneri: geniş, sıcak altın sarısı ışık
+      const artTop = this.y + this.height - GOLDEN_LANTERN_ART.height;
+      out.push({ x: this.x + GOLDEN_LANTERN_ART.light.x, y: artTop + GOLDEN_LANTERN_ART.light.y, radius: 96, color: [255, 204, 90], intensity: 0.9, glow: 0.4 });
     } else if (this.type === 'ancientTorch' && this.lit) {
       // (16. aşama) Kadim Meşale: titreyen mavi alev, geniş ve serin bir ışık halkası
       const artTop = this.y + this.height - TORCH_ART.height;
@@ -758,6 +860,11 @@ export class Building extends Entity {
       const artTop = this.y + this.height - WATCHTOWER_ART.height;
       const flicker = Math.sin(env.time * 7) * 2;
       out.push({ x: this.x + WATCHTOWER_ART.light.x, y: artTop + WATCHTOWER_ART.light.y, radius: 84 + flicker, color: [255, 200, 110], intensity: 0.9, glow: 0.4 });
+    } else if (this.type === 'guardTower' && this.lit) {
+      // (23. aşama) Gözcü Kulesi: köşkün feneri ve iki penceresi geceleri sıcak sarı yanar
+      const artTop = this.y + this.height - GUARD_TOWER_ART.height;
+      const flicker = Math.sin(env.time * 6 + this.id) * 2;
+      out.push({ x: this.x + GUARD_TOWER_ART.light.x, y: artTop + GUARD_TOWER_ART.light.y, radius: 90 + flicker, color: [255, 205, 110], intensity: 0.9, glow: 0.4 });
     } else if (this.type === 'mill') {
       const artTop = this.y + this.height - MILL_ART.height;
       if (env.windowsLit) out.push({ x: this.x + MILL_ART.window.x, y: artTop + MILL_ART.window.y, radius: 20, color: [255, 214, 120], intensity: 0.7, glow: 0.3 });
@@ -854,6 +961,12 @@ export class Building extends Entity {
       remedies: this.remedies,
       treatedToday: this.treatedToday,
       damaged: this.damaged,
+      isDamaged: this.damaged,
+      isBurning: this.isBurning,
+      fireProgress: this.fireProgress,
+      fireWater: this.fireWater,
+      damageKind: this.damageKind,
+      damagedAt: this.damagedAt,
       wonderStage: this.wonderStage,
       exportThreshold: this.exportThreshold,
       crate: this.crate,

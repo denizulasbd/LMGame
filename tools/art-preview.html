@@ -23,6 +23,9 @@
     import { getTileSprite, getObjectSprite, getEdgeSprite } from '../src/art/tiles/index.js';
     import { TILE_TYPES } from '../src/data/tiles.js';
     import { TileMap } from '../src/world/TileMap.js';
+    import { WeddingConfetti } from '../src/rendering/WeddingConfetti.js';
+    import { ChimeWaves } from '../src/rendering/ChimeWaves.js';
+    import { QUIRKS } from '../src/data/social.js';
 
     const root = document.getElementById('root');
     const SCALE = 5;
@@ -50,6 +53,210 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 23. aşama: yönetilebilir krizler — Su Kuyusu, Gözcü Kulesi, alev / duman, kova, kalkan, haydut, bandaj ve tamir ---
+    {
+      const looks = [
+        { hair: 'long', hairColor: 'auburn', skin: 'light', shirt: 'rose', pants: 'navy' },
+        { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'forest', pants: 'brown' },
+        { hair: 'bun', hairColor: 'blonde', skin: 'light', shirt: 'sky', pants: 'plum' },
+      ];
+      const scene = (w, h, layers, extra = null) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#4a9a46';
+        ctx.fillRect(0, 0, w, h);
+        for (const [sprite, x, y] of layers) ctx.drawImage(sprite, Math.round(x), Math.round(y - sprite.height));
+        if (extra) extra(ctx);
+        return canvas;
+      };
+      // Alev dilleri (Building.drawFlames ile aynı mantık: ilerlemeyle büyür) ve duman, yapının üstüne
+      const flames = (x0, y0, width, progress) => (ctx) => {
+        const grow = 0.45 + 0.55 * (progress / 100);
+        const tongues = Math.max(3, Math.floor(width / 7));
+        for (let i = 0; i < tongues; i++) {
+          const x = Math.round(x0 + 3 + ((width - 6) * (i + 0.5)) / tongues);
+          const h = Math.max(4, Math.round((9 + (i % 3) * 3) * grow));
+          ctx.fillStyle = '#e8463c'; ctx.fillRect(x - 2, y0 - h, 5, h);
+          ctx.fillStyle = '#ff9a3c'; ctx.fillRect(x - 1, y0 - h - 2, 3, h + 1);
+          ctx.fillStyle = '#ffd23f'; ctx.fillRect(x, y0 - h - 3, 1, Math.max(2, Math.round(h * 0.6)));
+        }
+        for (let i = 0; i < 4; i++) {
+          ctx.fillStyle = `rgba(70, 64, 80, ${(0.5 - i * 0.1).toFixed(2)})`;
+          ctx.fillRect(x0 + width * (0.25 + 0.17 * i), y0 - 22 - i * 5, 4, 4);
+        }
+      };
+      show('Su Kuyusu (1x1): taş halka, ahşap direkler, kiremit çatı, çıkrık, ip ve kova (üç su parıltısı karesi)', [0, 1, 2].map((f) => [`kare ${f}`, getStructureSprite('well', { frame: f })]), 8);
+      show('Gözcü Kulesi (2x2): taş gövde, kemerli kapı, ahşap korkuluklu nöbet köşkü, kiremit çatı ve flama; gece pencereleri ve feneri yanar', [['gündüz', getStructureSprite('guardTower', {})], ['gece (lit)', getStructureSprite('guardTower', { lit: true })], ['kış', getStructureSprite('guardTower', { season: 'winter' })]], 6);
+      show('Kış görünümü', [['kuyu', getStructureSprite('well', { season: 'winter' })], ['kule', getStructureSprite('guardTower', { season: 'winter' })]], 6);
+      show('23. aşama simgeleri: alev, su kovası, kalkan, haydut, bandaj (hafif yaralı), tamir (kırık + çekiç)', ['fire', 'bucket', 'shield', 'bandit', 'bandage', 'repair'].map((n) => [n, getIconSprite(n)]), 8);
+      show('Yeni balonlar: kova (itfaiyeci), kalkan (bekçi / savunma), haydut, bandaj, tamir', ['bucket', 'shield', 'bandit', 'bandage', 'repair'].map((n) => [n, getBubbleSprite(n)]), 8);
+      const well = getStructureSprite('well', {});
+      const tower = getStructureSprite('guardTower', {});
+      const towerLit = getStructureSprite('guardTower', { lit: true });
+      const workshop = getStructureSprite('workshop', { frame: 0 });
+      const mill = getStructureSprite('mill', { sailFrame: 1, frame: 0 });
+      show('Yangın: alevli atölye (ilerleme %25 / %60 / %95) ve üstünde alev simgesi, koşan kova taşıyıcılar', [
+        ['yeni tutuştu %25', scene(workshop.width + 16, workshop.height + 30, [[workshop, 8, workshop.height + 24], [getIconSprite('fire'), workshop.width / 2 + 4, 12]], flames(8, workshop.height + 8, workshop.width, 25))],
+        ['yayılıyor %60', scene(workshop.width + 16, workshop.height + 30, [[workshop, 8, workshop.height + 24], [getIconSprite('fire'), workshop.width / 2 + 4, 12]], flames(8, workshop.height + 8, workshop.width, 60))],
+        ['son an %95', scene(workshop.width + 16, workshop.height + 30, [[workshop, 8, workshop.height + 24], [getIconSprite('fire'), workshop.width / 2 + 4, 12]], flames(8, workshop.height + 8, workshop.width, 95))],
+        ['kova zinciri', scene(120, 64, [[well, 8, 54], [getCharacterSprite(looks[0], 'right', 'walk0'), 30, 60], [getBubbleSprite('bucket'), 31, 42], [getCharacterSprite(looks[1], 'right', 'walk1'), 52, 60], [getBubbleSprite('bucket'), 53, 42], [getCharacterSprite(looks[2], 'right', 'walk0'), 74, 60], [getBubbleSprite('sweat'), 75, 42]])],
+      ], 4);
+      show('Hasar ve tamir: yanık yapının üstünde kırık-çekiç simgesi (fırtına hasarında bulut simgesi), tamirden sonra', [
+        ['hasarlı (yangın)', scene(mill.width + 16, mill.height + 24, [[mill, 8, mill.height + 20], [getIconSprite('repair'), mill.width / 2 + 4, 12]])],
+        ['hasarlı (fırtına)', scene(mill.width + 16, mill.height + 24, [[mill, 8, mill.height + 20], [getIconSprite('storm'), mill.width / 2 + 4, 12]])],
+        ['onarıldı', scene(mill.width + 16, mill.height + 24, [[mill, 8, mill.height + 20]])],
+      ], 4);
+      show('Güvenlik sahneleri: nöbetteki bekçiyle Gözcü Kulesi, haydut izi (bekçiler kalkanla), şifacıdan çıkan yaralı', [
+        ['nöbet', scene(tower.width + 40, tower.height + 16, [[tower, 20, tower.height + 12], [getCharacterSprite(looks[1], 'down', 'idle0'), 14, tower.height + 14], [getBubbleSprite('shield'), 15, tower.height - 6], [getCharacterSprite(looks[0], 'down', 'idle1'), 52, tower.height + 14]])],
+        ['gece fener', scene(towerLit.width + 24, towerLit.height + 12, [[towerLit, 12, towerLit.height + 8]])],
+        ['baskın ve savunma', scene(120, 56, [[getCharacterSprite(looks[2], 'left', 'idle0'), 20, 50], [getBubbleSprite('bandit'), 21, 32], [getCharacterSprite(looks[1], 'right', 'idle0'), 78, 50], [getBubbleSprite('shield'), 79, 32], [getCharacterSprite(looks[0], 'right', 'idle1'), 96, 50], [getBubbleSprite('shield'), 97, 32]])],
+        ['hafif yaralı', scene(64, 56, [[getCharacterSprite(looks[0], 'down', 'idle0'), 26, 50], [getBubbleSprite('bandage'), 27, 32]])],
+      ], 4);
+    }
+
+    // --- 22. aşama: Krallık — Kraliyet Aslanlı Heykeli, tahsildar ve ferman simgeleri, bohça balonu ---
+    {
+      const looks = [
+        { hair: 'long', hairColor: 'auburn', skin: 'light', shirt: 'rose', pants: 'navy' },
+        { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'forest', pants: 'brown' },
+        { hair: 'bun', hairColor: 'blonde', skin: 'light', shirt: 'sky', pants: 'plum' },
+      ];
+      const tiny = (w, h, layers) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#4a9a46';
+        ctx.fillRect(0, 0, w, h);
+        for (const [sprite, x, y] of layers) ctx.drawImage(sprite, Math.round(x), Math.round(y - sprite.height));
+        return canvas;
+      };
+      show('Kraliyet Aslanlı Heykeli (2x2): mermer kaide, taçlı kalkan arması, flamalar ve taç giymiş altın aslan', [['royalStatue', getStructureSprite('royalStatue', {})]], 6);
+      show('22. aşama simgeleri: Kraliyet Tahsildarı, Kraliyet Fermanı (mühürlü rulo), Krallık tacı, Aslanlı Heykel, bohça', ['collector', 'decree', 'crown', 'royalStatue', 'bundle'].map((n) => [n, getIconSprite(n)]), 8);
+      show('Yeni balonlar: köyü terk edenin bohçası, tahsildar kesesi, ferman', ['bundle', 'collector', 'decree'].map((n) => [n, getBubbleSprite(n)]), 8);
+      const statue = getStructureSprite('royalStatue', {});
+      const hall = getStructureSprite('townHall', { frame: 0 });
+      show('Krallık sahneleri: heykel önünde gururlanan sakinler, Belediye Konağı önünde tahsildar uyarısı, bohçasıyla köyü terk eden', [
+        ['heykel', tiny(80, 64, [[statue, 24, 50], [getCharacterSprite(looks[0], 'up', 'idle0'), 14, 62], [getBubbleSprite('heart'), 15, 44], [getCharacterSprite(looks[2], 'up', 'idle1'), 56, 62], [getBubbleSprite('sparkle'), 57, 44]])],
+        ['tahsildar uyarısı', tiny(Math.max(80, hall.width + 16), hall.height + 24, [[hall, 8, hall.height + 6], [getCharacterSprite(looks[1], 'down', 'idle0'), hall.width / 2, hall.height + 22], [getBubbleSprite('collector'), hall.width / 2 + 1, hall.height + 4]])],
+        ['köyü terk ediyor', tiny(64, 48, [[getCharacterSprite(looks[0], 'right', 'walk0'), 16, 42], [getBubbleSprite('bundle'), 17, 24], [getCharacterSprite(looks[1], 'right', 'walk1'), 34, 42]])],
+      ], 4);
+    }
+
+    // --- 21. aşama: kişisel kese ve çanta, vatandaş dilekçeleri, Yönetim Güveni, isyan ve yağma ---
+    {
+      const looks = [
+        { hair: 'long', hairColor: 'auburn', skin: 'light', shirt: 'rose', pants: 'navy' },
+        { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'forest', pants: 'brown' },
+        { hair: 'bun', hairColor: 'blonde', skin: 'light', shirt: 'sky', pants: 'plum' },
+        { hair: 'spiky', hairColor: 'brown', skin: 'medium', shirt: 'mustard', pants: 'denim' },
+      ];
+      const tiny = (w, h, layers) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#4a9a46';
+        ctx.fillRect(0, 0, w, h);
+        for (const [sprite, x, y] of layers) ctx.drawImage(sprite, Math.round(x), Math.round(y - sprite.height));
+        return canvas;
+      };
+      show('21. aşama simgeleri: dilekçe (parşömen), Yönetim Güveni (kalkan), isyan meşalesi, kişisel kese, hatıra, sokak feneri, yağma çuvalı', ['scroll', 'trust', 'torch', 'purse', 'souvenir', 'lantern', 'loot'].map((n) => [n, getIconSprite(n)]), 8);
+      show('Yeni balonlar: dilekçe parşömeni, isyan meşalesi, kese (alışveriş / yevmiye), yağma çuvalı; öfke', ['scroll', 'torch', 'purse', 'loot', 'angry'].map((n) => [n, getBubbleSprite(n)]), 8);
+      show('Kişisel çantanın eşyaları: Ekmek, Börek, Erzak, Meyve, Şifalı Ot, Hatıra, Odun Demeti', [
+        ['Ekmek', getIconSprite('bread')], ['Börek', getIconSprite('bread')], ['Erzak', getIconSprite('food')], ['Meyve', getBubbleSprite('apple')],
+        ['Şifalı Ot', getIconSprite('herb')], ['Hatıra', getIconSprite('souvenir')], ['Odun Demeti', getIconSprite('wood')],
+      ], 6);
+      const fountain = getStructureSprite('fountain', {});
+      const storage = getStructureSprite('storage', {});
+      const cabin = getStructureSprite('cabin', {});
+      const market = getStructureSprite('market', {});
+      show('Vatandaşlık sahneleri: dilekçe veren sakin, pazarda alışveriş, çantasından yiyen, meydanda isyan, Kiler yağması', [
+        ['dilekçe', tiny(64, 64, [[cabin, 4, 52], [getCharacterSprite(looks[0], 'down', 'idle0'), 44, 60], [getBubbleSprite('scroll'), 45, 42]])],
+        ['pazar alışverişi', tiny(72, 56, [[market, 12, 40], [getCharacterSprite(looks[2], 'up', 'idle1'), 30, 54], [getBubbleSprite('purse'), 31, 36]])],
+        ['çantasından yiyor', tiny(48, 48, [[getCharacterSprite(looks[3], 'down', 'idle0'), 18, 40], [getBubbleSprite('apple'), 19, 22]])],
+        ['meydanda isyan', tiny(112, 80, [[fountain, 56 - fountain.width / 2, 60], [getCharacterSprite(looks[0], 'up', 'idle0'), 20, 74], [getBubbleSprite('angry'), 21, 56], [getCharacterSprite(looks[1], 'up', 'idle1'), 50, 76], [getBubbleSprite('torch'), 51, 58], [getCharacterSprite(looks[3], 'up', 'idle0'), 82, 74], [getBubbleSprite('angry'), 83, 56]])],
+        ['Kiler yağması', tiny(80, 64, [[storage, 16, 44], [getCharacterSprite(looks[1], 'up', 'idle0'), 30, 60], [getBubbleSprite('loot'), 31, 42], [getCharacterSprite(looks[2], 'up', 'idle1'), 44, 60], [getBubbleSprite('torch'), 45, 42]])],
+      ], 4);
+    }
+
+    // --- 20. aşama: Ulu Saat Kulesi, Altın Çağ, prestij peyzajı ---
+    show('Ulu Saat Kulesi: Temel, Gövde, Mekanizma & Çan (gece, çan odası yanık)', [1, 2, 3].map((st) => [['Temel', 'Gövde', 'Mekanizma & Çan'][st - 1], getStructureSprite('wonder', { wonderStage: st, windowsLit: st === 3, frame: 1 })]), 3);
+    {
+      const tower = getStructureSprite('wonder', { wonderStage: 3, windowsLit: false, frame: 0 });
+      const frames = [0.3, 1.1, 2.2].map((t) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 200;
+        canvas.height = 160;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#4a9a46';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(tower, 68, canvas.height - tower.height - 8);
+        const waves = new ChimeWaves();
+        waves.startedAt = 0;
+        const fakeTower = { x: 68, y: canvas.height - 8 - 64, height: 64 };
+        waves.draw({ fillRect: (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }, drawImage: (img, x, y) => ctx.drawImage(img, x, y) }, fakeTower, t);
+        return [`${t} sn`, canvas];
+      });
+      show('Kule saati çalınca (08:00 / 18:00): çan odasından yayılan altın ses dalgaları ve yükselen notalar', frames, 2);
+    }
+    show('Prestij peyzajı: Mermer Çeşme (dört kare, fışkıran su) ve Altın Çağ Feneri (gündüz / gece)', [
+      ...[0, 1, 2, 3].map((f) => [`mermer çeşme ${f}`, getStructureSprite('marbleFountain', { frame: f })]),
+      ['altın fener gündüz', getStructureSprite('goldenLantern', { lit: false })],
+      ['altın fener gece', getStructureSprite('goldenLantern', { lit: true })],
+    ], 5);
+    show('Yeni simgeler: Kadim Dişli (dişliler), Ulu Saat Kulesi; kule çanı balonu', [['gears', getIconSprite('gears')], ['wonder', getIconSprite('wonder')], ['bell', getIconSprite('bell')], ['çan balonu', getBubbleSprite('bell')]], 8);
+
+    // --- 19. aşama: sosyal yaşam — huy simgeleri, yeni balonlar, düğün konfetisi ve küçük sahneler ---
+    /** Küçük bir sahne: [sprite, x, y] listesini (ayak tabanı y) verilen boyutta bir tuvale çizer; isteğe bağlı çizim kancası. */
+    function scene(w, h, layers, extra = null) {
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#4a9a46';
+      ctx.fillRect(0, 0, w, h);
+      for (const [sprite, x, y] of layers) ctx.drawImage(sprite, Math.round(x), Math.round(y - sprite.height));
+      if (extra) extra(ctx);
+      return canvas;
+    }
+    const pixelRenderer = (ctx) => ({ fillRect: (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); } });
+    const socialLooks = [
+      { hair: 'long', hairColor: 'auburn', skin: 'light', shirt: 'rose', pants: 'navy' },
+      { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'forest', pants: 'brown' },
+      { hair: 'bun', hairColor: 'blonde', skin: 'light', shirt: 'sky', pants: 'plum' },
+      { hair: 'spiky', hairColor: 'brown', skin: 'medium', shirt: 'mustard', pants: 'denim' },
+      { hair: 'hat', hairColor: 'ginger', skin: 'light', shirt: 'red', pants: 'denim' },
+    ];
+    show('Karakter huyları: Hayvansever (pati), Kitap Kurdu (kitap), Müzisyen (ud), Doğa Tutkunu (yaprak)', Object.entries(QUIRKS).map(([key, q]) => [`${q.name}`, getIconSprite(q.icon)]), 10);
+    show('Yeni balonlar: dedikodu / haber fısıltısı, müzisyenin melodisi, kitap, pati; aşk, yüzük ve kalp', ['whisper', 'melody', 'book', 'paw', 'love', 'ring', 'heart', 'note'].map((n) => [n, getBubbleSprite(n)]), 8);
+    {
+      const fountain = getStructureSprite('fountain', {});
+      const confetti = new WeddingConfetti();
+      const frames = [0.4, 1.2, 3, 6.5].map((t) => {
+        const party = { x: 64, y: 70, startedAt: 1 };
+        confetti.startKey = party.startedAt; // kutlama 0. saniyede başlamış sayılır
+        confetti.startTime = 0;
+        return [`${t} sn`, scene(128, 112, [[fountain, 64 - fountain.width / 2, 86], [getCharacterSprite(socialLooks[0], 'down', 'idle0'), 46, 100], [getCharacterSprite(socialLooks[1], 'down', 'idle1'), 72, 100], [getBubbleSprite('ring'), 44, 82], [getBubbleSprite('ring'), 72, 82]], (ctx) => {
+          confetti.draw(pixelRenderer(ctx), party, t);
+        })];
+      });
+      show('Düğün kutlaması: meydan havuzunun üstünde konfeti demeti, süzülen kâğıtlar ve yükselen kalpler (zamanla)', frames, 3);
+    }
+    {
+      const bench = getStructureSprite('bench', {});
+      const cat = getCatSprite('sit', 'left', 0);
+      show('Sosyal yaşam sahneleri: bankta yan yana randevu, fener altında kitap okuyan, kedi okşayan Hayvansever, akşam çalan Müzisyen', [
+        ['bank randevusu', scene(80, 56, [[bench, 14, 44], [bench, 46, 44], [getCharacterSprite(socialLooks[2], 'down', 'sit0'), 16, 44], [getCharacterSprite(socialLooks[4], 'down', 'sit1'), 48, 44], [getBubbleSprite('love'), 17, 26], [getBubbleSprite('heart'), 49, 26]])],
+        ['fener altında kitap', scene(64, 56, [[getStructureSprite('lantern', { lit: true }), 8, 46], [bench, 30, 44], [getCharacterSprite(socialLooks[3], 'down', 'sit0'), 32, 44], [getBubbleSprite('book'), 33, 26]])],
+        ['kedi okşayan', scene(64, 48, [[getCharacterSprite(socialLooks[1], 'right', 'idle0'), 18, 40], [cat, 32, 40], [getBubbleSprite('heart'), 19, 22], [getBubbleSprite('paw'), 34, 26]])],
+        ['müzisyen ve dinleyenler', scene(96, 56, [[getCharacterSprite(socialLooks[0], 'down', 'idle0'), 42, 44], [getBubbleSprite('melody'), 43, 26], [getCharacterSprite(socialLooks[2], 'right', 'idle1'), 16, 48], [getBubbleSprite('note'), 17, 30], [getCharacterSprite(socialLooks[3], 'left', 'idle0'), 68, 48], [getBubbleSprite('note'), 69, 30]])],
+        ['dedikodu: yolda selamlaşma', scene(64, 48, [[getCharacterSprite(socialLooks[4], 'right', 'walk0'), 18, 42], [getCharacterSprite(socialLooks[1], 'left', 'walk1'), 32, 42], [getBubbleSprite('whisper'), 19, 24], [getBubbleSprite('whisper'), 33, 24]])],
+      ], 4);
+    }
 
     // --- 18. aşama: serbest imar, peyzaj fırçası ve kasaba estetiği ---
     /** Gerçek TileMap kuralıyla (kenar geçişleri + otomatik yol köşeleri, isteğe bağlı çamur) çizilen küçük harita. */
@@ -533,7 +740,7 @@
       ['çanta yandan', getBackpackSprite('right')],
       ...['P', 'p', 'i', 'a', 'O'].map((c) => [`nota ${c}`, getNoteSprite(c)]),
     ], 8);
-    show('HUD simgeleri', ['wood', 'stone', 'food', 'wool', 'iron', 'bread', 'sound', 'mute', 'smile', 'frown', 'coin', 'spring', 'summer', 'autumn', 'winter', 'snow', 'star', 'starEmpty'].map((n) => [n, getIconSprite(n)]), 10);
+    show('HUD simgeleri', ['wood', 'stone', 'food', 'wool', 'iron', 'bread', 'sound', 'mute', 'smile', 'frown', 'coin', 'spring', 'summer', 'autumn', 'winter', 'snow', 'star', 'starEmpty', 'lute', 'leaf', 'paw', 'book'].map((n) => [n, getIconSprite(n)]), 10);
     show('Hava simgeleri', ['sun', 'cloud', 'rain', 'firefly', 'moon', 'journal'].map((n) => [n, getIconSprite(n)]), 10);
   </script>
 </body>

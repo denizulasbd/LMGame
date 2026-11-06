@@ -10,13 +10,29 @@
 //   save-v12.json: 14. aşamanın oyunu (kayıt sürümü 12): otopilotla 34 gün; festivaller, anılar
 //   save-v13.json: 15. aşamanın oyunu (kayıt sürümü 13): otopilotla 34 gün; usta işi eserler, barışmalar
 //   save-v14.json: 16. aşamanın oyunu (kayıt sürümü 14): otopilotla 34 gün; seferler, ganimetler, çözülen yazıtlar
-//   save-v15.json: 18. aşamanın oyunu (kayıt sürümü 15, bugünkü): otopilotla 34 gün; döşenen yollar, tabelalar, süs ağaçları,
+//   save-v15.json: 18. aşamanın oyunu (kayıt sürümü 15): otopilotla 34 gün; döşenen yollar, tabelalar, süs ağaçları,
 //                  çitler, kasaba estetiği. Eski kayıtlarda (sürüm 2-14) peyzaj durumu boş başlar, estetik yüklenince hesaplanır
+//   save-v16.json: 19. aşamanın oyunu (kayıt sürümü 16): otopilotla 34 gün; evli çiftler ve ortak evleri, karakter
+//                  huyları, dolaşan dedikodular, son duyulan haberler. Eski kayıtlarda (sürüm 2-15) huylar ilk açılışta
+//                  dağıtılır (dördü de görülür), dedikodu boş başlar; evli çiftler kendi evlerinde kalır. Bu kayıt bir keşif
+//                  seferinin ortasındadır (macera pencereleri açılır ve sefer döner)
+//   save-v17.json: 20. aşamanın oyunu (kayıt sürümü 17): otopilotla 34 gün; aşama aşama yükselen Ulu Saat Kulesi,
+//                  Altın Çağ, Tarihçe Kütüğü, Mermer Çeşme ve Altın Çağ Fenerleri, antik kitaplar. Eski kayıtlarda (sürüm 2-16)
+//                  Tarihçe sakinlerden çıkarılır; tamamlanmış kulesi olan kasaba Altın Çağ'a sessizce (kutlamasız) girer
+//   save-v18.json: 21. aşamanın oyunu (kayıt sürümü 18): otopilotla 34 gün; sakinlerin keseleri ve çantaları,
+//                  karşılanan / açık dilekçeler, Yönetim Güveni. Eski kayıtlarda (sürüm 2-17) her yetişkine 12, her çocuğa 3
+//                  altın başlangıç harçlığı verilir, çantalar boş başlar, Yönetim Güveni %75'tir, dilekçe ve isyan yoktur
+//   save-v19.json: 22. aşamanın oyunu (kayıt sürümü 19): otopilotla 34 gün; iç vergi kademesi ve tahsilatlar,
+//                  ödenen Krallık Vergileri, teslim edilen Kraliyet Fermanları, Kraliyet Beratı ve Aslanlı Heykel. Eski kayıtlarda
+//                  (sürüm 2-18) Standart Vergi, itibar 50, ferman ve terk ediş yoktur; vergi takvimi yüklenince kurulur
+//   save-v20.json: 23. aşamanın oyunu (kayıt sürümü 20, bugünkü): otopilotla 34 gün; Su Kuyusu ve Gözcü Kulesi, yangın / baskın
+//                  sayaçları, tehlike sıklığı. Eski kayıtlarda (sürüm 2-19) hiçbir yapı yanmıyor / hasarlı değil, kimse yaralı
+//                  değil, tehlike sıklığı Dengeli'dir; yüklemeden sonraki ilk 24 saatte doğal kriz çıkmaz
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -74,13 +90,89 @@ for (const { name, raw } of fixtures) {
       return bad;
     };
     loaded.integrity = integrity();
+    // (20. aşama) Ulu Saat Kulesi, Altın Çağ, Tarihçe (yüklendiği an)
+    const towerB = s.buildings.find((b) => b.type === 'wonder');
+    loaded.golden = {
+      stage: towerB?.wonderStage ?? null,
+      complete: Boolean(towerB?.wonderComplete),
+      since: s.goldenAge.since,
+      celebration: s.goldenAge.celebration !== null,
+      chimes: s.goldenAge.chimes,
+      books: s.goldenAge.books,
+      founders: s.chronicle.founders.length,
+      couple: s.chronicle.firstCouple,
+      masterwork: s.chronicle.firstMasterwork,
+      stages: Object.keys(s.chronicle.towerStages).length,
+      gears: s.resources.gears,
+    };
+    // (21. aşama) kese, çanta, güven, dilekçeler (yüklendiği an)
+    loaded.citizens = {
+      coins: s.characters.map((c) => [c.id, c.coins, c.isChild]),
+      inv: s.characters.map((c) => [c.id, JSON.stringify(c.inventory)]),
+      trust: s.trust.value,
+      revolt: s.trust.revolt !== null,
+      petitions: s.petitions.list.map((p) => `${p.id}:${p.kind}:${p.characterId}`),
+      made: s.petitions.made,
+    };
+    // (23. aşama) krizler: yanan / hasarlı yapılar, yaralılar, tehlike sıklığı, bekleyen baskın (yüklendiği an)
+    loaded.crisis = {
+      difficulty: s.crisis.difficulty,
+      burning: s.buildings.filter((b) => b.isBurning).length,
+      damaged: s.buildings.filter((b) => b.damaged).length,
+      injured: s.characters.filter((c) => c.isInjured).length,
+      raid: s.crisis.raid !== null,
+      fires: s.crisis.fires,
+      raids: s.crisis.raids,
+      repairs: s.crisis.repairs,
+      wells: s.buildings.filter((b) => b.type === 'well').length,
+      towers: s.buildings.filter((b) => b.type === 'guardTower').length,
+      grace: scene.crisis.graceUntil === null ? null : scene.crisis.graceUntil - s.totalMinutes,
+    };
+    // (22. aşama) vergi, Krallık, terk ediş (yüklendiği an)
+    loaded.crown = {
+      rate: s.tax.rate,
+      taxNext: Number.isFinite(s.tax.nextAt) && s.tax.nextAt > s.totalMinutes,
+      collections: s.tax.collections,
+      reputation: s.crown.reputation,
+      levyNext: Number.isFinite(s.crown.nextLevyAt) && s.crown.nextLevyAt > s.totalMinutes,
+      levies: s.crown.levies,
+      paid: s.crown.paid,
+      decree: s.crown.decree?.kind ?? null,
+      delivered: s.crown.delivered,
+      right: s.crown.statueRight,
+      left: s.exodus.left,
+      emigrating: s.characters.filter((c) => c.emigrating).length,
+    };
+    // (19. aşama) huylar, ortak evler, dedikodu (yüklendiği an)
+    loaded.social = {
+      quirks: s.characters.map((c) => c.quirk),
+      kinds: [...new Set(s.characters.map((c) => c.quirk))].length,
+      couples: s.characters.filter((c) => c.married).map((c) => [c.id, c.partnerId, c.homeId]),
+      gossip: s.social.gossip.length,
+      news: s.characters.filter((c) => c.lastNews).length,
+      party: s.social.party !== null,
+    };
+    const startDay = s.time.day;
     window.sim.step(225 * 24); // bir gün
+    // Yolda bir sefer varsa macera pencereleri oyunu (gerçek zamanda 30 sn) durdurur: gün dönene kadar biraz daha ilerlet
+    for (let guard = 0; s.time.day === startDay && guard < 48; guard++) window.sim.step(225);
     game.render(0);
     offs.forEach((off) => off());
     const integrityAfter = integrity();
     const expeditionAfter = { active: Boolean(s.dilemma.expedition), away: s.characters.filter((c) => c.away).length, adventure: s.dilemma.active?.kind === 'adventure' };
     const { outfitFor } = await import('/src/systems/SkillSystem.js');
+    const { inventoryCapacity } = await import('/src/systems/Citizens.js');
+    const citizensAfter = {
+      trust: s.trust.value,
+      revolt: s.trust.revolt !== null,
+      bagsOk: s.characters.every((c) => Number.isFinite(c.coins) && c.coins >= 0 && c.inventory.length <= inventoryCapacity(c) && c.inventory.every((x) => x.qty > 0)),
+      petitionsOk: s.petitions.list.every((p) => s.characters.some((c) => c.id === p.characterId)),
+      wages: s.stats.wagesPaid ?? 0,
+    };
     return {
+      crownAfter: { pop: s.characters.length, left: s.exodus.left, active: Boolean(s.exodus.active), rate: s.tax.rate },
+      crisisAfter: { fires: s.crisis.fires, raids: s.crisis.raids, raidPending: s.crisis.raid !== null, nextWarn: s.crisis.nextRaidWarnAt, burning: s.buildings.filter((b) => b.isBurning).length, injured: s.characters.filter((c) => c.isInjured).length, day: s.time.day },
+      citizensAfter,
       integrityAfter,
       expeditionAfter,
       outfits: s.characters.filter((c) => c.outfit).length,
@@ -94,6 +186,7 @@ for (const { name, raw } of fixtures) {
       research: s.research,
       trade: s.trade,
       gold: s.resources.gold,
+      taxGold: s.tax.totalGold, // (22. aşama) iç vergi hazineye altın getirir
       academy: s.buildings.filter((b) => b.type === 'academy' || b.type === 'harbor' || b.type === 'wonder').length,
       luxury: s.luxury,
       history: s.history.length,
@@ -142,6 +235,108 @@ for (const { name, raw } of fixtures) {
       detail: `${L.signs.join(', ')} · ${L.trees.length} ağaç · estetik ${L.score}/${data.landscape.score} (+%${L.percent})`,
     });
   }
+  {
+    // (19. aşama) karakter huyları, evli çiftlerin evleri, dedikodu
+    const S = r.loaded.social;
+    const valid = S.quirks.every((q) => ['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(q));
+    const homes = Object.fromEntries(data.characters.map((c) => [c.id, c.homeId]));
+    const homesKept = S.couples.every(([id, , home]) => homes[id] === undefined || homes[id] === home || homes[id] === null);
+    if (data.version < 16) {
+      results.push({
+        name: `${tag}: huylar ilk açılışta dağıtıldı, dedikodu boş başlar, evli çiftlerin evleri korunur`,
+        ok: valid && (S.quirks.length < 4 || S.kinds === 4) && S.gossip === 0 && S.news === 0 && !S.party && homesKept,
+        detail: `${S.kinds} huy, ${S.couples.length / 2} evli çift`,
+      });
+    } else {
+      const quirks = data.characters.map((c) => c.quirk);
+      results.push({
+        name: `${tag}: huylar, ortak evler, son duyulan haberler ve dedikodu korundu`,
+        ok: valid && JSON.stringify(S.quirks) === JSON.stringify(quirks) && homesKept && S.gossip === data.social.gossip.length && S.news === data.characters.filter((c) => c.lastNews).length,
+        detail: `${S.kinds} huy, ${S.couples.length / 2} evli çift, ${S.gossip} haber, ${S.news} sakin haber duymuş`,
+      });
+    }
+  }
+  {
+    // (20. aşama) Ulu Saat Kulesi aşaması, Altın Çağ ve Tarihçe Kütüğü
+    const G = r.loaded.golden;
+    const towerData = data.buildings.find((b) => b.type === 'wonder');
+    const married = data.characters.some((c) => c.married && c.marriedAt !== null && c.marriedAt !== undefined);
+    if (data.version < 17) {
+      results.push({
+        name: `${tag}: Tarihçe sakinlerden çıkarıldı, kule aşaması korundu, Altın Çağ yalnızca tamamlanmış kuleyle (kutlamasız)`,
+        ok: G.founders >= 1 && (!married || G.couple) && (!data.masterworks?.items?.length || G.masterwork) && G.stage === (towerData ? towerData.wonderStage ?? 0 : null) && Boolean(G.since) === G.complete && !G.celebration && G.gears === 0 && G.books === 0,
+        detail: `kule ${G.stage ?? '-'} · Altın Çağ ${G.since ? `G${G.since.day}` : 'yok'} · kurucu ${G.founders} · ilk çift ${G.couple ? `${G.couple.a} & ${G.couple.b}` : '-'}`,
+      });
+    } else {
+      results.push({
+        name: `${tag}: Ulu Saat Kulesi, Altın Çağ, Tarihçe Kütüğü ve antik kitaplar korundu`,
+        ok: G.stage === towerData?.wonderStage && JSON.stringify(G.since) === JSON.stringify(data.goldenAge.since) && G.chimes === data.goldenAge.chimes && G.books === data.goldenAge.books && G.founders === data.chronicle.founders.length && G.stages === Object.keys(data.chronicle.towerStages).length,
+        detail: `kule ${G.stage} · Altın Çağ G${G.since?.day ?? '-'} · çan ${G.chimes} · kitap ${G.books} · kurucu ${G.founders}`,
+      });
+    }
+  }
+  {
+    // (21. aşama) kişisel kese ve çanta, Yönetim Güveni, dilekçeler
+    const C = r.loaded.citizens;
+    const A = r.citizensAfter;
+    if (data.version < 18) {
+      results.push({
+        name: `${tag}: sakinlere başlangıç harçlığı (yetişkin 12, çocuk 3), çantalar boş, Yönetim Güveni %75, dilekçe ve isyan yok`,
+        ok: C.coins.every(([, coins, child]) => coins === (child ? 3 : 12)) && C.inv.every(([, inv]) => inv === '[]') && C.trust === 75 && !C.revolt && C.petitions.length === 0 && C.made === 0,
+        detail: `${C.coins.length} sakin, güven %${C.trust}`,
+      });
+    } else {
+      const coins = data.characters.map((c) => [c.id, c.coins]);
+      results.push({
+        name: `${tag}: keseler, çantalar, Yönetim Güveni ve dilekçeler korundu`,
+        ok: JSON.stringify(C.coins.map(([id, v]) => [id, v])) === JSON.stringify(coins) && C.inv.every(([id, inv]) => inv === JSON.stringify(data.characters.find((c) => c.id === id).inventory)) && Math.abs(C.trust - data.trust.value) < 1e-9 && C.petitions.length === data.petitions.list.length && C.made === data.petitions.made,
+        detail: `${C.coins.reduce((a, [, v]) => a + v, 0)} altın kesede · güven %${Math.round(C.trust)} · ${C.petitions.length} açık dilekçe, ${C.made} dilekçe`,
+      });
+    }
+    results.push({ name: `${tag}: bir gün sonra keseler ve çantalar geçerli, isyan yok`, ok: A.bagsOk && A.petitionsOk && !A.revolt && A.trust >= 0 && A.trust <= 100, detail: `güven %${Math.round(A.trust)}, yevmiye ${A.wages}` });
+  }
+  {
+    // (22. aşama) iç vergi, Krallık Vergisi, Kraliyet Fermanları, terk ediş
+    const K = r.loaded.crown;
+    if (data.version < 19) {
+      results.push({
+        name: `${tag}: Standart Vergi, Krallık İtibarı 50, ferman / berat / terk ediş yok; vergi takvimi kuruldu`,
+        ok: K.rate === 'standard' && K.taxNext && K.levyNext && K.collections === 0 && K.reputation === 50 && K.levies === 0 && K.decree === null && !K.right && K.left === 0 && K.emigrating === 0,
+        detail: `itibar %${K.reputation}`,
+      });
+    } else {
+      results.push({
+        name: `${tag}: vergi kademesi, tahsilatlar, Krallık İtibarı, vergi sayaçları, fermanlar ve Kraliyet Beratı korundu`,
+        ok: K.rate === data.tax.rate && K.collections === data.tax.collections && Math.abs(K.reputation - data.crown.reputation) < 1e-9 && K.levies === data.crown.levies && K.paid === data.crown.paid && K.delivered === data.crown.delivered && K.right === data.crown.statueRight && K.decree === (data.crown.decree?.kind ?? null) && K.left === data.exodus.left,
+        detail: `${K.rate} · ${K.collections} tahsilat · itibar %${Math.round(K.reputation)} · vergi ${K.paid}/${K.levies} · ferman ${K.delivered} · berat ${K.right ? 'var' : 'yok'}`,
+      });
+    }
+    results.push({ name: `${tag}: bir gün sonra kimse köyü terk etmedi`, ok: !r.crownAfter.active && r.crownAfter.left === K.left, detail: `${r.crownAfter.pop} sakin, terk eden ${r.crownAfter.left}` });
+  }
+  {
+    // (23. aşama) krizler
+    const C = r.loaded.crisis;
+    const A = r.crisisAfter;
+    if (data.version < 20) {
+      results.push({
+        name: `${tag}: hiçbir yapı yanmıyor / hasarlı değil, kimse yaralı değil, Dengeli, baskın yok`,
+        ok: C.burning === 0 && C.damaged === 0 && C.injured === 0 && C.difficulty === 'dengeli' && !C.raid && C.fires === 0 && C.raids === 0 && C.repairs === 0,
+        detail: `${C.difficulty}`,
+      });
+    } else {
+      results.push({
+        name: `${tag}: tehlike sıklığı, kriz sayaçları, Su Kuyusu / Gözcü Kulesi, yanan / hasarlı yapılar ve yaralılar korundu`,
+        ok: C.difficulty === data.crisis.difficulty && C.fires === data.crisis.fires && C.raids === data.crisis.raids && C.repairs === data.crisis.repairs && C.burning === data.buildings.filter((b) => b.isBurning).length && C.damaged === data.buildings.filter((b) => b.damaged).length && C.injured === data.characters.filter((c) => c.isInjured).length && C.wells === data.buildings.filter((b) => b.type === 'well').length && C.towers === data.buildings.filter((b) => b.type === 'guardTower').length && C.raid === (data.crisis.raid !== null),
+        detail: `${C.difficulty} · yangın ${C.fires} · baskın ${C.raids} · tamir ${C.repairs} · kuyu ${C.wells} · kule ${C.towers}`,
+      });
+    }
+    const quiet = C.burning === 0 && !C.raid;
+    results.push({
+      name: `${tag}: yükleme sonrası ilk 24 oyun saatinde ${quiet ? 'koruma var, ' : ''}doğal yangın ya da baskın patlamadı`,
+      ok: (!quiet || C.grace === 1440) && A.fires === C.fires && A.raids === C.raids && (quiet ? !A.raidPending && A.burning === 0 : true),
+      detail: `koruma ${C.grace} dk · yangın ${C.fires}->${A.fires} · baskın ${C.raids}->${A.raids}`,
+    });
+  }
   results.push({ name: `${tag}: meslek kıyafetleri deneyimden giyildi`, ok: r.outfitsOk, detail: `${r.outfits} sakin kıyafetli` });
   results.push({ name: `${tag}: harita farkları birebir uygulandı`, ok: r.loaded.terrain === data.terrain.length, detail: `${r.loaded.terrain}/${data.terrain.length} karo` });
   if (!data.map) results.push({ name: `${tag}: eski 48x48 biyomsuz harita`, ok: r.loaded.map.width === 48 && r.loaded.map.height === 48 && r.loaded.map.generator === 1, detail: JSON.stringify(r.loaded.map) });
@@ -154,8 +349,8 @@ for (const { name, raw } of fixtures) {
   else results.push({ name: `${tag}: fermanlar korundu`, ok: r.civic.storageLevel === (data.civic.storageLevel ?? 0) && r.civic.craftGuild === Boolean(data.civic.craftGuild), detail: `depo kademesi ${r.civic.storageLevel}` });
   if (data.version < 10) {
     results.push({
-      name: `${tag}: araştırma, liman ve hazine boş başlar`,
-      ok: r.research.active === null && Object.keys(r.research.done).length === 0 && r.trade.shipments === 0 && r.gold === 0 && r.academy === 0 && r.civic.expeditionsSinceTalisman >= 0,
+      name: `${tag}: araştırma, liman ve hazine boş başlar (hazinede yalnızca iç vergiden gelen altın)`,
+      ok: r.research.active === null && Object.keys(r.research.done).length === 0 && r.trade.shipments === 0 && r.gold <= r.taxGold && r.academy === 0 && r.civic.expeditionsSinceTalisman >= 0,
     });
   } else {
     results.push({

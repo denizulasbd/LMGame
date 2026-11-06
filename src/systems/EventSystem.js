@@ -12,6 +12,9 @@
 // Olayların durumu GameState.events'te (kayda girer). Yayınladığı olaylar:
 //   'festival:started' / 'festival:ended', 'merchant:arrived' / 'merchant:left', 'trade:completed',
 //   'immigration:blocked' { reason } — günlük ve ses bunları dinler.
+import { isGoldenAge, goldenMerchantInterval } from './GoldenAge.js';
+import { GOLDEN_AGE } from '../data/goldenAge.js';
+import { EXOTIC_ITEMS } from '../data/exploration.js';
 import { CONFIG } from '../config.js';
 import { Character } from '../entities/Character.js';
 import { IMMIGRATION, FESTIVAL, TOWN_BUFFS } from '../data/town.js';
@@ -146,7 +149,7 @@ export class EventSystem {
     m.tier = tier;
     m.name = `${MERCHANT.titles[tier - 1] ?? MERCHANT.titles[0]} ${MERCHANT.names[index]}`;
     m.appearance = MERCHANT.appearances[index % MERCHANT.appearances.length];
-    m.stock = Object.fromEntries(offersFor(getSeason(this.state.time.day).key, tier).map((o) => [o.id, offerStock(o, tier)]));
+    m.stock = Object.fromEntries(offersFor(getSeason(this.state.time.day).key, tier, isGoldenAge(this.state)).map((o) => [o.id, offerStock(o, tier)]));
     const point = this.world.standPoint(entry.x, entry.y);
     m.x = point.x;
     m.y = point.y;
@@ -257,7 +260,7 @@ export class EventSystem {
     m.visits++;
     const [minDays, maxDays] = MERCHANT.intervalDays;
     // (16. aşama) Kayıp Şehir Haritası: tüccar kasabanın yolunu iki kat sık bulur
-    m.nextVisitDay = this.state.time.day + Math.max(1, Math.round(this.rngFor(4).int(minDays, maxDays) * merchantIntervalMultiplier(this.state)));
+    m.nextVisitDay = this.state.time.day + Math.max(1, Math.round(this.rngFor(4).int(minDays, maxDays) * merchantIntervalMultiplier(this.state) * goldenMerchantInterval(this.state)));
     this.merchant = null;
     this.world.visitors = [];
     this.events.emit('merchant:left', { name, nextVisitDay: m.nextVisitDay });
@@ -295,7 +298,7 @@ export class EventSystem {
   }
 
   trade(offerId) {
-    const offer = offersFor(getSeason(this.state.time.day).key, townTier(this.state).tier).find((o) => o.id === offerId);
+    const offer = offersFor(getSeason(this.state.time.day).key, townTier(this.state).tier, isGoldenAge(this.state)).find((o) => o.id === offerId);
     const m = this.merchantState;
     const warn = (text) => this.events.emit('toast', { text, tone: 'warn', icon: 'demolish' });
     if (!offer) return;
@@ -314,9 +317,25 @@ export class EventSystem {
     for (const [resource, amount] of Object.entries(offer.get ?? {})) this.economy.add(resource, amount);
     m.stock[offer.id] -= 1;
     if (offer.buff) this.applyBuff(offer.buff);
+    if (offer.grant) this.grantRare(offer.grant);
     this.merchant.showBubble('heart', MERCHANT_BUBBLE_SECONDS);
     this.events.emit('trade:completed', { offer, merchant: m.name });
     this.events.emit('toast', { text: `Takas yapıldı: ${describeOffer(offer)}`, tone: 'success', icon: 'sparkle' });
+  }
+
+  /** (20. aşama) Altın Çağ tüccarının nadir malı: egzotik fide ya da Bilgelik Evi kitaplığına antik kitap. */
+  grantRare(kind) {
+    if (kind === 'ancientBook') {
+      const ga = this.state.goldenAge;
+      ga.books = Math.min(GOLDEN_AGE.maxBooks, (ga.books ?? 0) + 1);
+      this.events.emit('goldenAge:book', { books: ga.books });
+      return;
+    }
+    const items = this.state.exploration?.items;
+    if (items && items[kind] !== undefined) {
+      items[kind] += 1;
+      this.events.emit('exotic:found', { item: kind, def: EXOTIC_ITEMS[kind], source: 'merchant' });
+    }
   }
 
   applyBuff(key) {

@@ -64,7 +64,7 @@ import { GROUND_TILES } from './tiles.js';
 //   academy      : Bilgelik Evi: Bilge araştırma yapar (data/research.js), çocuklar ders dinler
 //   placement 'harbor' : nehir kıyısına; ayak izinin kara yanı kum, kalanı su ve suyun ötesinde teknelerin
 //                  geçeceği açık bir su şeridi olmalı (ihracat teknesi oraya yanaşır; data/trade.js -> EXPORT)
-//   wonder       : { stages: [{ name, description, cost, work }] } çok aşamalı harika: ilk aşama şantiye olarak
+//   wonder       : { stages: [{ name, description, cost, work, masters? }] } çok aşamalı harika: ilk aşama şantiye olarak
 //                  kurulur, sonrakiler Yapı Bilgi Paneli'nden başlatılır (project 'stage'); son aşama bitince
 //                  townBonus, light ve warmRadius etkin olur (systems/TownStatus.js, HeatingSystem.js)
 //   (DAMAGEABLE_TYPES) fırtınada ya da kurt saldırısında hasar alabilen yapılar; hasarlı yapı onarılana kadar
@@ -402,7 +402,9 @@ export const BUILDINGS = {
     litHours: { from: 18.5, to: 6.5 },
   },
   wonder: {
-    name: 'Büyük Vadi Saat Kulesi',
+    // (20. aşama) Ulu Saat Kulesi: 12. aşamanın Büyük Vadi Saat Kulesi harikası yeniden tasarlandı (tür anahtarı aynı;
+    // eski kayıtlardaki kule ve aşaması korunur). Nüfus 20+ ve Kasaba seviyesinde açılır (data/goldenAge.js)
+    name: 'Ulu Saat Kulesi',
     size: { w: 4, h: 4 },
     spots: 'ring',
     buildable: true,
@@ -410,16 +412,29 @@ export const BUILDINGS = {
     unique: true,
     category: 'Harika',
     description:
-      'Vadinin her yerinden görünen, saat kuleli taş külliye. Üç aşamada yükselir (Temel, Gövde, Görkemli Kule). Tamamlanınca kasaba altın çağını yaşar: refah +12, geceleri kulesi bir fener gibi vadiyi aydınlatıp ısıtır, saat başı çan çalar.',
-    cost: { wood: 200, stone: 300, bread: 80, gold: 300 },
+      'Vadinin her yerinden görünen, saat kuleli taş külliye. Üç aşamada yükselir: Temel (taş ve kereste), Gövde (kesme taş ve demir; Yapı Ustaları hızlandırır), Mekanizma & Çan (Kadim Dişliler; usta zanaatkârlar hızlandırır). Tamamlanınca Çağ Kutlaması yapılır ve kasaba kalıcı olarak Altın Çağ\'a girer: kule saati her sabah 08:00 ve akşam 18:00\'de çalar, çalışma şevki +%10, refah +%10.',
+    cost: { wood: 300, stone: 400 },
     buildWork: 600,
     allowedTiles: [...GROUND_TILES, 'plaza'],
-    requiresTier: 4,
+    requiresTier: 3,
+    requiresPopulation: 20,
     wonder: {
       stages: [
-        { name: 'Temel', description: 'Kesme taş temel ve geniş basamaklar atılır.', cost: { wood: 200, stone: 300, bread: 80, gold: 300 }, work: 600 },
-        { name: 'Gövde', description: 'Kemerli taş gövde, demir kuşaklar ve yün kilimli iç salonlar yükselir.', cost: { wood: 150, stone: 400, iron: 150, wool: 80, bread: 120, gold: 800 }, work: 900 },
-        { name: 'Görkemli Kule', description: 'Saat kulesi, bronz çan ve altın kubbeli fener tamamlanır.', cost: { stone: 300, iron: 250, wool: 150, bread: 150, gold: 1600 }, work: 1200 },
+        { name: 'Temel', description: 'Bol taş ve kereste: kesme taş temel ve geniş basamaklar atılır.', cost: { wood: 300, stone: 400 }, work: 600 },
+        {
+          name: 'Gövde',
+          description: 'Kesme taş ve demir: kemerli taş gövde ve demir kuşaklar yükselir. Yapı Ustaları (İnşaat / Taşçılık ustaları) hızlandırır.',
+          cost: { stone: 450, iron: 150, wood: 100, gold: 400 },
+          work: 900,
+          masters: ['building', 'masonry'],
+        },
+        {
+          name: 'Mekanizma & Çan',
+          description: 'Kadim pirinç-çelik dişliler, saat kadranı ve bronz çan yerine oturur. Usta zanaatkârlar hızlandırır.',
+          cost: { gears: 8, iron: 120, stone: 150, gold: 900 },
+          work: 1000,
+          masters: ['crafting', 'building'],
+        },
       ],
       light: { radius: 230 },
       warmRadius: 420, // tamamlanınca bu yarıçaptaki (≈26 karo: kasabanın neredeyse tamamı) dışarıdaki sakinlerin içi ısınır (piksel)
@@ -614,6 +629,99 @@ export const BUILDINGS = {
     buildWork: 10,
     allowedTiles: [...GROUND_TILES, 'plaza'],
     sortLine: 13,
+  },
+  // 20. aşama: Altın Çağ'ın prestij peyzajı (Ulu Saat Kulesi tamamlanınca açılır)
+  marbleFountain: {
+    name: 'Mermer Çeşme',
+    size: { w: 2, h: 2 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: "Altın kuşaklı beyaz mermer havuz, ortasında fışkıran sütun. Altın Çağ'ın gururu: çevresine bolca güzellik yayar, yanından geçenlerin keyfi dolar.",
+    cost: { stone: 80, gold: 250 },
+    buildWork: 160,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresGoldenAge: true,
+    funAura: { radius: 64, perMinute: 0.12 },
+  },
+  goldenLantern: {
+    name: 'Altın Çağ Feneri',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: "Altın taçlı, kıvrık altın kollu görkemli sokak feneri. 18:30-06:30 arası sıcak altın sarısı, demir fenerden de geniş bir ışık yayar; altında yürüyenlerin keyfi yükselir.",
+    cost: { iron: 4, gold: 80 },
+    buildWork: 40,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresGoldenAge: true,
+    litHours: { from: 18.5, to: 6.5 },
+    funAura: { radius: 72, perMinute: 0.12 },
+  },
+  // 22. aşama: Kraliyet Fermanı ödülü (Kraliyet Beratı) ile açılan anıt
+  royalStatue: {
+    name: 'Kraliyet Aslanlı Heykeli',
+    size: { w: 2, h: 2 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Peyzaj',
+    description: "Kraliyet Beratı'yla dikilen, mermer kaide üstünde taç giymiş altın aslan. Çevresine bolca güzellik yayar; kasaba refahına kalıcı +4, Yönetim Güveni'ne saat başı küçük bir katkı verir.",
+    cost: { stone: 60, gold: 120 },
+    buildWork: 180,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresRoyalRight: true,
+    townBonus: { happiness: 4 },
+    funAura: { radius: 72, perMinute: 0.1 },
+  },
+  // --- 23. aşama: yönetilebilir krizler (kurallar data/crisis.js, mantık systems/CrisisSystem.js) ---
+  // well      : Su Kuyusu; çevresindeki 8 karoda yangın ihtimalini %80 azaltır, yangında kova zinciri için su sağlar,
+  //             4 karo yakınındaki bahçelere +%10 sulama verimi verir
+  // guardTower: Gözcü Kulesi; Yönetim Güveni'ne saatlik katkı, geceleri çevresini aydınlatır, 1-2 yetişkin Kasaba Bekçisi
+  //             olarak nöbet tutar (workActivity 'patrol'), haydut baskınını 2 gün önceden haber verir ve püskürtür
+  well: {
+    name: 'Su Kuyusu',
+    size: { w: 1, h: 1 },
+    spots: 'ring',
+    buildable: true,
+    demolishable: true,
+    category: 'Güvenlik',
+    description:
+      'Taş halkalı, çıkrıklı köy kuyusu. Çevresindeki 8 karoluk alanda yangın çıkma ihtimalini %80 azaltır; yangın çıkarsa sakinler buradan kovalarla hızla su taşır. 4 karo yakınındaki bahçeler sulanır (+%10 verim).',
+    cost: { wood: 15, stone: 25 },
+    buildWork: 90,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 2,
+    fireSafety: { radius: 8, reduction: 0.8 },
+    irrigation: { radius: 4, bonus: 0.1 },
+  },
+  guardTower: {
+    name: 'Gözcü Kulesi',
+    size: { w: 2, h: 2 },
+    spots: 'door',
+    doorTiles: [
+      { dx: 0, dy: 2 },
+      { dx: 1, dy: 2 },
+    ],
+    entrance: { x: 16, y: 32 },
+    buildable: true,
+    demolishable: true,
+    category: 'Güvenlik',
+    description:
+      'Ahşap korkuluklu taş gözetleme kulesi. Kasabaya asayiş sağlar (Yönetim Güveni saat başı artar), geceleri çevresini aydınlatır; 1-2 yetişkin Kasaba Bekçisi olarak nöbet tutar. Haydut baskınlarını 2 gün önceden haber verir ve bekçilerle püskürtmeni sağlar.',
+    cost: { wood: 50, stone: 45, iron: 12 },
+    buildWork: 260,
+    workers: 1,
+    workActivity: 'patrol',
+    workPoints: [{ x: 8, y: 33 }, { x: 24, y: 33 }],
+    workFacing: 'down',
+    guard: true,
+    requiresTier: 3,
+    litHours: { from: 18, to: 6 },
+    funAura: { radius: 56, perMinute: 0.05 },
   },
   parkBench: {
     name: 'Park Bankı',
@@ -897,6 +1005,11 @@ export const BUILD_MENU = [
   'gazebo',
   'grapeVine',
   'ancientTorch',
+  'marbleFountain',
+  'goldenLantern',
+  'royalStatue',
+  'well',
+  'guardTower',
 ];
 
 /** (18. aşama) Menü öğesinin İnşa sekmesi: 'roads' (zemin fırçaları), 'decor' (süs ve sokak eşyaları), 'buildings'. */

@@ -7,19 +7,40 @@
 //                      ve içerideki listeleri, rezervasyonlar, iş emirlerinin atananları; evdeki kişi sayısı kapasiteyi aşıyor mu
 //   İş gücü          : çalışanı olan ama hiç üretmeyen (ya da çalışma noktası kalmamış) yapılar, sonsuz bekleyen iş emirleri
 //
+//   (21. aşama) Vatandaşlık: kesesi sayı olmayan / eksi sakin, çantası kapasitesini aşan ya da bozuk eşyalı sakin, kayıp sakine
+//                      ait dilekçe, aynı sakinin iki dilekçesi, kayıp isyancı, yıkılmış yapıyı hedefleyen yağma, aralık dışı
+//                      güven kopuk referanstır; güvenin en düşük / en yüksek değeri, isyan saatleri, yağma, dilekçe sonuçları,
+//                      yevmiye, alışveriş ve çantadan yemek raporlanır
+//   (22. aşama) Krallık: geçersiz vergi kademesi / ferman, takvimsiz Krallık Vergisi, harita kenarına varamadan süresi geçen
+//                      göçmen, nüfusun çekirdeğin (3) altına inmesi kopuk referanstır; vergi tahsilatları, Krallık Vergisi ödemeleri
+//                      ve cezaları, fermanlar, Kraliyet Beratı ve terk edenler raporlanır
+//   (20. aşama) Ulu Saat Kulesi: geçersiz aşama, iş emri olmayan süren aşama, Altın Çağ'sız tamamlanmış kule, bitiş
+//                      vaktini aşan Çağ Kutlaması kopuk referanstır; kulenin ulaştığı aşama ve Altın Çağ raporlanır
+//   (19. aşama) Sosyal yaşam: evli çift ortak eve taşınamadan RELOCATE_HOURS saatten uzun "taşınıyor" kalırsa ya da
+//                      boş yatak varken MAX_APART_HOURS saat ayrı evlerde yaşarsa sıkışma sayılır; kutlama bitiş vaktini
+//                      aşarsa, huyu olmayan sakin, kayıp sakine işaret eden haber / kutlama kopuk referanstır; nüfusun en
+//                      düşük ve en yüksek değeri, evsiz sakinler ve sosyal sayaçlar (randevu, düğün kutlaması, akşam
+//                      yemeği, dedikodu, müzik, hayvan sevme, kitap, boşalan ev) raporlanır
+//
 // Kullanım (Node tarafı):  await installMonitor(page);  ...  window.__monitor.sample() her saat;  await monitorReport(page)
 
 export const STUCK_MINUTES = 150;     // görevsiz / yolda aynı karoda bu kadar kalan sakin takılmış sayılır
 export const BLOCKED_MINUTES = 120;  // yürünemez karoda (su, yapı) görevsiz / yolda bu kadar kalan takılmış sayılır (3 örnek)
 export const JOB_STALE_DAYS = 4;      // atanmış iş emri bu kadar gün ilerlemezse "sonsuz bekleme" sayılır
+export const RELOCATE_HOURS = 30;     // (19. aşama) yeni evine bu kadar saatte varamayan sakin taşınmada sıkışmış sayılır
+export const MAX_APART_HOURS = 48;    // boş yatak varken evli çift bu kadar saat ayrı evlerde kalırsa sıkışma
 
 export async function installMonitor(page) {
   await page.evaluate(async () => {
     window.__outfitFor = (await import('/src/systems/SkillSystem.js')).outfitFor;
     window.__charSprite = (await import('/src/art/sprites/index.js')).getCharacterSprite;
+    window.__citizens = await import('/src/systems/Citizens.js');
+    window.__citizenData = await import('/src/data/citizens.js');
+    window.__crownData = await import('/src/data/crown.js');
+    window.__crisisData = await import('/src/data/crisis.js');
   });
   await page.evaluate(
-    ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS }) => {
+    ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
       const game = window.game;
       const m = {
         samples: 0,
@@ -37,7 +58,21 @@ export async function installMonitor(page) {
         minNeeds: { hunger: 100, energy: 100, social: 100, fun: 100 },
         events: { weddings: 0, births: 0, grownUp: 0, quarrels: 0, reconciled: 0, ill: 0, cured: 0, cold: 0, warmed: 0, masterworks: 0, exhibited: 0, sold: 0, expeditions: 0, adventures: 0, mishaps: 0, tales: 0, returned: 0 },
         outfitErrors: [], // (15. aşama) çizilemeyen ya da yanlış kademede kıyafet
+        // (19. aşama) sosyal yaşam
+        socialStuck: [], // taşınmada / ayrı evde sıkışan evli çiftler
+        relocateSince: new Map(), // sakin id -> taşınmaya başladığı dakika
+        apartSince: new Map(), // "a-b" -> ayrı evlerde yaşamaya başladıkları dakika
+        minPop: Infinity,
+        homelessMax: 0,
+        weddingParties: 0,
+        // (21. aşama)
+        trustMin: Infinity,
+        trustMax: -Infinity,
+        revoltSamples: 0,
+        petitionEvents: { opened: 0, fulfilled: 0, rejected: 0, expired: 0 },
       };
+      game.events.on('petition:opened', () => m.petitionEvents.opened++);
+      game.events.on('petition:resolved', ({ outcome }) => m.petitionEvents[outcome]++);
       const on = (name, key) => game.events.on(name, () => m.events[key]++);
       on('relationship:married', 'weddings');
       on('family:childBorn', 'births');
@@ -54,6 +89,10 @@ export async function installMonitor(page) {
       on('expedition:departed', 'expeditions');
       on('expedition:returned', 'returned');
       on('expedition:taleTold', 'tales');
+      m.events.parties = 0;
+      on('social:partyStarted', 'parties');
+      m.events.homesFreed = 0;
+      on('social:homeFreed', 'homesFreed');
       game.events.on('adventure:resolved', ({ success }) => {
         m.events.adventures++;
         if (!success) m.events.mishaps++;
@@ -64,7 +103,8 @@ export async function installMonitor(page) {
       const detail = (c, map, world) => {
         const b = world.getBuilding(map.getOccupant(c.tileX, c.tileY));
         const task = c.task ? { activity: c.task.activity, phase: c.task.phase, buildingId: c.task.buildingId ?? null, jobId: c.task.jobId ?? null, spot: c.task.spot ?? null } : null;
-        return { x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10, task, building: b ? `${b.type}#${b.id}${b.underConstruction ? ' (şantiye)' : ''}` : null, inside: c.insideBuildingId, tile: map.get(c.tileX, c.tileY) };
+        const walk = c.waypoints ? { left: c.waypoints.length - c.waypointIndex, next: c.waypoints[c.waypointIndex] ?? null, tileSpeed: map.getSpeedMultiplier(c.tileX, c.tileY), profileSpeed: c.profile.speed, ill: Boolean(c.illness), injured: Boolean(c.isInjured) } : null;
+        return { x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10, task, building: b ? `${b.type}#${b.id}${b.underConstruction ? ' (şantiye)' : ''}` : null, inside: c.insideBuildingId, tile: map.get(c.tileX, c.tileY), walk, moving: c.isMoving };
       };
       const broke = (text) => {
         m.brokenCount++;
@@ -97,8 +137,11 @@ export async function installMonitor(page) {
           const idleish = c.visible && (!c.task || c.task.phase === 'travel');
           let t = m.track.get(c.id);
           // Süre, sakinin bu karoda boşta / yolda kalmaya BAŞLADIĞI örnekten sayılır (çalışırken geçen süre sayılmaz)
-          if (!t || t.tile !== tile || !idleish) {
-            m.track.set(c.id, { tile, since: idleish ? now : null, flagged: false, blockFlag: false });
+          // (23. aşama) Yalnızca gerçekten kıpırdamayan sakin takılmış sayılır: aynı karoda olmak yetmez, konum da (4 pikselden fazla)
+          // değişmemiş olmalı. Her saat başı aynı kavşaktan (meydan) geçen uzun bir yürüyüş, buçuk saat örneklerinde hep aynı karoda
+          // görünüp yanlışlıkla "takıldı" sayılabiliyordu (tohum 13, G15: Duru uzun yolları normal yürüyordu).
+          if (!t || t.tile !== tile || !idleish || Math.hypot(c.x - t.x, c.y - t.y) > 4) {
+            m.track.set(c.id, { tile, x: c.x, y: c.y, since: idleish ? now : null, flagged: false, blockFlag: false });
             continue;
           }
           if (t.since === null) t.since = now;
@@ -149,9 +192,134 @@ export async function installMonitor(page) {
           const residents = homeCount.get(b.id) ?? 0;
           if (b.capacity && residents > b.capacity) m.overfull.push(`G${s.time.day} ${b.type}#${b.id} ${residents}/${b.capacity}`);
         }
+        // ---- (19. aşama) Evlilik akışı: taşınma, ortak ev, kutlama, huylar, dedikodu ----
+        m.minPop = Math.min(m.minPop, s.characters.length);
+        m.homelessMax = Math.max(m.homelessMax, s.characters.filter((c) => c.homeId === null && !c.role).length);
+        const freeBed = s.buildings.some((b) => b.functional && b.capacity && (homeCount.get(b.id) ?? 0) <= b.capacity - 2);
+        for (const c of s.characters) {
+          if (!['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(c.quirk)) broke(`${c.name}: huyu yok (${c.quirk})`);
+          if (c.relocating && !c.away) {
+            if (!m.relocateSince.has(c.id)) m.relocateSince.set(c.id, now);
+            else if (now - m.relocateSince.get(c.id) > RELOCATE_HOURS * 60) {
+              m.socialStuck.push(`G${s.time.day} ${c.name}: ${RELOCATE_HOURS} saattir yeni evine taşınamıyor (${c.activityLabel})`);
+              m.relocateSince.set(c.id, now + 1e9); // bir kez raporla
+            }
+          } else m.relocateSince.delete(c.id);
+          const p = c.married ? byId.get(c.partnerId) : null;
+          if (!p || c.id > p.id) continue;
+          const key = `${c.id}-${p.id}`;
+          if (c.homeId !== p.homeId && freeBed) {
+            if (!m.apartSince.has(key)) m.apartSince.set(key, now);
+            else if (now - m.apartSince.get(key) > MAX_APART_HOURS * 60) {
+              m.socialStuck.push(`G${s.time.day} ${c.name} & ${p.name}: boş yatak varken ${MAX_APART_HOURS} saattir ayrı evlerde`);
+              m.apartSince.set(key, now + 1e9);
+            }
+          } else m.apartSince.delete(key);
+        }
+        const party = s.social?.party;
+        if (party) {
+          if (now > party.until + 60) broke(`düğün kutlaması bitiş vaktini aştı (${Math.round((now - party.until) / 60)} saat)`);
+          for (const id of [...party.coupleIds, ...party.guestIds]) if (!ids.has(id)) broke(`düğün kutlaması: kayıp sakin ${id}`);
+        }
+        for (const n of s.social?.gossip ?? []) {
+          if (n.heardBy.some((id) => !ids.has(id))) broke(`haber #${n.id}: kayıp sakin duymuş`);
+          if (new Set(n.heardBy).size !== n.heardBy.length) broke(`haber #${n.id}: aynı sakin iki kez duymuş`);
+        }
+        for (const c of s.characters) if (c.lastNews && typeof c.lastNews.text !== 'string') broke(`${c.name}: bozuk son haber`);
+
+        // ---- (21. aşama) Kese, çanta, dilekçeler, güven ve isyan ----
+        {
+          const CZ = window.__citizens;
+          const ITEMS = window.__citizenData.ITEMS;
+          const t = s.trust;
+          const tv = t?.value;
+          if (!Number.isFinite(tv) || tv < 0 || tv > 100) broke(`Yönetim Güveni aralık dışı (${tv})`);
+          m.trustMin = Math.min(m.trustMin, tv);
+          m.trustMax = Math.max(m.trustMax, tv);
+          if (t?.revolt) m.revoltSamples++;
+          for (const c of s.characters) {
+            if (!Number.isFinite(c.coins) || c.coins < 0) broke(`${c.name}: kesesi bozuk (${c.coins})`);
+            if (!Array.isArray(c.inventory)) broke(`${c.name}: çantası yok`);
+            else {
+              if (c.inventory.length > CZ.inventoryCapacity(c)) broke(`${c.name}: çantası taşıyor (${c.inventory.length}/${CZ.inventoryCapacity(c)})`);
+              for (const it of c.inventory) if (!ITEMS[it.kind] || !(it.qty > 0) || it.qty > ITEMS[it.kind].stack) broke(`${c.name}: bozuk eşya ${JSON.stringify(it)}`);
+            }
+          }
+          const owners = new Set();
+          for (const p of s.petitions?.list ?? []) {
+            if (!ids.has(p.characterId)) broke(`dilekçe #${p.id}: sahibi kayıp`);
+            if (owners.has(p.characterId)) broke(`dilekçe #${p.id}: sakinin iki dilekçesi var`);
+            owners.add(p.characterId);
+          }
+          const rv = t?.revolt;
+          if (rv) {
+            for (const id of rv.rioters) if (!ids.has(id)) broke(`isyan: kayıp isyancı ${id}`);
+            for (const r of rv.raids) if (!buildings.has(r.targetId)) broke(`yağma #${r.id}: hedef yapı yok`);
+          }
+        }
+
+        // ---- (22. aşama) Vergi, Krallık ve terk ediş ----
+        {
+          const CD = window.__crownData;
+          if (!CD.TAX_RATES[s.tax?.rate]) broke(`geçersiz vergi kademesi (${s.tax?.rate})`);
+          if (!Number.isFinite(s.tax?.nextAt)) broke('vergi takvimi yok');
+          if (!Number.isFinite(s.crown?.nextLevyAt)) broke('Krallık Vergisi takvimi yok');
+          if (s.crown?.decree && !CD.DECREES[s.crown.decree.kind]) broke(`bilinmeyen ferman ${s.crown.decree.kind}`);
+          if (s.crown?.decree && now > s.crown.decree.deadline + 120) broke('ferman süresi geçtiği hâlde sonuçlanmadı');
+          for (const c of s.characters) if (c.emigrating && now - c.emigrating.since > CD.EXODUS.leaveTimeoutMinutes + 120) broke(`${c.name}: köyü terk edemiyor (yolda takıldı)`);
+          if (s.characters.filter((c) => !c.role).length < Math.min(CD.EXODUS.core, m.startPop ?? CD.EXODUS.core)) broke(`nüfus çekirdeğin altına indi (${s.characters.length})`);
+          m.startPop ??= s.characters.length;
+          if (s.exodus?.active) m.exodusSamples = (m.exodusSamples ?? 0) + 1;
+        }
+
+        // ---- (23. aşama) Krizler: yangın, hasar, haydut baskını, yaralanma ----
+        {
+          const KD = window.__crisisData;
+          if (!KD.CRISIS_DIFFICULTY[s.crisis?.difficulty]) broke(`geçersiz tehlike sıklığı (${s.crisis?.difficulty})`);
+          for (const b of s.buildings) {
+            if (b.isBurning) {
+              m.fireSamples = (m.fireSamples ?? 0) + 1;
+              if (b.fireProgress >= 100) broke(`${b.name}: yangın %100'e vardı ama yapı hasara geçmedi`);
+              if (b.damaged) broke(`${b.name}: hem yanıyor hem hasarlı`);
+              if (b.underConstruction) broke(`${b.name}: şantiye yanıyor`);
+              if (!b.fireSince) b.fireSince = now;
+              if (now - b.fireSince > KD.FIRE.burnMinutes + 240) broke(`${b.name}: yangın bitiş vaktini aştı`);
+            } else b.fireSince = null;
+            if (b.damaged) {
+              m.damagedSamples = (m.damagedSamples ?? 0) + 1;
+              if (!b.damagedSince) b.damagedSince = now;
+              if (b.damageKind && !KD.DAMAGE_KINDS[b.damageKind]) broke(`${b.name}: bilinmeyen hasar nedeni ${b.damageKind}`);
+              // Boşta ustalar ya da oyuncu iki günden uzun süre onarmadıysa takılmıştır (kaynak yoksa uyarı)
+              if (now - b.damagedSince > 3 * 1440 && !b.project) m.longDamaged = (m.longDamaged ?? 0) + 1;
+            } else b.damagedSince = null;
+          }
+          for (const c of s.characters) {
+            if (c.isInjured) {
+              m.injuredSamples = (m.injuredSamples ?? 0) + 1;
+              if (!(c.injuryTimer > 0)) broke(`${c.name}: yaralı ama iyileşme süresi yok`);
+              if (c.injuryTimer > KD.INJURY.naturalHours * 60 + 1) broke(`${c.name}: yaralanma süresi sınırı aştı`);
+            }
+          }
+          const rd = s.crisis?.raid;
+          if (rd && now > rd.arriveAt + 180) broke('haydut baskını varış vaktini aştı ama çözülmedi');
+          if (s.buildings.filter((b) => b.type === 'guardTower').some((b) => b.workerIds.size > b.guardSlots)) broke('Gözcü Kulesi: nöbetçi sayısı yuvaları aştı');
+        }
+
+        // ---- (20. aşama) Ulu Saat Kulesi ve Altın Çağ ----
+        const tower = s.buildings.find((b) => b.type === 'wonder');
+        if (tower) {
+          m.towerMax = Math.max(m.towerMax ?? 0, tower.wonderStage + (tower.project ? 0.5 : 0));
+          if (tower.wonderStage > 3 || tower.wonderStage < 0) broke(`kule: geçersiz aşama ${tower.wonderStage}`);
+          if (tower.wonderComplete && !s.goldenAge?.since) broke('kule tamamlandı ama Altın Çağ başlamadı');
+          if (tower.project && !scene.jobs.jobs.some((j) => j.buildingId === tower.id)) broke('kule: süren aşamanın iş emri yok');
+        }
+        const cel = s.goldenAge?.celebration;
+        if (cel && now > cel.until + 60) broke(`Çağ Kutlaması bitiş vaktini aştı (${Math.round((now - cel.until) / 60)} saat)`);
+        if ((s.resources.gears ?? 0) < 0) broke('Kadim Dişli stoğu eksiye düştü');
+
         // (16. aşama) Seferde kaybolan ya da takılan kafile
         const exp = s.dilemma.expedition;
-        for (const c of s.characters) if (c.away && !exp?.members.includes(c.id)) broke(`${c.name}: seferde sanılıyor ama süren sefer yok`);
+        for (const c of s.characters) if (c.away && !exp?.members.includes(c.id)) broke(`${c.name}: seferde sanılıyor ama süren sefer yok (${c.away.stage}, ${c.task?.activity ?? 'görevsiz'}/${c.task?.phase ?? '-'}: ${c.activityLabel})`);
         if (exp) {
           for (const id of exp.members) if (!ids.has(id)) broke(`sefer: kafileden ${id} kayıp`);
           if (now > exp.until + 240 && !s.dilemma.active) broke(`sefer: dönüş vakti çoktan geçti (${Math.round((now - exp.until) / 60)} saat)`);
@@ -224,6 +392,92 @@ export async function installMonitor(page) {
           pairs: Object.keys(s.relationships).length,
           quarrels: s.stats.quarrels ?? 0,
           reconciliations: s.stats.reconciliations ?? 0,
+          // (19. aşama) sosyal yaşam
+          social: {
+            stuck: m.socialStuck,
+            minPop: Number.isFinite(m.minPop) ? m.minPop : s.characters.length,
+            homelessMax: m.homelessMax,
+            couples: s.characters.filter((c) => c.married).length / 2,
+            couplesTogether: s.characters.filter((c) => c.married && s.characters.find((p) => p.id === c.partnerId)?.homeId === c.homeId).length / 2,
+            dates: s.stats.dates ?? 0,
+            parties: s.stats.weddingParties ?? 0,
+            dinners: s.stats.familyDinners ?? 0,
+            gossip: s.stats.gossipHeard ?? 0,
+            serenades: s.stats.serenades ?? 0,
+            cuddles: s.stats.petCuddles ?? 0,
+            books: s.stats.booksRead ?? 0,
+            homesFreed: s.stats.homesFreed ?? 0,
+            news: s.social?.gossip.length ?? 0,
+            quirks: Object.fromEntries(['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].map((q) => [q, s.characters.filter((c) => c.quirk === q).length])),
+          },
+          // (23. aşama)
+          crisis: {
+            difficulty: s.crisis?.difficulty,
+            fires: s.crisis?.fires ?? 0,
+            extinguished: s.crisis?.extinguished ?? 0,
+            burned: s.crisis?.burned ?? 0,
+            raids: s.crisis?.raids ?? 0,
+            repelled: s.crisis?.repelled ?? 0,
+            tributes: s.crisis?.tributes ?? 0,
+            caught: s.crisis?.caught ?? 0,
+            injuries: s.crisis?.injuries ?? 0,
+            treated: s.crisis?.treated ?? 0,
+            repairs: s.crisis?.repairs ?? 0,
+            injuredNow: s.characters.filter((c) => c.isInjured).length,
+            damagedNow: s.buildings.filter((b) => b.damaged).length,
+            burningNow: s.buildings.filter((b) => b.isBurning).length,
+            fireHours: m.fireSamples ?? 0,
+            damagedHours: m.damagedSamples ?? 0,
+            injuredHours: m.injuredSamples ?? 0,
+            longDamaged: m.longDamaged ?? 0,
+            wells: s.buildings.filter((b) => b.type === 'well' && b.functional).length,
+            towers: s.buildings.filter((b) => b.type === 'guardTower' && b.functional).length,
+            guards: s.buildings.filter((b) => b.type === 'guardTower').reduce((n, b) => n + b.workerIds.size, 0),
+            raidPending: Boolean(s.crisis?.raid),
+          },
+          // (22. aşama)
+          crown: {
+            rate: s.tax?.rate,
+            collections: s.tax?.collections ?? 0,
+            taxGold: s.tax?.totalGold ?? 0,
+            taxGoods: s.tax?.totalGoods ?? 0,
+            levies: s.crown?.levies ?? 0,
+            paid: s.crown?.paid ?? 0,
+            failed: s.crown?.failed ?? 0,
+            reputation: Math.round(s.crown?.reputation ?? 0),
+            delivered: s.crown?.delivered ?? 0,
+            decreesFailed: s.crown?.decreesFailed ?? 0,
+            statueRight: Boolean(s.crown?.statueRight),
+            statues: s.buildings.filter((b) => b.type === 'royalStatue' && b.functional).length,
+            emigrants: s.stats.emigrants ?? 0,
+            exodusHours: m.exodusSamples ?? 0,
+          },
+          // (21. aşama)
+          citizens: {
+            trust: Math.round(s.trust?.value ?? 0),
+            trustMin: Number.isFinite(m.trustMin) ? Math.round(m.trustMin) : null,
+            trustMax: Number.isFinite(m.trustMax) ? Math.round(m.trustMax) : null,
+            revolts: s.stats.revolts ?? 0,
+            revoltHours: m.revoltSamples,
+            raids: s.stats.raids ?? 0,
+            lootedGoods: s.stats.lootedGoods ?? 0,
+            lootedGold: s.stats.lootedGold ?? 0,
+            reliefs: s.stats.reliefs ?? 0,
+            petitions: { made: s.petitions?.made ?? 0, fulfilled: s.petitions?.fulfilled ?? 0, rejected: s.petitions?.rejected ?? 0, expired: s.petitions?.expired ?? 0, accepted: s.petitions?.accepted ?? 0, open: s.petitions?.list.length ?? 0 },
+            wages: s.stats.wagesPaid ?? 0,
+            purchases: s.stats.purchases ?? 0,
+            bagMeals: s.stats.bagMeals ?? 0,
+            ...window.__citizens.purseTotals(s),
+          },
+          // (20. aşama)
+          golden: {
+            towerMax: m.towerMax ?? 0,
+            stage: s.buildings.find((b) => b.type === 'wonder')?.wonderStage ?? 0,
+            since: s.goldenAge?.since?.day ?? null,
+            chimes: s.goldenAge?.chimes ?? 0,
+            celebrations: s.stats.ageCelebrations ?? 0,
+            master: s.chronicle?.towerMaster?.name ?? null,
+          },
           events: m.events,
           welfare: Math.round(s.town.welfare ?? 0),
           tier: s.town.tier,
@@ -231,7 +485,7 @@ export async function installMonitor(page) {
       };
       window.__monitor = m;
     },
-    { STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS }
+    { STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }
   );
 }
 

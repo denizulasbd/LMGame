@@ -56,6 +56,18 @@ import { RallySystem } from '../systems/RallySystem.js';
 import { CraftsmanshipSystem } from '../systems/CraftsmanshipSystem.js';
 import { ExpeditionSystem } from '../systems/ExpeditionSystem.js';
 import { LandscapeSystem } from '../systems/LandscapeSystem.js';
+import { SocialSystem } from '../systems/SocialSystem.js';
+import { WeddingConfetti } from '../rendering/WeddingConfetti.js';
+import { GoldenAgeSystem } from '../systems/GoldenAgeSystem.js';
+import { ChimeWaves } from '../rendering/ChimeWaves.js';
+import { towerOf } from '../systems/GoldenAge.js';
+import { PurseSystem } from '../systems/PurseSystem.js';
+import { TrustSystem } from '../systems/TrustSystem.js';
+import { PetitionSystem } from '../systems/PetitionSystem.js';
+import { TaxSystem } from '../systems/TaxSystem.js';
+import { CrownSystem } from '../systems/CrownSystem.js';
+import { DesertionSystem } from '../systems/DesertionSystem.js';
+import { CrisisSystem } from '../systems/CrisisSystem.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -130,6 +142,7 @@ export class TownScene extends Scene {
     this.relationships = new RelationshipSystem(this.game, this.world, new Random(state.seed + 5));
     this.conflicts = new ConflictSystem(this.game, this.world, this.relationships, new Random(state.seed + 6));
     this.family = new FamilySystem(this.game, this.world, new Random(state.seed + 7));
+    this.social = new SocialSystem(this.game, this.world, new Random(state.seed + 19), { relationships: this.relationships });
     this.crafting = new CraftingSystem(this.game, this.world, this.economy);
     this.health = new HealthSystem(this.game, this.world, new Random(state.seed + 8));
     this.animals = new AnimalSystem(this.game, this.world, new Random(state.seed + 9));
@@ -141,9 +154,23 @@ export class TownScene extends Scene {
     this.stats = new StatsSystem(this.game);
     this.seasonFestivals = new SeasonFestivalSystem(this.game, this.world, new Random(state.seed + 14), { attract: this.attract });
     this.memories = new MemorySystem(this.game, this.world, new Random(state.seed + 15));
+    // (20. aşama) Altın Çağ: anılardan sonra kurulur (Tarihçe'nin kurucuları ilk sakinlerin anısından çıkarılır)
+    this.goldenAge = new GoldenAgeSystem(this.game, this.world, { attract: this.attract });
     this.rally = new RallySystem(this.game);
     this.craftsmanship = new CraftsmanshipSystem(this.game, this.world, this.economy, new Random(state.seed + 16));
+    // (21. aşama) Vatandaşlık katmanı: kişisel kese ve çanta, Yönetim Güveni ve isyan, vatandaş dilekçeleri (kendi üreteçleri)
+    this.purse = new PurseSystem(this.game, this.world, this.economy, new Random(state.seed + 21));
+    this.trust = new TrustSystem(this.game, this.world, { economy: this.economy }, new Random(state.seed + 22), { attract: this.attract });
+    this.petitions = new PetitionSystem(this.game, this.world, { economy: this.economy, construction: this.construction, crafting: this.crafting, trust: this.trust }, new Random(state.seed + 23), { attract: this.attract });
+    // (22. aşama) Krallık katmanı: iç vergi ve öşür, Krallık Vergisi ve Kraliyet Fermanları, köyü terk etme
+    this.tax = new TaxSystem(this.game, this.world, { economy: this.economy, trust: this.trust });
+    this.crown = new CrownSystem(this.game, this.world, { economy: this.economy, trust: this.trust }, new Random(state.seed + 24), { attract: this.attract });
+    this.desertion = new DesertionSystem(this.game, this.world, { jobs: this.jobs }, new Random(state.seed + 25), { attract: this.attract });
+    // (23. aşama) Yönetilebilir krizler: yangın ve itfaiye, haydut baskınları, hasar / tamir, yaralanma (ana üretece dokunmaz)
+    this.crisis = new CrisisSystem(this.game, this.world, { economy: this.economy, trust: this.trust, construction: this.construction, social: this.social }, new Random(state.seed + 26), { attract: this.attract });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
+      citizens: this.purse,
+      crisis: this.crisis,
       economy: this.economy,
       jobs: this.jobs,
       relationships: this.relationships,
@@ -179,14 +206,18 @@ export class TownScene extends Scene {
       this.health,
       new MovementSystem(this.world),
       this.behavior,
+      this.crisis,
       this.animals,
       this.relationships,
       this.conflicts,
       this.family,
+      this.social,
       this.townEvents,
       this.seasonFestivals,
       this.memories,
+      this.goldenAge,
       this.rally,
+      this.petitions,
       this.heating,
       this.milestones,
       this.townLevel,
@@ -212,6 +243,7 @@ export class TownScene extends Scene {
       this.milestones,
       this.relationships,
       this.family,
+      this.social,
       this.crafting,
       this.townLevel,
       this.animals,
@@ -223,10 +255,18 @@ export class TownScene extends Scene {
       this.stats,
       this.seasonFestivals,
       this.memories,
+      this.goldenAge,
       this.rally,
       this.craftsmanship,
       this.expeditions,
       this.landscape,
+      this.purse,
+      this.trust,
+      this.petitions,
+      this.tax,
+      this.crown,
+      this.desertion,
+      this.crisis,
     ];
 
     this.camera = new Camera();
@@ -239,6 +279,9 @@ export class TownScene extends Scene {
     this.weatherFx = new WeatherEffects();
     this.fireflies = new FireflyField(state.seed);
     this.festivalFx = new FestivalEffects();
+    this.confetti = new WeddingConfetti(); // (19. aşama) meydandaki düğün kutlaması
+    this.ageConfetti = new WeddingConfetti(); // (20. aşama) Çağ Kutlaması
+    this.chimeWaves = new ChimeWaves(); // (20. aşama) kule çanının ses dalgaları
     this.leaves = new LeafFall();
     this.animationTime = 0; // görsel animasyonlar için gerçek zaman (oyun duraklasa da akar)
 
@@ -253,6 +296,7 @@ export class TownScene extends Scene {
     this.cinematic = false; // (13. aşama) fotoğraf modu: arayüz gizli, haritada imleç ve seçim çizilmez
 
     this.unsubscribers = [
+      events.on('goldenAge:chime', () => this.chimeWaves.ring()),
       events.on('ui:setCinematic', (on) => {
         this.cinematic = Boolean(on);
         if (this.cinematic) this.tools.setTool('select');
@@ -679,6 +723,11 @@ export class TownScene extends Scene {
     renderer.applyCamera(this.camera);
     this.fireflies.draw(renderer, view, fireflyIntensity(weather, hour), this.animationTime, season.fireflies);
     if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime, env.festivalTheme, this.game.state.seasonFestival);
+    const party = this.game.state.social.party;
+    if (party && this.game.state.totalMinutes < party.until) this.confetti.draw(renderer, party, this.animationTime, view);
+    const ageParty = this.game.state.goldenAge?.celebration;
+    if (ageParty && this.game.state.totalMinutes < ageParty.until) this.ageConfetti.draw(renderer, ageParty, this.animationTime, view);
+    this.chimeWaves.draw(renderer, towerOf(this.game.state), this.animationTime);
     renderer.resetCamera();
     const daylight = 1 - Math.min(1, getAmbientColor(hour).a / 0.55);
     this.weatherFx.drawRain(renderer, this.camera, weather, daylight);

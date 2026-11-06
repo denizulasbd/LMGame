@@ -12,13 +12,16 @@
 //     altın fermanları; iş yerlerinde "İşçi Ata" ile sakini sabitleme (yalnızca orada çalışır) ve sabitlemeyi kaldırma
 //   - (12. aşama) Bilgelik Evi'nin araştırma kartları (Araştır düğmesi, ilerleme) ve okulu; limanın fazlalık
 //     ihracatı sınırı, ihracat sandığı, tekne durumu ve Kasaba Hazinesi; harikanın aşamaları
+//   - (23. aşama) kriz bölümü: yanan yapıda ilerleme ve "Acil Söndür (Kova Zinciri)", hasarlı yapıda "Tamir Et" (maliyetin %25'i,
+//     anında), Su Kuyusu'nun etkileri, Gözcü Kulesi'nde bekçiler ve bekleyen haydut baskınının üç çözüm yolu
 //   - (10. aşama) yan ürün (ağılda yiyecek, madende taş), değirmen-fırının işleme satırları (1 yiyecek -> 1
 //     ekmek), ekipmanın asıl (demir / yün) ve eski usul tarifi, ağıldaki koyunlar, belediyenin etkileri
 // Panel oyun durumunu yalnızca okur; istekleri olay olarak yayınlar (ui:startProject, ui:cancelProject,
 // ui:demolishBuilding, ui:selectCharacter, ui:dismissWorker, ui:rehireWorker, ui:setCraftMode, ui:civicProject,
 // ui:startResearch, ui:setExportThreshold, ui:prepareCrate, ui:buyLuxury, ui:buyRelic, ui:goldDecree, ui:pinWorker,
-// ui:unpinWorker). Ne
+// ui:unpinWorker, ui:extinguish, ui:repairBuilding, ui:raidChoice). Ne
 // değiştiğini anlamak için her karede kısa bir anahtar üretir; anahtar değişmedikçe DOM'a dokunmaz.
+import { CLOCK_GEAR } from '../../data/goldenAge.js';
 import { BUILDINGS, mendSpec, PROJECT_WORDS } from '../../data/buildings.js';
 import { STORM } from '../../data/dilemmas.js';
 import { RESOURCES, RESOURCE_KEYS, formatCost } from '../../data/resources.js';
@@ -46,6 +49,15 @@ import { EXPLORATION, EXOTIC_ITEMS, INSCRIPTIONS, INSCRIPTION_KEYS, VINE } from 
 import { expeditionLaunchStatus, pickParty, decodeStatus } from '../../systems/Exploration.js';
 import { AESTHETIC, ORNAMENTAL_TREES, DARKNESS } from '../../data/landscape.js';
 import { aestheticLevel } from '../../systems/Landscape.js';
+import { RELIEF, REVOLT, PETITION_KINDS } from '../../data/citizens.js';
+import { trustValue, trustLevel } from '../../systems/Citizens.js';
+import { reliefStatus, trustWelfare } from '../../systems/TrustSystem.js';
+import { formatRemaining } from '../../systems/Petitions.js';
+import { TAX_RATES, TAX_RATE_KEYS, TAX, LEVY, DECREES, DECREE_ITEMS } from '../../data/crown.js';
+import { estimateTax, levyAmount, levyPlan, decreeStatus, reputationLevel } from '../../systems/Crown.js';
+import { mendSpecFor, repairCost, wellNear, defenseStatus } from '../../systems/Crisis.js';
+import { FIRE, WELL, GUARD, REPAIR } from '../../data/crisis.js';
+import { raidCard } from './crisisCards.js';
 
 const thumbnailCache = new Map();
 
@@ -83,6 +95,9 @@ export class BuildingPanel {
     this.harbor = el('div', { className: 'building-decrees building-harbor' });
     this.luxury = el('div', { className: 'building-decrees building-luxury' });
     this.bell = el('div', { className: 'building-decrees building-bell' });
+    this.trustBox = el('div', { className: 'building-decrees building-trust' }); // (21. aşama) Yönetim Güveni
+    this.crownBox = el('div', { className: 'building-decrees building-crown' }); // (22. aşama) iç vergi ve Krallık
+    this.crisisBox = el('div', { className: 'building-decrees building-crisis' }); // (23. aşama) yangın, tamir, kuyu, kule
     this.expedition = el('div', { className: 'building-decrees building-expedition' });
     this.inscriptions = el('div', { className: 'building-decrees building-inscriptions' });
     this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
@@ -125,6 +140,9 @@ export class BuildingPanel {
       this.research,
       this.harbor,
       this.luxury,
+      this.crownBox,
+      this.trustBox,
+      this.crisisBox,
       this.bell,
       this.expedition,
       this.inscriptions,
@@ -196,7 +214,8 @@ export class BuildingPanel {
         ? [JSON.stringify(state.luxury), state.resources.gold, Math.floor((state.buffs.spices ?? 0) / 60), Math.floor((state.buffs.goldBonus ?? 0) / 60), Math.floor((state.buffs.royalArchitects ?? 0) / 60), state.time.day, state.buildings.length].join(':')
         : '';
     const pickerKey = this.pickerFor === building.id ? this.workerCandidates(building, state).map((o) => `${o.character.id}:${o.character.name}:${o.level}:${o.pinnedTo}`).join(',') : '';
-    const bellKey = building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}` : '';
+    const crownKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.tax?.rate, state.tax?.last, Math.floor(((state.tax?.nextAt ?? 0) - state.totalMinutes) / 60), state.crown, Math.floor((state.crown?.nextLevyAt - state.totalMinutes) / 60), levyAmount(state), state.crown?.decree ? decreeStatus(state, state.crown.decree) : null, estimateTax(state), state.resources]) : '';
+    const bellKey = (building.type === 'fountain' || building.definition.civic ? crownKey : '') + (building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}:${Math.round(trustValue(state))}:${JSON.stringify(state.trust?.revolt?.rioters ?? null)}:${state.trust?.revolt?.raids?.length ?? 0}:${JSON.stringify(reliefStatus(state, 'food'))}:${JSON.stringify(reliefStatus(state, 'gold'))}:${(state.petitions?.list ?? []).map((p) => `${p.id}${p.status}${Math.floor((p.deadline - state.totalMinutes) / 60)}`).join(',')}` : '');
     // (16. aşama) keşif seferi (liman, belediye) ve kadim yazıtlar (Bilgelik Evi)
     const exploreKey =
       building.type === 'harbor' || building.type === 'townHall' || building.definition.academy
@@ -206,7 +225,10 @@ export class BuildingPanel {
             expeditionLaunchStatus(state, building.type).reason,
           ])
         : '';
+    // (23. aşama) kriz: yangın ilerlemesi, tamir bedeli, bekleyen baskın, kule ve bekçiler
+    const crisisKey = this.crisisKeyOf(building, state);
     const key = [
+      crisisKey,
       exploreKey,
       bellKey,
       craftKey,
@@ -256,6 +278,9 @@ export class BuildingPanel {
     this.renderResearch(building, state);
     this.renderHarbor(building, state);
     this.renderLuxury(building, state);
+    this.renderCrown(building, state);
+    this.renderTrust(building, state);
+    this.renderCrisis(building, state);
     this.renderBell(building, state);
     this.renderExpedition(building, state);
     this.renderInscriptions(building, state);
@@ -273,6 +298,7 @@ export class BuildingPanel {
   }
 
   badgeText(building) {
+    if (building.isBurning) return 'Yanıyor!';
     if (building.damaged) return building.project ? 'Hasarlı · onarılıyor' : 'Hasarlı · onarılmalı';
     if (building.ruined) return building.project ? 'Kadim Harabe · onarılıyor' : 'Kadim Harabe';
     if (building.definition.ruin) return 'Onarılmış Kadim Yapı';
@@ -415,7 +441,7 @@ export class BuildingPanel {
       return b;
     });
     const current = building.craft
-      ? `Tezgâhta: ${EQUIPMENT[building.craft.item].name}${building.craft.recipe === 'fallback' ? ' (eski usul)' : ''} · ${percent(building.craftRatio)}`
+      ? `Tezgâhta: ${(EQUIPMENT[building.craft.item] ?? CLOCK_GEAR).name}${building.craft.recipe === 'fallback' ? ' (eski usul)' : ''} · ${percent(building.craftRatio)}`
       : building.craftStatus ?? 'Zanaatkâr bekleniyor (mesai 08:00-17:00)';
     const stock = EQUIPMENT_KEYS.map((item) => {
       const def = EQUIPMENT[item];
@@ -479,6 +505,199 @@ export class BuildingPanel {
         return { character: c, level: skill ? skillLevel(c, skill).level : 1, pinnedTo: other ? `${other.name}'a sabit` : '' };
       })
       .sort((a, b) => b.level - a.level || a.character.name.localeCompare(b.character.name, 'tr'));
+  }
+
+  /**
+   * (22. aşama) Belediye Konağı ve meydan havuzu: iç vergi kademesi ('ui:setTaxRate'), sıradaki tahsilat ve tahmini; Krallık
+   * İtibarı, sıradaki Krallık Vergisi (yoldaki tahsildar) ve süren Kraliyet Fermanı ('ui:deliverDecree' / 'ui:rejectDecree').
+   */
+  renderCrown(building, state) {
+    const show = (building.type === 'fountain' || Boolean(building.definition.civic)) && building.functional;
+    this.crownBox.hidden = !show;
+    if (!show) return;
+    const tax = state.tax;
+    const rate = TAX_RATES[tax.rate];
+    const est = estimateTax(state);
+    const buttons = TAX_RATE_KEYS.map((key) => {
+      const def = TAX_RATES[key];
+      const b = this.button(def.short, `${def.name}: ${def.description}`, () => this.events.emit('ui:setTaxRate', { rate: key }));
+      b.classList.add('tax-rate-button', `is-${key}`);
+      b.classList.toggle('is-active', key === tax.rate);
+      b.dataset.rate = key;
+      return b;
+    });
+    const last = tax.last ? `Son tahsilat (Gün ${tax.last.day}, ${TAX_RATES[tax.last.rate]?.short}): +${tax.last.gold} altın${Object.keys(tax.last.goods ?? {}).length ? `, öşür ${Object.values(tax.last.goods).reduce((a, b) => a + b, 0)} birim` : ''}` : 'Henüz tahsilat yapılmadı';
+    const cr = state.crown;
+    const rep = reputationLevel(cr.reputation);
+    const amount = cr.notice?.amount ?? levyAmount(state);
+    const plan = levyPlan(state, amount);
+    const levyLeft = formatRemaining(cr.nextLevyAt - state.totalMinutes);
+    const levyText = cr.notice
+      ? `Kraliyet Tahsildarı yolda! ${levyLeft} sonra ${amount} altın ${plan.ok ? (Object.keys(plan.goods).length ? '(altın yetmiyor: bir kısmı malla ödenecek)' : '(hazine hazır)') : `— ${plan.short} altın eksik: ödenemezse hazineye el konur!`}`
+      : `Sıradaki Krallık Vergisi ${levyLeft} sonra: yaklaşık ${amount} altın (seviye, nüfus ve Altın Çağ'la artar)`;
+    const decree = cr.decree;
+    const decreeNodes = [];
+    if (decree) {
+      const def = DECREES[decree.kind];
+      const st = decreeStatus(state, decree);
+      const needText = Object.entries(decree.need ?? {}).map(([r, v]) => `${RESOURCES[r].name} ${Math.min(state.resources[r] ?? 0, v)}/${v}`).join(' · ') || (def.kind === 'research' ? 'Süre içinde bir araştırma tamamla' : 'Depodaki bir usta işi eseri gönder');
+      const reward = decree.reward ? `Ödül: ${decree.reward.gold} altın${decree.reward.item ? ` + ${DECREE_ITEMS[decree.reward.item].name}` : ''}` : '';
+      const deliver = this.button('Teslim Et', st.ok ? 'Fermanı teslim et ve ödülü al' : st.reason, () => this.events.emit('ui:deliverDecree'));
+      deliver.classList.add('upgrade-button');
+      deliver.disabled = !st.ok;
+      const reject = this.button('Reddet', 'Fermanı reddet: Krallık para / erzak cezası keser, itibar düşer', () => this.events.emit('ui:rejectDecree'));
+      reject.classList.add('decree-reject');
+      decreeNodes.push(
+        el('div', { className: 'decree luxury-card royal-decree' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('decree'), alt: '' }), def.name, el('span', { className: 'decree-state', text: formatRemaining(decree.deadline - state.totalMinutes) })]),
+          el('div', { className: 'upgrade-text', text: `"${def.text}"` }),
+          el('div', { className: 'upgrade-text', text: needText }),
+          el('div', { className: 'upgrade-text', text: reward }),
+          el('div', { className: 'upgrade-row' }, [reject, deliver]),
+        ])
+      );
+    }
+    this.crownBox.replaceChildren(
+      el('div', { className: 'building-section-title', text: 'İç Vergi ve Öşür' }),
+      el('div', { className: `decree luxury-card tax-card is-${tax.rate}` }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL(rate.icon), alt: '' }), rate.name, el('span', { className: 'decree-state', text: `%${rate.percent}` })]),
+        el('div', { className: 'tax-rates' }, buttons),
+        el('div', { className: 'upgrade-text', text: rate.description }),
+        el('div', { className: 'upgrade-text', text: `Sıradaki tahsilat ${formatRemaining(tax.nextAt - state.totalMinutes)} sonra (${TAX.everyDays} günde bir, ${TAX.hour}:00): tahminen +${est.gold} altın${est.goods ? `, ${est.goods} birim öşür` : ''} (${est.payers} vergi veren)` }),
+        el('div', { className: 'upgrade-text', text: last }),
+      ]),
+      el('div', { className: 'building-section-title', text: 'Krallık' }),
+      el('div', { className: `decree luxury-card crown-card${cr.notice && !plan.ok ? ' is-revolt' : ''}` }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('crown'), alt: '' }), `Krallık İtibarı %${Math.round(cr.reputation)}`, el('span', { className: 'decree-state', text: rep.name })]),
+        el('div', { className: `upgrade-text${cr.notice ? ' is-active' : ''}`, text: levyText }),
+        el('div', { className: 'upgrade-text', text: `Ödenen vergi ${cr.paid}/${cr.levies} · teslim edilen ferman ${cr.delivered}${cr.statueRight ? " · Kraliyet Beratı: Aslanlı Heykel dikilebilir (İnşa Et → Peyzaj)" : ''}` }),
+      ]),
+      ...decreeNodes
+    );
+  }
+
+  /**
+   * (21. aşama) Meydan havuzu ve Belediye Konağı: Yönetim Güveni çubuğu, isyan durumu, açık dilekçeler ve acil erzak /
+   * altın dağıtımı ('ui:relief' { kind }).
+   */
+  renderTrust(building, state) {
+    const show = (building.type === 'fountain' || Boolean(building.definition.civic)) && building.functional;
+    this.trustBox.hidden = !show;
+    if (!show) return;
+    const value = Math.round(trustValue(state));
+    const level = trustLevel(value);
+    const revolt = state.trust?.revolt ?? null;
+    const welfare = Math.round(trustWelfare(state));
+    const bar = el('span', { className: 'need-bar trust-bar' }, [el('span', { className: `need-fill trust-fill is-${revolt ? 'revolt' : level.key}`, style: `width: ${value}%` })]);
+    const status = revolt
+      ? `İSYAN: ${revolt.rioters.length} sakin işi bıraktı${revolt.raids.length ? `, ${revolt.raids.map((r) => r.target).join(', ')} yağmalanıyor` : ''}. Güven %${REVOLT.endTrust}'i aşınca (refah %${REVOLT.critical} üstündeyken) yatışır.`
+      : `${level.name}. Refah %${welfare}: yüksek refah ve karşılanan dilekler güveni artırır; güven ya da refah ${REVOLT.graceHours} saat %${REVOLT.critical} altında kalırsa isyan çıkar.`;
+    const reliefButton = (kind) => {
+      const def = RELIEF[kind];
+      const st = reliefStatus(state, kind);
+      const b = this.button(def.name, st.ok ? `${kind === 'food' ? `${st.cost} yiyecek değeri` : `${st.cost} altın`} halka dağıtılır: güven +${def.trust}` : st.reason, () => this.events.emit('ui:relief', { kind }));
+      b.classList.add('upgrade-button');
+      b.disabled = !st.ok;
+      return el('div', { className: 'upgrade-row' }, [
+        el('span', { className: 'build-costs' }, [el('span', { className: `build-cost${st.ok ? '' : ' is-missing'}` }, [el('img', { src: getAnyIconURL(kind === 'food' ? 'food' : 'coin'), alt: '' }), String(st.cost)])]),
+        b,
+      ]);
+    };
+    const petitions = (state.petitions?.list ?? []).map((p) => {
+      const row = this.button(`${p.name}: ${PETITION_KINDS[p.kind].name} · ${formatRemaining(p.deadline - state.totalMinutes)}`, `"${p.text}" · tıkla: sakini seç`, () => this.events.emit('ui:selectCharacter', p.characterId));
+      row.classList.add('petition-row');
+      return row;
+    });
+    this.trustBox.replaceChildren(
+      el('div', { className: 'building-section-title', text: 'Yönetim Güveni' }),
+      el('div', { className: `decree luxury-card${revolt ? ' is-revolt' : ''}` }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL(revolt ? 'torch' : 'trust'), alt: '' }), `Güven %${value}`, bar, el('span', { className: 'decree-state', text: revolt ? 'İsyan!' : level.name })]),
+        el('div', { className: `upgrade-text${revolt ? ' is-active' : ''}`, text: status }),
+        ...(petitions.length ? [el('div', { className: 'upgrade-text', text: 'Açık dilekçeler:' }), ...petitions] : []),
+        reliefButton('food'),
+        reliefButton('gold'),
+      ])
+    );
+  }
+
+  /** (23. aşama) Panelin kriz bölümünün değişim anahtarı (anahtar değişmedikçe DOM'a dokunulmaz). */
+  crisisKeyOf(building, state) {
+    const raid = state.crisis?.raid;
+    const parts = [building.isBurning, Math.floor(building.fireProgress / 5), building.fireWater, building.damaged, building.damageKind];
+    if (building.damaged || building.type === 'well') parts.push(state.resources.wood, state.resources.stone);
+    if (building.type === 'guardTower' || building.type === 'well') {
+      parts.push(Math.floor(state.totalMinutes / 60), building.workerIds.size, building.guardSlots);
+    }
+    if (building.type === 'guardTower' || building.type === 'fountain' || building.definition.civic) {
+      parts.push(JSON.stringify(raid), raid ? JSON.stringify(defenseStatus(state)) : '', raid ? state.resources.gold : '');
+    }
+    return parts.join(':');
+  }
+
+  /**
+   * (23. aşama) Kriz bölümü: yanan yapıda "Acil Söndür (Kova Zinciri)", hasarlı yapıda "Tamir Et" (maliyetin %25'i), Su Kuyusu'nun
+   * etkileri, Gözcü Kulesi'nin bekçileri ve bekleyen haydut baskınının üç çözüm yolu ('ui:raidChoice').
+   */
+  renderCrisis(building, state) {
+    const children = [];
+    const crisis = state.crisis;
+    if (building.isBurning) {
+      const bar = el('span', { className: 'need-bar trust-bar' }, [el('span', { className: 'need-fill trust-fill is-revolt', style: `width: ${Math.round(building.fireProgress)}%` })]);
+      const needed = wellNear(state, building) ? FIRE.bucketsNearWell : FIRE.buckets;
+      const go = this.button('Acil Söndür (Kova Zinciri)', 'Sakinler kova zinciri kurar: yangın hemen söner, yapı hasar almaz', () => this.events.emit('ui:extinguish', { buildingId: building.id }));
+      go.classList.add('upgrade-button');
+      children.push(
+        el('div', { className: 'building-section-title', text: 'Yangın!' }),
+        el('div', { className: 'decree luxury-card is-revolt' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('fire'), alt: '' }), `Yangın %${Math.round(building.fireProgress)}`, bar, el('span', { className: 'decree-state', text: `${building.fireWater}/${needed} kova` })]),
+          el('div', { className: 'upgrade-text is-active', text: `Yakındaki sakinler Su Kuyusu'ndan (yoksa nehirden) kova taşıyor. Yangın %100'e varırsa yapı hasar alır (haritadan silinmez); ${needed} kova atılırsa ya da aşağıdaki düğmeye basarsan hasarsız söner (Güven +${FIRE.trustOut}).` }),
+          el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, []), go]),
+        ])
+      );
+    } else if (building.damaged) {
+      const cost = repairCost(building.type);
+      const missing = Object.entries(cost).filter(([r, v]) => (state.resources[r] ?? 0) < v).map(([r]) => RESOURCES[r].name);
+      const costs = Object.entries(cost).map(([r, v]) =>
+        el('span', { className: `build-cost${(state.resources[r] ?? 0) < v ? ' is-missing' : ''}` }, [el('img', { src: getIconDataURL(RESOURCES[r].icon), alt: RESOURCES[r].name }), String(v)])
+      );
+      const go = this.button('Tamir Et', missing.length ? `Yetersiz kaynak: ${missing.join(', ')}` : `İnşa maliyetinin %${Math.round(REPAIR.costRatio * 100)}'iyle yapıyı anında onar`, () => this.events.emit('ui:repairBuilding', { buildingId: building.id }));
+      go.classList.add('upgrade-button');
+      go.disabled = missing.length > 0;
+      const kindText = building.damageKind === 'fire' ? 'Yangında yanan kirişler' : building.damageKind === 'raid' ? 'Haydutların kırdığı yapı' : 'Fırtınanın kırdığı yapı';
+      children.push(
+        el('div', { className: 'building-section-title', text: 'Hasar ve Tamir' }),
+        el('div', { className: 'decree luxury-card' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('repair'), alt: '' }), 'Hasarlı yapı', el('span', { className: 'decree-state', text: building.project ? 'Onarılıyor' : 'Üretim durdu' })]),
+          el('div', { className: 'upgrade-text', text: `${kindText}: onarılana kadar kimse çalışamaz. "Tamir Et" anında düzeltir; yoksa boştaki ustalar kaynak yettikçe kendiliğinden onarmaya gelir.` }),
+          el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, costs), go]),
+        ])
+      );
+    }
+    if (building.type === 'well' && building.functional) {
+      children.push(
+        el('div', { className: 'building-section-title', text: 'Su Kuyusu' }),
+        el('div', { className: 'decree luxury-card' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('bucket'), alt: '' }), 'Yangın emniyeti', el('span', { className: 'decree-state', text: `${WELL.gardenRadius} karoya sulama` })]),
+          el('div', { className: 'upgrade-text', text: `Çevresindeki ${FIRE.wellRadius} karoluk alanda yangın çıkma ihtimali %${Math.round(FIRE.wellReduction * 100)} azalır; yangında kova zinciri buradan ${FIRE.bucketsNearWell} kovayla söndürür. ${WELL.gardenRadius} karo yakınındaki bahçelere +%${Math.round(WELL.gardenBonus * 100)} sulama verimi verir.` }),
+        ])
+      );
+    }
+    if (building.type === 'guardTower' && building.functional) {
+      const def = defenseStatus(state);
+      const guards = [...building.workerIds].map((id) => state.characters.find((c) => c.id === id)).filter(Boolean);
+      children.push(
+        el('div', { className: 'building-section-title', text: 'Gözcü Kulesi' }),
+        el('div', { className: 'decree luxury-card' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('shield'), alt: '' }), 'Asayiş ve gözetleme', el('span', { className: 'decree-state', text: `${guards.length}/${building.guardSlots} bekçi` })]),
+          el('div', { className: 'upgrade-text', text: `Yönetim Güveni saat başı +${GUARD.trustPerHour} (nöbetteki her bekçi +${GUARD.trustPerGuard}). Gece çevresi aydınlık, yürümekten korkulmaz. Haydut baskınını ${GUARD.warnDaysWithTower} gün önceden haber verir. ${guards.length ? `Nöbette: ${guards.map((g) => g.name).join(', ')}.` : 'Şu an nöbette bekçi yok.'}` }),
+          el('div', { className: `upgrade-text${def.ok ? '' : ' is-active'}`, text: def.ok ? 'Savunma yeterli: baskın püskürtülebilir.' : `Savunma yetersiz: ${def.reason}` }),
+        ])
+      );
+    }
+    const raid = building.type === 'guardTower' || building.type === 'fountain' || building.definition.civic ? raidCard(state, (name, payload) => this.events.emit(name, payload)) : null;
+    if (raid) children.push(el('div', { className: 'building-section-title', text: 'Haydut Baskını' }), raid);
+    this.crisisBox.hidden = children.length === 0;
+    this.crisisBox.replaceChildren(...children);
   }
 
   /** (14. aşama) Meydan havuzu ve Belediye Konağı: Toplanma Zili. */
@@ -688,7 +907,7 @@ export class BuildingPanel {
     const def = BUILDINGS[building.type];
     if (building.underConstruction) return null;
     if (building.ruined) return { kind: 'repair', spec: def.ruin };
-    if (building.damaged) return { kind: 'mend', spec: mendSpec(building.type, STORM.mend) };
+    if (building.damaged) return { kind: 'mend', spec: mendSpecFor(building) };
     if (def.wonder && !building.wonderComplete) {
       const stage = def.wonder.stages[building.wonderStage];
       return { kind: 'stage', spec: { ...stage, buildWork: stage.work }, index: building.wonderStage };
@@ -706,7 +925,7 @@ export class BuildingPanel {
       kind === 'repair'
         ? `Onarınca: ${building.definition.name}`
         : kind === 'mend'
-          ? 'Fırtına hasarı: onarım gerekli'
+          ? `${building.damageKind === 'fire' ? 'Yangın' : building.damageKind === 'raid' ? 'Baskın' : 'Fırtına'} hasarı: onarım gerekli`
           : kind === 'stage'
             ? `Aşama ${next.index + 1}/${stages}: ${spec.name}`
             : `Seviye 2: ${spec.name}`;
@@ -755,7 +974,8 @@ export class BuildingPanel {
       return lines;
     }
 
-    if (building.damaged) lines.push(building.project ? 'Hasarlı: inşaatçılar onarıyor' : 'Hasarlı: onarılana kadar kimse çalışamaz');
+    if (building.isBurning) lines.push(`Yanıyor: yangın %${Math.round(building.fireProgress)} (%100'de yapı hasar alır, silinmez) · ${building.fireWater} kova atıldı`);
+    else if (building.damaged) lines.push(building.project ? 'Hasarlı: inşaatçılar onarıyor' : `Hasarlı (${building.damageKind === 'fire' ? 'yangın' : building.damageKind === 'raid' ? 'baskın' : 'fırtına'}): onarılana kadar kimse çalışamaz`);
     if (def.production && building.factors) lines.push(...this.productionLines(building, state));
     if (def.processing) lines.push(...this.processingLines(building));
 

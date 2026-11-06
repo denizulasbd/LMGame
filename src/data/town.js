@@ -59,6 +59,12 @@ export const TOWN_BUFFS = {
   harvestFeast: { name: 'Büyük Hasat Bayramı', icon: 'harvest', hours: 9, friendship: 1.4, funDecay: 0.5, happiness: 5 },
   lightsNight: { name: 'Işıklar Gecesi', icon: 'snowman', hours: 9, friendship: 1.5, funDecay: 0.4, happiness: 6 },
   seasonCheer: { name: 'Mevsim Coşkusu', icon: 'sparkle', hours: 24, workSpeed: 1.15, funDecay: 0.8, happiness: 6 },
+  // 21. aşama: bir vatandaş dilekçesi karşılanınca (PetitionSystem) kasaba bir gün "sesimiz duyuldu" der
+  heard: { name: 'Sesimiz Duyuldu', icon: 'scroll', hours: 24, happiness: 3 },
+  // 22. aşama: Krallık Vergisi ödenemeyince (CrownSystem) iki gün boyunca refah darbesi
+  royalPenalty: { name: 'Kraliyet Cezası', icon: 'collector', hours: 48, happiness: -8 },
+  // 23. aşama: haydut baskını bekçilerce püskürtülünce (CrisisSystem) kasaba bir gün huzurla yaşar
+  banditsRepelled: { name: 'Haydutlar Kovuldu', icon: 'shield', hours: 24, happiness: 4 },
 };
 
 // Handa sıcak yemek yiyen sakinin kişisel bonusu: bu kadar oyun saati boyunca yavaş acıkır
@@ -136,9 +142,9 @@ export const TOWN_TIERS = [
     icon: 'tierTown',
     requires: { population: 20, buildings: 17, upgraded: 3, welfare: 68 },
     merchantBonus: 2,
-    unlocks: ['townHall', 'harbor'],
+    unlocks: ['townHall', 'harbor', 'wonder'],
     maxPerMorning: 3,
-    perks: ['Belediye Konağı inşa edilebilir', 'Büyük Ticaret Limanı kurulabilir: nehir teknesiyle ihracat ve Kasaba Hazinesi', 'Tüccar kervanla gelir: ekmek sepeti, yün ve demir alımı', 'Tüccarın her malından +2 stok', 'Bir sabah 3 göçmene kadar gelebilir', 'Bir kedi daha gelir'],
+    perks: ['Belediye Konağı inşa edilebilir', 'Ulu Saat Kulesi başlatılabilir (20 sakinle): üç aşamalı mega proje ve Altın Çağ', 'Büyük Ticaret Limanı kurulabilir: nehir teknesiyle ihracat ve Kasaba Hazinesi', 'Tüccar kervanla gelir: ekmek sepeti, yün ve demir alımı', 'Tüccarın her malından +2 stok', 'Bir sabah 3 göçmene kadar gelebilir', 'Bir kedi daha gelir'],
   },
   {
     tier: 4,
@@ -151,8 +157,7 @@ export const TOWN_TIERS = [
     maxPerMorning: 3,
     maxPopulation: 30,
     happiness: 4,
-    unlocks: ['wonder'],
-    perks: ['Kasaba Harikası başlatılabilir: üç aşamalı Büyük Vadi Saat Kulesi', 'Şehir gururu: kasaba refahına kalıcı +4', 'Göç sınırı 24 yerine 30 sakin', 'Kervanbaşı Şehir Kervanı ve Lonca Ustaları getirir', 'Tüccarın her malından +3 stok', 'Bir köpek daha gelir'],
+    perks: ['Şehir gururu: kasaba refahına kalıcı +4', 'Göç sınırı 24 yerine 30 sakin', 'Kervanbaşı Şehir Kervanı ve Lonca Ustaları getirir', 'Tüccarın her malından +3 stok', 'Bir köpek daha gelir'],
   },
 ];
 

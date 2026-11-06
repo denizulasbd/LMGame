@@ -3773,3 +3773,568 @@ kbd {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   19. aşama: Karakter Kartı'nda Sosyal Hayat (huy, eş ve ev, son duyulan dedikodu)
+   --------------------------------------------------------------------------- */
+.quirk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #ffe9a8;
+  color: var(--ui-ink-dark);
+  border-color: #c98f55;
+  box-shadow: inset -1px -1px 0 #e0a030;
+}
+
+.quirk-chip img {
+  width: 12px;
+  height: 12px;
+  image-rendering: pixelated;
+}
+
+.social-life {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--ui-card);
+  border: 2px solid var(--ui-wood);
+}
+
+.social-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.social-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  image-rendering: pixelated;
+}
+
+.social-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  min-width: 0;
+}
+
+.social-label {
+  font-weight: 700;
+}
+
+.social-label::after {
+  content: ':';
+}
+
+.social-news {
+  font-style: italic;
+}
+
+.social-meta {
+  width: 100%;
+  font-size: 11px;
+  opacity: 0.72;
+}
+
+.social-muted {
+  opacity: 0.7;
+}
+
+/* ---------------------------------------------------------------------------
+   20. aşama: Kasaba Arşivi sekmeleri ve Tarihçe Kütüğü (parşömen berat, altın harfler)
+   --------------------------------------------------------------------------- */
+.archive-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 8px;
+}
+
+.archive-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.archive-tab img {
+  width: 14px;
+  height: 14px;
+  image-rendering: pixelated;
+}
+
+.archive-tab.is-active {
+  background: #ffe9a8;
+  color: var(--ui-ink-dark);
+}
+
+.chronicle-scroll {
+  padding: 12px 14px;
+  background: linear-gradient(#f6e7c1, #ecd6a2);
+  color: #3a2614;
+  border: 3px double #a8703f;
+  box-shadow: inset 0 0 0 2px #f9efd3, 0 2px 0 rgba(27, 20, 35, 0.4);
+}
+
+.chronicle-head {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.chronicle-seal {
+  font-size: 18px;
+  color: #c98f15;
+}
+
+.chronicle-town {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #7a4a12;
+}
+
+.chronicle-sub {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.chronicle-entry {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 6px 0;
+  border-top: 1px dashed rgba(122, 74, 18, 0.35);
+}
+
+.chronicle-entry img {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+}
+
+.chronicle-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  opacity: 0.75;
+}
+
+.chronicle-body {
+  font-size: 13px;
+}
+
+.chronicle-gold {
+  font-weight: 800;
+  color: #b07800;
+  text-shadow: 0 1px 0 #fff3c4, 0 0 4px rgba(255, 210, 63, 0.55);
+}
+
+.chronicle-pending {
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.chronicle-meta {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.chronicle-stages {
+  margin: 0 0 4px 26px;
+  padding: 0;
+  font-size: 12px;
+  list-style: none;
+}
+
+.trade-row.is-golden {
+  box-shadow: inset 3px 0 0 #ffd23f;
+}
+
+/* ---------- 21. aşama: kişisel kese ve çanta, dilekçeler, Yönetim Güveni, isyan ---------- */
+.welfare-bars {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hud-welfare .welfare-bars .welfare-bar {
+  height: 6px;
+}
+
+.trust-mini-bar {
+  display: block;
+  width: 40px;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.trust-mini-fill {
+  display: block;
+  height: 100%;
+  background: var(--ui-info);
+}
+
+.trust-mini-fill.is-ok {
+  background: var(--ui-ok);
+}
+
+.trust-mini-fill.is-low {
+  background: var(--ui-warn);
+}
+
+.trust-mini-fill.is-bad,
+.trust-mini-fill.is-revolt {
+  background: var(--ui-bad);
+}
+
+.trust-mini {
+  display: inline-flex;
+  align-items: center;
+}
+
+.hud.topbar .trust-mini .hud-icon {
+  width: 12px;
+  height: 12px;
+  image-rendering: pixelated;
+}
+
+.trust-mini.is-low .hud-icon,
+.trust-mini.is-bad .hud-icon {
+  filter: hue-rotate(160deg) saturate(1.6);
+}
+
+.trust-mini.is-revolt {
+  animation: trust-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes trust-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.buff-chip.is-action {
+  font-family: var(--ui-font);
+  color: var(--ui-ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.buff-chip.is-action:hover {
+  border-color: var(--ui-highlight);
+}
+
+.buff-chip.is-petition {
+  background: rgba(233, 207, 143, 0.18);
+}
+
+.buff-chip.is-petition.is-accepted {
+  background: var(--ui-card-ok);
+}
+
+.buff-chip.is-revolt {
+  background: var(--ui-card-bad);
+  border-color: var(--ui-bad);
+  font-weight: 700;
+}
+
+.purse-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--ui-card);
+  border: 2px solid var(--ui-wood);
+}
+
+.purse-coins {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.purse-coins img,
+.bag-slot img,
+.petition-head img {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+}
+
+.purse-amount {
+  font-weight: 700;
+  color: var(--ui-highlight);
+  font-variant-numeric: tabular-nums;
+}
+
+.purse-unit {
+  opacity: 0.75;
+  font-size: 12px;
+}
+
+.purse-rioter {
+  margin-left: auto;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--ui-bad);
+  border-radius: 8px;
+}
+
+.bag-slots {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 3px;
+}
+
+.bag-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--ui-wood-light);
+  border-radius: 3px;
+  cursor: help;
+}
+
+.bag-slot.is-empty {
+  border-style: dashed;
+  opacity: 0.45;
+}
+
+.bag-qty {
+  position: absolute;
+  right: 1px;
+  bottom: -1px;
+  font-size: 10px;
+  font-weight: 700;
+  text-shadow: 0 1px 0 #000, 1px 0 0 #000;
+}
+
+.bag-summary {
+  font-size: 11px;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
+}
+
+.petition-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 4px 0;
+  padding: 5px 7px;
+  color: var(--ui-ink-dark);
+  background: linear-gradient(180deg, #f3e2b6, #e5cb8e);
+  border: 2px solid #8a5a32;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.petition-box[hidden] {
+  display: none;
+}
+
+.petition-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.petition-state {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 7px;
+  background: rgba(125, 82, 54, 0.25);
+}
+
+.petition-state.is-accepted {
+  background: rgba(60, 140, 60, 0.35);
+}
+
+.petition-text {
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.petition-progress,
+.petition-meta {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.petition-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.petition-buttons .hud-btn {
+  font-size: 11px;
+  padding: 2px 7px;
+}
+
+.petition-buttons .hud-btn.is-grant {
+  background: #3f6b2c;
+  color: #f2e4c4;
+}
+
+.petition-buttons .hud-btn.is-reject {
+  background: #6b2c2c;
+  color: #f2e4c4;
+}
+
+.trust-bar {
+  width: 70px;
+  height: 7px;
+}
+
+.trust-fill.is-good {
+  background: var(--ui-info);
+}
+
+.trust-fill.is-ok {
+  background: var(--ui-ok);
+}
+
+.trust-fill.is-low {
+  background: var(--ui-warn);
+}
+
+.trust-fill.is-bad,
+.trust-fill.is-revolt {
+  background: var(--ui-bad);
+}
+
+.luxury-card.is-revolt {
+  border-color: var(--ui-bad);
+  background: var(--ui-card-bad);
+}
+
+.petition-row {
+  display: block;
+  width: 100%;
+  margin: 2px 0;
+  text-align: left;
+  font-size: 11px;
+  white-space: normal;
+}
+
+/* ---------- 22. aşama: iç vergi, Krallık, fermanlar, terk ediş ---------- */
+.tax-rates {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  margin: 3px 0;
+}
+
+.tax-rate-button {
+  font-size: 11px;
+  padding: 2px 3px;
+}
+
+.tax-rate-button.is-active {
+  background: var(--ui-highlight);
+  color: var(--ui-ink-dark);
+  font-weight: 700;
+}
+
+.tax-rate-button.is-heavy.is-active {
+  background: var(--ui-bad);
+  color: #fff;
+}
+
+.tax-rate-button.is-exempt.is-active {
+  background: var(--ui-ok);
+}
+
+.tax-card.is-heavy {
+  border-color: var(--ui-bad);
+}
+
+.royal-decree {
+  border-color: #b4523f;
+  background: linear-gradient(180deg, rgba(243, 226, 182, 0.14), rgba(180, 82, 63, 0.12));
+}
+
+.decree-reject {
+  margin-right: auto;
+}
+
+.buff-chip.is-crown {
+  background: rgba(255, 210, 63, 0.18);
+}
+
+.buff-chip.is-crown.is-short {
+  background: var(--ui-card-bad);
+  border-color: var(--ui-bad);
+}
+
+.purse-rioter.is-leaving {
+  background: #5d6070;
+}
+
+/* ---------------------------------------------------------------------------
+   23. aşama: krizler (yangın, tamir, haydut baskını), tehlike sıklığı ayarı
+   --------------------------------------------------------------------------- */
+.crisis-panel {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.crisis-body .luxury-card {
+  margin: 0;
+}
+
+.luxury-card.is-raid {
+  border-color: rgba(232, 70, 60, 0.55);
+  background: rgba(60, 24, 24, 0.55);
+}
+
+.crisis-option {
+  display: grid;
+  grid-template-columns: minmax(150px, auto) 1fr;
+  gap: 4px 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.crisis-option .upgrade-button {
+  white-space: normal;
+  text-align: left;
+}
+
+.crisis-option.is-risky .upgrade-button {
+  border-color: rgba(232, 70, 60, 0.6);
+}
+
+.settings-crisis.is-active {
+  background: var(--ui-highlight);
+  color: #1b1423;
+  border-color: var(--ui-highlight);
+}
+
+@media (max-width: 520px) {
+  .crisis-option {
+    grid-template-columns: 1fr;
+  }
+}

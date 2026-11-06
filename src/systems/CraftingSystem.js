@@ -14,6 +14,8 @@
 //            tarifiyle (fallbackCost) üretilir; üreten yapı varsa zanaatkâr malzemeyi bekler. Tezgâhtaki işin
 //            hangi tarifle yapıldığı building.craft.recipe'tedir ('material' | 'fallback').
 // Ekipmanın etkileri src/systems/Equipment.js'teki saf yardımcılarla hesaplanır.
+import { gearsNeeded } from './GoldenAge.js';
+import { CLOCK_GEAR } from '../data/goldenAge.js';
 import { EQUIPMENT, EQUIPMENT_KEYS, CRAFTING, CRAFT_MODES } from '../data/equipment.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { lacking } from './Equipment.js';
@@ -21,6 +23,9 @@ import { RESOURCES, formatCost } from '../data/resources.js';
 import { getSeason } from '../data/seasons.js';
 import { isShivering } from './HeatingSystem.js';
 import { schemeIronSaving } from './Exploration.js';
+
+const GEAR_ITEM = 'clockGear'; // (20. aşama) tezgâhtaki Kadim Dişli (ekipman değil; bitince stoğa 'gears' olarak girer)
+const itemName = (item) => (item === GEAR_ITEM ? CLOCK_GEAR.name : EQUIPMENT[item].name);
 
 // Ekipmanı alabileceği yerler (yakın olan seçilir)
 const PICKUP_TYPES = ['workshop', 'storage', 'supplyCamp'];
@@ -63,9 +68,9 @@ export class CraftingSystem {
     for (const c of this.world.characters) c.coatVisible = coatSeason && c.equipment.clothing === 'winterCoat';
     for (const building of this.world.buildings) {
       if (!building.definition.crafting) continue;
-      if (!building.functional || building.damaged) {
+      if (!building.functional || building.damaged || building.isBurning) {
         building.idle = true;
-        building.craftStatus = building.damaged ? 'Fırtınada hasar gördü: onarılana kadar çalışmaz' : null;
+        building.craftStatus = building.isBurning ? 'Yanıyor: yangın söndürülünce çalışır' : building.damaged ? `${building.damageKind === 'fire' ? 'Yangında' : building.damageKind === 'raid' ? 'Baskında' : 'Fırtınada'} hasar gördü: onarılana kadar çalışmaz` : null;
         continue;
       }
       if (building.craft) {
@@ -76,7 +81,7 @@ export class CraftingSystem {
       const choice = this.chooseItem(building);
       building.idle = !choice.item;
       building.craftStatus =
-        choice.reason ?? `Sıradaki: ${EQUIPMENT[choice.item].name}${choice.recipe.kind === 'fallback' ? ' (eski usul)' : ''}`;
+        choice.reason ?? `Sıradaki: ${itemName(choice.item)}${choice.recipe.kind === 'fallback' ? ' (eski usul)' : ''}`;
     }
   }
 
@@ -85,6 +90,17 @@ export class CraftingSystem {
    * Otomatikte ihtiyacı (kuşanmamış yetişkin sayısı - depodaki) en büyük olan; sonbahar ve kışın palto önce.
    */
   chooseItem(building) {
+    // (20. aşama) Ulu Saat Kulesi'nin Gövdesi bittiyse atölye önce Mekanizma & Çan için Kadim Dişli döker
+    let gearReason = null;
+    if (gearsNeeded(this.state) > 0) {
+      if (this.economy.canAfford(CLOCK_GEAR.cost)) return { item: GEAR_ITEM, recipe: { cost: CLOCK_GEAR.cost, kind: 'material' } };
+      gearReason = `Kadim Dişli için malzeme bekleniyor (${formatCost(CLOCK_GEAR.cost)})`;
+    }
+    const choice = this.chooseEquipment(building);
+    return gearReason && !choice.item ? { reason: gearReason } : choice;
+  }
+
+  chooseEquipment(building) {
     const mode = building.craftMode;
     const coatSeason = CRAFTING.coatSeasons.includes(getSeason(this.state.time.day).key);
     const candidates = mode === 'auto' ? EQUIPMENT_KEYS : [mode];
@@ -160,9 +176,15 @@ export class CraftingSystem {
     }
     building.craft.progress += amount;
     const item = building.craft.item;
-    if (building.craft.progress < EQUIPMENT[item].work) return true;
+    if (building.craft.progress < (item === GEAR_ITEM ? CLOCK_GEAR.work : EQUIPMENT[item].work)) return true;
     const recipe = building.craft.recipe ?? 'material';
     building.craft = null;
+    if (item === GEAR_ITEM) {
+      this.economy.add('gears', 1);
+      building.producedToday += 1;
+      this.events.emit('goldenAge:gearCast', { building, gears: this.state.resources.gears });
+      return true;
+    }
     this.stock[item] += 1;
     building.producedToday += 1;
     this.events.emit('equipment:crafted', { item, building, recipe });
@@ -171,7 +193,7 @@ export class CraftingSystem {
 
   /** Tezgâhtaki işin adı (durum metni için) ya da null. */
   currentItemName(building) {
-    return building.craft ? EQUIPMENT[building.craft.item].name : null;
+    return building.craft ? itemName(building.craft.item) : null;
   }
 
   /**

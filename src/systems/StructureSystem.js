@@ -19,6 +19,7 @@ import { getSeason } from '../data/seasons.js';
 import { clamp } from '../utils/math.js';
 import { VINE } from '../data/exploration.js';
 import { schemeGardenMultiplier } from './Exploration.js';
+import { wellGardenMultiplier } from './Crisis.js';
 
 const MIN_TREE_EFFICIENCY = 0.25; // oduncunun çevresinde hiç ağaç yokken bile biraz üretir
 
@@ -69,6 +70,8 @@ export function productionFactors(building, world, raining, season) {
   const scheme = building.type === 'garden' ? schemeGardenMultiplier(world.state) : 1;
   const vineCount = building.type === 'garden' ? vinesNear(world, building) : 0;
   const vines = 1 + vineCount * VINE.gardenBonus;
+  // (23. aşama) Su Kuyusu: 4 karo yakınındaki bahçeler sulanır (+%10)
+  const well = building.type === 'garden' ? wellGardenMultiplier(world.state, building) : 1;
   return {
     seasonal,
     seasonalRaw,
@@ -81,7 +84,8 @@ export function productionFactors(building, world, raining, season) {
     scheme,
     vines,
     vineCount,
-    total: seasonal * trees * rain * biome * upgrade * scheme * vines,
+    well,
+    total: seasonal * trees * rain * biome * upgrade * scheme * vines * well,
   };
 }
 
@@ -196,9 +200,12 @@ export class StructureSystem {
       if (!def.crafting && !def.processing && !def.apothecary) building.idle = false;
       if (def.processing) this.updateProcessing(building, def.processing);
       if (def.apothecary) this.updateApothecary(building, def.apothecary);
-      if (building.damaged) {
+      if (building.isBurning) {
         building.idle = true;
-        building.processStatus = building.project ? 'Onarılıyor' : 'Fırtınada hasar gördü: onarılana kadar çalışmaz';
+        building.processStatus = 'Yanıyor: sakinler yangını söndürmeye çalışıyor';
+      } else if (building.damaged) {
+        building.idle = true;
+        building.processStatus = building.project ? 'Onarılıyor' : `${building.damageKind === 'fire' ? 'Yangında' : building.damageKind === 'raid' ? 'Baskında' : 'Fırtınada'} hasar gördü: onarılana kadar çalışmaz`;
       }
       if (def.flock) {
         building.flock ??= new Flock(building);

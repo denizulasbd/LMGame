@@ -60,15 +60,22 @@ export class CelebrationModal {
     this.element.hidden = false;
   }
 
-  /** (12. aşama) Büyük Vadi Saat Kulesi tamamlandı: altın çağ. */
+  /** (12. aşama, 20. aşamada yenilendi) Ulu Saat Kulesi tamamlandı: Çağ Dönüm Noktası, Altın Çağ başlar (oyun sürer). */
   showWonder(townName, state) {
-    this.title.textContent = 'Altın Çağ: Vadinin İncisi!';
+    this.title.textContent = 'Çağ Dönüm Noktası: Altın Çağ!';
     this.drawArt(getStructureSprite('wonder', { wonderStage: 3, windowsLit: true, frame: 1 }), 2);
     this.message.textContent =
-      `${townName}, ${state.time.day}. günde Büyük Vadi Saat Kulesi'ni üç aşamasıyla tamamladı. ` +
-      'Kulenin çanı artık saat başı çalıyor; vadinin dört bir yanından görünüyor.';
+      `${townName}, ${state.time.day}. günde Ulu Saat Kulesi'ni üç aşamasıyla tamamladı ve Altın Çağ'a girdi! ` +
+      'Meydanda Çağ Kutlaması başladı, çan ilk kez çaldı. Bu bir son değil: kasaban büyümeye devam ediyor.';
     this.perks.replaceChildren(
-      ...['Kasaba refahına kalıcı +12', 'Geceleri kule bir fener gibi vadiyi aydınlatır', 'Kulenin ışığındaki sakinler kışın üşümez', 'Saat başı çan çalar'].map((text) => el('li', { text }))
+      ...[
+        'Kalıcı unvan: Altın Çağ · çalışma şevki +%10',
+        'Kasaba refahına kalıcı +%10 çarpan (ve +12)',
+        "Kule saati her sabah 08:00 ve akşam 18:00'de çalar: duyanların yorgunluğu azalır",
+        'Yeni prestij peyzajı: Mermer Çeşme ve Altın Çağ Feneri',
+        'Gezgin tüccar daha sık gelir: nadir tohumlar ve antik kitaplar',
+        "Arşiv'de Tarihçe Kütüğü: kurucular, ilk çift, ilk usta eseri, kulenin baş ustası",
+      ].map((text) => el('li', { text }))
     );
     this.perks.hidden = false;
     this.element.hidden = false;

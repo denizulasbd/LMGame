@@ -201,7 +201,8 @@ export class BuildMenu {
     const built = new Set(game.state.buildings.filter((b) => !b.underConstruction).map((b) => b.type));
     const tier = game.state.town?.tier ?? 1;
     const items = game.state.exploration?.items ?? {};
-    const key = `${tier}|${Object.values(resources).join(',')}|${Object.values(items).join(',')}|${game.state.buildings.map((b) => `${b.type}${b.underConstruction ? '~' : ''}`).sort().join(',')}`;
+    const royal = Boolean(game.state.crown?.statueRight);
+    const key = `${tier}|${royal}|${Object.values(resources).join(',')}|${Object.values(items).join(',')}|${game.state.buildings.map((b) => `${b.type}${b.underConstruction ? '~' : ''}`).sort().join(',')}`;
     if (key === this.affordKey) return;
     this.affordKey = key;
     for (const { type, def, button } of this.items) {
@@ -212,7 +213,8 @@ export class BuildMenu {
       // Kasaba seviyesiyle açılan yapılar (değirmen: Köy, belediye: Kasaba) kilit simgesiyle görünür
       const tierLocked = def.requiresTier && tier < def.requiresTier;
       const noItem = def.item && (items[def.item] ?? 0) < 1;
-      const locked = needsOther || alreadyHave || tierLocked || noItem;
+      const noRight = def.requiresRoyalRight && !royal; // (22. aşama) Kraliyet Beratı
+      const locked = needsOther || alreadyHave || tierLocked || noItem || noRight;
       const chip = button.querySelector('.build-item-count');
       if (chip) {
         chip.lastChild.textContent = `${items[def.item] ?? 0}`;
@@ -229,7 +231,9 @@ export class BuildMenu {
           ? `${def.name} — kasabada zaten var (yalnızca bir tane olabilir)`
           : noItem
             ? `${def.name} — önce bir keşif seferinden ${EXOTIC_ITEMS[def.item].name} getirilmeli · ${def.description}`
-            : `${def.name} — ${def.description}`;
+            : noRight
+              ? `${def.name} — bir Kraliyet Fermanı'nın ödülü olarak Kraliyet Beratı alınınca açılır · ${def.description}`
+              : `${def.name} — ${def.description}`;
       button.classList.toggle('is-unaffordable', locked || Object.entries(cost).some(([r, v]) => resources[r] < v));
       for (const node of button.querySelectorAll('.build-cost[data-resource]')) {
         node.classList.toggle('is-missing', resources[node.dataset.resource] < cost[node.dataset.resource]);

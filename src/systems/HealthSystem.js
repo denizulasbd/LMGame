@@ -17,22 +17,28 @@ import { coldProtection } from './Equipment.js';
 import { clamp } from '../utils/math.js';
 import { researchVigorHours } from './ResearchSystem.js';
 import { relicColdMultiplier } from './Luxury.js';
+import { INJURY } from '../data/crisis.js';
 
 /** Dinçlik bonusu sürüyor mu? */
 export function hasVigor(c, now) {
   return (c.buffs.vigor ?? -1) > now;
 }
 
-/** Yürüme hızı çarpanı: hasta 0,65, dinç 1,15. */
-export function healthWalkMultiplier(c, now) {
-  if (c.illness) return ILLNESS.walkSpeed;
-  return hasVigor(c, now) ? VIGOR.walkSpeed : 1;
+/** (23. aşama) Hafif yaralı sakin yürürken ve çalışırken %20 yavaştır. */
+export function injuryMultiplier(c) {
+  return c.isInjured ? INJURY.speed : 1;
 }
 
-/** Çalışma hızı çarpanı: hasta 0,65, dinç 1,15. */
+/** Yürüme hızı çarpanı: hasta 0,65, dinç 1,15; hafif yaralı ayrıca ×0,8. */
+export function healthWalkMultiplier(c, now) {
+  if (c.illness) return ILLNESS.walkSpeed * injuryMultiplier(c);
+  return (hasVigor(c, now) ? VIGOR.walkSpeed : 1) * injuryMultiplier(c);
+}
+
+/** Çalışma hızı çarpanı: hasta 0,65, dinç 1,15; hafif yaralı ayrıca ×0,8. */
 export function healthWorkMultiplier(c, now) {
-  if (c.illness) return ILLNESS.workSpeed;
-  return hasVigor(c, now) ? VIGOR.workSpeed : 1;
+  if (c.illness) return ILLNESS.workSpeed * injuryMultiplier(c);
+  return (hasVigor(c, now) ? VIGOR.workSpeed : 1) * injuryMultiplier(c);
 }
 
 /** Enerji azalma çarpanı: hasta 1,2, dinç 0,85. */
@@ -104,7 +110,7 @@ export class HealthSystem {
 
   /** Hastalığı tedavi edebilecek yapılar: iksiri olan, kullanılabilir şifacı kulübeleri. */
   clinics() {
-    return this.world.getCompleted().filter((b) => BUILDINGS[b.type].apothecary && !b.damaged && b.remedies > 0);
+    return this.world.getCompleted().filter((b) => BUILDINGS[b.type].apothecary && !b.damaged && !b.isBurning && b.remedies > 0);
   }
 
   /** Bu kulübeye tedaviye gitmekte olan diğer hastalar (iksirler yolda paylaşılmasın). */

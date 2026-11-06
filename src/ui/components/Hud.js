@@ -6,6 +6,9 @@
 //          listesi (Yün, Demir, Ekmek: depo, üreticiler ve bugünkü üretim; açık / kapalı tercihi hatırlanır), refah
 //          göstergesi ve nüfus (üzerine gelince göç koşulları)
 //   Altında: etkin kasaba bonusları ve uyarılar (ısınma, hasta, sefer, fırtına, festival) küçük çipler hâlinde.
+// (21. aşama) Refah göstergesinin yanında küçük kalkanla Yönetim Güveni (üzerine gelince güven ve isyan durumu); durum
+// çiplerinde açık dilekçeler (tıklayınca dilekçe sahibi seçilir) ve isyan alarmı (tıklayınca meydan havuzu / Belediye
+// Konağı paneli açılır: acil erzak ve altın dağıtımı).
 // Kaydet / Yükle / Yeni Harita Ayarlar penceresine, farenin altındaki karonun bilgisi harita ipucuna taşındı.
 import { CONFIG } from '../../config.js';
 import { getDayPhase } from '../../systems/TimeSystem.js';
@@ -32,6 +35,12 @@ import {
   foodSupply,
 } from '../../systems/TownStatus.js';
 import { el } from '../dom.js';
+import { trustValue, trustLevel } from '../../systems/Citizens.js';
+import { PETITION_KINDS, REVOLT } from '../../data/citizens.js';
+import { DECREES, TAX_RATES } from '../../data/crown.js';
+import { levyPlan } from '../../systems/Crown.js';
+import { formatRemaining } from '../../systems/Petitions.js';
+import { raidHoursLeft, defenseStatus } from '../../systems/Crisis.js';
 
 const DELTA_MERGE_MS = 500; // bu süre içindeki değişiklikler tek vurguda toplanır
 const DELTA_VISIBLE_MS = 1400;
@@ -109,7 +118,9 @@ export class Hud {
     const population = state.characters.length;
     const capacity = housingCapacity(state);
     const status = immigrationStatus(state);
-    const key = `${happiness}|${population}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}`;
+    const trust = Math.round(trustValue(state));
+    const revolt = state.trust?.revolt ?? null;
+    const key = `${happiness}|${population}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}|${trust}|${Boolean(revolt)}`;
     if (key !== this.lastWelfare) {
       this.lastWelfare = key;
       this.welfareFill.style.width = `${happiness}%`;
@@ -118,7 +129,17 @@ export class Hud {
       this.welfareIcon.src = getIconDataURL(level.key === 'bad' ? 'frown' : 'smile');
       // (18. aşama) Kasabanın estetiği refaha kalıcı küçük bir çarpan ekler
       const beauty = state.landscape?.percent ? ` Kasaba estetiği (${state.landscape.score} puan): refah +%${state.landscape.percent}.` : ' Süs, fener, ağaç ve taş plakalarla kasabayı güzelleştirdikçe refah +%5\'e kadar artar.';
-      this.welfareRow.title = `Refah (ortalama mutluluk): ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.${beauty}`;
+      // (21. aşama) Yönetim Güveni
+      const tl = trustLevel(trust);
+      this.trustFill.style.width = `${trust}%`;
+      this.trustFill.className = `trust-mini-fill is-${revolt ? 'revolt' : tl.key}`;
+      this.trustWrap.className = `trust-mini is-${revolt ? 'revolt' : tl.key}`;
+      this.trustWrap.dataset.trust = String(trust);
+      this.trustIcon.src = getAnyIconURL(revolt ? 'torch' : 'trust');
+      const trustLine = revolt
+        ? `\nYönetim Güveni: %${trust} · İSYAN sürüyor! Güven %${REVOLT.endTrust}'in üstüne çıkınca yatışır (meydan havuzu / Belediye Konağı: erzak ve altın dağıt).`
+        : `\nYönetim Güveni: %${trust} (${tl.name}). Dilekçeleri karşılamak ve yüksek refah güveni artırır; reddetmek, açlık, soğuk ve %35 altı refah eritir. %${REVOLT.critical} altında uzun kalırsa isyan çıkar.`;
+      this.welfareRow.title = `Refah (ortalama mutluluk): ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.${beauty}${trustLine}`;
       this.population.textContent = `${population}/${capacity}`;
       this.populationWrap.classList.toggle('is-full', population >= capacity);
       this.population.classList.toggle('is-full', population >= capacity);
@@ -132,11 +153,18 @@ export class Hud {
     const sick = state.characters.filter((c) => c.illness).map((c) => c.name);
     const away = state.characters.filter((c) => c.away).map((c) => c.name);
     const storm = state.dilemma?.storm;
-    const damaged = state.buildings.filter((b) => b.damaged).map((b) => b.name);
+    const damaged = state.buildings.filter((b) => b.damaged && !b.isBurning).map((b) => b.name);
+    // (23. aşama) yanan yapılar, bekleyen haydut baskını, hafif yaralılar
+    const burning = state.buildings.filter((b) => b.isBurning);
+    const raidLeft = raidHoursLeft(state);
+    const injured = state.characters.filter((c) => c.isInjured).map((c) => c.name);
     // 14. aşama: duyurulan / süren mevsim festivali ve toplanma zili
     const festival = currentSeasonFestival(state);
     const rally = isRallyActive(state) ? Math.ceil((state.rally.until - state.totalMinutes) / 10) : 0;
-    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}`;
+    // (21. aşama) açık dilekçeler ve isyan
+    const petitions = state.petitions?.list ?? [];
+    const revoltNow = state.trust?.revolt ?? null;
+    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}`;
     if (buffKey !== this.lastBuffs) {
       this.lastBuffs = buffKey;
       const chips = buffs.map((b) =>
@@ -164,7 +192,52 @@ export class Hud {
         const label = storm.kind === 'wolves' ? 'Kurt tehlikesi' : 'Fırtına yaklaşıyor';
         chips.push(chip(storm.kind === 'wolves' ? 'wolf' : 'storm', `${label}${storm.fortified ? ' · hazır' : ''}`, storm.fortified ? 'Kasaba güçlendirildi' : 'Güçlendirilmedi: hasar verebilir', storm.fortified ? '' : ' is-freezing'));
       }
-      if (damaged.length) chips.push(chip('storm', `${damaged.length} hasarlı yapı`, `Onarılmalı: ${damaged.join(', ')}`, ' is-freezing'));
+      if (damaged.length) {
+        const crisisDamage = state.buildings.some((b) => b.damaged && !b.isBurning && (b.damageKind === 'fire' || b.damageKind === 'raid'));
+        chips.push(chip(crisisDamage ? 'repair' : 'storm', `${damaged.length} hasarlı yapı`, `Onarılmalı (panelden "Tamir Et" ya da ustalar kendiliğinden): ${damaged.join(', ')}`, ' is-freezing'));
+      }
+      if (injured.length) chips.push(chip('bandage', `${injured.length} hafif yaralı`, `Yürüme ve çalışma %20 yavaş: ${injured.join(', ')}. Şifacı Kulübesi'nde sarılırlar; yoksa 1,5 günde kendiliğinden geçer.`));
+      // (21. aşama) İsyan alarmı ve açık dilekçeler (tıklanabilir)
+      const action = (icon, text, title, cls, onClick) => {
+        const b = el('button', { className: `buff-chip is-action${cls}`, type: 'button', title, tabIndex: -1 }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
+        b.addEventListener('mousedown', (e) => e.preventDefault());
+        b.addEventListener('click', onClick);
+        return b;
+      };
+      if (revoltNow) {
+        const venue = state.buildings.find((b) => b.functional && b.type === 'fountain') ?? state.buildings.find((b) => b.functional && BUILDINGS[b.type].civic);
+        chips.unshift(
+          action('torch', `İsyan! ${revoltNow.rioters.length} isyancı${revoltNow.raids.length ? ' · yağma' : ''}`, 'Sakinler işi bıraktı. Tıkla: meydan havuzunda / Belediye Konağı\'nda acil erzak ve altın dağıt', ' is-revolt', () => venue && this.game.events.emit('ui:selectBuilding', venue.id))
+        );
+      }
+      // (23. aşama) Yangın alarmı (her yanan yapı için, tıklayınca yapı seçilir) ve haydut izi (tıklayınca karar penceresi)
+      for (const b of burning) {
+        chips.unshift(action('fire', `${b.name} yanıyor · %${Math.round(b.fireProgress)}`, 'Sakinler kovalarla koşuyor. Tıkla: yapıyı seç, panelden "Acil Söndür (Kova Zinciri)" de. %100\'e varırsa yapı hasar alır (silinmez).', ' is-revolt', () => this.game.events.emit('ui:selectBuilding', b.id)));
+      }
+      if (raidLeft !== null) {
+        const ok = defenseStatus(state).ok;
+        const when = raidLeft <= 1 ? 'birazdan' : raidLeft <= 48 ? `${raidLeft} sa` : `${Math.ceil(raidLeft / 24)} gün`;
+        chips.unshift(action('bandit', `Haydut izleri · ${when}`, `Ormanda haydut izleri görüldü. Tıkla: bekçilerle püskürt, haraç öde ya da bekle (${ok ? 'savunma yeterli' : 'savunma yetersiz'}).`, ok ? ' is-crown' : ' is-revolt', () => this.game.events.emit('ui:openRaid')));
+      }
+      // (22. aşama) Kraliyet Tahsildarı, Kraliyet Fermanı, Ağır Vergi ve terk ediş
+      const hall = state.buildings.find((b) => b.functional && BUILDINGS[b.type].civic) ?? state.buildings.find((b) => b.functional && b.type === 'fountain');
+      const openHall = () => hall && this.game.events.emit('ui:selectBuilding', hall.id);
+      const cr = state.crown;
+      if (state.exodus?.active) chips.unshift(action('bundle', 'Terk ediş! Sakinler köyden gidiyor', 'Umut tükendi: en mutsuz sakinler kesesi ve çantasıyla köyü terk ediyor, göçmen gelmiyor. Güveni ve refahı toparla', ' is-revolt', openHall));
+      if (cr?.notice) {
+        const ok = levyPlan(state, cr.notice.amount).ok;
+        chips.push(action('collector', `Tahsildar yolda · ${cr.notice.amount} altın · ${formatRemaining(cr.nextLevyAt - state.totalMinutes)}`, ok ? 'Krallık Vergisi vakti gelince hazineden ödenecek' : 'Hazine yetmiyor! Ödenemezse Krallık hazineye el koyar ve depodan mal çeker. İç vergiyi ayarla', ok ? ' is-crown' : ' is-crown is-short', openHall));
+      }
+      if (cr?.decree) {
+        const def = DECREES[cr.decree.kind];
+        chips.push(action('decree', `Ferman · ${def.name} · ${formatRemaining(cr.decree.deadline - state.totalMinutes)}`, `"${def.text}" · Belediye Konağı'nın panelinden teslim et`, ' is-crown', openHall));
+      }
+      if (state.tax?.rate === 'heavy') chips.push(chip('torch', 'Ağır Vergi · verim -%15', `${TAX_RATES.heavy.description}`, ' is-freezing'));
+      const trustNow = Math.round(trustValue(state));
+      if (!revoltNow && trustNow < 50) chips.push(chip('trust', `Güven %${trustNow}`, `Yönetim Güveni düşük (${trustLevel(trustNow).name}). %${REVOLT.critical} altında ${REVOLT.graceHours} saat kalırsa isyan çıkar: dilekleri karşıla, erzak / altın dağıt`, ' is-freezing'));
+      for (const p of petitions) {
+        chips.push(action('scroll', `Dilekçe · ${p.name}`, `${PETITION_KINDS[p.kind].name}: "${p.text}"${p.status === 'accepted' ? ' (söz verildi)' : ''} · tıkla: sakini seç`, p.status === 'accepted' ? ' is-petition is-accepted' : ' is-petition', () => this.game.events.emit('ui:selectCharacter', p.characterId)));
+      }
       this.buffs.hidden = chips.length === 0;
       this.buffs.replaceChildren(...chips);
       this.resources.wood.box.title = heating > 0 ? `Odun · ısınma gideri −${heating}/gün\n${RESOURCES.wood.hint}` : `Odun\n${RESOURCES.wood.hint}`;
@@ -303,7 +376,17 @@ export class Hud {
     this.welfareIcon = el('img', { className: 'hud-icon', alt: '' });
     this.welfareFill = el('span', { className: 'need-fill welfare-fill' });
     this.welfareValue = el('span', { className: 'welfare-value' });
-    this.welfareRow = el('span', { className: 'hud-chip hud-welfare' }, [this.welfareIcon, el('span', { className: 'need-bar welfare-bar' }, [this.welfareFill]), this.welfareValue]);
+    // (21. aşama) Yönetim Güveni: refah çipinin içinde küçük kalkan ve yüzde
+    // (ince üst çubuk dar: güven, refah çubuğunun altında ikinci ince çubuk ve sağda küçük kalkan; yüzdesi ipucunda)
+    this.trustFill = el('span', { className: 'trust-mini-fill' });
+    this.trustIcon = el('img', { className: 'hud-icon trust-icon', src: getAnyIconURL('trust'), alt: '' });
+    this.trustWrap = el('span', { className: 'trust-mini' }, [this.trustIcon]);
+    this.welfareRow = el('span', { className: 'hud-chip hud-welfare' }, [
+      this.welfareIcon,
+      el('span', { className: 'welfare-bars' }, [el('span', { className: 'need-bar welfare-bar' }, [this.welfareFill]), el('span', { className: 'trust-mini-bar' }, [this.trustFill])]),
+      this.welfareValue,
+      this.trustWrap,
+    ]);
     this.buffs = el('div', { className: 'hud-buffs ui-interactive' });
     this.lastWelfare = '';
     this.lastBuffs = '';

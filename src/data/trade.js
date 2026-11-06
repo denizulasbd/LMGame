@@ -5,17 +5,19 @@
 //   seasons: yalnızca bu mevsimlerde sunulur (yoksa her mevsim)
 //   minTier: (10. aşama) kasaba en az bu seviyedeyse sunulur (data/town.js -> TOWN_TIERS); kasaba
 //            büyüdükçe tüccarın mal çeşitliliği artar, her teklifin stoğu da merchantBonus kadar büyür
+import { GOLDEN_OFFERS } from './goldenAge.js';
 import { TOWN_TIERS } from './town.js';
 
-/** Bu mevsimde ve bu kasaba seviyesinde sunulan teklifler. */
-export function offersFor(seasonKey, tier = 1) {
-  return TRADE_OFFERS.filter((o) => (!o.seasons || o.seasons.includes(seasonKey)) && (o.minTier ?? 1) <= tier);
+/** Bu mevsimde ve bu kasaba seviyesinde sunulan teklifler; (20. aşama) Altın Çağ'da nadir tohum ve antik kitap da. */
+export function offersFor(seasonKey, tier = 1, goldenAge = false) {
+  const all = goldenAge ? [...TRADE_OFFERS, ...GOLDEN_OFFERS] : TRADE_OFFERS;
+  return all.filter((o) => (!o.seasons || o.seasons.includes(seasonKey)) && (o.minTier ?? 1) <= tier);
 }
 
 /** Bir teklifin bu kasaba seviyesindeki ziyaret başı stoğu (seviye arttıkça mal miktarı artar). */
 export function offerStock(offer, tier = 1) {
   const def = TOWN_TIERS.find((t) => t.tier === tier) ?? TOWN_TIERS[0];
-  return offer.stock + (offer.buff ? 0 : def.merchantBonus ?? 0);
+  return offer.stock + (offer.buff || offer.grant ? 0 : def.merchantBonus ?? 0);
 }
 
 export const TRADE_OFFERS = [

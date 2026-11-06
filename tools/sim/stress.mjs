@@ -77,5 +77,36 @@ console.log(
     `(kaza ${sum((d) => d.monitor.events.mishaps)}) · handa anlatılan hikâye ${sum((d) => d.monitor.events.tales)} · çözülen yazıt ${sum((d) => d.monitor.decoded ?? 0)} · ` +
     `dikilen asma / meşale ${sum((d) => d.monitor.exotic ?? 0)}`
 );
+const so = (f) => sum((d) => (d.monitor.social ? f(d.monitor.social) : 0));
+console.log(
+  `(19. aşama) evli çift ${so((x) => x.couples)} (aynı evde ${so((x) => x.couplesTogether)}) · sosyal sıkışma ${so((x) => x.stuck.length)} · ` +
+    `randevu ${so((x) => x.dates)} · düğün kutlaması ${so((x) => x.parties)} · akşam yemeği ${so((x) => x.dinners)} · boşalan ev ${so((x) => x.homesFreed)} · ` +
+    `dedikodu ${so((x) => x.gossip)} · müzik ${so((x) => x.serenades)} · hayvan sevme ${so((x) => x.cuddles)} · kitap ${so((x) => x.books)} · ` +
+    `en düşük nüfus (toplam) ${so((x) => x.minPop)} · en çok evsiz ${Math.max(0, ...results.map((r) => r.data?.monitor.social?.homelessMax ?? 0))}`
+);
+const ga = (f) => sum((d) => (d.monitor.golden ? f(d.monitor.golden) : 0));
+console.log(
+  `(20. aşama) Ulu Saat Kulesi tamamlanan koşu ${results.filter((r) => r.data?.monitor.golden?.stage >= 3).length}/${results.length} · ` +
+    `aşamalar ${results.map((r) => `${r.seed}:${r.data?.monitor.golden?.stage ?? '-'}`).join(' ')} · Altın Çağ günleri ${results.map((r) => r.data?.monitor.golden?.since ?? '-').join(',')} · ` +
+    `çan ${ga((g) => g.chimes)} · Çağ Kutlaması ${ga((g) => g.celebrations)}`
+);
+const cz = (f) => sum((d) => (d.monitor.citizens ? f(d.monitor.citizens) : 0));
+console.log(
+  `(21. aşama) isyan ${cz((z) => z.revolts)} (${cz((z) => z.revoltHours)} saat) · yağma ${cz((z) => z.raids)} · en düşük güven ${results.map((r) => `${r.seed}:${r.data?.monitor.citizens?.trustMin ?? '-'}`).join(' ')} · ` +
+    `dilekçe ${cz((z) => z.petitions.made)} (karşılanan ${cz((z) => z.petitions.fulfilled)}, reddedilen ${cz((z) => z.petitions.rejected)}, süresi dolan ${cz((z) => z.petitions.expired)}) · ` +
+    `yevmiye ${cz((z) => z.wages)} altın · alışveriş ${cz((z) => z.purchases)} · çantadan yemek ${cz((z) => z.bagMeals)} · keselerde ${cz((z) => z.coins)} altın, çantalarda ${cz((z) => z.items)} eşya`
+);
+const kr = (f) => sum((d) => (d.monitor.crown ? f(d.monitor.crown) : 0));
+console.log(
+  `(22. aşama) vergi tahsilatı ${kr((k) => k.collections)} (+${kr((k) => k.taxGold)} altın, ${kr((k) => k.taxGoods)} öşür) · Krallık Vergisi ${kr((k) => k.paid)}/${kr((k) => k.levies)} ödendi (ceza ${kr((k) => k.failed)}) · ` +
+    `ferman teslim ${kr((k) => k.delivered)}, başarısız ${kr((k) => k.decreesFailed)} · berat ${kr((k) => (k.statueRight ? 1 : 0))} · heykel ${kr((k) => k.statues)} · terk eden ${kr((k) => k.emigrants)} · ` +
+    `son kademe ${results.map((r) => `${r.seed}:${r.data?.monitor.crown?.rate ?? '-'}`).join(' ')} · itibar ${results.map((r) => `${r.seed}:${r.data?.monitor.crown?.reputation ?? '-'}`).join(' ')}`
+);
+const cs = (f) => sum((d) => (d.monitor.crisis ? f(d.monitor.crisis) : 0));
+console.log(
+  `(23. aşama) yangın ${cs((c) => c.fires)} (söndürülen ${cs((c) => c.extinguished)}, hasar bırakan ${cs((c) => c.burned)}) · haydut baskını ${cs((c) => c.raids)} (püskürtülen ${cs((c) => c.repelled)}, haraç ${cs((c) => c.tributes)}, hazırlıksız ${cs((c) => c.caught)}) · ` +
+    `yaralanma ${cs((c) => c.injuries)} (şifacıda iyileşen ${cs((c) => c.treated)}) · tamir ${cs((c) => c.repairs)} · koşu sonunda hasarlı ${cs((c) => c.damagedNow)}, yanan ${cs((c) => c.burningNow)}, yaralı ${cs((c) => c.injuredNow)} · ` +
+    `Su Kuyusu ${cs((c) => c.wells)}, Gözcü Kulesi ${cs((c) => c.towers)} · 3 günü aşan hasar ${cs((c) => c.longDamaged)} · en düşük güven ${results.map((r) => `${r.seed}:${r.data?.monitor.citizens?.trustMin ?? '-'}`).join(' ')}`
+);
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

@@ -21,7 +21,11 @@
 //   bubbles     : etkinlik sırasında çıkan ifade balonları; partnerBubbles: sohbet ederken
 //                 (sevgilisi / eşiyle sohbet ederken LOVE_BUBBLES, anlaşamadığıyla RIVAL_BUBBLES)
 //   urgentBubble: hedefe acil ihtiyaçla yürürken başta gösterilen balon
-//   travelLabel / label / partnerLabel: arayüzde görünen durum metinleri
+//   travelLabel / label / partnerLabel: arayüzde görünen durum metinleri; dateLabel: (19. aşama) randevudaki çiftin
+//   (19. aşama) {pet} hayvanın adı ("Tekir'in"), {place} çalınan yer ("Handa" / "Meydanda") ile değiştirilir
+//   (21. aşama) finishEvent: etkinlik bitince yayınlanan olay { character, task, building } (vatandaşlık katmanı etkileri
+//                uygular: PurseSystem, TrustSystem); {bag} çantadaki eşyanın adıyla değiştirilir ("ekmeğini")
+//                kind 'riot': yağma (yarıda kesilmez, kısa sürer)
 export const ACTIVITIES = {
   sleep: {
     kind: 'rest',
@@ -91,6 +95,7 @@ export const ACTIVITIES = {
     travelLabel: 'Çardağa yürüyor',
     label: 'Çardakta oturup çiçekleri seyrediyor',
     partnerLabel: '{partner} ile çardakta sohbet ediyor',
+    dateLabel: '{partner} ile çardakta baş başa buluştu',
     duration: [45, 80],
     effects: { fun: 0.6, energy: 0.08 },
     socialGain: 1.4,
@@ -115,6 +120,97 @@ export const ACTIVITIES = {
     faceBuilding: true,
     bubbles: ['note', 'chat'],
     partnerBubbles: ['chat', 'laugh', 'note'],
+  },
+  // 19. aşama: düğün kutlaması — evlenen çift ve dostları meydanda konfetiler arasında kutlar (data/social.js)
+  weddingParty: {
+    kind: 'social',
+    target: 'fountain',
+    travelLabel: 'Düğün kutlamasına koşuyor',
+    label: 'Meydanda düğünü kutluyor',
+    partnerLabel: '{partner} ile meydanda düğünü kutluyor',
+    duration: [45, 45],
+    effects: { fun: 0.3 },
+    socialGain: 1.3,
+    aloneSocialGain: 0.6,
+    friendshipMultiplier: 1.4,
+    bubbles: ['note', 'laugh', 'heart'],
+    partnerBubbles: ['laugh', 'heart', 'note', 'ring'],
+  },
+  // 20. aşama: Ulu Saat Kulesi tamamlanınca meydanda büyük Çağ Kutlaması (uyanık herkes katılır)
+  ageCelebration: {
+    kind: 'social',
+    target: 'fountain',
+    travelLabel: "Çağ Kutlaması'na koşuyor",
+    label: "Meydanda Çağ Kutlaması'nda",
+    partnerLabel: "{partner} ile meydanda Altın Çağ'ı kutluyor",
+    duration: [120, 120],
+    effects: { fun: 0.3 },
+    socialGain: 1.3,
+    aloneSocialGain: 0.7,
+    friendshipMultiplier: 1.3,
+    bubbles: ['bell', 'note', 'laugh', 'sparkle'],
+    partnerBubbles: ['laugh', 'note', 'bell', 'heart'],
+  },
+  // 19. aşama: evli çift akşamları evde birlikte yemek yer (içeride; öğün başı yiyecek değeri öder)
+  homeDinner: {
+    kind: 'need',
+    indoor: true,
+    travelLabel: 'Akşam yemeği için eve dönüyor',
+    label: 'Eşiyle evde akşam yemeği yiyor',
+    partnerLabel: 'Eşi {partner} ile evde akşam yemeği yiyor',
+    duration: [25, 35],
+    effects: { hunger: 3.2 },
+  },
+  // 19. aşama: karakter huyları
+  // Hayvansever: sokaktaki kediye / köpeğe yürüyüp başını okşar
+  petAnimal: {
+    kind: 'leisure',
+    travelLabel: 'Sokaktaki {pet} yanına gidiyor',
+    label: '{pet} başını okşuyor',
+    duration: [6, 10],
+    effects: { fun: 0.2 },
+    pose: 'gather',
+    bubbles: ['heart', 'paw'],
+  },
+  // Kitap Kurdu: fener altındaki bankta ya da Bilgelik Evi'nde kitap okur
+  readBench: {
+    kind: 'leisure',
+    target: 'bench',
+    travelLabel: 'Kitabını alıp fener altındaki banka yürüyor',
+    label: 'Fener altındaki bankta kitap okuyor',
+    duration: [40, 70],
+    effects: { fun: 0.55, energy: 0.1 },
+    pose: 'sit',
+    bubbles: ['book', 'sparkle'],
+  },
+  readLibrary: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: "Bilgelik Evi'ne kitap okumaya gidiyor",
+    label: "Bilgelik Evi'nde kitap okuyor",
+    duration: [45, 75],
+    effects: { fun: 0.6, social: 0.1 },
+  },
+  // Müzisyen: akşamları handa ya da meydan havuzunun başında çalar; dinleyenlerin keyfi dolar (SocialSystem)
+  music: {
+    kind: 'leisure',
+    travelLabel: '{place} çalmaya gidiyor',
+    label: '{place} melodiler çalıyor',
+    duration: [40, 70],
+    effects: { fun: 0.4, social: 0.6 },
+    bubbles: ['melody', 'note', 'melody'],
+  },
+  // Doğa Tutkunu: süs ağacının gölgesinde ya da nehir kenarında manzarayı izler
+  viewpoint: {
+    kind: 'leisure',
+    travelLabel: 'Manzarayı izlemeye yürüyor',
+    label: 'Nehir kenarında manzarayı izleyip dinleniyor',
+    treeLabel: 'Süs ağacının gölgesinde manzarayı izliyor',
+    duration: [35, 60],
+    effects: { fun: 0.75, energy: 0.15 },
+    nature: true,
+    pose: 'sit',
+    bubbles: ['sparkle', 'heart', 'note'],
   },
   // 18. aşama: ulu süs ağacının gölgesinde dinlenmek
   shade: {
@@ -391,6 +487,7 @@ export const ACTIVITIES = {
     duration: [14, 20],
     effects: { hunger: 7, fun: 0.6 },
     urgentBubble: 'apple',
+    finishEvent: 'citizen:innMeal', // (21. aşama) yemekten sonra kesesine göre azık alabilir
   },
   inn: {
     kind: 'social',
@@ -398,6 +495,7 @@ export const ACTIVITIES = {
     travelLabel: 'Hana gidiyor',
     label: 'Hanın önünde dinleniyor',
     partnerLabel: '{partner} ile handa sohbet ediyor',
+    dateLabel: '{partner} ile handa aynı masayı paylaşıyor',
     duration: [50, 90],
     effects: { fun: 0.6 },
     socialGain: 1.4,
@@ -435,6 +533,117 @@ export const ACTIVITIES = {
     bubbles: ['heart'],
   },
 
+  // --- 21. aşama: kişisel çanta, alışveriş, isyan ---
+  snack: {
+    kind: 'need',
+    target: 'none',
+    label: 'Çantasından {bag} çıkarıp yiyor',
+    duration: [8, 12],
+    effects: {},
+    bubbles: ['apple'],
+    finishEvent: 'citizen:snack',
+  },
+  herbTea: {
+    kind: 'need',
+    target: 'none',
+    label: 'Çantasındaki şifalı otla ıhlamur demleyip içiyor',
+    duration: [14, 20],
+    effects: { energy: 0.1 },
+    bubbles: ['herb'],
+    finishEvent: 'citizen:herbTea',
+  },
+  keepsake: {
+    kind: 'leisure',
+    target: 'none',
+    label: 'Çantasındaki hatırasına bakıp gülümsüyor',
+    duration: [6, 10],
+    effects: {},
+    bubbles: ['memory', 'heart'],
+    finishEvent: 'citizen:keepsake',
+  },
+  shop: {
+    kind: 'leisure',
+    target: 'market',
+    travelLabel: "Pazar Yeri'ne alışverişe gidiyor",
+    label: "Pazar Yeri'nde tezgâhları geziyor, alışveriş yapıyor",
+    duration: [18, 28],
+    effects: { fun: 0.25 },
+    bubbles: ['purse', 'sparkle'],
+    finishEvent: 'citizen:shop',
+  },
+  protest: {
+    kind: 'social',
+    target: 'fountain',
+    travelLabel: 'Öfkeyle meydana yürüyor',
+    label: 'Meydanda öfkeyle yönetime bağırıyor',
+    partnerLabel: '{partner} ile meydanda yönetime söyleniyor',
+    duration: [60, 60],
+    effects: {},
+    socialGain: 0.6,
+    aloneSocialGain: 0.3,
+    faceBuilding: true,
+    bubbles: ['angry', 'torch'],
+    partnerBubbles: ['angry', 'torch', 'sulk'],
+  },
+  loot: {
+    kind: 'riot',
+    travelLabel: 'Öfkeli kalabalıkla yağmaya yürüyor',
+    label: '{target} yağmalıyor, çuvalları dolduruyor',
+    duration: [15, 20],
+    effects: {},
+    pose: 'gather',
+    bubbles: ['torch', 'angry', 'loot'],
+    finishEvent: 'riot:loot',
+  },
+  // --- 22. aşama: köyü terk etme (kesesi ve çantasıyla harita kenarına yürür, orada kasabadan ayrılır) ---
+  emigrate: {
+    kind: 'away',
+    travelLabel: 'Bohçasını sırtlamış, köyü terk ediyor',
+    label: 'Son kez ardına bakıp köyden ayrılıyor',
+    duration: [0, 0],
+    effects: {},
+    bubbles: ['bundle'],
+    finishEvent: 'citizen:emigrated',
+  },
+  // --- 23. aşama: krizler (yangın ve itfaiye, nöbet, yaralanma) ---
+  patrol: {
+    kind: 'work',
+    travelLabel: 'Kasaba bekçisi olarak nöbete gidiyor',
+    label: 'Kasaba bekçisi: Gözcü Kulesi önünde nöbet tutuyor, çevreyi gözetliyor',
+    pose: 'stand',
+    bubbles: ['shield', 'sparkle'],
+  },
+  fetchWater: {
+    kind: 'crisis',
+    travelLabel: 'Yangın var! Kovasını doldurmaya koşuyor',
+    label: 'Kovasını suyla dolduruyor',
+    duration: [3, 3],
+    effects: {},
+    pose: 'gather',
+    urgentBubble: 'bucket',
+    bubbles: ['bucket', 'sweat'],
+    finishEvent: 'crisis:bucketFilled',
+  },
+  fightFire: {
+    kind: 'crisis',
+    travelLabel: 'Kovayla yanan yapıya koşuyor',
+    label: 'Yangına su atıyor, kova zincirine katılıyor',
+    duration: [3, 3],
+    effects: {},
+    pose: 'work',
+    bubbles: ['bucket', 'sweat', 'fire'],
+    finishEvent: 'crisis:bucketThrown',
+  },
+  tendWound: {
+    kind: 'need',
+    indoor: true,
+    travelLabel: "Yaralarını sarmak için Şifacı Kulübesi'ne gidiyor",
+    label: 'Şifacıda yaraları sarılıyor',
+    duration: [12, 16],
+    effects: { energy: 0.3 },
+    urgentBubble: 'bandage',
+    finishEvent: 'crisis:treated',
+  },
   wait: {
     kind: 'idle',
     target: 'none',

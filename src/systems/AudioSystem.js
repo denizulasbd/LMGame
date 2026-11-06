@@ -84,6 +84,12 @@ export class AudioSystem {
       on('weather:lightning', () => this.playRumble()),
       on('pet:cheered', ({ animal }) => (animal.kind === 'cat' ? this.playMeow() : this.playBark())),
       on('rally:rung', () => this.playTownBell()),
+      // (20. aşama) Ulu Saat Kulesi: sabah / akşam çanı ve Çağ Kutlaması
+      on('goldenAge:chime', ({ hour, first }) => {
+        this.playTownBell();
+        this.playClockTower(first ? 12 : hour);
+      }),
+      on('goldenAge:began', () => this.playGrandFanfare()),
       on('seasonFestival:announced', () => this.playBell()),
       on('memory:recalled', () => this.playChime()),
       on('civic:decreed', () => this.playGrandFanfare()),
@@ -95,6 +101,10 @@ export class AudioSystem {
       on('expedition:returned', () => this.playFanfare()),
       on('goods:firstProduced', () => this.playMilestone()),
       on('relationship:married', () => this.playWedding()),
+      // (19. aşama) düğün kutlaması, hayvanseverin okşadığı kedinin mırlaması / köpeğin sevinci, müzisyenin ilk notaları
+      on('social:partyStarted', () => this.playFanfare()),
+      on('pet:purred', ({ animal }) => (animal.kind === 'cat' ? this.playMeow() : this.playBark())),
+      on('social:serenade', () => this.playChime()),
       on('relationship:partnered', () => this.playChime()),
       on('family:childBorn', () => this.playLullaby()),
       on('family:grownUp', () => this.playMilestone()),
@@ -106,7 +116,8 @@ export class AudioSystem {
       on('time:hour', (hour) => {
         if (hour === 6) this.playMorning();
         // Altın çağ (12. aşama): Büyük Vadi Saat Kulesi saat başı çan çalar (gece yarısından sabaha susar)
-        else if (hour >= 7 && hour <= 22 && this.world.getCompleted('wonder').some((b) => b.wonderComplete)) this.playClockTower(hour);
+        // (20. aşama) 08:00 ve 18:00'de Altın Çağ çanı ayrıca çalar ('goldenAge:chime')
+        else if (hour >= 7 && hour <= 22 && hour !== 8 && hour !== 18 && this.world.getCompleted('wonder').some((b) => b.wonderComplete)) this.playClockTower(hour);
       }),
       on('merchant:arrived', () => this.playBell()),
       on('trade:completed', () => this.playCoin()),

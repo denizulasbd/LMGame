@@ -27,6 +27,7 @@ import { TitleMenu } from './components/TitleMenu.js';
 import { DilemmaModal } from './components/DilemmaModal.js';
 import { StatsPanel } from './components/StatsPanel.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
+import { CrisisModal } from './components/CrisisModal.js';
 import { MapTooltip } from './components/MapTooltip.js';
 
 const BOTTOM_GAP = 10; // dock ile pencere kenarı / sağ sütun arasındaki boşluk (piksel)
@@ -60,6 +61,7 @@ export class UIManager {
       new TownJournal(game),
       new StatsPanel(game),
       new SettingsPanel(game),
+      new CrisisModal(game),
       new CelebrationModal(game),
       new DilemmaModal(game),
       new TitleMenu(game),

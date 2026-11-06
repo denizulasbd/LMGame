@@ -3,6 +3,7 @@
 // kuralları EventSystem uygular. Tüccar ayrılınca pencere kendiliğinden kapanır.
 // (13. aşama) İki sekme: "Takas" ve yalnızca altınla alınan "Lüks Mallar" (baharat sandığı, ipek ve mermer, kasaba
 // yadigârları; kartlar luxuryCards.js'te, kuralları LuxurySystem uygular).
+import { isGoldenAge } from '../../systems/GoldenAge.js';
 import { MERCHANT, offersFor } from '../../data/trade.js';
 import { getSeason } from '../../data/seasons.js';
 import { RESOURCES } from '../../data/resources.js';
@@ -90,7 +91,7 @@ export class TradePanel {
       return;
     }
     this.title.textContent = 'Takas teklifleri';
-    const offers = offersFor(getSeason(game.state.time.day).key, game.state.town?.tier ?? 1);
+    const offers = offersFor(getSeason(game.state.time.day).key, game.state.town?.tier ?? 1, isGoldenAge(game.state));
     this.offers.replaceChildren(...offers.map((offer) => this.offerRow(offer, m.stock[offer.id] ?? 0, resources)));
   }
 
@@ -113,7 +114,7 @@ export class TradePanel {
       ...(offer.description ? [el('div', { className: 'trade-description', text: offer.description })] : []),
     ]);
     const tierClass = (offer.minTier ?? 1) > 1 ? ' is-tier' : '';
-    return el('div', { className: `trade-row${offer.buff || offer.seasons ? ' is-special' : ''}${tierClass}` }, [
+    return el('div', { className: `trade-row${offer.buff || offer.seasons || offer.grant ? ' is-special' : ''}${offer.goldenAge ? ' is-golden' : ''}${tierClass}` }, [
       info,
       el('div', { className: 'trade-side' }, [button, el('span', { className: 'trade-stock', text: `stok ${stock}` })]),
     ]);

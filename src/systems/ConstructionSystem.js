@@ -9,9 +9,11 @@
 //                      peşin ödenir, inşaatçılar yapının çevresinde çalışır, yapı bu sırada işlemeye devam eder
 //   - proje bitince yapı Seviye 2 olur ('building:upgraded') ya da harabe onarılır ('ruin:restored';
 //     erzak kampının hazinesi stoğa eklenir)
+import { isGoldenAge } from './GoldenAge.js';
 import { BUILDINGS, TILE_BUILDS, TILE_REMOVAL, TILE_BUILD_BY_RESULT, mendSpec, PROJECT_WORDS } from '../data/buildings.js';
 import { STREET_NAMES } from '../data/landscape.js';
 import { STORM } from '../data/dilemmas.js';
+import { mendSpecFor } from './Crisis.js';
 import { OBJECT_TYPES, TILE_TYPES, GROUND_TILES } from '../data/tiles.js';
 import { formatCost } from '../data/resources.js';
 import { Building } from '../entities/Building.js';
@@ -74,6 +76,13 @@ export class ConstructionSystem {
     if (!reason && def.requiresTier && (this.world.state.town?.tier ?? 1) < def.requiresTier) {
       reason = `${TOWN_TIERS[def.requiresTier - 1].name} seviyesine ulaşınca açılır`;
     }
+    // (20. aşama) Nüfusla açılan yapılar (Ulu Saat Kulesi: 20 sakin); Altın Çağ'la açılan prestij yapıları
+    if (!reason && def.requiresPopulation && this.world.state.characters.length < def.requiresPopulation) {
+      reason = `Kasaba ${def.requiresPopulation} sakine ulaşınca açılır (şu an ${this.world.state.characters.length})`;
+    }
+    if (!reason && def.requiresGoldenAge && !isGoldenAge(this.world.state)) reason = "Ulu Saat Kulesi tamamlanıp Altın Çağ başlayınca açılır";
+    // (22. aşama) Kraliyet Beratı'yla açılan anıt (Kraliyet Fermanı ödülü)
+    if (!reason && def.requiresRoyalRight && !this.world.state.crown?.statueRight) reason = 'Bir Kraliyet Fermanı ödülü olarak Kraliyet Beratı alınınca açılır';
     // (16. aşama) Seferden gelen egzotik ganimetle dikilen yapılar (üzüm asması, kadim meşale)
     if (!reason && def.item && itemCount(this.world.state, def.item) < 1) {
       reason = `Önce bir keşif seferinden ${EXOTIC_ITEMS[def.item].name} getirilmeli`;
@@ -409,7 +418,8 @@ export class ConstructionSystem {
     const def = BUILDINGS[building.type];
     if (building.ruined) return def.ruin ? { kind: 'repair', spec: def.ruin } : null;
     // Fırtınada / kurt saldırısında hasar gören yapı önce onarılır (11. aşama)
-    if (building.damaged) return { kind: 'mend', spec: mendSpec(building.type, STORM.mend) };
+    // (23. aşama) Yangın / baskın hasarı %25 maliyet + kısa iş; fırtına hasarı eski kural
+    if (building.damaged) return { kind: 'mend', spec: mendSpecFor(building) };
     // Çok aşamalı harika: sıradaki aşama (Gövde, Görkemli Kule)
     if (def.wonder && !building.wonderComplete) {
       const stage = def.wonder.stages[building.wonderStage];
@@ -503,9 +513,10 @@ export class ConstructionSystem {
       return;
     }
     if (kind === 'mend') {
-      building.damaged = false;
+      const damageKind = building.damageKind;
+      building.isDamaged = false;
       this.world.invalidateSpots(building);
-      this.events.emit('building:mended', { building });
+      this.events.emit('building:mended', { building, kind: damageKind, instant: false });
       this.events.emit('toast', { text: `${building.name} onarıldı, yeniden çalışıyor`, tone: 'success', icon: 'hammer' });
       return;
     }

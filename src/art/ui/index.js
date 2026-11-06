@@ -1139,6 +1139,53 @@ Object.assign(ICONS, {
   ],
 });
 
+// 19. aşama: karakter huyları (Müzisyen'in udu, Doğa Tutkunu'nun yaprağı; Hayvansever pati, Kitap Kurdu kitap simgesini kullanır)
+Object.assign(ICONS, {
+  lute: [
+    '......KK.',
+    '.....KXK.',
+    '....KwK..',
+    '...KwK...',
+    '.KKKK....',
+    'KXEEXK...',
+    'KEKKEK...',
+    'KXEEXK...',
+    '.KKKK....',
+  ],
+  leaf: [
+    '.......K.',
+    '.....KKvK',
+    '...KKvVvK',
+    '..KvVvvK.',
+    '.KvVvvK..',
+    '.KvvvK...',
+    '.KvKK....',
+    '.K.......',
+    'K........',
+  ],
+  // 22. aşama: Kraliyet Tahsildarı (mühürlü kese ve şapka), Kraliyet Fermanı (kırmızı mühürlü rulo), taç, Aslanlı Heykel, bohça
+  collector: ['..KKKKK..', '.KnnnnnK.', 'KKKKKKKKK', '...KPK...', '..KdddK..', '.KdeYedK.', 'KddYoYddK', 'KdeeYeedK', '.KKKKKKK.'],
+  decree: ['.KKKKKKK.', 'KeSSSSSeK', 'KKSSSSSKK', '.KsKKKsK.', '.KsSSSsK.', '.KsKKoKK.', '.KsSooo.K', 'KeSSoooeK', '.KKKKKKK.'],
+  crown: ['.........', 'P...P...P', 'PP.PYP.PP', 'PYPYYYPYP', 'PYYYoYYYP', 'KPPPPPPPK', 'KYYYYYYYK', '.KKKKKKK.', '.........'],
+  royalStatue: ['..P.P.P..', '..PYYYP..', '.KOOOOK..', 'KOYPYOKK.', 'KOYYYOYYK', '.KOOOKYYK', '.KKKKKKKK', 'KuuPPPuuK', 'KKKKKKKKK'],
+  bundle: ['....K....', '...KoK...', '..KoooK..', '.KoBoBoK.', 'KoBoooBoK', 'KoooBoooK', '.KoBoBoK.', '..KoooK..', '...KKK...'],
+  // 21. aşama: dilekçe (parşömen), Yönetim Güveni (kalkan), isyan meşalesi, kişisel kese, hatıra, sokak feneri, yağma çuvalı
+  scroll: ['.KKKKKKK.', 'KeSSSSSeK', '.KsSSSSK.', '.KsKKKsK.', '.KsSSSsK.', '.KsKKSsK.', '.KsSSSsK.', 'KeSSSSSeK', '.KKKKKKK.'],
+  trust: ['.KKKKKKK.', 'KBBBuBBBK', 'KBBuPuBBK', 'KBBuPuBBK', 'KBuPPPuBK', '.KBuPuBK.', '.KBBuBBK.', '..KBBBK..', '...KKK...'],
+  torch: ['...O.O...', '..OPO.O..', '..OPYPO..', '...OPO...', '..KXXXK..', '...KwK...', '...KwK...', '...KwK...', '...KKK...'],
+  purse: ['...KKK...', '..KPKPK..', '...KdK...', '..KdddK..', '.KdeYedK.', 'KddYPYddK', 'KdeeYeedK', '.KdddddK.', '..KKKKK..'],
+  souvenir: ['..o...o..', '...o.o...', 'KKKKoKKKK', 'KiiioiiiK', 'KKKKoKKKK', '.KiioiiK.', '.KiioiiK.', '.KiioiiK.', '.KKKKKKK.'],
+  lantern: ['...KKK...', '..KxxxK..', '..KPYPK..', '..KYPYK..', '..KxxxK..', '...KwK...', '...KwK...', '...KwK...', '..KKKKK..'],
+  loot: ['...K.K...', '....K....', '...KXK...', '..KXXXK..', '.KXEXXXK.', 'KXXXEXXXK', 'KXEXXXEXK', '.KXXXXXK.', '..KKKKK..'],
+  // 23. aşama: yangın, su kovası, kalkan (Gözcü Kulesi / savunma), haydut, bandaj (hafif yaralı) ve tamir
+  fire: ['....o....', '...oO....', '..ooOo...', '..oOPOo..', '.ooOPPOo.', '.oOPyPPo.', '.oOPyyPo.', '..oOPPo..', '...ooo...'],
+  bucket: ['..KKKKK..', '.K.....K.', 'KKKKKKKKK', 'KcaWcacaK', '.KwXwXwK.', '.KwXwXwK.', '.KrrrrrK.', '.KwXwXwK.', '..KKKKK..'],
+  shield: ['KKKKKKKKK', 'KbbbPbbbK', 'KbbbPbbbK', 'KPPPPPPPK', 'KbbbPbbbK', '.KbbPbbK.', '.KbbPbbK.', '..KbbbK..', '...KKK...'],
+  bandit: ['...KKK...', '..KxxxK..', 'KKKxxxKKK', '.KsssssK.', '.KuKKKuK.', '.KKKKKKK.', '.KoooooK.', '..KoooK..', '...KKK...'],
+  bandage: ['.........', '.........', '.KKKKKKK.', 'KSSSSSSSK', 'KSsKsKsSK', 'KSSSSSSSK', '.KKKKKKK.', '.........', '.........'],
+  repair: ['.KKKKKKK.', 'KqqqqrRRK', '.KKKwKKK.', '...KwK..o', '...KwK.o.', '...KwKo..', '...KXK.o.', '...KKK..o', '.........'],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);
@@ -1272,6 +1319,28 @@ const BUBBLE_ICONS = {
   // 16. aşama: maceracı hikâyesi (karlı dağ) ve hazine sandığı
   adventure: ['...K...', '..KuK..', '.KqrrK.', 'KrRrRrK', 'gggggg.', '.......'],
   treasure: ['.KKKKK.', 'KXPXPXK', 'KKKPKKK', 'KwXXXwK', 'KwwwwwK', '.KKKKK.'],
+  // 19. aşama: dedikodu / haber fısıltısı (menekşe balonda ünlem), müzisyenin melodisi, kitap kurdunun kitabı, pati
+  whisper: ['.KKKKK.', 'KiiYiiK', 'KiiYiiK', 'KiiiiiK', 'KiiYiiK', '.KKKKK.'],
+  melody: ['P..O...', '...OO..', '...O.O.', '.P.O...', '.OOO..P', '.OO....'],
+  book: ['.KK.KK.', 'KuRKRuK', 'KuRKRuK', 'KuuKuuK', 'KBBKBBK', '.KK.KK.'],
+  paw: ['.w...w.', 'www.www', '...w...', '..www..', '.wwwww.', '..www..'],
+  // 20. aşama: Ulu Saat Kulesi'nin çanı (altın çan, iki yanında ses çizgileri)
+  bell: ['c..P..c', '.cPYPc.', 'c.PYP.c', '.PYYYP.', 'PPPPPPP', '...o...'],
+  // 21. aşama: dilekçe parşömeni, isyan meşalesi, kese (yevmiye / alışveriş), yağma çuvalı
+  scroll: ['.KKKKK.', 'KeSSSeK', '.KsKsK.', '.KsSsK.', 'KeSSSeK', '.KKKKK.'],
+  torch: ['..O.O..', '.OPYO..', '..OPO..', '..KXK..', '...w...', '...w...'],
+  purse: ['..K.K..', '...K...', '..KdK..', '.KdYdK.', 'KddPddK', '.KKKKK.'],
+  loot: ['..KXK..', '.KXXXK.', 'KXEXXXK', 'KXXXEXK', '.KKKKKP', '....PYP'],
+  // 22. aşama: köyü terk edenin bohçası (değnek ucunda kırmızı puantiyeli çıkın), tahsildar ve ferman
+  bundle: ['...K..K', '..KoK.K', '.KoBoKK', 'KoooBKw', '.KoBoKw', '..KKK.w'],
+  collector: ['.KKKKK.', 'KnnnnnK', '..KPK..', '.KdYdK.', 'KddoddK', '.KKKKK.'],
+  decree: ['KKKKKK.', 'KSSSSK.', 'KsKKsK.', 'KsSSsKo', 'KSSSSoo', 'KKKKKoo'],
+  // 23. aşama: su kovası, kalkan, haydut, bandaj ve tamir
+  bucket: ['..KKK..', '.K...K.', 'KKKKKKK', 'KcWacaK', '.KwXwK.', '..KKK..'],
+  shield: ['KKKKKKK', 'KbbPbbK', 'KPPPPPK', 'KbbPbbK', '.KbPbK.', '..KKK..'],
+  bandit: ['..KKK..', '.KxxxK.', 'KKxxxKK', 'KuKKKuK', 'KoooooK', '.KKKKK.'],
+  bandage: ['.......', '.KKKKK.', 'KSSSSSK', 'KSsKsSK', '.KKKKK.', '.......'],
+  repair: ['KKKK...', 'KqrRK.o', '.Kw..o.', '..w.o..', '..x..o.', '.....o.'],
 };
 
 export const BUBBLE_WIDTH = 11;

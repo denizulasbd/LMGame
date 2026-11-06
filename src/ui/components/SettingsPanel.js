@@ -1,5 +1,6 @@
 // (17. aşama) Ayarlar penceresi: eskiden HUD'a ve sol sütuna dağılmış ayrıntılar tek bir ortalanmış pencerede.
 //   Oyun     : Kaydet / Yükle / Yeni Harita (onay ister, 6 sn içinde onaylanmazsa vazgeçilir) ve son kaydın bilgisi
+//   Tehlike Sıklığı : (23. aşama) Huzurlu / Dengeli / Çetin: doğal yangın ve haydut baskını sıklığı (kayda girer)
 //   Ses      : sesi aç / kapat (tercih hatırlanır)
 //   Bilgi    : harita tohumu ve yakınlaştırma
 //   Kontroller: bütün kısayollar
@@ -7,6 +8,7 @@
 import { el } from '../dom.js';
 import { dockButton, modalHeader } from '../dockButton.js';
 import { getIconDataURL } from '../../art/ui/index.js';
+import { CRISIS_DIFFICULTY } from '../../data/crisis.js';
 
 const CONFIRM_TIMEOUT_MS = 6000;
 
@@ -65,6 +67,13 @@ export class SettingsPanel {
     this.muteButton = button('', 'Sesi kapat / aç', () => this.events.emit('ui:toggleMute'), 'settings-mute');
     this.muteButton.append(this.muteIcon, this.muteText);
     this.info = el('div', { className: 'settings-note' });
+    // (23. aşama) Tehlike Sıklığı: doğal yangın ve haydut baskını
+    this.crisisButtons = Object.entries(CRISIS_DIFFICULTY).map(([key, def]) => {
+      const b = button(def.name, def.description, () => this.events.emit('ui:setCrisisDifficulty', { difficulty: key }), 'settings-crisis');
+      b.dataset.difficulty = key;
+      return b;
+    });
+    this.crisisNote = el('div', { className: 'settings-note' });
 
     const keys = CONTROLS.map(([ks, label]) =>
       el('div', { className: 'settings-key' }, [el('span', { className: 'settings-keys' }, ks.map((k) => el('kbd', { text: k }))), el('span', { text: label })])
@@ -73,6 +82,7 @@ export class SettingsPanel {
     this.window = el('div', { className: 'panel settings-panel ui-interactive', hidden: true }, [
       modalHeader('Ayarlar', () => this.setOpen(false), { icon: 'gear' }),
       section('Oyun', this.saveRow, this.confirmRow, this.saveInfo),
+      section('Tehlike Sıklığı', el('div', { className: 'settings-row' }, this.crisisButtons), this.crisisNote),
       section('Ses ve görünüm', el('div', { className: 'settings-row' }, [this.muteButton]), this.info),
       section('Kontroller', el('div', { className: 'settings-keys-list' }, keys)),
     ]);
@@ -111,6 +121,10 @@ export class SettingsPanel {
 
   render(game) {
     if (!this.open) return;
+    const current = game.state.crisis?.difficulty ?? 'dengeli';
+    for (const b of this.crisisButtons) b.classList.toggle('is-active', b.dataset.difficulty === current);
+    const note = `${CRISIS_DIFFICULTY[current]?.description ?? ''} Yanan yapılar haritadan silinmez, yaralanan sakin ölmez.`;
+    if (this.crisisNote.textContent !== note) this.crisisNote.textContent = note;
     const text = `Harita tohumu ${game.state.seed} · yakınlık ${this.zoom ?? '-'}x · ${game.state.map.width}x${game.state.map.height} harita`;
     if (text !== this.lastInfo) {
       this.lastInfo = text;

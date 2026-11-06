@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -219,6 +219,197 @@ const PAGE_HELPERS = () => {
       check('yüklenen toplanma sürer ve vaktinde biter', s.rally?.until === until && gathered > 0, `${gathered} sakin`);
     }
 
+    // --- 2h. (19. aşama) Düğün kutlaması sürerken (meydanda konfeti, çift ortak eve taşınacak) ---
+    {
+      const RS = await import('/src/systems/RelationshipSystem.js');
+      while (s.time.hour < 9 || s.time.hour >= 16) hours(1);
+      const singles = s.characters.filter((c) => !c.isChild && !c.away && c.partnerId === null);
+      let pair = null;
+      for (let i = 0; i < singles.length && !pair; i++) for (let j = i + 1; j < singles.length && !pair; j++) if (RS.canRomance(singles[i], singles[j])) pair = [singles[i], singles[j]];
+      const fountain = scene().world.getCompleted('fountain')[0];
+      if (pair && fountain) {
+        const [a, b] = pair;
+        a.partnerId = b.id;
+        b.partnerId = a.id;
+        a.partnerSince = b.partnerSince = s.totalMinutes - 3 * 1440;
+        scene().relationships.marry(a, b, fountain, false);
+        hours(0.2);
+        const party = JSON.stringify(s.social.party);
+        const diff = A.roundtrip();
+        check('düğün kutlaması sırasında kayıt -> yükleme durum kayması yok', s.social.party && diff.length === 0, diff.join(' | '));
+        check('yüklenen kutlama aynen döner (çift, davetliler, bitiş)', JSON.stringify(s.social.party) === party);
+        const ended = counter('social:partyEnded');
+        hours(1);
+        const a2 = s.characters.find((c) => c.id === a.id);
+        const b2 = s.characters.find((c) => c.id === b.id);
+        check('yüklenen kutlama bir kez biter; çift aynı evde', ended.n === 1 && s.social.party === null && a2.homeId === b2.homeId, `${ended.n} · ${a2.homeId}/${b2.homeId}`);
+        ended.off();
+      } else check('kutlama için bekâr çift ve meydan havuzu var', false, `${singles.length} bekâr`);
+    }
+
+    // --- 2i. (20. aşama) Çağ Kutlaması sürerken (Altın Çağ başladı, meydanda kutlama, çan) ---
+    {
+      const GA = await import('/src/systems/GoldenAge.js');
+      const { BUILDINGS } = await import('/src/data/buildings.js');
+      let tower = GA.towerOf(s);
+      if (!tower) {
+        // Denetim kasabası küçük: kule seviye ve nüfus koşulu geçici olarak karşılanıp kurulur, aşamaları tamamlanmış sayılır
+        const keep = BUILDINGS.wonder.requiresPopulation;
+        BUILDINGS.wonder.requiresPopulation = 0;
+        s.town.tier = Math.max(s.town.tier, 3);
+        rich();
+        sim.give({ wood: 500, stone: 600 });
+        tower = sim.place('wonder', { maxRadius: 34 });
+        BUILDINGS.wonder.requiresPopulation = keep;
+        if (tower) {
+          tower.wonderStage = 3;
+          BUILDINGS.wonder.wonder.stages.forEach((st, i) => (s.chronicle.towerStages[i + 1] ??= { name: st.name, day: s.time.day, hour: s.time.hour, minute: 0 }));
+        }
+      }
+      check('Çağ Kutlaması denemesi için Ulu Saat Kulesi var', tower);
+      if (tower) {
+        while (s.time.hour < 9 || s.time.hour >= 15) hours(1);
+        scene().goldenAge.begin(tower);
+        hours(0.3);
+        const cel = JSON.stringify(s.goldenAge.celebration);
+        const diff = A.roundtrip();
+        check('Çağ Kutlaması sırasında kayıt -> yükleme durum kayması yok', s.goldenAge.celebration && diff.length === 0, diff.join(' | '));
+        check('yüklenen Çağ Kutlaması aynen döner', JSON.stringify(s.goldenAge.celebration) === cel);
+        const ended = counter('goldenAge:celebrationEnded');
+        hours(2.2);
+        check('yüklenen Çağ Kutlaması bir kez biter, Altın Çağ sürer', ended.n === 1 && s.goldenAge.celebration === null && GA.isGoldenAge(s), `${ended.n}`);
+        ended.off();
+      }
+    }
+
+    // --- 2j. (21. aşama) İsyan sürerken ve yağma baskını yoldayken (dilekçe açık, çantalar dolu) ---
+    {
+      rich();
+      if (!scene().world.getCompleted('storage').length) sim.place('storage');
+      while (s.time.hour < 9 || s.time.hour >= 15) hours(1);
+      for (const c of s.characters) c.needs.fun = 10;
+      s.trust.value = 12;
+      s.town.welfare = 30;
+      const pet = scene().petitions.create();
+      const revolt = scene().trust.startRevolt();
+      const storage = scene().world.getCompleted('storage')[0];
+      const raid = revolt ? scene().trust.startRaid(storage.id) : null;
+      hours(0.2);
+      const before = JSON.stringify({ rioters: s.trust.revolt?.rioters, raids: s.trust.revolt?.raids.map((r) => [r.id, r.targetId, r.members]) });
+      const diff = A.roundtrip();
+      check('isyan ve yağma sürerken kayıt -> yükleme durum kayması yok', revolt && raid && pet && diff.length === 0, diff.join(' | '));
+      check('yüklenen isyan, yağma baskını ve dilekçe aynen döner', JSON.stringify({ rioters: s.trust.revolt?.rioters, raids: s.trust.revolt?.raids.map((r) => [r.id, r.targetId, r.members]) }) === before && s.petitions.list.some((p) => p.id === pet?.id));
+      const looted = counter('riot:looted');
+      hours(3);
+      const res = s.resources.food;
+      check('yüklenen yağma baskını sonuçlanır (yağmacılar depoya varır)', looted.n >= 1 && s.trust.revolt?.raids.every((r) => r.id !== raid?.id), `${looted.n}`);
+      looted.off();
+      const ended = counter('revolt:ended');
+      s.town.welfare = 70;
+      s.trust.relief = {};
+      game.events.emit('ui:relief', { kind: 'gold' });
+      game.events.emit('ui:relief', { kind: 'food' });
+      hours(1.2);
+      check('yatıştırılan isyan bir kez biter, sakinler işe döner', ended.n === 1 && !s.trust.revolt && s.characters.every((c) => c.task?.activity !== 'protest') && res >= 0, `${ended.n} güven %${Math.round(s.trust.value)}`);
+      ended.off();
+      s.petitions.list = [];
+    }
+
+    // --- 2k. (22. aşama) Tahsildar yoldayken, ferman sürerken, Ağır Vergi seçiliyken ve bir sakin köyü terk ederken ---
+    {
+      rich();
+      s.town.tier = Math.max(s.town.tier, 3);
+      while (s.time.hour < 9 || s.time.hour >= 15) hours(1);
+      game.events.emit('ui:setTaxRate', { rate: 'heavy' });
+      s.crown.nextLevyAt = s.totalMinutes + 1440;
+      scene().crown.announceLevy();
+      const decree = scene().crown.openDecree('shipyard');
+      const leaver = s.characters.find((c) => !c.isChild && !c.away && !c.married && c.visible);
+      scene().desertion.startLeaving([leaver]);
+      hours(0.2);
+      const before = JSON.stringify({ notice: s.crown.notice, decree: s.crown.decree, rate: s.tax.rate, leaving: leaver.emigrating });
+      const diff = A.roundtrip();
+      check('tahsildar yolda, ferman sürerken ve sakin köyü terk ederken kayıt -> yükleme durum kayması yok', decree && diff.length === 0, diff.join(' | '));
+      const l2 = s.characters.find((c) => c.id === leaver.id);
+      check('yüklenen tahsildar uyarısı, ferman, vergi kademesi ve yoldaki sakin aynen döner', JSON.stringify({ notice: s.crown.notice, decree: s.crown.decree, rate: s.tax.rate, leaving: l2?.emigrating }) === before);
+      const left = counter('population:left');
+      hours(10);
+      check('yüklenen sakin harita kenarına varıp bir kez ayrılır', left.n === 1 && !s.characters.some((c) => c.id === leaver.id), `${left.n}`);
+      left.off();
+      const paid = counter('crown:levyPaid');
+      hours(16);
+      check('yüklenen Krallık Vergisi vakti gelince bir kez ödenir', paid.n === 1 && !s.crown.notice, `${paid.n}`);
+      paid.off();
+      game.events.emit('ui:deliverDecree');
+      game.events.emit('ui:setTaxRate', { rate: 'standard' });
+      check('yüklenen ferman teslim edilir', !s.crown.decree && s.crown.delivered >= 1);
+    }
+
+    // --- 2l. (23. aşama) Yangın sürerken, haydut izi beklerken, hasarlı yapı ve yaralı sakin varken ---
+    {
+      rich();
+      s.crisis.difficulty = 'huzurlu'; // doğal krizler karışmasın; testler fonksiyonları doğrudan çağırır
+      s.town.tier = Math.max(s.town.tier, 3);
+      s.petitions.list = [];
+      s.crown.decree = null;
+      s.crown.nextDecreeAt = s.totalMinutes + 1e6;
+      s.crown.notice = null;
+      s.crown.nextLevyAt = s.totalMinutes + 1e6;
+      if (s.trust.revolt) scene().trust.endRevolt();
+      s.trust.value = 70;
+      for (const b of s.buildings) {
+        b.isBurning = false;
+        b.isDamaged = false;
+      }
+      for (const c of s.characters) c.isInjured = false;
+      s.crisis.raid = null;
+      for (let i = 0; i < 4 && s.dilemma.active; i++) sim.step(1900); // açık karar penceresi varsa varsayılan seçenek uygulansın
+      while (s.time.hour < 9 || s.time.hour >= 12) hours(1);
+      const pickFire = () => s.buildings.find((b) => b.functional && ['workshop', 'mill', 'lumberHut', 'quarry', 'garden'].includes(b.type) && !b.damaged && !b.isBurning);
+      const fireB = pickFire();
+      scene().crisis.startFire(fireB);
+      const hurtOne = s.characters.find((c) => !c.isChild && !c.role && !c.away);
+      scene().crisis.injure(hurtOne, 'fire');
+      const wreck = s.buildings.find((b) => b.functional && ['quarry', 'garden', 'market', 'lumberHut', 'sheepFarm'].includes(b.type) && b !== fireB && !b.damaged && !b.isBurning);
+      scene().crisis.damage(wreck, 'raid');
+      const raid = scene().crisis.warnRaid();
+      hours(0.2);
+      const progressBefore = fireB.fireProgress;
+      const diff = A.roundtrip();
+      check('yangın sürerken, haydut izi beklerken, hasarlı yapı ve yaralı sakin varken kayıt -> yükleme durum kayması yok', Boolean(raid) && diff.length === 0, diff.join(' | '));
+      const f2 = s.buildings.find((b) => b.id === fireB.id);
+      const w2 = s.buildings.find((b) => b.id === wreck.id);
+      const h2 = s.characters.find((c) => c.id === hurtOne.id);
+      check('yüklenen yangın, hasarlı yapı, yaralı sakin ve haydut baskını aynen döner', f2.isBurning && Math.abs(f2.fireProgress - progressBefore) < 1e-6 && w2.isDamaged && w2.damageKind === 'raid' && h2.isInjured && JSON.stringify(s.crisis.raid) === JSON.stringify(raid), `${f2.fireProgress}/${progressBefore}`);
+      check('yükleme sonrası aktif kriz kayıtlı olduğundan doğal kriz koruması (24 saat) kurulmaz', scene().crisis.graceUntil === null);
+      const outs = counter('crisis:fireOut');
+      const burnt = counter('crisis:burnedDown');
+      for (let i = 0; i < 28 && f2.isBurning; i++) {
+        sim.step(56);
+        if (s.dilemma.active) sim.step(1900);
+      }
+      check('yüklenen yangın tam bir kez sonuçlanır (söner ya da yanıp hasara geçer), sayaç tutarlı', outs.n + burnt.n === 1 && !f2.isBurning && s.crisis.extinguished + s.crisis.burned >= 1, `${outs.n}/${burnt.n} yanıyor=${f2.isBurning} %${Math.round(f2.fireProgress)} gün ${s.time.day} ${s.time.hour}:00 duraklı=${s.time.paused} karar=${s.dilemma.active?.id ?? '-'}`);
+      outs.off();
+      burnt.off();
+      // Haydut baskını yüklemeden sonra varışta bir kez sonuçlanır
+      const resolved = counter('crisis:raidResolved');
+      s.crisis.raid.arriveAt = s.totalMinutes + 60;
+      hours(3);
+      check('yüklenen haydut baskını varışta tam bir kez sonuçlanır (savunma yetiyorsa püskürtülür)', resolved.n === 1 && !s.crisis.raid, `${resolved.n}`);
+      resolved.off();
+      const repaired = counter('building:mended');
+      hours(40);
+      check('hasarlı yapılar yüklemeden sonra (ustalar ya da bekleme sonrası kaynakla) onarılır; kopuk iş emri kalmaz', repaired.n >= 1 && !w2.damaged && !w2.project, `${repaired.n}`);
+      repaired.off();
+      check('yaralı sakin yüklemeden sonra bir kez iyileşir (şifacıda ya da kendiliğinden)', !h2.isInjured);
+      for (const b of s.buildings) {
+        b.isBurning = false;
+        b.isDamaged = false;
+      }
+      for (const c of s.characters) c.isInjured = false;
+      s.crisis.raid = null;
+    }
+
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();
@@ -376,6 +567,9 @@ const PAGE_HELPERS = () => {
       hours(6);
     }
     const sickBefore = s.stats.illnesses;
+    // (22. aşama) Uzun kıtlıkta umudunu yitiren sakinler köyü bilerek terk edebilir: onlar "kaybolan" sayılmaz
+    let emigrated = 0;
+    const offLeft = game.events.on('population:left', () => emigrated++);
     while (s.time.day < 13) hours(1);
     starve();
     let peakSick = 0;
@@ -399,7 +593,9 @@ const PAGE_HELPERS = () => {
     hours(48);
     const sickAfter = s.characters.filter((c) => c.illness).length;
     check('stok gelince kasaba toparlanır: hastalar iyileşir', sickAfter < Math.max(1, peakSick) && events.recovered + events.cured >= 1, `${peakSick} -> ${sickAfter} hasta`);
-    check('kriz sırasında kimse kaybolmaz', s.characters.length === pop && pop > 0, `${pop} sakin`);
+    offLeft();
+    const popEnd = s.characters.length + emigrated;
+    check('kriz sırasında kimse kaybolmaz (köyü bilerek terk edenler ayrı sayılır)', popEnd >= pop && pop > 0 && s.characters.length >= 3, `${pop} sakin · ${emigrated} sakin köyü terk etti`);
     return out;
   });
   const mon = await monitorReport(page);
