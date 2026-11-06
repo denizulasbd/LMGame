@@ -20,6 +20,8 @@
 // Uyku bitince 'character:woke' { character } yayınlanır (FamilySystem Mutlu Yuva'yı verir). Oyuncu bir
 // çalışanı işten çıkarınca ('ui:dismissWorker') görevi biter ve o yapıda bir daha çalışmaz
 // ('ui:rehireWorker' geri alır).
+import { towerMasteryMultiplier, recordTowerWork, towerStageIndex } from './GoldenAge.js';
+import { skillLevel } from './SkillSystem.js';
 import { ACTIVITIES, LEAVING_HOME_LABEL, BREAK_PREFIX, LOVE_BUBBLES, RIVAL_BUBBLES } from '../data/activities.js';
 import { RESOURCES, MEAL_FOOD_COST } from '../data/resources.js';
 import { EQUIPMENT } from '../data/equipment.js';
@@ -49,6 +51,7 @@ import { schemeBakeMultiplier } from './Exploration.js';
 import { VINE } from '../data/exploration.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
+const TOWER_BUBBLES = ['hammer', 'hammer', 'sweat', 'sparkle']; // (20. aşama) Ulu Saat Kulesi şantiyesinde
 
 export class BehaviorSystem {
   /**
@@ -97,6 +100,13 @@ export class BehaviorSystem {
           const c = this.world.getCharacter(id);
           const kind = c?.task ? ACTIVITIES[c.task.activity].kind : 'idle';
           if (c && c.visible && !c.away && INTERRUPTIBLE_KINDS.has(kind)) this.endTask(c);
+        }
+      }),
+      // (20. aşama) Çağ Kutlaması: uyanık herkes (yarıda kesilebilen) elindekini bırakıp meydana koşar
+      game.events.on('goldenAge:celebrationStarted', () => {
+        for (const c of this.world.characters) {
+          const kind = c.task ? ACTIVITIES[c.task.activity].kind : 'idle';
+          if (c.visible && !c.away && INTERRUPTIBLE_KINDS.has(kind)) this.endTask(c);
         }
       }),
       game.events.on('festival:started', () => {
@@ -451,6 +461,7 @@ export class BehaviorSystem {
     if (task.activity === 'sleep') this.applyHomeComfort(c, minutes);
 
     let bubbles = activity.bubbles;
+    if (task.activity === 'build' && this.towerFor(task)) bubbles = TOWER_BUBBLES; // (20. aşama) kule şantiyesinde çekiç balonları
     if (activity.kind === 'social' || activity.kind === 'festival') bubbles = this.performSocial(c, task, activity, minutes);
     // Şenlikte ritimle sağa sola dönerek dans eder
     if (activity.dance) c.facing = Math.floor((c.animTime + c.id * 0.3) / 0.6) % 2 === 0 ? 'left' : 'right';
@@ -483,6 +494,14 @@ export class BehaviorSystem {
       }
       this.endTask(c);
     }
+  }
+
+  /** (20. aşama) Görev Ulu Saat Kulesi'nin inşaatı mı? Kule (yapı) ya da null. */
+  towerFor(task) {
+    if (!task.jobId || task.activity !== 'build') return null;
+    const job = this.jobs.getJob(task.jobId);
+    const building = job?.buildingId ? this.world.getBuilding(job.buildingId) : null;
+    return building?.definition.wonder && towerStageIndex(building) !== null ? building : null; // yalnızca süren aşama
   }
 
   /** Taş Evde (Seviye 2) uyuyanın keyfi uykuda yavaşça dolar: sabah keyifle uyanır. */
@@ -550,6 +569,12 @@ export class BehaviorSystem {
     // (12. aşama) Mimarlık Loncası inşaatı, yükseltmeyi ve onarımı hızlandırır
     // (13. aşama) Kraliyet Mimarları fermanı inşaatları 3 kat hızlandırır
     if (task.jobId && task.activity === 'build') amount *= researchBuildMultiplier(this.state) * buffMultiplier(this.state, 'buildSpeed');
+    // (20. aşama) Ulu Saat Kulesi: aşamanın ustaları (Yapı Ustası, usta zanaatkâr) daha hızlı yükseltir; emek Tarihçe'ye yazılır
+    const tower = this.towerFor(task);
+    if (tower) {
+      amount *= towerMasteryMultiplier(c, tower, skillLevel);
+      recordTowerWork(this.state, c, amount);
+    }
     addExperience(this.events, c, task.activity, minutes, civicXpMultiplier(this.state) * relicXpMultiplier(this.state));
 
     if (task.jobId) {

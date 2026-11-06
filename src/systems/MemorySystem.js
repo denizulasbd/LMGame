@@ -126,7 +126,7 @@ export class MemorySystem {
       on('seasonFestival:ended', ({ festival, attendees }) => {
         for (const id of attendees) remember(this.world.getCharacter(id), festival.memory, festival.icon, { kind: 'festival' });
       }),
-      on('wonder:completed', () => all('Büyük Vadi Saat Kulesi\'nin tamamlanışını gördü', 'wonder')),
+      on('wonder:completed', () => all("Ulu Saat Kulesi'nin tamamlanışını ve Altın Çağ'ın başlangıcını gördü", 'wonder')),
       on('town:tierUp', ({ tier }) => all(`Kasaba ${tier.name} oldu; o gün meydanda kutlama vardı`, tier.icon)),
       on('character:renamed', ({ character, from }) => remember(character, `Artık ${character.name} adıyla anılıyor (eskiden ${from})`, 'heart', { kind: 'name', fond: false })),
       on('character:woke', ({ character }) => {

@@ -3847,3 +3847,113 @@ kbd {
 .social-muted {
   opacity: 0.7;
 }
+
+/* ---------------------------------------------------------------------------
+   20. aşama: Kasaba Arşivi sekmeleri ve Tarihçe Kütüğü (parşömen berat, altın harfler)
+   --------------------------------------------------------------------------- */
+.archive-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 8px;
+}
+
+.archive-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.archive-tab img {
+  width: 14px;
+  height: 14px;
+  image-rendering: pixelated;
+}
+
+.archive-tab.is-active {
+  background: #ffe9a8;
+  color: var(--ui-ink-dark);
+}
+
+.chronicle-scroll {
+  padding: 12px 14px;
+  background: linear-gradient(#f6e7c1, #ecd6a2);
+  color: #3a2614;
+  border: 3px double #a8703f;
+  box-shadow: inset 0 0 0 2px #f9efd3, 0 2px 0 rgba(27, 20, 35, 0.4);
+}
+
+.chronicle-head {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.chronicle-seal {
+  font-size: 18px;
+  color: #c98f15;
+}
+
+.chronicle-town {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #7a4a12;
+}
+
+.chronicle-sub {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.chronicle-entry {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 6px 0;
+  border-top: 1px dashed rgba(122, 74, 18, 0.35);
+}
+
+.chronicle-entry img {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+}
+
+.chronicle-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  opacity: 0.75;
+}
+
+.chronicle-body {
+  font-size: 13px;
+}
+
+.chronicle-gold {
+  font-weight: 800;
+  color: #b07800;
+  text-shadow: 0 1px 0 #fff3c4, 0 0 4px rgba(255, 210, 63, 0.55);
+}
+
+.chronicle-pending {
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.chronicle-meta {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.chronicle-stages {
+  margin: 0 0 4px 26px;
+  padding: 0;
+  font-size: 12px;
+  list-style: none;
+}
+
+.trade-row.is-golden {
+  box-shadow: inset 3px 0 0 #ffd23f;
+}

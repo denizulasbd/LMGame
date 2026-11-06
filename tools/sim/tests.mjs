@@ -23,6 +23,10 @@
 //              evlenen çiftin aynı kulübeye taşınması ve boşalan kulübenin göçmenlere açılması, meydanda düğün kutlaması ve
 //              konfeti, evli çiftin akşam yemeği, dedikodu (haber oluşturma, sohbette ve selamlaşırken aktarma, Yaşam Günlüğü
 //              notu, yayılma, eskime), Karakter Detay Kartı'nın Sosyal Hayat bölümü, kayıt sürümü 16
+//   20. aşama: Ulu Saat Kulesi (Kasaba seviyesi + 20 sakin, üç aşama ve malzemeleri, ustalık katkısı, Kadim Dişli dökümü,
+//              Tarihçe'ye yazılan emek), Altın Çağ (çalışma şevki ve refah +%10, 08:00 / 18:00 çanı ve ses dalgası, Çağ
+//              Kutlaması), prestij peyzajı (Mermer Çeşme, Altın Çağ Feneri), tüccarın nadir malları, Tarihçe Kütüğü sekmesi,
+//              kayıt sürümü 17
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
 import { openGame, createChecks } from './lib.mjs';
@@ -455,10 +459,16 @@ const pageResults = await page.evaluate(async () => {
 
   // --- Kasaba Harikası: üç aşama ---
   const { BUILDINGS } = await import('/src/data/buildings.js');
+  // (20. aşama) Ulu Saat Kulesi: Kasaba seviyesinde ve 20 sakinle açılır
+  s.town.tier = 2;
+  check('Ulu Saat Kulesi Köy seviyesinde açılmaz', !sim.findSpot('wonder') && scene.construction.checkPlacement('wonder', plaza.centerX + 6, plaza.centerY + 6).reason.includes('Kasaba'));
   s.town.tier = 3;
-  check('Harika Gelişmiş Şehir\'de açılır', !sim.findSpot('wonder'));
+  const popReason = scene.construction.checkPlacement('wonder', plaza.centerX + 6, plaza.centerY + 6).reason;
+  check('Ulu Saat Kulesi 20 sakinle açılır', s.characters.length >= 20 || popReason.includes('20 sakine'), popReason);
+  const keepPop = BUILDINGS.wonder.requiresPopulation;
+  BUILDINGS.wonder.requiresPopulation = Math.min(keepPop, s.characters.length); // test kasabası küçük: nüfus koşulu geçici olarak karşılanır
   s.town.tier = 4;
-  sim.give({ wood: 600, stone: 1200, iron: 600, wool: 400, bread: 500, gold: 3000 });
+  sim.give({ wood: 600, stone: 1200, iron: 600, wool: 400, bread: 500, gold: 3000, gears: 8 });
   {
     // Harikanın şantiyesi iptal edilebilir (tam iade); bitmiş harika yıkılamaz
     const gold0 = s.resources.gold;
@@ -466,7 +476,7 @@ const pageResults = await page.evaluate(async () => {
     const cancel = site ? scene.construction.demolishAt(site.tileX, site.tileY) : { ok: false };
     check('harika şantiyesi iptal edilebilir', site && cancel.ok && !s.buildings.includes(site) && s.resources.gold === gold0, cancel.reason);
   }
-  sim.give({ wood: 600, stone: 1200, iron: 600, wool: 400, bread: 500, gold: 3000 }); // iade depo sınırına takılır: yeniden ver
+  sim.give({ wood: 600, stone: 1200, iron: 600, wool: 400, bread: 500, gold: 3000, gears: 8 }); // iade depo sınırına takılır: yeniden ver
   const wonder = sim.place('wonder');
   const { MILESTONES } = await import('/src/data/milestones.js');
   const { milestoneProgress } = await import('/src/systems/MilestoneSystem.js');
@@ -493,6 +503,7 @@ const pageResults = await page.evaluate(async () => {
   check('9. hedef Vadinin İncisi tamamlandı', Boolean(s.milestones.pearl));
   check('altın çağ refahı +12', landmarkBonus(s) - landmarkW === 12, `${landmarkW} -> ${landmarkBonus(s)}`);
   check('ikinci harika kurulamaz', !sim.findSpot('wonder'));
+  BUILDINGS.wonder.requiresPopulation = keepPop;
 
   // ===== 13. aşama =====
   const L = await import('/src/systems/Luxury.js');
@@ -1953,8 +1964,9 @@ const pageResults = await page.evaluate(async () => {
     check('sohbette haber aktarılır; dinleyenin son duyduğu haber olur', shared && L.lastNews?.id === mwNews.id && L.lastNews.from === M.name && mwNews.heardBy.includes(L.id) && st.stats.gossipHeard === heard + 1);
     check('haberi ilk kez duyanın Yaşam Günlüğü\'ne not düşer (ustanın kendi ağzından)', L.memories.some((m) => m.kind === 'gossip' && m.text === `${TR.ablative(M.name)}, ustalıkla yaptığı ${piece.name} eserini kendi ağzından dinledi`), L.memories[L.memories.length - 1]?.text);
     check('başlarında fısıltı / haber balonu', M.bubble?.icon === 'whisper' || !M.visible);
+    const notesBefore = newsCount(L);
     social.share(M, L);
-    check('aynı haber ikinci kez anlatılmaz', mwNews.heardBy.filter((id) => id === L.id).length === 1 && newsCount(L) === 1);
+    check('aynı haber ikinci kez anlatılmaz', mwNews.heardBy.filter((id) => id === L.id).length === 1 && newsCount(L) === notesBefore);
     // Seferden dönüş haberi: "Leyla'dan, Emre'nin ... getirdiği kadim haritayı duydu"
     const E = adults.find((c) => c !== M && c !== L && c !== A && c !== B);
     game.events.emit('expedition:returned', { members: [E], route: 'Kayıp Tapınak', finds: ['cityMap'], loot: {}, memories: {}, text: 'Kadim bir harita buldular.' });
@@ -2039,7 +2051,179 @@ const pageResults = await page.evaluate(async () => {
     window.__s19 = { a: A.id, b: B.id, home: home.id, quirks: Object.fromEntries(st.characters.map((c) => [c.id, c.quirk])), news: { id: L.id, text: L.lastNews.text, from: L.lastNews.from }, gossip: st.social.gossip.length, dinnerDay: A.dinnerDay, dates: st.stats.dates, dinners: st.stats.familyDinners };
   }
 
-  // --- Kayıt gidiş-dönüşü (sürüm 16) ---
+  // ===== 20. aşama: Ulu Saat Kulesi, Altın Çağ, Tarihçe Kütüğü, prestij peyzajı =====
+  {
+    const S = game.scenes.current;
+    const st = game.state;
+    const W = S.world;
+    const GA = await import('/src/systems/GoldenAge.js');
+    const GD = await import('/src/data/goldenAge.js');
+    const { BUILDINGS: BD } = await import('/src/data/buildings.js');
+    const { offersFor: offers } = await import('/src/data/trade.js');
+    const TS = await import('/src/systems/TownStatus.js');
+    const { getSeason: season } = await import('/src/data/seasons.js');
+    const tower = GA.towerOf(st);
+    const stages = BD.wonder.wonder.stages;
+    sim.give({ wood: 600, stone: 900, iron: 400, gold: 4000, food: 200 });
+
+    // --- Kulenin kuralları ---
+    check('kulenin adı Ulu Saat Kulesi; Kasaba seviyesi ve 20 sakinle açılır', BD.wonder.name === 'Ulu Saat Kulesi' && BD.wonder.requiresTier === 3 && BD.wonder.requiresPopulation === 20 && GD.TOWER_UNLOCK.population === 20);
+    check('üç aşama: Temel, Gövde, Mekanizma & Çan', stages.map((x) => x.name).join(',') === 'Temel,Gövde,Mekanizma & Çan');
+    check('Temel bol taş ve kereste ister', Object.keys(stages[0].cost).sort().join() === 'stone,wood' && stages[0].cost.stone >= 300 && stages[0].cost.wood >= 300);
+    check('Gövde taş ve demir ister; Yapı Ustaları hızlandırır', stages[1].cost.stone > 0 && stages[1].cost.iron > 0 && stages[1].masters.includes('building'));
+    check('Mekanizma & Çan Kadim Dişli ister; usta zanaatkârlar hızlandırır', stages[2].cost.gears === 8 && stages[2].masters.includes('crafting'));
+    // Ustalık katkısı
+    const fake = (wonderStage) => ({ definition: BD.wonder, underConstruction: false, project: { kind: 'stage' }, wonderStage });
+    const { skillLevel } = await import('/src/systems/SkillSystem.js');
+    const pro = { skills: { building: 99999 } };
+    const mid = { skills: { building: 700 } };
+    const crafter = { skills: { crafting: 99999 } };
+    const mason = { skills: { masonry: 99999 } };
+    check('Gövdede Usta yapı ustası 1,6 kat, Kalfa 1,25 kat hızlı', GA.towerMasteryMultiplier(pro, fake(1), skillLevel) === GD.TOWER_MASTERY.master && GA.towerMasteryMultiplier(mid, fake(1), skillLevel) === GD.TOWER_MASTERY.journeyman && GA.towerMasteryMultiplier({ skills: {} }, fake(1), skillLevel) === 1, `${GA.towerMasteryMultiplier(mid, fake(1), skillLevel)}`);
+    check('Mekanizma & Çan aşamasında usta zanaatkâr hızlandırır, taşçı hızlandırmaz', GA.towerMasteryMultiplier(crafter, fake(2), skillLevel) === GD.TOWER_MASTERY.master && GA.towerMasteryMultiplier(mason, fake(2), skillLevel) === 1);
+
+    // --- Kadim Dişli ve aşamanın gerçek inşası (kule geçici olarak Gövde'ye döndürülür) ---
+    const workshop = W.getCompleted('workshop')[0];
+    tower.wonderStage = 2;
+    st.resources.gears = 0;
+    check('Gövde bitince 8 Kadim Dişli gerekir', GA.gearsNeeded(st) === 8, GA.gearsNeeded(st));
+    const keepCraft = workshop.craft;
+    workshop.craft = null;
+    const pick = S.crafting.chooseItem(workshop);
+    check('Zanaat Atölyesi önce Kadim Dişli döker', pick.item === 'clockGear' && pick.recipe.cost.iron === GD.CLOCK_GEAR.cost.iron, JSON.stringify(pick));
+    const casts = [];
+    const offCast = game.events.on('goldenAge:gearCast', (p) => casts.push(p));
+    S.crafting.work(workshop, 1);
+    S.crafting.work(workshop, GD.CLOCK_GEAR.work);
+    offCast();
+    check('dökülen dişli stoğa girer (Mallar)', st.resources.gears === 1 && casts.length === 1 && workshop.craft === null);
+    check('dişli eksikken Mekanizma aşaması başlatılamaz', S.construction.checkProject(tower).reason?.includes('Kadim Dişli'), S.construction.checkProject(tower).reason);
+    st.resources.gears = 8;
+    check('dişliler tamamlanınca atölye dişli dökmeyi bırakır', GA.gearsNeeded(st) === 0 && S.crafting.chooseItem(workshop).item !== 'clockGear');
+    const started = S.construction.startProject(tower);
+    check('Mekanizma & Çan aşaması başlar, dişliler harcanır', started.ok && tower.project?.kind === 'stage' && st.resources.gears === 0 && GA.towerStageIndex(tower) === 2, started.reason);
+    const job = S.jobs.jobs.find((j) => j.buildingId === tower.id && j.project);
+    const builder = st.characters.find((c) => !c.isChild && !c.away && c.visible);
+    const keepSkills = { ...builder.skills };
+    builder.skills = { ...builder.skills, crafting: 99999 };
+    S.behavior.endTask(builder);
+    const task = { activity: 'build', jobId: job.id, phase: 'perform', elapsed: 0, duration: 60 };
+    builder.task = task;
+    const workBefore = st.chronicle.towerWork[builder.id] ?? 0;
+    const progBefore = job.progress;
+    S.behavior.performWork(builder, task, 10);
+    const gained = job.progress - progBefore;
+    check('kule şantiyesindeki görev tanınır (çekiç balonları)', S.behavior.towerFor(task) === tower);
+    check('usta zanaatkârın emeği kuleyi hızlandırır ve Tarihçe\'ye yazılır', (st.chronicle.towerWork[builder.id] ?? 0) - workBefore === gained && gained > 10 * 1.5, `${gained.toFixed(1)}`);
+    builder.skills = keepSkills;
+    S.behavior.endTask(builder);
+    S.construction.cancelProject(tower);
+    tower.wonderStage = 3;
+    workshop.craft = keepCraft;
+    check('kule yeniden tamam (Altın Çağ sürüyor)', tower.wonderComplete && GA.isGoldenAge(st));
+
+    // --- Altın Çağ: kalıcı etkiler ---
+    check('Altın Çağ kule tamamlanınca başladı ve Tarihçe\'ye yazıldı', st.goldenAge.since && st.chronicle.goldenAge && st.chronicle.towerStages[3]?.name === 'Mekanizma & Çan');
+    const since = st.goldenAge.since;
+    for (const c of st.characters) c.needs.fun = 30;
+    st.goldenAge.since = null;
+    const plainWork = TS.townWorkMultiplier(st);
+    const plainHappy = TS.townHappiness(st);
+    st.goldenAge.since = since;
+    check('çalışma şevki kalıcı +%10', Math.abs(TS.townWorkMultiplier(st) / plainWork - GD.GOLDEN_AGE.workMultiplier) < 1e-9);
+    check('kasaba refahına kalıcı +%10 çarpan', Math.abs(TS.townHappiness(st) - Math.min(100, plainHappy * GD.GOLDEN_AGE.welfareMultiplier)) < 1e-6, `${plainHappy.toFixed(1)} -> ${TS.townHappiness(st).toFixed(1)}`);
+    // Kule saati 08:00 ve 18:00'de çalar
+    const awake = st.characters.filter((c) => !c.isChild && !c.away && !c.isSleeping).slice(0, 3);
+    awake.forEach((c) => (c.needs.energy = 40));
+    const chimes = st.goldenAge.chimes;
+    const heard = [];
+    const offChime = game.events.on('goldenAge:chime', (p) => heard.push(p));
+    game.events.emit('time:hour', 9);
+    check('kule saati 09:00\'da çalmaz', st.goldenAge.chimes === chimes);
+    game.events.emit('time:hour', 8);
+    check('kule saati 08:00\'de çalar: duyanların yorgunluğu azalır', st.goldenAge.chimes === chimes + 1 && heard.length === 1 && heard[0].heard > 0 && awake.every((c) => c.needs.energy >= 40 + GD.GOLDEN_AGE.chimeEnergy - 1e-6), `${awake.map((c) => c.needs.energy.toFixed(0))}`);
+    game.events.emit('time:hour', 18);
+    offChime();
+    check('kule saati 18:00\'de de çalar', st.goldenAge.chimes === chimes + 2);
+    game.render(0);
+    check('çan ses dalgası çizilir', S.chimeWaves.startedAt !== null);
+    let dots = 0;
+    const waves = new S.chimeWaves.constructor();
+    waves.ring();
+    waves.draw({ fillRect: () => dots++, drawImage: () => dots++ }, tower, 10);
+    waves.draw({ fillRect: () => dots++, drawImage: () => dots++ }, tower, 10.8);
+    check('ses dalgası halkaları ve altın notalar', dots > 40, dots);
+
+    // --- Çağ Kutlaması (yeniden başlatılarak denenir) ---
+    const keepChronicleAge = st.chronicle.goldenAge;
+    const celebrations = st.stats.ageCelebrations ?? 0;
+    const startedEvents = [];
+    const offStart = game.events.on('goldenAge:celebrationStarted', (p) => startedEvents.push(p));
+    S.goldenAge.begin(tower);
+    offStart();
+    const cel = st.goldenAge.celebration;
+    check('Çağ Kutlaması meydanda başlar, çan ilk kez çalar', cel && cel.until - st.totalMinutes === GD.AGE_CELEBRATION.minutes && startedEvents.length === 1 && st.stats.ageCelebrations === celebrations + 1 && W.getBuilding(cel.venueId));
+    const guest = st.characters.find((c) => !c.isChild && !c.away && c.visible && !c.isSleeping);
+    guest.needs.energy = 80;
+    guest.needs.hunger = 80;
+    S.behavior.endTask(guest);
+    const celPlan = S.behavior.brain.decide(guest, 11);
+    check('sakinler Çağ Kutlaması\'na koşar', celPlan.activity === 'ageCelebration' && celPlan.buildingId === cel.venueId, celPlan.activity);
+    guest.task = { ...celPlan, phase: 'perform', elapsed: 0 };
+    guest.needs.fun = 30;
+    S.goldenAge.update({ gameMinutes: 10, hour: 11 });
+    check('kutlamadakilerin keyfi dolar', guest.needs.fun > 33 && cel.attended.includes(guest.id));
+    cel.until = st.totalMinutes;
+    S.goldenAge.update({ gameMinutes: 1, hour: 11 });
+    check('kutlama biter; katılanlar "ilk çanı" anısını taşır, oyun sürer', st.goldenAge.celebration === null && guest.memories.some((m) => m.text.includes('ilk çanını')) && GA.isGoldenAge(st));
+    S.behavior.endTask(guest);
+    st.chronicle.goldenAge = keepChronicleAge;
+
+    // --- Prestij peyzajı ---
+    st.goldenAge.since = null;
+    const locked = S.construction.checkPlacement('marbleFountain', plaza.centerX + 7, plaza.centerY + 7).reason;
+    st.goldenAge.since = since;
+    check('Mermer Çeşme ve Altın Çağ Feneri Altın Çağ\'da açılır', String(locked).includes('Altın Çağ') && BD.marbleFountain.requiresGoldenAge && BD.goldenLantern.requiresGoldenAge, locked);
+    const mf = sim.place('marbleFountain');
+    const gl = sim.place('goldenLantern');
+    check('Mermer Çeşme kurulur (estetik ve keyif alanı)', mf && mf.functional && BD.marbleFountain.funAura && W.aesthetics.some((v) => v > 0));
+    gl.lit = true;
+    const lights = [];
+    gl.collectLights(lights, { time: 0, windowsLit: true });
+    check('Altın Çağ Feneri gece geniş altın ışık yayar', lights.some((l) => l.radius === 96));
+    const sprites = await import('/src/art/sprites/index.js');
+    check('prestij yapılarının görselleri çizilir (çeşme dört kare)', sprites.getStructureSprite('marbleFountain', { frame: 2 }).width === 32 && sprites.getStructureSprite('goldenLantern', { lit: true }).height === 40);
+
+    // --- Gezgin tüccar: daha sık, nadir tohum ve antik kitap ---
+    const sk = season(st.time.day).key;
+    check('Altın Çağ\'da tüccar nadir tohum ve antik kitap getirir', offers(sk, 4, true).some((o) => o.id === 'rareSeeds') && offers(sk, 4, true).some((o) => o.id === 'ancientBooks') && !offers(sk, 4, false).some((o) => o.goldenAge));
+    check('tüccar daha sık gelir (ziyaret arası x0,6)', GA.goldenMerchantInterval(st) === GD.GOLDEN_AGE.merchantInterval);
+    const seeds = st.exploration.items.vineSeed;
+    S.townEvents.grantRare('vineSeed');
+    const books = st.goldenAge.books;
+    S.townEvents.grantRare('ancientBook');
+    check('nadir tohum egzotik fide olur; antik kitap araştırmayı %5 hızlandırır', st.exploration.items.vineSeed === seeds + 1 && st.goldenAge.books === books + 1 && Math.abs(GA.bookResearchMultiplier(st) - (1 + st.goldenAge.books * 0.05)) < 1e-9);
+
+    // --- Tarihçe Kütüğü ---
+    const ch = st.chronicle;
+    check('Tarihçe: kurucu sakinler', ch.founders.length >= 1 && ch.founders.every((f) => typeof f.name === 'string'), ch.founders.map((f) => f.name).join(','));
+    check('Tarihçe: ilk evlenen çift ve ilk usta eseri', (ch.firstCouple?.a && ch.firstCouple?.b) && ch.firstMasterwork?.maker, JSON.stringify([ch.firstCouple, ch.firstMasterwork]));
+    check('Tarihçe: kulenin aşamaları ve baş ustası', [1, 2, 3].every((i) => ch.towerStages[i]) && GA.towerMasterOf(st)?.name);
+    game.events.emit('ui:toggleStats');
+    const archive = document.querySelector('.archive-panel');
+    archive.querySelector('.archive-tab[data-tab="chronicle"]').click();
+    game.render(0);
+    const text = archive.querySelector('.chronicle-view')?.textContent ?? '';
+    check('Arşiv\'de Tarihçe Kütüğü sekmesi: berat açılır', !archive.querySelector('.chronicle-view').hidden && archive.querySelector('.archive-view').hidden && text.includes('Tarihçe Kütüğü') && text.includes('Kurucu Sakinler') && text.includes(ch.founders[0].name), text.slice(0, 120));
+    check('beratta altın harfler: ilk çift, ilk eser, baş usta, Altın Çağ', archive.querySelectorAll('.chronicle-gold').length >= 4 && text.includes('Mekanizma & Çan') && text.includes('Altın Çağ'));
+    archive.querySelector('.archive-tab[data-tab="archive"]').click();
+    game.render(0);
+    check('Kasaba Arşivi sekmesine geri dönülür', !archive.querySelector('.archive-view').hidden);
+    game.events.emit('ui:toggleStats');
+    window.__s20 = { since: JSON.stringify(st.goldenAge.since), chimes: st.goldenAge.chimes, books: st.goldenAge.books, founders: ch.founders.length, master: GA.towerMasterOf(st)?.name, stages: Object.keys(ch.towerStages).length, couple: ch.firstCouple?.a, fountain: mf.id };
+  }
+
+  // --- Kayıt gidiş-dönüşü (sürüm 17) ---
   const ill = s.characters.find((c) => !c.isChild);
   scene.health.fallIll(ill);
   hut.remedies = 4;
@@ -2051,7 +2235,14 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 16', raw.version === 16);
+  check('kayıt sürümü 17', raw.version === 17);
+  // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
+  {
+    const T = window.__s20;
+    check('kayıttan Altın Çağ (başlangıcı, çan sayısı, antik kitaplar) döner', JSON.stringify(s2.goldenAge.since) === T.since && s2.goldenAge.chimes === T.chimes && s2.goldenAge.books === T.books);
+    check('kayıttan Tarihçe Kütüğü (kurucular, ilk çift, kulenin aşamaları ve baş ustası) döner', s2.chronicle.founders.length === T.founders && Object.keys(s2.chronicle.towerStages).length === T.stages && s2.chronicle.firstCouple?.a === T.couple && (await import('/src/systems/GoldenAge.js')).towerMasterOf(s2)?.name === T.master);
+    check('kayıttan Mermer Çeşme ve Kadim Dişli stoğu döner', s2.buildings.some((b) => b.id === T.fountain && b.type === 'marbleFountain') && s2.resources.gears === raw.resources.gears);
+  }
   // (19. aşama) evlilik, ortak ev, huylar, dedikodu kaydı
   {
     const T = window.__s19;

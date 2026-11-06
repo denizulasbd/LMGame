@@ -12,15 +12,18 @@
 //   save-v14.json: 16. aşamanın oyunu (kayıt sürümü 14): otopilotla 34 gün; seferler, ganimetler, çözülen yazıtlar
 //   save-v15.json: 18. aşamanın oyunu (kayıt sürümü 15): otopilotla 34 gün; döşenen yollar, tabelalar, süs ağaçları,
 //                  çitler, kasaba estetiği. Eski kayıtlarda (sürüm 2-14) peyzaj durumu boş başlar, estetik yüklenince hesaplanır
-//   save-v16.json: 19. aşamanın oyunu (kayıt sürümü 16, bugünkü): otopilotla 34 gün; evli çiftler ve ortak evleri, karakter
+//   save-v16.json: 19. aşamanın oyunu (kayıt sürümü 16): otopilotla 34 gün; evli çiftler ve ortak evleri, karakter
 //                  huyları, dolaşan dedikodular, son duyulan haberler. Eski kayıtlarda (sürüm 2-15) huylar ilk açılışta
 //                  dağıtılır (dördü de görülür), dedikodu boş başlar; evli çiftler kendi evlerinde kalır. Bu kayıt bir keşif
 //                  seferinin ortasındadır (macera pencereleri açılır ve sefer döner)
+//   save-v17.json: 20. aşamanın oyunu (kayıt sürümü 17, bugünkü): otopilotla 34 gün; aşama aşama yükselen Ulu Saat Kulesi,
+//                  Altın Çağ, Tarihçe Kütüğü, Mermer Çeşme ve Altın Çağ Fenerleri, antik kitaplar. Eski kayıtlarda (sürüm 2-16)
+//                  Tarihçe sakinlerden çıkarılır; tamamlanmış kulesi olan kasaba Altın Çağ'a sessizce (kutlamasız) girer
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -78,6 +81,21 @@ for (const { name, raw } of fixtures) {
       return bad;
     };
     loaded.integrity = integrity();
+    // (20. aşama) Ulu Saat Kulesi, Altın Çağ, Tarihçe (yüklendiği an)
+    const towerB = s.buildings.find((b) => b.type === 'wonder');
+    loaded.golden = {
+      stage: towerB?.wonderStage ?? null,
+      complete: Boolean(towerB?.wonderComplete),
+      since: s.goldenAge.since,
+      celebration: s.goldenAge.celebration !== null,
+      chimes: s.goldenAge.chimes,
+      books: s.goldenAge.books,
+      founders: s.chronicle.founders.length,
+      couple: s.chronicle.firstCouple,
+      masterwork: s.chronicle.firstMasterwork,
+      stages: Object.keys(s.chronicle.towerStages).length,
+      gears: s.resources.gears,
+    };
     // (19. aşama) huylar, ortak evler, dedikodu (yüklendiği an)
     loaded.social = {
       quirks: s.characters.map((c) => c.quirk),
@@ -176,6 +194,25 @@ for (const { name, raw } of fixtures) {
         name: `${tag}: huylar, ortak evler, son duyulan haberler ve dedikodu korundu`,
         ok: valid && JSON.stringify(S.quirks) === JSON.stringify(quirks) && homesKept && S.gossip === data.social.gossip.length && S.news === data.characters.filter((c) => c.lastNews).length,
         detail: `${S.kinds} huy, ${S.couples.length / 2} evli çift, ${S.gossip} haber, ${S.news} sakin haber duymuş`,
+      });
+    }
+  }
+  {
+    // (20. aşama) Ulu Saat Kulesi aşaması, Altın Çağ ve Tarihçe Kütüğü
+    const G = r.loaded.golden;
+    const towerData = data.buildings.find((b) => b.type === 'wonder');
+    const married = data.characters.some((c) => c.married && c.marriedAt !== null && c.marriedAt !== undefined);
+    if (data.version < 17) {
+      results.push({
+        name: `${tag}: Tarihçe sakinlerden çıkarıldı, kule aşaması korundu, Altın Çağ yalnızca tamamlanmış kuleyle (kutlamasız)`,
+        ok: G.founders >= 1 && (!married || G.couple) && (!data.masterworks?.items?.length || G.masterwork) && G.stage === (towerData ? towerData.wonderStage ?? 0 : null) && Boolean(G.since) === G.complete && !G.celebration && G.gears === 0 && G.books === 0,
+        detail: `kule ${G.stage ?? '-'} · Altın Çağ ${G.since ? `G${G.since.day}` : 'yok'} · kurucu ${G.founders} · ilk çift ${G.couple ? `${G.couple.a} & ${G.couple.b}` : '-'}`,
+      });
+    } else {
+      results.push({
+        name: `${tag}: Ulu Saat Kulesi, Altın Çağ, Tarihçe Kütüğü ve antik kitaplar korundu`,
+        ok: G.stage === towerData?.wonderStage && JSON.stringify(G.since) === JSON.stringify(data.goldenAge.since) && G.chimes === data.goldenAge.chimes && G.books === data.goldenAge.books && G.founders === data.chronicle.founders.length && G.stages === Object.keys(data.chronicle.towerStages).length,
+        detail: `kule ${G.stage} · Altın Çağ G${G.since?.day ?? '-'} · çan ${G.chimes} · kitap ${G.books} · kurucu ${G.founders}`,
       });
     }
   }

@@ -133,6 +133,21 @@ export const ACTIVITIES = {
     bubbles: ['note', 'laugh', 'heart'],
     partnerBubbles: ['laugh', 'heart', 'note', 'ring'],
   },
+  // 20. aşama: Ulu Saat Kulesi tamamlanınca meydanda büyük Çağ Kutlaması (uyanık herkes katılır)
+  ageCelebration: {
+    kind: 'social',
+    target: 'fountain',
+    travelLabel: "Çağ Kutlaması'na koşuyor",
+    label: "Meydanda Çağ Kutlaması'nda",
+    partnerLabel: "{partner} ile meydanda Altın Çağ'ı kutluyor",
+    duration: [120, 120],
+    effects: { fun: 0.3 },
+    socialGain: 1.3,
+    aloneSocialGain: 0.7,
+    friendshipMultiplier: 1.3,
+    bubbles: ['bell', 'note', 'laugh', 'sparkle'],
+    partnerBubbles: ['laugh', 'note', 'bell', 'heart'],
+  },
   // 19. aşama: evli çift akşamları evde birlikte yemek yer (içeride; öğün başı yiyecek değeri öder)
   homeDinner: {
     kind: 'need',

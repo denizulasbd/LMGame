@@ -58,6 +58,9 @@ import { ExpeditionSystem } from '../systems/ExpeditionSystem.js';
 import { LandscapeSystem } from '../systems/LandscapeSystem.js';
 import { SocialSystem } from '../systems/SocialSystem.js';
 import { WeddingConfetti } from '../rendering/WeddingConfetti.js';
+import { GoldenAgeSystem } from '../systems/GoldenAgeSystem.js';
+import { ChimeWaves } from '../rendering/ChimeWaves.js';
+import { towerOf } from '../systems/GoldenAge.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -144,6 +147,8 @@ export class TownScene extends Scene {
     this.stats = new StatsSystem(this.game);
     this.seasonFestivals = new SeasonFestivalSystem(this.game, this.world, new Random(state.seed + 14), { attract: this.attract });
     this.memories = new MemorySystem(this.game, this.world, new Random(state.seed + 15));
+    // (20. aşama) Altın Çağ: anılardan sonra kurulur (Tarihçe'nin kurucuları ilk sakinlerin anısından çıkarılır)
+    this.goldenAge = new GoldenAgeSystem(this.game, this.world, { attract: this.attract });
     this.rally = new RallySystem(this.game);
     this.craftsmanship = new CraftsmanshipSystem(this.game, this.world, this.economy, new Random(state.seed + 16));
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
@@ -190,6 +195,7 @@ export class TownScene extends Scene {
       this.townEvents,
       this.seasonFestivals,
       this.memories,
+      this.goldenAge,
       this.rally,
       this.heating,
       this.milestones,
@@ -228,6 +234,7 @@ export class TownScene extends Scene {
       this.stats,
       this.seasonFestivals,
       this.memories,
+      this.goldenAge,
       this.rally,
       this.craftsmanship,
       this.expeditions,
@@ -245,6 +252,8 @@ export class TownScene extends Scene {
     this.fireflies = new FireflyField(state.seed);
     this.festivalFx = new FestivalEffects();
     this.confetti = new WeddingConfetti(); // (19. aşama) meydandaki düğün kutlaması
+    this.ageConfetti = new WeddingConfetti(); // (20. aşama) Çağ Kutlaması
+    this.chimeWaves = new ChimeWaves(); // (20. aşama) kule çanının ses dalgaları
     this.leaves = new LeafFall();
     this.animationTime = 0; // görsel animasyonlar için gerçek zaman (oyun duraklasa da akar)
 
@@ -259,6 +268,7 @@ export class TownScene extends Scene {
     this.cinematic = false; // (13. aşama) fotoğraf modu: arayüz gizli, haritada imleç ve seçim çizilmez
 
     this.unsubscribers = [
+      events.on('goldenAge:chime', () => this.chimeWaves.ring()),
       events.on('ui:setCinematic', (on) => {
         this.cinematic = Boolean(on);
         if (this.cinematic) this.tools.setTool('select');
@@ -687,6 +697,9 @@ export class TownScene extends Scene {
     if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime, env.festivalTheme, this.game.state.seasonFestival);
     const party = this.game.state.social.party;
     if (party && this.game.state.totalMinutes < party.until) this.confetti.draw(renderer, party, this.animationTime, view);
+    const ageParty = this.game.state.goldenAge?.celebration;
+    if (ageParty && this.game.state.totalMinutes < ageParty.until) this.ageConfetti.draw(renderer, ageParty, this.animationTime, view);
+    this.chimeWaves.draw(renderer, towerOf(this.game.state), this.animationTime);
     renderer.resetCamera();
     const daylight = 1 - Math.min(1, getAmbientColor(hour).a / 0.55);
     this.weatherFx.drawRain(renderer, this.camera, weather, daylight);

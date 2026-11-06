@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -245,6 +245,41 @@ const PAGE_HELPERS = () => {
         check('yüklenen kutlama bir kez biter; çift aynı evde', ended.n === 1 && s.social.party === null && a2.homeId === b2.homeId, `${ended.n} · ${a2.homeId}/${b2.homeId}`);
         ended.off();
       } else check('kutlama için bekâr çift ve meydan havuzu var', false, `${singles.length} bekâr`);
+    }
+
+    // --- 2i. (20. aşama) Çağ Kutlaması sürerken (Altın Çağ başladı, meydanda kutlama, çan) ---
+    {
+      const GA = await import('/src/systems/GoldenAge.js');
+      const { BUILDINGS } = await import('/src/data/buildings.js');
+      let tower = GA.towerOf(s);
+      if (!tower) {
+        // Denetim kasabası küçük: kule seviye ve nüfus koşulu geçici olarak karşılanıp kurulur, aşamaları tamamlanmış sayılır
+        const keep = BUILDINGS.wonder.requiresPopulation;
+        BUILDINGS.wonder.requiresPopulation = 0;
+        s.town.tier = Math.max(s.town.tier, 3);
+        rich();
+        sim.give({ wood: 500, stone: 600 });
+        tower = sim.place('wonder', { maxRadius: 34 });
+        BUILDINGS.wonder.requiresPopulation = keep;
+        if (tower) {
+          tower.wonderStage = 3;
+          BUILDINGS.wonder.wonder.stages.forEach((st, i) => (s.chronicle.towerStages[i + 1] ??= { name: st.name, day: s.time.day, hour: s.time.hour, minute: 0 }));
+        }
+      }
+      check('Çağ Kutlaması denemesi için Ulu Saat Kulesi var', tower);
+      if (tower) {
+        while (s.time.hour < 9 || s.time.hour >= 15) hours(1);
+        scene().goldenAge.begin(tower);
+        hours(0.3);
+        const cel = JSON.stringify(s.goldenAge.celebration);
+        const diff = A.roundtrip();
+        check('Çağ Kutlaması sırasında kayıt -> yükleme durum kayması yok', s.goldenAge.celebration && diff.length === 0, diff.join(' | '));
+        check('yüklenen Çağ Kutlaması aynen döner', JSON.stringify(s.goldenAge.celebration) === cel);
+        const ended = counter('goldenAge:celebrationEnded');
+        hours(2.2);
+        check('yüklenen Çağ Kutlaması bir kez biter, Altın Çağ sürer', ended.n === 1 && s.goldenAge.celebration === null && GA.isGoldenAge(s), `${ended.n}`);
+        ended.off();
+      }
     }
 
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---

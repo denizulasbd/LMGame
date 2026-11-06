@@ -2,6 +2,8 @@
 // Sistemler durumu burada değiştirir; çizim ve UI yalnızca okur.
 // Harita kaydedilmez: aynı tohumdan (seed) yeniden üretilir, yalnızca değişen karolar
 // kayda eklenir (bkz. world/TerrainSnapshot.js; kayıt dosyasını SaveManager yazar).
+import { emptyGoldenAge, emptyChronicle } from '../systems/GoldenAge.js';
+import { GOLDEN_AGE } from '../data/goldenAge.js';
 import { CONFIG } from '../config.js';
 import { STARTING_RESOURCES, BASE_STORAGE_CAPACITY } from '../data/resources.js';
 import { STARTING_WEATHER } from '../data/weather.js';
@@ -139,6 +141,10 @@ export class GameState {
     // (19. aşama) Sosyal yaşam (SocialSystem): süren düğün kutlaması { venueId, coupleIds, guestIds, names, until } ve
     // kasaba dedikodusu (dolaşan haberler: { id, kind, text, story, icon, day, hour, heardBy, spread })
     this.social = emptySocial();
+    // (20. aşama) Altın Çağ (GoldenAgeSystem): başladığı an, çan sayısı, süren Çağ Kutlaması, kitaplıktaki antik kitaplar;
+    // Tarihçe Kütüğü: kurucular, ilk evlenen çift, ilk usta işi eser, kuleye verilen emek ve baş usta, kulenin aşamaları
+    this.goldenAge = emptyGoldenAge();
+    this.chronicle = emptyChronicle();
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -204,6 +210,8 @@ export class GameState {
       exploration: this.exploration,
       landscape: this.landscape,
       social: this.social,
+      goldenAge: this.goldenAge,
+      chronicle: this.chronicle,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -293,6 +301,10 @@ export class GameState {
     next.landscape = restoreLandscape(data.landscape);
     // 19. aşamadan eski kayıtlarda sosyal durum yoktur: dedikodu boş başlar, huylar ilk açılışta dağıtılır (SocialSystem)
     next.social = restoreSocial(data.social);
+    // 20. aşamadan eski kayıtlarda Altın Çağ ve Tarihçe yoktur: tamamlanmış kule varsa Altın Çağ sessizce başlar,
+    // Tarihçe sakinlerden, evliliklerden ve eserlerden çıkarılır (GoldenAgeSystem)
+    next.goldenAge = restoreGoldenAge(data.goldenAge);
+    next.chronicle = restoreChronicle(data.chronicle);
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
@@ -318,6 +330,38 @@ export class GameState {
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
+}
+
+const STAMP = (v) => (v && Number.isFinite(v.day) ? { ...v } : null);
+
+/** Kayıttaki Altın Çağ: sayılar sınırlanır, kutlama yalnızca geçerliyse sürer. */
+function restoreGoldenAge(data) {
+  const out = emptyGoldenAge();
+  if (!data || typeof data !== 'object') return out;
+  out.since = STAMP(data.since);
+  out.chimes = Math.max(0, Math.floor(Number(data.chimes) || 0));
+  out.books = Math.min(GOLDEN_AGE.maxBooks, Math.max(0, Math.floor(Number(data.books) || 0)));
+  out.lastChime = data.lastChime && Number.isFinite(data.lastChime.at) ? { ...data.lastChime } : null;
+  const c = data.celebration;
+  if (out.since && c && Number.isFinite(c.until)) {
+    out.celebration = { venueId: c.venueId ?? null, x: Number(c.x) || 0, y: Number(c.y) || 0, startedAt: Number.isFinite(c.startedAt) ? c.startedAt : c.until, until: c.until, attended: Array.isArray(c.attended) ? c.attended.filter(Number.isFinite) : [] };
+  }
+  return out;
+}
+
+/** Kayıttaki Tarihçe Kütüğü: bozuk satırlar atlanır (eksikleri GoldenAgeSystem çıkarır). */
+function restoreChronicle(data) {
+  const out = emptyChronicle();
+  if (!data || typeof data !== 'object') return out;
+  out.founders = (Array.isArray(data.founders) ? data.founders : []).filter((f) => f && Number.isFinite(f.id) && typeof f.name === 'string').map((f) => ({ id: f.id, name: f.name }));
+  const named = (v, keys) => (v && keys.every((k) => typeof v[k] === 'string') ? { ...v } : null);
+  out.firstCouple = named(data.firstCouple, ['a', 'b']);
+  out.firstMasterwork = named(data.firstMasterwork, ['maker', 'piece']);
+  for (const [id, v] of Object.entries(data.towerWork ?? {})) if (Number.isFinite(Number(id)) && Number(v) > 0) out.towerWork[id] = Number(v);
+  out.towerMaster = named(data.towerMaster, ['name']);
+  for (const [k, v] of Object.entries(data.towerStages ?? {})) if (v && typeof v.name === 'string') out.towerStages[k] = { ...v };
+  out.goldenAge = STAMP(data.goldenAge);
+  return out;
 }
 
 function emptySocial() {

@@ -1303,6 +1303,8 @@ const BUBBLE_ICONS = {
   melody: ['P..O...', '...OO..', '...O.O.', '.P.O...', '.OOO..P', '.OO....'],
   book: ['.KK.KK.', 'KuRKRuK', 'KuRKRuK', 'KuuKuuK', 'KBBKBBK', '.KK.KK.'],
   paw: ['.w...w.', 'www.www', '...w...', '..www..', '.wwwww.', '..www..'],
+  // 20. aşama: Ulu Saat Kulesi'nin çanı (altın çan, iki yanında ses çizgileri)
+  bell: ['c..P..c', '.cPYPc.', 'c.PYP.c', '.PYYYP.', 'PPPPPPP', '...o...'],
 };
 
 export const BUBBLE_WIDTH = 11;

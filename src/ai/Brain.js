@@ -88,6 +88,11 @@ export class Brain {
     const { needs, profile } = c;
     const bedtime = isBedtime(profile, hour);
 
+    // (20. aşama) Çağ Kutlaması: Ulu Saat Kulesi tamamlanınca uyanık herkes meydanda kutlar
+    if (this.world.state.goldenAge?.celebration && needs.energy > FESTIVAL_MIN_ENERGY && !this.world.state.events.festival.active) {
+      const plan = this.planAgeCelebration(c);
+      if (plan) return plan;
+    }
     // (19. aşama) Düğün kutlaması: çift ve davetli dostları meydanda konfetiler arasında kutlar
     if (this.world.state.social?.party && needs.energy > FESTIVAL_MIN_ENERGY && !this.world.state.events.festival.active) {
       const plan = this.planWeddingParty(c);
@@ -853,6 +858,18 @@ export class Brain {
     const spot = useTree ? treeSpot : riverSpot;
     if (!spot) return null;
     return { activity: 'viewpoint', spot, reserve: true, facing: spot.facing ?? 'down', view: useTree ? 'tree' : 'river', duration };
+  }
+
+  /** (20. aşama) Çağ Kutlaması: meydanda (havuz başı; yoksa kulenin dibinde) kutlama bitene kadar. */
+  planAgeCelebration(c) {
+    const cel = this.world.state.goldenAge.celebration;
+    const now = this.world.state.totalMinutes;
+    if (!cel || now >= cel.until - 3 || c.away || c.role) return null;
+    const venue = this.world.getBuilding(cel.venueId);
+    if (!venue) return null;
+    const plan = this.planGathering(c, venue, null, 'festival');
+    if (!plan) return null;
+    return { ...plan, activity: 'ageCelebration', duration: Math.max(3, cel.until - now) };
   }
 
   /** Düğün kutlamasına davetliyse meydanda kutlama yerine gitmek. */

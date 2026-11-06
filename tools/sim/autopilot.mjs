@@ -11,6 +11,9 @@
 // sonunda döşenen yolu, estetik puanını ve yürüyüşlerin yollardan geçme oranını raporlar. (19. aşama) Sosyal yaşamı
 // raporlar: evli çiftler ve aynı evde yaşayanlar, randevu, düğün kutlaması, akşam yemeği, boşalan ev, dedikodu, huyların
 // davranışları, en düşük nüfus ve evsizler; bekçinin sosyal sıkışma raporu (taşınamayan / ayrı kalan çift) çıkış kodunu etkiler.
+// (20. aşama) Ulu Saat Kulesi'ni Kasaba seviyesinde ve 20 sakinle kurar, aşamaları kaynak ve Kadim Dişli yettikçe başlatır;
+// Altın Çağ'da Mermer Çeşme ve Altın Çağ Feneri diker, tüccardan antik kitap ve nadir tohum alır; aşama günlerini, dökülen
+// dişlileri, baş ustayı, çanları ve Tarihçe'yi raporlar.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
@@ -34,7 +37,8 @@ await installMonitor(page);
 await page.evaluate((passive) => {
   const game = window.game;
   const sim = window.sim;
-  window.__stats = { crafted: { material: 0, fallback: 0 }, minWelfare: 100, daily: [], spent: { research: {}, wonder: {}, crates: 0 } };
+  window.__stats = { crafted: { material: 0, fallback: 0 }, minWelfare: 100, daily: [], spent: { research: {}, wonder: {}, crates: 0 }, gears: 0 };
+  game.events.on('goldenAge:gearCast', () => window.__stats.gears++);
   game.events.on('equipment:crafted', (p) => window.__stats.crafted[p.recipe]++);
   const addSpent = (bucket, cost) => {
     for (const [r, v] of Object.entries(cost)) bucket[r] = (bucket[r] ?? 0) + v;
@@ -63,7 +67,7 @@ await page.evaluate((passive) => {
     window.__stats.gold.decrees += price;
     window.__stats.gold.items.push(decree.name);
   });
-  for (const name of ['research:completed', 'school:graduated', 'harbor:shipped', 'wonder:stageCompleted', 'wonder:completed']) {
+  for (const name of ['research:completed', 'school:graduated', 'harbor:shipped', 'wonder:stageCompleted', 'wonder:completed', 'goldenAge:began', 'goldenAge:celebrationEnded']) {
     game.events.on(name, (p) => {
       const what = p?.research?.name ?? (p?.skill ? `${p.character.name} -> ${p.skill}` : '') ?? '';
       const extra = name === 'harbor:shipped' ? `+${p.gold} altın (${Object.entries(p.cargo).map(([r, v]) => `${r}${v}`).join(' ')})` : p?.stage ? `${p.stage.name} (${p.index})` : '';
@@ -326,7 +330,9 @@ await page.evaluate((passive) => {
     // harika bitince oyunun varsayılanı (400); (14. aşama) stok 400'ün çok üstüne çıkınca Büyük İhracat Seferi;
     // harika yükselirken ihracat sandığı hazırlanmaz
     const wonder = s.buildings.find((b) => b.type === 'wonder');
-    const saving = s.town.tier >= 4 && !wonder?.wonderComplete;
+    // (20. aşama) Ulu Saat Kulesi Kasaba seviyesinde ve 20 sakinle açılır: o andan itibaren biriktirilir
+    const towerOpen = s.town.tier >= window.__wonder.requiresTier && s.characters.length >= window.__wonder.requiresPopulation;
+    const saving = (towerOpen || wonder) && !wonder?.wonderComplete;
     for (const h of world.getCompleted('harbor')) {
       const threshold = saving ? 550 : wonder?.wonderComplete ? 400 : 250; // harika bitince oyunun varsayılan sınırı
       if (h.exportThreshold !== threshold) game.events.emit('ui:setExportThreshold', { buildingId: h.id, threshold });
@@ -335,13 +341,29 @@ await page.evaluate((passive) => {
       const over = ['wood', 'stone', 'food', 'wool', 'iron', 'bread'].reduce((a, r) => a + Math.max(0, res[r] - 400), 0);
       if (!saving && wonder?.wonderComplete && over > 900 && window.__harbor.grandVoyageStatus(s).ok) game.events.emit('ui:grandVoyage', { buildingId: h.id });
     }
-    // Harika: Gelişmiş Şehir'de kurulur, aşamalar kaynak yettikçe başlatılır
-    if (s.town.tier >= 4 && !wonder && Object.entries(window.__wonder.cost).every(([r, v]) => res[r] >= v)) {
+    // Ulu Saat Kulesi: açılınca kurulur, aşamalar kaynak (ve Kadim Dişli) yettikçe başlatılır
+    if (towerOpen && !wonder && Object.entries(window.__wonder.cost).every(([r, v]) => res[r] >= v)) {
       const spot = sim.findSpot('wonder', 34);
       if (spot) scene.construction.placeSite('wonder', spot.x, spot.y);
     } else if (wonder && wonder.functional && !wonder.project && !wonder.wonderComplete) {
       const stage = window.__wonder.wonder.stages[wonder.wonderStage];
       if (Object.entries(stage.cost).every(([r, v]) => res[r] >= v)) scene.construction.startProject(wonder);
+    }
+
+    // (20. aşama) Altın Çağ: prestij peyzajı (bir Mermer Çeşme, iki Altın Çağ Feneri) ve tüccarın nadir malları
+    if (wonder?.wonderComplete && s.goldenAge?.since) {
+      const count = (t) => s.buildings.filter((b) => b.type === t).length;
+      if (count('marbleFountain') < 1 && res.gold >= 600 && res.stone >= 120) {
+        const spot = sim.findSpot('marbleFountain', 14);
+        if (spot) scene.construction.placeSite('marbleFountain', spot.x, spot.y);
+      } else if (count('goldenLantern') < 2 && res.gold >= 300 && res.iron >= 10) {
+        const spot = sim.findSpot('goldenLantern', 12);
+        if (spot) scene.construction.placeSite('goldenLantern', spot.x, spot.y);
+      }
+      const m = s.events.merchant;
+      if (scene.townEvents.canTrade()) {
+        for (const id of ['ancientBooks', 'rareSeeds']) if ((m.stock[id] ?? 0) > 0 && res.gold >= 500) game.events.emit('ui:trade', { offerId: id });
+      }
     }
 
     // (13. aşama) Harika bitince hazine: önce yadigârlar (biraz yedek kalsın), ipek ve mermer, baharat, altın fermanları
@@ -500,6 +522,21 @@ const report = await page.evaluate(() => {
     trade: s.trade,
     research: Object.keys(s.research.done),
     wonder: s.buildings.find((b) => b.type === 'wonder')?.wonderStage ?? 0,
+    // (20. aşama) Ulu Saat Kulesi ve Altın Çağ
+    golden: {
+      since: s.goldenAge?.since?.day ?? null,
+      chimes: s.goldenAge?.chimes ?? 0,
+      books: s.goldenAge?.books ?? 0,
+      celebrations: s.stats.ageCelebrations ?? 0,
+      stages: Object.fromEntries(Object.entries(s.chronicle?.towerStages ?? {}).map(([k, v]) => [k, v.day ?? '?'])),
+      master: s.chronicle?.towerMaster ?? null,
+      builders: Object.keys(s.chronicle?.towerWork ?? {}).length,
+      founders: (s.chronicle?.founders ?? []).map((f) => f.name),
+      couple: s.chronicle?.firstCouple ? `${s.chronicle.firstCouple.a} & ${s.chronicle.firstCouple.b}` : null,
+      masterwork: s.chronicle?.firstMasterwork?.maker ?? null,
+      gears: window.__stats.gears ?? 0,
+      prestige: ['marbleFountain', 'goldenLantern'].map((t) => `${t}:${s.buildings.filter((b) => b.type === t && b.functional).length}`).join(' '),
+    },
     gold: s.resources.gold,
     goldSpent: s.luxury.goldSpent,
     relics: Object.keys(s.luxury.relics),
@@ -562,6 +599,14 @@ console.log(`(16. aşama) sefer ${report.ex.expeditions} · macera ${report.ex.a
 console.log(`(15. aşama) atışma ${report.quarrels} · barışma ${report.reconciliations} (oran %${report.quarrels ? Math.round((report.reconciliations / report.quarrels) * 100) : 0}) · usta işi eser ${report.mw.made} (sergilenen ${report.mw.exhibited}, satılan ${report.mw.sold}, +${report.mw.goldEarned} altın) · kıyafet ${JSON.stringify(report.outfits)}`);
 console.log(`${report.sampleName} anıları:\n  ${report.sampleMemories.join('\n  ')}`);
 console.log(`harika: aşama ${report.wonder}/3, ${sum(spent.wonder)} birim (${fmt(spent.wonder)}); hazinede ${report.gold} altın`);
+{
+  const g = report.golden;
+  console.log(
+    `(20. aşama) Ulu Saat Kulesi aşamaları (gün) ${JSON.stringify(g.stages)} · dökülen Kadim Dişli ${g.gears} · emek veren ${g.builders} sakin · baş usta ${g.master ? `${g.master.name} (${g.master.work})` : '-'} · ` +
+      `Altın Çağ ${g.since !== null ? `G${g.since}'den beri, çan ${g.chimes} kez, Çağ Kutlaması ${g.celebrations}` : 'başlamadı'} · antik kitap ${g.books} · prestij ${g.prestige} · ` +
+      `Tarihçe: kurucular ${g.founders.join(', ')} · ilk çift ${g.couple ?? '-'} · ilk usta eseri ${g.masterwork ?? '-'}`
+  );
+}
 const late = report.stats.daily.slice(-12);
 if (late.length) {
   const keys = ['wood', 'stone', 'food', 'wool', 'iron', 'bread'];

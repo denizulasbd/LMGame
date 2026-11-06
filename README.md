@@ -1207,6 +1207,10 @@ görünür. Aynı anda tek araştırma yürür; bitince teknoloji kalıcıdır (
 
 ### Kasaba Harikası: Büyük Vadi Saat Kulesi
 
+> **20. aşamadan beri** bu harika **Ulu Saat Kulesi** adıyla yeniden tasarlandı: Kasaba seviyesinde ve 20 sakinle açılır,
+> aşamaları ve maliyetleri değişti, tamamlanınca kalıcı Altın Çağ başlar (bkz. *Kasaba Zaferi ve Altın Çağ*). Aşağıdaki
+> tablo 12. aşamanın ilk tasarımıdır; görünüm, ışık, ısıtma ve saat başı çan aynen geçerlidir.
+
 Gelişmiş Şehir olunca inşa menüsünde açılır. İlk şantiye **Temel** aşamasıdır. Sonraki aşamalar yapının panelinden
 **Aşamayı Başlat** ile başlatılır (maliyet peşin; iptalde çalışılmadıysa tamamı, yoksa yarısı iade edilir).
 İnşaatçılar her aşamayı emekleriyle yükseltir.

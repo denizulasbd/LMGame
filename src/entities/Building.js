@@ -13,6 +13,7 @@
 // 10. aşama: koyun ağılı iki katmanda çizilir, aradaki koyunlar (flock, entities/Flock.js) derinlik sırasıyla
 // girer; değirmenin kanatları rüzgârda ağır ağır, fırıncı çalışırken hızlı döner (sailPhase); fırın ve
 // belediye geceleri ışık verir; madenin girişinde fener yanar.
+import { CLOCK_GEAR } from '../data/goldenAge.js';
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { BUILDINGS, PROJECT_WORDS } from '../data/buildings.js';
@@ -38,6 +39,7 @@ import {
   WONDER_ART,
   CHERRY_ART,
   IRON_LANTERN_ART,
+  GOLDEN_LANTERN_ART,
   SIGNPOST_ART,
   getGazeboLayer,
   getSheepFarmLayer,
@@ -85,6 +87,8 @@ const BASELINE_INSET = {
   woodFence: 3,
   fenceGate: 3,
   ironLantern: 3,
+  marbleFountain: 3,
+  goldenLantern: 3,
   signpost: 3,
   parkBench: 3,
   planter: 3,
@@ -98,7 +102,7 @@ const SITE_BASELINE_INSET = 2;
 const RECENT_WORKERS_EXTRA = 2; // panelde çalışan yuvasından bu kadar fazla "son çalışan" hatırlanır
 
 // Animasyon kare hızı (kare / saniye): ateş titrer, tabela ve flama sallanır, çiçekler eğilir
-const FRAME_RATES = { campfire: 8, flowerBed: 1.4, planter: 1.2, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3, academy: 2.5, harbor: 1.6, wonder: 2.4 };
+const FRAME_RATES = { campfire: 8, flowerBed: 1.4, planter: 1.2, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3, academy: 2.5, harbor: 1.6, wonder: 2.4, marbleFountain: 4 };
 const DEFAULT_FRAME_RATE = 3;
 const MAX_OVERHANG = 70; // yapıların karolarının üstüne taşabileceği en fazla piksel (görünürlük testi; harika 64)
 // Değirmen kanatları: saniyede kaç kare (çeyrek tur = MILL_ART.sailFrames kare) döner
@@ -205,7 +209,7 @@ export class Building extends Entity {
 
   /** Atölyede yapılan işin ilerlemesi 0-1. */
   get craftRatio() {
-    return this.craft ? Math.min(1, this.craft.progress / EQUIPMENT[this.craft.item].work) : 0;
+    return this.craft ? Math.min(1, this.craft.progress / (EQUIPMENT[this.craft.item] ?? CLOCK_GEAR).work) : 0; // (20. aşama) Kadim Dişli
   }
 
   get definition() {
@@ -359,7 +363,7 @@ export class Building extends Entity {
       return { name: this.name, detail: 'Yanındakilerin keyfi artıyor' };
     }
     if (this.type === 'workshop') {
-      if (this.craft) return { name: this.name, detail: `${EQUIPMENT[this.craft.item].name}: %${Math.floor(this.craftRatio * 100)}` };
+      if (this.craft) return { name: this.name, detail: `${(EQUIPMENT[this.craft.item] ?? CLOCK_GEAR).name}: %${Math.floor(this.craftRatio * 100)}` };
       return { name: this.name, detail: this.craftStatus ?? 'Zanaatkâr bekleniyor' };
     }
     if (this.type === 'mill') {
@@ -392,7 +396,7 @@ export class Building extends Entity {
     if (this.type === 'signpost') return { name: this.name, detail: 'Mahalle tabelası · tıkla ve adını değiştir' };
     if (this.type === 'fenceGate') return { name: this.name, detail: 'Sakinler kapıdan geçer' };
     if (this.type === 'woodFence') return { name: this.name, detail: 'Geçilemez · bir Çit Kapısı bırak' };
-    if (this.type === 'ironLantern' || this.type === 'lantern') return { name: this.name, detail: this.lit ? 'Yanıyor · sokağı aydınlatıyor' : 'Akşam yanacak' };
+    if (this.type === 'ironLantern' || this.type === 'lantern' || this.type === 'goldenLantern') return { name: this.name, detail: this.lit ? 'Yanıyor · sokağı aydınlatıyor' : 'Akşam yanacak' };
     if (this.type === 'parkBench' || this.type === 'bench') return { name: this.name, detail: 'Sakinler oturup manzarayı izler' };
     if (this.type === 'planter') return { name: this.name, detail: 'Yanından geçenler çiçek kokusunu içine çeker' };
     if (this.definition.ornamentalTree) {
@@ -726,6 +730,10 @@ export class Building extends Entity {
       const artTop = this.y + this.height - IRON_LANTERN_ART.height;
       const sparkle = env.festivalTheme === 'winter' ? 1.3 : 1;
       out.push({ x: this.x + IRON_LANTERN_ART.light.x, y: artTop + IRON_LANTERN_ART.light.y, radius: 68 * sparkle, color: [255, 222, 140], intensity: 0.85, glow: 0.3 });
+    } else if (this.type === 'goldenLantern' && this.lit) {
+      // (20. aşama) Altın Çağ Feneri: geniş, sıcak altın sarısı ışık
+      const artTop = this.y + this.height - GOLDEN_LANTERN_ART.height;
+      out.push({ x: this.x + GOLDEN_LANTERN_ART.light.x, y: artTop + GOLDEN_LANTERN_ART.light.y, radius: 96, color: [255, 204, 90], intensity: 0.9, glow: 0.4 });
     } else if (this.type === 'ancientTorch' && this.lit) {
       // (16. aşama) Kadim Meşale: titreyen mavi alev, geniş ve serin bir ışık halkası
       const artTop = this.y + this.height - TORCH_ART.height;

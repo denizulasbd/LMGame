@@ -9,6 +9,7 @@
 // Durum state.research'tedir (kayda girer): { active: { id, progress } | null, done: { id: { day, hour, minute } } }.
 //   (16. aşama) Kadim yazıt: araştırma yokken Bilge çözülmeyi bekleyen yazıtın başına oturur
 //              (state.exploration.decoding); çözülünce kalıcı imar şeması: 'inscription:decoded' { id, inscription }.
+import { bookResearchMultiplier } from './GoldenAge.js';
 import { RESEARCH, SCHOOL } from '../data/research.js';
 import { SKILL_LEVELS, SKILL_KEYS } from '../data/skills.js';
 import { isWithinHours } from './StructureSystem.js';
@@ -141,7 +142,7 @@ export class ResearchSystem {
   work(building, amount) {
     const active = this.state.research.active;
     if (active) {
-      active.progress += amount;
+      active.progress += amount * bookResearchMultiplier(this.state); // (20. aşama) antik kitaplar
       const def = RESEARCH[active.id];
       if (active.progress >= def.work) this.complete(active.id);
       return true;

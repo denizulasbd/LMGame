@@ -24,6 +24,7 @@
     import { TILE_TYPES } from '../src/data/tiles.js';
     import { TileMap } from '../src/world/TileMap.js';
     import { WeddingConfetti } from '../src/rendering/WeddingConfetti.js';
+    import { ChimeWaves } from '../src/rendering/ChimeWaves.js';
     import { QUIRKS } from '../src/data/social.js';
 
     const root = document.getElementById('root');
@@ -52,6 +53,33 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 20. aşama: Ulu Saat Kulesi, Altın Çağ, prestij peyzajı ---
+    show('Ulu Saat Kulesi: Temel, Gövde, Mekanizma & Çan (gece, çan odası yanık)', [1, 2, 3].map((st) => [['Temel', 'Gövde', 'Mekanizma & Çan'][st - 1], getStructureSprite('wonder', { wonderStage: st, windowsLit: st === 3, frame: 1 })]), 3);
+    {
+      const tower = getStructureSprite('wonder', { wonderStage: 3, windowsLit: false, frame: 0 });
+      const frames = [0.3, 1.1, 2.2].map((t) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 200;
+        canvas.height = 160;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#4a9a46';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(tower, 68, canvas.height - tower.height - 8);
+        const waves = new ChimeWaves();
+        waves.startedAt = 0;
+        const fakeTower = { x: 68, y: canvas.height - 8 - 64, height: 64 };
+        waves.draw({ fillRect: (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }, drawImage: (img, x, y) => ctx.drawImage(img, x, y) }, fakeTower, t);
+        return [`${t} sn`, canvas];
+      });
+      show('Kule saati çalınca (08:00 / 18:00): çan odasından yayılan altın ses dalgaları ve yükselen notalar', frames, 2);
+    }
+    show('Prestij peyzajı: Mermer Çeşme (dört kare, fışkıran su) ve Altın Çağ Feneri (gündüz / gece)', [
+      ...[0, 1, 2, 3].map((f) => [`mermer çeşme ${f}`, getStructureSprite('marbleFountain', { frame: f })]),
+      ['altın fener gündüz', getStructureSprite('goldenLantern', { lit: false })],
+      ['altın fener gece', getStructureSprite('goldenLantern', { lit: true })],
+    ], 5);
+    show('Yeni simgeler: Kadim Dişli (dişliler), Ulu Saat Kulesi; kule çanı balonu', [['gears', getIconSprite('gears')], ['wonder', getIconSprite('wonder')], ['bell', getIconSprite('bell')], ['çan balonu', getBubbleSprite('bell')]], 8);
 
     // --- 19. aşama: sosyal yaşam — huy simgeleri, yeni balonlar, düğün konfetisi ve küçük sahneler ---
     /** Küçük bir sahne: [sprite, x, y] listesini (ayak tabanı y) verilen boyutta bir tuvale çizer; isteğe bağlı çizim kancası. */

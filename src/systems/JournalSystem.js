@@ -109,6 +109,13 @@ export class JournalSystem {
       ),
       on('social:homeFreed', ({ home, a, b }) => this.log(`${a.name} ile ${b.name} ortak evlerine taşındı; ${home.name} boşaldı ve yeni göçmenlere açık`, 'heart')),
       on('gossip:spread', ({ news }) => this.log(`Kasabada dilden dile dolaşıyor: ${news.text}`, 'whisper')),
+      // (20. aşama) Altın Çağ
+      on('goldenAge:began', ({ master }) =>
+        this.log(`Çağ Dönüm Noktası! Ulu Saat Kulesi tamamlandı, kasaba Altın Çağ'a girdi${master ? `; baş usta ${master.name} Tarihçe Kütüğü'ne yazıldı` : ''}`, 'wonder')
+      ),
+      on('goldenAge:celebrationEnded', ({ attended }) => this.log(`Meydandaki Çağ Kutlaması sona erdi: ${attended} sakin ilk çanı birlikte dinledi`, 'bell')),
+      on('goldenAge:gearCast', ({ gears }) => gears === 1 && this.log("Zanaat Atölyesi ilk Kadim Dişli'yi döktü: kulenin mekanizması yolda", 'gears')),
+      on('goldenAge:book', ({ books }) => this.log(`Bilgelik Evi'nin kitaplığına antik bir kitap girdi (${books} kitap: araştırmalar +%${books * 5})`, 'book')),
       on('family:madeRoom', ({ character, to }) => this.log(`${character.name}, ailenin büyümesi için başka bir eve (${to.name}) taşındı`, 'heart')),
       on('family:childBorn', ({ child, parents }) => this.log(`${parents[0].name} ve ${parents[1].name} ailesine küçük ${child.name} katıldı`, 'love')),
       on('family:grownUp', ({ character }) => this.log(`${character.name} büyüdü ve kasabanın genç bir sakini oldu`, 'star')),
@@ -163,7 +170,7 @@ export class JournalSystem {
       on('adventure:resolved', ({ scenario, option, success, member }) =>
         this.log(`Maceracı Günlüğü · ${scenario.title}: ${option.label}${success ? '' : ` (${member?.name} ${option.risk.text})`}`, scenario.icon)
       ),
-      on('exotic:found', ({ def }) => this.log(`Seferden ${def.name} geldi`, def.icon)),
+      on('exotic:found', ({ def, source }) => this.log(`${source === 'merchant' ? 'Gezgin tüccardan' : 'Seferden'} ${def.name} geldi`, def.icon)),
       on('inscription:found', ({ inscription, source }) => this.log(`${source === 'ruin' ? 'Onarılan harabenin içinden' : 'Seferden'} kadim bir yazıt çıktı: ${inscription.name}`, 'inscription')),
       on('inscription:decoded', ({ inscription }) => this.log(`Bilge kadim yazıtı çözdü: ${inscription.name} (${inscription.description})`, 'scheme')),
       on('expedition:taleTold', ({ teller, listeners, route }) => this.log(`${teller.name} ${route} Seferi'ni anlattı; ${listeners.length} kişi soluksuz dinledi`, 'adventure')),

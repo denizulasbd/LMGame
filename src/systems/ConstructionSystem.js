@@ -9,6 +9,7 @@
 //                      peşin ödenir, inşaatçılar yapının çevresinde çalışır, yapı bu sırada işlemeye devam eder
 //   - proje bitince yapı Seviye 2 olur ('building:upgraded') ya da harabe onarılır ('ruin:restored';
 //     erzak kampının hazinesi stoğa eklenir)
+import { isGoldenAge } from './GoldenAge.js';
 import { BUILDINGS, TILE_BUILDS, TILE_REMOVAL, TILE_BUILD_BY_RESULT, mendSpec, PROJECT_WORDS } from '../data/buildings.js';
 import { STREET_NAMES } from '../data/landscape.js';
 import { STORM } from '../data/dilemmas.js';
@@ -74,6 +75,11 @@ export class ConstructionSystem {
     if (!reason && def.requiresTier && (this.world.state.town?.tier ?? 1) < def.requiresTier) {
       reason = `${TOWN_TIERS[def.requiresTier - 1].name} seviyesine ulaşınca açılır`;
     }
+    // (20. aşama) Nüfusla açılan yapılar (Ulu Saat Kulesi: 20 sakin); Altın Çağ'la açılan prestij yapıları
+    if (!reason && def.requiresPopulation && this.world.state.characters.length < def.requiresPopulation) {
+      reason = `Kasaba ${def.requiresPopulation} sakine ulaşınca açılır (şu an ${this.world.state.characters.length})`;
+    }
+    if (!reason && def.requiresGoldenAge && !isGoldenAge(this.world.state)) reason = "Ulu Saat Kulesi tamamlanıp Altın Çağ başlayınca açılır";
     // (16. aşama) Seferden gelen egzotik ganimetle dikilen yapılar (üzüm asması, kadim meşale)
     if (!reason && def.item && itemCount(this.world.state, def.item) < 1) {
       reason = `Önce bir keşif seferinden ${EXOTIC_ITEMS[def.item].name} getirilmeli`;

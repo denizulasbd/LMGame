@@ -5,6 +5,11 @@
 // state.trade, state.luxury, state.research) yazar; burası yalnızca GameState'i okur.
 // (15. aşama) "Usta İşi Eserler" vitrini: ustaların çıkardığı eserler; her biri sergilenir (kalıcı +1 refah) ya da
 // limandan / tüccara satılır. Düğmeler yalnızca 'ui:exhibitMasterwork' / 'ui:sellMasterwork' yayınlar.
+// (20. aşama) Pencerenin üstünde iki sekme: "Kasaba Arşivi" (grafikler, tarih, eserler) ve "Tarihçe Kütüğü": kasabanın
+// gurur tablosu (berat): kurucu sakinler, ilk evlenen çift, ilk usta işi eser, Ulu Saat Kulesi'nin aşamaları ve baş
+// ustası (altın harflerle), Altın Çağ. Veriyi GoldenAgeSystem (state.chronicle, state.goldenAge) yazar.
+import { towerOf, towerMasterOf, isGoldenAge } from '../../systems/GoldenAge.js';
+import { BUILDINGS } from '../../data/buildings.js';
 import { CONFIG } from '../../config.js';
 import { RELIC_KEYS } from '../../data/luxury.js';
 import { RESEARCH_KEYS } from '../../data/research.js';
@@ -57,8 +62,18 @@ export class StatsPanel {
     this.vitrineInfo = el('div', { className: 'archive-subtitle masterwork-info' });
     this.vitrine = el('div', { className: 'masterwork-list' });
     this.lastVitrine = '';
-    this.window = el('div', { className: 'panel archive-panel ui-interactive', hidden: true }, [
-      modalHeader('Kasaba Arşivi', () => this.setOpen(false), { icon: 'chart' }),
+    // (20. aşama) Sekmeler: Kasaba Arşivi | Tarihçe Kütüğü
+    this.tab = 'archive';
+    this.tabButtons = [
+      ['archive', 'Kasaba Arşivi', 'chart'],
+      ['chronicle', 'Tarihçe Kütüğü', 'wonder'],
+    ].map(([id, label, icon]) => {
+      const b = el('button', { className: 'hud-btn archive-tab', type: 'button', tabIndex: -1, dataset: { tab: id } }, [el('img', { src: getAnyIconURL(icon), alt: '' }), label]);
+      b.addEventListener('mousedown', (e) => e.preventDefault());
+      b.addEventListener('click', () => this.setTab(id));
+      return [id, b];
+    });
+    this.archiveView = el('div', { className: 'archive-view' }, [
       this.subtitle,
       el('div', { className: 'archive-grid' }, this.charts.map((c) => c.box)),
       el('div', { className: 'building-section-title', text: 'Kasabanın tarihi' }),
@@ -67,9 +82,29 @@ export class StatsPanel {
       this.vitrineInfo,
       this.vitrine,
     ]);
+    this.chronicleView = el('div', { className: 'chronicle-view', hidden: true });
+    this.lastChronicle = '';
+    this.window = el('div', { className: 'panel archive-panel ui-interactive', hidden: true }, [
+      modalHeader('Kasaba Arşivi', () => this.setOpen(false), { icon: 'chart' }),
+      el('div', { className: 'archive-tabs' }, this.tabButtons.map(([, b]) => b)),
+      this.archiveView,
+      this.chronicleView,
+    ]);
+    this.setTab('archive');
     this.modal = { id: 'archive', element: this.window };
 
     game.events.on('ui:toggleStats', () => this.setOpen(!this.open));
+  }
+
+  /** (20. aşama) Sekme seç: 'archive' | 'chronicle'. */
+  setTab(tab) {
+    this.tab = tab;
+    for (const [id, b] of this.tabButtons) b.classList.toggle('is-active', id === tab);
+    this.archiveView.hidden = tab !== 'archive';
+    this.chronicleView.hidden = tab !== 'chronicle';
+    this.lastKey = '';
+    this.lastVitrine = '';
+    this.lastChronicle = '';
   }
 
   setOpen(open) {
@@ -85,6 +120,10 @@ export class StatsPanel {
   render(game) {
     if (!this.open) return;
     const state = game.state;
+    if (this.tab === 'chronicle') {
+      this.renderChronicle(state);
+      return;
+    }
     this.renderVitrine(state);
     // Grafiklerin son noktası her zaman bugünün anlık değeri (arşiv her sabah yazılır)
     const now = townSnapshot(state);
@@ -197,6 +236,51 @@ export class StatsPanel {
       ]);
     };
     this.vitrine.replaceChildren(...shown.sort((a, b) => (a.status === b.status ? b.id - a.id : a.status === 'stored' ? -1 : 1)).map(row));
+  }
+
+  /** (20. aşama) Tarihçe Kütüğü: kasabanın gurur tablosu, altın harflerle. */
+  renderChronicle(state) {
+    const ch = state.chronicle ?? {};
+    const ga = state.goldenAge ?? {};
+    const tower = towerOf(state);
+    const leader = towerMasterOf(state);
+    const key = JSON.stringify([ch, ga.since, ga.chimes, ga.books, tower?.wonderStage, tower?.underConstruction, leader, state.townName]);
+    if (key === this.lastChronicle) return;
+    this.lastChronicle = key;
+    const when = (v) => (v && Number.isFinite(v.day) ? `Gün ${v.day}${Number.isFinite(v.hour) ? `, ${String(v.hour).padStart(2, '0')}:00` : ''}` : '');
+    const gold = (text) => el('span', { className: 'chronicle-gold', text });
+    const pending = (text) => el('span', { className: 'chronicle-pending', text });
+    const entry = (icon, title, body, meta = '') =>
+      el('div', { className: 'chronicle-entry' }, [
+        el('img', { src: getAnyIconURL(icon), alt: '' }),
+        el('div', { className: 'chronicle-text' }, [el('div', { className: 'chronicle-title', text: title }), el('div', { className: 'chronicle-body' }, body), ...(meta ? [el('div', { className: 'chronicle-meta', text: meta })] : [])]),
+      ]);
+
+    const stages = BUILDINGS.wonder.wonder.stages;
+    const stageRows = stages.map((s, i) => {
+      const done = ch.towerStages?.[i + 1];
+      return el('li', { className: done ? 'is-done' : '' }, [`${i + 1}. ${s.name}: `, done ? gold(done.unknown ? 'tamamlandı' : when(done)) : pending('bekliyor')]);
+    });
+    let towerBody;
+    if (ch.towerMaster) towerBody = [gold(ch.towerMaster.name), ` kulenin baş ustası (${formatNumber(ch.towerMaster.work)} emek)`];
+    else if (leader) towerBody = ['Kule yükseliyor; şu an en çok emek veren: ', gold(leader.name), ` (${formatNumber(leader.work)})`];
+    else towerBody = [pending(tower ? 'Kule yükseliyor; henüz kimsenin emeği yazılmadı' : 'Kasaba 20 sakine ve Kasaba seviyesine ulaşınca Ulu Saat Kulesi başlatılabilir')];
+
+    this.chronicleView.replaceChildren(
+      el('div', { className: 'chronicle-scroll' }, [
+        el('div', { className: 'chronicle-head' }, [
+          el('div', { className: 'chronicle-seal', text: '✦' }),
+          el('div', { className: 'chronicle-town', text: `${state.townName} Tarihçe Kütüğü` }),
+          el('div', { className: 'chronicle-sub', text: isGoldenAge(state) ? `Altın Çağ · ${when(ga.since)}'den beri · kule saati ${ga.chimes ?? 0} kez çaldı` : 'Kasabanın gurur tablosu' }),
+        ]),
+        entry('heart', 'Kurucu Sakinler', ch.founders?.length ? [gold(ch.founders.map((f) => f.name).join(', '))] : [pending('Henüz yazılmadı')], 'Kasabayı ilk kuran ve ilk kulübelere yerleşenler'),
+        entry('ring', 'İlk Evlenen Çift', ch.firstCouple ? [gold(`${ch.firstCouple.a} ile ${ch.firstCouple.b}`)] : [pending('Henüz kimse evlenmedi')], when(ch.firstCouple)),
+        entry('masterpiece', 'İlk Usta Eseri', ch.firstMasterwork ? [gold(ch.firstMasterwork.maker), ` · ${ch.firstMasterwork.piece}`] : [pending('Henüz bir usta eser vermedi')], when(ch.firstMasterwork)),
+        entry('wonder', 'Ulu Saat Kulesi', towerBody),
+        el('ul', { className: 'chronicle-stages' }, stageRows),
+        entry('bell', 'Altın Çağ', isGoldenAge(state) ? [gold(`${when(ch.goldenAge ?? ga.since)}`), ' · çalışma şevki +%10, refah +%10', ...(ga.books ? [` · kitaplıkta ${ga.books} antik kitap`] : [])] : [pending('Kule tamamlanınca başlar')]),
+      ])
+    );
   }
 
   vitrineButton(label, title, onClick) {

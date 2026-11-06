@@ -84,5 +84,11 @@ console.log(
     `dedikodu ${so((x) => x.gossip)} · müzik ${so((x) => x.serenades)} · hayvan sevme ${so((x) => x.cuddles)} · kitap ${so((x) => x.books)} · ` +
     `en düşük nüfus (toplam) ${so((x) => x.minPop)} · en çok evsiz ${Math.max(0, ...results.map((r) => r.data?.monitor.social?.homelessMax ?? 0))}`
 );
+const ga = (f) => sum((d) => (d.monitor.golden ? f(d.monitor.golden) : 0));
+console.log(
+  `(20. aşama) Ulu Saat Kulesi tamamlanan koşu ${results.filter((r) => r.data?.monitor.golden?.stage >= 3).length}/${results.length} · ` +
+    `aşamalar ${results.map((r) => `${r.seed}:${r.data?.monitor.golden?.stage ?? '-'}`).join(' ')} · Altın Çağ günleri ${results.map((r) => r.data?.monitor.golden?.since ?? '-').join(',')} · ` +
+    `çan ${ga((g) => g.chimes)} · Çağ Kutlaması ${ga((g) => g.celebrations)}`
+);
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

@@ -31,6 +31,7 @@ import { getHarborSprite, getHarborSiteSprite } from './structuresHarbor.js';
 import { getWonderSprite } from './structuresWonder.js';
 import { getCherryTreeSprite, getGazeboLayer, getMarbleArchSprite, getFlowerFenceSprite } from './structuresGarden.js';
 import { getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.js';
+import { getMarbleFountainSprite, getGoldenLanternSprite } from './structuresGoldenAge.js';
 import {
   getWoodFenceSprite,
   getFenceGateSprite,
@@ -717,6 +718,11 @@ function getBaseStructureSprite(type, state) {
       return getFenceGateSprite(state.connect ?? {});
     case 'ironLantern':
       return getIronLanternSprite(Boolean(state.lit ?? state.windowsLit));
+    // 20. aşama: Altın Çağ'ın prestij peyzajı
+    case 'marbleFountain':
+      return getMarbleFountainSprite(state.frame ?? 0);
+    case 'goldenLantern':
+      return getGoldenLanternSprite(Boolean(state.lit ?? state.windowsLit));
     case 'signpost':
       return getSignpostSprite();
     case 'parkBench':

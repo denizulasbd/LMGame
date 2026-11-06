@@ -19,6 +19,7 @@
 // ui:startResearch, ui:setExportThreshold, ui:prepareCrate, ui:buyLuxury, ui:buyRelic, ui:goldDecree, ui:pinWorker,
 // ui:unpinWorker). Ne
 // değiştiğini anlamak için her karede kısa bir anahtar üretir; anahtar değişmedikçe DOM'a dokunmaz.
+import { CLOCK_GEAR } from '../../data/goldenAge.js';
 import { BUILDINGS, mendSpec, PROJECT_WORDS } from '../../data/buildings.js';
 import { STORM } from '../../data/dilemmas.js';
 import { RESOURCES, RESOURCE_KEYS, formatCost } from '../../data/resources.js';
@@ -415,7 +416,7 @@ export class BuildingPanel {
       return b;
     });
     const current = building.craft
-      ? `Tezgâhta: ${EQUIPMENT[building.craft.item].name}${building.craft.recipe === 'fallback' ? ' (eski usul)' : ''} · ${percent(building.craftRatio)}`
+      ? `Tezgâhta: ${(EQUIPMENT[building.craft.item] ?? CLOCK_GEAR).name}${building.craft.recipe === 'fallback' ? ' (eski usul)' : ''} · ${percent(building.craftRatio)}`
       : building.craftStatus ?? 'Zanaatkâr bekleniyor (mesai 08:00-17:00)';
     const stock = EQUIPMENT_KEYS.map((item) => {
       const def = EQUIPMENT[item];

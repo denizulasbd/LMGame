@@ -3,6 +3,7 @@
 // aynı hesabı kullansın diye tek yerde.
 // 10. aşama: kasabanın toplam yiyecek değeri (ekmek 2,5 sayılır), kasaba seviyesi (Mezra -> Gelişmiş
 // Şehir) ölçütleri ve unvanı, belediyenin iş verimi çarpanı.
+import { goldenWelfareMultiplier, goldenWorkMultiplier } from './GoldenAge.js';
 import { silkPrestige } from './Luxury.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { HAPPINESS_WEIGHTS, HAPPINESS_LEVELS, IMMIGRATION, TOWN_BUFFS, TOWN_TIERS, TITLE_WORDS, CIVIC_PROJECTS } from '../data/town.js';
@@ -27,7 +28,8 @@ export function townHappiness(state) {
   const people = state.characters;
   if (people.length === 0) return 0;
   const average = people.reduce((sum, c) => sum + happinessOf(c), 0) / people.length;
-  return Math.min(100, average * aestheticWelfareMultiplier(state) + townHappinessBonus(state));
+  // (20. aşama) Altın Çağ: kasaba refahına kalıcı +%10 çarpan
+  return Math.min(100, (average * aestheticWelfareMultiplier(state) + townHappinessBonus(state)) * goldenWelfareMultiplier(state));
 }
 
 /**
@@ -253,7 +255,7 @@ export function civicProductionMultiplier(state) {
 
 /** Kasaba çapında iş hızı: geçici bonuslar (Alet Paketi, şenlik, lonca) × belediye. */
 export function townWorkMultiplier(state) {
-  return buffMultiplier(state, 'workSpeed') * civicWorkMultiplier(state);
+  return buffMultiplier(state, 'workSpeed') * civicWorkMultiplier(state) * goldenWorkMultiplier(state); // (20. aşama) Altın Çağ şevki +%10
 }
 
 // ---------------------------------------------------------------------------

@@ -136,9 +136,9 @@ export const TOWN_TIERS = [
     icon: 'tierTown',
     requires: { population: 20, buildings: 17, upgraded: 3, welfare: 68 },
     merchantBonus: 2,
-    unlocks: ['townHall', 'harbor'],
+    unlocks: ['townHall', 'harbor', 'wonder'],
     maxPerMorning: 3,
-    perks: ['Belediye Konağı inşa edilebilir', 'Büyük Ticaret Limanı kurulabilir: nehir teknesiyle ihracat ve Kasaba Hazinesi', 'Tüccar kervanla gelir: ekmek sepeti, yün ve demir alımı', 'Tüccarın her malından +2 stok', 'Bir sabah 3 göçmene kadar gelebilir', 'Bir kedi daha gelir'],
+    perks: ['Belediye Konağı inşa edilebilir', 'Ulu Saat Kulesi başlatılabilir (20 sakinle): üç aşamalı mega proje ve Altın Çağ', 'Büyük Ticaret Limanı kurulabilir: nehir teknesiyle ihracat ve Kasaba Hazinesi', 'Tüccar kervanla gelir: ekmek sepeti, yün ve demir alımı', 'Tüccarın her malından +2 stok', 'Bir sabah 3 göçmene kadar gelebilir', 'Bir kedi daha gelir'],
   },
   {
     tier: 4,
@@ -151,8 +151,7 @@ export const TOWN_TIERS = [
     maxPerMorning: 3,
     maxPopulation: 30,
     happiness: 4,
-    unlocks: ['wonder'],
-    perks: ['Kasaba Harikası başlatılabilir: üç aşamalı Büyük Vadi Saat Kulesi', 'Şehir gururu: kasaba refahına kalıcı +4', 'Göç sınırı 24 yerine 30 sakin', 'Kervanbaşı Şehir Kervanı ve Lonca Ustaları getirir', 'Tüccarın her malından +3 stok', 'Bir köpek daha gelir'],
+    perks: ['Şehir gururu: kasaba refahına kalıcı +4', 'Göç sınırı 24 yerine 30 sakin', 'Kervanbaşı Şehir Kervanı ve Lonca Ustaları getirir', 'Tüccarın her malından +3 stok', 'Bir köpek daha gelir'],
   },
 ];
 

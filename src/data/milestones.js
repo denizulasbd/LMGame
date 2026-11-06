@@ -72,7 +72,7 @@ export const MILESTONES = [
   {
     id: 'pearl',
     name: 'Vadinin İncisi',
-    description: 'Büyük Saat Kulesi Harikası\'nı üç aşamasıyla tamamla.',
+    description: 'Ulu Saat Kulesi\'ni üç aşamasıyla (Temel, Gövde, Mekanizma & Çan) tamamla ve Altın Çağ\'ı başlat.',
     icon: 'wonder',
     kind: 'wonder',
     target: 3, // temel, gövde, kule

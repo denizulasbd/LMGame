@@ -34,6 +34,8 @@ export const AESTHETIC = {
     ancientTorch: 2,
     monument: 4,
     fountain: 3,
+    marbleFountain: 6, // (20. aşama) Altın Çağ'ın prestij peyzajı
+    goldenLantern: 3.5,
   },
   // Döşemeli zemin karoları: komşuluğuna küçük estetik katkı (taş plaka meydanı en şık zemindir)
   tileValues: { plaza: 0.35, cobble: 0.2 },
@@ -57,7 +59,7 @@ export const DARKNESS = {
   toHour: 5,
   funPerMinute: 0.015, // karanlık sokakta yürüyen sakinin keyfi dakikada bu kadar fazla kaçar (keyif azalmasının ~%25'i)
   // Gecenin karanlığını yaran ışık kaynakları ve ışık yarıçapları (piksel)
-  lights: { lantern: 52, ironLantern: 68, ancientTorch: 58, campfire: 70, watchtower: 84, inn: 34, fishingPier: 46, harbor: 56, wonder: 230 },
+  lights: { lantern: 52, ironLantern: 68, ancientTorch: 58, campfire: 70, watchtower: 84, inn: 34, fishingPier: 46, harbor: 56, wonder: 230, goldenLantern: 96 },
 };
 
 export const MUD = {

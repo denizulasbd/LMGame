@@ -7,6 +7,8 @@
 //                      ve içerideki listeleri, rezervasyonlar, iş emirlerinin atananları; evdeki kişi sayısı kapasiteyi aşıyor mu
 //   İş gücü          : çalışanı olan ama hiç üretmeyen (ya da çalışma noktası kalmamış) yapılar, sonsuz bekleyen iş emirleri
 //
+//   (20. aşama) Ulu Saat Kulesi: geçersiz aşama, iş emri olmayan süren aşama, Altın Çağ'sız tamamlanmış kule, bitiş
+//                      vaktini aşan Çağ Kutlaması kopuk referanstır; kulenin ulaştığı aşama ve Altın Çağ raporlanır
 //   (19. aşama) Sosyal yaşam: evli çift ortak eve taşınamadan RELOCATE_HOURS saatten uzun "taşınıyor" kalırsa ya da
 //                      boş yatak varken MAX_APART_HOURS saat ayrı evlerde yaşarsa sıkışma sayılır; kutlama bitiş vaktini
 //                      aşarsa, huyu olmayan sakin, kayıp sakine işaret eden haber / kutlama kopuk referanstır; nüfusun en
@@ -203,6 +205,18 @@ export async function installMonitor(page) {
         }
         for (const c of s.characters) if (c.lastNews && typeof c.lastNews.text !== 'string') broke(`${c.name}: bozuk son haber`);
 
+        // ---- (20. aşama) Ulu Saat Kulesi ve Altın Çağ ----
+        const tower = s.buildings.find((b) => b.type === 'wonder');
+        if (tower) {
+          m.towerMax = Math.max(m.towerMax ?? 0, tower.wonderStage + (tower.project ? 0.5 : 0));
+          if (tower.wonderStage > 3 || tower.wonderStage < 0) broke(`kule: geçersiz aşama ${tower.wonderStage}`);
+          if (tower.wonderComplete && !s.goldenAge?.since) broke('kule tamamlandı ama Altın Çağ başlamadı');
+          if (tower.project && !scene.jobs.jobs.some((j) => j.buildingId === tower.id)) broke('kule: süren aşamanın iş emri yok');
+        }
+        const cel = s.goldenAge?.celebration;
+        if (cel && now > cel.until + 60) broke(`Çağ Kutlaması bitiş vaktini aştı (${Math.round((now - cel.until) / 60)} saat)`);
+        if ((s.resources.gears ?? 0) < 0) broke('Kadim Dişli stoğu eksiye düştü');
+
         // (16. aşama) Seferde kaybolan ya da takılan kafile
         const exp = s.dilemma.expedition;
         for (const c of s.characters) if (c.away && !exp?.members.includes(c.id)) broke(`${c.name}: seferde sanılıyor ama süren sefer yok (${c.away.stage}, ${c.task?.activity ?? 'görevsiz'}/${c.task?.phase ?? '-'}: ${c.activityLabel})`);
@@ -295,6 +309,15 @@ export async function installMonitor(page) {
             homesFreed: s.stats.homesFreed ?? 0,
             news: s.social?.gossip.length ?? 0,
             quirks: Object.fromEntries(['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].map((q) => [q, s.characters.filter((c) => c.quirk === q).length])),
+          },
+          // (20. aşama)
+          golden: {
+            towerMax: m.towerMax ?? 0,
+            stage: s.buildings.find((b) => b.type === 'wonder')?.wonderStage ?? 0,
+            since: s.goldenAge?.since?.day ?? null,
+            chimes: s.goldenAge?.chimes ?? 0,
+            celebrations: s.stats.ageCelebrations ?? 0,
+            master: s.chronicle?.towerMaster?.name ?? null,
           },
           events: m.events,
           welfare: Math.round(s.town.welfare ?? 0),
