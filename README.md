@@ -425,7 +425,7 @@ eklendi; evli çiftin ortak evi zaten `homeId` ile kayda girer. 20. aşamada kul
 Tarihçe Kütüğü (`chronicle`: kurucular, ilk evlenen çift, ilk usta eseri, kuleye verilen emek ve baş usta, kulenin aşamaları),
 Kadim Dişli stoğu (`resources.gears`), Mermer Çeşme / Altın Çağ Feneri ve `stats.ageCelebrations` eklendi. Kayıt sürümü
 17'dir; 4.–19. aşamanın (sürüm 2–16) kayıtları da açılır (Tarihçe sakinlerden çıkarılır, tamamlanmış kulesi olan kasaba Altın
-Çağ'a kutlamasız girer, dişli ve kitap 0 başlar) (19. aşama, sürüm 2–15 için: (huyu olmayan sakinlere ilk açılışta huy dağıtılır, dedikodu boş başlar, evli çiftler kendi evlerinde kalır) (peyzaj durumu boş başlar) (usta işi eser vitrini ve keşif ganimetleri boş başlar; eski biçimde yarım kalmış bir sefer maceralar
+Çağ'a kutlamasız girer, dişli ve kitap 0 başlar) (huyu olmayan sakinlere ilk açılışta huy dağıtılır, dedikodu boş başlar, evli çiftler kendi evlerinde kalır) (peyzaj durumu boş başlar) (usta işi eser vitrini ve keşif ganimetleri boş başlar; eski biçimde yarım kalmış bir sefer maceralar
 açmadan sürer ve döner) (anısı olmayan sakinin anı defteri ilk açılışta "Kasabada yaşamaya başladı" ile açılır): eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
 ve ekipmansız başlar; yün, demir, ekmek ve altın 0 olur; araştırma, ihracat ve yadigâr boş başlar; arşiv ilk açılışta
 kurulur, düğün ve doğum sayaçları evli çiftlerden ve ebeveynli sakinlerden tahmin edilir; yaban hayatı ilk açılışta
