@@ -1938,7 +1938,34 @@ Sağ alttaki kartta **İlişkiler**'in altında yeni **Sosyal Hayat** bölümü 
 
 ### Denge ve test (simülasyon)
 
-STRESS_PLACEHOLDER
+- **Hedefli testler** (`tests.mjs`, 383; 71'i bu aşamanın): Türkçe ad ekleri (Emre'nin, Ozan'ın, Kemal'in, Leyla'dan,
+  Mert'ten), her sakinin geçerli bir huyu olması ve dört huyun da görülmesi, göçmenin en az görülen huyu, çocuğun ebeveyn
+  huyu; Hayvansever'in planı, hayvanın beklemesi ve okşama (+10 keyif, mırlama); Kitap Kurdu'nun fener altı bankı ve Bilgelik
+  Evi; Müzisyen'in akşam saati, en yakın 4 dinleyicisi ve durum metni; Doğa Tutkunu'nun genç ağaç gölgesi; randevu (Dost
+  eşiği, yer seçimi, yandaki banka gelen davetli, "randevuya gidiyor", ilişki bonusu, ilk randevu anısı, bankta aşk,
+  sevgililerin randevusu); kulübe kapasitesi 2, aynı eve taşınma, boşalan kulübenin göçmenlere açılması ve çiftin evine
+  göçmen yerleşmemesi; düğün kutlaması (davetliler, günlük, taşınmadan önce meydana koşma, düğün haberi, konfeti, bitişte
+  anılar); akşam yemeği (saat aralığı, eşin daveti, günde bir kez, stoktan ödeme, keyif / sosyallik / Mutlu Yuva, anı);
+  dedikodu (usta işi eser, seferden dönüş, barışma haberi, sohbette ve selamlaşırken aktarma, "kendi ağzından", tekrar
+  anlatılmama, selamlaşma arası, "dilden dile", eskime); Sosyal Hayat kartı; kayıt sürümü 16 gidiş-dönüşü (evli çift ve
+  ortak ev, huylar, son haber, dedikodu, akşam yemeği günü, sayaçlar).
+- **Denetim** (`audit.mjs`, 88): düğün kutlaması sürerken kayıt -> yükleme durum kayması yok, kutlama aynen döner, bir kez biter
+  ve çift aynı evde kalır.
+- **Uyumluluk** (`compat.mjs`, sürüm 2-16, 250): `save-v16.json` bu aşamanın otopilotuyla 34 günlük oyundur (12 evli çift,
+  hepsi aynı evde; 11 dolaşan haber; bir keşif seferinin ortası). Sürüm 2-15 kayıtlarında huylar ilk açılışta dağıtılır
+  (dördü de görülür), dedikodu boş başlar, evli çiftler kendi evlerinde kalır.
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 30`): takılma 0, kopuk referans 0, taşan ev 0,
+  sosyal sıkışma 0, sayfa hatası 0. Altı kasabada 66 düğün (66 çiftin hepsi aynı evde, hepsi meydanda kutlandı), 177 randevu,
+  304 akşam yemeği, 5946 dedikodu aktarımı, 381 müzik akşamı, 1120 hayvan sevme, 595 kitap molası; nüfus hiçbir koşuda
+  başlangıcın (6) altına inmedi, hepsi 30 tavanına ulaştı, evsiz sakin olmadı. Çiftlerin çoğu evlendiğinde zaten aynı evde ya
+  da ev arkadaşı değiş tokuşuyla birleştiği için boşalan kulübe nadirdir (altı koşuda 1).
+- **Bulunan ve düzeltilen eski hata:** sefere yürüyen bir sakinin rotasına şantiye kurulunca görevi kesiliyor, sakin "seferde"
+  bayrağıyla kasabada kalıyor ve kafile onsuz dönüyordu (tohum 21, "seferde sanılıyor ama süren sefer yok"). Artık görevi
+  kesilen sefer üyesi yeniden harita kenarına yönelir (`BehaviorSystem.updateCharacter`); hedefli testle kilitlendi.
+- Sonuç: `tests.mjs` 383/383, `audit.mjs` 88/88, `compat.mjs` 250/250, sayfa hatası yok. **Sanat önizleme**
+  (`tools/art-preview.html`): huy simgeleri (pati, kitap, ud, yaprak), yeni balonlar (fısıltı, melodi, kitap, pati), zamanla
+  ilerleyen düğün konfetisi ve küçük sahneler (bank randevusu, fener altında kitap, kedi okşama, müzisyen ve dinleyenler,
+  yolda selamlaşma).
 
 ## Kod denetimi (15. aşama öncesi)
 
