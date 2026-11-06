@@ -11,6 +11,7 @@ import { EXPEDITION } from '../data/dilemmas.js';
 import { RESOURCES, FOOD_KEYS } from '../data/resources.js';
 import { masterworkHappiness } from './Masterworks.js';
 import { aestheticWelfareMultiplier } from './Landscape.js';
+import { taxWorkMultiplier, reputationForImmigration } from './Crown.js';
 
 /** Bir sakinin mutluluğu 0-100: ihtiyaçlarının ağırlıklı ortalaması. */
 export function happinessOf(character) {
@@ -108,6 +109,8 @@ export function immigrationStatus(state) {
   const foodNeeded = Math.max(IMMIGRATION.minFood, population * IMMIGRATION.foodPerResident);
   const happiness = townHappiness(state);
   const supply = Math.floor(foodSupply(state));
+  // (22. aşama) Kasabanın şöhreti: güven çok düşükse (ya da sakinler terk ediyorsa) göçmen gelmez, düşükse sabah en çok 1
+  const fame = reputationForImmigration(state);
   const checks = [
     {
       key: 'beds',
@@ -131,8 +134,10 @@ export function immigrationStatus(state) {
       ok: happiness >= IMMIGRATION.minHappiness,
       text: `Refah %${Math.round(happiness)} (en az %${IMMIGRATION.minHappiness})`,
     },
+    { key: 'fame', ok: !fame.blocked, text: fame.text },
   ];
-  return { ok: checks.every((c) => c.ok), freeBeds: freeBedCount, maxPerMorning: townTier(state).maxPerMorning ?? IMMIGRATION.maxPerMorning, checks };
+  const perMorning = townTier(state).maxPerMorning ?? IMMIGRATION.maxPerMorning;
+  return { ok: checks.every((c) => c.ok), freeBeds: freeBedCount, maxPerMorning: fame.slow ? Math.min(1, perMorning) : perMorning, checks };
 }
 
 /** Göçle ulaşılabilecek en yüksek nüfus (Gelişmiş Şehir'de artar). */
@@ -255,7 +260,8 @@ export function civicProductionMultiplier(state) {
 
 /** Kasaba çapında iş hızı: geçici bonuslar (Alet Paketi, şenlik, lonca) × belediye. */
 export function townWorkMultiplier(state) {
-  return buffMultiplier(state, 'workSpeed') * civicWorkMultiplier(state) * goldenWorkMultiplier(state); // (20. aşama) Altın Çağ şevki +%10
+  // (20. aşama) Altın Çağ şevki +%10; (22. aşama) Ağır Vergi seçiliyken -%15
+  return buffMultiplier(state, 'workSpeed') * civicWorkMultiplier(state) * goldenWorkMultiplier(state) * taxWorkMultiplier(state);
 }
 
 // ---------------------------------------------------------------------------

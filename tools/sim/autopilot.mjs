@@ -16,7 +16,10 @@
 // dişlileri, baş ustayı, çanları ve Tarihçe'yi raporlar. (21. aşama) Vatandaş dilekçelerini yanıtlar: fidan, bank, sağlam alet
 // ve meydanda buluşma isteklerini bedelini ödeyip hemen karşılar ("Hemen Karşıla"), ötekileri kabul edip yerine getirmeye
 // çalışır (kışlık stok için ek kesim / toplama emri, araştırma, antik kitap); güven düşerse acil erzak / altın dağıtır.
-// Güveni, dilekçe sonuçlarını, isyanı, yevmiyeleri, alışverişi ve çantalardaki eşyaları raporlar.
+// Güveni, dilekçe sonuçlarını, isyanı, yevmiyeleri, alışverişi ve çantalardaki eşyaları raporlar. (22. aşama) İç vergiyi
+// dengeli yönetir (güven düşerse Düşük / Muaf, toparlanınca Standart; Ağır Vergi'ye hiç geçmez), tahsildar yoldayken hazineyi
+// lüks harcamalara açmaz, Kraliyet Fermanlarını kaynak yettiğinde teslim eder, Kraliyet Beratı gelince Aslanlı Heykel'i diker;
+// vergileri, Krallık Vergisi ödemelerini, fermanları ve terk edenleri raporlar.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
@@ -306,6 +309,22 @@ await page.evaluate((passive) => {
           }
         }
       }
+      // (22. aşama) İç vergi: güven düştükçe hafiflet, toparlanınca Standart'a dön
+      {
+        const CR = window.__crown;
+        const t = s.trust.value;
+        const want = t < 40 ? 'exempt' : t < 62 ? 'low' : 'standard';
+        if (s.tax.rate !== want) game.events.emit('ui:setTaxRate', { rate: want });
+        const d = s.crown.decree;
+        if (d && CR.decreeStatus(s, d).ok) {
+          const margin = Object.entries(d.need ?? {}).every(([r, v]) => res[r] >= v + 25);
+          if (margin || d.deadline - s.totalMinutes < 12 * 60) game.events.emit('ui:deliverDecree');
+        }
+        if (s.crown.statueRight && !s.buildings.some((b) => b.type === 'royalStatue') && res.stone >= 90 && res.gold >= 220) {
+          const spot = sim.findSpot('royalStatue', 16);
+          if (spot) scene.construction.placeSite('royalStatue', spot.x, spot.y);
+        }
+      }
       // Güven düşerse (ya da isyan çıkarsa) acil dağıtım
       const T = window.__trust;
       if (s.trust.revolt || s.trust.value < 40) {
@@ -404,7 +423,9 @@ await page.evaluate((passive) => {
     }
 
     // (13. aşama) Harika bitince hazine: önce yadigârlar (biraz yedek kalsın), ipek ve mermer, baharat, altın fermanları
-    if (wonder?.wonderComplete) {
+    // (22. aşama) Kraliyet Tahsildarı yoldayken vergi parası ayrılır
+    const levyReserve = s.crown.notice ? s.crown.notice.amount + 300 : 0;
+    if (wonder?.wonderComplete && res.gold >= levyReserve) {
       const L = window.__luxury;
       const source = world.getCompleted('harbor').length ? 'harbor' : 'merchant';
       const price = L.relicPrice(s);
@@ -517,6 +538,7 @@ await page.evaluate(async () => {
   window.__buildings = BUILDINGS;
   window.__petitions = await import('/src/systems/Petitions.js');
   window.__trust = await import('/src/systems/TrustSystem.js');
+  window.__crown = await import('/src/systems/Crown.js');
 });
 
 function summary() {
@@ -674,6 +696,13 @@ console.log(
   console.log(
     `(21. aşama) Yönetim Güveni %${z.trust} (en az %${z.trustMin}, en çok %${z.trustMax}) · isyan ${z.revolts} (${z.revoltHours} saat) · yağma ${z.raids} (${z.lootedGoods} mal, ${z.lootedGold} altın) · acil dağıtım ${z.reliefs} · ` +
       `dilekçe ${P.made} (karşılanan ${P.fulfilled}, reddedilen ${P.rejected}, süresi dolan ${P.expired}, açık ${P.open}; kabul ${P.accepted}) · yevmiye ${z.wages} altın · alışveriş ${z.purchases} · çantadan yemek ${z.bagMeals} · keselerde ${z.coins} altın, çantalarda ${z.items} eşya`
+  );
+}
+{
+  const k = mon.crown;
+  console.log(
+    `(22. aşama) iç vergi ${k.rate} · ${k.collections} tahsilat (+${k.taxGold} altın, ${k.taxGoods} birim öşür) · Krallık Vergisi ${k.paid}/${k.levies} ödendi (ceza ${k.failed}) · ` +
+      `itibar %${k.reputation} · ferman teslim ${k.delivered}, başarısız ${k.decreesFailed} · Kraliyet Beratı ${k.statueRight ? 'var' : 'yok'}, heykel ${k.statues} · terk eden ${k.emigrants} (terk ediş ${k.exodusHours} saat)`
   );
 }
 console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);

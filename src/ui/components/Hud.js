@@ -37,6 +37,9 @@ import {
 import { el } from '../dom.js';
 import { trustValue, trustLevel } from '../../systems/Citizens.js';
 import { PETITION_KINDS, REVOLT } from '../../data/citizens.js';
+import { DECREES, TAX_RATES } from '../../data/crown.js';
+import { levyPlan } from '../../systems/Crown.js';
+import { formatRemaining } from '../../systems/Petitions.js';
 
 const DELTA_MERGE_MS = 500; // bu süre içindeki değişiklikler tek vurguda toplanır
 const DELTA_VISIBLE_MS = 1400;
@@ -156,7 +159,7 @@ export class Hud {
     // (21. aşama) açık dilekçeler ve isyan
     const petitions = state.petitions?.list ?? [];
     const revoltNow = state.trust?.revolt ?? null;
-    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}`;
+    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}`;
     if (buffKey !== this.lastBuffs) {
       this.lastBuffs = buffKey;
       const chips = buffs.map((b) =>
@@ -198,6 +201,20 @@ export class Hud {
           action('torch', `İsyan! ${revoltNow.rioters.length} isyancı${revoltNow.raids.length ? ' · yağma' : ''}`, 'Sakinler işi bıraktı. Tıkla: meydan havuzunda / Belediye Konağı\'nda acil erzak ve altın dağıt', ' is-revolt', () => venue && this.game.events.emit('ui:selectBuilding', venue.id))
         );
       }
+      // (22. aşama) Kraliyet Tahsildarı, Kraliyet Fermanı, Ağır Vergi ve terk ediş
+      const hall = state.buildings.find((b) => b.functional && BUILDINGS[b.type].civic) ?? state.buildings.find((b) => b.functional && b.type === 'fountain');
+      const openHall = () => hall && this.game.events.emit('ui:selectBuilding', hall.id);
+      const cr = state.crown;
+      if (state.exodus?.active) chips.unshift(action('bundle', 'Terk ediş! Sakinler köyden gidiyor', 'Umut tükendi: en mutsuz sakinler kesesi ve çantasıyla köyü terk ediyor, göçmen gelmiyor. Güveni ve refahı toparla', ' is-revolt', openHall));
+      if (cr?.notice) {
+        const ok = levyPlan(state, cr.notice.amount).ok;
+        chips.push(action('collector', `Tahsildar yolda · ${cr.notice.amount} altın · ${formatRemaining(cr.nextLevyAt - state.totalMinutes)}`, ok ? 'Krallık Vergisi vakti gelince hazineden ödenecek' : 'Hazine yetmiyor! Ödenemezse Krallık hazineye el koyar ve depodan mal çeker. İç vergiyi ayarla', ok ? ' is-crown' : ' is-crown is-short', openHall));
+      }
+      if (cr?.decree) {
+        const def = DECREES[cr.decree.kind];
+        chips.push(action('decree', `Ferman · ${def.name} · ${formatRemaining(cr.decree.deadline - state.totalMinutes)}`, `"${def.text}" · Belediye Konağı'nın panelinden teslim et`, ' is-crown', openHall));
+      }
+      if (state.tax?.rate === 'heavy') chips.push(chip('torch', 'Ağır Vergi · verim -%15', `${TAX_RATES.heavy.description}`, ' is-freezing'));
       const trustNow = Math.round(trustValue(state));
       if (!revoltNow && trustNow < 50) chips.push(chip('trust', `Güven %${trustNow}`, `Yönetim Güveni düşük (${trustLevel(trustNow).name}). %${REVOLT.critical} altında ${REVOLT.graceHours} saat kalırsa isyan çıkar: dilekleri karşıla, erzak / altın dağıt`, ' is-freezing'));
       for (const p of petitions) {

@@ -36,6 +36,7 @@ export const AESTHETIC = {
     fountain: 3,
     marbleFountain: 6, // (20. aşama) Altın Çağ'ın prestij peyzajı
     goldenLantern: 3.5,
+    royalStatue: 7, // (22. aşama) Kraliyet Aslanlı Heykeli: kasabanın en şık anıtı
   },
   // Döşemeli zemin karoları: komşuluğuna küçük estetik katkı (taş plaka meydanı en şık zemindir)
   tileValues: { plaza: 0.35, cobble: 0.2 },

@@ -64,6 +64,9 @@ import { towerOf } from '../systems/GoldenAge.js';
 import { PurseSystem } from '../systems/PurseSystem.js';
 import { TrustSystem } from '../systems/TrustSystem.js';
 import { PetitionSystem } from '../systems/PetitionSystem.js';
+import { TaxSystem } from '../systems/TaxSystem.js';
+import { CrownSystem } from '../systems/CrownSystem.js';
+import { DesertionSystem } from '../systems/DesertionSystem.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -158,6 +161,10 @@ export class TownScene extends Scene {
     this.purse = new PurseSystem(this.game, this.world, this.economy, new Random(state.seed + 21));
     this.trust = new TrustSystem(this.game, this.world, { economy: this.economy }, new Random(state.seed + 22), { attract: this.attract });
     this.petitions = new PetitionSystem(this.game, this.world, { economy: this.economy, construction: this.construction, crafting: this.crafting, trust: this.trust }, new Random(state.seed + 23), { attract: this.attract });
+    // (22. aşama) Krallık katmanı: iç vergi ve öşür, Krallık Vergisi ve Kraliyet Fermanları, köyü terk etme
+    this.tax = new TaxSystem(this.game, this.world, { economy: this.economy, trust: this.trust });
+    this.crown = new CrownSystem(this.game, this.world, { economy: this.economy, trust: this.trust }, new Random(state.seed + 24), { attract: this.attract });
+    this.desertion = new DesertionSystem(this.game, this.world, { jobs: this.jobs }, new Random(state.seed + 25), { attract: this.attract });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       economy: this.economy,
@@ -251,6 +258,9 @@ export class TownScene extends Scene {
       this.purse,
       this.trust,
       this.petitions,
+      this.tax,
+      this.crown,
+      this.desertion,
     ];
 
     this.camera = new Camera();

@@ -4239,3 +4239,57 @@ kbd {
   font-size: 11px;
   white-space: normal;
 }
+
+/* ---------- 22. aşama: iç vergi, Krallık, fermanlar, terk ediş ---------- */
+.tax-rates {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  margin: 3px 0;
+}
+
+.tax-rate-button {
+  font-size: 11px;
+  padding: 2px 3px;
+}
+
+.tax-rate-button.is-active {
+  background: var(--ui-highlight);
+  color: var(--ui-ink-dark);
+  font-weight: 700;
+}
+
+.tax-rate-button.is-heavy.is-active {
+  background: var(--ui-bad);
+  color: #fff;
+}
+
+.tax-rate-button.is-exempt.is-active {
+  background: var(--ui-ok);
+}
+
+.tax-card.is-heavy {
+  border-color: var(--ui-bad);
+}
+
+.royal-decree {
+  border-color: #b4523f;
+  background: linear-gradient(180deg, rgba(243, 226, 182, 0.14), rgba(180, 82, 63, 0.12));
+}
+
+.decree-reject {
+  margin-right: auto;
+}
+
+.buff-chip.is-crown {
+  background: rgba(255, 210, 63, 0.18);
+}
+
+.buff-chip.is-crown.is-short {
+  background: var(--ui-card-bad);
+  border-color: var(--ui-bad);
+}
+
+.purse-rioter.is-leaving {
+  background: #5d6070;
+}

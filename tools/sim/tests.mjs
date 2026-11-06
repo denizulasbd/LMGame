@@ -32,6 +32,11 @@
 //              oluşma, kabul, hemen karşılama, ret, süre dolması, stok / alet / buluşma, kart ve üst çubuk), Yönetim Güveni
 //              (refah, açlık, soğuk, şenlik), isyan (12 saatlik eşik, isyancılar, alarm), yağma (kasaba deposundan
 //              yağmacıların çantasına / kesesine birebir), yatıştırma (erzak ve altın dağıtımı), kayıt sürümü 18
+//   22. aşama: iç vergi kademeleri (keselerden hazineye birebir, öşür, güven / keyif / verim etkileri, takvim, panel
+//              düğmeleri), Krallık Vergisi (ölçeklenme, 2 gün önce tahsildar uyarısı, ödeme, malla ödeme, ceza), Kraliyet
+//              Fermanları (seviye kilidi, beş ferman, teslim ve ödüller, Kraliyet Beratı ve Aslanlı Heykel, süre dolması ve
+//              ret cezası), kötü şöhretin göçe etkisi, köyü terk etme (eşik, aile, çekirdek sakinler, referans temizliği,
+//              bitişi), kayıt sürümü 19
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
 import { openGame, createChecks } from './lib.mjs';
@@ -2228,7 +2233,7 @@ const pageResults = await page.evaluate(async () => {
     window.__s20 = { since: JSON.stringify(st.goldenAge.since), chimes: st.goldenAge.chimes, books: st.goldenAge.books, founders: ch.founders.length, master: GA.towerMasterOf(st)?.name, stages: Object.keys(ch.towerStages).length, couple: ch.firstCouple?.a, fountain: mf.id };
   }
 
-  // --- Kayıt gidiş-dönüşü (sürüm 18) ---
+  // --- Kayıt gidiş-dönüşü (sürüm 19) ---
   const ill = s.characters.find((c) => !c.isChild);
   scene.health.fallIll(ill);
   hut.remedies = 4;
@@ -2240,7 +2245,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 18', raw.version === 18);
+  check('kayıt sürümü 19', raw.version === 19);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2683,11 +2688,326 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 18: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 18 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 19: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 19 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
     check('kayıttan açık dilekçe (türü, sahibi, süresi) ve sayaçlar döner', pk3?.kind === T.pkind && pk3.characterId === T.id && pk3.deadline === T.deadline && s3.petitions.made === T.made);
+  }
+
+  // ===== 22. aşama: iç vergi ve öşür, Krallık Vergisi, Kraliyet Fermanları, Kraliyet Heykeli, köyü terk etme =====
+  {
+    const S = game.scenes.current;
+    const st = game.state;
+    const W = S.world;
+    const CR = await import('/src/systems/Crown.js');
+    const CD = await import('/src/data/crown.js');
+    const TS = await import('/src/systems/TownStatus.js');
+    const CZ = await import('/src/systems/Citizens.js');
+    const now = () => st.totalMinutes;
+    const renderNow = () => {
+      game.ui.components.find((x) => x.renderWelfare).welfareAt = -Infinity;
+      game.render(0);
+    };
+    sim.give({ wood: 500, stone: 500, food: 300, bread: 80, iron: 80, gold: 3000 });
+    st.trust.value = 70;
+    if (st.trust.revolt) S.trust.endRevolt();
+    st.petitions.list = [];
+    st.petitions.nextAt = now() + 1e6;
+    st.crown.decree = null;
+    st.crown.nextDecreeAt = now() + 1e6;
+    st.crown.nextLevyAt = now() + 1e6;
+    st.crown.notice = null;
+    const adults = () => st.characters.filter((c) => !c.isChild && !c.role);
+
+    // --- İç vergi kademeleri ---
+    check('dört vergi kademesi: Muaf %0, Düşük %10, Standart %20 (varsayılan), Ağır %45', CD.TAX_RATE_KEYS.join(',') === 'exempt,low,standard,heavy' && CD.TAX_RATES.exempt.percent === 0 && CD.TAX_RATES.low.percent === 10 && CD.TAX_RATES.standard.percent === 20 && CD.TAX_RATES.heavy.percent === 45 && CD.TAX.defaultRate === 'standard');
+    game.events.emit('ui:setTaxRate', { rate: 'low' });
+    check('vergi kademesi istenen an değişir ("ui:setTaxRate") ve günlüğe yazılır', st.tax.rate === 'low' && st.journal.at(-1).text.includes('Düşük'));
+    // Tahsilat: keselerden hazineye birebir, öşür çantadan kilere
+    game.events.emit('ui:setTaxRate', { rate: 'standard' });
+    for (const c of adults()) {
+      c.coins = 50;
+      c.inventory = [];
+    }
+    const payer = adults()[0];
+    CZ.addItem(payer, 'ration', 6);
+    CZ.addItem(payer, 'firewood', 11);
+    sim.give({ food: 50, wood: 50 }); // kilerde öşre yer olsun
+    const gold0 = st.resources.gold;
+    const food0 = st.resources.food;
+    const wood0 = st.resources.wood;
+    const trust0 = st.trust.value;
+    const res = S.tax.collect();
+    const expect = adults().length * 10;
+    check('Standart Vergi: her yetişkinin kesesinden %20 kesilir, birebir Kasaba Hazinesi\'ne geçer', res.gold === expect && st.resources.gold === gold0 + expect && adults().every((c) => c.coins === 40), `${res.gold}/${expect}`);
+    check('öşür: çantadaki fazla erzak ve odundan %20 kilere geçer (birer tanesi bırakılır)', st.resources.food === food0 + 1 && st.resources.wood === wood0 + 2 && CZ.countItem(payer, 'ration') === 5 && CZ.countItem(payer, 'firewood') === 9, `${st.resources.food - food0} ${st.resources.wood - wood0}`);
+    check('Standart Vergi güveni değiştirmez; tahsilat günlüğe yazılır', st.trust.value === trust0 && st.journal.at(-1).text.startsWith('İç vergi tahsil edildi'));
+    check('sıradaki tahsilat 3 gün sonra öğlen 12:00', st.tax.nextAt - now() <= 3 * 1440 && st.tax.nextAt > now() && st.tax.nextAt % 1440 === 720 && (Math.floor(st.tax.nextAt / 1440) + 1) % 3 === 0, CR.formatStamp(st.tax.nextAt));
+    check('çocuklardan ve kesesi boş olandan vergi alınmaz', CR.coinTax({ isChild: true, coins: 99 }, 45) === 0 && CR.coinTax({ coins: 1 }, 45) === 0 && CR.coinTax({ coins: 10 }, 45) === 4);
+    // Muafiyet ve düşük vergi
+    game.events.emit('ui:setTaxRate', { rate: 'exempt' });
+    const fan = adults()[1];
+    fan.needs.fun = 50;
+    st.trust.value = 60;
+    const g1 = st.resources.gold;
+    S.tax.collect();
+    check('Vergi Muafiyeti: kesinti yok, güven +6, keyif +5', st.resources.gold === g1 && adults().every((c) => c.coins === 40) && st.trust.value === 66 && fan.needs.fun === 55);
+    game.events.emit('ui:setTaxRate', { rate: 'low' });
+    st.trust.value = 60;
+    const g2 = st.resources.gold;
+    S.tax.collect();
+    check('Düşük / Adil Vergi: %10 kesinti, güven +2', st.resources.gold === g2 + adults().length * 4 && st.trust.value === 62);
+    // Ağır Vergi
+    const workStd = (game.events.emit('ui:setTaxRate', { rate: 'standard' }), TS.townWorkMultiplier(st));
+    game.events.emit('ui:setTaxRate', { rate: 'heavy' });
+    const workHeavy = TS.townWorkMultiplier(st);
+    check('Ağır Vergi seçiliyken çalışma hızı -%15', Math.abs(workHeavy / workStd - 0.85) < 1e-9, `${workHeavy}/${workStd}`);
+    st.trust.value = 40;
+    fan.needs.fun = 50;
+    const c0 = fan.coins;
+    S.tax.collect();
+    check('Ağır Vergi / Haraç: %45 kesinti, güven -8, keyif -10', fan.coins === c0 - Math.floor(c0 * 0.45) && st.trust.value === 32 && fan.needs.fun === 40);
+    S.tax.collect();
+    S.tax.collect();
+    check('Ağır Vergi güveni hızla isyan sınırının altına iter', st.trust.value < 25, st.trust.value);
+    game.events.emit('ui:setTaxRate', { rate: 'standard' });
+    st.trust.value = 70;
+    // Belediye panelinde vergi düğmeleri
+    if (!W.getCompleted('townHall').length) {
+      st.town.tier = Math.max(st.town.tier, 3);
+      sim.place('townHall');
+    }
+    const hall = W.getCompleted('townHall')[0];
+    game.events.emit('ui:selectBuilding', hall.id);
+    renderNow();
+    const taxButtons = [...document.querySelectorAll('.building-crown .tax-rate-button')];
+    check('Belediye Konağı panelinde dört vergi düğmesi; seçili kademe vurgulu', taxButtons.length === 4 && taxButtons.find((b) => b.dataset.rate === 'standard').classList.contains('is-active'));
+    taxButtons.find((b) => b.dataset.rate === 'low').click();
+    check('panelden kademe seçilir', st.tax.rate === 'low');
+    game.events.emit('ui:setTaxRate', { rate: 'standard' });
+
+    // --- Krallık Vergisi ---
+    const keepTier = st.town.tier;
+    const keepSince = st.goldenAge.since;
+    st.goldenAge.since = null;
+    st.crown.reputation = 50;
+    st.town.tier = 1;
+    const a1 = CR.levyAmount(st);
+    st.town.tier = 3;
+    const a3 = CR.levyAmount(st);
+    st.goldenAge.since = keepSince ?? { day: 1, hour: 0, minute: 0 };
+    const a3g = CR.levyAmount(st);
+    check('Krallık Vergisi seviye, nüfus ve Altın Çağ\'la ölçeklenir', a3 > a1 && a3g === Math.round(a3 * CD.LEVY.goldenAge) && a1 === CD.LEVY.base + CD.LEVY.perTier + CD.LEVY.perResident * st.characters.length, `${a1} ${a3} ${a3g}`);
+    st.goldenAge.since = keepSince;
+    st.town.tier = keepTier;
+    // Tahsildar uyarısı: iki gün önce
+    st.crown.nextLevyAt = now() + 2 * 1440;
+    st.crown.notice = null;
+    const notices = [];
+    const offN = game.events.on('crown:levyNotice', (p) => notices.push(p));
+    S.crown.hourly(st.time.hour);
+    offN();
+    const amount = st.crown.notice?.amount;
+    renderNow();
+    check('vergi gününden 2 gün önce "Kraliyet Tahsildarı Yolda" uyarısı ve tutarı (günlük, üst çubuk)', notices.length === 1 && amount === CR.levyAmount(st) && st.journal.at(-1).text.includes('Kraliyet Tahsildarı yolda') && [...document.querySelectorAll('.hud-buffs .buff-chip.is-crown')].some((b) => b.textContent.includes(`${amount} altın`)));
+    // Ödeme
+    st.resources.gold = amount + 100;
+    st.crown.reputation = 50;
+    st.trust.value = 60;
+    st.crown.nextLevyAt = now();
+    S.crown.hourly(st.time.hour);
+    check('vakti gelince hazineden ödenir: güven +3, itibar +8', st.resources.gold === 100 && st.trust.value === 63 && st.crown.reputation === 58 && st.crown.lastLevy.ok && !st.crown.notice);
+    check('sıradaki Krallık Vergisi tam 6 gün sonra', st.crown.nextLevyAt - now() === 6 * 1440);
+    check('ilk Krallık Vergisi takvimde 6. günün öğlenidir', CR.nextOnSchedule(0, CD.LEVY.everyDays, CD.LEVY.hour) === 5 * 1440 + 720);
+    // Altın yetmezse yarısına kadar malla
+    sim.give({ food: 200, wood: 200, stone: 200 });
+    const amt2 = CR.levyAmount(st);
+    st.resources.gold = Math.ceil(amt2 * 0.6);
+    st.crown.notice = { at: now(), amount: amt2 };
+    st.crown.nextLevyAt = now();
+    const stock0 = st.resources.food + st.resources.wood + st.resources.stone;
+    S.crown.hourly(st.time.hour);
+    check('altın yetmezse vergi tutarının yarısına kadarı malla ödenir (1 altın = 2 birim)', st.crown.lastLevy.ok && st.resources.gold === 0 && stock0 - (st.resources.food + st.resources.wood + st.resources.stone) === (amt2 - Math.ceil(amt2 * 0.6)) * 2, JSON.stringify(st.crown.lastLevy));
+    // Ödenemezse ceza
+    st.resources.gold = 7;
+    sim.give({ food: 100, wood: 100, stone: 100 });
+    const amt3 = CR.levyAmount(st);
+    st.crown.notice = { at: now(), amount: amt3 };
+    st.crown.nextLevyAt = now();
+    st.trust.value = 60;
+    st.crown.reputation = 50;
+    delete st.buffs.royalPenalty;
+    const bonus0 = TS.townHappinessBonus(st);
+    S.crown.hourly(st.time.hour);
+    const L3 = st.crown.lastLevy;
+    check('ödenemeyen Krallık Vergisi: hazineye el konur, depodan zorla mal çekilir', !L3.ok && L3.gold === 7 && st.resources.gold === 0 && Object.values(L3.goods).reduce((a, b) => a + b, 0) > 0 && st.resources.food < 100, JSON.stringify(L3));
+    check('ceza: güven -12, itibar -20, refah darbesi (Kraliyet Cezası -8)', st.trust.value === 48 && st.crown.reputation === 30 && TS.townHappinessBonus(st) === bonus0 - 8 && st.journal.at(-1).text.startsWith('ALARM · Krallık Vergisi'));
+    check('düşük itibar vergiyi artırır', CR.reputationLevel(st.crown.reputation).levy > 1);
+    delete st.buffs.royalPenalty;
+    st.crown.reputation = 60;
+    st.crown.nextLevyAt = now() + 1e6;
+    sim.give({ wood: 400, stone: 400, food: 250, bread: 80, iron: 80, gold: 3000 });
+
+    // --- Kraliyet Fermanları ---
+    st.town.tier = 1;
+    check('Mezra seviyesinde ferman gelmez', S.crown.availableDecrees().length === 0);
+    st.town.tier = Math.max(keepTier, 3);
+    check('Köy seviyesinden itibaren fermanlar gelir (tersane her zaman)', S.crown.availableDecrees().includes('shipyard'));
+    st.crown.statueRight = false;
+    const placeBefore = S.construction.checkPlacement('royalStatue', 1, 1);
+    check('Aslanlı Heykel beratsız dikilemez', !placeBefore.ok && placeBefore.reason.includes('Kraliyet Beratı'));
+    const d1 = S.crown.openDecree('shipyard');
+    check('ferman açılır: seviyeye göre ihtiyaç, 3 günlük süre, ödül; günlük ve bildirim', d1.need.wood === 30 * Math.min(4, st.town.tier) && d1.deadline - d1.createdAt === CD.DECREE.deadlineMinutes && d1.reward.item === 'statueRight' && st.journal.at(-1).text.includes('Kraliyet Fermanı'));
+    game.events.emit('ui:selectBuilding', hall.id);
+    renderNow();
+    const deliverBtn = [...document.querySelectorAll('.building-crown .royal-decree button')].find((b) => b.textContent === 'Teslim Et');
+    check('Belediye panelinde ferman kartı: istek, ihtiyaç, ödül ve Teslim Et / Reddet', deliverBtn && !deliverBtn.disabled && document.querySelector('.building-crown .royal-decree').textContent.includes('Reddet'));
+    const w1 = st.resources.wood;
+    const gd1 = st.resources.gold;
+    st.crown.reputation = 60;
+    st.trust.value = 60;
+    deliverBtn.click();
+    check('ferman teslim edilir: kaynaklar harcanır, altın ödülü ve Kraliyet Beratı; itibar +10, güven +4', st.resources.wood === w1 - d1.need.wood && st.resources.gold === gd1 + d1.reward.gold && st.crown.statueRight && st.crown.reputation === 70 && st.trust.value === 64 && !st.crown.decree);
+    renderNow();
+    const placeAfter = S.construction.checkPlacement('royalStatue', 1, 1);
+    check('berat alınınca Aslanlı Heykel İnşa menüsünde açılır', !placeAfter.reason?.includes('Kraliyet Beratı'), placeAfter.reason);
+    const bonusBefore = TS.landmarkBonus(st);
+    const statue = sim.place('royalStatue', { maxRadius: 30 });
+    check('Kraliyet Aslanlı Heykeli dikilir: kalıcı refah +4 ve estetik', statue && TS.landmarkBonus(st) === bonusBefore + 4 && W.aesthetics.some((v) => v > 0));
+    st.trust.value = 50;
+    st.town.welfare = 50;
+    S.crown.hourly(st.time.hour);
+    check('heykel saat başı güven verir', Math.abs(st.trust.value - (50 + CD.ROYAL_STATUE.trustPerHour)) < 1e-9, st.trust.value);
+    // Garnizon: Kadim Dişli ödülü
+    const gears0 = st.resources.gears;
+    S.crown.openDecree('garrison');
+    game.events.emit('ui:deliverDecree');
+    check('Garnizon fermanı: ekmek ve demir teslim edilir, Kadim Dişli ödülü', st.resources.gears === gears0 + 2 && st.crown.decreeLog.at(-1).outcome === 'delivered');
+    // Saray kütüphanesi: araştırma
+    const dL = S.crown.openDecree('library');
+    check('kütüphane fermanı araştırma bitmeden teslim edilemez', !CR.decreeStatus(st, dL).ok);
+    dL.baseline.done = Object.keys(st.research.done).length - 1;
+    const books0 = st.goldenAge.books;
+    game.events.emit('ui:deliverDecree');
+    check('araştırma tamamlanınca teslim edilir: Antik Kitap (ya da kitaplık doluysa altın)', st.crown.decreeLog.at(-1).outcome === 'delivered' && (st.goldenAge.books === books0 + 1 || st.crown.decreeLog.at(-1).item === null));
+    // Usta işi eser
+    st.masterworks.items.push({ id: 9999, type: 'ironStatue', maker: 'Usta', makerId: -1, status: 'stored', day: 1, hour: 1 });
+    const seeds0 = st.exploration.items.vineSeed;
+    S.crown.openDecree('treasure');
+    game.events.emit('ui:deliverDecree');
+    check('saray hazinesi fermanı: depodaki usta işi eser Krallığa gider, Nadir Tohum ödülü', st.masterworks.items.find((i) => i.id === 9999).status === 'sold' && st.exploration.items.vineSeed === seeds0 + 1);
+    st.masterworks.items = st.masterworks.items.filter((i) => i.id !== 9999);
+    // Süresi dolan ve reddedilen ferman: ceza
+    S.crown.openDecree('feast');
+    st.crown.decree.deadline = now();
+    st.crown.reputation = 60;
+    st.trust.value = 60;
+    const gf = st.resources.gold;
+    S.crown.hourly(st.time.hour);
+    const fine = st.crown.decreeLog.at(-1);
+    check('süresi dolan ferman: Krallık altın cezası keser, itibar -12, güven -4', fine.outcome === 'expired' && st.resources.gold === gf - fine.fine.gold && fine.fine.gold > 0 && st.crown.reputation === 48 && Math.abs(st.trust.value - (56 + CD.ROYAL_STATUE.trustPerHour)) < 1e-9, st.trust.value); // heykelin saatlik güveni de işler
+    S.crown.openDecree('shipyard');
+    game.events.emit('ui:selectBuilding', hall.id);
+    renderNow();
+    [...document.querySelectorAll('.building-crown .royal-decree button')].find((b) => b.textContent === 'Reddet').click();
+    check('"Reddet" düğmesi: ferman reddedilir ve ceza kesilir', st.crown.decreeLog.at(-1).outcome === 'rejected' && !st.crown.decree);
+    check('berat zaten varsa tersane ödülü altına döner', S.crown.rewardFor('shipyard').item === 'statueRight' && st.crown.statueRight);
+
+    // --- Kötü şöhret ve göç ---
+    st.trust.value = 30;
+    let im = TS.immigrationStatus(st);
+    check('güven %35 altındayken kötü şöhret yüzünden göçmen gelmez', !im.ok && im.checks.find((c) => c.key === 'fame').ok === false);
+    st.trust.value = 45;
+    im = TS.immigrationStatus(st);
+    check('güven %50 altındayken sabah en çok 1 göçmen', im.checks.find((c) => c.key === 'fame').ok && im.maxPerMorning === 1);
+    st.trust.value = 80;
+    check('güven toparlanınca göç normale döner', TS.immigrationStatus(st).checks.find((c) => c.key === 'fame').ok && TS.immigrationStatus(st).maxPerMorning >= 2);
+
+    // --- Köyü terk etme ---
+    const E = st.exodus;
+    st.trust.value = 10;
+    st.town.welfare = 10;
+    E.lowSince = now() - 30 * 60;
+    E.active = false;
+    E.lastAt = null;
+    if (st.trust.revolt) S.trust.endRevolt();
+    S.desertion.hourly();
+    check('isyan yağmaya varmadan terk ediş başlamaz', !E.active);
+    for (const c of st.characters) c.needs.fun = 5;
+    S.trust.startRevolt();
+    check('terk ediş denemesi için isyan var', st.trust.revolt);
+    st.trust.revolt.looted = { food: 12 };
+    // En mutsuz bekâr sakin ayrılsın: herkes mutlu, o mutsuz
+    for (const c of st.characters) c.needs = { hunger: 90, energy: 90, social: 90, fun: 90 };
+    const single = st.characters.find((c) => !c.isChild && !c.married && !c.away && c.visible && !c.role && !st.characters.some((o) => o.parentIds.includes(c.id)));
+    single.needs.fun = 0;
+    single.coins = 77;
+    single.inventory = [];
+    CZ.addItem(single, 'bread', 3);
+    const singleId = single.id;
+    const pop0 = st.characters.length;
+    const leftEv = [];
+    const offL = game.events.on('population:left', (p) => leftEv.push(p));
+    S.desertion.hourly();
+    check('güven / refah %20 altında 24 saat kalınca ve isyan yağmaya varınca terk ediş başlar (göç durur)', E.active && TS.immigrationStatus(st).checks.find((c) => c.key === 'fame').ok === false && st.journal.some((j) => j.text.startsWith('ALARM · Umut tükendi')));
+    check('en mutsuz sakin bohçasını toplar (emigrating), elindeki işi bırakır', single.emigrating && single.emigrating.exit && single.bubble?.icon === 'bundle' || (single.emigrating && !single.visible));
+    const plan = S.behavior.brain.decide(single, 11);
+    check('köyü terk eden harita kenarına yürür (emigrate)', plan.activity === 'emigrate' && plan.spot.x === single.emigrating.exit.x);
+    game.events.emit('ui:selectCharacter', singleId);
+    renderNow();
+    check('karakter kartında "Köyü terk ediyor" etiketi', document.querySelector('.character-panel .purse-rioter.is-leaving')?.textContent === 'Köyü terk ediyor');
+    for (let i = 0; i < 40 && st.characters.some((c) => c.id === singleId); i++) sim.step(225);
+    offL();
+    check('sakin kesesi ve çantasıyla kasabadan temelli ayrılır', !st.characters.some((c) => c.id === singleId) && st.characters.length === pop0 - 1 && leftEv[0]?.coins === 77 && leftEv[0]?.items === 3 && E.left >= 1 && E.coins >= 77 && st.stats.emigrants >= 1, JSON.stringify(leftEv[0] ? { coins: leftEv[0].coins, items: leftEv[0].items } : null));
+    check('günlüğe acı bir not düşer', st.journal.some((j) => j.text.includes('köyden temelli ayrıldı') && j.icon === 'bundle'));
+    const dangling = st.characters.filter((c) => c.partnerId === singleId || c.parentIds.includes(singleId)).length + Object.keys(st.relationships).filter((k) => k.split('-').map(Number).includes(singleId)).length + st.buildings.filter((b) => b.occupants.has(singleId) || b.workerIds.has(singleId)).length + (st.trust.revolt?.rioters.includes(singleId) ? 1 : 0);
+    check('ayrılan sakine işaret eden referans kalmaz (eş, ebeveyn, ilişki, yapı, isyan)', dangling === 0, dangling);
+    // Evli çift ailesiyle birlikte ayrılır
+    const wife = st.characters.find((c) => c.married && !c.away && st.characters.find((p) => p.id === c.partnerId && !p.away));
+    if (wife) {
+      for (const c of st.characters) c.needs.fun = 90;
+      wife.needs.fun = 0;
+      E.lastAt = null;
+      const group = S.desertion.leaveNext();
+      check('evli sakin eşi (ve çocuklarıyla) birlikte ayrılır', group && group.includes(wife) && group.some((c) => c.id === wife.partnerId) && group.every((c) => c.emigrating), group?.map((c) => c.name).join(','));
+      for (const c of group ?? []) S.desertion.depart(c);
+      check('ayrılan çiftin bağı kimsede kalmaz', !st.characters.some((c) => group.some((g) => g.id === c.partnerId)));
+    } else check('evli sakin eşi (ve çocuklarıyla) birlikte ayrılır', true, 'evli çift yok');
+    // Çekirdek sakinler
+    const keepCore = CD.EXODUS.core;
+    const staying = st.characters.filter((c) => !c.role && !c.emigrating).length;
+    CD.EXODUS.core = staying;
+    E.lastAt = null;
+    check(`en az ${keepCore} çekirdek sakin her koşulda kalır (çekirdek dolunca kimse ayrılmaz)`, S.desertion.leaveNext() === null);
+    CD.EXODUS.core = staying - 1;
+    const one = S.desertion.leaveNext();
+    check('çekirdeğe bir kişilik yer kalınca aile değil yalnızca bir sakin ayrılır', one?.length === 1);
+    for (const c of one ?? []) c.emigrating = null;
+    CD.EXODUS.core = keepCore;
+    check('çekirdek sakin sayısı 3', keepCore === 3);
+    // Kriz çözülünce terk ediş biter, göç döner
+    st.trust.value = 70;
+    st.town.welfare = 70;
+    S.desertion.hourly();
+    check('güven ve refah toparlanınca terk ediş biter, göç yeniden açılır', !E.active && E.lowSince === null && TS.immigrationStatus(st).checks.find((c) => c.key === 'fame').ok && st.journal.some((j) => j.text.startsWith('Kasabaya umut döndü')));
+    if (st.trust.revolt) S.trust.endRevolt();
+
+    // --- Kayıt gidiş-dönüşü (sürüm 19) ---
+    game.events.emit('ui:setTaxRate', { rate: 'low' });
+    S.crown.openDecree('shipyard');
+    const leaver = st.characters.find((c) => !c.isChild && !c.away && !c.role);
+    leaver.emigrating = { since: now(), exit: { x: 1, y: 1 } };
+    const T = { rate: st.tax.rate, collections: st.tax.collections, rep: st.crown.reputation, decree: st.crown.decree.id, kind: st.crown.decree.kind, deadline: st.crown.decree.deadline, right: st.crown.statueRight, left: E.left, emig: leaver.id, paid: st.crown.paid, levies: st.crown.levies, emigrants: st.stats.emigrants };
+    game.events.emit('ui:save');
+    const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    game.events.emit('ui:load');
+    const s4 = game.state;
+    check('kayıt sürümü 19: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 19 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
+    check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
+    check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
+    check('kayıttan Kraliyet Aslanlı Heykeli döner', s4.buildings.some((b) => b.type === 'royalStatue'));
   }
 
   return out;

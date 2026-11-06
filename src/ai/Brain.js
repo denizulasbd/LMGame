@@ -98,6 +98,11 @@ export class Brain {
     const { needs, profile } = c;
     const bedtime = isBedtime(profile, hour);
 
+    // (22. aşama) Köyü terk etmeye karar verdiyse her şeyden önce harita kenarına yürür
+    if (c.emigrating) {
+      const plan = this.planEmigrate(c);
+      if (plan) return plan;
+    }
     // (20. aşama) Çağ Kutlaması: Ulu Saat Kulesi tamamlanınca uyanık herkes meydanda kutlar
     if (this.world.state.goldenAge?.celebration && needs.energy > FESTIVAL_MIN_ENERGY && !this.world.state.events.festival.active) {
       const plan = this.planAgeCelebration(c);
@@ -202,6 +207,13 @@ export class Brain {
   // ---------------------------------------------------------------------------
   // (21. aşama) Kişisel çanta, alışveriş, isyan
   // ---------------------------------------------------------------------------
+
+  /** (22. aşama) Köyü terk eden sakin harita kenarındaki çıkışa yürür (yol yoksa null; DesertionSystem süre dolunca çıkarır). */
+  planEmigrate(c) {
+    const exit = c.emigrating?.exit;
+    if (!exit || !this.world.findPath(this.originTile(c), exit)) return null;
+    return { activity: 'emigrate', spot: exit, duration: 0 };
+  }
 
   /** Çantadan yemek (urgent: çok aç; değilse yarı yarıya). */
   planSnack(c, urgent) {

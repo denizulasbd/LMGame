@@ -19,14 +19,17 @@
 //   save-v17.json: 20. aşamanın oyunu (kayıt sürümü 17): otopilotla 34 gün; aşama aşama yükselen Ulu Saat Kulesi,
 //                  Altın Çağ, Tarihçe Kütüğü, Mermer Çeşme ve Altın Çağ Fenerleri, antik kitaplar. Eski kayıtlarda (sürüm 2-16)
 //                  Tarihçe sakinlerden çıkarılır; tamamlanmış kulesi olan kasaba Altın Çağ'a sessizce (kutlamasız) girer
-//   save-v18.json: 21. aşamanın oyunu (kayıt sürümü 18, bugünkü): otopilotla 34 gün; sakinlerin keseleri ve çantaları,
+//   save-v18.json: 21. aşamanın oyunu (kayıt sürümü 18): otopilotla 34 gün; sakinlerin keseleri ve çantaları,
 //                  karşılanan / açık dilekçeler, Yönetim Güveni. Eski kayıtlarda (sürüm 2-17) her yetişkine 12, her çocuğa 3
 //                  altın başlangıç harçlığı verilir, çantalar boş başlar, Yönetim Güveni %75'tir, dilekçe ve isyan yoktur
+//   save-v19.json: 22. aşamanın oyunu (kayıt sürümü 19, bugünkü): otopilotla 34 gün; iç vergi kademesi ve tahsilatlar,
+//                  ödenen Krallık Vergileri, teslim edilen Kraliyet Fermanları, Kraliyet Beratı ve Aslanlı Heykel. Eski kayıtlarda
+//                  (sürüm 2-18) Standart Vergi, itibar 50, ferman ve terk ediş yoktur; vergi takvimi yüklenince kurulur
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -108,6 +111,21 @@ for (const { name, raw } of fixtures) {
       petitions: s.petitions.list.map((p) => `${p.id}:${p.kind}:${p.characterId}`),
       made: s.petitions.made,
     };
+    // (22. aşama) vergi, Krallık, terk ediş (yüklendiği an)
+    loaded.crown = {
+      rate: s.tax.rate,
+      taxNext: Number.isFinite(s.tax.nextAt) && s.tax.nextAt > s.totalMinutes,
+      collections: s.tax.collections,
+      reputation: s.crown.reputation,
+      levyNext: Number.isFinite(s.crown.nextLevyAt) && s.crown.nextLevyAt > s.totalMinutes,
+      levies: s.crown.levies,
+      paid: s.crown.paid,
+      decree: s.crown.decree?.kind ?? null,
+      delivered: s.crown.delivered,
+      right: s.crown.statueRight,
+      left: s.exodus.left,
+      emigrating: s.characters.filter((c) => c.emigrating).length,
+    };
     // (19. aşama) huylar, ortak evler, dedikodu (yüklendiği an)
     loaded.social = {
       quirks: s.characters.map((c) => c.quirk),
@@ -135,6 +153,7 @@ for (const { name, raw } of fixtures) {
       wages: s.stats.wagesPaid ?? 0,
     };
     return {
+      crownAfter: { pop: s.characters.length, left: s.exodus.left, active: Boolean(s.exodus.active), rate: s.tax.rate },
       citizensAfter,
       integrityAfter,
       expeditionAfter,
@@ -149,6 +168,7 @@ for (const { name, raw } of fixtures) {
       research: s.research,
       trade: s.trade,
       gold: s.resources.gold,
+      taxGold: s.tax.totalGold, // (22. aşama) iç vergi hazineye altın getirir
       academy: s.buildings.filter((b) => b.type === 'academy' || b.type === 'harbor' || b.type === 'wonder').length,
       luxury: s.luxury,
       history: s.history.length,
@@ -257,6 +277,24 @@ for (const { name, raw } of fixtures) {
     }
     results.push({ name: `${tag}: bir gün sonra keseler ve çantalar geçerli, isyan yok`, ok: A.bagsOk && A.petitionsOk && !A.revolt && A.trust >= 0 && A.trust <= 100, detail: `güven %${Math.round(A.trust)}, yevmiye ${A.wages}` });
   }
+  {
+    // (22. aşama) iç vergi, Krallık Vergisi, Kraliyet Fermanları, terk ediş
+    const K = r.loaded.crown;
+    if (data.version < 19) {
+      results.push({
+        name: `${tag}: Standart Vergi, Krallık İtibarı 50, ferman / berat / terk ediş yok; vergi takvimi kuruldu`,
+        ok: K.rate === 'standard' && K.taxNext && K.levyNext && K.collections === 0 && K.reputation === 50 && K.levies === 0 && K.decree === null && !K.right && K.left === 0 && K.emigrating === 0,
+        detail: `itibar %${K.reputation}`,
+      });
+    } else {
+      results.push({
+        name: `${tag}: vergi kademesi, tahsilatlar, Krallık İtibarı, vergi sayaçları, fermanlar ve Kraliyet Beratı korundu`,
+        ok: K.rate === data.tax.rate && K.collections === data.tax.collections && Math.abs(K.reputation - data.crown.reputation) < 1e-9 && K.levies === data.crown.levies && K.paid === data.crown.paid && K.delivered === data.crown.delivered && K.right === data.crown.statueRight && K.decree === (data.crown.decree?.kind ?? null) && K.left === data.exodus.left,
+        detail: `${K.rate} · ${K.collections} tahsilat · itibar %${Math.round(K.reputation)} · vergi ${K.paid}/${K.levies} · ferman ${K.delivered} · berat ${K.right ? 'var' : 'yok'}`,
+      });
+    }
+    results.push({ name: `${tag}: bir gün sonra kimse köyü terk etmedi`, ok: !r.crownAfter.active && r.crownAfter.left === K.left, detail: `${r.crownAfter.pop} sakin, terk eden ${r.crownAfter.left}` });
+  }
   results.push({ name: `${tag}: meslek kıyafetleri deneyimden giyildi`, ok: r.outfitsOk, detail: `${r.outfits} sakin kıyafetli` });
   results.push({ name: `${tag}: harita farkları birebir uygulandı`, ok: r.loaded.terrain === data.terrain.length, detail: `${r.loaded.terrain}/${data.terrain.length} karo` });
   if (!data.map) results.push({ name: `${tag}: eski 48x48 biyomsuz harita`, ok: r.loaded.map.width === 48 && r.loaded.map.height === 48 && r.loaded.map.generator === 1, detail: JSON.stringify(r.loaded.map) });
@@ -269,8 +307,8 @@ for (const { name, raw } of fixtures) {
   else results.push({ name: `${tag}: fermanlar korundu`, ok: r.civic.storageLevel === (data.civic.storageLevel ?? 0) && r.civic.craftGuild === Boolean(data.civic.craftGuild), detail: `depo kademesi ${r.civic.storageLevel}` });
   if (data.version < 10) {
     results.push({
-      name: `${tag}: araştırma, liman ve hazine boş başlar`,
-      ok: r.research.active === null && Object.keys(r.research.done).length === 0 && r.trade.shipments === 0 && r.gold === 0 && r.academy === 0 && r.civic.expeditionsSinceTalisman >= 0,
+      name: `${tag}: araştırma, liman ve hazine boş başlar (hazinede yalnızca iç vergiden gelen altın)`,
+      ok: r.research.active === null && Object.keys(r.research.done).length === 0 && r.trade.shipments === 0 && r.gold <= r.taxGold && r.academy === 0 && r.civic.expeditionsSinceTalisman >= 0,
     });
   } else {
     results.push({

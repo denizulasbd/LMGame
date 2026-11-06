@@ -18,6 +18,8 @@ import { INSCRIPTIONS } from '../data/exploration.js';
 import { emptyExploration } from '../systems/Exploration.js';
 import { emptyTrust, emptyPetitions } from '../systems/Citizens.js';
 import { PETITION_KINDS, TRUST } from '../data/citizens.js';
+import { emptyTax, emptyCrown, emptyExodus } from '../systems/Crown.js';
+import { TAX_RATES, DECREES, REPUTATION } from '../data/crown.js';
 import { SEASON_FESTIVALS } from '../data/festivals.js';
 import { WEATHER_TYPES } from '../data/weather.js';
 import { Character } from '../entities/Character.js';
@@ -107,6 +109,7 @@ export class GameState {
       lootedGoods: 0, // yağmalanan mal (birim)
       lootedGold: 0, // yağmalanan altın
       reliefs: 0, // acil erzak / altın dağıtımı
+      emigrants: 0, // (22. aşama) köyü terk eden sakinler
     };
     // Hayvanlar (AnimalSystem, 11. aşama): yaban hayatı (tavşan, geyik) ve kasaba kedileri / köpekleri.
     // animalMeta: wildlifeSeeded yaban hayatı yerleştirildi mi, lastPetDay son evcil hayvanın geldiği gün
@@ -160,6 +163,12 @@ export class GameState {
     // { list: açık dilekçeler, nextId, nextAt, log: sonuçlananlar, sayaçlar }
     this.trust = emptyTrust();
     this.petitions = emptyPetitions();
+    // (22. aşama) İç vergi (TaxSystem): kademe, sıradaki tahsilat, toplamlar ve son tahsilatlar; Krallık (CrownSystem):
+    // itibar, sıradaki Krallık Vergisi ve yoldaki tahsildar, süren Kraliyet Fermanı, Kraliyet Beratı; terk ediş
+    // (DesertionSystem): umutsuzluğun başladığı an, süren terk ediş, ayrılanlar
+    this.tax = emptyTax();
+    this.crown = emptyCrown();
+    this.exodus = emptyExodus();
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -229,6 +238,9 @@ export class GameState {
       chronicle: this.chronicle,
       trust: this.trust,
       petitions: this.petitions,
+      tax: this.tax,
+      crown: this.crown,
+      exodus: this.exodus,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -325,6 +337,10 @@ export class GameState {
     // 21. aşamadan eski kayıtlarda güven ve dilekçe yoktur: güven %75 başlar (sakinlere başlangıç harçlığı Character'da)
     next.trust = restoreTrust(data.trust);
     next.petitions = restorePetitions(data.petitions);
+    // 22. aşamadan eski kayıtlarda vergi, Krallık ve terk ediş yoktur: Standart Vergi, itibar 50, takvim yüklenince kurulur
+    next.tax = restoreTax(data.tax);
+    next.crown = restoreCrown(data.crown);
+    next.exodus = restoreExodus(data.exodus);
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
@@ -350,6 +366,54 @@ export class GameState {
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
+}
+
+const NUM = (v) => (Number.isFinite(v) ? v : null);
+const COUNT = (v) => Math.max(0, Math.floor(Number(v) || 0));
+
+/** (22. aşama) Kayıttaki iç vergi: bilinmeyen kademe Standart olur. */
+function restoreTax(data) {
+  const out = emptyTax();
+  if (!data || typeof data !== 'object') return out;
+  if (TAX_RATES[data.rate]) out.rate = data.rate;
+  out.nextAt = NUM(data.nextAt);
+  out.collections = COUNT(data.collections);
+  out.totalGold = COUNT(data.totalGold);
+  out.totalGoods = COUNT(data.totalGoods);
+  out.last = data.last && typeof data.last === 'object' ? { ...data.last } : null;
+  out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && Number.isFinite(l.day)).slice(-8);
+  return out;
+}
+
+/** (22. aşama) Kayıttaki Krallık durumu: bilinmeyen ferman atlanır, itibar sınırlanır. */
+function restoreCrown(data) {
+  const out = emptyCrown();
+  if (!data || typeof data !== 'object') return out;
+  out.reputation = Number.isFinite(data.reputation) ? Math.min(100, Math.max(0, data.reputation)) : REPUTATION.start;
+  out.nextLevyAt = NUM(data.nextLevyAt);
+  out.notice = data.notice && Number.isFinite(data.notice.amount) ? { ...data.notice } : null;
+  for (const k of ['levies', 'paid', 'failed', 'delivered', 'decreesFailed']) out[k] = COUNT(data[k]);
+  out.lastLevy = data.lastLevy && typeof data.lastLevy === 'object' ? { ...data.lastLevy } : null;
+  const d = data.decree;
+  out.decree = d && DECREES[d.kind] && Number.isFinite(d.deadline) ? { ...d, need: { ...(d.need ?? {}) }, baseline: { ...(d.baseline ?? {}) }, reward: d.reward ? { ...d.reward } : null } : null;
+  out.nextDecreeAt = NUM(data.nextDecreeAt);
+  out.nextDecreeId = Math.max(1, COUNT(data.nextDecreeId), (out.decree?.id ?? 0) + 1);
+  out.decreeLog = (Array.isArray(data.decreeLog) ? data.decreeLog : []).filter((l) => l && DECREES[l.kind]).slice(-10);
+  out.statueRight = Boolean(data.statueRight);
+  return out;
+}
+
+/** (22. aşama) Kayıttaki terk ediş durumu. */
+function restoreExodus(data) {
+  const out = emptyExodus();
+  if (!data || typeof data !== 'object') return out;
+  out.lowSince = NUM(data.lowSince);
+  out.lastAt = NUM(data.lastAt);
+  out.active = Boolean(data.active);
+  out.startedAt = NUM(data.startedAt);
+  for (const k of ['left', 'coins', 'items']) out[k] = COUNT(data[k]);
+  out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && typeof l.name === 'string').slice(-12);
+  return out;
 }
 
 /** (21. aşama) Kayıttaki Yönetim Güveni: değer sınırlanır, isyan yalnızca geçerliyse sürer. */

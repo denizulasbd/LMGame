@@ -595,6 +595,16 @@ export const ACTIVITIES = {
     bubbles: ['torch', 'angry', 'loot'],
     finishEvent: 'riot:loot',
   },
+  // --- 22. aşama: köyü terk etme (kesesi ve çantasıyla harita kenarına yürür, orada kasabadan ayrılır) ---
+  emigrate: {
+    kind: 'away',
+    travelLabel: 'Bohçasını sırtlamış, köyü terk ediyor',
+    label: 'Son kez ardına bakıp köyden ayrılıyor',
+    duration: [0, 0],
+    effects: {},
+    bubbles: ['bundle'],
+    finishEvent: 'citizen:emigrated',
+  },
   wait: {
     kind: 'idle',
     target: 'none',

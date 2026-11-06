@@ -287,14 +287,19 @@ export class CharacterPanel {
     const rioter = isRioter(state, character);
     const raid = rioter ? raidOf(state, character) : null;
     const inv = character.inventory ?? [];
-    const key = `${character.id}:${character.coins}:${capacity}:${rioter}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}`).join(',')}`;
+    const leaving = Boolean(character.emigrating); // (22. aşama) köyü terk ediyor
+    const key = `${character.id}:${character.coins}:${capacity}:${rioter}:${leaving}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}`).join(',')}`;
     if (key === this.lastPurse) return;
     this.lastPurse = key;
     const coins = el('div', { className: 'purse-coins', title: 'Kişisel kese: yevmiyeler, usta eseri ödülleri ve alışveriş (kasaba hazinesinden ayrıdır)' }, [
       el('img', { src: getAnyIconURL('purse'), alt: '' }),
       el('span', { className: 'purse-amount', text: `${character.coins ?? 0}` }),
       el('span', { className: 'purse-unit', text: 'altın' }),
-      ...(rioter ? [el('span', { className: 'purse-rioter', text: raid ? 'Yağmada' : 'İsyancı', title: 'Yönetime öfkeli: işi bıraktı, meydanda toplanıyor' })] : []),
+      ...(leaving
+        ? [el('span', { className: 'purse-rioter is-leaving', text: 'Köyü terk ediyor', title: 'Umudunu kaybetti: kesesi ve çantasıyla kasabadan temelli ayrılıyor' })]
+        : rioter
+          ? [el('span', { className: 'purse-rioter', text: raid ? 'Yağmada' : 'İsyancı', title: 'Yönetime öfkeli: işi bıraktı, meydanda toplanıyor' })]
+          : []),
     ]);
     const slots = [];
     for (let i = 0; i < capacity; i++) {

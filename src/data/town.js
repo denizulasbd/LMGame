@@ -61,6 +61,8 @@ export const TOWN_BUFFS = {
   seasonCheer: { name: 'Mevsim Coşkusu', icon: 'sparkle', hours: 24, workSpeed: 1.15, funDecay: 0.8, happiness: 6 },
   // 21. aşama: bir vatandaş dilekçesi karşılanınca (PetitionSystem) kasaba bir gün "sesimiz duyuldu" der
   heard: { name: 'Sesimiz Duyuldu', icon: 'scroll', hours: 24, happiness: 3 },
+  // 22. aşama: Krallık Vergisi ödenemeyince (CrownSystem) iki gün boyunca refah darbesi
+  royalPenalty: { name: 'Kraliyet Cezası', icon: 'collector', hours: 48, happiness: -8 },
 };
 
 // Handa sıcak yemek yiyen sakinin kişisel bonusu: bu kadar oyun saati boyunca yavaş acıkır

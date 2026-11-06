@@ -36,7 +36,7 @@ export const CONFIG = {
   // --- Kayıt ---
   SAVE_KEY: 'lmgame.save.v2',          // elle kaydedilen / sabah otomatik kaydedilen oyun
   SESSION_KEY: 'lmgame.session.v2',    // sayfa kapanırken yazılır: F5 oyunu kaldığı yerden sürdürür
-  SAVE_VERSION: 18,                    // 21. aşama: kişisel kese ve çanta, vatandaş dilekçeleri, Yönetim Güveni, isyan ve yağma; 20. aşama: Ulu Saat Kulesi aşamaları ve Kadim Dişli, Altın Çağ, Tarihçe Kütüğü; 19. aşama: evlilik ortak evi, karakter huyları, randevu, dedikodu, düğün kutlaması; 18. aşama: peyzaj (tabela adı, fidan büyümesi, estetik, iade birikimi); 16. aşama: keşif ganimetleri, kadim yazıtlar, maceralı sefer; 15. aşama: usta işi eserler
+  SAVE_VERSION: 19,                    // 22. aşama: iç vergi ve öşür, Krallık Vergisi ve itibar, Kraliyet Fermanları ve Beratı, terk ediş; 21. aşama: kişisel kese ve çanta, vatandaş dilekçeleri, Yönetim Güveni, isyan ve yağma; 20. aşama: Ulu Saat Kulesi aşamaları ve Kadim Dişli, Altın Çağ, Tarihçe Kütüğü; 19. aşama: evlilik ortak evi, karakter huyları, randevu, dedikodu, düğün kutlaması; 18. aşama: peyzaj (tabela adı, fidan büyümesi, estetik, iade birikimi); 16. aşama: keşif ganimetleri, kadim yazıtlar, maceralı sefer; 15. aşama: usta işi eserler
   SAVE_MIN_VERSION: 2,                 // bundan eski kayıtlar açılmaz; arası eksik alanlarla yüklenir
   AUTOSAVE_HOUR: 6,                    // her sabah bu saatte otomatik kayıt
   HISTORY_DAYS: 64,                    // Kasaba Arşivi'nde saklanan günlük özet sayısı

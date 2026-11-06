@@ -119,6 +119,13 @@ export class BehaviorSystem {
       game.events.on('revolt:joined', ({ ids }) => this.interrupt(ids)),
       game.events.on('revolt:raid', ({ raid }) => this.interrupt(raid.members, ['protest'])),
       game.events.on('revolt:ended', ({ rioters }) => this.interrupt(rioters, ['protest'], true)),
+      // (22. aşama) Köyü terk etmeye karar verenler elindeki her işi bırakır (uyuyan uyanır, içerideki kapıdan çıkar)
+      game.events.on('exodus:leaving', ({ ids }) => {
+        for (const id of ids) {
+          const c = this.world.getCharacter(id);
+          if (c && !c.away) this.endTask(c);
+        }
+      }),
       game.events.on('festival:started', () => {
         for (const c of this.world.characters) {
           const kind = c.task ? ACTIVITIES[c.task.activity].kind : 'idle';

@@ -660,6 +660,23 @@ export const BUILDINGS = {
     litHours: { from: 18.5, to: 6.5 },
     funAura: { radius: 72, perMinute: 0.12 },
   },
+  // 22. aşama: Kraliyet Fermanı ödülü (Kraliyet Beratı) ile açılan anıt
+  royalStatue: {
+    name: 'Kraliyet Aslanlı Heykeli',
+    size: { w: 2, h: 2 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Peyzaj',
+    description: "Kraliyet Beratı'yla dikilen, mermer kaide üstünde taç giymiş altın aslan. Çevresine bolca güzellik yayar; kasaba refahına kalıcı +4, Yönetim Güveni'ne saat başı küçük bir katkı verir.",
+    cost: { stone: 60, gold: 120 },
+    buildWork: 180,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresRoyalRight: true,
+    townBonus: { happiness: 4 },
+    funAura: { radius: 72, perMinute: 0.1 },
+  },
   parkBench: {
     name: 'Park Bankı',
     size: { w: 1, h: 1 },
@@ -944,6 +961,7 @@ export const BUILD_MENU = [
   'ancientTorch',
   'marbleFountain',
   'goldenLantern',
+  'royalStatue',
 ];
 
 /** (18. aşama) Menü öğesinin İnşa sekmesi: 'roads' (zemin fırçaları), 'decor' (süs ve sokak eşyaları), 'buildings'. */

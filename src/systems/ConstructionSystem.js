@@ -80,6 +80,8 @@ export class ConstructionSystem {
       reason = `Kasaba ${def.requiresPopulation} sakine ulaşınca açılır (şu an ${this.world.state.characters.length})`;
     }
     if (!reason && def.requiresGoldenAge && !isGoldenAge(this.world.state)) reason = "Ulu Saat Kulesi tamamlanıp Altın Çağ başlayınca açılır";
+    // (22. aşama) Kraliyet Beratı'yla açılan anıt (Kraliyet Fermanı ödülü)
+    if (!reason && def.requiresRoyalRight && !this.world.state.crown?.statueRight) reason = 'Bir Kraliyet Fermanı ödülü olarak Kraliyet Beratı alınınca açılır';
     // (16. aşama) Seferden gelen egzotik ganimetle dikilen yapılar (üzüm asması, kadim meşale)
     if (!reason && def.item && itemCount(this.world.state, def.item) < 1) {
       reason = `Önce bir keşif seferinden ${EXOTIC_ITEMS[def.item].name} getirilmeli`;

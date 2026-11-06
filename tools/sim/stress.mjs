@@ -96,5 +96,11 @@ console.log(
     `dilekçe ${cz((z) => z.petitions.made)} (karşılanan ${cz((z) => z.petitions.fulfilled)}, reddedilen ${cz((z) => z.petitions.rejected)}, süresi dolan ${cz((z) => z.petitions.expired)}) · ` +
     `yevmiye ${cz((z) => z.wages)} altın · alışveriş ${cz((z) => z.purchases)} · çantadan yemek ${cz((z) => z.bagMeals)} · keselerde ${cz((z) => z.coins)} altın, çantalarda ${cz((z) => z.items)} eşya`
 );
+const kr = (f) => sum((d) => (d.monitor.crown ? f(d.monitor.crown) : 0));
+console.log(
+  `(22. aşama) vergi tahsilatı ${kr((k) => k.collections)} (+${kr((k) => k.taxGold)} altın, ${kr((k) => k.taxGoods)} öşür) · Krallık Vergisi ${kr((k) => k.paid)}/${kr((k) => k.levies)} ödendi (ceza ${kr((k) => k.failed)}) · ` +
+    `ferman teslim ${kr((k) => k.delivered)}, başarısız ${kr((k) => k.decreesFailed)} · berat ${kr((k) => (k.statueRight ? 1 : 0))} · heykel ${kr((k) => k.statues)} · terk eden ${kr((k) => k.emigrants)} · ` +
+    `son kademe ${results.map((r) => `${r.seed}:${r.data?.monitor.crown?.rate ?? '-'}`).join(' ')} · itibar ${results.map((r) => `${r.seed}:${r.data?.monitor.crown?.reputation ?? '-'}`).join(' ')}`
+);
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

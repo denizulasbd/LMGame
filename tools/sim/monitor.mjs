@@ -11,6 +11,9 @@
 //                      ait dilekçe, aynı sakinin iki dilekçesi, kayıp isyancı, yıkılmış yapıyı hedefleyen yağma, aralık dışı
 //                      güven kopuk referanstır; güvenin en düşük / en yüksek değeri, isyan saatleri, yağma, dilekçe sonuçları,
 //                      yevmiye, alışveriş ve çantadan yemek raporlanır
+//   (22. aşama) Krallık: geçersiz vergi kademesi / ferman, takvimsiz Krallık Vergisi, harita kenarına varamadan süresi geçen
+//                      göçmen, nüfusun çekirdeğin (3) altına inmesi kopuk referanstır; vergi tahsilatları, Krallık Vergisi ödemeleri
+//                      ve cezaları, fermanlar, Kraliyet Beratı ve terk edenler raporlanır
 //   (20. aşama) Ulu Saat Kulesi: geçersiz aşama, iş emri olmayan süren aşama, Altın Çağ'sız tamamlanmış kule, bitiş
 //                      vaktini aşan Çağ Kutlaması kopuk referanstır; kulenin ulaştığı aşama ve Altın Çağ raporlanır
 //   (19. aşama) Sosyal yaşam: evli çift ortak eve taşınamadan RELOCATE_HOURS saatten uzun "taşınıyor" kalırsa ya da
@@ -33,6 +36,7 @@ export async function installMonitor(page) {
     window.__charSprite = (await import('/src/art/sprites/index.js')).getCharacterSprite;
     window.__citizens = await import('/src/systems/Citizens.js');
     window.__citizenData = await import('/src/data/citizens.js');
+    window.__crownData = await import('/src/data/crown.js');
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -249,6 +253,20 @@ export async function installMonitor(page) {
           }
         }
 
+        // ---- (22. aşama) Vergi, Krallık ve terk ediş ----
+        {
+          const CD = window.__crownData;
+          if (!CD.TAX_RATES[s.tax?.rate]) broke(`geçersiz vergi kademesi (${s.tax?.rate})`);
+          if (!Number.isFinite(s.tax?.nextAt)) broke('vergi takvimi yok');
+          if (!Number.isFinite(s.crown?.nextLevyAt)) broke('Krallık Vergisi takvimi yok');
+          if (s.crown?.decree && !CD.DECREES[s.crown.decree.kind]) broke(`bilinmeyen ferman ${s.crown.decree.kind}`);
+          if (s.crown?.decree && now > s.crown.decree.deadline + 120) broke('ferman süresi geçtiği hâlde sonuçlanmadı');
+          for (const c of s.characters) if (c.emigrating && now - c.emigrating.since > CD.EXODUS.leaveTimeoutMinutes + 120) broke(`${c.name}: köyü terk edemiyor (yolda takıldı)`);
+          if (s.characters.filter((c) => !c.role).length < Math.min(CD.EXODUS.core, m.startPop ?? CD.EXODUS.core)) broke(`nüfus çekirdeğin altına indi (${s.characters.length})`);
+          m.startPop ??= s.characters.length;
+          if (s.exodus?.active) m.exodusSamples = (m.exodusSamples ?? 0) + 1;
+        }
+
         // ---- (20. aşama) Ulu Saat Kulesi ve Altın Çağ ----
         const tower = s.buildings.find((b) => b.type === 'wonder');
         if (tower) {
@@ -353,6 +371,23 @@ export async function installMonitor(page) {
             homesFreed: s.stats.homesFreed ?? 0,
             news: s.social?.gossip.length ?? 0,
             quirks: Object.fromEntries(['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].map((q) => [q, s.characters.filter((c) => c.quirk === q).length])),
+          },
+          // (22. aşama)
+          crown: {
+            rate: s.tax?.rate,
+            collections: s.tax?.collections ?? 0,
+            taxGold: s.tax?.totalGold ?? 0,
+            taxGoods: s.tax?.totalGoods ?? 0,
+            levies: s.crown?.levies ?? 0,
+            paid: s.crown?.paid ?? 0,
+            failed: s.crown?.failed ?? 0,
+            reputation: Math.round(s.crown?.reputation ?? 0),
+            delivered: s.crown?.delivered ?? 0,
+            decreesFailed: s.crown?.decreesFailed ?? 0,
+            statueRight: Boolean(s.crown?.statueRight),
+            statues: s.buildings.filter((b) => b.type === 'royalStatue' && b.functional).length,
+            emigrants: s.stats.emigrants ?? 0,
+            exodusHours: m.exodusSamples ?? 0,
           },
           // (21. aşama)
           citizens: {

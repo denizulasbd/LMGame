@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -315,6 +315,36 @@ const PAGE_HELPERS = () => {
       s.petitions.list = [];
     }
 
+    // --- 2k. (22. aşama) Tahsildar yoldayken, ferman sürerken, Ağır Vergi seçiliyken ve bir sakin köyü terk ederken ---
+    {
+      rich();
+      s.town.tier = Math.max(s.town.tier, 3);
+      while (s.time.hour < 9 || s.time.hour >= 15) hours(1);
+      game.events.emit('ui:setTaxRate', { rate: 'heavy' });
+      s.crown.nextLevyAt = s.totalMinutes + 1440;
+      scene().crown.announceLevy();
+      const decree = scene().crown.openDecree('shipyard');
+      const leaver = s.characters.find((c) => !c.isChild && !c.away && !c.married && c.visible);
+      scene().desertion.startLeaving([leaver]);
+      hours(0.2);
+      const before = JSON.stringify({ notice: s.crown.notice, decree: s.crown.decree, rate: s.tax.rate, leaving: leaver.emigrating });
+      const diff = A.roundtrip();
+      check('tahsildar yolda, ferman sürerken ve sakin köyü terk ederken kayıt -> yükleme durum kayması yok', decree && diff.length === 0, diff.join(' | '));
+      const l2 = s.characters.find((c) => c.id === leaver.id);
+      check('yüklenen tahsildar uyarısı, ferman, vergi kademesi ve yoldaki sakin aynen döner', JSON.stringify({ notice: s.crown.notice, decree: s.crown.decree, rate: s.tax.rate, leaving: l2?.emigrating }) === before);
+      const left = counter('population:left');
+      hours(10);
+      check('yüklenen sakin harita kenarına varıp bir kez ayrılır', left.n === 1 && !s.characters.some((c) => c.id === leaver.id), `${left.n}`);
+      left.off();
+      const paid = counter('crown:levyPaid');
+      hours(16);
+      check('yüklenen Krallık Vergisi vakti gelince bir kez ödenir', paid.n === 1 && !s.crown.notice, `${paid.n}`);
+      paid.off();
+      game.events.emit('ui:deliverDecree');
+      game.events.emit('ui:setTaxRate', { rate: 'standard' });
+      check('yüklenen ferman teslim edilir', !s.crown.decree && s.crown.delivered >= 1);
+    }
+
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();
@@ -472,6 +502,9 @@ const PAGE_HELPERS = () => {
       hours(6);
     }
     const sickBefore = s.stats.illnesses;
+    // (22. aşama) Uzun kıtlıkta umudunu yitiren sakinler köyü bilerek terk edebilir: onlar "kaybolan" sayılmaz
+    let emigrated = 0;
+    const offLeft = game.events.on('population:left', () => emigrated++);
     while (s.time.day < 13) hours(1);
     starve();
     let peakSick = 0;
@@ -495,7 +528,9 @@ const PAGE_HELPERS = () => {
     hours(48);
     const sickAfter = s.characters.filter((c) => c.illness).length;
     check('stok gelince kasaba toparlanır: hastalar iyileşir', sickAfter < Math.max(1, peakSick) && events.recovered + events.cured >= 1, `${peakSick} -> ${sickAfter} hasta`);
-    check('kriz sırasında kimse kaybolmaz', s.characters.length === pop && pop > 0, `${pop} sakin`);
+    offLeft();
+    const popEnd = s.characters.length + emigrated;
+    check('kriz sırasında kimse kaybolmaz (köyü bilerek terk edenler ayrı sayılır)', popEnd >= pop && pop > 0 && s.characters.length >= 3, `${pop} sakin · ${emigrated} sakin köyü terk etti`);
     return out;
   });
   const mon = await monitorReport(page);

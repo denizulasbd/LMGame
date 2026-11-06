@@ -90,3 +90,47 @@ function buildGoldenLanternRows(lit) {
 export function getGoldenLanternSprite(lit) {
   return getSprite(`building:goldenLantern:${lit ? 'lit' : 'day'}`, () => buildGoldenLanternRows(Boolean(lit)));
 }
+
+// ---------------------------------------------------------------------------
+// (22. aşama) Kraliyet Aslanlı Heykeli (2x2, 32x40): Kraliyet Beratı'yla dikilen anıt. Altın kuşaklı beyaz mermer kaide,
+// önünde kraliyet arması (taçlı kalkan) işli altın levha, üstünde taç giymiş oturan altın aslan; iki yanda kırmızı flamalar.
+// ---------------------------------------------------------------------------
+export const ROYAL_STATUE_ART = { width: 32, height: 40 };
+
+function buildRoyalStatueRows() {
+  const g = new CharGrid(ROYAL_STATUE_ART.width, ROYAL_STATUE_ART.height);
+  g.ellipse(16, 37.5, 14, 2.2, 'k');
+  // Kaide
+  g.rect(3, 22, 26, 3, 'K').hline(4, 27, 23, 'u').hline(4, 27, 24, 'q');
+  g.rect(4, 25, 24, 13, 'K').rect(5, 25, 22, 11, 'u').vline(26, 25, 35, 'q').vline(5, 25, 35, 'q');
+  g.hline(5, 26, 27, 'P').hline(5, 26, 28, 'Y').hline(5, 26, 35, 'q').hline(5, 26, 36, 'r');
+  // Altın levha ve arma (taçlı kalkan)
+  g.rect(11, 29, 10, 6, 'K').rect(12, 30, 8, 4, 'Y').hline(12, 19, 30, 'P');
+  g.rect(15, 30, 2, 3, 'o').set(15, 33, 'o').set(16, 33, 'C').set(14, 30, 'P').set(17, 30, 'P');
+  // Flamalar (iki köşede)
+  for (const x of [5, 26]) {
+    g.vline(x, 13, 22, 'K');
+    g.rect(x === 5 ? 6 : 23, 13, 3, 4, 'o').set(x === 5 ? 8 : 23, 17, 'o').hline(x === 5 ? 6 : 23, x === 5 ? 8 : 25, 13, 'C');
+    g.set(x, 12, 'P');
+  }
+  // Aslanın gövdesi (oturur, sağa dönük), kuyruğu
+  g.rect(15, 12, 10, 10, 'K').rect(16, 13, 8, 9, 'Y').hline(16, 23, 13, 'P').vline(23, 14, 21, 'O');
+  g.ellipse(21, 18, 3, 3, 'Y').hline(19, 23, 21, 'O');
+  g.line(25, 15, 27, 11, 'K').set(28, 10, 'O').set(27, 10, 'O').set(28, 9, 'P');
+  // Ön ayaklar
+  g.rect(10, 16, 4, 6, 'K').rect(11, 16, 2, 5, 'Y').hline(10, 14, 21, 'K').hline(11, 13, 20, 'P');
+  g.rect(14, 17, 3, 5, 'K').rect(15, 17, 1, 4, 'Y');
+  // Yele ve baş
+  g.ellipse(12, 10, 6, 6, 'K');
+  g.ellipse(12, 10, 5, 5, 'O');
+  g.ellipse(12, 10, 3.6, 3.6, 'Y');
+  g.ellipse(12, 11, 2.4, 2.2, 'P');
+  g.set(11, 10, 'K').set(13, 10, 'K').set(12, 12, 'x').hline(11, 13, 13, 'O');
+  // Taç
+  g.hline(9, 15, 4, 'K').hline(10, 14, 3, 'Y').set(10, 2, 'P').set(12, 1, 'P').set(14, 2, 'P').set(12, 2, 'o');
+  return g.toRows();
+}
+
+export function getRoyalStatueSprite() {
+  return getSprite('building:royalStatue', buildRoyalStatueRows);
+}

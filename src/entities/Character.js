@@ -7,6 +7,7 @@
 // 19. aşama: karakter huyu (quirk), son duyduğu dedikodu (lastNews), eşiyle akşam yemeği günü ve randevu zamanı.
 // 21. aşama: kişisel kese (coins) ve çanta (inventory: [{ kind, qty, name? }]; ekipman yuvalarından bağımsız,
 // systems/Citizens.js). Eski kayıtlarda kese yoksa başlangıç harçlığı verilir.
+// 22. aşama: köyü terk etmeye karar verdiyse yola çıktığı an ve çıkış karosu (emigrating: { since, exit }; DesertionSystem).
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { NEED_KEYS } from '../data/characters.js';
@@ -86,6 +87,7 @@ export class Character extends Entity {
     lastDateAt = null,
     coins = null,
     inventory = [],
+    emigrating = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -130,6 +132,7 @@ export class Character extends Entity {
     // 21. aşama: kişisel kese ve çanta (kayda girer; eski kayıtlarda başlangıç harçlığı)
     this.coins = Number.isFinite(coins) ? Math.max(0, Math.floor(coins)) : startingCoins(growsUpAt !== null);
     this.inventory = sanitizeInventory(inventory);
+    this.emigrating = emigrating && Number.isFinite(emigrating.since) ? { since: emigrating.since, exit: emigrating.exit ? { ...emigrating.exit } : null } : null;
     this.recall = null;
     this.flowerCrown = false;
     this.profile = buildTraitProfile(traits, { child: this.isChild });
@@ -474,6 +477,7 @@ export class Character extends Entity {
       lastDateAt: this.lastDateAt,
       coins: this.coins,
       inventory: this.inventory,
+      emigrating: this.emigrating,
     };
   }
 

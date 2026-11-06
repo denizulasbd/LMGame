@@ -51,6 +51,8 @@ import { RELIEF, REVOLT, PETITION_KINDS } from '../../data/citizens.js';
 import { trustValue, trustLevel } from '../../systems/Citizens.js';
 import { reliefStatus, trustWelfare } from '../../systems/TrustSystem.js';
 import { formatRemaining } from '../../systems/Petitions.js';
+import { TAX_RATES, TAX_RATE_KEYS, TAX, LEVY, DECREES, DECREE_ITEMS } from '../../data/crown.js';
+import { estimateTax, levyAmount, levyPlan, decreeStatus, reputationLevel } from '../../systems/Crown.js';
 
 const thumbnailCache = new Map();
 
@@ -89,6 +91,7 @@ export class BuildingPanel {
     this.luxury = el('div', { className: 'building-decrees building-luxury' });
     this.bell = el('div', { className: 'building-decrees building-bell' });
     this.trustBox = el('div', { className: 'building-decrees building-trust' }); // (21. aşama) Yönetim Güveni
+    this.crownBox = el('div', { className: 'building-decrees building-crown' }); // (22. aşama) iç vergi ve Krallık
     this.expedition = el('div', { className: 'building-decrees building-expedition' });
     this.inscriptions = el('div', { className: 'building-decrees building-inscriptions' });
     this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
@@ -131,6 +134,7 @@ export class BuildingPanel {
       this.research,
       this.harbor,
       this.luxury,
+      this.crownBox,
       this.trustBox,
       this.bell,
       this.expedition,
@@ -203,7 +207,8 @@ export class BuildingPanel {
         ? [JSON.stringify(state.luxury), state.resources.gold, Math.floor((state.buffs.spices ?? 0) / 60), Math.floor((state.buffs.goldBonus ?? 0) / 60), Math.floor((state.buffs.royalArchitects ?? 0) / 60), state.time.day, state.buildings.length].join(':')
         : '';
     const pickerKey = this.pickerFor === building.id ? this.workerCandidates(building, state).map((o) => `${o.character.id}:${o.character.name}:${o.level}:${o.pinnedTo}`).join(',') : '';
-    const bellKey = building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}:${Math.round(trustValue(state))}:${JSON.stringify(state.trust?.revolt?.rioters ?? null)}:${state.trust?.revolt?.raids?.length ?? 0}:${JSON.stringify(reliefStatus(state, 'food'))}:${JSON.stringify(reliefStatus(state, 'gold'))}:${(state.petitions?.list ?? []).map((p) => `${p.id}${p.status}${Math.floor((p.deadline - state.totalMinutes) / 60)}`).join(',')}` : '';
+    const crownKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.tax?.rate, state.tax?.last, Math.floor(((state.tax?.nextAt ?? 0) - state.totalMinutes) / 60), state.crown, Math.floor((state.crown?.nextLevyAt - state.totalMinutes) / 60), levyAmount(state), state.crown?.decree ? decreeStatus(state, state.crown.decree) : null, estimateTax(state), state.resources]) : '';
+    const bellKey = (building.type === 'fountain' || building.definition.civic ? crownKey : '') + (building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}:${Math.round(trustValue(state))}:${JSON.stringify(state.trust?.revolt?.rioters ?? null)}:${state.trust?.revolt?.raids?.length ?? 0}:${JSON.stringify(reliefStatus(state, 'food'))}:${JSON.stringify(reliefStatus(state, 'gold'))}:${(state.petitions?.list ?? []).map((p) => `${p.id}${p.status}${Math.floor((p.deadline - state.totalMinutes) / 60)}`).join(',')}` : '');
     // (16. aşama) keşif seferi (liman, belediye) ve kadim yazıtlar (Bilgelik Evi)
     const exploreKey =
       building.type === 'harbor' || building.type === 'townHall' || building.definition.academy
@@ -263,6 +268,7 @@ export class BuildingPanel {
     this.renderResearch(building, state);
     this.renderHarbor(building, state);
     this.renderLuxury(building, state);
+    this.renderCrown(building, state);
     this.renderTrust(building, state);
     this.renderBell(building, state);
     this.renderExpedition(building, state);
@@ -487,6 +493,75 @@ export class BuildingPanel {
         return { character: c, level: skill ? skillLevel(c, skill).level : 1, pinnedTo: other ? `${other.name}'a sabit` : '' };
       })
       .sort((a, b) => b.level - a.level || a.character.name.localeCompare(b.character.name, 'tr'));
+  }
+
+  /**
+   * (22. aşama) Belediye Konağı ve meydan havuzu: iç vergi kademesi ('ui:setTaxRate'), sıradaki tahsilat ve tahmini; Krallık
+   * İtibarı, sıradaki Krallık Vergisi (yoldaki tahsildar) ve süren Kraliyet Fermanı ('ui:deliverDecree' / 'ui:rejectDecree').
+   */
+  renderCrown(building, state) {
+    const show = (building.type === 'fountain' || Boolean(building.definition.civic)) && building.functional;
+    this.crownBox.hidden = !show;
+    if (!show) return;
+    const tax = state.tax;
+    const rate = TAX_RATES[tax.rate];
+    const est = estimateTax(state);
+    const buttons = TAX_RATE_KEYS.map((key) => {
+      const def = TAX_RATES[key];
+      const b = this.button(def.short, `${def.name}: ${def.description}`, () => this.events.emit('ui:setTaxRate', { rate: key }));
+      b.classList.add('tax-rate-button', `is-${key}`);
+      b.classList.toggle('is-active', key === tax.rate);
+      b.dataset.rate = key;
+      return b;
+    });
+    const last = tax.last ? `Son tahsilat (Gün ${tax.last.day}, ${TAX_RATES[tax.last.rate]?.short}): +${tax.last.gold} altın${Object.keys(tax.last.goods ?? {}).length ? `, öşür ${Object.values(tax.last.goods).reduce((a, b) => a + b, 0)} birim` : ''}` : 'Henüz tahsilat yapılmadı';
+    const cr = state.crown;
+    const rep = reputationLevel(cr.reputation);
+    const amount = cr.notice?.amount ?? levyAmount(state);
+    const plan = levyPlan(state, amount);
+    const levyLeft = formatRemaining(cr.nextLevyAt - state.totalMinutes);
+    const levyText = cr.notice
+      ? `Kraliyet Tahsildarı yolda! ${levyLeft} sonra ${amount} altın ${plan.ok ? (Object.keys(plan.goods).length ? '(altın yetmiyor: bir kısmı malla ödenecek)' : '(hazine hazır)') : `— ${plan.short} altın eksik: ödenemezse hazineye el konur!`}`
+      : `Sıradaki Krallık Vergisi ${levyLeft} sonra: yaklaşık ${amount} altın (seviye, nüfus ve Altın Çağ'la artar)`;
+    const decree = cr.decree;
+    const decreeNodes = [];
+    if (decree) {
+      const def = DECREES[decree.kind];
+      const st = decreeStatus(state, decree);
+      const needText = Object.entries(decree.need ?? {}).map(([r, v]) => `${RESOURCES[r].name} ${Math.min(state.resources[r] ?? 0, v)}/${v}`).join(' · ') || (def.kind === 'research' ? 'Süre içinde bir araştırma tamamla' : 'Depodaki bir usta işi eseri gönder');
+      const reward = decree.reward ? `Ödül: ${decree.reward.gold} altın${decree.reward.item ? ` + ${DECREE_ITEMS[decree.reward.item].name}` : ''}` : '';
+      const deliver = this.button('Teslim Et', st.ok ? 'Fermanı teslim et ve ödülü al' : st.reason, () => this.events.emit('ui:deliverDecree'));
+      deliver.classList.add('upgrade-button');
+      deliver.disabled = !st.ok;
+      const reject = this.button('Reddet', 'Fermanı reddet: Krallık para / erzak cezası keser, itibar düşer', () => this.events.emit('ui:rejectDecree'));
+      reject.classList.add('decree-reject');
+      decreeNodes.push(
+        el('div', { className: 'decree luxury-card royal-decree' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('decree'), alt: '' }), def.name, el('span', { className: 'decree-state', text: formatRemaining(decree.deadline - state.totalMinutes) })]),
+          el('div', { className: 'upgrade-text', text: `"${def.text}"` }),
+          el('div', { className: 'upgrade-text', text: needText }),
+          el('div', { className: 'upgrade-text', text: reward }),
+          el('div', { className: 'upgrade-row' }, [reject, deliver]),
+        ])
+      );
+    }
+    this.crownBox.replaceChildren(
+      el('div', { className: 'building-section-title', text: 'İç Vergi ve Öşür' }),
+      el('div', { className: `decree luxury-card tax-card is-${tax.rate}` }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL(rate.icon), alt: '' }), rate.name, el('span', { className: 'decree-state', text: `%${rate.percent}` })]),
+        el('div', { className: 'tax-rates' }, buttons),
+        el('div', { className: 'upgrade-text', text: rate.description }),
+        el('div', { className: 'upgrade-text', text: `Sıradaki tahsilat ${formatRemaining(tax.nextAt - state.totalMinutes)} sonra (${TAX.everyDays} günde bir, ${TAX.hour}:00): tahminen +${est.gold} altın${est.goods ? `, ${est.goods} birim öşür` : ''} (${est.payers} vergi veren)` }),
+        el('div', { className: 'upgrade-text', text: last }),
+      ]),
+      el('div', { className: 'building-section-title', text: 'Krallık' }),
+      el('div', { className: `decree luxury-card crown-card${cr.notice && !plan.ok ? ' is-revolt' : ''}` }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('crown'), alt: '' }), `Krallık İtibarı %${Math.round(cr.reputation)}`, el('span', { className: 'decree-state', text: rep.name })]),
+        el('div', { className: `upgrade-text${cr.notice ? ' is-active' : ''}`, text: levyText }),
+        el('div', { className: 'upgrade-text', text: `Ödenen vergi ${cr.paid}/${cr.levies} · teslim edilen ferman ${cr.delivered}${cr.statueRight ? " · Kraliyet Beratı: Aslanlı Heykel dikilebilir (İnşa Et → Peyzaj)" : ''}` }),
+      ]),
+      ...decreeNodes
+    );
   }
 
   /**

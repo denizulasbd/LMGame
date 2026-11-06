@@ -12,6 +12,8 @@
 //   expedition:departed / returned, civic:decreed, building:mended
 //   19. aşama: social:partyStarted (düğün kutlaması), social:homeFreed (boşalan ev), gossip:spread (yayılan haber)
 //   21. aşama: petition:opened / resolved (dilekçeler), revolt:started / ended / raidEnded (isyan ve yağma), relief:given
+//   22. aşama: tax:rateChanged / collected (iç vergi), crown:levyNotice / levyPaid / levyFailed (Krallık Vergisi), crown:decree /
+//              decreeDelivered / decreeFailed (Kraliyet Fermanları), exodus:started / ended, exodus:leaving, population:left
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
@@ -22,6 +24,7 @@ import { SKILLS } from '../data/skills.js';
 import { formatTownTitle } from './TownStatus.js';
 import { cargoValue } from './HarborSystem.js';
 import { PETITION_KINDS } from '../data/citizens.js';
+import { TAX_RATES, DECREE_ITEMS } from '../data/crown.js';
 import { genitive } from '../utils/turkish.js';
 
 // İşlenmiş malların ilk üretimi
@@ -193,6 +196,25 @@ export class JournalSystem {
       }),
       on('revolt:ended', ({ hours }) => this.log(`İsyan yatıştı (${hours} saat sürdü); sakinler işlerinin başına döndü`, 'trust')),
       on('relief:given', ({ kind, cost }) => this.log(kind === 'food' ? `Halka acil erzak dağıtıldı (${cost} yiyecek değeri)` : `Halka altın dağıtıldı (${cost} altın)`, kind === 'food' ? 'food' : 'coin')),
+      // 22. aşama: iç vergi, Krallık Vergisi, Kraliyet Fermanları, terk ediş
+      on('tax:rateChanged', ({ def }) => this.log(`Belediye iç vergiyi değiştirdi: ${def.name}`, def.icon)),
+      on('tax:collected', ({ def, gold, goods }) => {
+        const units = Object.values(goods).reduce((a, b) => a + b, 0);
+        this.log(def.percent ? `İç vergi tahsil edildi (${def.name}): Kasaba Hazinesi'ne +${gold} altın${units ? `, kilere ${units} birim öşür` : ''}` : `${def.name}: bu dönem kimseden vergi alınmadı`, 'coin');
+      }),
+      on('crown:levyNotice', ({ amount }) => this.log(`Kraliyet Tahsildarı yolda: iki gün sonra Krallık Vergisi ${amount} altın`, 'collector')),
+      on('crown:levyPaid', ({ amount, goods }) => this.log(`Krallık Vergisi ödendi (${amount} altın${Object.keys(goods).length ? `; bir kısmı ${Object.entries(goods).map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`).join(', ')} ile` : ''})`, 'collector')),
+      on('crown:levyFailed', ({ amount, seized, goods }) => {
+        const taken = Object.entries(goods).map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`).join(', ');
+        this.log(`ALARM · Krallık Vergisi (${amount} altın) ödenemedi: tahsildar hazinedeki ${seized} altına el koydu${taken ? `, depodan ${taken} çekti` : ''}`, 'collector');
+      }),
+      on('crown:decree', ({ def }) => this.log(`Kraliyet Fermanı geldi: ${def.name}`, 'decree')),
+      on('crown:decreeDelivered', ({ def, gold, item }) => this.log(`Ferman teslim edildi: ${def.name} · Krallık ödülü +${gold} altın${item ? ` ve ${DECREE_ITEMS[item].name}` : ''}`, 'decree')),
+      on('crown:decreeFailed', ({ def, outcome, gold, food }) => this.log(`Ferman ${outcome === 'rejected' ? 'reddedildi' : 'yerine getirilmedi'}: ${def.name} · Krallık cezası ${gold} altın${food ? `, ${food} yiyecek` : ''}`, 'decree')),
+      on('exodus:started', () => this.log('ALARM · Umut tükendi: sakinler köyü terk etmeyi konuşuyor, göçmenler artık gelmiyor', 'bundle')),
+      on('exodus:ended', () => this.log('Kasabaya umut döndü: terk edişler durdu', 'heart')),
+      on('exodus:leaving', ({ names }) => this.log(`${names.join(' ve ')} bohçasını topladı, köyü terk etmek için yola çıktı`, 'bundle')),
+      on('population:left', ({ character, coins, items }) => this.log(`${character.name} kesesindeki ${coins} altın ve çantasındaki ${items} eşyayla köyden temelli ayrıldı. Geride boş bir ev ve hüzün kaldı`, 'bundle')),
       // 12. aşama: Bilgelik Evi, okul, liman ve harika
       on('research:started', ({ research }) => this.log(`Bilgelik Evi'nde araştırma başladı: ${research.name}`, 'book')),
       on('research:completed', ({ research }) => this.log(`Araştırma tamamlandı: ${research.name}`, research.icon)),

@@ -1163,6 +1163,12 @@ Object.assign(ICONS, {
     '.K.......',
     'K........',
   ],
+  // 22. aşama: Kraliyet Tahsildarı (mühürlü kese ve şapka), Kraliyet Fermanı (kırmızı mühürlü rulo), taç, Aslanlı Heykel, bohça
+  collector: ['..KKKKK..', '.KnnnnnK.', 'KKKKKKKKK', '...KPK...', '..KdddK..', '.KdeYedK.', 'KddYoYddK', 'KdeeYeedK', '.KKKKKKK.'],
+  decree: ['.KKKKKKK.', 'KeSSSSSeK', 'KKSSSSSKK', '.KsKKKsK.', '.KsSSSsK.', '.KsKKoKK.', '.KsSooo.K', 'KeSSoooeK', '.KKKKKKK.'],
+  crown: ['.........', 'P...P...P', 'PP.PYP.PP', 'PYPYYYPYP', 'PYYYoYYYP', 'KPPPPPPPK', 'KYYYYYYYK', '.KKKKKKK.', '.........'],
+  royalStatue: ['..P.P.P..', '..PYYYP..', '.KOOOOK..', 'KOYPYOKK.', 'KOYYYOYYK', '.KOOOKYYK', '.KKKKKKKK', 'KuuPPPuuK', 'KKKKKKKKK'],
+  bundle: ['....K....', '...KoK...', '..KoooK..', '.KoBoBoK.', 'KoBoooBoK', 'KoooBoooK', '.KoBoBoK.', '..KoooK..', '...KKK...'],
   // 21. aşama: dilekçe (parşömen), Yönetim Güveni (kalkan), isyan meşalesi, kişisel kese, hatıra, sokak feneri, yağma çuvalı
   scroll: ['.KKKKKKK.', 'KeSSSSSeK', '.KsSSSSK.', '.KsKKKsK.', '.KsSSSsK.', '.KsKKSsK.', '.KsSSSsK.', 'KeSSSSSeK', '.KKKKKKK.'],
   trust: ['.KKKKKKK.', 'KBBBuBBBK', 'KBBuPuBBK', 'KBBuPuBBK', 'KBuPPPuBK', '.KBuPuBK.', '.KBBuBBK.', '..KBBBK..', '...KKK...'],
@@ -1318,6 +1324,10 @@ const BUBBLE_ICONS = {
   torch: ['..O.O..', '.OPYO..', '..OPO..', '..KXK..', '...w...', '...w...'],
   purse: ['..K.K..', '...K...', '..KdK..', '.KdYdK.', 'KddPddK', '.KKKKK.'],
   loot: ['..KXK..', '.KXXXK.', 'KXEXXXK', 'KXXXEXK', '.KKKKKP', '....PYP'],
+  // 22. aşama: köyü terk edenin bohçası (değnek ucunda kırmızı puantiyeli çıkın), tahsildar ve ferman
+  bundle: ['...K..K', '..KoK.K', '.KoBoKK', 'KoooBKw', '.KoBoKw', '..KKK.w'],
+  collector: ['.KKKKK.', 'KnnnnnK', '..KPK..', '.KdYdK.', 'KddoddK', '.KKKKK.'],
+  decree: ['KKKKKK.', 'KSSSSK.', 'KsKKsK.', 'KsSSsKo', 'KSSSSoo', 'KKKKKoo'],
 };
 
 export const BUBBLE_WIDTH = 11;

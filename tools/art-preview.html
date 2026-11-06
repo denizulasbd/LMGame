@@ -54,6 +54,35 @@
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
 
+    // --- 22. aşama: Krallık — Kraliyet Aslanlı Heykeli, tahsildar ve ferman simgeleri, bohça balonu ---
+    {
+      const looks = [
+        { hair: 'long', hairColor: 'auburn', skin: 'light', shirt: 'rose', pants: 'navy' },
+        { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'forest', pants: 'brown' },
+        { hair: 'bun', hairColor: 'blonde', skin: 'light', shirt: 'sky', pants: 'plum' },
+      ];
+      const tiny = (w, h, layers) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#4a9a46';
+        ctx.fillRect(0, 0, w, h);
+        for (const [sprite, x, y] of layers) ctx.drawImage(sprite, Math.round(x), Math.round(y - sprite.height));
+        return canvas;
+      };
+      show('Kraliyet Aslanlı Heykeli (2x2): mermer kaide, taçlı kalkan arması, flamalar ve taç giymiş altın aslan', [['royalStatue', getStructureSprite('royalStatue', {})]], 6);
+      show('22. aşama simgeleri: Kraliyet Tahsildarı, Kraliyet Fermanı (mühürlü rulo), Krallık tacı, Aslanlı Heykel, bohça', ['collector', 'decree', 'crown', 'royalStatue', 'bundle'].map((n) => [n, getIconSprite(n)]), 8);
+      show('Yeni balonlar: köyü terk edenin bohçası, tahsildar kesesi, ferman', ['bundle', 'collector', 'decree'].map((n) => [n, getBubbleSprite(n)]), 8);
+      const statue = getStructureSprite('royalStatue', {});
+      const hall = getStructureSprite('townHall', { frame: 0 });
+      show('Krallık sahneleri: heykel önünde gururlanan sakinler, Belediye Konağı önünde tahsildar uyarısı, bohçasıyla köyü terk eden', [
+        ['heykel', tiny(80, 64, [[statue, 24, 50], [getCharacterSprite(looks[0], 'up', 'idle0'), 14, 62], [getBubbleSprite('heart'), 15, 44], [getCharacterSprite(looks[2], 'up', 'idle1'), 56, 62], [getBubbleSprite('sparkle'), 57, 44]])],
+        ['tahsildar uyarısı', tiny(Math.max(80, hall.width + 16), hall.height + 24, [[hall, 8, hall.height + 6], [getCharacterSprite(looks[1], 'down', 'idle0'), hall.width / 2, hall.height + 22], [getBubbleSprite('collector'), hall.width / 2 + 1, hall.height + 4]])],
+        ['köyü terk ediyor', tiny(64, 48, [[getCharacterSprite(looks[0], 'right', 'walk0'), 16, 42], [getBubbleSprite('bundle'), 17, 24], [getCharacterSprite(looks[1], 'right', 'walk1'), 34, 42]])],
+      ], 4);
+    }
+
     // --- 21. aşama: kişisel kese ve çanta, vatandaş dilekçeleri, Yönetim Güveni, isyan ve yağma ---
     {
       const looks = [
