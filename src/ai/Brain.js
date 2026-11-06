@@ -23,6 +23,13 @@
 // 19. aşama: düğün kutlamasına davetliyse önce meydana koşar (yeni eve taşınmadan da önce); evliyse akşam (18:00-20:30)
 // acıkınca eşini evde birlikte yemeğe çağırır; bekârsa sevgilisini ya da hoşlandığı kişiyi randevuya (çardak, han, yan
 // yana iki bank) çağırır; boş zamanda huyuna göre (Hayvansever, Kitap Kurdu, Müzisyen, Doğa Tutkunu) etkinlik seçer.
+//
+// 21. aşama (vatandaşlık katmanı; kararlarını kendi rastgele sayı üretecinden verir, eski kararların sırası bozulmaz):
+//   - Acıkınca çantasında yiyecek varsa yürümeden çantasından yer ('snack'; çok açken her zaman, değilse yarı yarıya)
+//   - Üşüttüyse çantasındaki şifalı otu demler ('herbTea'), keyfi düşünce hatırasına bakar ('keepsake')
+//   - Boş zamanında kesesi ve çantasında yeri varsa Pazar Yeri'ne alışverişe gider ('shop'; günde en çok bir kez)
+//   - İsyancıysa gündüz (08:00-20:00) işe gitmez: meydanda öfkeyle toplanır ('protest') ya da yağma baskınındaysa
+//     depoya yürür ('loot'). Yemek ve uyku önce gelir; şenlik, kutlama ve toplanma zili isyandan önce gelir.
 import { ACTIVITIES } from '../data/activities.js';
 import { BENCH_TYPES, BUILDINGS } from '../data/buildings.js';
 import { MEAL_FOOD_COST } from '../data/resources.js';
@@ -36,6 +43,8 @@ import { healSpeedMultiplier } from '../systems/ResearchSystem.js';
 import { QUIRKS, QUIRK_RULES, DATING, HOME_DINNER } from '../data/social.js';
 import { partnerOf, canRomance } from '../systems/RelationshipSystem.js';
 import { genitive } from '../utils/turkish.js';
+import { SHOP, SNACK, REVOLT } from '../data/citizens.js';
+import { foodItemOf, countItem, roomFor, isRioter, raidOf } from '../systems/Citizens.js';
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
 const PLAYGROUND_TYPES = ['fountain', 'campfire', 'inn', 'monument'];
@@ -73,7 +82,8 @@ export class Brain {
    *   relationships: import('../systems/RelationshipSystem.js').RelationshipSystem,
    *   crafting: import('../systems/CraftingSystem.js').CraftingSystem }} services
    */
-  constructor(world, rng, { economy, jobs, relationships, crafting, health, research }) {
+  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null }) {
+    this.citizenRng = citizens?.rng ?? rng; // (21. aşama) vatandaşlık kararları kendi üretecinden
     this.health = health;
     this.research = research;
     this.world = world;
@@ -105,10 +115,14 @@ export class Brain {
       c.relocating = false;
     }
     if (needs.hunger < 15) {
+      const snack = this.planSnack(c, true);
+      if (snack) return snack;
       const plan = this.planEat(c);
       if (plan) return plan;
     }
     if (c.illness) {
+      const tea = this.planHerbTea(c);
+      if (tea) return tea;
       const plan = this.planHeal(c);
       if (plan) return plan;
       if (!bedtime && needs.energy < ILLNESS.restBelow) {
@@ -139,11 +153,18 @@ export class Brain {
       if (plan) return plan;
     }
     if (needs.hunger < profile.thresholds.hunger) {
+      const snack = this.planSnack(c, false);
+      if (snack) return snack;
       const plan = this.planEat(c);
       if (plan) return plan;
     }
     if (!c.isChild) {
       const plan = this.planEquip(c);
+      if (plan) return plan;
+    }
+    // (21. aşama) İsyancı gündüz işe gitmez: meydanda toplanır ya da yağmaya çıkar
+    if (this.world.state.trust?.revolt && isRioter(this.world.state, c)) {
+      const plan = this.planRiot(c, hour);
       if (plan) return plan;
     }
 
@@ -169,8 +190,86 @@ export class Brain {
       const plan = this.planSchool(c, hour);
       if (plan) return plan;
     }
+    // (21. aşama) Çantadaki hatıra ve pazar alışverişi
+    if (!c.isChild) {
+      const plan = this.planKeepsake(c) ?? this.planShop(c);
+      if (plan) return { ...plan, onBreak };
+    }
     const leisure = this.planLeisure(c, hour);
     return leisure ? { ...leisure, onBreak } : this.planWait();
+  }
+
+  // ---------------------------------------------------------------------------
+  // (21. aşama) Kişisel çanta, alışveriş, isyan
+  // ---------------------------------------------------------------------------
+
+  /** Çantadan yemek (urgent: çok aç; değilse yarı yarıya). */
+  planSnack(c, urgent) {
+    const kind = foodItemOf(c);
+    if (!kind) return null;
+    if (!urgent && this.citizenRng.next() >= SNACK.chance) return null;
+    return { activity: 'snack', bagItem: kind, duration: this.durationFor('snack') };
+  }
+
+  /** Üşüten sakin çantasındaki şifalı otu demler. */
+  planHerbTea(c) {
+    if (!c.illness || countItem(c, 'herb') <= 0) return null;
+    return { activity: 'herbTea', duration: this.durationFor('herbTea') };
+  }
+
+  /** Keyfi düşen sakin çantasındaki hatırasına bakar (6 saatte bir). */
+  planKeepsake(c) {
+    if (c.needs.fun >= SNACK.keepsakeBelowFun || countItem(c, 'souvenir') <= 0) return null;
+    const now = this.world.state.totalMinutes;
+    if (c.lastKeepsakeAt !== undefined && c.lastKeepsakeAt !== null && now - c.lastKeepsakeAt < SNACK.keepsakeCooldownMinutes) return null;
+    c.lastKeepsakeAt = now;
+    return { activity: 'keepsake', duration: this.durationFor('keepsake') };
+  }
+
+  /** Pazar Yeri'nde alışveriş: kesesi yetiyor, çantasında yer varsa, günde en çok bir kez. */
+  planShop(c) {
+    if (c.role || (c.coins ?? 0) < SHOP.minCoins) return null;
+    const now = this.world.state.totalMinutes;
+    if (c.lastShopAt !== undefined && c.lastShopAt !== null && now - c.lastShopAt < SHOP.cooldownMinutes) return null;
+    const markets = this.world.getCompleted('market');
+    if (markets.length === 0 || (roomFor(c, 'fruit') <= 0 && roomFor(c, 'souvenir') <= 0)) return null;
+    if (this.citizenRng.next() >= SHOP.chance) return null;
+    const origin = this.originTile(c);
+    for (const market of markets) {
+      const doors = this.world.getSpots(market);
+      if (doors.length === 0) continue;
+      const spot = this.nearest(doors, c);
+      if (!this.world.findPath(origin, spot)) continue;
+      c.lastShopAt = now;
+      return { activity: 'shop', buildingId: market.id, spot, faceTarget: market.center, duration: this.durationFor('shop') };
+    }
+    return null;
+  }
+
+  /** İsyancı: yağma baskınındaysa depoya, değilse meydanda (havuz, ateş; yoksa kiler önü) öfkeli toplanma. */
+  planRiot(c, hour) {
+    if (c.isChild || c.away || hour < REVOLT.hours[0] || hour >= REVOLT.hours[1]) return null;
+    const state = this.world.state;
+    const raid = raidOf(state, c);
+    if (raid && !raid.done.includes(c.id)) {
+      const target = this.world.getBuilding(raid.targetId);
+      const doors = target ? this.world.getSpots(target) : [];
+      if (doors.length) {
+        const spot = this.nearest(doors, c);
+        if (this.world.findPath(this.originTile(c), spot)) {
+          return { activity: 'loot', buildingId: target.id, spot, faceTarget: target.entrancePoint ?? target.center, raidId: raid.id, duration: this.durationFor('loot') };
+        }
+      }
+    }
+    const venue = this.world.getCompleted('fountain')[0] ?? this.world.getCompleted('campfire')[0] ?? null;
+    if (venue) {
+      const plan = this.planGathering(c, venue, null, 'festival');
+      if (plan) return { ...plan, activity: 'protest', duration: this.durationFor('protest') };
+    }
+    const storage = this.world.getCompleted('storage')[0];
+    const doors = storage ? this.world.getSpots(storage) : [];
+    if (doors.length) return { activity: 'protest', buildingId: storage.id, spot: this.nearest(doors, c), faceTarget: storage.center, duration: this.durationFor('protest') };
+    return null;
   }
 
   /** Boş zaman etkinliğini yarıda kesmeyi gerektiren bir durum var mı? */

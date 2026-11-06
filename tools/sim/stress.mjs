@@ -90,5 +90,11 @@ console.log(
     `aşamalar ${results.map((r) => `${r.seed}:${r.data?.monitor.golden?.stage ?? '-'}`).join(' ')} · Altın Çağ günleri ${results.map((r) => r.data?.monitor.golden?.since ?? '-').join(',')} · ` +
     `çan ${ga((g) => g.chimes)} · Çağ Kutlaması ${ga((g) => g.celebrations)}`
 );
+const cz = (f) => sum((d) => (d.monitor.citizens ? f(d.monitor.citizens) : 0));
+console.log(
+  `(21. aşama) isyan ${cz((z) => z.revolts)} (${cz((z) => z.revoltHours)} saat) · yağma ${cz((z) => z.raids)} · en düşük güven ${results.map((r) => `${r.seed}:${r.data?.monitor.citizens?.trustMin ?? '-'}`).join(' ')} · ` +
+    `dilekçe ${cz((z) => z.petitions.made)} (karşılanan ${cz((z) => z.petitions.fulfilled)}, reddedilen ${cz((z) => z.petitions.rejected)}, süresi dolan ${cz((z) => z.petitions.expired)}) · ` +
+    `yevmiye ${cz((z) => z.wages)} altın · alışveriş ${cz((z) => z.purchases)} · çantadan yemek ${cz((z) => z.bagMeals)} · keselerde ${cz((z) => z.coins)} altın, çantalarda ${cz((z) => z.items)} eşya`
+);
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

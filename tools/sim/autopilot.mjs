@@ -13,7 +13,10 @@
 // davranışları, en düşük nüfus ve evsizler; bekçinin sosyal sıkışma raporu (taşınamayan / ayrı kalan çift) çıkış kodunu etkiler.
 // (20. aşama) Ulu Saat Kulesi'ni Kasaba seviyesinde ve 20 sakinle kurar, aşamaları kaynak ve Kadim Dişli yettikçe başlatır;
 // Altın Çağ'da Mermer Çeşme ve Altın Çağ Feneri diker, tüccardan antik kitap ve nadir tohum alır; aşama günlerini, dökülen
-// dişlileri, baş ustayı, çanları ve Tarihçe'yi raporlar.
+// dişlileri, baş ustayı, çanları ve Tarihçe'yi raporlar. (21. aşama) Vatandaş dilekçelerini yanıtlar: fidan, bank, sağlam alet
+// ve meydanda buluşma isteklerini bedelini ödeyip hemen karşılar ("Hemen Karşıla"), ötekileri kabul edip yerine getirmeye
+// çalışır (kışlık stok için ek kesim / toplama emri, araştırma, antik kitap); güven düşerse acil erzak / altın dağıtır.
+// Güveni, dilekçe sonuçlarını, isyanı, yevmiyeleri, alışverişi ve çantalardaki eşyaları raporlar.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
@@ -275,6 +278,40 @@ await page.evaluate((passive) => {
     const res = s.resources;
     window.__decide();
     window.__stats.minWelfare = Math.min(window.__stats.minWelfare, s.town.welfare ?? 100);
+    // (21. aşama) Vatandaş dilekçeleri ve Yönetim Güveni
+    {
+      const PT = window.__petitions;
+      for (const p of [...s.petitions.list]) {
+        const grant = PT.grantStatus(s, p, s.equipment.sturdyTool ?? 0);
+        const spare = p.kind !== 'tool' || (s.equipment.sturdyTool ?? 0) > 0 || (res.iron >= 12 && res.wood >= 30);
+        if (grant.available && grant.ok && spare) {
+          game.events.emit('ui:grantPetition', { id: p.id });
+          if (!s.petitions.list.includes(p)) continue;
+        }
+        if (p.status !== 'accepted') game.events.emit('ui:acceptPetition', { id: p.id });
+        if (p.kind === 'stock' && s.time.hour >= 6 && s.time.hour < 18) {
+          if (res.wood < p.target.wood && scene.jobs.jobs.filter((j) => j.type === 'chop').length < 6) {
+            let made = 0;
+            for (let r = 2; r < 26 && made < 3; r++) {
+              for (let dy = -r; dy <= r && made < 3; dy++) {
+                for (let dx = -r; dx <= r && made < 3; dx++) {
+                  if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+                  const x = cx + dx;
+                  const y = cy + dy;
+                  if (!['oak', 'pine'].includes(map.getObject(x, y)) || !world.getApproachSpots(x, y).length) continue;
+                  if (scene.jobs.designate(x, y)) made++;
+                }
+              }
+            }
+          }
+        }
+      }
+      // Güven düşerse (ya da isyan çıkarsa) acil dağıtım
+      const T = window.__trust;
+      if (s.trust.revolt || s.trust.value < 40) {
+        for (const kind of ['food', 'gold']) if (T.reliefStatus(s, kind).ok) game.events.emit('ui:relief', { kind });
+      }
+    }
     if (s.time.hour < 6 || s.time.hour >= 18) return;
 
     // Toplama emirleri
@@ -478,6 +515,8 @@ await page.evaluate(async () => {
   window.__adventures = (await import('/src/data/exploration.js')).ADVENTURES;
   window.__mwMax = (await import('/src/data/masterpieces.js')).MASTERWORK.maxExhibitHappiness;
   window.__buildings = BUILDINGS;
+  window.__petitions = await import('/src/systems/Petitions.js');
+  window.__trust = await import('/src/systems/TrustSystem.js');
 });
 
 function summary() {
@@ -629,6 +668,14 @@ console.log(
     `boşalan ev ${so.homesFreed} · dedikodu ${so.gossip} (dolaşan haber ${so.news}) · müzik ${so.serenades} · hayvan sevme ${so.cuddles} · kitap ${so.books} · ` +
     `huylar ${JSON.stringify(so.quirks)} · nüfus en az ${so.minPop} · en çok evsiz ${so.homelessMax} · sosyal sıkışma ${so.stuck.length}${so.stuck.length ? `: ${so.stuck.slice(0, 3).join(' | ')}` : ''}`
 );
+{
+  const z = mon.citizens;
+  const P = z.petitions;
+  console.log(
+    `(21. aşama) Yönetim Güveni %${z.trust} (en az %${z.trustMin}, en çok %${z.trustMax}) · isyan ${z.revolts} (${z.revoltHours} saat) · yağma ${z.raids} (${z.lootedGoods} mal, ${z.lootedGold} altın) · acil dağıtım ${z.reliefs} · ` +
+      `dilekçe ${P.made} (karşılanan ${P.fulfilled}, reddedilen ${P.rejected}, süresi dolan ${P.expired}, açık ${P.open}; kabul ${P.accepted}) · yevmiye ${z.wages} altın · alışveriş ${z.purchases} · çantadan yemek ${z.bagMeals} · keselerde ${z.coins} altın, çantalarda ${z.items} eşya`
+  );
+}
 console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);
 for (const st of mon.stuck.slice(0, 10)) console.log(`  takıldı: G${st.day} ${st.hour}:00 ${st.name} @${st.tile} ${st.reason} (${st.task ?? '-'}/${st.phase ?? '-'}: ${st.label})`);
 for (const b of mon.broken.slice(0, 10)) console.log(`  referans: ${b}`);

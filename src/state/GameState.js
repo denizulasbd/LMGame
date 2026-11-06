@@ -16,6 +16,8 @@ import { RELICS } from '../data/luxury.js';
 import { MASTERPIECES } from '../data/masterpieces.js';
 import { INSCRIPTIONS } from '../data/exploration.js';
 import { emptyExploration } from '../systems/Exploration.js';
+import { emptyTrust, emptyPetitions } from '../systems/Citizens.js';
+import { PETITION_KINDS, TRUST } from '../data/citizens.js';
 import { SEASON_FESTIVALS } from '../data/festivals.js';
 import { WEATHER_TYPES } from '../data/weather.js';
 import { Character } from '../entities/Character.js';
@@ -97,6 +99,14 @@ export class GameState {
       petCuddles: 0, // hayvanseverlerin kedi / köpek okşaması
       booksRead: 0, // kitap kurtlarının okuma molaları
       homesFreed: 0, // evlenen çift taşınınca göçmenlere açılan evler
+      wagesPaid: 0, // (21. aşama) sakinlerin keselerine ödenen toplam yevmiye
+      purchases: 0, // pazardan / handan alınan eşyalar
+      bagMeals: 0, // çantadan yenen yiyecekler
+      revolts: 0, // çıkan isyanlar
+      raids: 0, // yağma baskınları
+      lootedGoods: 0, // yağmalanan mal (birim)
+      lootedGold: 0, // yağmalanan altın
+      reliefs: 0, // acil erzak / altın dağıtımı
     };
     // Hayvanlar (AnimalSystem, 11. aşama): yaban hayatı (tavşan, geyik) ve kasaba kedileri / köpekleri.
     // animalMeta: wildlifeSeeded yaban hayatı yerleştirildi mi, lastPetDay son evcil hayvanın geldiği gün
@@ -145,6 +155,11 @@ export class GameState {
     // Tarihçe Kütüğü: kurucular, ilk evlenen çift, ilk usta işi eser, kuleye verilen emek ve baş usta, kulenin aşamaları
     this.goldenAge = emptyGoldenAge();
     this.chronicle = emptyChronicle();
+    // (21. aşama) Yönetim Güveni ve isyan (TrustSystem): { value 0-100, lowSince, revolt: { since, rioters, raids, ... },
+    // revolts, relief: { tür: son dağıtım dakikası }, eventDays, min } ve vatandaş dilekçeleri (PetitionSystem):
+    // { list: açık dilekçeler, nextId, nextAt, log: sonuçlananlar, sayaçlar }
+    this.trust = emptyTrust();
+    this.petitions = emptyPetitions();
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -212,6 +227,8 @@ export class GameState {
       social: this.social,
       goldenAge: this.goldenAge,
       chronicle: this.chronicle,
+      trust: this.trust,
+      petitions: this.petitions,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -305,6 +322,9 @@ export class GameState {
     // Tarihçe sakinlerden, evliliklerden ve eserlerden çıkarılır (GoldenAgeSystem)
     next.goldenAge = restoreGoldenAge(data.goldenAge);
     next.chronicle = restoreChronicle(data.chronicle);
+    // 21. aşamadan eski kayıtlarda güven ve dilekçe yoktur: güven %75 başlar (sakinlere başlangıç harçlığı Character'da)
+    next.trust = restoreTrust(data.trust);
+    next.petitions = restorePetitions(data.petitions);
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
@@ -330,6 +350,49 @@ export class GameState {
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
+}
+
+/** (21. aşama) Kayıttaki Yönetim Güveni: değer sınırlanır, isyan yalnızca geçerliyse sürer. */
+function restoreTrust(data) {
+  const out = emptyTrust();
+  if (!data || typeof data !== 'object') return out;
+  const n = Number(data.value);
+  out.value = Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : TRUST.start;
+  out.min = Number.isFinite(data.min) ? Math.min(100, Math.max(0, data.min)) : out.value;
+  out.lowSince = Number.isFinite(data.lowSince) ? data.lowSince : null;
+  out.revolts = Math.max(0, Math.floor(Number(data.revolts) || 0));
+  for (const [k, v] of Object.entries(data.relief ?? {})) if (Number.isFinite(v)) out.relief[k] = v;
+  for (const [k, v] of Object.entries(data.eventDays ?? {})) if (Number.isFinite(v)) out.eventDays[k] = v;
+  const r = data.revolt;
+  if (r && Number.isFinite(r.since) && Array.isArray(r.rioters)) {
+    const ids = (list) => (Array.isArray(list) ? list.filter(Number.isFinite) : []);
+    out.revolt = {
+      since: r.since,
+      rioters: ids(r.rioters),
+      raids: (Array.isArray(r.raids) ? r.raids : []).filter((x) => x && Number.isFinite(x.targetId) && Array.isArray(x.members)).map((x) => ({ ...x, members: ids(x.members), done: ids(x.done) })),
+      nextRaidAt: Number.isFinite(r.nextRaidAt) ? r.nextRaidAt : r.since,
+      nextJoinAt: Number.isFinite(r.nextJoinAt) ? r.nextJoinAt : r.since,
+      nextRaidId: Math.max(1, Math.floor(Number(r.nextRaidId) || 1)),
+      looted: { ...(r.looted ?? {}) },
+    };
+  }
+  out.lastLoot = data.lastLoot && typeof data.lastLoot === 'object' ? { ...data.lastLoot } : null;
+  return out;
+}
+
+/** (21. aşama) Kayıttaki dilekçeler: bilinmeyen türler atlanır. */
+function restorePetitions(data) {
+  const out = emptyPetitions();
+  if (!data || typeof data !== 'object') return out;
+  out.list = (Array.isArray(data.list) ? data.list : [])
+    .filter((p) => p && PETITION_KINDS[p.kind] && Number.isFinite(p.id) && Number.isFinite(p.characterId) && Number.isFinite(p.deadline))
+    .map((p) => ({ ...p, status: p.status === 'accepted' ? 'accepted' : 'open', baseline: { ...(p.baseline ?? {}) } }));
+  const maxId = out.list.reduce((m, p) => Math.max(m, p.id), 0);
+  out.nextId = Math.max(maxId + 1, Number(data.nextId) || 1);
+  out.nextAt = Number.isFinite(data.nextAt) ? data.nextAt : null;
+  out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && typeof l.text === 'string').slice(-12);
+  for (const k of ['fulfilled', 'rejected', 'expired', 'accepted', 'made']) out[k] = Math.max(0, Math.floor(Number(data[k]) || 0));
+  return out;
 }
 
 const STAMP = (v) => (v && Number.isFinite(v.day) ? { ...v } : null);
@@ -483,6 +546,13 @@ function sanitizeReferences(next) {
       }
     }
     if (c.parentIds.some((id) => id === c.id || !people.has(id))) c.parentIds = c.parentIds.filter((id) => id !== c.id && people.has(id));
+  }
+  // (21. aşama) kayıp sakine ait dilekçe ve isyancılar atlanır; yağma hedefi yıkılmışsa baskın biter
+  next.petitions.list = next.petitions.list.filter((p) => people.has(p.characterId));
+  const revolt = next.trust.revolt;
+  if (revolt) {
+    revolt.rioters = revolt.rioters.filter((id) => people.has(id));
+    revolt.raids = revolt.raids.filter((r) => buildings.has(r.targetId)).map((r) => ({ ...r, members: r.members.filter((id) => people.has(id)) })).filter((r) => r.members.length > 0);
   }
   const residents = new Map();
   for (const c of next.characters) if (c.homeId !== null) residents.set(c.homeId, (residents.get(c.homeId) ?? 0) + 1);

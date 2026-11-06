@@ -59,6 +59,8 @@ export const TOWN_BUFFS = {
   harvestFeast: { name: 'Büyük Hasat Bayramı', icon: 'harvest', hours: 9, friendship: 1.4, funDecay: 0.5, happiness: 5 },
   lightsNight: { name: 'Işıklar Gecesi', icon: 'snowman', hours: 9, friendship: 1.5, funDecay: 0.4, happiness: 6 },
   seasonCheer: { name: 'Mevsim Coşkusu', icon: 'sparkle', hours: 24, workSpeed: 1.15, funDecay: 0.8, happiness: 6 },
+  // 21. aşama: bir vatandaş dilekçesi karşılanınca (PetitionSystem) kasaba bir gün "sesimiz duyuldu" der
+  heard: { name: 'Sesimiz Duyuldu', icon: 'scroll', hours: 24, happiness: 3 },
 };
 
 // Handa sıcak yemek yiyen sakinin kişisel bonusu: bu kadar oyun saati boyunca yavaş acıkır

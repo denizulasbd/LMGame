@@ -5,11 +5,14 @@
 // 9. aşama: aile bağları (partnerId, married, parentIds), çocukluk (growsUpAt: büyüyeceği oyun
 // dakikası; null = yetişkin) ve kişisel ekipman (equipment: { tool, clothing, bag } -> data/equipment.js).
 // 19. aşama: karakter huyu (quirk), son duyduğu dedikodu (lastNews), eşiyle akşam yemeği günü ve randevu zamanı.
+// 21. aşama: kişisel kese (coins) ve çanta (inventory: [{ kind, qty, name? }]; ekipman yuvalarından bağımsız,
+// systems/Citizens.js). Eski kayıtlarda kese yoksa başlangıç harçlığı verilir.
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { NEED_KEYS } from '../data/characters.js';
 import { CHILDREN } from '../data/family.js';
 import { buildTraitProfile } from '../ai/TraitProfile.js';
+import { startingCoins, sanitizeInventory } from '../systems/Citizens.js';
 import { getCharacterSprite, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT, getFlowerCrownSprite } from '../art/sprites/index.js';
 
 const CELEBRATION_SECONDS = 2.6; // (15. aşama) usta işi eser kutlamasının süresi
@@ -81,6 +84,8 @@ export class Character extends Entity {
     lastNews = null,
     dinnerDay = null,
     lastDateAt = null,
+    coins = null,
+    inventory = [],
   }) {
     super({ id, x, y });
     this.name = name;
@@ -122,6 +127,9 @@ export class Character extends Entity {
     this.lastNews = lastNews && typeof lastNews.text === 'string' ? { ...lastNews } : null;
     this.dinnerDay = Number.isFinite(dinnerDay) ? dinnerDay : null;
     this.lastDateAt = Number.isFinite(lastDateAt) ? lastDateAt : null;
+    // 21. aşama: kişisel kese ve çanta (kayda girer; eski kayıtlarda başlangıç harçlığı)
+    this.coins = Number.isFinite(coins) ? Math.max(0, Math.floor(coins)) : startingCoins(growsUpAt !== null);
+    this.inventory = sanitizeInventory(inventory);
     this.recall = null;
     this.flowerCrown = false;
     this.profile = buildTraitProfile(traits, { child: this.isChild });
@@ -464,6 +472,8 @@ export class Character extends Entity {
       lastNews: this.lastNews,
       dinnerDay: this.dinnerDay,
       lastDateAt: this.lastDateAt,
+      coins: this.coins,
+      inventory: this.inventory,
     };
   }
 

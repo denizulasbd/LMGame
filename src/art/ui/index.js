@@ -1163,6 +1163,14 @@ Object.assign(ICONS, {
     '.K.......',
     'K........',
   ],
+  // 21. aşama: dilekçe (parşömen), Yönetim Güveni (kalkan), isyan meşalesi, kişisel kese, hatıra, sokak feneri, yağma çuvalı
+  scroll: ['.KKKKKKK.', 'KeSSSSSeK', '.KsSSSSK.', '.KsKKKsK.', '.KsSSSsK.', '.KsKKSsK.', '.KsSSSsK.', 'KeSSSSSeK', '.KKKKKKK.'],
+  trust: ['.KKKKKKK.', 'KBBBuBBBK', 'KBBuPuBBK', 'KBBuPuBBK', 'KBuPPPuBK', '.KBuPuBK.', '.KBBuBBK.', '..KBBBK..', '...KKK...'],
+  torch: ['...O.O...', '..OPO.O..', '..OPYPO..', '...OPO...', '..KXXXK..', '...KwK...', '...KwK...', '...KwK...', '...KKK...'],
+  purse: ['...KKK...', '..KPKPK..', '...KdK...', '..KdddK..', '.KdeYedK.', 'KddYPYddK', 'KdeeYeedK', '.KdddddK.', '..KKKKK..'],
+  souvenir: ['..o...o..', '...o.o...', 'KKKKoKKKK', 'KiiioiiiK', 'KKKKoKKKK', '.KiioiiK.', '.KiioiiK.', '.KiioiiK.', '.KKKKKKK.'],
+  lantern: ['...KKK...', '..KxxxK..', '..KPYPK..', '..KYPYK..', '..KxxxK..', '...KwK...', '...KwK...', '...KwK...', '..KKKKK..'],
+  loot: ['...K.K...', '....K....', '...KXK...', '..KXXXK..', '.KXEXXXK.', 'KXXXEXXXK', 'KXEXXXEXK', '.KXXXXXK.', '..KKKKK..'],
 });
 
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
@@ -1305,6 +1313,11 @@ const BUBBLE_ICONS = {
   paw: ['.w...w.', 'www.www', '...w...', '..www..', '.wwwww.', '..www..'],
   // 20. aşama: Ulu Saat Kulesi'nin çanı (altın çan, iki yanında ses çizgileri)
   bell: ['c..P..c', '.cPYPc.', 'c.PYP.c', '.PYYYP.', 'PPPPPPP', '...o...'],
+  // 21. aşama: dilekçe parşömeni, isyan meşalesi, kese (yevmiye / alışveriş), yağma çuvalı
+  scroll: ['.KKKKK.', 'KeSSSeK', '.KsKsK.', '.KsSsK.', 'KeSSSeK', '.KKKKK.'],
+  torch: ['..O.O..', '.OPYO..', '..OPO..', '..KXK..', '...w...', '...w...'],
+  purse: ['..K.K..', '...K...', '..KdK..', '.KdYdK.', 'KddPddK', '.KKKKK.'],
+  loot: ['..KXK..', '.KXXXK.', 'KXEXXXK', 'KXXXEXK', '.KKKKKP', '....PYP'],
 };
 
 export const BUBBLE_WIDTH = 11;

@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -280,6 +280,39 @@ const PAGE_HELPERS = () => {
         check('yüklenen Çağ Kutlaması bir kez biter, Altın Çağ sürer', ended.n === 1 && s.goldenAge.celebration === null && GA.isGoldenAge(s), `${ended.n}`);
         ended.off();
       }
+    }
+
+    // --- 2j. (21. aşama) İsyan sürerken ve yağma baskını yoldayken (dilekçe açık, çantalar dolu) ---
+    {
+      rich();
+      if (!scene().world.getCompleted('storage').length) sim.place('storage');
+      while (s.time.hour < 9 || s.time.hour >= 15) hours(1);
+      for (const c of s.characters) c.needs.fun = 10;
+      s.trust.value = 12;
+      s.town.welfare = 30;
+      const pet = scene().petitions.create();
+      const revolt = scene().trust.startRevolt();
+      const storage = scene().world.getCompleted('storage')[0];
+      const raid = revolt ? scene().trust.startRaid(storage.id) : null;
+      hours(0.2);
+      const before = JSON.stringify({ rioters: s.trust.revolt?.rioters, raids: s.trust.revolt?.raids.map((r) => [r.id, r.targetId, r.members]) });
+      const diff = A.roundtrip();
+      check('isyan ve yağma sürerken kayıt -> yükleme durum kayması yok', revolt && raid && pet && diff.length === 0, diff.join(' | '));
+      check('yüklenen isyan, yağma baskını ve dilekçe aynen döner', JSON.stringify({ rioters: s.trust.revolt?.rioters, raids: s.trust.revolt?.raids.map((r) => [r.id, r.targetId, r.members]) }) === before && s.petitions.list.some((p) => p.id === pet?.id));
+      const looted = counter('riot:looted');
+      hours(3);
+      const res = s.resources.food;
+      check('yüklenen yağma baskını sonuçlanır (yağmacılar depoya varır)', looted.n >= 1 && s.trust.revolt?.raids.every((r) => r.id !== raid?.id), `${looted.n}`);
+      looted.off();
+      const ended = counter('revolt:ended');
+      s.town.welfare = 70;
+      s.trust.relief = {};
+      game.events.emit('ui:relief', { kind: 'gold' });
+      game.events.emit('ui:relief', { kind: 'food' });
+      hours(1.2);
+      check('yatıştırılan isyan bir kez biter, sakinler işe döner', ended.n === 1 && !s.trust.revolt && s.characters.every((c) => c.task?.activity !== 'protest') && res >= 0, `${ended.n} güven %${Math.round(s.trust.value)}`);
+      ended.off();
+      s.petitions.list = [];
     }
 
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---

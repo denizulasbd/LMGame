@@ -3957,3 +3957,285 @@ kbd {
 .trade-row.is-golden {
   box-shadow: inset 3px 0 0 #ffd23f;
 }
+
+/* ---------- 21. aşama: kişisel kese ve çanta, dilekçeler, Yönetim Güveni, isyan ---------- */
+.welfare-bars {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hud-welfare .welfare-bars .welfare-bar {
+  height: 6px;
+}
+
+.trust-mini-bar {
+  display: block;
+  width: 40px;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.trust-mini-fill {
+  display: block;
+  height: 100%;
+  background: var(--ui-info);
+}
+
+.trust-mini-fill.is-ok {
+  background: var(--ui-ok);
+}
+
+.trust-mini-fill.is-low {
+  background: var(--ui-warn);
+}
+
+.trust-mini-fill.is-bad,
+.trust-mini-fill.is-revolt {
+  background: var(--ui-bad);
+}
+
+.trust-mini {
+  display: inline-flex;
+  align-items: center;
+}
+
+.hud.topbar .trust-mini .hud-icon {
+  width: 12px;
+  height: 12px;
+  image-rendering: pixelated;
+}
+
+.trust-mini.is-low .hud-icon,
+.trust-mini.is-bad .hud-icon {
+  filter: hue-rotate(160deg) saturate(1.6);
+}
+
+.trust-mini.is-revolt {
+  animation: trust-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes trust-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.buff-chip.is-action {
+  font-family: var(--ui-font);
+  color: var(--ui-ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.buff-chip.is-action:hover {
+  border-color: var(--ui-highlight);
+}
+
+.buff-chip.is-petition {
+  background: rgba(233, 207, 143, 0.18);
+}
+
+.buff-chip.is-petition.is-accepted {
+  background: var(--ui-card-ok);
+}
+
+.buff-chip.is-revolt {
+  background: var(--ui-card-bad);
+  border-color: var(--ui-bad);
+  font-weight: 700;
+}
+
+.purse-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--ui-card);
+  border: 2px solid var(--ui-wood);
+}
+
+.purse-coins {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.purse-coins img,
+.bag-slot img,
+.petition-head img {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+}
+
+.purse-amount {
+  font-weight: 700;
+  color: var(--ui-highlight);
+  font-variant-numeric: tabular-nums;
+}
+
+.purse-unit {
+  opacity: 0.75;
+  font-size: 12px;
+}
+
+.purse-rioter {
+  margin-left: auto;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--ui-bad);
+  border-radius: 8px;
+}
+
+.bag-slots {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 3px;
+}
+
+.bag-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--ui-wood-light);
+  border-radius: 3px;
+  cursor: help;
+}
+
+.bag-slot.is-empty {
+  border-style: dashed;
+  opacity: 0.45;
+}
+
+.bag-qty {
+  position: absolute;
+  right: 1px;
+  bottom: -1px;
+  font-size: 10px;
+  font-weight: 700;
+  text-shadow: 0 1px 0 #000, 1px 0 0 #000;
+}
+
+.bag-summary {
+  font-size: 11px;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
+}
+
+.petition-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 4px 0;
+  padding: 5px 7px;
+  color: var(--ui-ink-dark);
+  background: linear-gradient(180deg, #f3e2b6, #e5cb8e);
+  border: 2px solid #8a5a32;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.petition-box[hidden] {
+  display: none;
+}
+
+.petition-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.petition-state {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 7px;
+  background: rgba(125, 82, 54, 0.25);
+}
+
+.petition-state.is-accepted {
+  background: rgba(60, 140, 60, 0.35);
+}
+
+.petition-text {
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.petition-progress,
+.petition-meta {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.petition-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.petition-buttons .hud-btn {
+  font-size: 11px;
+  padding: 2px 7px;
+}
+
+.petition-buttons .hud-btn.is-grant {
+  background: #3f6b2c;
+  color: #f2e4c4;
+}
+
+.petition-buttons .hud-btn.is-reject {
+  background: #6b2c2c;
+  color: #f2e4c4;
+}
+
+.trust-bar {
+  width: 70px;
+  height: 7px;
+}
+
+.trust-fill.is-good {
+  background: var(--ui-info);
+}
+
+.trust-fill.is-ok {
+  background: var(--ui-ok);
+}
+
+.trust-fill.is-low {
+  background: var(--ui-warn);
+}
+
+.trust-fill.is-bad,
+.trust-fill.is-revolt {
+  background: var(--ui-bad);
+}
+
+.luxury-card.is-revolt {
+  border-color: var(--ui-bad);
+  background: var(--ui-card-bad);
+}
+
+.petition-row {
+  display: block;
+  width: 100%;
+  margin: 2px 0;
+  text-align: left;
+  font-size: 11px;
+  white-space: normal;
+}

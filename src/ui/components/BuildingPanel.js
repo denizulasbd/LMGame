@@ -47,6 +47,10 @@ import { EXPLORATION, EXOTIC_ITEMS, INSCRIPTIONS, INSCRIPTION_KEYS, VINE } from 
 import { expeditionLaunchStatus, pickParty, decodeStatus } from '../../systems/Exploration.js';
 import { AESTHETIC, ORNAMENTAL_TREES, DARKNESS } from '../../data/landscape.js';
 import { aestheticLevel } from '../../systems/Landscape.js';
+import { RELIEF, REVOLT, PETITION_KINDS } from '../../data/citizens.js';
+import { trustValue, trustLevel } from '../../systems/Citizens.js';
+import { reliefStatus, trustWelfare } from '../../systems/TrustSystem.js';
+import { formatRemaining } from '../../systems/Petitions.js';
 
 const thumbnailCache = new Map();
 
@@ -84,6 +88,7 @@ export class BuildingPanel {
     this.harbor = el('div', { className: 'building-decrees building-harbor' });
     this.luxury = el('div', { className: 'building-decrees building-luxury' });
     this.bell = el('div', { className: 'building-decrees building-bell' });
+    this.trustBox = el('div', { className: 'building-decrees building-trust' }); // (21. aşama) Yönetim Güveni
     this.expedition = el('div', { className: 'building-decrees building-expedition' });
     this.inscriptions = el('div', { className: 'building-decrees building-inscriptions' });
     this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
@@ -126,6 +131,7 @@ export class BuildingPanel {
       this.research,
       this.harbor,
       this.luxury,
+      this.trustBox,
       this.bell,
       this.expedition,
       this.inscriptions,
@@ -197,7 +203,7 @@ export class BuildingPanel {
         ? [JSON.stringify(state.luxury), state.resources.gold, Math.floor((state.buffs.spices ?? 0) / 60), Math.floor((state.buffs.goldBonus ?? 0) / 60), Math.floor((state.buffs.royalArchitects ?? 0) / 60), state.time.day, state.buildings.length].join(':')
         : '';
     const pickerKey = this.pickerFor === building.id ? this.workerCandidates(building, state).map((o) => `${o.character.id}:${o.character.name}:${o.level}:${o.pinnedTo}`).join(',') : '';
-    const bellKey = building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}` : '';
+    const bellKey = building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}:${Math.round(trustValue(state))}:${JSON.stringify(state.trust?.revolt?.rioters ?? null)}:${state.trust?.revolt?.raids?.length ?? 0}:${JSON.stringify(reliefStatus(state, 'food'))}:${JSON.stringify(reliefStatus(state, 'gold'))}:${(state.petitions?.list ?? []).map((p) => `${p.id}${p.status}${Math.floor((p.deadline - state.totalMinutes) / 60)}`).join(',')}` : '';
     // (16. aşama) keşif seferi (liman, belediye) ve kadim yazıtlar (Bilgelik Evi)
     const exploreKey =
       building.type === 'harbor' || building.type === 'townHall' || building.definition.academy
@@ -257,6 +263,7 @@ export class BuildingPanel {
     this.renderResearch(building, state);
     this.renderHarbor(building, state);
     this.renderLuxury(building, state);
+    this.renderTrust(building, state);
     this.renderBell(building, state);
     this.renderExpedition(building, state);
     this.renderInscriptions(building, state);
@@ -480,6 +487,50 @@ export class BuildingPanel {
         return { character: c, level: skill ? skillLevel(c, skill).level : 1, pinnedTo: other ? `${other.name}'a sabit` : '' };
       })
       .sort((a, b) => b.level - a.level || a.character.name.localeCompare(b.character.name, 'tr'));
+  }
+
+  /**
+   * (21. aşama) Meydan havuzu ve Belediye Konağı: Yönetim Güveni çubuğu, isyan durumu, açık dilekçeler ve acil erzak /
+   * altın dağıtımı ('ui:relief' { kind }).
+   */
+  renderTrust(building, state) {
+    const show = (building.type === 'fountain' || Boolean(building.definition.civic)) && building.functional;
+    this.trustBox.hidden = !show;
+    if (!show) return;
+    const value = Math.round(trustValue(state));
+    const level = trustLevel(value);
+    const revolt = state.trust?.revolt ?? null;
+    const welfare = Math.round(trustWelfare(state));
+    const bar = el('span', { className: 'need-bar trust-bar' }, [el('span', { className: `need-fill trust-fill is-${revolt ? 'revolt' : level.key}`, style: `width: ${value}%` })]);
+    const status = revolt
+      ? `İSYAN: ${revolt.rioters.length} sakin işi bıraktı${revolt.raids.length ? `, ${revolt.raids.map((r) => r.target).join(', ')} yağmalanıyor` : ''}. Güven %${REVOLT.endTrust}'i aşınca (refah %${REVOLT.critical} üstündeyken) yatışır.`
+      : `${level.name}. Refah %${welfare}: yüksek refah ve karşılanan dilekler güveni artırır; güven ya da refah ${REVOLT.graceHours} saat %${REVOLT.critical} altında kalırsa isyan çıkar.`;
+    const reliefButton = (kind) => {
+      const def = RELIEF[kind];
+      const st = reliefStatus(state, kind);
+      const b = this.button(def.name, st.ok ? `${kind === 'food' ? `${st.cost} yiyecek değeri` : `${st.cost} altın`} halka dağıtılır: güven +${def.trust}` : st.reason, () => this.events.emit('ui:relief', { kind }));
+      b.classList.add('upgrade-button');
+      b.disabled = !st.ok;
+      return el('div', { className: 'upgrade-row' }, [
+        el('span', { className: 'build-costs' }, [el('span', { className: `build-cost${st.ok ? '' : ' is-missing'}` }, [el('img', { src: getAnyIconURL(kind === 'food' ? 'food' : 'coin'), alt: '' }), String(st.cost)])]),
+        b,
+      ]);
+    };
+    const petitions = (state.petitions?.list ?? []).map((p) => {
+      const row = this.button(`${p.name}: ${PETITION_KINDS[p.kind].name} · ${formatRemaining(p.deadline - state.totalMinutes)}`, `"${p.text}" · tıkla: sakini seç`, () => this.events.emit('ui:selectCharacter', p.characterId));
+      row.classList.add('petition-row');
+      return row;
+    });
+    this.trustBox.replaceChildren(
+      el('div', { className: 'building-section-title', text: 'Yönetim Güveni' }),
+      el('div', { className: `decree luxury-card${revolt ? ' is-revolt' : ''}` }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL(revolt ? 'torch' : 'trust'), alt: '' }), `Güven %${value}`, bar, el('span', { className: 'decree-state', text: revolt ? 'İsyan!' : level.name })]),
+        el('div', { className: `upgrade-text${revolt ? ' is-active' : ''}`, text: status }),
+        ...(petitions.length ? [el('div', { className: 'upgrade-text', text: 'Açık dilekçeler:' }), ...petitions] : []),
+        reliefButton('food'),
+        reliefButton('gold'),
+      ])
+    );
   }
 
   /** (14. aşama) Meydan havuzu ve Belediye Konağı: Toplanma Zili. */

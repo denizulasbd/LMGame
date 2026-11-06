@@ -54,6 +54,43 @@
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
 
+    // --- 21. aşama: kişisel kese ve çanta, vatandaş dilekçeleri, Yönetim Güveni, isyan ve yağma ---
+    {
+      const looks = [
+        { hair: 'long', hairColor: 'auburn', skin: 'light', shirt: 'rose', pants: 'navy' },
+        { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'forest', pants: 'brown' },
+        { hair: 'bun', hairColor: 'blonde', skin: 'light', shirt: 'sky', pants: 'plum' },
+        { hair: 'spiky', hairColor: 'brown', skin: 'medium', shirt: 'mustard', pants: 'denim' },
+      ];
+      const tiny = (w, h, layers) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#4a9a46';
+        ctx.fillRect(0, 0, w, h);
+        for (const [sprite, x, y] of layers) ctx.drawImage(sprite, Math.round(x), Math.round(y - sprite.height));
+        return canvas;
+      };
+      show('21. aşama simgeleri: dilekçe (parşömen), Yönetim Güveni (kalkan), isyan meşalesi, kişisel kese, hatıra, sokak feneri, yağma çuvalı', ['scroll', 'trust', 'torch', 'purse', 'souvenir', 'lantern', 'loot'].map((n) => [n, getIconSprite(n)]), 8);
+      show('Yeni balonlar: dilekçe parşömeni, isyan meşalesi, kese (alışveriş / yevmiye), yağma çuvalı; öfke', ['scroll', 'torch', 'purse', 'loot', 'angry'].map((n) => [n, getBubbleSprite(n)]), 8);
+      show('Kişisel çantanın eşyaları: Ekmek, Börek, Erzak, Meyve, Şifalı Ot, Hatıra, Odun Demeti', [
+        ['Ekmek', getIconSprite('bread')], ['Börek', getIconSprite('bread')], ['Erzak', getIconSprite('food')], ['Meyve', getBubbleSprite('apple')],
+        ['Şifalı Ot', getIconSprite('herb')], ['Hatıra', getIconSprite('souvenir')], ['Odun Demeti', getIconSprite('wood')],
+      ], 6);
+      const fountain = getStructureSprite('fountain', {});
+      const storage = getStructureSprite('storage', {});
+      const cabin = getStructureSprite('cabin', {});
+      const market = getStructureSprite('market', {});
+      show('Vatandaşlık sahneleri: dilekçe veren sakin, pazarda alışveriş, çantasından yiyen, meydanda isyan, Kiler yağması', [
+        ['dilekçe', tiny(64, 64, [[cabin, 4, 52], [getCharacterSprite(looks[0], 'down', 'idle0'), 44, 60], [getBubbleSprite('scroll'), 45, 42]])],
+        ['pazar alışverişi', tiny(72, 56, [[market, 12, 40], [getCharacterSprite(looks[2], 'up', 'idle1'), 30, 54], [getBubbleSprite('purse'), 31, 36]])],
+        ['çantasından yiyor', tiny(48, 48, [[getCharacterSprite(looks[3], 'down', 'idle0'), 18, 40], [getBubbleSprite('apple'), 19, 22]])],
+        ['meydanda isyan', tiny(112, 80, [[fountain, 56 - fountain.width / 2, 60], [getCharacterSprite(looks[0], 'up', 'idle0'), 20, 74], [getBubbleSprite('angry'), 21, 56], [getCharacterSprite(looks[1], 'up', 'idle1'), 50, 76], [getBubbleSprite('torch'), 51, 58], [getCharacterSprite(looks[3], 'up', 'idle0'), 82, 74], [getBubbleSprite('angry'), 83, 56]])],
+        ['Kiler yağması', tiny(80, 64, [[storage, 16, 44], [getCharacterSprite(looks[1], 'up', 'idle0'), 30, 60], [getBubbleSprite('loot'), 31, 42], [getCharacterSprite(looks[2], 'up', 'idle1'), 44, 60], [getBubbleSprite('torch'), 45, 42]])],
+      ], 4);
+    }
+
     // --- 20. aşama: Ulu Saat Kulesi, Altın Çağ, prestij peyzajı ---
     show('Ulu Saat Kulesi: Temel, Gövde, Mekanizma & Çan (gece, çan odası yanık)', [1, 2, 3].map((st) => [['Temel', 'Gövde', 'Mekanizma & Çan'][st - 1], getStructureSprite('wonder', { wonderStage: st, windowsLit: st === 3, frame: 1 })]), 3);
     {

@@ -16,14 +16,17 @@
 //                  huyları, dolaşan dedikodular, son duyulan haberler. Eski kayıtlarda (sürüm 2-15) huylar ilk açılışta
 //                  dağıtılır (dördü de görülür), dedikodu boş başlar; evli çiftler kendi evlerinde kalır. Bu kayıt bir keşif
 //                  seferinin ortasındadır (macera pencereleri açılır ve sefer döner)
-//   save-v17.json: 20. aşamanın oyunu (kayıt sürümü 17, bugünkü): otopilotla 34 gün; aşama aşama yükselen Ulu Saat Kulesi,
+//   save-v17.json: 20. aşamanın oyunu (kayıt sürümü 17): otopilotla 34 gün; aşama aşama yükselen Ulu Saat Kulesi,
 //                  Altın Çağ, Tarihçe Kütüğü, Mermer Çeşme ve Altın Çağ Fenerleri, antik kitaplar. Eski kayıtlarda (sürüm 2-16)
 //                  Tarihçe sakinlerden çıkarılır; tamamlanmış kulesi olan kasaba Altın Çağ'a sessizce (kutlamasız) girer
+//   save-v18.json: 21. aşamanın oyunu (kayıt sürümü 18, bugünkü): otopilotla 34 gün; sakinlerin keseleri ve çantaları,
+//                  karşılanan / açık dilekçeler, Yönetim Güveni. Eski kayıtlarda (sürüm 2-17) her yetişkine 12, her çocuğa 3
+//                  altın başlangıç harçlığı verilir, çantalar boş başlar, Yönetim Güveni %75'tir, dilekçe ve isyan yoktur
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -96,6 +99,15 @@ for (const { name, raw } of fixtures) {
       stages: Object.keys(s.chronicle.towerStages).length,
       gears: s.resources.gears,
     };
+    // (21. aşama) kese, çanta, güven, dilekçeler (yüklendiği an)
+    loaded.citizens = {
+      coins: s.characters.map((c) => [c.id, c.coins, c.isChild]),
+      inv: s.characters.map((c) => [c.id, JSON.stringify(c.inventory)]),
+      trust: s.trust.value,
+      revolt: s.trust.revolt !== null,
+      petitions: s.petitions.list.map((p) => `${p.id}:${p.kind}:${p.characterId}`),
+      made: s.petitions.made,
+    };
     // (19. aşama) huylar, ortak evler, dedikodu (yüklendiği an)
     loaded.social = {
       quirks: s.characters.map((c) => c.quirk),
@@ -114,7 +126,16 @@ for (const { name, raw } of fixtures) {
     const integrityAfter = integrity();
     const expeditionAfter = { active: Boolean(s.dilemma.expedition), away: s.characters.filter((c) => c.away).length, adventure: s.dilemma.active?.kind === 'adventure' };
     const { outfitFor } = await import('/src/systems/SkillSystem.js');
+    const { inventoryCapacity } = await import('/src/systems/Citizens.js');
+    const citizensAfter = {
+      trust: s.trust.value,
+      revolt: s.trust.revolt !== null,
+      bagsOk: s.characters.every((c) => Number.isFinite(c.coins) && c.coins >= 0 && c.inventory.length <= inventoryCapacity(c) && c.inventory.every((x) => x.qty > 0)),
+      petitionsOk: s.petitions.list.every((p) => s.characters.some((c) => c.id === p.characterId)),
+      wages: s.stats.wagesPaid ?? 0,
+    };
     return {
+      citizensAfter,
       integrityAfter,
       expeditionAfter,
       outfits: s.characters.filter((c) => c.outfit).length,
@@ -215,6 +236,26 @@ for (const { name, raw } of fixtures) {
         detail: `kule ${G.stage} · Altın Çağ G${G.since?.day ?? '-'} · çan ${G.chimes} · kitap ${G.books} · kurucu ${G.founders}`,
       });
     }
+  }
+  {
+    // (21. aşama) kişisel kese ve çanta, Yönetim Güveni, dilekçeler
+    const C = r.loaded.citizens;
+    const A = r.citizensAfter;
+    if (data.version < 18) {
+      results.push({
+        name: `${tag}: sakinlere başlangıç harçlığı (yetişkin 12, çocuk 3), çantalar boş, Yönetim Güveni %75, dilekçe ve isyan yok`,
+        ok: C.coins.every(([, coins, child]) => coins === (child ? 3 : 12)) && C.inv.every(([, inv]) => inv === '[]') && C.trust === 75 && !C.revolt && C.petitions.length === 0 && C.made === 0,
+        detail: `${C.coins.length} sakin, güven %${C.trust}`,
+      });
+    } else {
+      const coins = data.characters.map((c) => [c.id, c.coins]);
+      results.push({
+        name: `${tag}: keseler, çantalar, Yönetim Güveni ve dilekçeler korundu`,
+        ok: JSON.stringify(C.coins.map(([id, v]) => [id, v])) === JSON.stringify(coins) && C.inv.every(([id, inv]) => inv === JSON.stringify(data.characters.find((c) => c.id === id).inventory)) && Math.abs(C.trust - data.trust.value) < 1e-9 && C.petitions.length === data.petitions.list.length && C.made === data.petitions.made,
+        detail: `${C.coins.reduce((a, [, v]) => a + v, 0)} altın kesede · güven %${Math.round(C.trust)} · ${C.petitions.length} açık dilekçe, ${C.made} dilekçe`,
+      });
+    }
+    results.push({ name: `${tag}: bir gün sonra keseler ve çantalar geçerli, isyan yok`, ok: A.bagsOk && A.petitionsOk && !A.revolt && A.trust >= 0 && A.trust <= 100, detail: `güven %${Math.round(A.trust)}, yevmiye ${A.wages}` });
   }
   results.push({ name: `${tag}: meslek kıyafetleri deneyimden giyildi`, ok: r.outfitsOk, detail: `${r.outfits} sakin kıyafetli` });
   results.push({ name: `${tag}: harita farkları birebir uygulandı`, ok: r.loaded.terrain === data.terrain.length, detail: `${r.loaded.terrain}/${data.terrain.length} karo` });

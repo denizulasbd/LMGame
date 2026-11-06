@@ -23,6 +23,9 @@
 //   urgentBubble: hedefe acil ihtiyaçla yürürken başta gösterilen balon
 //   travelLabel / label / partnerLabel: arayüzde görünen durum metinleri; dateLabel: (19. aşama) randevudaki çiftin
 //   (19. aşama) {pet} hayvanın adı ("Tekir'in"), {place} çalınan yer ("Handa" / "Meydanda") ile değiştirilir
+//   (21. aşama) finishEvent: etkinlik bitince yayınlanan olay { character, task, building } (vatandaşlık katmanı etkileri
+//                uygular: PurseSystem, TrustSystem); {bag} çantadaki eşyanın adıyla değiştirilir ("ekmeğini")
+//                kind 'riot': yağma (yarıda kesilmez, kısa sürer)
 export const ACTIVITIES = {
   sleep: {
     kind: 'rest',
@@ -484,6 +487,7 @@ export const ACTIVITIES = {
     duration: [14, 20],
     effects: { hunger: 7, fun: 0.6 },
     urgentBubble: 'apple',
+    finishEvent: 'citizen:innMeal', // (21. aşama) yemekten sonra kesesine göre azık alabilir
   },
   inn: {
     kind: 'social',
@@ -529,6 +533,68 @@ export const ACTIVITIES = {
     bubbles: ['heart'],
   },
 
+  // --- 21. aşama: kişisel çanta, alışveriş, isyan ---
+  snack: {
+    kind: 'need',
+    target: 'none',
+    label: 'Çantasından {bag} çıkarıp yiyor',
+    duration: [8, 12],
+    effects: {},
+    bubbles: ['apple'],
+    finishEvent: 'citizen:snack',
+  },
+  herbTea: {
+    kind: 'need',
+    target: 'none',
+    label: 'Çantasındaki şifalı otla ıhlamur demleyip içiyor',
+    duration: [14, 20],
+    effects: { energy: 0.1 },
+    bubbles: ['herb'],
+    finishEvent: 'citizen:herbTea',
+  },
+  keepsake: {
+    kind: 'leisure',
+    target: 'none',
+    label: 'Çantasındaki hatırasına bakıp gülümsüyor',
+    duration: [6, 10],
+    effects: {},
+    bubbles: ['memory', 'heart'],
+    finishEvent: 'citizen:keepsake',
+  },
+  shop: {
+    kind: 'leisure',
+    target: 'market',
+    travelLabel: "Pazar Yeri'ne alışverişe gidiyor",
+    label: "Pazar Yeri'nde tezgâhları geziyor, alışveriş yapıyor",
+    duration: [18, 28],
+    effects: { fun: 0.25 },
+    bubbles: ['purse', 'sparkle'],
+    finishEvent: 'citizen:shop',
+  },
+  protest: {
+    kind: 'social',
+    target: 'fountain',
+    travelLabel: 'Öfkeyle meydana yürüyor',
+    label: 'Meydanda öfkeyle yönetime bağırıyor',
+    partnerLabel: '{partner} ile meydanda yönetime söyleniyor',
+    duration: [60, 60],
+    effects: {},
+    socialGain: 0.6,
+    aloneSocialGain: 0.3,
+    faceBuilding: true,
+    bubbles: ['angry', 'torch'],
+    partnerBubbles: ['angry', 'torch', 'sulk'],
+  },
+  loot: {
+    kind: 'riot',
+    travelLabel: 'Öfkeli kalabalıkla yağmaya yürüyor',
+    label: '{target} yağmalıyor, çuvalları dolduruyor',
+    duration: [15, 20],
+    effects: {},
+    pose: 'gather',
+    bubbles: ['torch', 'angry', 'loot'],
+    finishEvent: 'riot:loot',
+  },
   wait: {
     kind: 'idle',
     target: 'none',

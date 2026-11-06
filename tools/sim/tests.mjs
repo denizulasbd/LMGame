@@ -27,6 +27,11 @@
 //              Tarihçe'ye yazılan emek), Altın Çağ (çalışma şevki ve refah +%10, 08:00 / 18:00 çanı ve ses dalgası, Çağ
 //              Kutlaması), prestij peyzajı (Mermer Çeşme, Altın Çağ Feneri), tüccarın nadir malları, Tarihçe Kütüğü sekmesi,
 //              kayıt sürümü 17
+//   21. aşama: kişisel kese ve çanta (harçlık, yuvalar, istif, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot,
+//              pazar alışverişi, han azığı, Kişisel Kese & Çanta kartı), vatandaş dilekçeleri (huy / meslek eşlemesi,
+//              oluşma, kabul, hemen karşılama, ret, süre dolması, stok / alet / buluşma, kart ve üst çubuk), Yönetim Güveni
+//              (refah, açlık, soğuk, şenlik), isyan (12 saatlik eşik, isyancılar, alarm), yağma (kasaba deposundan
+//              yağmacıların çantasına / kesesine birebir), yatıştırma (erzak ve altın dağıtımı), kayıt sürümü 18
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
 import { openGame, createChecks } from './lib.mjs';
@@ -2223,7 +2228,7 @@ const pageResults = await page.evaluate(async () => {
     window.__s20 = { since: JSON.stringify(st.goldenAge.since), chimes: st.goldenAge.chimes, books: st.goldenAge.books, founders: ch.founders.length, master: GA.towerMasterOf(st)?.name, stages: Object.keys(ch.towerStages).length, couple: ch.firstCouple?.a, fountain: mf.id };
   }
 
-  // --- Kayıt gidiş-dönüşü (sürüm 17) ---
+  // --- Kayıt gidiş-dönüşü (sürüm 18) ---
   const ill = s.characters.find((c) => !c.isChild);
   scene.health.fallIll(ill);
   hut.remedies = 4;
@@ -2235,7 +2240,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 17', raw.version === 17);
+  check('kayıt sürümü 18', raw.version === 18);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2281,6 +2286,410 @@ const pageResults = await page.evaluate(async () => {
   check('kayıttan keşif ganimetleri, yazıtlar ve şemalar döner', Object.keys(s2.exploration.inscriptions).length === window.__x16.inscriptions && s2.exploration.cityMap === window.__x16.map && s2.exploration.expeditions === window.__x16.expeditions && s2.exploration.inscriptions.aqueduct?.status === 'decoded');
   check('kayıttan maceracıların anlatacağı hikâyeler döner', s2.characters.filter((c) => window.__x16.teamIds.includes(c.id) && c.tale).length === window.__x16.tales);
   check('kayıttan ferman ve fırtına döner', s2.civic.storageLevel === 1 && s2.civic.craftGuild && s2.dilemma.storm?.fortified);
+  // ===== 21. aşama: kişisel kese ve çanta, vatandaş dilekçeleri, Yönetim Güveni, isyan ve yağma =====
+  {
+    const S = game.scenes.current;
+    const st = game.state;
+    const W = S.world;
+    const CZ = await import('/src/systems/Citizens.js');
+    const CD = await import('/src/data/citizens.js');
+    const PT = await import('/src/systems/Petitions.js');
+    const TR = await import('/src/systems/TrustSystem.js');
+    const { Character: Ch } = await import('/src/entities/Character.js');
+    const now = () => st.totalMinutes;
+    sim.give({ wood: 300, stone: 300, food: 250, bread: 60, iron: 80, gold: 2000 });
+    for (const t of ['market', 'mill', 'healerHut', 'inn', 'storage', 'workshop']) if (!W.getCompleted(t).length) sim.place(t);
+    const hudOf = () => game.ui.components.find((x) => x.renderWelfare);
+    const renderNow = () => {
+      hudOf().welfareAt = -Infinity; // üst çubuk yarım saniyede bir yenilenir: hemen çizilsin
+      game.render(0);
+    };
+    st.petitions.list = [];
+    st.petitions.nextAt = now() + 1e6; // bu bölümde dilekçeleri test kendisi açar
+    if (st.trust.revolt) S.trust.endRevolt();
+    st.trust.value = 75;
+    const adults = st.characters.filter((c) => !c.isChild && !c.away && c.visible);
+    const A = adults[0];
+    const B = adults[1];
+    const resetBag = (c) => {
+      c.inventory = [];
+      c.equipment.bag = null;
+    };
+
+    // --- Kişisel kese ve çanta ---
+    const fresh = new Ch({ id: 99001, name: 'Deneme', traits: [], appearance: A.appearance });
+    const kid = new Ch({ id: 99002, name: 'Minik', traits: [], appearance: A.appearance, growsUpAt: 1e9 });
+    check('yeni sakine başlangıç harçlığı (yetişkin 12, çocuk 3) ve boş çanta', fresh.coins === CD.PURSE.allowance.adult && kid.coins === CD.PURSE.allowance.child && fresh.inventory.length === 0);
+    check('her sakinin kesesi sayı ve çantası dizi', st.characters.every((c) => Number.isFinite(c.coins) && c.coins >= 0 && Array.isArray(c.inventory)));
+    const keepBag = A.equipment.bag;
+    resetBag(A);
+    check('çanta 4 yuva; Sırt Çantası kuşanınca 6; çocukta 2 (ekipman yuvası değişmez)', CZ.inventoryCapacity(A) === 4 && (A.equipment.bag = 'backpack', CZ.inventoryCapacity(A) === 6) && CZ.inventoryCapacity(kid) === 2 && A.equipment.bag === 'backpack');
+    A.equipment.bag = null;
+    const put = CZ.addItem(A, 'bread', 8);
+    check('eşyalar istiflenir (ekmek 6\'lık yığın), fazlası yeni yuvaya', put === 8 && A.inventory.length === 2 && A.inventory[0].qty === 6 && CZ.countItem(A, 'bread') === 8);
+    CZ.addItem(A, 'souvenir', 1, 'Boncuk Kolye');
+    CZ.addItem(A, 'herb', 1);
+    check('çanta dolunca yeni tür sığmaz', CZ.addItem(A, 'fruit', 1) === 0 && A.inventory.length === 4 && CZ.roomFor(A, 'fruit') === 0);
+    check('çantadan eşya çıkar', CZ.takeItem(A, 'bread', 3) === 3 && CZ.countItem(A, 'bread') === 5);
+    check('çantanın kısa yazımı adlı hatırayı gösterir', CZ.describeInventory(A).includes('Boncuk Kolye') && CZ.describeInventory(A).includes('Ekmek ×'));
+    resetBag(A);
+
+    // Yevmiye: gerçek bir vardiya bitince
+    let shift = null;
+    for (const c of adults) {
+      if (shift) break;
+      S.behavior.endTask(c);
+      const plan = S.behavior.brain.planWork(c);
+      if (!plan?.workBuildingId) continue;
+      S.behavior.startPlan(c, plan, 10);
+      if (!c.task) continue;
+      c.clearPath();
+      c.task.phase = 'perform';
+      shift = c;
+    }
+    if (shift) {
+      const before = shift.coins;
+      const wages = st.stats.wagesPaid;
+      shift.task.elapsed = (shift.task.duration ?? 60) + 1;
+      sim.step(1);
+      check('vardiya bitince yevmiye keseye girer (hazineden düşülmez)', shift.coins >= before + CD.PURSE.wage.shift && st.stats.wagesPaid > wages, `${before}->${shift.coins}`);
+    } else check('vardiya bitince yevmiye keseye girer (hazineden düşülmez)', false, 'çalışan yok');
+    let coins = B.coins;
+    const gold = st.resources.gold;
+    game.events.emit('work:jobDone', { character: B, job: { type: 'build' }, yields: {} });
+    game.events.emit('work:jobDone', { character: B, job: { type: 'chop' }, yields: {} });
+    game.events.emit('masterwork:created', { character: B, piece: { name: 'x' } });
+    check('inşaat (+2), hasat (+1) ve usta işi eser (+15) ödülü; kasaba hazinesi değişmez', B.coins === coins + 18 && st.resources.gold === gold, `${coins}->${B.coins}`);
+    coins = kid.coins;
+    S.purse.pay(kid, 5);
+    check('çocuklara yevmiye ödenmez', kid.coins === coins);
+
+    // İş yerinden pay: fırıncı ekmeği kasaba stoğundan alır (kaybolmaz, çantaya geçer)
+    const mill = W.getCompleted('mill')[0];
+    resetBag(B);
+    sim.give({ bread: 40 });
+    let townBread = st.resources.bread;
+    for (let i = 0; i < 60 && CZ.countItem(B, 'bread') === 0; i++) S.purse.onShift(B, mill);
+    check('fırıncı vardiya sonunda ekmek payını kasaba stoğundan çantasına alır', CZ.countItem(B, 'bread') === 1 && st.resources.bread === townBread - 1, `${townBread}->${st.resources.bread}`);
+    resetBag(B);
+    for (let i = 0; i < 60 && CZ.countItem(B, 'herb') === 0; i++) S.purse.onShift(B, W.getCompleted('healerHut')[0]);
+    const hutB = W.getCompleted('healerHut')[0];
+    check('şifacı kulübesinden şifalı ot payı', CZ.countItem(B, 'herb') === 1 || (hutB?.herbs ?? 0) < 3, `ot ${hutB?.herbs}`);
+
+    // Çantadan yemek
+    resetBag(B);
+    CZ.addItem(B, 'bread', 2);
+    S.behavior.endTask(B);
+    B.needs.hunger = 10;
+    const snackPlan = S.behavior.brain.decide(B, 13);
+    check('çok acıkınca yürümeden çantasından yer (snack)', snackPlan.activity === 'snack' && snackPlan.bagItem === 'bread', snackPlan.activity);
+    S.behavior.startPlan(B, snackPlan, 13);
+    sim.step(3);
+    const snackLabel = B.activityLabel;
+    const meals = st.stats.bagMeals;
+    for (let i = 0; i < 300 && B.task?.activity === 'snack'; i++) sim.step(5);
+    check('çantadaki ekmek yenir: tokluk dolar, ekmek azalır, sayaç artar', B.needs.hunger >= 60 && CZ.countItem(B, 'bread') < 2 && st.stats.bagMeals === meals + 1, `${Math.round(B.needs.hunger)} ${CZ.countItem(B, 'bread')}`);
+    check('durum metni: "Çantasından ekmek çıkarıp yiyor"', snackLabel === 'Çantasından ekmek çıkarıp yiyor', snackLabel);
+
+    // Şifalı ot çayı
+    resetBag(B);
+    CZ.addItem(B, 'herb', 1);
+    S.health.fallIll(B);
+    const remain = B.illness.remaining;
+    S.behavior.endTask(B);
+    B.needs.hunger = 90;
+    const tea = S.behavior.brain.decide(B, 13);
+    check('üşüyen sakin çantasındaki şifalı otu demler', tea.activity === 'herbTea', tea.activity);
+    S.purse.herbTea(B);
+    check('şifalı ot hastalığın kalan süresini %40 kısaltır ve çantadan çıkar', Math.abs(B.illness.remaining - remain * 0.6) < 1e-6 && CZ.countItem(B, 'herb') === 0);
+    B.illness = null;
+
+    // Pazar alışverişi ve han azığı
+    const market = W.getCompleted('market')[0];
+    resetBag(B);
+    B.coins = 20;
+    const bought = S.purse.shop(B, market);
+    check('Pazar Yeri\'nden alışveriş: kese azalır, eşya çantaya girer', bought && B.coins === 20 - CD.SHOP.prices[bought] && CZ.countItem(B, bought) === 1, bought);
+    const bought2 = S.purse.shop(B, market);
+    check('hatıra adıyla çantada durur ve anıya yazılır', [bought, bought2].includes('souvenir') && B.inventory.some((x) => x.kind === 'souvenir' && x.name) && B.memories.at(-1).text.includes("Pazar Yeri'nden"), `${bought},${bought2}`);
+    B.coins = 2;
+    resetBag(B);
+    check('kesesi yetmeyen alışveriş yapamaz', S.purse.shop(B, market) === 'fruit' ? B.coins === 0 : B.coins === 2);
+    B.coins = 20;
+    resetBag(B);
+    S.behavior.endTask(B);
+    B.lastShopAt = null;
+    B.needs = { hunger: 95, energy: 95, social: 95, fun: 95 };
+    let shopPlan = null;
+    for (let i = 0; i < 200 && shopPlan?.activity !== 'shop'; i++) {
+      B.lastShopAt = null;
+      shopPlan = S.behavior.brain.decide(B, 19);
+    }
+    check('boş zamanında kesesi olan sakin Pazar Yeri\'ne alışverişe gider', shopPlan?.activity === 'shop' && shopPlan.buildingId === market.id);
+    const inn = W.getCompleted('inn')[0];
+    inn.meals = 6;
+    resetBag(B);
+    let took = false;
+    for (let i = 0; i < 80 && !took; i++) took = S.purse.takeaway(B, inn);
+    check('handa yemekten sonra azık (Börek) alır: handaki pişmiş yemek bir azalır', took && CZ.countItem(B, 'pie') === 1 && inn.meals === 5);
+
+    // Karakter kartı: Kişisel Kese & Çanta
+    game.events.emit('ui:selectCharacter', B.id);
+    renderNow();
+    const pbox = document.querySelector('.character-panel .purse-box');
+    const card = pbox?.closest('.character-panel');
+    const purseText = pbox?.textContent ?? '';
+    check('Karakter kartında "Kişisel Kese & Çanta" satırı: altın ve çantadaki eşyalar', card && !card.hidden && card.textContent.includes('Kişisel Kese & Çanta') && purseText.includes(String(B.coins)) && purseText.includes('Börek') && pbox.querySelectorAll('.bag-slot').length === CZ.inventoryCapacity(B), purseText);
+
+    // --- Vatandaş dilekçeleri ---
+    const nat = adults.find((c) => c.homeId !== null) ?? A;
+    const natQuirk = nat.quirk;
+    nat.quirk = 'natureEnthusiast';
+    const opts = Object.fromEntries(S.petitions.optionsFor(nat));
+    check('Doğa Tutkunu en çok fidan ister', opts.sapling === 5 && Object.values(opts).every((w) => w <= 5));
+    const bw = adults.find((c) => c !== nat);
+    const keepQuirk = bw.quirk;
+    bw.quirk = 'bookworm';
+    const bwOpts = Object.keys(Object.fromEntries(S.petitions.optionsFor(bw)));
+    check('Kitap Kurdu Bilgelik Evi / araştırma / antik kitap ister', bwOpts.some((k) => ['academy', 'research', 'books'].includes(k)), bwOpts.join(','));
+    bw.quirk = 'musician';
+    check('Müzisyen meydanda buluşma ister', Object.fromEntries(S.petitions.optionsFor(bw)).gathering === 5);
+    bw.quirk = keepQuirk;
+    const toasts = [];
+    const offToast = game.events.on('toast', (t) => toasts.push(t.text));
+    const p1 = S.petitions.create('sapling', nat.id);
+    offToast();
+    check('dilekçe oluşur: parşömen balonu, günlük ve bildirim', p1 && p1.kind === 'sapling' && (!nat.visible || nat.bubble?.icon === 'scroll') && st.journal.slice(-3).some((j) => j.text.startsWith('Dilekçe') && j.icon === 'scroll') && toasts.some((t) => t.includes('fidan')), p1?.kind);
+    check('dilekçenin süresi 2,5 gün', p1.deadline - p1.createdAt === CD.PETITIONS.deadlineMinutes);
+    check('aynı sakin aynı anda tek dilekçe verir', S.petitions.create('sapling', nat.id) === null);
+    game.events.emit('ui:selectCharacter', nat.id);
+    renderNow();
+    const box = document.querySelector('.character-panel .petition-box');
+    check('kartta dilekçe kutusu: istek, ne yapılmalı, kalan süre, Kabul Et / Fidanı Dik / Reddet', !box.hidden && box.textContent.includes('Evimin yakınına') && box.textContent.includes('Kalan süre') && [...box.querySelectorAll('button')].map((b) => b.textContent).join(',') === 'Kabul Et,Fidanı Dik,Reddet');
+    const hudChips = [...document.querySelectorAll('.hud-buffs .buff-chip.is-petition')].map((b) => b.textContent);
+    check('üst çubukta dilekçe çipi (tıklayınca sakin seçilir)', hudChips.some((t) => t.includes(nat.name)), hudChips.join('|'));
+    // Kabul ve hemen karşılama
+    const trust0 = st.trust.value = 60;
+    game.events.emit('ui:acceptPetition', { id: p1.id });
+    check('kabul: söz verildi, yarım gün ek süre, güven +1', p1.status === 'accepted' && p1.deadline - p1.createdAt === CD.PETITIONS.deadlineMinutes + CD.PETITIONS.acceptExtraMinutes && st.trust.value === trust0 + 1);
+    const fun0 = nat.needs.fun = 40;
+    const wood0 = st.resources.wood;
+    game.events.emit('ui:grantPetition', { id: p1.id });
+    const tree = st.buildings.filter((b) => PT.PETITION_TYPES.sapling.includes(b.type) && !(p1.baseline.ids ?? []).includes(b.id)).find((b) => PT.distanceToHome(W.getBuilding(nat.homeId), b) <= CD.PETITIONS.nearHome);
+    check('"Fidanı Dik": evinin yakınına fidan dikilir (bedeli ödenir)', tree && st.resources.wood < wood0, tree?.type);
+    check('karşılanan dilekçe: güven +8, keyif +20, olumlu anı, "Sesimiz Duyuldu" refah bonusu', !S.petitions.find(p1.id) && st.trust.value === trust0 + 1 + 8 && nat.needs.fun === fun0 + 20 && nat.memories.at(-1).fond && nat.memories.at(-1).text.includes('dileği yerine getirildi') && st.buffs.heard > now() && st.petitions.log.at(-1).outcome === 'fulfilled', `${st.trust.value}`);
+    // Ret
+    const p2 = S.petitions.create('street', nat.id) ?? S.petitions.create(null, nat.id);
+    st.trust.value = 60;
+    nat.needs.fun = 50;
+    game.events.emit('ui:selectCharacter', nat.id);
+    renderNow();
+    [...document.querySelectorAll('.character-panel .petition-box button')].find((b) => b.textContent === 'Reddet').click();
+    check('"Reddet" düğmesi: güven -5, keyif -12, olumsuz anı', !S.petitions.find(p2.id) && st.trust.value === 55 && nat.needs.fun === 38 && nat.memories.at(-1).fond === false && st.petitions.log.at(-1).outcome === 'rejected');
+    // Süre dolması (kabul edilmiş: ek ceza)
+    const p3 = S.petitions.create('stock', A.id) ?? S.petitions.create('tool', A.id) ?? S.petitions.create(null, A.id);
+    st.resources.wood = 0;
+    game.events.emit('ui:acceptPetition', { id: p3.id });
+    st.trust.value = 60;
+    p3.deadline = now();
+    S.petitions.hourly(12);
+    check('süresi dolan dilekçe: güven -6 (sözü tutulmadıysa -3 daha), olumsuz anı', !S.petitions.find(p3.id) && (st.petitions.log.at(-1).outcome === 'expired' ? st.trust.value === 60 - 9 : st.petitions.log.at(-1).outcome === 'fulfilled'), `${st.petitions.log.at(-1).outcome} ${st.trust.value}`);
+    sim.give({ wood: 250 });
+    // Kışlık stok: hedefe ulaşınca kendiliğinden karşılanır
+    st.resources.wood = 20;
+    st.resources.food = 20;
+    st.resources.bread = 0;
+    st.pantry.credit = 0;
+    const pS = S.petitions.open(B, 'stock');
+    check('kışlık stok dilekçesinin hedefi var; ilerleme metni', pS.target.wood > 20 && pS.target.food > 20 && PT.petitionProgress(st, pS).includes(`Odun 20/${pS.target.wood}`));
+    S.petitions.hourly(10);
+    check('stok hedefe ulaşmadan karşılanmaz', S.petitions.find(pS.id));
+    sim.give({ wood: pS.target.wood, food: pS.target.food });
+    S.petitions.hourly(11);
+    check('stok güvenli seviyeye çıkınca dilekçe karşılanır', !S.petitions.find(pS.id) && st.petitions.log.at(-1).outcome === 'fulfilled');
+    // Sağlam alet
+    const keepTool = B.equipment.tool;
+    B.equipment.tool = null;
+    st.equipment.sturdyTool = 0;
+    const pT = S.petitions.open(B, 'tool');
+    const iron0 = st.resources.iron;
+    game.events.emit('ui:grantPetition', { id: pT.id });
+    check('"Aleti Ver": Sağlam Alet kuşanır (demir ve odun ödenir), dilekçe karşılanır', B.equipment.tool === 'sturdyTool' && st.resources.iron === iron0 - CD.PETITION_KINDS.tool.grant.iron && !S.petitions.find(pT.id));
+    B.equipment.tool = keepTool;
+    // Meydanda buluşma: Toplanma Zili
+    st.rally = null;
+    const pG = S.petitions.open(B, 'gathering');
+    game.events.emit('ui:grantPetition', { id: pG.id });
+    check('"Zili Çal": toplanma zili çalar, buluşma dilekçesi karşılanır', !S.petitions.find(pG.id) && st.rally && st.petitions.log.at(-1).outcome === 'fulfilled');
+    st.rally = null;
+    // Kendiliğinden oluşma aralığı
+    st.time.hour = 10;
+    st.petitions.nextAt = now();
+    const made0 = st.petitions.made;
+    S.petitions.hourly(10);
+    const gap = st.petitions.nextAt - now();
+    check('dilekçeler kendiliğinden 2-3 günde bir gelir', st.petitions.made === made0 + 1 && gap >= CD.PETITIONS.intervalMinutes[0] && gap <= CD.PETITIONS.intervalMinutes[1], gap);
+    st.petitions.list = [];
+    st.petitions.nextAt = now() + 1e6;
+
+    // --- Yönetim Güveni ---
+    st.trust.value = 50;
+    st.heating.cold = false;
+    for (const c of st.characters) c.needs.hunger = Math.max(c.needs.hunger, 60);
+    st.town.welfare = 80;
+    S.trust.hourly();
+    check('yüksek refahta (%70+) güven saat başı artar', Math.abs(st.trust.value - 50.25) < 1e-6, st.trust.value);
+    st.town.welfare = 30;
+    st.trust.value = 50;
+    S.trust.hourly();
+    check('refah %35 altında güven erir', Math.abs(st.trust.value - 49.5) < 1e-6, st.trust.value);
+    st.town.welfare = 50;
+    st.trust.value = 50;
+    st.heating.cold = true;
+    const starving = st.characters.slice(0, 3);
+    for (const c of starving) c.needs.hunger = 5;
+    S.trust.hourly();
+    check('açlık ve soğuk güveni düşürür', st.trust.value < 50 - 0.3 - 0.06 * 2, st.trust.value);
+    st.heating.cold = false;
+    for (const c of starving) c.needs.hunger = 70;
+    st.trust.value = 70;
+    S.trust.trust.eventDays = {};
+    S.trust.onEvent('festival');
+    check('şenlik güveni artırır', st.trust.value === 70 + CD.TRUST.events.festival);
+    renderNow();
+    const tm = document.querySelector('.hud .trust-mini');
+    const tf = document.querySelector('.hud .trust-mini-fill');
+    check('üst çubukta refahın yanında Yönetim Güveni (ince çubuk ve kalkan); ipucunda yüzdesi', tm && tm.dataset.trust === String(Math.round(st.trust.value)) && tf.style.width === `${Math.round(st.trust.value)}%` && document.querySelector('.hud-welfare').title.includes(`Yönetim Güveni: %${Math.round(st.trust.value)}`));
+
+    // --- İsyan ---
+    for (const c of st.characters) c.needs.fun = 15;
+    st.town.welfare = 30;
+    st.trust.value = 20;
+    st.trust.lowSince = null;
+    S.trust.hourly();
+    check('güven kritik eşiğin altına inince isyan hemen çıkmaz (12 saat bekler)', !st.trust.revolt && st.trust.lowSince !== null);
+    st.trust.lowSince = now() - CD.REVOLT.graceHours * 60;
+    st.trust.value = 20;
+    S.trust.hourly();
+    const rv = st.trust.revolt;
+    const adultCount = st.characters.filter((c) => !c.isChild && !c.role).length;
+    check('güven 12 saat %25 altında kalınca isyan çıkar', rv && rv.rioters.length >= CD.REVOLT.minRioters && rv.rioters.length <= Math.ceil(adultCount * CD.REVOLT.maxShare) && st.stats.revolts >= 1, rv?.rioters.length);
+    check('isyan kasaba günlüğüne alarm düşer', st.journal.slice(-4).some((j) => j.text.startsWith('ALARM') && j.icon === 'torch'));
+    const rioter = W.getCharacter(rv.rioters[0]);
+    S.behavior.endTask(rioter);
+    rioter.needs = { hunger: 90, energy: 90, social: 60, fun: 15 };
+    rioter.carrying = null;
+    const riotPlan = S.behavior.brain.decide(rioter, 10);
+    check('isyancı mesaide işe gitmez, meydanda öfkeyle toplanır', riotPlan.activity === 'protest', riotPlan.activity);
+    S.behavior.startPlan(rioter, riotPlan, 10);
+    check('isyancının durum metni: öfkeyle meydana yürüyor', /öfke|Öfke|yönetime/.test(rioter.activityLabel), rioter.activityLabel);
+    renderNow();
+    check('üst çubukta isyan alarmı', [...document.querySelectorAll('.hud-buffs .buff-chip.is-revolt')].some((b) => b.textContent.includes('İsyan')));
+    // Yağma: gerçek baskın (Kiler)
+    const storage = W.getCompleted('storage')[0];
+    sim.give({ food: 120, wood: 120, gold: 500 });
+    const res0 = { food: st.resources.food, wood: st.resources.wood, gold: st.resources.gold };
+    const totals = () => st.characters.reduce((a, c) => {
+      const r = CZ.inventoryResources(c);
+      a.food += r.food ?? 0;
+      a.wood += r.wood ?? 0;
+      a.coins += c.coins;
+      return a;
+    }, { food: 0, wood: 0, coins: 0 });
+    const t0 = totals();
+    for (const id of rv.rioters) resetBag(W.getCharacter(id));
+    const t0b = totals();
+    const hasHall = st.buildings.some((b) => b.functional && b.type === 'townHall');
+    const lootedEv = { food: 0, wood: 0, gold: 0 };
+    const offLoot = game.events.on('riot:looted', ({ goods, gold }) => {
+      lootedEv.food += goods.food ?? 0;
+      lootedEv.wood += goods.wood ?? 0;
+      lootedEv.gold += gold;
+    });
+    const raid = S.trust.startRaid(storage.id);
+    check('yağma baskını: en çok 3 isyancı Kiler\'e yürür', raid && raid.members.length >= 1 && raid.members.length <= 3 && raid.members.every((id) => rv.rioters.includes(id)) && raid.members.every((id) => W.getCharacter(id).task?.activity !== 'protest'));
+    st.time.hour = 10;
+    for (let i = 0; i < 12 && st.trust.revolt?.raids.length; i++) sim.step(225);
+    offLoot();
+    const t1 = totals();
+    check('yağmacılar Kiler\'e yürüyüp erzak ve odun yağmalar', lootedEv.food > 0 && lootedEv.wood > 0 && raid.members.some((id) => CZ.countItem(W.getCharacter(id), 'firewood') > 0), JSON.stringify(lootedEv));
+    check('yağmalanan odun çantalarda: kasaba deposundan düşülenle birebir', t1.wood - t0b.wood === lootedEv.wood, `${t1.wood - t0b.wood}/${lootedEv.wood}`);
+    // Birebir aktarım (anlık ölçüm): bir yağmacının tek baskını
+    const looter0 = W.getCharacter(st.trust.revolt.rioters[0]);
+    resetBag(looter0);
+    sim.give({ food: 100, wood: 100 });
+    st.trust.revolt.raids.push({ id: 998, targetId: storage.id, target: storage.name, members: [looter0.id], done: [], startedAt: now(), until: now() + 240, goods: {}, gold: 0 });
+    const before1 = { food: st.resources.food, wood: st.resources.wood, gold: st.resources.gold, coins: looter0.coins };
+    const got1 = S.trust.loot(looter0, storage);
+    const inv1 = CZ.inventoryResources(looter0);
+    check('yağmalanan mallar kaybolmaz: kasaba deposundan düşülen erzak ve odun birebir yağmacının çantasına geçer', got1 && before1.food - st.resources.food === inv1.food && before1.wood - st.resources.wood === inv1.wood && inv1.food === Math.min(CD.REVOLT.loot.food, 12) && inv1.wood > 0, JSON.stringify([inv1, before1.food - st.resources.food]));
+    check('yağmacının çantasındaki yer sınırı aşılmaz', looter0.inventory.length <= CZ.inventoryCapacity(looter0));
+    const goldLoot = lootedEv.gold;
+    check(hasHall ? 'Kiler yağmasında hazine (Belediye Konağı\'nda) korunur' : 'Kiler yağmasında hazineden altın da yağmalanır', hasHall ? goldLoot === 0 : goldLoot > 0, `${goldLoot}`);
+    check('yağma günlüğe, sayaçlara ve yağmacının anısına yazılır', st.stats.raids >= 1 && st.stats.lootedGoods >= lootedEv.wood && st.journal.some((j) => j.text.startsWith('ALARM · Yağma')) && raid.members.some((id) => W.getCharacter(id).memories.at(-1)?.text.includes('yağmasına')));
+    // Hazine yağması: Belediye Konağı
+    const hall = W.getCompleted('townHall')[0];
+    if (hall) {
+      const looter = W.getCharacter(st.trust.revolt.rioters[0]);
+      const raid2 = { id: 999, targetId: hall.id, target: hall.name, members: [looter.id], done: [], startedAt: now(), until: now() + 240, goods: {}, gold: 0 };
+      st.trust.revolt.raids.push(raid2);
+      const g0 = st.resources.gold;
+      const c0 = looter.coins;
+      const got = S.trust.loot(looter, hall);
+      check('Belediye Konağı yağması: hazineden düşülen altın birebir yağmacının kesesine geçer', got.gold > 0 && g0 - st.resources.gold === got.gold && looter.coins - c0 === got.gold && got.gold <= CD.REVOLT.loot.gold);
+    } else check('Belediye Konağı yağması: hazineden düşülen altın birebir yağmacının kesesine geçer', true, 'konak yok');
+    // Yatıştırma
+    st.town.welfare = 60;
+    st.trust.relief = {};
+    st.trust.value = 20;
+    const foodStatus = TR.reliefStatus(st, 'food');
+    const supply0 = scene.economy.foodSupply();
+    game.events.emit('ui:relief', { kind: 'food' });
+    check('acil erzak dağıtımı: yiyecek harcanır, güven +10', st.trust.value === 30 && Math.round(supply0 - scene.economy.foodSupply()) === foodStatus.cost && st.trust.revolt, st.trust.value);
+    check('erzak 12 saatte bir dağıtılabilir', !TR.reliefStatus(st, 'food').ok);
+    const g1 = st.resources.gold;
+    const someone = W.getCharacter(st.trust.revolt.rioters[0]);
+    const sc0 = someone.coins;
+    game.events.emit('ui:relief', { kind: 'gold' });
+    check('altın dağıtımı: hazineden sakinlerin keselerine, güven eşiği aşınca isyan biter', st.resources.gold < g1 && someone.coins > sc0 && !st.trust.revolt && st.journal.some((j) => j.text.startsWith('İsyan yatıştı')), `${st.trust.value}`);
+    S.behavior.endTask(someone);
+    someone.needs = { hunger: 90, energy: 90, social: 60, fun: 15 };
+    const after = S.behavior.brain.decide(someone, 10);
+    check('isyan bitince sakinler işlerinin başına döner', after.activity !== 'protest' && after.activity !== 'loot', after.activity);
+    // Refah kritikse isyan güven yüksek olsa da sürer; refah düzelince biter
+    st.trust.value = 60;
+    st.town.welfare = 20;
+    st.trust.lowSince = now() - CD.REVOLT.graceHours * 60;
+    S.trust.hourly();
+    check('refah uzun süre %25 altında kalırsa da isyan çıkar', st.trust.revolt);
+    st.town.welfare = 60;
+    st.trust.value = 60;
+    S.trust.hourly();
+    check('refah ve güven eşiği aşınca isyan kendiliğinden biter', !st.trust.revolt);
+    for (const c of st.characters) c.needs.fun = 70;
+    st.trust.value = 77;
+    nat.quirk = natQuirk;
+    // Kayıt için açık bir dilekçe ve dolu bir çanta bırak
+    resetBag(A);
+    CZ.addItem(A, 'souvenir', 1, 'Pirinç Yüzük');
+    CZ.addItem(A, 'ration', 5);
+    A.coins = 321;
+    const pk = S.petitions.open(A, 'street');
+    A.equipment.bag = keepBag;
+    const T = { id: A.id, coins: A.coins, inv: JSON.stringify(A.inventory), trust: st.trust.value, pid: pk.id, pkind: pk.kind, deadline: pk.deadline, made: st.petitions.made, revolts: st.trust.revolts, raids: st.stats.raids };
+    // --- Kayıt gidiş-dönüşü (sürüm 18): kese, çanta, dilekçe, güven ---
+    game.events.emit('ui:save');
+    const raw18 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    game.events.emit('ui:load');
+    const s3 = game.state;
+    const a3 = s3.characters.find((c) => c.id === T.id);
+    check('kayıt sürümü 18: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 18 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
+    check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
+    const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
+    check('kayıttan açık dilekçe (türü, sahibi, süresi) ve sayaçlar döner', pk3?.kind === T.pkind && pk3.characterId === T.id && pk3.deadline === T.deadline && s3.petitions.made === T.made);
+  }
+
   return out;
 });
 results.push(...pageResults);

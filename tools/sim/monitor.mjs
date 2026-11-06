@@ -7,6 +7,10 @@
 //                      ve içerideki listeleri, rezervasyonlar, iş emirlerinin atananları; evdeki kişi sayısı kapasiteyi aşıyor mu
 //   İş gücü          : çalışanı olan ama hiç üretmeyen (ya da çalışma noktası kalmamış) yapılar, sonsuz bekleyen iş emirleri
 //
+//   (21. aşama) Vatandaşlık: kesesi sayı olmayan / eksi sakin, çantası kapasitesini aşan ya da bozuk eşyalı sakin, kayıp sakine
+//                      ait dilekçe, aynı sakinin iki dilekçesi, kayıp isyancı, yıkılmış yapıyı hedefleyen yağma, aralık dışı
+//                      güven kopuk referanstır; güvenin en düşük / en yüksek değeri, isyan saatleri, yağma, dilekçe sonuçları,
+//                      yevmiye, alışveriş ve çantadan yemek raporlanır
 //   (20. aşama) Ulu Saat Kulesi: geçersiz aşama, iş emri olmayan süren aşama, Altın Çağ'sız tamamlanmış kule, bitiş
 //                      vaktini aşan Çağ Kutlaması kopuk referanstır; kulenin ulaştığı aşama ve Altın Çağ raporlanır
 //   (19. aşama) Sosyal yaşam: evli çift ortak eve taşınamadan RELOCATE_HOURS saatten uzun "taşınıyor" kalırsa ya da
@@ -27,6 +31,8 @@ export async function installMonitor(page) {
   await page.evaluate(async () => {
     window.__outfitFor = (await import('/src/systems/SkillSystem.js')).outfitFor;
     window.__charSprite = (await import('/src/art/sprites/index.js')).getCharacterSprite;
+    window.__citizens = await import('/src/systems/Citizens.js');
+    window.__citizenData = await import('/src/data/citizens.js');
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -54,7 +60,14 @@ export async function installMonitor(page) {
         minPop: Infinity,
         homelessMax: 0,
         weddingParties: 0,
+        // (21. aşama)
+        trustMin: Infinity,
+        trustMax: -Infinity,
+        revoltSamples: 0,
+        petitionEvents: { opened: 0, fulfilled: 0, rejected: 0, expired: 0 },
       };
+      game.events.on('petition:opened', () => m.petitionEvents.opened++);
+      game.events.on('petition:resolved', ({ outcome }) => m.petitionEvents[outcome]++);
       const on = (name, key) => game.events.on(name, () => m.events[key]++);
       on('relationship:married', 'weddings');
       on('family:childBorn', 'births');
@@ -205,6 +218,37 @@ export async function installMonitor(page) {
         }
         for (const c of s.characters) if (c.lastNews && typeof c.lastNews.text !== 'string') broke(`${c.name}: bozuk son haber`);
 
+        // ---- (21. aşama) Kese, çanta, dilekçeler, güven ve isyan ----
+        {
+          const CZ = window.__citizens;
+          const ITEMS = window.__citizenData.ITEMS;
+          const t = s.trust;
+          const tv = t?.value;
+          if (!Number.isFinite(tv) || tv < 0 || tv > 100) broke(`Yönetim Güveni aralık dışı (${tv})`);
+          m.trustMin = Math.min(m.trustMin, tv);
+          m.trustMax = Math.max(m.trustMax, tv);
+          if (t?.revolt) m.revoltSamples++;
+          for (const c of s.characters) {
+            if (!Number.isFinite(c.coins) || c.coins < 0) broke(`${c.name}: kesesi bozuk (${c.coins})`);
+            if (!Array.isArray(c.inventory)) broke(`${c.name}: çantası yok`);
+            else {
+              if (c.inventory.length > CZ.inventoryCapacity(c)) broke(`${c.name}: çantası taşıyor (${c.inventory.length}/${CZ.inventoryCapacity(c)})`);
+              for (const it of c.inventory) if (!ITEMS[it.kind] || !(it.qty > 0) || it.qty > ITEMS[it.kind].stack) broke(`${c.name}: bozuk eşya ${JSON.stringify(it)}`);
+            }
+          }
+          const owners = new Set();
+          for (const p of s.petitions?.list ?? []) {
+            if (!ids.has(p.characterId)) broke(`dilekçe #${p.id}: sahibi kayıp`);
+            if (owners.has(p.characterId)) broke(`dilekçe #${p.id}: sakinin iki dilekçesi var`);
+            owners.add(p.characterId);
+          }
+          const rv = t?.revolt;
+          if (rv) {
+            for (const id of rv.rioters) if (!ids.has(id)) broke(`isyan: kayıp isyancı ${id}`);
+            for (const r of rv.raids) if (!buildings.has(r.targetId)) broke(`yağma #${r.id}: hedef yapı yok`);
+          }
+        }
+
         // ---- (20. aşama) Ulu Saat Kulesi ve Altın Çağ ----
         const tower = s.buildings.find((b) => b.type === 'wonder');
         if (tower) {
@@ -309,6 +353,23 @@ export async function installMonitor(page) {
             homesFreed: s.stats.homesFreed ?? 0,
             news: s.social?.gossip.length ?? 0,
             quirks: Object.fromEntries(['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].map((q) => [q, s.characters.filter((c) => c.quirk === q).length])),
+          },
+          // (21. aşama)
+          citizens: {
+            trust: Math.round(s.trust?.value ?? 0),
+            trustMin: Number.isFinite(m.trustMin) ? Math.round(m.trustMin) : null,
+            trustMax: Number.isFinite(m.trustMax) ? Math.round(m.trustMax) : null,
+            revolts: s.stats.revolts ?? 0,
+            revoltHours: m.revoltSamples,
+            raids: s.stats.raids ?? 0,
+            lootedGoods: s.stats.lootedGoods ?? 0,
+            lootedGold: s.stats.lootedGold ?? 0,
+            reliefs: s.stats.reliefs ?? 0,
+            petitions: { made: s.petitions?.made ?? 0, fulfilled: s.petitions?.fulfilled ?? 0, rejected: s.petitions?.rejected ?? 0, expired: s.petitions?.expired ?? 0, accepted: s.petitions?.accepted ?? 0, open: s.petitions?.list.length ?? 0 },
+            wages: s.stats.wagesPaid ?? 0,
+            purchases: s.stats.purchases ?? 0,
+            bagMeals: s.stats.bagMeals ?? 0,
+            ...window.__citizens.purseTotals(s),
           },
           // (20. aşama)
           golden: {

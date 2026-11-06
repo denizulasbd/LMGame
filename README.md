@@ -60,6 +60,10 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 | `F` / dock'ta **Fotoğraf** | Fotoğraf modu: bütün arayüz gizlenir; kamerayı gezdirip kasabayı seyret (`F`, `Esc` ya da sağ alttaki ipucu geri getirir) |
 | Karakter panelinde eşin, çocuğun, ebeveynin ya da bir ilişkinin adı | O sakini seç |
 | Karakter kartında **Sosyal Hayat** bölümü | Sakinin huyu, eşi ve paylaştıkları ev, son duyduğu dedikodu (eşin adına tıklayınca o seçilir) |
+| Karakter kartında **Kişisel Kese & Çanta** | Sakinin kesesindeki altın ve çantasındaki eşyalar (üzerine gelince ne işe yaradığı) |
+| Karakter kartındaki parşömen kutusu: **Kabul Et** / **Fidanı Dik · Bank Koy · Aleti Ver · Zili Çal** / **Reddet** | Sakinin dilekçesini kabul et (yarım gün ek süre), bedelini ödeyip hemen karşıla ya da reddet |
+| Üst çubuğun altındaki **Dilekçe · Ad** çipi / kırmızı **İsyan!** çipi | Dilekçe sahibini seç / meydan havuzunun (ya da Belediye Konağı'nın) panelini aç |
+| Meydan havuzunun ya da Belediye Konağı'nın panelinde **Erzak Dağıt** / **Altın Dağıt** | Halka acil erzak ya da altın dağıt: Yönetim Güveni artar, isyan yatışır (12 saatte bir) |
 | `B` / dock'ta **İnşa Et** | İnşa et aracı (dock'un üstünde açılan listeden yapı seç, haritada tıkla; yolu sürükleyerek döşe; düğmeye yeniden basmak aracı bırakır) |
 | `H` / dock'ta **Topla** | Kaynak topla aracı (ağaç, kaya, çalı üzerinde sürükle; emirliden başlarsan kaldırır) |
 | `X` / dock'ta **Yık** | Yık / iptal aracı (yapı, şantiye, yol, toplama emri) |
@@ -168,6 +172,8 @@ LMGame/
     │   ├── festivals.js    Dört mevsim kapanış festivali: saatler, yerler, bonuslar, süslemeler, anı cümleleri
     │   ├── exploration.js  (16. aşama) Sefer kuralları, dört macera ve seçenekleri (risk, usta / alet kuralları, ganimet),
     │   │                   egzotik ganimetler, üç kadim yazıt ve imar şemaları, üzüm asması
+    │   ├── citizens.js     (21. aşama) Kişisel kese (harçlık, yevmiye), çanta eşyaları ve yuvaları, iş yerinden pay,
+    │   │                   alışveriş, dilekçe türleri ve etkileri, Yönetim Güveni, yatıştırma, isyan ve yağma sayıları
     │   ├── goldenAge.js    (20. aşama) Ulu Saat Kulesi'nin açılışı ve ustalık katkısı, Kadim Dişli, Çağ Kutlaması, Altın Çağ
     │   │                   çanı ve çarpanları, Tarihçe, tüccarın nadir malları
     │   ├── social.js       (19. aşama) Flört ve randevu, düğün kutlaması, evli çiftin akşam yemeği, dört karakter
@@ -253,6 +259,11 @@ LMGame/
     │   ├── ExpeditionSystem.js (16. aşama) Keşif seferleri: yola çıkış, maceralar, kaza, dönüş, ganimet, anılar, handa
     │   │                   hikâye anlatma; harabe yazıtları ve çözme
     │   ├── Exploration.js  (16. aşama) Keşfin saf hesapları: kafile seçimi, risk, sefer durumu, şema etkileri
+    │   ├── PurseSystem.js  (21. aşama) Yevmiye, iş yerinden pay, çantadan yemek / şifalı ot / hatıra, pazar ve han alışverişi
+    │   ├── PetitionSystem.js (21. aşama) Vatandaş dilekçeleri: oluşma, kabul, hemen karşılama, ret, süre dolması, ödül ve
+    │   │                   cezalar; Petitions.js saf hesaplar (karşılandı mı, ilerleme, "Hemen Karşıla" durumu)
+    │   ├── TrustSystem.js  (21. aşama) Yönetim Güveni, isyan, yağma baskınları (depodan çantaya birebir), acil erzak / altın
+    │   │                   dağıtımı; Citizens.js saf yardımcılar (kese, çanta yuvaları, güven seviyesi, isyancı mı)
     │   ├── GoldenAgeSystem.js (20. aşama) Çağ Kutlaması, 08:00 / 18:00 kule çanı, Tarihçe Kütüğü; GoldenAge.js saf yardımcılar
     │   │                   (Altın Çağ çarpanları, ustalık katkısı, dişli ihtiyacı, baş usta)
     │   ├── SocialSystem.js (19. aşama) Huyların dağıtımı ve etkileri, randevu bonusu, meydanda düğün kutlaması, boşalan
@@ -423,8 +434,13 @@ eşiyle son akşam yemeği günü (`dinnerDay`) ve son randevusu (`lastDateAt`),
 (`stats.dates`, `weddingParties`, `familyDinners`, `gossipHeard`, `serenades`, `petCuddles`, `booksRead`, `homesFreed`)
 eklendi; evli çiftin ortak evi zaten `homeId` ile kayda girer. 20. aşamada kulenin aşama günleri, Altın Çağ (`goldenAge`: başladığı an, çan sayısı, süren Çağ Kutlaması, antik kitaplar),
 Tarihçe Kütüğü (`chronicle`: kurucular, ilk evlenen çift, ilk usta eseri, kuleye verilen emek ve baş usta, kulenin aşamaları),
-Kadim Dişli stoğu (`resources.gears`), Mermer Çeşme / Altın Çağ Feneri ve `stats.ageCelebrations` eklendi. Kayıt sürümü
-17'dir; 4.–19. aşamanın (sürüm 2–16) kayıtları da açılır (Tarihçe sakinlerden çıkarılır, tamamlanmış kulesi olan kasaba Altın
+Kadim Dişli stoğu (`resources.gears`), Mermer Çeşme / Altın Çağ Feneri ve `stats.ageCelebrations` eklendi. 21. aşamada
+sakinlerin kişisel kesesi ve çantası (`coins`, `inventory`: `[{ kind, qty, name? }]`), Yönetim Güveni ve isyan (`trust`: değer,
+kritik eşiğin altında kalmaya başladığı an, süren isyan — isyancılar, yağma baskınları, yağmalananlar —, son dağıtımlar, en düşük
+değer), vatandaş dilekçeleri (`petitions`: açık dilekçeler ve durumları, sıradaki dilekçenin zamanı, sonuçlananların günlüğü,
+sayaçlar) ve yeni sayaçlar (`stats.wagesPaid`, `purchases`, `bagMeals`, `revolts`, `raids`, `lootedGoods`, `lootedGold`, `reliefs`)
+eklendi. Kayıt sürümü 18'dir; 4.–20. aşamanın (sürüm 2–17) kayıtları da açılır (her yetişkine 12, her çocuğa 3 altın başlangıç
+harçlığı verilir, çantalar boş, Yönetim Güveni %75 başlar, dilekçe ve isyan yoktur) (Tarihçe sakinlerden çıkarılır, tamamlanmış kulesi olan kasaba Altın
 Çağ'a kutlamasız girer, dişli ve kitap 0 başlar) (huyu olmayan sakinlere ilk açılışta huy dağıtılır, dedikodu boş başlar, evli çiftler kendi evlerinde kalır) (peyzaj durumu boş başlar) (usta işi eser vitrini ve keşif ganimetleri boş başlar; eski biçimde yarım kalmış bir sefer maceralar
 açmadan sürer ve döner) (anısı olmayan sakinin anı defteri ilk açılışta "Kasabada yaşamaya başladı" ile açılır): eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
 ve ekipmansız başlar; yün, demir, ekmek ve altın 0 olur; araştırma, ihracat ve yadigâr boş başlar; arşiv ilk açılışta
@@ -2076,6 +2092,111 @@ Eski kayıtlarda kütük yüklenince doldurulur: kurucular ilk sakinlerin anıs�
   (`tools/art-preview.html`): kulenin üç aşaması, zamanla yayılan çan dalgaları, Mermer Çeşme'nin dört karesi, Altın Çağ
   Feneri'nin gündüz / gece hâli, dişli ve çan simgeleri.
 
+## Vatandaşlık: kişisel kese ve çanta, dilekçeler, Yönetim Güveni, isyan ve yağma (21. aşama)
+
+Bu aşama mevcut sistemlerin (karakterler, sosyal yaşam, refah, meslekler, ikilem olayları) üstüne **bağımsız bir katman** olarak
+eklendi: hiçbir eski kural değiştirilmedi, yeni sistemler yalnızca olayları dinler ve kendi rastgele sayı üreteçlerini kullanır
+(eski kararların sırası bozulmaz). Sayılar `data/citizens.js`'te; mantık `systems/PurseSystem.js` (kese ve çanta),
+`systems/PetitionSystem.js` (dilekçeler; saf hesaplar `systems/Petitions.js`), `systems/TrustSystem.js` (güven, isyan, yağma,
+yatıştırma; saf yardımcılar `systems/Citizens.js`), kararlar `ai/Brain.js`'tedir. Sakin varlığı `entities/Character.js`'tir
+(oyunda ayrı bir `Resident.js` yoktur; kese ve çanta oraya eklendi).
+
+### Kişisel kese ve çanta
+
+- Her sakinin ekipman yuvalarından (alet, kıyafet, çanta) **bağımsız** bir kesesi (`coins`) ve çantası (`inventory`) vardır.
+  Çanta **4 yuvalıdır**; Sırt Çantası kuşanan yetişkinde 6, çocukta 2 (ekipman yalnızca okunur, değişmez). Her yuvada tek tür
+  eşya istiflenir: Ekmek (6), Börek (4), Erzak (12), Meyve (4), Şifalı Ot (3), adlı Hatıra (1), Odun Demeti (15).
+- **Başlangıç harçlığı:** yeni yetişkin 12, çocuk 3 altın (eski kayıtlarda da).
+- **Yevmiye** kasaba hazinesinden ödenmez (gelecekteki vergi / haraç sistemlerinin altyapısı): biten her vardiya +1, bitirilen
+  hasat işi (ağaç, kaya, çalı) +1, şantiye / yükseltme / onarım +2, usta işi eser +15. Çocuklar yevmiye almaz.
+- **İş yerinden pay:** vardiya sonunda olasılıkla fırıncı bir ekmek, bahçıvan meyve, şifacı bir demet şifalı ot, balıkçı erzak
+  alır. Kaynaklı paylar kasaba stoğundan düşülür (stok azken alınmaz); hiçbir şey yoktan ya da boşa gitmez.
+- **Alışveriş:** boş zamanında kesesi ve çantasında yeri olan sakin (günde en çok bir kez) Pazar Yeri'ne gider: hastaysa şifalı
+  ot, hiç hatırası yoksa kendine bir hatıra (Boncuk Kolye, Oymalı Tahta At… anısına yazılır), çantası boşsa meyve alır. Handa
+  yemekten sonra pişmiş bir porsiyonu azık (Börek) olarak alabilir. Harcanan para esnafa gider, hazineye girmez.
+- **Çantadan tüketim:** acıkan sakin çantasında yiyecek varsa yürümeden yer ("Çantasından ekmek çıkarıp yiyor"; çok açken her
+  zaman, değilse yarı yarıya), üşüten şifalı otu demler (hastalığın kalan süresi %40 kısalır), keyfi düşen hatırasına bakar.
+- **Karakter Detay Kartı → Kişisel Kese & Çanta:** kesedeki altın, çantanın yuvaları (simge ve adet; üzerine gelince ne işe
+  yaradığı) ve kısa liste; isyancıysa kırmızı "İsyancı" / "Yağmada" etiketi.
+
+### Vatandaş istekleri / dilekçeler
+
+İkilem olaylarından (DilemmaSystem) bağımsızdır; oyunu durdurmaz. 2-3 günde bir (09:00-17:00) bir yetişkin huyuna, mesleğine ve
+kasabanın eksiğine göre yöneticiden bir şey ister; başında **parşömen balonu** çıkar, bildirim ve Kasaba Günlüğü'ne düşer, üst
+çubuğun altındaki durum çiplerinde görünür (tıklayınca sakin seçilir). Aynı anda en çok 2 açık dilekçe olur.
+
+| Dilekçe | Kim ister? | Nasıl karşılanır? | Hemen Karşıla |
+|---|---|---|---|
+| Evimin yakınına bir fidan | Doğa Tutkunu (en çok), evi olan herkes | Evinin 7 karo yakınına süs fidanı / kiraz | **Fidanı Dik** (Odun 2, Yiyecek 2) |
+| Sokağımıza fener veya bank | Herkes (Hayvansever daha çok) | Evinin yakınına fener ya da bank | **Bank Koy** (Odun 4) |
+| Bilgelik Evi / yeni araştırma / antik kitap | Kitap Kurdu | Bilgelik Evi kurmak, araştırma başlatmak, tüccardan kitap almak | — |
+| Kışlık odun ve yiyecek stoğu | Oduncu, taşçı, madenci; sonbahar ve kışta herkes | Odun ve yiyecek değeri hedefe çıkınca | — |
+| Bana sağlam bir alet | Meslek sahibi (dış işçiler daha çok) | Sağlam Alet kuşanınca | **Aleti Ver** (depodaki alet ya da Demir 4, Odun 3) |
+| Meydanda buluşma | Müzisyen (en çok) | Toplanma Zili ya da şenlik | **Zili Çal** |
+
+- Karakter kartının üstündeki parşömen kutusunda istek, ne yapılması gerektiği (stokta "Odun 40/120 · Yiyecek 90/120"), kalan
+  süre ve **Kabul Et** (yarım gün ek süre, güven +1) / **Hemen Karşıla** / **Reddet** düğmeleri vardır. Meydan havuzunun ve
+  Belediye Konağı'nın panelinde açık dilekçelerin listesi durur.
+- Süre 2,5 gündür. **Yerine getirilirse:** güven +6 (kabul edilmişse +8), sakinin keyfi +20, Yaşam Günlüğü'ne olumlu anı
+  ("Yöneticiye ilettiği dileği yerine getirildi: fidan"), kasabaya bir günlük **Sesimiz Duyuldu** (+3 refah) bonusu.
+  **Reddedilirse:** güven −5, keyif −12, olumsuz anı. **Süresi dolarsa:** güven −6 (söz verilip tutulmadıysa −3 daha), keyif −15.
+
+### Yönetim Güveni ve isyan
+
+- **Yönetim Güveni / Asayiş** (`trust`, 0-100, başlangıç 75) refahla paralel çalışır; refah hesabına dokunmaz. Üst çubukta refah
+  çubuğunun altında ince ikinci bir çubuk ve küçük bir kalkan olarak görünür (üzerine gelince yüzdesi ve kuralları); %50'nin
+  altına inince durum çiplerinde "Güven %42" uyarısı çıkar.
+- Saat başı kasabanın ortalama refahına göre değişir: %70 üstü +0,25, %55-70 +0,1, %35-55 sabit, %25-35 −0,5, %25 altı −0,8.
+  Açlıktan kıvranan her sakin (tokluk < 10) −0,06 (en çok −0,6), kışın odun bitip evler soğuyunca −0,3. Akşam şenliği +4, mevsim
+  festivali +6, Büyük Ziyafet +8, Altın İkramiye +6, Toplanma Zili günde bir +2 (isyanda +4), evlerin soğuması −3.
+- **İsyan:** güven ya da refah **12 saat boyunca %25'in altında** kalırsa çıkar. En mutsuz yetişkinler (en az 2, en çok %60)
+  işlerini bırakır; gündüz (08:00-20:00) meydan havuzunun başında öfkeyle toplanır (kızgın ve meşale balonları, "Meydanda öfkeyle
+  yönetime bağırıyor"), Kasaba Günlüğü'ne "ALARM · İsyan çıktı!" düşer, üst çubukta kırmızı isyan çipi yanıp söner. Yemek ve uyku
+  önce gelir; şenlik, kutlama ve toplanma zili isyandan önce gelir. Öfkesi artanlar 6 saatte bir isyana katılır.
+- **Yağma:** isyan sürerken 3 saatte bir en çok 3 isyancı Kiler'e (erzak ve odun; Belediye Konağı yoksa hazine), Fırın'a (ekmek)
+  ya da Belediye Konağı'na (hazine) yürür. Yağmalanan mal **kaybolmaz**: kasaba deposundan düşülen erzak, ekmek ve odun birebir
+  yağmacıların çantalarına (Erzak, Ekmek, Odun Demeti), altın da keselerine geçer (çantadaki yer kadar; kişi başı en çok 12 erzak,
+  6 ekmek, 15 odun, 40 altın). Günlüğe "ALARM · Yağma: … Kiler yapısını yağmaladı; 24 yiyecek, 30 odun … yağmacıların çantalarına
+  geçti" yazılır.
+- **Yatıştırma:** meydan havuzunun ya da Belediye Konağı'nın panelindeki **Yönetim Güveni** bölümünden **Erzak Dağıt** (sakin başı
+  2 yiyecek değeri, herkesin tokluğu +30, güven +10) ve **Altın Dağıt** (yetişkin başı 8 altın keselere, güven +12; ikisi de 12 saatte
+  bir), şenlik / festival, Toplanma Zili ya da dilekçeleri karşılamak. Güven %35'in üstüne çıkıp refah %25'in üstündeyken isyan
+  biter ("İsyan yatıştı"), isyancılar işlerinin başına döner, anılarına "Kasabadaki isyana katıldı" düşer.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 499; 71'i bu aşamanın): başlangıç harçlığı, çanta yuvaları (4 / Sırt Çantası'yla 6 / çocukta
+  2), istif ve taşma, gerçek bir vardiyanın yevmiyesi, inşaat / hasat / usta eseri ödülü ve hazinenin değişmemesi, fırıncının ekmek
+  payının kasaba stoğundan gelmesi, şifacının ot payı, çantadan yeme planı ve gerçek yeme (tokluk, sayaç, durum metni), şifalı ot
+  çayı, pazar alışverişi ve hatıra anısı, pazara gitme kararı, han azığı, Kişisel Kese & Çanta kartı; huy ve mesleğe göre dilekçe
+  seçimi, dilekçenin oluşması (balon, günlük, bildirim, süre), sakin başına tek dilekçe, karttaki parşömen kutusu ve düğmeleri,
+  üst çubuk çipi, kabul (+yarım gün, güven +1), "Fidanı Dik" ile karşılama (güven, keyif, olumlu anı, Sesimiz Duyuldu), karttaki
+  "Reddet" düğmesi, süre dolması (sözü tutulmayan ek ceza), kışlık stok hedefi, "Aleti Ver", "Zili Çal", 2-3 günlük aralık;
+  güvenin refah, açlık, soğuk ve şenlikle değişmesi, üst çubuktaki güven çubuğu ve ipucu; isyanın 12 saatlik eşiği, isyancı
+  sayısı, ALARM günlüğü, isyancının işe gitmeyip meydanda toplanması, isyan çipi; gerçek bir Kiler baskını, yağmalanan erzak ve
+  odunun kasaba deposundan birebir yağmacının çantasına geçmesi, çanta sınırı, Belediye Konağı'ndan hazinenin keseye geçmesi,
+  yağmanın günlüğe ve anılara yazılması; erzak ve altın dağıtımı (bedel, bekleme süresi), eşiği aşınca isyanın bitmesi ve
+  sakinlerin işe dönmesi, kritik refahla da isyan çıkması; kayıt sürümü 18 gidiş-dönüşü (kese, adlı hatıralı çanta, güven,
+  isyan sayacı, açık dilekçe).
+- **Denetim** (`audit.mjs`, 96): isyan ve yağma baskını sürerken kayıt -> yükleme durum kayması yok; isyan, baskın ve dilekçe aynen
+  döner, baskın sonuçlanır, yatıştırılan isyan bir kez biter ve sakinler işe döner. Beş çözünürlükte arayüz yerleşimi yine temiz
+  (güven, refah çipinin içinde ince bir çubuk ve kalkan olarak durduğu için 1280 piksellik üst çubuk tek satırda kalır).
+- **Uyumluluk** (`compat.mjs`, sürüm 2-18, 333): `save-v18.json` bu aşamanın otopilotuyla 34 günlük oyundur (keselerde 1840 altın,
+  çantalarda 81 eşya, 12 dilekçenin 11'i karşılandı, güven %99). Sürüm 2-17 kayıtlarında her yetişkin 12, her çocuk 3 altınla,
+  boş çantayla açılır, güven %75'tir; bir gün sonra keseler ve çantalar geçerli, isyan yok.
+- **Otopilot** (`autopilot.mjs 42 36`): dilekçelerin fidan, bank, alet ve buluşmayı hemen karşılar, ötekileri kabul edip yerine
+  getirir (kışlık stok için ek kesim). 13 dilekçenin 12'si karşılandı, biri süresi dolarak kapandı; güven hiç %75'in altına inmedi,
+  isyan 0; 2621 altın yevmiye, 354 alışveriş, 328 kez çantadan yemek; takılma 0, kopuk referans 0, sayfa hatası 0. 20. aşamanın
+  metrikleri korundu (kule G27 / G29 / G31, Altın Çağ G31, en düşük ortalama refah %70).
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 36`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen
+  iş 0, üretmeyen iş yeri 0, sosyal sıkışma 0, sayfa hatası 0. Altı kasabada 78 dilekçe (71 karşılandı, 5 süresi doldu, 0 ret),
+  isyan 0, yağma 0, en düşük güven her koşuda %75; 16 962 altın yevmiye, 2128 alışveriş, 1924 çantadan yemek, koşu sonunda
+  keselerde 13 118 altın ve çantalarda 471 eşya. Ulu Saat Kulesi altı koşunun altısında tamamlandı (Altın Çağ G29-G34).
+- Sonuç: `tests.mjs` 499/499, `audit.mjs` 96/96, `compat.mjs` 333/333, sayfa hatası yok. **Sanat önizleme**
+  (`tools/art-preview.html`): yeni simgeler (parşömen, güven kalkanı, meşale, kese, hatıra, fener, yağma çuvalı), yeni balonlar
+  (dilekçe, meşale, kese, yağma, öfke), çanta eşyaları ve küçük sahneler (dilekçe veren sakin, pazar alışverişi, çantasından yiyen,
+  meydanda isyan, Kiler yağması).
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -2118,10 +2239,10 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (428; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 17'ye) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (499; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 18'e) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
-| `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması / Çağ Kutlaması sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
+| `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması / Çağ Kutlaması / isyan ve yağma sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |
 | `node tools/sim/autopilot.mjs 42 40` | Hilesiz otopilotla 40 günlük oyun (18. aşama: kapıları yola bağlar, parke döşer, süs ve ağaç diker; döşenen yol, estetik ve yürüyüşlerin yoldan geçme oranı raporlanır): günlük özet (araştırma, altın, sefer, harika aşaması, yadigâr ve harcanan altın dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya, altının yadigâr / lüks mal / fermanlara ne kadar harcandığı, peyzaj ve son 12 günün ortalama stoğu; (14. aşama) mevsim festivalleri ve katılımcıları, anı sayıları ve örnek bir sakinin anıları, nadir hava olayları, Büyük İhracat Seferi sayısı. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar, `--speed 1\|2\|4` oyun hızını seçer, `--json rapor.json` bekçi raporunu yazar (takılma ya da kopuk referans varsa çıkış 1) |
 | `node tools/sim/preview.mjs ["başlık"]` | Sanat önizleme sayfasının bölümlerinin ekran görüntüleri (`tools/sim/out/`) |
@@ -2130,7 +2251,8 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 `tools/sim/lib.mjs` ortak yardımcıları içerir: oyunu açma, saat saat ilerletme (oyunun hızına göre adım sayısı),
 `window.sim` (yapı kurma, kaynak verme, olay günlüğü) ve test kaydı. `tools/sim/monitor.mjs` uzun koşuların bekçisidir:
 saat başı sakinlerin takılıp takılmadığını (boşta / yolda aynı karoda 150 dakika, yürünemez karoda 120 dakika), referans
-bütünlüğünü ve iş gücünü denetler; 19. aşamadan beri evlilik akışını da izler (30 saatte yeni evine taşınamayan sakin, boş yatak
+bütünlüğünü ve iş gücünü denetler; 21. aşamadan beri keseleri, çantaları (kapasite, bozuk eşya), dilekçeleri, isyancıları ve
+yağma hedeflerini de denetler, güvenin en düşük değerini, isyan saatlerini ve dilekçe sonuçlarını raporlar; 19. aşamadan beri evlilik akışını da izler (30 saatte yeni evine taşınamayan sakin, boş yatak
 varken 48 saat ayrı evlerde kalan evli çift, bitiş vaktini aşan kutlama, huyu olmayan sakin, kayıp sakine işaret eden haber) ve en
 düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 

@@ -11,6 +11,7 @@
 //   11. aşama: pet:arrived, health:fellIll / recovered / cured, dilemma:resolved / recruited, storm:struck,
 //   expedition:departed / returned, civic:decreed, building:mended
 //   19. aşama: social:partyStarted (düğün kutlaması), social:homeFreed (boşalan ev), gossip:spread (yayılan haber)
+//   21. aşama: petition:opened / resolved (dilekçeler), revolt:started / ended / raidEnded (isyan ve yağma), relief:given
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
@@ -20,6 +21,8 @@ import { describeOffer } from './EventSystem.js';
 import { SKILLS } from '../data/skills.js';
 import { formatTownTitle } from './TownStatus.js';
 import { cargoValue } from './HarborSystem.js';
+import { PETITION_KINDS } from '../data/citizens.js';
+import { genitive } from '../utils/turkish.js';
 
 // İşlenmiş malların ilk üretimi
 const FIRST_GOODS_TEXT = {
@@ -174,6 +177,22 @@ export class JournalSystem {
       on('inscription:found', ({ inscription, source }) => this.log(`${source === 'ruin' ? 'Onarılan harabenin içinden' : 'Seferden'} kadim bir yazıt çıktı: ${inscription.name}`, 'inscription')),
       on('inscription:decoded', ({ inscription }) => this.log(`Bilge kadim yazıtı çözdü: ${inscription.name} (${inscription.description})`, 'scheme')),
       on('expedition:taleTold', ({ teller, listeners, route }) => this.log(`${teller.name} ${route} Seferi'ni anlattı; ${listeners.length} kişi soluksuz dinledi`, 'adventure')),
+      // 21. aşama: vatandaş dilekçeleri, isyan ve yağma, yatıştırma
+      on('petition:opened', ({ petition }) => this.log(`Dilekçe · ${petition.name}: "${petition.text}"`, 'scroll')),
+      on('petition:resolved', ({ petition, outcome }) => {
+        const what = PETITION_KINDS[petition.kind].name;
+        if (outcome === 'fulfilled') this.log(`${genitive(petition.name)} dilekçesi karşılandı (${what}): yönetime güven arttı`, 'scroll');
+        else if (outcome === 'rejected') this.log(`${genitive(petition.name)} dilekçesi reddedildi (${what})`, 'sulk');
+        else this.log(`${genitive(petition.name)} dilekçesi yanıtsız kaldı, süresi doldu (${what})`, 'sulk');
+      }),
+      on('revolt:started', ({ names }) => this.log(`ALARM · İsyan çıktı! ${names.join(', ')} işi bıraktı, meydanda öfkeyle toplanıyor`, 'torch')),
+      on('revolt:raidEnded', ({ raid, names }) => {
+        const parts = Object.entries(raid.goods).map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`);
+        if (raid.gold) parts.push(`${raid.gold} altın`);
+        if (parts.length) this.log(`ALARM · Yağma: ${names.join(', ')} ${raid.target} yapısını yağmaladı; ${parts.join(', ')} kasaba deposundan yağmacıların çantalarına geçti`, 'loot');
+      }),
+      on('revolt:ended', ({ hours }) => this.log(`İsyan yatıştı (${hours} saat sürdü); sakinler işlerinin başına döndü`, 'trust')),
+      on('relief:given', ({ kind, cost }) => this.log(kind === 'food' ? `Halka acil erzak dağıtıldı (${cost} yiyecek değeri)` : `Halka altın dağıtıldı (${cost} altın)`, kind === 'food' ? 'food' : 'coin')),
       // 12. aşama: Bilgelik Evi, okul, liman ve harika
       on('research:started', ({ research }) => this.log(`Bilgelik Evi'nde araştırma başladı: ${research.name}`, 'book')),
       on('research:completed', ({ research }) => this.log(`Araştırma tamamlandı: ${research.name}`, research.icon)),

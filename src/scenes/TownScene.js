@@ -61,6 +61,9 @@ import { WeddingConfetti } from '../rendering/WeddingConfetti.js';
 import { GoldenAgeSystem } from '../systems/GoldenAgeSystem.js';
 import { ChimeWaves } from '../rendering/ChimeWaves.js';
 import { towerOf } from '../systems/GoldenAge.js';
+import { PurseSystem } from '../systems/PurseSystem.js';
+import { TrustSystem } from '../systems/TrustSystem.js';
+import { PetitionSystem } from '../systems/PetitionSystem.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -151,7 +154,12 @@ export class TownScene extends Scene {
     this.goldenAge = new GoldenAgeSystem(this.game, this.world, { attract: this.attract });
     this.rally = new RallySystem(this.game);
     this.craftsmanship = new CraftsmanshipSystem(this.game, this.world, this.economy, new Random(state.seed + 16));
+    // (21. aşama) Vatandaşlık katmanı: kişisel kese ve çanta, Yönetim Güveni ve isyan, vatandaş dilekçeleri (kendi üreteçleri)
+    this.purse = new PurseSystem(this.game, this.world, this.economy, new Random(state.seed + 21));
+    this.trust = new TrustSystem(this.game, this.world, { economy: this.economy }, new Random(state.seed + 22), { attract: this.attract });
+    this.petitions = new PetitionSystem(this.game, this.world, { economy: this.economy, construction: this.construction, crafting: this.crafting, trust: this.trust }, new Random(state.seed + 23), { attract: this.attract });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
+      citizens: this.purse,
       economy: this.economy,
       jobs: this.jobs,
       relationships: this.relationships,
@@ -197,6 +205,7 @@ export class TownScene extends Scene {
       this.memories,
       this.goldenAge,
       this.rally,
+      this.petitions,
       this.heating,
       this.milestones,
       this.townLevel,
@@ -239,6 +248,9 @@ export class TownScene extends Scene {
       this.craftsmanship,
       this.expeditions,
       this.landscape,
+      this.purse,
+      this.trust,
+      this.petitions,
     ];
 
     this.camera = new Camera();

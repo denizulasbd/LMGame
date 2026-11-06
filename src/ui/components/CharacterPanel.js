@@ -9,6 +9,9 @@
 // hatırladığı anı vurgulanır ve durum satırında "Anılara daldı" etiketi çıkar.
 // (19. aşama) "Sosyal Hayat": huyu (Hayvansever, Kitap Kurdu, Müzisyen, Doğa Tutkunu), eşi ve paylaştıkları ev, son
 // duyduğu dedikodu (kimden, ne zaman). Huy ayrıca kişilik etiketlerinin yanında altın çerçeveli bir çip olarak görünür.
+// (21. aşama) "Kişisel Kese & Çanta": sakinin altını ve çantasındaki eşyalar (4 yuva, Sırt Çantası'yla 6); isyancıysa
+// kırmızı "İsyancı" etiketi. Açık bir dilekçesi varsa kartın üstünde parşömen kutusu: isteği, ne yapılmalı, kalan süre ve
+// Kabul Et / Hemen Karşıla / Reddet düğmeleri ('ui:acceptPetition', 'ui:grantPetition', 'ui:rejectPetition').
 import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../../art/sprites/index.js';
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
@@ -27,6 +30,10 @@ import { CHARACTER_NAME_MAX_LENGTH } from '../../data/characters.js';
 import { LUXURY_GOODS } from '../../data/luxury.js';
 import { el } from '../dom.js';
 import { QUIRKS } from '../../data/social.js';
+import { ITEMS, PETITION_KINDS } from '../../data/citizens.js';
+import { RESOURCES } from '../../data/resources.js';
+import { inventoryCapacity, petitionOf, isRioter, raidOf } from '../../systems/Citizens.js';
+import { petitionProgress, grantStatus, formatRemaining } from '../../systems/Petitions.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -108,6 +115,8 @@ export class CharacterPanel {
     this.skillsList = el('div', { className: 'relations-list skills-list' });
     this.conditions = el('div', { className: 'character-conditions' });
     this.socialList = el('div', { className: 'social-life' });
+    this.purseBox = el('div', { className: 'purse-box' });
+    this.petitionBox = el('div', { className: 'petition-box', hidden: true });
     this.memoryList = el('div', { className: 'memory-list' });
     this.memoryToggle = this.button('Tümünü Göster', 'Sakinin bütün anılarını göster / gizle', () => {
       this.showAllMemories = !this.showAllMemories;
@@ -131,11 +140,13 @@ export class CharacterPanel {
         el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.meta, this.craftBadge, this.traits]),
       ]),
       el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
+      this.petitionBox,
       el('div', { className: 'character-needs' }, needs),
       section('Aile', this.familyList),
       section('İlişkiler', this.relationsList),
       section('Sosyal Hayat', this.socialList),
       section('Ekipman', this.equipmentList),
+      section('Kişisel Kese & Çanta', this.purseBox),
       section('Meslekler', this.skillsList),
       section('Anılar ve Hatıralar', this.memoryBox),
       this.followButton,
@@ -225,6 +236,8 @@ export class CharacterPanel {
     this.lastEquipment = null;
     this.lastMemories = null;
     this.lastSocial = null;
+    this.lastPurse = null;
+    this.lastPetition = null;
   }
 
   render(game) {
@@ -264,6 +277,84 @@ export class CharacterPanel {
     this.renderConditions(character, game.state);
     this.renderMemories(character, game.state);
     this.renderSocial(character, game.state);
+    this.renderPurse(character, game.state);
+    this.renderPetition(character, game.state);
+  }
+
+  /** (21. aşama) Kişisel Kese & Çanta: altını ve çantasındaki eşyalar (boş yuvalar soluk). */
+  renderPurse(character, state) {
+    const capacity = inventoryCapacity(character);
+    const rioter = isRioter(state, character);
+    const raid = rioter ? raidOf(state, character) : null;
+    const inv = character.inventory ?? [];
+    const key = `${character.id}:${character.coins}:${capacity}:${rioter}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}`).join(',')}`;
+    if (key === this.lastPurse) return;
+    this.lastPurse = key;
+    const coins = el('div', { className: 'purse-coins', title: 'Kişisel kese: yevmiyeler, usta eseri ödülleri ve alışveriş (kasaba hazinesinden ayrıdır)' }, [
+      el('img', { src: getAnyIconURL('purse'), alt: '' }),
+      el('span', { className: 'purse-amount', text: `${character.coins ?? 0}` }),
+      el('span', { className: 'purse-unit', text: 'altın' }),
+      ...(rioter ? [el('span', { className: 'purse-rioter', text: raid ? 'Yağmada' : 'İsyancı', title: 'Yönetime öfkeli: işi bıraktı, meydanda toplanıyor' })] : []),
+    ]);
+    const slots = [];
+    for (let i = 0; i < capacity; i++) {
+      const item = inv[i];
+      const def = item ? ITEMS[item.kind] : null;
+      const name = item ? item.name ?? def.name : 'Boş yuva';
+      const hint = def ? `${name}${item.qty > 1 ? ` ×${item.qty}` : ''}${def.hunger ? ` · tokluk +${def.hunger}` : ''}${def.heal ? ' · hastalığı çabuk geçirir' : ''}${def.fun ? ' · bakınca keyif verir' : ''}${def.resource && !def.hunger ? ` · ${RESOURCES[def.resource].name}` : ''}` : 'Boş yuva';
+      slots.push(
+        el('span', { className: `bag-slot${item ? '' : ' is-empty'}`, title: hint }, [
+          ...(item ? [el('img', { src: getAnyIconURL(def.icon), alt: '' })] : []),
+          ...(item && item.qty > 1 ? [el('span', { className: 'bag-qty', text: String(item.qty) })] : []),
+        ])
+      );
+    }
+    const summary = inv.length ? inv.map((s) => `${s.name ?? ITEMS[s.kind].name}${s.qty > 1 ? ` ×${s.qty}` : ''}`).join(', ') : 'Çantası boş';
+    this.purseBox.replaceChildren(coins, el('div', { className: 'bag-slots' }, slots), el('div', { className: 'bag-summary', text: summary }));
+  }
+
+  /** (21. aşama) Açık dilekçe: isteği, ne yapılmalı, kalan süre ve yanıt düğmeleri. */
+  renderPetition(character, state) {
+    const p = petitionOf(state, character);
+    if (!p) {
+      if (this.lastPetition !== '') {
+        this.lastPetition = '';
+        this.petitionBox.hidden = true;
+        this.petitionBox.replaceChildren();
+      }
+      return;
+    }
+    const def = PETITION_KINDS[p.kind];
+    const progress = petitionProgress(state, p);
+    const grant = grantStatus(state, p, state.equipment?.sturdyTool ?? 0);
+    const left = formatRemaining(p.deadline - state.totalMinutes);
+    const key = `${p.id}:${p.status}:${left}:${progress}:${grant.ok}:${grant.reason}`;
+    if (key === this.lastPetition) return;
+    this.lastPetition = key;
+    const buttons = [];
+    if (p.status !== 'accepted') buttons.push(this.button('Kabul Et', 'Dileği kabul et: yerine getirmek için yarım gün ek süre (güven +1)', () => this.events.emit('ui:acceptPetition', { id: p.id })));
+    if (grant.available) {
+      const cost = Object.entries(grant.cost).map(([r, v]) => `${RESOURCES[r].name} ${v}`).join(', ');
+      const b = this.button(grant.label, grant.ok ? `Hemen karşıla${cost ? ` (${cost})` : ''}${grant.reason ? ` · ${grant.reason}` : ''}` : grant.reason, () => this.events.emit('ui:grantPetition', { id: p.id }));
+      b.disabled = !grant.ok;
+      b.classList.add('is-grant');
+      buttons.push(b);
+    }
+    const reject = this.button('Reddet', 'Dileği reddet: sakinin keyfi ve Yönetim Güveni düşer', () => this.events.emit('ui:rejectPetition', { id: p.id }));
+    reject.classList.add('is-reject');
+    buttons.push(reject);
+    this.petitionBox.hidden = false;
+    this.petitionBox.replaceChildren(
+      el('div', { className: 'petition-head' }, [
+        el('img', { src: getAnyIconURL('scroll'), alt: '' }),
+        el('span', { className: 'petition-title', text: `Dilekçe · ${def.name}` }),
+        el('span', { className: `petition-state${p.status === 'accepted' ? ' is-accepted' : ''}`, text: p.status === 'accepted' ? 'Söz verildi' : 'Yanıt bekliyor' }),
+      ]),
+      el('div', { className: 'petition-text', text: `"${p.text}"` }),
+      el('div', { className: 'petition-progress', text: progress }),
+      el('div', { className: 'petition-meta', text: `Kalan süre: ${left}` }),
+      el('div', { className: 'petition-buttons' }, buttons)
+    );
   }
 
   /** (19. aşama) Sosyal Hayat: huyu, eşi ve paylaştıkları ev, son duyduğu haber. */

@@ -6,6 +6,9 @@
 //          listesi (Yün, Demir, Ekmek: depo, üreticiler ve bugünkü üretim; açık / kapalı tercihi hatırlanır), refah
 //          göstergesi ve nüfus (üzerine gelince göç koşulları)
 //   Altında: etkin kasaba bonusları ve uyarılar (ısınma, hasta, sefer, fırtına, festival) küçük çipler hâlinde.
+// (21. aşama) Refah göstergesinin yanında küçük kalkanla Yönetim Güveni (üzerine gelince güven ve isyan durumu); durum
+// çiplerinde açık dilekçeler (tıklayınca dilekçe sahibi seçilir) ve isyan alarmı (tıklayınca meydan havuzu / Belediye
+// Konağı paneli açılır: acil erzak ve altın dağıtımı).
 // Kaydet / Yükle / Yeni Harita Ayarlar penceresine, farenin altındaki karonun bilgisi harita ipucuna taşındı.
 import { CONFIG } from '../../config.js';
 import { getDayPhase } from '../../systems/TimeSystem.js';
@@ -32,6 +35,8 @@ import {
   foodSupply,
 } from '../../systems/TownStatus.js';
 import { el } from '../dom.js';
+import { trustValue, trustLevel } from '../../systems/Citizens.js';
+import { PETITION_KINDS, REVOLT } from '../../data/citizens.js';
 
 const DELTA_MERGE_MS = 500; // bu süre içindeki değişiklikler tek vurguda toplanır
 const DELTA_VISIBLE_MS = 1400;
@@ -109,7 +114,9 @@ export class Hud {
     const population = state.characters.length;
     const capacity = housingCapacity(state);
     const status = immigrationStatus(state);
-    const key = `${happiness}|${population}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}`;
+    const trust = Math.round(trustValue(state));
+    const revolt = state.trust?.revolt ?? null;
+    const key = `${happiness}|${population}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}|${trust}|${Boolean(revolt)}`;
     if (key !== this.lastWelfare) {
       this.lastWelfare = key;
       this.welfareFill.style.width = `${happiness}%`;
@@ -118,7 +125,17 @@ export class Hud {
       this.welfareIcon.src = getIconDataURL(level.key === 'bad' ? 'frown' : 'smile');
       // (18. aşama) Kasabanın estetiği refaha kalıcı küçük bir çarpan ekler
       const beauty = state.landscape?.percent ? ` Kasaba estetiği (${state.landscape.score} puan): refah +%${state.landscape.percent}.` : ' Süs, fener, ağaç ve taş plakalarla kasabayı güzelleştirdikçe refah +%5\'e kadar artar.';
-      this.welfareRow.title = `Refah (ortalama mutluluk): ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.${beauty}`;
+      // (21. aşama) Yönetim Güveni
+      const tl = trustLevel(trust);
+      this.trustFill.style.width = `${trust}%`;
+      this.trustFill.className = `trust-mini-fill is-${revolt ? 'revolt' : tl.key}`;
+      this.trustWrap.className = `trust-mini is-${revolt ? 'revolt' : tl.key}`;
+      this.trustWrap.dataset.trust = String(trust);
+      this.trustIcon.src = getAnyIconURL(revolt ? 'torch' : 'trust');
+      const trustLine = revolt
+        ? `\nYönetim Güveni: %${trust} · İSYAN sürüyor! Güven %${REVOLT.endTrust}'in üstüne çıkınca yatışır (meydan havuzu / Belediye Konağı: erzak ve altın dağıt).`
+        : `\nYönetim Güveni: %${trust} (${tl.name}). Dilekçeleri karşılamak ve yüksek refah güveni artırır; reddetmek, açlık, soğuk ve %35 altı refah eritir. %${REVOLT.critical} altında uzun kalırsa isyan çıkar.`;
+      this.welfareRow.title = `Refah (ortalama mutluluk): ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.${beauty}${trustLine}`;
       this.population.textContent = `${population}/${capacity}`;
       this.populationWrap.classList.toggle('is-full', population >= capacity);
       this.population.classList.toggle('is-full', population >= capacity);
@@ -136,7 +153,10 @@ export class Hud {
     // 14. aşama: duyurulan / süren mevsim festivali ve toplanma zili
     const festival = currentSeasonFestival(state);
     const rally = isRallyActive(state) ? Math.ceil((state.rally.until - state.totalMinutes) / 10) : 0;
-    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}`;
+    // (21. aşama) açık dilekçeler ve isyan
+    const petitions = state.petitions?.list ?? [];
+    const revoltNow = state.trust?.revolt ?? null;
+    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}`;
     if (buffKey !== this.lastBuffs) {
       this.lastBuffs = buffKey;
       const chips = buffs.map((b) =>
@@ -165,6 +185,24 @@ export class Hud {
         chips.push(chip(storm.kind === 'wolves' ? 'wolf' : 'storm', `${label}${storm.fortified ? ' · hazır' : ''}`, storm.fortified ? 'Kasaba güçlendirildi' : 'Güçlendirilmedi: hasar verebilir', storm.fortified ? '' : ' is-freezing'));
       }
       if (damaged.length) chips.push(chip('storm', `${damaged.length} hasarlı yapı`, `Onarılmalı: ${damaged.join(', ')}`, ' is-freezing'));
+      // (21. aşama) İsyan alarmı ve açık dilekçeler (tıklanabilir)
+      const action = (icon, text, title, cls, onClick) => {
+        const b = el('button', { className: `buff-chip is-action${cls}`, type: 'button', title, tabIndex: -1 }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
+        b.addEventListener('mousedown', (e) => e.preventDefault());
+        b.addEventListener('click', onClick);
+        return b;
+      };
+      if (revoltNow) {
+        const venue = state.buildings.find((b) => b.functional && b.type === 'fountain') ?? state.buildings.find((b) => b.functional && BUILDINGS[b.type].civic);
+        chips.unshift(
+          action('torch', `İsyan! ${revoltNow.rioters.length} isyancı${revoltNow.raids.length ? ' · yağma' : ''}`, 'Sakinler işi bıraktı. Tıkla: meydan havuzunda / Belediye Konağı\'nda acil erzak ve altın dağıt', ' is-revolt', () => venue && this.game.events.emit('ui:selectBuilding', venue.id))
+        );
+      }
+      const trustNow = Math.round(trustValue(state));
+      if (!revoltNow && trustNow < 50) chips.push(chip('trust', `Güven %${trustNow}`, `Yönetim Güveni düşük (${trustLevel(trustNow).name}). %${REVOLT.critical} altında ${REVOLT.graceHours} saat kalırsa isyan çıkar: dilekleri karşıla, erzak / altın dağıt`, ' is-freezing'));
+      for (const p of petitions) {
+        chips.push(action('scroll', `Dilekçe · ${p.name}`, `${PETITION_KINDS[p.kind].name}: "${p.text}"${p.status === 'accepted' ? ' (söz verildi)' : ''} · tıkla: sakini seç`, p.status === 'accepted' ? ' is-petition is-accepted' : ' is-petition', () => this.game.events.emit('ui:selectCharacter', p.characterId)));
+      }
       this.buffs.hidden = chips.length === 0;
       this.buffs.replaceChildren(...chips);
       this.resources.wood.box.title = heating > 0 ? `Odun · ısınma gideri −${heating}/gün\n${RESOURCES.wood.hint}` : `Odun\n${RESOURCES.wood.hint}`;
@@ -303,7 +341,17 @@ export class Hud {
     this.welfareIcon = el('img', { className: 'hud-icon', alt: '' });
     this.welfareFill = el('span', { className: 'need-fill welfare-fill' });
     this.welfareValue = el('span', { className: 'welfare-value' });
-    this.welfareRow = el('span', { className: 'hud-chip hud-welfare' }, [this.welfareIcon, el('span', { className: 'need-bar welfare-bar' }, [this.welfareFill]), this.welfareValue]);
+    // (21. aşama) Yönetim Güveni: refah çipinin içinde küçük kalkan ve yüzde
+    // (ince üst çubuk dar: güven, refah çubuğunun altında ikinci ince çubuk ve sağda küçük kalkan; yüzdesi ipucunda)
+    this.trustFill = el('span', { className: 'trust-mini-fill' });
+    this.trustIcon = el('img', { className: 'hud-icon trust-icon', src: getAnyIconURL('trust'), alt: '' });
+    this.trustWrap = el('span', { className: 'trust-mini' }, [this.trustIcon]);
+    this.welfareRow = el('span', { className: 'hud-chip hud-welfare' }, [
+      this.welfareIcon,
+      el('span', { className: 'welfare-bars' }, [el('span', { className: 'need-bar welfare-bar' }, [this.welfareFill]), el('span', { className: 'trust-mini-bar' }, [this.trustFill])]),
+      this.welfareValue,
+      this.trustWrap,
+    ]);
     this.buffs = el('div', { className: 'hud-buffs ui-interactive' });
     this.lastWelfare = '';
     this.lastBuffs = '';

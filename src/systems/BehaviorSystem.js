@@ -20,6 +20,10 @@
 // Uyku bitince 'character:woke' { character } yayınlanır (FamilySystem Mutlu Yuva'yı verir). Oyuncu bir
 // çalışanı işten çıkarınca ('ui:dismissWorker') görevi biter ve o yapıda bir daha çalışmaz
 // ('ui:rehireWorker' geri alır).
+//
+// 21. aşama: biten her vardiya 'work:shiftEnded' { character, activity, building }, bitirilen iş emri 'work:jobDone'
+// { character, job, yields } yayınlar (PurseSystem yevmiye öder); etkinliğin finishEvent'i bitince yayınlanır (çantadan
+// yemek, alışveriş, yağma). İsyan başlayınca / yağma baskını çıkınca isyancılar elindeki (yarıda kesilebilen) işi bırakır.
 import { towerMasteryMultiplier, recordTowerWork, towerStageIndex } from './GoldenAge.js';
 import { skillLevel } from './SkillSystem.js';
 import { ACTIVITIES, LEAVING_HOME_LABEL, BREAK_PREFIX, LOVE_BUBBLES, RIVAL_BUBBLES } from '../data/activities.js';
@@ -49,6 +53,7 @@ const JOBS_MAX = Object.fromEntries(Object.entries(JOBS).map(([k, v]) => [k, v.m
 import { clamp } from '../utils/math.js';
 import { schemeBakeMultiplier } from './Exploration.js';
 import { VINE } from '../data/exploration.js';
+import { ITEMS } from '../data/citizens.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
 const TOWER_BUBBLES = ['hammer', 'hammer', 'sweat', 'sparkle']; // (20. aşama) Ulu Saat Kulesi şantiyesinde
@@ -109,6 +114,11 @@ export class BehaviorSystem {
           if (c.visible && !c.away && INTERRUPTIBLE_KINDS.has(kind)) this.endTask(c);
         }
       }),
+      // (21. aşama) İsyan: isyancılar ve yağmaya çıkanlar elindeki (yarıda kesilebilen) işi bırakır; bitince işlerine döner
+      game.events.on('revolt:started', ({ rioters }) => this.interrupt(rioters)),
+      game.events.on('revolt:joined', ({ ids }) => this.interrupt(ids)),
+      game.events.on('revolt:raid', ({ raid }) => this.interrupt(raid.members, ['protest'])),
+      game.events.on('revolt:ended', ({ rioters }) => this.interrupt(rioters, ['protest'], true)),
       game.events.on('festival:started', () => {
         for (const c of this.world.characters) {
           const kind = c.task ? ACTIVITIES[c.task.activity].kind : 'idle';
@@ -120,6 +130,21 @@ export class BehaviorSystem {
 
   destroy() {
     this.unsubscribers.forEach((off) => off());
+  }
+
+  /**
+   * (21. aşama) Verilen sakinlerin yarıda kesilebilen işini bitirir (extra: ayrıca kesilecek etkinlikler; only: yalnızca
+   * onlar). Uyuyanlar, içeridekiler ve seferdekiler etkilenmez.
+   */
+  interrupt(ids, extra = [], only = false) {
+    for (const id of ids ?? []) {
+      const c = this.world.getCharacter(id);
+      if (!c || !c.visible || c.away) continue;
+      const activity = c.task?.activity;
+      const kind = c.task ? ACTIVITIES[activity].kind : 'idle';
+      const hit = extra.includes(activity) || (!only && INTERRUPTIBLE_KINDS.has(kind));
+      if (hit) this.endTask(c);
+    }
   }
 
   update(tick) {
@@ -336,6 +361,7 @@ export class BehaviorSystem {
     if (task.placeTo) label = label.replace('{place}', task.placeTo);
     if (task.activity === 'haul' && task.cargo) label = label.replace('{resource}', RESOURCES[task.cargo].name.toLowerCase());
     if (task.item) label = label.replace('{item}', EQUIPMENT[task.item].name);
+    if (task.bagItem) label = label.replace('{bag}', ITEMS[task.bagItem].name.toLocaleLowerCase('tr'));
     return task.onBreak ? `${BREAK_PREFIX}${label}` : label;
   }
 
@@ -355,6 +381,7 @@ export class BehaviorSystem {
     if (task.activity === 'viewpoint' && task.view === 'tree') label = activity.treeLabel;
     if (task.petName) label = label.replace('{pet}', task.petName);
     if (task.placeAt) label = label.replace('{place}', task.placeAt);
+    if (task.bagItem) label = label.replace('{bag}', ITEMS[task.bagItem].name.toLocaleLowerCase('tr'));
     label = label.charAt(0).toLocaleUpperCase('tr') + label.slice(1);
     return task.onBreak ? `${BREAK_PREFIX}${label}` : label;
   }
@@ -481,6 +508,11 @@ export class BehaviorSystem {
       if (activity.kind === 'work' && task.workBuildingId) {
         this.events.emit('work:finished', { character: c, activity: task.activity, building: this.world.getBuilding(task.workBuildingId) });
       }
+      // (21. aşama) Vardiya bitti (yevmiye ve iş yerinden pay) ve etkinliğin vatandaşlık olayı (çanta, alışveriş, yağma)
+      if (activity.kind === 'work') {
+        this.events.emit('work:shiftEnded', { character: c, activity: task.activity, building: task.workBuildingId ? this.world.getBuilding(task.workBuildingId) : null });
+      }
+      if (activity.finishEvent) this.events.emit(activity.finishEvent, { character: c, task, building: task.buildingId ? this.world.getBuilding(task.buildingId) : null });
       // Sıcak yemek bir süre tok tutar (NeedsSystem acıkmayı yavaşlatır)
       if (task.activity === 'innMeal') {
         c.buffs.warmMeal = this.world.state.totalMinutes + WARM_MEAL.hours * 60;
@@ -583,6 +615,7 @@ export class BehaviorSystem {
       if (!this.jobs.applyWork(job, amount)) return true;
       const { yields } = this.jobs.complete(job);
       this.collectYields(c, yields);
+      this.events.emit('work:jobDone', { character: c, job, yields }); // (21. aşama) yevmiye
       return false;
     }
 
