@@ -4293,3 +4293,48 @@ kbd {
 .purse-rioter.is-leaving {
   background: #5d6070;
 }
+
+/* ---------------------------------------------------------------------------
+   23. aşama: krizler (yangın, tamir, haydut baskını), tehlike sıklığı ayarı
+   --------------------------------------------------------------------------- */
+.crisis-panel {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.crisis-body .luxury-card {
+  margin: 0;
+}
+
+.luxury-card.is-raid {
+  border-color: rgba(232, 70, 60, 0.55);
+  background: rgba(60, 24, 24, 0.55);
+}
+
+.crisis-option {
+  display: grid;
+  grid-template-columns: minmax(150px, auto) 1fr;
+  gap: 4px 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.crisis-option .upgrade-button {
+  white-space: normal;
+  text-align: left;
+}
+
+.crisis-option.is-risky .upgrade-button {
+  border-color: rgba(232, 70, 60, 0.6);
+}
+
+.settings-crisis.is-active {
+  background: var(--ui-highlight);
+  color: #1b1423;
+  border-color: var(--ui-highlight);
+}
+
+@media (max-width: 520px) {
+  .crisis-option {
+    grid-template-columns: 1fr;
+  }
+}

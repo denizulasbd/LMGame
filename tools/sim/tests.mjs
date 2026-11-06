@@ -2245,7 +2245,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 19', raw.version === 19);
+  check('kayıt sürümü 20', raw.version === 20);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2688,7 +2688,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 19: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 19 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 20: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 20 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -3003,11 +3003,643 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 19: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 19 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 20: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 20 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
     check('kayıttan Kraliyet Aslanlı Heykeli döner', s4.buildings.some((b) => b.type === 'royalStatue'));
+  }
+
+  // ===== 23. aşama: yangın ve itfaiye, Su Kuyusu, Gözcü Kulesi ve bekçiler, haydut baskınları, hasar / tamir, yaralanma =====
+  {
+    const S = game.scenes.current;
+    const st = game.state;
+    const W = S.world;
+    const CRI = await import('/src/systems/Crisis.js');
+    const CD = await import('/src/data/crisis.js');
+    const BD = await import('/src/data/buildings.js');
+    const HS = await import('/src/systems/HealthSystem.js');
+    const SP = await import('/src/systems/StructureSystem.js');
+    const ART = await import('/src/art/sprites/index.js');
+    const UI = await import('/src/art/ui/index.js');
+    const now = () => st.totalMinutes;
+    const crisis = () => game.scenes.current.crisis;
+    const renderNow = () => {
+      game.ui.components.find((x) => x.renderWelfare).welfareAt = -Infinity;
+      game.render(0);
+    };
+    const adults = () => st.characters.filter((c) => !c.isChild && !c.role);
+    // Doğal krizler testi bozmasın: Huzurlu; testler fonksiyonları doğrudan çağırır
+    st.crisis.difficulty = 'huzurlu';
+    st.crisis.raid = null;
+    st.crisis.nextRaidWarnAt = null;
+    for (const b of st.buildings) {
+      b.isBurning = false;
+      b.isDamaged = false;
+    }
+    st.town.tier = 4;
+    st.trust.value = 70;
+    if (st.trust.revolt) S.trust.endRevolt();
+    st.petitions.list = [];
+    st.petitions.nextAt = now() + 1e6;
+    st.crown.decree = null;
+    st.crown.nextDecreeAt = now() + 1e6;
+    st.crown.nextLevyAt = now() + 1e6;
+    st.crown.notice = null;
+    sim.give({ wood: 600, stone: 600, food: 300, bread: 80, iron: 80, gold: 800 });
+    const placeAt = (type, x, y) => {
+      const res = S.construction.placeSite(type, x, y);
+      if (!res.ok) return null;
+      const job = S.jobs.jobs.find((j) => j.buildingId === res.building.id);
+      if (job) S.jobs.cancel(job);
+      S.construction.complete(res.building);
+      return res.building;
+    };
+    const firstOf = (type) => st.buildings.find((b) => b.type === type && b.functional && !b.damaged);
+    const popBefore = st.characters.length;
+    const buildingsBefore = st.buildings.length;
+
+    // --- Ayar: Tehlike Sıklığı ---
+    check('üç tehlike sıklığı: Huzurlu (çarpan 0), Dengeli (1, varsayılan), Çetin (1,5)', CD.CRISIS_DIFFICULTY_KEYS.join(',') === 'huzurlu,dengeli,cetin' && CD.CRISIS_DIFFICULTY.huzurlu.rate === 0 && CD.CRISIS_DIFFICULTY.dengeli.rate === 1 && CD.CRISIS_DIFFICULTY.cetin.rate === 1.5 && CD.DEFAULT_DIFFICULTY === 'dengeli' && CRI.emptyCrisis().difficulty === 'dengeli');
+    game.events.emit('ui:setCrisisDifficulty', { difficulty: 'cetin' });
+    check('"ui:setCrisisDifficulty" tehlike sıklığını değiştirir ve çarpanı verir', st.crisis.difficulty === 'cetin' && CRI.crisisRate(st) === 1.5);
+    game.events.emit('ui:setCrisisDifficulty', { difficulty: 'yok' });
+    check('bilinmeyen tehlike sıklığı yok sayılır', st.crisis.difficulty === 'cetin');
+    game.events.emit('ui:setCrisisDifficulty', { difficulty: 'huzurlu' });
+    game.events.emit('ui:toggleSettings');
+    renderNow();
+    const crisisBtns = [...document.querySelectorAll('.settings-crisis')];
+    check('Ayarlar penceresinde Tehlike Sıklığı: üç düğme, seçili olan vurgulu', crisisBtns.length === 3 && crisisBtns.map((b) => b.textContent).join(',') === 'Huzurlu,Dengeli,Çetin' && crisisBtns.find((b) => b.dataset.difficulty === 'huzurlu').classList.contains('is-active'));
+    crisisBtns.find((b) => b.dataset.difficulty === 'dengeli').click();
+    renderNow();
+    check('Ayarlar düğmesi tehlike sıklığını seçer', st.crisis.difficulty === 'dengeli' && crisisBtns.find((b) => b.dataset.difficulty === 'dengeli').classList.contains('is-active'));
+    game.events.emit('ui:toggleSettings');
+    crisis().warnRaid();
+    game.events.emit('ui:setCrisisDifficulty', { difficulty: 'huzurlu' });
+    check('Huzurlu\'ya geçince bekleyen haydut tehlikesi geçer', !st.crisis.raid && st.crisis.nextRaidWarnAt === null && st.crisis.difficulty === 'huzurlu');
+
+    // --- Doğal kriz kapıları: gün, tehlike sıklığı ---
+    const realDay = st.time.day;
+    st.time.day = 7;
+    st.crisis.difficulty = 'dengeli';
+    check('doğal yangın 8. günden önce çıkmaz, haydut 10. günden önce görülmez', !CRI.naturalCrisisAllowed(st, 'fire'));
+    st.time.day = 8;
+    check('8. günde doğal yangın açılır; haydut hâlâ kapalı', CRI.naturalCrisisAllowed(st, 'fire') && !CRI.naturalCrisisAllowed(st, 'bandit'));
+    st.time.day = 10;
+    check('10. günde haydut izleri açılır', CRI.naturalCrisisAllowed(st, 'bandit'));
+    st.crisis.difficulty = 'huzurlu';
+    check('Huzurlu: hiçbir doğal kriz çıkmaz', !CRI.naturalCrisisAllowed(st, 'fire') && !CRI.naturalCrisisAllowed(st, 'bandit'));
+    st.time.day = realDay;
+
+    // --- Su Kuyusu ---
+    st.town.tier = 1;
+    const lockWell = S.construction.checkPlacement('well', plaza.centerX + 3, plaza.centerY + 3);
+    check('Su Kuyusu Köy seviyesinde açılır', !lockWell.ok && lockWell.reason.includes('Köy'), lockWell.reason);
+    st.town.tier = 4;
+    const wellDef = BD.BUILDINGS.well;
+    check('Su Kuyusu tanımı: 1x1, odun + taş, Güvenlik, yangın emniyeti 8 karo / %80, sulama 4 karo / %10', wellDef.size.w === 1 && wellDef.cost.wood > 0 && wellDef.cost.stone > 0 && wellDef.category === 'Güvenlik' && wellDef.requiresTier === 2 && CD.FIRE.wellRadius === 8 && CD.FIRE.wellReduction === 0.8 && CD.WELL.gardenRadius === 4 && CD.WELL.gardenBonus === 0.1);
+    check('Su Kuyusu İnşa menüsünde', BD.BUILD_MENU.includes('well') && BD.BUILD_MENU.includes('guardTower'));
+    // Yangın olasılığı: kuyusuz / kuyulu
+    const target = st.buildings.find((b) => b.type === 'workshop' && b.functional) ?? st.buildings.find((b) => b.type === 'lumberHut' && b.functional);
+    for (const w of st.buildings.filter((b) => b.type === 'well')) w.damaged = true; // eski testlerden kalan olursa sayılmasın
+    st.crisis.difficulty = 'dengeli';
+    const chanceNoWell = CRI.fireChance(st, target);
+    for (const w of st.buildings.filter((b) => b.type === 'well')) w.damaged = false;
+    let wellSpot = null;
+    for (let r = 1; r <= 6 && !wellSpot; r++) {
+      for (let dy = -r; dy <= r && !wellSpot; dy++) {
+        for (let dx = -r; dx <= r && !wellSpot; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = target.tileX + dx;
+          const y = target.tileY + dy;
+          if (S.construction.checkPlacement('well', x, y).ok) wellSpot = { x, y };
+        }
+      }
+    }
+    const wellB = wellSpot ? placeAt('well', wellSpot.x, wellSpot.y) : null;
+    check('Su Kuyusu kurulur (anında tamam)', wellB && wellB.functional && wellB.type === 'well');
+    const chanceWell = CRI.fireChance(st, target);
+    check('yakında Su Kuyusu varken yangın ihtimali %80 azalır (×0,2)', chanceNoWell > 0 && Math.abs(chanceWell - chanceNoWell * 0.2) < 1e-12, `${chanceNoWell} -> ${chanceWell}`);
+    st.crisis.difficulty = 'cetin';
+    check('Çetin: yangın ihtimali %50 artar', Math.abs(CRI.fireChance(st, target) - chanceWell * 1.5) < 1e-12);
+    st.crisis.difficulty = 'huzurlu';
+    check('Huzurlu: yangın ihtimali sıfır', CRI.fireChance(st, target) === 0);
+    check('kuyunun yangın etkisi 8 karoyla sınırlı', CRI.wellNear(st, target)?.id === wellB.id && !CRI.wellNear(st, { ...target, type: target.type, tileX: wellB.tileX + 30, tileY: wellB.tileY, definition: target.definition }, 8));
+    // Bahçe sulaması
+    let garden = st.buildings.find((b) => b.type === 'garden' && b.functional);
+    for (let r = 2; r <= 24 && !garden; r++) {
+      for (let dy = -r; dy <= r && !garden; dy++) {
+        for (let dx = -r; dx <= r && !garden; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) === r && S.construction.checkPlacement('garden', plaza.centerX + dx, plaza.centerY + dy).ok) garden = placeAt('garden', plaza.centerX + dx, plaza.centerY + dy);
+        }
+      }
+    }
+    const wellsNow = () => st.buildings.filter((b) => b.type === 'well');
+    let wellNearGarden = CRI.wellNear(st, garden, 4);
+    for (let r = 1; r <= 3 && !wellNearGarden; r++) {
+      for (let dy = -r - 1; dy <= r + 2 && !wellNearGarden; dy++) {
+        for (let dx = -r - 1; dx <= r + 2 && !wellNearGarden; dx++) {
+          if (S.construction.checkPlacement('well', garden.tileX + dx, garden.tileY + dy).ok) wellNearGarden = placeAt('well', garden.tileX + dx, garden.tileY + dy);
+        }
+      }
+    }
+    const live = SP.productionFactors(garden, W, false, { farm: 1 });
+    wellsNow().forEach((w) => (w.damaged = true));
+    const dry = SP.productionFactors(garden, W, false, { farm: 1 });
+    wellsNow().forEach((w) => (w.damaged = false));
+    check('kuyusuz bahçede sulama çarpanı 1', dry.well === 1);
+    check('4 karo yakınındaki bahçeye kuyu +%10 sulama verimi verir', Boolean(wellNearGarden) && Math.abs(live.well - 1.1) < 1e-9 && Math.abs(live.total / dry.total - 1.1) < 1e-9, JSON.stringify([dry.well, live.well, live.total / dry.total]));
+
+    // --- Gözcü Kulesi ---
+    st.town.tier = 2;
+    const lockTower = S.construction.checkPlacement('guardTower', plaza.centerX + 3, plaza.centerY + 3);
+    check('Gözcü Kulesi Kasaba seviyesinde açılır', !lockTower.ok && lockTower.reason.includes('Kasaba'), lockTower.reason);
+    st.town.tier = 4;
+    const towerDef = BD.BUILDINGS.guardTower;
+    check('Gözcü Kulesi tanımı: 2x2, odun + taş + demir, nöbet işi (patrol), Güvenlik', towerDef.size.w === 2 && towerDef.cost.wood > 0 && towerDef.cost.stone > 0 && towerDef.cost.iron > 0 && towerDef.workActivity === 'patrol' && towerDef.guard === true && towerDef.category === 'Güvenlik' && towerDef.requiresTier === 3);
+    // Baskın uyarısı: kulesiz 1 gün
+    st.crisis.raid = null;
+    const raidNoTower = crisis().warnRaid();
+    check('kulesiz haydut baskını 1 gün önceden haber verilir', raidNoTower && !raidNoTower.early && raidNoTower.arriveAt - raidNoTower.warnedAt === 1440 && raidNoTower.tribute >= 25 && raidNoTower.tribute <= 40, JSON.stringify(raidNoTower));
+    check('haydut izi günlüğe ve bildirime düşer', st.journal.at(-1).text.includes('haydut izleri'));
+    renderNow();
+    const raidChip = [...document.querySelectorAll('.hud-buffs .buff-chip')].find((c) => c.textContent.includes('Haydut izleri'));
+    check('üst çubuğun altında haydut izi çipi (geri sayım) görünür', Boolean(raidChip) && raidChip.textContent.includes('sa'), raidChip?.textContent);
+    // Savunma: kulesiz yetişkin + alet
+    st.equipment.sturdyTool = 0;
+    check('kulesiz savunma için depoda sağlam alet gerekir', !CRI.defenseStatus(st).ok && CRI.defenseStatus(st).reason.includes('alet'));
+    st.equipment.sturdyTool = 2;
+    check('kulesiz savunma: yeterli yetişkin ve alet varsa yapılabilir', CRI.defenseStatus(st).ok && CRI.defenseStatus(st).tower === null);
+    // B: haraç (altın)
+    sim.give({ gold: 500 });
+    st.crisis.difficulty = 'dengeli';
+    const tribute = st.crisis.raid.tribute;
+    const g0 = st.resources.gold;
+    const food0 = st.resources.food;
+    const trustB0 = st.trust.value;
+    const injuredBefore = st.characters.filter((c) => c.isInjured).length;
+    const damagedBefore = st.buildings.filter((b) => b.damaged).length;
+    const resB = crisis().resolveRaid('tribute');
+    check('B) Haraç: hazineden tam haraç gider; hasar ve yaralı yok; Güven -2', resB.ok && g0 - st.resources.gold === tribute && st.resources.food === food0 && st.characters.filter((c) => c.isInjured).length === injuredBefore && st.buildings.filter((b) => b.damaged).length === damagedBefore && Math.abs(st.trust.value - (trustB0 - 2)) < 1e-9 && !st.crisis.raid && st.crisis.tributes >= 1);
+    check('baskın çözülünce sıradaki haydut izi 8-10 gün sonraya kurulur', Number.isFinite(st.crisis.nextRaidWarnAt) && st.crisis.nextRaidWarnAt - now() >= 8 * 1440 && st.crisis.nextRaidWarnAt - now() <= 10 * 1440);
+    st.crisis.difficulty = 'huzurlu';
+    // B: altın yoksa erzak
+    crisis().warnRaid();
+    sim.give({ gold: 3, food: 200, bread: 0 });
+    const payFood = CRI.tributeStatus(st, st.crisis.raid.tribute);
+    const foodB0 = st.resources.food;
+    crisis().resolveRaid('tribute');
+    check('altın yetmezse haraç kilerden erzakla ödenir', payFood.ok && payFood.gold === 0 && payFood.food > 0 && foodB0 - st.resources.food >= payFood.food - 2 && st.resources.gold === 3, JSON.stringify(payFood));
+    // Haraç ödenemez
+    crisis().warnRaid();
+    sim.give({ gold: 0, food: 0, bread: 0 });
+    const badPay = crisis().resolveRaid('tribute');
+    check('haraç ödenemezse seçim reddedilir, baskın sürer', !badPay.ok && Boolean(st.crisis.raid));
+    // C: hazırlıksız yakalanma
+    sim.give({ wood: 500, stone: 500, food: 400, bread: 0, gold: 1000 });
+    for (const b of st.buildings) b.isDamaged = false;
+    const foodC0 = st.resources.food;
+    const goldC0 = st.resources.gold;
+    const woodC0 = st.resources.wood;
+    const stoneC0 = st.resources.stone;
+    const trustC0 = st.trust.value;
+    const dmgC0 = st.buildings.filter((b) => b.damaged).length;
+    const resC = crisis().resolveRaid('caught');
+    const stolenFood = foodC0 - st.resources.food;
+    const stolenGold = goldC0 - st.resources.gold;
+    const damagedC = st.buildings.filter((b) => b.damaged);
+    check('C) Hazırlıksız: en çok stoğun %15\'i gider (asla tamamı değil), odun ve taş dokunulmaz', resC.ok && stolenFood > 0 && stolenFood <= Math.floor(foodC0 * 0.15) && stolenGold > 0 && stolenGold <= Math.floor(goldC0 * 0.15) && st.resources.food > 0 && st.resources.gold > 0 && st.resources.wood === woodC0 && st.resources.stone === stoneC0, `${stolenFood}/${foodC0} ${stolenGold}/${goldC0}`);
+    check('C) tam olarak 1 yapı HASARLI olur (haritadan silinmez); Güven -8', damagedC.length === dmgC0 + 1 && damagedC[0].damageKind === 'raid' && st.buildings.includes(damagedC[0]) && Math.abs(st.trust.value - (trustC0 - 8)) < 1e-9, damagedC.map((b) => b.name).join(','));
+    check('hasarlı yapı sınırdakilerden seçilir (kasaba merkezine en uzak)', damagedC[0] && st.buildings.filter((b) => b.functional && BD.DAMAGEABLE_TYPES.includes(b.type)).every((b) => Math.hypot(b.tileX - plaza.centerX, b.tileY - plaza.centerY) <= Math.hypot(damagedC[0].tileX - plaza.centerX, damagedC[0].tileY - plaza.centerY) + 1e-9 || b.damaged));
+    check('stok 1 iken hiçbir şey çalınmaz (asla tamamı değil)', CRI.stolenAmount(1) === 0 && CRI.stolenAmount(0) === 0 && CRI.stolenAmount(100) === 15 && CRI.stolenAmount(7) === 1);
+    // Kuleyi kur
+    const tower = sim.place('guardTower', { maxRadius: 40 });
+    check('Gözcü Kulesi kurulur', tower && tower.functional && CRI.towerOf(st)?.id === tower.id);
+    check('kule varken yetişkinler yeterliyse 1-2 bekçi yuvası; sayı yetişkin sayısına göre', (() => { crisis().guardHour(); return tower.guardSlots === (CRI.ablePeople(st).length >= CD.GUARD.twoGuardsAdults ? 2 : 1) && tower.workerSlots === tower.guardSlots; })());
+    check('kuleli savunma: en az 2 sağlam yetişkin yeter (alet gerekmez)', (() => { st.equipment.sturdyTool = 0; return CRI.defenseStatus(st).ok && CRI.defenseStatus(st).tower?.id === tower.id; })());
+    // Kule güven katkısı
+    st.trust.value = 50;
+    crisis().guardHour();
+    check('Gözcü Kulesi saat başı Yönetim Güveni\'ne katkı verir (+0,2 ve nöbetçi başına +0,1)', Math.abs(st.trust.value - (50 + CD.GUARD.trustPerHour + tower.workerIds.size * CD.GUARD.trustPerGuard)) < 1e-9, String(st.trust.value));
+    const lightRadius = (await import('/src/data/landscape.js')).DARKNESS.lights.guardTower;
+    {
+      const LS = await import('/src/systems/Landscape.js');
+      const wasLit = tower.lit;
+      tower.lit = true;
+      const sources = LS.litSources([tower]);
+      const nearby = { x: tower.center.x + 40, y: tower.center.y + 40 };
+      const lit = sources.length === 1 && LS.isLitPoint(sources, nearby.x, nearby.y) && !LS.isLitPoint(sources, tower.center.x + 400, tower.center.y);
+      tower.lit = wasLit;
+      check('kule geceleri çevresini aydınlatır: yakınındaki yürüyen sakin karanlıkta ürkmez (ışık yarıçapı ~90 piksel)', lightRadius >= 80 && Boolean(towerDef.litHours) && lit);
+    }
+    // Bekçi nöbeti
+    let patrolling = null;
+    // Nöbet üretimden sonra gelir (boştaki yetişkinlerin işi); testte bir sakini kuleye sabitleyip nöbeti doğrularız
+    const guardCandidate = adults().find((c) => !c.away && !c.illness && c.workplaceId === null);
+    game.events.emit('ui:pinWorker', { buildingId: tower.id, characterId: guardCandidate.id });
+    for (let i = 0; i < 30 && !patrolling; i++) {
+      hours(1);
+      patrolling = st.characters.find((c) => c.task?.activity === 'patrol');
+    }
+    check('Kasaba Bekçisi: 1-2 yetişkin kuleye nöbete gider (devriye)', patrolling && !patrolling.isChild && tower.workerIds.has(patrolling.id) && patrolling.activityLabel.includes('bekçi'), patrolling?.activityLabel);
+    check('nöbetçi sayısı kule yuvalarını aşmaz', tower.workerIds.size <= tower.guardSlots);
+    // Kuleyle baskın 2 gün önceden
+    st.crisis.raid = null;
+    const raidTower = crisis().warnRaid();
+    check('Gözcü Kulesi varken haydut baskını 2 gün önceden haber verilir', raidTower.early && raidTower.arriveAt - raidTower.warnedAt === 2 * 1440);
+    // A: bekçilerle püskürt
+    sim.give({ wood: 500, stone: 500, food: 400, gold: 500 });
+    for (const c of st.characters) c.isInjured = false;
+    const goldA0 = st.resources.gold;
+    const stockA = { wood: st.resources.wood, stone: st.resources.stone, food: st.resources.food };
+    const trustA0 = st.trust.value;
+    const dmgA0 = st.buildings.filter((b) => b.damaged).length;
+    const resA = crisis().resolveRaid('defend');
+    const gainA = st.resources.gold - goldA0;
+    const hurt = st.characters.filter((c) => c.isInjured);
+    check('A) Bekçilerle Püskürt: kaynak kaybı yok, +15-25 altın ganimet, Güven +6, "Haydutlar Kovuldu" bonusu', resA.ok && gainA >= 15 && gainA <= 25 && st.resources.wood === stockA.wood && st.resources.stone === stockA.stone && st.resources.food === stockA.food && Math.abs(st.trust.value - (trustA0 + 6)) < 1e-9 && st.buffs.banditsRepelled > now(), `${gainA}`);
+    check('A) hiçbir yapı hasar görmez; en çok 1 savunmacı hafif yaralanır', st.buildings.filter((b) => b.damaged).length === dmgA0 && hurt.length <= 1);
+    check('A) savunmacılar "Haydutları kasabadan kovduk" anısı kazanır; dedikodu dolaşır', resA.defenders.length > 0 && st.characters.find((c) => c.id === resA.defenders[0]).memories.some((m) => m.text === 'Haydutları kasabadan kovduk') && st.social.gossip.some((n) => n.kind === 'raid'));
+    check('günlüğe baskın sonucu yazılır', st.journal.some((j) => j.text.startsWith('Haydutlar püskürtüldü')));
+    check('bonus "Haydutlar Kovuldu" refaha eklenir', (await import('/src/systems/TownStatus.js')).townHappinessBonus(st) >= 4);
+    // Savunma yoksa A reddedilir
+    crisis().warnRaid();
+    const savedTower = tower.damaged;
+    tower.damaged = true;
+    st.equipment.sturdyTool = 0;
+    const adultsAble = CRI.ablePeople(st);
+    const savedAway = adultsAble.map((c) => c.away);
+    adultsAble.forEach((c, i) => { if (i >= 2) c.away = { stage: 'away', until: now() + 1e6 }; });
+    const denyA = crisis().resolveRaid('defend');
+    check('savunma yetmiyorsa "Bekçilerle Püskürt" reddedilir (nedeniyle), baskın sürer', !denyA.ok && Boolean(st.crisis.raid) && denyA.reason.length > 0, denyA.reason);
+    // Otomatik çözüm: süre dolunca savunma yoksa hazırlıksız yakalanır
+    st.crisis.raid.arriveAt = now();
+    const cb = st.crisis.caught;
+    crisis().hourly();
+    check('karar verilmezse varışta savunma yetmiyorsa C uygulanır (kendiliğinden)', !st.crisis.raid && st.crisis.caught === cb + 1);
+    adultsAble.forEach((c, i) => (c.away = savedAway[i]));
+    tower.damaged = savedTower;
+    st.equipment.sturdyTool = 1;
+    crisis().warnRaid();
+    st.crisis.raid.arriveAt = now();
+    const rb = st.crisis.repelled;
+    crisis().hourly();
+    check('karar verilmezse varışta savunma yetiyorsa A uygulanır (kendiliğinden)', !st.crisis.raid && st.crisis.repelled === rb + 1);
+    // Baskın penceresi
+    crisis().warnRaid();
+    game.events.emit('ui:openRaid');
+    renderNow();
+    const modal = document.querySelector('.crisis-panel');
+    const optionBtns = modal ? [...modal.querySelectorAll('.crisis-option .upgrade-button')] : [];
+    check('haydut izi çipi/Kule paneli: üç net seçenekli pencere (A püskürt, B haraç, C hazırlıksız)', modal && !modal.hidden && optionBtns.length === 3 && optionBtns[0].textContent.startsWith('A') && optionBtns[1].textContent.startsWith('B') && optionBtns[2].textContent.startsWith('C'), optionBtns.map((b) => b.textContent).join(' | '));
+    sim.give({ gold: 800 });
+    renderNow();
+    const tribBefore = st.crisis.tributes;
+    [...document.querySelectorAll('.crisis-panel .crisis-option .upgrade-button')][1].click();
+    renderNow();
+    check('pencerede "Haraç Öde" düğmesi baskını çözer ve pencere kapanır', st.crisis.tributes === tribBefore + 1 && !st.crisis.raid && document.querySelector('.crisis-panel').hidden);
+    game.events.emit('ui:selectBuilding', null);
+    crisis().warnRaid();
+    game.events.emit('ui:selectBuilding', tower.id);
+    renderNow();
+    check('Gözcü Kulesi panelinde haydut baskını kartı (üç seçenek) ve bekçiler', document.querySelectorAll('.building-crisis .crisis-option').length === 3 && document.querySelector('.building-crisis').textContent.includes('Asayiş'));
+    crisis().resolveRaid('tribute');
+    game.events.emit('ui:selectBuilding', null);
+
+    // --- Yangın ---
+    // Gündüz olsun (sakinler uyanık): koşacak itfaiyeciler gerekir
+    for (let i = 0; i < 24 && st.time.hour !== 9; i++) hours(1);
+    for (const b of st.buildings) b.isDamaged = false;
+    st.trust.value = 60;
+    const burner = st.buildings.find((b) => b.type === 'lumberHut' && b.functional) ?? st.buildings.find((b) => BD.DAMAGEABLE_TYPES.includes(b.type) && b.functional);
+    const trustF0 = st.trust.value;
+    let fireEvent = null;
+    const offFire = game.events.on('crisis:fireStarted', (p) => (fireEvent = p));
+    crisis().startFire(burner);
+    offFire();
+    check('yangın başlar: isBurning, fireProgress 0, hasar nedeni "yangın"', burner.isBurning && burner.fireProgress === 0 && burner.damageKind === 'fire' && !burner.damaged);
+    check('yangın günlüğe yazılır ve "yangın çıktı" olayı yayılır', st.journal.some((j) => j.text.includes(`${burner.name} yangın çıktı`)) && fireEvent?.building === burner && fireEvent.responders.length > 0 && fireEvent.responders.length <= CD.FIRE.maxFighters);
+    renderNow();
+    const fireChip = [...document.querySelectorAll('.hud-buffs .buff-chip')].find((c) => c.textContent.includes('yanıyor'));
+    check('üst çubuk altında yangın uyarı çipi ("yanıyor · %…")', Boolean(fireChip) && fireChip.textContent.includes(burner.name), fireChip?.textContent);
+    check('yanan yapı çalışmaz (iş yeri boşta)', (() => { sim.step(2); return burner.idle === true; })());
+    const p0 = burner.fireProgress;
+    crisis().update({ gameMinutes: 60 });
+    check('yangın zamanla yayılır (6 saatte %100)', Math.abs(burner.fireProgress - p0 - 100 / 6) < 1e-6, String(burner.fireProgress));
+    // Panel: Acil Söndür
+    game.events.emit('ui:selectBuilding', burner.id);
+    renderNow();
+    st.trust.value = 60;
+    const extBtn = [...document.querySelectorAll('.building-crisis button')].find((b) => b.textContent.startsWith('Acil Söndür'));
+    check('yanan yapının panelinde "Acil Söndür (Kova Zinciri)" düğmesi', Boolean(extBtn) && extBtn.textContent.includes('Kova Zinciri'));
+    const trustE0 = st.trust.value;
+    const extinguishedBefore = st.crisis.extinguished;
+    extBtn.click();
+    check('Acil Söndür: yangın anında söner, yapı hasar almaz, Güven +2', !burner.isBurning && !burner.damaged && burner.fireProgress === 0 && Math.abs(st.trust.value - (trustE0 + 2)) < 1e-9 && st.crisis.extinguished === extinguishedBefore + 1 && st.journal.some((j) => j.text.includes('acil kova zinciriyle')));
+    game.events.emit('ui:selectBuilding', null);
+    // Kova ile söndürme (kuyu uzakta: 4 kova)
+    wellsNow().forEach((w) => (w.damaged = true)); // kuyular devre dışı: kuyusuz kasaba
+    const farTarget = st.buildings.find((b) => b.functional && BD.DAMAGEABLE_TYPES.includes(b.type) && !b.damaged && !b.isBurning);
+    st.trust.value = 60;
+    if (farTarget) {
+      crisis().startFire(farTarget);
+      const helperA = adults()[0];
+      const helperB = adults()[1];
+      const trustK0 = st.trust.value;
+      const fireOutEvents = [];
+      const offOut = game.events.on('crisis:fireOut', (p) => fireOutEvents.push(p));
+      for (let i = 0; i < 3; i++) crisis().onBucket(i % 2 ? helperA : helperB, farTarget);
+      check('kuyu yokken yangın için 4 kova gerekir', farTarget.isBurning && farTarget.fireWater === 3 && CRI.bucketsNeeded(st, farTarget) === 4);
+      crisis().onBucket(helperA, farTarget);
+      offOut();
+      check('4. kovada yangın söner: hasarsız, "yangını el birliğiyle söndürdük" anısı ve Güven +2', !farTarget.isBurning && !farTarget.damaged && fireOutEvents.length === 1 && fireOutEvents[0].helpers.length === 2 && helperA.memories.some((m) => m.text === 'Yangını el birliğiyle söndürdük') && Math.abs(st.trust.value - (trustK0 + 2)) < 1e-9 && st.journal.some((j) => j.text.includes('el birliğiyle')));
+    } else check('kuyu yokken kova ile söndürme (uygun yapı bulunamadı)', false);
+    wellsNow().forEach((w) => (w.damaged = false));
+    const nearTarget = target;
+    nearTarget.isBurning = false;
+    nearTarget.isDamaged = false;
+    crisis().startFire(nearTarget);
+    check('yakında Su Kuyusu varken (kova zinciri) 3 kova yeter', CRI.bucketsNeeded(st, nearTarget) === 3);
+    for (let i = 0; i < 3; i++) crisis().onBucket(adults()[i % 2], nearTarget);
+    check('3 kovada yangın söner (kuyu yakın)', !nearTarget.isBurning && !nearTarget.damaged);
+    // Sakinler gerçekten koşar: kovalar atılır ve yangın söner (sim ile)
+    {
+      const fightTarget = nearTarget;
+      let seen = new Set();
+      let buckets = 0;
+      const offB = game.events.on('crisis:bucket', () => buckets++);
+      crisis().startFire(fightTarget);
+      for (let i = 0; i < 72 && fightTarget.isBurning; i++) {
+        sim.step(19);
+        for (const c of st.characters) if (c.task && ['fetchWater', 'fightFire'].includes(c.task.activity)) seen.add(c.task.activity);
+      }
+      offB();
+      check('sakinler işi bırakıp kova taşır: su alır (fetchWater), yangına boşaltır (fightFire) ve yangını söndürür', !fightTarget.isBurning && seen.has('fetchWater') && seen.has('fightFire') && buckets >= 3 && !fightTarget.damaged, `${[...seen]} ${buckets} kova`);
+      check('yangını söndüren kova taşıyıcıların başında su kovası balonu çıkar', (() => { try { return UI.getBubbleSprite('bucket') && UI.getBubbleSprite('shield') && UI.getBubbleSprite('bandit') && UI.getBubbleSprite('bandage'); } catch (e) { return false; } })());
+    }
+    // Kuyu yokken nehirden su taşıma: kovayı dolduranlar yangına koşar (sorumlu sakinler kova doluyken sıralamadan düşmez)
+    {
+      wellsNow().forEach((w) => (w.damaged = true));
+      const riverTarget = st.buildings.find((b) => b.functional && BD.DAMAGEABLE_TYPES.includes(b.type) && !b.damaged && !b.isBurning && b.id !== nearTarget.id) ?? nearTarget;
+      riverTarget.isBurning = false;
+      let thrownRiver = 0;
+      let filledRiver = 0;
+      const offT = game.events.on('crisis:bucketThrown', () => thrownRiver++);
+      const offF = game.events.on('crisis:bucketFilled', () => filledRiver++);
+      const sourceKind = crisis().waterSource(riverTarget, adults()[0])?.kind ?? null;
+      crisis().startFire(riverTarget);
+      for (let i = 0; i < 72 && riverTarget.isBurning; i++) {
+        sim.step(19);
+        if (st.dilemma.active) sim.step(1900);
+      }
+      offT();
+      offF();
+      wellsNow().forEach((w) => (w.damaged = false));
+      check('kuyu yokken sakinler nehirden su taşır: kovayı dolduranlar yangına koşar, kovalar atılır ve yangın hasarsız söner', sourceKind === 'river' && !riverTarget.isBurning && !riverTarget.damaged && thrownRiver >= 4 && filledRiver >= thrownRiver, `${sourceKind} dolan ${filledRiver} atılan ${thrownRiver} hasar ${riverTarget.damaged}`);
+    }
+    // Yanıp biten yangın: hasarlı ama silinmez
+    const burnTarget = st.buildings.find((b) => b.functional && BD.DAMAGEABLE_TYPES.includes(b.type) && b.id !== nearTarget.id) ?? nearTarget;
+    const burnCount = st.buildings.length;
+    st.trust.value = 60;
+    const burnTrust0 = st.trust.value;
+    crisis().startFire(burnTarget);
+    burnTarget.fireProgress = 99;
+    crisis().update({ gameMinutes: 30 });
+    check('söndürülemeyen yangın: yapı HASARLI olur (isDamaged), haritadan SİLİNMEZ', !burnTarget.isBurning && burnTarget.damaged && burnTarget.isDamaged === true && burnTarget.damageKind === 'fire' && st.buildings.length === burnCount && st.buildings.includes(burnTarget));
+    check('yanıp biten yapıda Güven -2; günlük ve sayaç', Math.abs(st.trust.value - (burnTrust0 - 2)) < 1e-9 && st.crisis.burned >= 1 && st.journal.some((j) => j.text.includes('yanıp hasar gördü')));
+    sim.step(6);
+    check('hasarlı yapı üretim yapamaz (boşta, çalışan yok)', burnTarget.idle === true && burnTarget.workerSlots >= 0 && [...burnTarget.workerIds].length === 0);
+    renderNow();
+    check('hasarlı yapı için "N hasarlı yapı" çipi', [...document.querySelectorAll('.hud-buffs .buff-chip')].some((c) => c.textContent.includes('hasarlı yapı')));
+
+    // --- Tamir ---
+    game.events.emit('ui:selectBuilding', burnTarget.id);
+    renderNow();
+    const repairBtn = [...document.querySelectorAll('.building-crisis button')].find((b) => b.textContent === 'Tamir Et');
+    const cost = CRI.repairCost(burnTarget.type);
+    const expectCost = Object.fromEntries(Object.entries(burnTarget.definition.cost).filter(([r]) => r === 'wood' || r === 'stone').map(([r, v]) => [r, Math.max(1, Math.ceil(v * 0.25))]));
+    check('tamir bedeli inşa maliyetinin %25\'i (yalnızca odun ve taş)', JSON.stringify(cost) === JSON.stringify(expectCost) && Object.keys(cost).every((r) => r === 'wood' || r === 'stone'), JSON.stringify(cost));
+    check('hasarlı yapının panelinde "Tamir Et" düğmesi ve hasar kartı', Boolean(repairBtn) && document.querySelector('.building-crisis').textContent.includes('Hasar'));
+    sim.give({ wood: 0, stone: 0 });
+    renderNow();
+    const poor = crisis().repairNow(burnTarget);
+    check('kaynak yetmezse Tamir Et reddedilir, yapı hasarlı kalır', !poor.ok && burnTarget.damaged);
+    sim.give({ wood: 400, stone: 400 });
+    const wr0 = st.resources.wood;
+    const sr0 = st.resources.stone;
+    const repairs0 = st.crisis.repairs;
+    game.events.emit('ui:repairBuilding', { buildingId: burnTarget.id });
+    check('Tamir Et: bedel düşülür, yapı ANINDA onarılır (isDamaged = false)', !burnTarget.damaged && wr0 - st.resources.wood === (cost.wood ?? 0) && sr0 - st.resources.stone === (cost.stone ?? 0) && burnTarget.damageKind === null && st.crisis.repairs === repairs0 + 1);
+    check('onarım günlüğe yazılır (yangın hasarından)', st.journal.some((j) => j.text.includes(`${burnTarget.name} yangın hasarından onarıldı`)));
+    game.events.emit('ui:selectBuilding', null);
+    sim.step(2);
+    check('onarılan yapı yeniden çalışabilir', burnTarget.idle === false || burnTarget.definition.crafting || burnTarget.definition.processing || burnTarget.definition.apothecary);
+    // Ustalar otomatik onarır
+    const autoTarget = st.buildings.find((b) => b.functional && BD.DAMAGEABLE_TYPES.includes(b.type) && !b.damaged && !b.project);
+    sim.give({ wood: 400, stone: 400 });
+    crisis().damage(autoTarget, 'fire');
+    autoTarget.damagedAt = now() - 30; // henüz 2 saat dolmadı
+    crisis().autoRepair();
+    check('hasardan 2 saat geçmeden usta onarımı başlamaz (oyuncuya fırsat)', !autoTarget.project);
+    autoTarget.damagedAt = now() - 150;
+    const wA = st.resources.wood;
+    crisis().autoRepair();
+    check('boştaki ustalar 2 saat sonra kaynak varsa onarım projesini kendiliğinden başlatır (maliyet %25)', autoTarget.project?.kind === 'mend' && autoTarget.project.work === CD.REPAIR.buildWork && wA - st.resources.wood === (CRI.repairCost(autoTarget.type).wood ?? 0));
+    let mended = false;
+    for (let i = 0; i < 40 && !mended; i++) {
+      hours(1);
+      mended = !autoTarget.damaged;
+    }
+    check('inşaatçılar kısa sürede binayı onarır (isDamaged = false)', mended && !autoTarget.project, `${autoTarget.damaged}`);
+    // Fırtına hasarı eski kuralı korur (otomatik başlamaz, %30)
+    const stormTarget = st.buildings.find((b) => b.functional && BD.DAMAGEABLE_TYPES.includes(b.type) && !b.damaged && !b.project);
+    stormTarget.damaged = true;
+    crisis().autoRepair();
+    const stormSpec = CRI.mendSpecFor(stormTarget);
+    const stormWood = stormTarget.definition.cost.wood ? Math.max(1, Math.ceil(stormTarget.definition.cost.wood * 0.3)) : undefined;
+    check('fırtına hasarı eski kurala bağlı kalır: oyuncu başlatır (maliyet %30), usta kendiliğinden başlamaz', !stormTarget.project && stormSpec.buildWork === 90 && stormSpec.cost.wood === stormWood, JSON.stringify(stormSpec.cost));
+    crisis().repairNow(stormTarget);
+    check('"Tamir Et" fırtına hasarını da anında onarır', !stormTarget.damaged);
+
+    // --- Hafif yaralanma ve Şifacı ---
+    const victim = adults()[2];
+    victim.isInjured = false;
+    const popD = st.characters.length;
+    crisis().injure(victim, 'fire');
+    check('yaralanma: isInjured ve 1,5 günlük (2160 dk) injuryTimer; sakin ölmez', victim.isInjured && victim.injuryTimer === 36 * 60 && st.characters.includes(victim));
+    check('yaralı sakin %20 yavaş yürür ve çalışır', Math.abs(HS.healthWalkMultiplier(victim, now()) - 0.8) < 1e-9 && Math.abs(HS.healthWorkMultiplier(victim, now()) - 0.8) < 1e-9 && HS.healthWalkMultiplier(adults().find((c) => !c.isInjured && !c.illness && !HS.hasVigor(c, now())), now()) === 1);
+    game.events.emit('ui:selectCharacter', victim.id);
+    renderNow();
+    check('Karakter Kartı "🩹 Hafif Yaralı" etiketini gösterir', [...document.querySelectorAll('.condition-chip')].some((c) => c.textContent.includes('Hafif Yaralı')), [...document.querySelectorAll('.condition-chip')].map((c) => c.textContent).join('|'));
+    renderNow();
+    check('yaralılar üst çubukta "hafif yaralı" çipinde sayılır', [...document.querySelectorAll('.hud-buffs .buff-chip')].some((c) => c.textContent.includes('hafif yaralı')));
+    game.events.emit('ui:selectCharacter', null);
+    // Çocuklar yaralanmaz
+    const kid = st.characters.find((c) => c.isChild);
+    if (kid) check('çocuklar yaralanmaz', !crisis().injure(kid, 'raid') && !kid.isInjured);
+    // Şifacı yokken kendiliğinden iyileşme
+    const healers = st.buildings.filter((b) => b.type === 'healerHut');
+    const healerStates = healers.map((b) => b.damaged);
+    healers.forEach((b) => (b.damaged = true));
+    victim.task = null;
+    crisis().update({ gameMinutes: 36 * 60 + 1 });
+    check('Şifacı Kulübesi yoksa bile yara 1,5 günde kendiliğinden iyileşir', !victim.isInjured && st.journal.some((j) => j.text.includes('yarası kendiliğinden iyileşti')));
+    // Şifacıda iyileşme
+    healers.forEach((b, i) => (b.damaged = healerStates[i]));
+    const healer = firstOf('healerHut') ?? sim.place('healerHut', { maxRadius: 40 });
+    const patient = adults().find((c) => c !== victim && !c.illness && !c.away);
+    patient.isInjured = false;
+    crisis().injure(patient, 'raid');
+    patient.needs.fun = 40;
+    const treated0 = st.crisis.treated;
+    let healedAt = null;
+    for (let i = 0; i < 48 && !healedAt; i++) {
+      hours(1);
+      if (!patient.isInjured) healedAt = i;
+    }
+    check('yaralı sakin Şifacı Kulübesi\'ne gider, orada iyileşir (isInjured = false)', healedAt !== null && st.crisis.treated === treated0 + 1, `${healedAt} saat`);
+    check('şifacıda sarılınca keyif artar ve Yaşam Günlüğü\'ne "Şifacıda yaraları sarıldı" yazılır', patient.memories.some((m) => m.text === 'Şifacıda yaraları sarıldı') && st.journal.some((j) => j.text.includes('Şifacı Kulübesi\'nde sarıldı')));
+    // Şifalı ot
+    const herbal = adults().find((c) => !c.isInjured && !c.illness);
+    herbal.isInjured = true;
+    herbal.injuryTimer = 36 * 60;
+    game.events.emit('citizen:herbTea', { character: herbal });
+    check('şifalı ot demleyen yaralının yarası çabuk kapanır', herbal.injuryTimer <= 180);
+    herbal.isInjured = false;
+    herbal.injuryTimer = 0;
+
+    // --- Ana üreteç yalıtımı (KURAL 1) ---
+    {
+      const mainRng = S.behavior.rng;
+      const rngStateBefore = mainRng.state;
+      let randomCalls = 0;
+      const realRandom = Math.random;
+      Math.random = () => { randomCalls++; return realRandom(); };
+      const b = st.buildings.find((x) => x.functional && BD.DAMAGEABLE_TYPES.includes(x.type) && !x.damaged);
+      crisis().startFire(b);
+      crisis().onBucket(adults()[0], b);
+      crisis().extinguish(b, { byPlayer: true });
+      crisis().startFire(b);
+      b.fireProgress = 100;
+      crisis().update({ gameMinutes: 1 });
+      crisis().repairNow(b);
+      crisis().warnRaid();
+      crisis().resolveRaid('defend');
+      crisis().warnRaid();
+      crisis().resolveRaid('caught');
+      for (const x of st.buildings) x.isDamaged = false;
+      crisis().injure(adults()[3], 'raid');
+      crisis().update({ gameMinutes: 3000 });
+      st.crisis.difficulty = 'cetin';
+      crisis().rollFire();
+      crisis().hourly();
+      st.crisis.difficulty = 'huzurlu';
+      Math.random = realRandom;
+      check('kriz sistemi oyunun ana rastgele sayı üretecini ve Math.random\'u tüketmez', mainRng.state === rngStateBefore && randomCalls === 0, `${mainRng.state}/${rngStateBefore} ${randomCalls}`);
+      check('kriz sistemi kendi tohumlanmış üretecini kullanır (seed + 26)', crisis().rng !== S.behavior.rng && crisis().rng.state !== undefined);
+      st.crisis.raid = null;
+      for (const x of st.buildings) { x.isBurning = false; x.isDamaged = false; }
+      for (const c of st.characters) { c.isInjured = false; c.injuryTimer = 0; }
+    }
+
+    // --- Doğal takvim (Çetin) ve yükleme sonrası 24 saat koruması ---
+    {
+      const c = crisis();
+      st.crisis.difficulty = 'cetin';
+      st.crisis.raid = null;
+      st.crisis.nextRaidWarnAt = null;
+      const dayKept = st.time.day;
+      st.time.day = Math.max(dayKept, 12);
+      const firesBefore = st.crisis.fires;
+      const graceSaved = c.graceUntil;
+      c.graceUntil = now() + 1440;
+      c.hourly();
+      check('kayıt yüklendikten sonraki ilk 24 saatte doğal kriz çıkmaz (haydut takvimi bile kurulmaz)', st.crisis.nextRaidWarnAt === null && st.crisis.fires === firesBefore && !st.crisis.raid);
+      c.graceUntil = null;
+      c.hourly();
+      check('koruma bitince haydut izi takvimi kurulur (Çetin: 8-10 günlük aralık ≥ 1/1,5)', Number.isFinite(st.crisis.nextRaidWarnAt));
+      st.crisis.nextRaidWarnAt = now() - 1;
+      c.hourly();
+      check('takvim gelince doğal haydut izi uyarısı çıkar', Boolean(st.crisis.raid));
+      st.crisis.raid = null;
+      st.crisis.difficulty = 'huzurlu';
+      st.crisis.nextRaidWarnAt = now() - 1;
+      c.hourly();
+      check('Huzurlu: takvim dolsa bile doğal haydut izi çıkmaz', !st.crisis.raid);
+      // Çetin'de doğal yangın zamanla kesinlikle çıkar (günlük yoklama, kendi üretecinden)
+      st.crisis.difficulty = 'cetin';
+      for (const x of st.buildings) x.isBurning = false;
+      let natural = 0;
+      for (let i = 0; i < 400 && natural === 0; i++) {
+        c.rollFire();
+        natural = st.buildings.filter((x) => x.isBurning).length;
+      }
+      check('Çetin: doğal yangın yoklaması ateşli yapılarda yangın çıkarır', natural === 1);
+      for (const x of st.buildings) { x.isBurning = false; x.isDamaged = false; }
+      st.crisis.difficulty = 'huzurlu';
+      st.crisis.nextRaidWarnAt = null;
+      st.crisis.raid = null;
+      c.graceUntil = graceSaved;
+      st.time.day = dayKept;
+    }
+
+    // --- Sanat ---
+    {
+      const w = ART.getStructureSprite('well', {});
+      const t = ART.getStructureSprite('guardTower', {});
+      const tl = ART.getStructureSprite('guardTower', { lit: true });
+      check('Su Kuyusu sprite\'ı 16x24, Gözcü Kulesi 32x56 (geceleri farklı)', w.width === 16 && w.height === 24 && t.width === 32 && t.height === 56 && t !== tl);
+      check('yeni simgeler: alev, kova, kalkan, haydut, bandaj, tamir (dünya ve arayüz)', ['fire', 'bucket', 'shield', 'bandit', 'bandage', 'repair'].every((n) => { try { return UI.getIconSprite(n) && UI.getAnyIconURL(n); } catch (e) { return false; } }));
+    }
+
+    check('kriz boyunca kimse ölmedi ve nüfus eksilmedi; hiçbir yapı haritadan silinmedi', st.characters.length >= popBefore && st.buildings.length >= buildingsBefore);
+    // --- Kayıt gidiş-dönüşü (sürüm 20) ---
+    {
+      const b = st.buildings.find((x) => x.functional && BD.DAMAGEABLE_TYPES.includes(x.type) && !x.damaged);
+      const d = st.buildings.find((x) => x.functional && BD.DAMAGEABLE_TYPES.includes(x.type) && !x.damaged && x !== b);
+      crisis().startFire(b);
+      b.fireProgress = 42;
+      b.fireWater = 2;
+      crisis().damage(d, 'raid');
+      const hurtOne = adults()[4];
+      crisis().injure(hurtOne, 'raid');
+      hurtOne.injuryTimer = 1000;
+      st.crisis.difficulty = 'cetin';
+      st.crisis.raid = null;
+      crisis().warnRaid();
+      const T = { b: b.id, d: d.id, hurt: hurtOne.id, raid: JSON.stringify(st.crisis.raid), fires: st.crisis.fires, repairs: st.crisis.repairs, extinguished: st.crisis.extinguished };
+      game.events.emit('ui:save');
+      const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+      game.events.emit('ui:load');
+      const s5 = game.state;
+      const b2 = s5.buildings.find((x) => x.id === T.b);
+      const d2 = s5.buildings.find((x) => x.id === T.d);
+      const h2 = s5.characters.find((c) => c.id === T.hurt);
+      check('kayıt sürümü 20: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 20 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
+      check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
+      check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
+      check('yüklemeden sonra krizin kendi üreteci ve koruma süresi yeniden kurulur (aktif kriz kaydedildiyse koruma yok)', game.scenes.current.crisis.graceUntil === null);
+      // Aktif kriz yokken yükleyince koruma var
+      const s6s = game.scenes.current;
+      for (const x of s5.buildings) { x.isBurning = false; x.isDamaged = false; }
+      s5.crisis.raid = null;
+      game.events.emit('ui:save');
+      game.events.emit('ui:load');
+      check('aktif kriz yokken yüklenince ilk 24 oyun saatinde doğal kriz korumasında', game.scenes.current.crisis.graceUntil === game.state.totalMinutes + 1440);
+      // Eski (v19) kayıt: kriz yok
+      game.events.emit('ui:save');
+      const old = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+      old.version = 19;
+      delete old.crisis;
+      for (const x of old.buildings) for (const k of ['isBurning', 'isDamaged', 'fireProgress', 'fireWater', 'damageKind', 'damagedAt']) delete x[k];
+      for (const c of old.characters) { delete c.isInjured; delete c.injuryTimer; }
+      localStorage.setItem('lmgame.save.v2', JSON.stringify(old));
+      game.events.emit('ui:load');
+      const s7 = game.state;
+      check('v19 kaydı yüklenince hiçbir yapı yanmıyor / hasarlı değil, kimse yaralı değil, kriz boş ve Dengeli', s7.buildings.every((x) => !x.isBurning && !x.isDamaged) && s7.characters.every((c) => !c.isInjured) && s7.crisis.difficulty === 'dengeli' && !s7.crisis.raid && s7.crisis.fires === 0);
+      check('v19 kaydı yüklenince ilk 24 saatte kriz çıkmaz', game.scenes.current.crisis.graceUntil === s7.totalMinutes + 1440);
+    }
   }
 
   return out;

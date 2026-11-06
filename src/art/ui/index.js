@@ -1177,6 +1177,13 @@ Object.assign(ICONS, {
   souvenir: ['..o...o..', '...o.o...', 'KKKKoKKKK', 'KiiioiiiK', 'KKKKoKKKK', '.KiioiiK.', '.KiioiiK.', '.KiioiiK.', '.KKKKKKK.'],
   lantern: ['...KKK...', '..KxxxK..', '..KPYPK..', '..KYPYK..', '..KxxxK..', '...KwK...', '...KwK...', '...KwK...', '..KKKKK..'],
   loot: ['...K.K...', '....K....', '...KXK...', '..KXXXK..', '.KXEXXXK.', 'KXXXEXXXK', 'KXEXXXEXK', '.KXXXXXK.', '..KKKKK..'],
+  // 23. aşama: yangın, su kovası, kalkan (Gözcü Kulesi / savunma), haydut, bandaj (hafif yaralı) ve tamir
+  fire: ['....o....', '...oO....', '..ooOo...', '..oOPOo..', '.ooOPPOo.', '.oOPyPPo.', '.oOPyyPo.', '..oOPPo..', '...ooo...'],
+  bucket: ['..KKKKK..', '.K.....K.', 'KKKKKKKKK', 'KcaWcacaK', '.KwXwXwK.', '.KwXwXwK.', '.KrrrrrK.', '.KwXwXwK.', '..KKKKK..'],
+  shield: ['KKKKKKKKK', 'KbbbPbbbK', 'KbbbPbbbK', 'KPPPPPPPK', 'KbbbPbbbK', '.KbbPbbK.', '.KbbPbbK.', '..KbbbK..', '...KKK...'],
+  bandit: ['...KKK...', '..KxxxK..', 'KKKxxxKKK', '.KsssssK.', '.KuKKKuK.', '.KKKKKKK.', '.KoooooK.', '..KoooK..', '...KKK...'],
+  bandage: ['.........', '.........', '.KKKKKKK.', 'KSSSSSSSK', 'KSsKsKsSK', 'KSSSSSSSK', '.KKKKKKK.', '.........', '.........'],
+  repair: ['.KKKKKKK.', 'KqqqqrRRK', '.KKKwKKK.', '...KwK..o', '...KwK.o.', '...KwKo..', '...KXK.o.', '...KKK..o', '.........'],
 });
 
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
@@ -1328,6 +1335,12 @@ const BUBBLE_ICONS = {
   bundle: ['...K..K', '..KoK.K', '.KoBoKK', 'KoooBKw', '.KoBoKw', '..KKK.w'],
   collector: ['.KKKKK.', 'KnnnnnK', '..KPK..', '.KdYdK.', 'KddoddK', '.KKKKK.'],
   decree: ['KKKKKK.', 'KSSSSK.', 'KsKKsK.', 'KsSSsKo', 'KSSSSoo', 'KKKKKoo'],
+  // 23. aşama: su kovası, kalkan, haydut, bandaj ve tamir
+  bucket: ['..KKK..', '.K...K.', 'KKKKKKK', 'KcWacaK', '.KwXwK.', '..KKK..'],
+  shield: ['KKKKKKK', 'KbbPbbK', 'KPPPPPK', 'KbbPbbK', '.KbPbK.', '..KKK..'],
+  bandit: ['..KKK..', '.KxxxK.', 'KKxxxKK', 'KuKKKuK', 'KoooooK', '.KKKKK.'],
+  bandage: ['.......', '.KKKKK.', 'KSSSSSK', 'KSsKsSK', '.KKKKK.', '.......'],
+  repair: ['KKKK...', 'KqrRK.o', '.Kw..o.', '..w.o..', '..x..o.', '.....o.'],
 };
 
 export const BUBBLE_WIDTH = 11;

@@ -63,6 +63,8 @@ export const TOWN_BUFFS = {
   heard: { name: 'Sesimiz Duyuldu', icon: 'scroll', hours: 24, happiness: 3 },
   // 22. aşama: Krallık Vergisi ödenemeyince (CrownSystem) iki gün boyunca refah darbesi
   royalPenalty: { name: 'Kraliyet Cezası', icon: 'collector', hours: 48, happiness: -8 },
+  // 23. aşama: haydut baskını bekçilerce püskürtülünce (CrisisSystem) kasaba bir gün huzurla yaşar
+  banditsRepelled: { name: 'Haydutlar Kovuldu', icon: 'shield', hours: 24, happiness: 4 },
 };
 
 // Handa sıcak yemek yiyen sakinin kişisel bonusu: bu kadar oyun saati boyunca yavaş acıkır

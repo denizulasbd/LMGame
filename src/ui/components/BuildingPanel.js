@@ -12,12 +12,14 @@
 //     altın fermanları; iş yerlerinde "İşçi Ata" ile sakini sabitleme (yalnızca orada çalışır) ve sabitlemeyi kaldırma
 //   - (12. aşama) Bilgelik Evi'nin araştırma kartları (Araştır düğmesi, ilerleme) ve okulu; limanın fazlalık
 //     ihracatı sınırı, ihracat sandığı, tekne durumu ve Kasaba Hazinesi; harikanın aşamaları
+//   - (23. aşama) kriz bölümü: yanan yapıda ilerleme ve "Acil Söndür (Kova Zinciri)", hasarlı yapıda "Tamir Et" (maliyetin %25'i,
+//     anında), Su Kuyusu'nun etkileri, Gözcü Kulesi'nde bekçiler ve bekleyen haydut baskınının üç çözüm yolu
 //   - (10. aşama) yan ürün (ağılda yiyecek, madende taş), değirmen-fırının işleme satırları (1 yiyecek -> 1
 //     ekmek), ekipmanın asıl (demir / yün) ve eski usul tarifi, ağıldaki koyunlar, belediyenin etkileri
 // Panel oyun durumunu yalnızca okur; istekleri olay olarak yayınlar (ui:startProject, ui:cancelProject,
 // ui:demolishBuilding, ui:selectCharacter, ui:dismissWorker, ui:rehireWorker, ui:setCraftMode, ui:civicProject,
 // ui:startResearch, ui:setExportThreshold, ui:prepareCrate, ui:buyLuxury, ui:buyRelic, ui:goldDecree, ui:pinWorker,
-// ui:unpinWorker). Ne
+// ui:unpinWorker, ui:extinguish, ui:repairBuilding, ui:raidChoice). Ne
 // değiştiğini anlamak için her karede kısa bir anahtar üretir; anahtar değişmedikçe DOM'a dokunmaz.
 import { CLOCK_GEAR } from '../../data/goldenAge.js';
 import { BUILDINGS, mendSpec, PROJECT_WORDS } from '../../data/buildings.js';
@@ -53,6 +55,9 @@ import { reliefStatus, trustWelfare } from '../../systems/TrustSystem.js';
 import { formatRemaining } from '../../systems/Petitions.js';
 import { TAX_RATES, TAX_RATE_KEYS, TAX, LEVY, DECREES, DECREE_ITEMS } from '../../data/crown.js';
 import { estimateTax, levyAmount, levyPlan, decreeStatus, reputationLevel } from '../../systems/Crown.js';
+import { mendSpecFor, repairCost, wellNear, defenseStatus } from '../../systems/Crisis.js';
+import { FIRE, WELL, GUARD, REPAIR } from '../../data/crisis.js';
+import { raidCard } from './crisisCards.js';
 
 const thumbnailCache = new Map();
 
@@ -92,6 +97,7 @@ export class BuildingPanel {
     this.bell = el('div', { className: 'building-decrees building-bell' });
     this.trustBox = el('div', { className: 'building-decrees building-trust' }); // (21. aşama) Yönetim Güveni
     this.crownBox = el('div', { className: 'building-decrees building-crown' }); // (22. aşama) iç vergi ve Krallık
+    this.crisisBox = el('div', { className: 'building-decrees building-crisis' }); // (23. aşama) yangın, tamir, kuyu, kule
     this.expedition = el('div', { className: 'building-decrees building-expedition' });
     this.inscriptions = el('div', { className: 'building-decrees building-inscriptions' });
     this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
@@ -136,6 +142,7 @@ export class BuildingPanel {
       this.luxury,
       this.crownBox,
       this.trustBox,
+      this.crisisBox,
       this.bell,
       this.expedition,
       this.inscriptions,
@@ -218,7 +225,10 @@ export class BuildingPanel {
             expeditionLaunchStatus(state, building.type).reason,
           ])
         : '';
+    // (23. aşama) kriz: yangın ilerlemesi, tamir bedeli, bekleyen baskın, kule ve bekçiler
+    const crisisKey = this.crisisKeyOf(building, state);
     const key = [
+      crisisKey,
       exploreKey,
       bellKey,
       craftKey,
@@ -270,6 +280,7 @@ export class BuildingPanel {
     this.renderLuxury(building, state);
     this.renderCrown(building, state);
     this.renderTrust(building, state);
+    this.renderCrisis(building, state);
     this.renderBell(building, state);
     this.renderExpedition(building, state);
     this.renderInscriptions(building, state);
@@ -287,6 +298,7 @@ export class BuildingPanel {
   }
 
   badgeText(building) {
+    if (building.isBurning) return 'Yanıyor!';
     if (building.damaged) return building.project ? 'Hasarlı · onarılıyor' : 'Hasarlı · onarılmalı';
     if (building.ruined) return building.project ? 'Kadim Harabe · onarılıyor' : 'Kadim Harabe';
     if (building.definition.ruin) return 'Onarılmış Kadim Yapı';
@@ -608,6 +620,86 @@ export class BuildingPanel {
     );
   }
 
+  /** (23. aşama) Panelin kriz bölümünün değişim anahtarı (anahtar değişmedikçe DOM'a dokunulmaz). */
+  crisisKeyOf(building, state) {
+    const raid = state.crisis?.raid;
+    const parts = [building.isBurning, Math.floor(building.fireProgress / 5), building.fireWater, building.damaged, building.damageKind];
+    if (building.damaged || building.type === 'well') parts.push(state.resources.wood, state.resources.stone);
+    if (building.type === 'guardTower' || building.type === 'well') {
+      parts.push(Math.floor(state.totalMinutes / 60), building.workerIds.size, building.guardSlots);
+    }
+    if (building.type === 'guardTower' || building.type === 'fountain' || building.definition.civic) {
+      parts.push(JSON.stringify(raid), raid ? JSON.stringify(defenseStatus(state)) : '', raid ? state.resources.gold : '');
+    }
+    return parts.join(':');
+  }
+
+  /**
+   * (23. aşama) Kriz bölümü: yanan yapıda "Acil Söndür (Kova Zinciri)", hasarlı yapıda "Tamir Et" (maliyetin %25'i), Su Kuyusu'nun
+   * etkileri, Gözcü Kulesi'nin bekçileri ve bekleyen haydut baskınının üç çözüm yolu ('ui:raidChoice').
+   */
+  renderCrisis(building, state) {
+    const children = [];
+    const crisis = state.crisis;
+    if (building.isBurning) {
+      const bar = el('span', { className: 'need-bar trust-bar' }, [el('span', { className: 'need-fill trust-fill is-revolt', style: `width: ${Math.round(building.fireProgress)}%` })]);
+      const needed = wellNear(state, building) ? FIRE.bucketsNearWell : FIRE.buckets;
+      const go = this.button('Acil Söndür (Kova Zinciri)', 'Sakinler kova zinciri kurar: yangın hemen söner, yapı hasar almaz', () => this.events.emit('ui:extinguish', { buildingId: building.id }));
+      go.classList.add('upgrade-button');
+      children.push(
+        el('div', { className: 'building-section-title', text: 'Yangın!' }),
+        el('div', { className: 'decree luxury-card is-revolt' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('fire'), alt: '' }), `Yangın %${Math.round(building.fireProgress)}`, bar, el('span', { className: 'decree-state', text: `${building.fireWater}/${needed} kova` })]),
+          el('div', { className: 'upgrade-text is-active', text: `Yakındaki sakinler Su Kuyusu'ndan (yoksa nehirden) kova taşıyor. Yangın %100'e varırsa yapı hasar alır (haritadan silinmez); ${needed} kova atılırsa ya da aşağıdaki düğmeye basarsan hasarsız söner (Güven +${FIRE.trustOut}).` }),
+          el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, []), go]),
+        ])
+      );
+    } else if (building.damaged) {
+      const cost = repairCost(building.type);
+      const missing = Object.entries(cost).filter(([r, v]) => (state.resources[r] ?? 0) < v).map(([r]) => RESOURCES[r].name);
+      const costs = Object.entries(cost).map(([r, v]) =>
+        el('span', { className: `build-cost${(state.resources[r] ?? 0) < v ? ' is-missing' : ''}` }, [el('img', { src: getIconDataURL(RESOURCES[r].icon), alt: RESOURCES[r].name }), String(v)])
+      );
+      const go = this.button('Tamir Et', missing.length ? `Yetersiz kaynak: ${missing.join(', ')}` : `İnşa maliyetinin %${Math.round(REPAIR.costRatio * 100)}'iyle yapıyı anında onar`, () => this.events.emit('ui:repairBuilding', { buildingId: building.id }));
+      go.classList.add('upgrade-button');
+      go.disabled = missing.length > 0;
+      const kindText = building.damageKind === 'fire' ? 'Yangında yanan kirişler' : building.damageKind === 'raid' ? 'Haydutların kırdığı yapı' : 'Fırtınanın kırdığı yapı';
+      children.push(
+        el('div', { className: 'building-section-title', text: 'Hasar ve Tamir' }),
+        el('div', { className: 'decree luxury-card' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('repair'), alt: '' }), 'Hasarlı yapı', el('span', { className: 'decree-state', text: building.project ? 'Onarılıyor' : 'Üretim durdu' })]),
+          el('div', { className: 'upgrade-text', text: `${kindText}: onarılana kadar kimse çalışamaz. "Tamir Et" anında düzeltir; yoksa boştaki ustalar kaynak yettikçe kendiliğinden onarmaya gelir.` }),
+          el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, costs), go]),
+        ])
+      );
+    }
+    if (building.type === 'well' && building.functional) {
+      children.push(
+        el('div', { className: 'building-section-title', text: 'Su Kuyusu' }),
+        el('div', { className: 'decree luxury-card' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('bucket'), alt: '' }), 'Yangın emniyeti', el('span', { className: 'decree-state', text: `${WELL.gardenRadius} karoya sulama` })]),
+          el('div', { className: 'upgrade-text', text: `Çevresindeki ${FIRE.wellRadius} karoluk alanda yangın çıkma ihtimali %${Math.round(FIRE.wellReduction * 100)} azalır; yangında kova zinciri buradan ${FIRE.bucketsNearWell} kovayla söndürür. ${WELL.gardenRadius} karo yakınındaki bahçelere +%${Math.round(WELL.gardenBonus * 100)} sulama verimi verir.` }),
+        ])
+      );
+    }
+    if (building.type === 'guardTower' && building.functional) {
+      const def = defenseStatus(state);
+      const guards = [...building.workerIds].map((id) => state.characters.find((c) => c.id === id)).filter(Boolean);
+      children.push(
+        el('div', { className: 'building-section-title', text: 'Gözcü Kulesi' }),
+        el('div', { className: 'decree luxury-card' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('shield'), alt: '' }), 'Asayiş ve gözetleme', el('span', { className: 'decree-state', text: `${guards.length}/${building.guardSlots} bekçi` })]),
+          el('div', { className: 'upgrade-text', text: `Yönetim Güveni saat başı +${GUARD.trustPerHour} (nöbetteki her bekçi +${GUARD.trustPerGuard}). Gece çevresi aydınlık, yürümekten korkulmaz. Haydut baskınını ${GUARD.warnDaysWithTower} gün önceden haber verir. ${guards.length ? `Nöbette: ${guards.map((g) => g.name).join(', ')}.` : 'Şu an nöbette bekçi yok.'}` }),
+          el('div', { className: `upgrade-text${def.ok ? '' : ' is-active'}`, text: def.ok ? 'Savunma yeterli: baskın püskürtülebilir.' : `Savunma yetersiz: ${def.reason}` }),
+        ])
+      );
+    }
+    const raid = building.type === 'guardTower' || building.type === 'fountain' || building.definition.civic ? raidCard(state, (name, payload) => this.events.emit(name, payload)) : null;
+    if (raid) children.push(el('div', { className: 'building-section-title', text: 'Haydut Baskını' }), raid);
+    this.crisisBox.hidden = children.length === 0;
+    this.crisisBox.replaceChildren(...children);
+  }
+
   /** (14. aşama) Meydan havuzu ve Belediye Konağı: Toplanma Zili. */
   renderBell(building, state) {
     const show = (building.type === 'fountain' || Boolean(building.definition.civic)) && building.functional;
@@ -815,7 +907,7 @@ export class BuildingPanel {
     const def = BUILDINGS[building.type];
     if (building.underConstruction) return null;
     if (building.ruined) return { kind: 'repair', spec: def.ruin };
-    if (building.damaged) return { kind: 'mend', spec: mendSpec(building.type, STORM.mend) };
+    if (building.damaged) return { kind: 'mend', spec: mendSpecFor(building) };
     if (def.wonder && !building.wonderComplete) {
       const stage = def.wonder.stages[building.wonderStage];
       return { kind: 'stage', spec: { ...stage, buildWork: stage.work }, index: building.wonderStage };
@@ -833,7 +925,7 @@ export class BuildingPanel {
       kind === 'repair'
         ? `Onarınca: ${building.definition.name}`
         : kind === 'mend'
-          ? 'Fırtına hasarı: onarım gerekli'
+          ? `${building.damageKind === 'fire' ? 'Yangın' : building.damageKind === 'raid' ? 'Baskın' : 'Fırtına'} hasarı: onarım gerekli`
           : kind === 'stage'
             ? `Aşama ${next.index + 1}/${stages}: ${spec.name}`
             : `Seviye 2: ${spec.name}`;
@@ -882,7 +974,8 @@ export class BuildingPanel {
       return lines;
     }
 
-    if (building.damaged) lines.push(building.project ? 'Hasarlı: inşaatçılar onarıyor' : 'Hasarlı: onarılana kadar kimse çalışamaz');
+    if (building.isBurning) lines.push(`Yanıyor: yangın %${Math.round(building.fireProgress)} (%100'de yapı hasar alır, silinmez) · ${building.fireWater} kova atıldı`);
+    else if (building.damaged) lines.push(building.project ? 'Hasarlı: inşaatçılar onarıyor' : `Hasarlı (${building.damageKind === 'fire' ? 'yangın' : building.damageKind === 'raid' ? 'baskın' : 'fırtına'}): onarılana kadar kimse çalışamaz`);
     if (def.production && building.factors) lines.push(...this.productionLines(building, state));
     if (def.processing) lines.push(...this.processingLines(building));
 

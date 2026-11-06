@@ -215,7 +215,7 @@ export class JobSystem {
   /** Sabitlenmiş sakinin işi: kendi iş yerinde boş bir çalışma yeri (yapı kullanılamıyorsa null). */
   pinnedWork(c, origin) {
     const building = this.world.getBuilding(c.workplaceId);
-    if (!building || !building.functional || !building.workerSlots || building.frozen || building.idle || building.damaged) return null;
+    if (!building || !building.functional || !building.workerSlots || building.frozen || building.idle || building.damaged || building.isBurning) return null;
     if (building.workerIds.size >= building.workerSlots && !building.workerIds.has(c.id)) return null;
     const free = this.world.getSpots(building).filter((s) => !this.world.isReserved(s.x, s.y, c.id));
     if (free.length === 0) return null;
@@ -278,7 +278,9 @@ export class JobSystem {
       if (!building.workerIds.has(c.id) && this.reservedForPinned(building) >= workers - building.workerIds.size) continue; // yuvalar sabit çalışanlara ayrılmış
       if (!building.workerIds.has(c.id) && this.expertWaiting(c, building)) continue;
       const spot = freeSpot(this.world.getSpots(building));
-      if (spot) candidates.push({ priority: PRODUCTION_PRIORITY, d: dist(spot, origin) - preference(def.workActivity), building, spot });
+      // (23. aşama) Gözcü Kulesi'nde nöbet, üretim yuvaları dolunca boşta kalan yetişkinlerin işidir (üretimden daha az öncelikli)
+      const priority = def.guard ? PRODUCTION_PRIORITY + 1 : PRODUCTION_PRIORITY;
+      if (spot) candidates.push({ priority, d: dist(spot, origin) - preference(def.workActivity), building, spot });
     }
 
     candidates.sort((a, b) => a.priority - b.priority || a.d - b.d);

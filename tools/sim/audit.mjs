@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -343,6 +343,71 @@ const PAGE_HELPERS = () => {
       game.events.emit('ui:deliverDecree');
       game.events.emit('ui:setTaxRate', { rate: 'standard' });
       check('yüklenen ferman teslim edilir', !s.crown.decree && s.crown.delivered >= 1);
+    }
+
+    // --- 2l. (23. aşama) Yangın sürerken, haydut izi beklerken, hasarlı yapı ve yaralı sakin varken ---
+    {
+      rich();
+      s.crisis.difficulty = 'huzurlu'; // doğal krizler karışmasın; testler fonksiyonları doğrudan çağırır
+      s.town.tier = Math.max(s.town.tier, 3);
+      s.petitions.list = [];
+      s.crown.decree = null;
+      s.crown.nextDecreeAt = s.totalMinutes + 1e6;
+      s.crown.notice = null;
+      s.crown.nextLevyAt = s.totalMinutes + 1e6;
+      if (s.trust.revolt) scene().trust.endRevolt();
+      s.trust.value = 70;
+      for (const b of s.buildings) {
+        b.isBurning = false;
+        b.isDamaged = false;
+      }
+      for (const c of s.characters) c.isInjured = false;
+      s.crisis.raid = null;
+      for (let i = 0; i < 4 && s.dilemma.active; i++) sim.step(1900); // açık karar penceresi varsa varsayılan seçenek uygulansın
+      while (s.time.hour < 9 || s.time.hour >= 12) hours(1);
+      const pickFire = () => s.buildings.find((b) => b.functional && ['workshop', 'mill', 'lumberHut', 'quarry', 'garden'].includes(b.type) && !b.damaged && !b.isBurning);
+      const fireB = pickFire();
+      scene().crisis.startFire(fireB);
+      const hurtOne = s.characters.find((c) => !c.isChild && !c.role && !c.away);
+      scene().crisis.injure(hurtOne, 'fire');
+      const wreck = s.buildings.find((b) => b.functional && ['quarry', 'garden', 'market', 'lumberHut', 'sheepFarm'].includes(b.type) && b !== fireB && !b.damaged && !b.isBurning);
+      scene().crisis.damage(wreck, 'raid');
+      const raid = scene().crisis.warnRaid();
+      hours(0.2);
+      const progressBefore = fireB.fireProgress;
+      const diff = A.roundtrip();
+      check('yangın sürerken, haydut izi beklerken, hasarlı yapı ve yaralı sakin varken kayıt -> yükleme durum kayması yok', Boolean(raid) && diff.length === 0, diff.join(' | '));
+      const f2 = s.buildings.find((b) => b.id === fireB.id);
+      const w2 = s.buildings.find((b) => b.id === wreck.id);
+      const h2 = s.characters.find((c) => c.id === hurtOne.id);
+      check('yüklenen yangın, hasarlı yapı, yaralı sakin ve haydut baskını aynen döner', f2.isBurning && Math.abs(f2.fireProgress - progressBefore) < 1e-6 && w2.isDamaged && w2.damageKind === 'raid' && h2.isInjured && JSON.stringify(s.crisis.raid) === JSON.stringify(raid), `${f2.fireProgress}/${progressBefore}`);
+      check('yükleme sonrası aktif kriz kayıtlı olduğundan doğal kriz koruması (24 saat) kurulmaz', scene().crisis.graceUntil === null);
+      const outs = counter('crisis:fireOut');
+      const burnt = counter('crisis:burnedDown');
+      for (let i = 0; i < 28 && f2.isBurning; i++) {
+        sim.step(56);
+        if (s.dilemma.active) sim.step(1900);
+      }
+      check('yüklenen yangın tam bir kez sonuçlanır (söner ya da yanıp hasara geçer), sayaç tutarlı', outs.n + burnt.n === 1 && !f2.isBurning && s.crisis.extinguished + s.crisis.burned >= 1, `${outs.n}/${burnt.n} yanıyor=${f2.isBurning} %${Math.round(f2.fireProgress)} gün ${s.time.day} ${s.time.hour}:00 duraklı=${s.time.paused} karar=${s.dilemma.active?.id ?? '-'}`);
+      outs.off();
+      burnt.off();
+      // Haydut baskını yüklemeden sonra varışta bir kez sonuçlanır
+      const resolved = counter('crisis:raidResolved');
+      s.crisis.raid.arriveAt = s.totalMinutes + 60;
+      hours(3);
+      check('yüklenen haydut baskını varışta tam bir kez sonuçlanır (savunma yetiyorsa püskürtülür)', resolved.n === 1 && !s.crisis.raid, `${resolved.n}`);
+      resolved.off();
+      const repaired = counter('building:mended');
+      hours(40);
+      check('hasarlı yapılar yüklemeden sonra (ustalar ya da bekleme sonrası kaynakla) onarılır; kopuk iş emri kalmaz', repaired.n >= 1 && !w2.damaged && !w2.project, `${repaired.n}`);
+      repaired.off();
+      check('yaralı sakin yüklemeden sonra bir kez iyileşir (şifacıda ya da kendiliğinden)', !h2.isInjured);
+      for (const b of s.buildings) {
+        b.isBurning = false;
+        b.isDamaged = false;
+      }
+      for (const c of s.characters) c.isInjured = false;
+      s.crisis.raid = null;
     }
 
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---

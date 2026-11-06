@@ -19,12 +19,21 @@
 // Güveni, dilekçe sonuçlarını, isyanı, yevmiyeleri, alışverişi ve çantalardaki eşyaları raporlar. (22. aşama) İç vergiyi
 // dengeli yönetir (güven düşerse Düşük / Muaf, toparlanınca Standart; Ağır Vergi'ye hiç geçmez), tahsildar yoldayken hazineyi
 // lüks harcamalara açmaz, Kraliyet Fermanlarını kaynak yettiğinde teslim eder, Kraliyet Beratı gelince Aslanlı Heykel'i diker;
-// vergileri, Krallık Vergisi ödemelerini, fermanları ve terk edenleri raporlar.
+// vergileri, Krallık Vergisi ödemelerini, fermanları ve terk edenleri raporlar. (23. aşama) Krizleri yönetir: kasabaya bir Su Kuyusu
+// ve (Kasaba seviyesinde) bir Gözcü Kulesi diker; yangın çıkınca "Acil Söndür" der, hasarlı yapıyı "Tamir Et" ile hemen onarır;
+// haydut izi gelince savunma yetiyorsa püskürtür, yetmiyorsa haraç öder (ikisi de olmazsa hazırlıksız yakalanır); yangın, hasar,
+// baskın, yaralanma ve iyileşme sayılarını raporlar.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
+//                                         [--crisis huzurlu|dengeli|cetin] [--no-safety] [--crisis-state]
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
 //   --speed   : oyun hızı (varsayılan 4); 1x'te aynı oyun günü dört kat çok, daha küçük adımla geçer
 //   --save    : simülasyon sonunda oyunu kayıt dosyasına yazar (uyumluluk testinin fikstürü için)
+//   --crisis  : (23. aşama) tehlike sıklığı (varsayılan dengeli); huzurlu + --no-safety, 22. aşamayla bire bir aynı koşuyu verir
+//   --crisis-state : (23. aşama) kayıttan hemen önce bir yangın, bir hasarlı yapı, bir yaralı ve bekleyen bir haydut baskını oluşturur
+//               (save-v20.json fikstürü bu bayrakla üretilir: kriz alanlarının hepsi kayda girer)
+//   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
+//               oyunun ana üretecini tüketmediğini göstermek için: --crisis huzurlu ile 22. aşamanın koşusunu bire bir verir)
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
 //               bulunursa çıkış kodu 1 olur
 import fs from 'fs';
@@ -39,12 +48,18 @@ const speed = Number(options.speed ?? 4);
 const { browser, page, errors } = await openGame({ seed });
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
+await page.evaluate((o) => {
+  window.__noSafety = o.noSafety;
+  if (o.crisis) window.game.state.crisis.difficulty = o.crisis; // doğrudan durumdan (bildirim / ses tüketmesin: huzurlu + --no-safety koşusu 22. aşamayla bire bir aynı olmalı)
+}, { noSafety: Boolean(options['no-safety']), crisis: options.crisis ?? null });
 
 await page.evaluate((passive) => {
   const game = window.game;
   const sim = window.sim;
   window.__stats = { crafted: { material: 0, fallback: 0 }, minWelfare: 100, daily: [], spent: { research: {}, wonder: {}, crates: 0 }, gears: 0 };
   game.events.on('goldenAge:gearCast', () => window.__stats.gears++);
+  window.__stats.patrolShifts = 0;
+  game.events.on('work:shiftEnded', ({ activity }) => activity === 'patrol' && window.__stats.patrolShifts++); // (23. aşama) bekçi vardiyaları
   game.events.on('equipment:crafted', (p) => window.__stats.crafted[p.recipe]++);
   const addSpent = (bucket, cost) => {
     for (const [r, v] of Object.entries(cost)) bucket[r] = (bucket[r] ?? 0) + v;
@@ -88,11 +103,35 @@ await page.evaluate((passive) => {
     'monument', 'cabin', 'flowerBed', 'lumberHut', 'cabin', 'sheepFarm', 'garden', 'healerHut', 'storage', 'fishingPier', 'quarry',
     'cherryTree', 'gazebo', 'marbleArch', 'flowerFence', 'flowerFence', 'cherryTree',
   ];
+  // (23. aşama) Su Kuyusu ve Gözcü Kulesi: seviye ve kaynak yettiğinde (isteğe bağlı) PLAN'ın başına yakın kurulur
+  if (!window.__noSafety) {
+    PLAN.splice(PLAN.indexOf('mill') + 1, 0, 'well');
+    PLAN.splice(PLAN.indexOf('townHall') + 1, 0, 'guardTower');
+  }
   const UPGRADES = ['cabin', 'cabin', 'lumberHut', 'garden', 'cabin', 'quarry', 'cabin', 'garden', 'cabin', 'cabin', 'lumberHut', 'cabin'];
-  const WOOD = { storage: 30, lumberHut: 20, garden: 15, cabin: 25, quarry: 35, inn: 45, workshop: 25, sheepFarm: 30, market: 40, ironMine: 40, mill: 40, fishingPier: 30, townHall: 60, monument: 40, healerHut: 30, flowerBed: 8, academy: 70, harbor: 120 };
+  const WOOD = { storage: 30, lumberHut: 20, garden: 15, cabin: 25, quarry: 35, inn: 45, workshop: 25, sheepFarm: 30, market: 40, ironMine: 40, mill: 40, fishingPier: 30, townHall: 60, monument: 40, healerHut: 30, flowerBed: 8, academy: 70, harbor: 120, well: 15, guardTower: 50 };
   const ESSENTIAL = ['storage', 'lumberHut', 'garden', 'cabin'];
+  // (23. aşama) Su Kuyusu ateşli yapıların (fırın, atölye) yanına, Gözcü Kulesi meydandan uzağa (kenar mahalleye) dikilir: meydana
+  // yakın boş yerleri (Ulu Saat Kulesi gibi büyük yapılara lazım) kapatmasın
+  const SAFETY = ['well', 'guardTower'];
+  const safetySpot = (type) => {
+    if (!SAFETY.includes(type)) return null;
+    const scene = game.scenes.current;
+    const plaza = scene.world.landmarks.plaza;
+    const anchor = type === 'well' ? game.state.buildings.find((b) => b.functional && ['mill', 'workshop'].includes(b.type)) : null;
+    const [ax, ay, from, to] = anchor ? [anchor.tileX, anchor.tileY, 2, 7] : [plaza.centerX, plaza.centerY, 13, 34];
+    for (let r = from; r <= to; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          if (scene.construction.checkPlacement(type, ax + dx, ay + dy).ok) return { x: ax + dx, y: ay + dy };
+        }
+      }
+    }
+    return null;
+  };
   // İsteğe bağlı yapılar: kaçıncı kopyasından itibaren (kurulamıyorsa sıra beklemeden atlanır)
-  const OPTIONAL = { academy: 1, harbor: 1, ironMine: 1, mill: 2, cherryTree: 1, gazebo: 1, marbleArch: 1, flowerFence: 1 };
+  const OPTIONAL = { academy: 1, harbor: 1, ironMine: 1, mill: 2, cherryTree: 1, gazebo: 1, marbleArch: 1, flowerFence: 1, well: 1, guardTower: 1 };
 
   /** Karar politikası: kasabanın yararına olan ve gücü yeten seçenek. */
   const PREFER = {
@@ -325,6 +364,20 @@ await page.evaluate((passive) => {
           if (spot) scene.construction.placeSite('royalStatue', spot.x, spot.y);
         }
       }
+      // (23. aşama) Krizler: yangını söndür, hasarlıyı tamir et, haydut izine karşı püskürt / uzlaş
+      if (!window.__noSafety) {
+        const CRI = window.__crisis;
+        // Sakinler kovalarla uğraşır; yangın yarıyı aşarsa oyuncu "Acil Söndür" der
+        for (const b of s.buildings) if (b.isBurning && b.fireProgress >= 45) game.events.emit('ui:extinguish', { buildingId: b.id });
+        for (const b of s.buildings) if (b.damaged && !b.isBurning && !b.project) game.events.emit('ui:repairBuilding', { buildingId: b.id });
+        const raid = s.crisis.raid;
+        if (raid) {
+          const choice = CRI.defenseStatus(s).ok ? 'defend' : CRI.tributeStatus(s, raid.tribute).ok ? 'tribute' : 'caught';
+          game.events.emit('ui:raidChoice', { choice });
+          window.__stats.raidChoices = window.__stats.raidChoices ?? {};
+          window.__stats.raidChoices[choice] = (window.__stats.raidChoices[choice] ?? 0) + 1;
+        }
+      }
       // Güven düşerse (ya da isyan çıkarsa) acil dağıtım
       const T = window.__trust;
       if (s.trust.revolt || s.trust.value < 40) {
@@ -497,7 +550,7 @@ await page.evaluate((passive) => {
       planned[type] = (planned[type] ?? 0) + 1;
       if ((counts[type] ?? 0) >= planned[type]) continue;
       if (planned[type] >= (OPTIONAL[type] ?? Infinity)) {
-        const spot = sim.findSpot(type, type === 'harbor' ? 45 : 30);
+        const spot = safetySpot(type) ?? (SAFETY.includes(type) ? null : sim.findSpot(type, type === 'harbor' ? 45 : 30));
         if (!spot) continue;
         nextSpot = spot;
       }
@@ -516,7 +569,7 @@ await page.evaluate((passive) => {
     }
     if (!next) return;
     if (!ESSENTIAL.includes(next) && res.wood - (WOOD[next] ?? 0) < (autumn ? 50 : 15)) return;
-    const spot = nextSpot ?? sim.findSpot(next);
+    const spot = nextSpot ?? safetySpot(next) ?? (SAFETY.includes(next) ? null : sim.findSpot(next));
     if (spot) scene.construction.placeSite(next, spot.x, spot.y);
   };
 }, Boolean(options.passive));
@@ -539,6 +592,7 @@ await page.evaluate(async () => {
   window.__petitions = await import('/src/systems/Petitions.js');
   window.__trust = await import('/src/systems/TrustSystem.js');
   window.__crown = await import('/src/systems/Crown.js');
+  window.__crisis = await import('/src/systems/Crisis.js');
 });
 
 function summary() {
@@ -675,6 +729,29 @@ if (late.length) {
   const full = late.filter((d) => keys.some((k) => d[k] >= d.cap)).length;
   console.log(`son ${late.length} gün ortalama stok: ${fmt(avg)} · depo ${late[late.length - 1].cap} · deposu dolan gün: ${full}`);
 }
+if (options['crisis-state']) {
+  const made = await page.evaluate(() => {
+    const scene = window.game.scenes.current;
+    const s = window.game.state;
+    const c = scene.crisis;
+    const pick = (types, skip = []) => s.buildings.find((b) => types.includes(b.type) && b.functional && !b.damaged && !b.isBurning && !skip.includes(b));
+    const burning = pick(['workshop', 'mill', 'lumberHut']);
+    const wrecked = pick(['quarry', 'garden', 'lumberHut', 'market'], [burning]);
+    if (burning) c.startFire(burning);
+    if (burning) {
+      burning.fireProgress = 38;
+      burning.fireWater = 1;
+    }
+    if (wrecked) c.damage(wrecked, 'raid');
+    const hurt = s.characters.find((x) => !x.isChild && !x.role && !x.isInjured);
+    if (hurt) c.injure(hurt, 'raid');
+    if (hurt) hurt.injuryTimer = 1500;
+    s.crisis.raid = null;
+    c.warnRaid();
+    return { burning: burning?.name, damaged: wrecked?.name, injured: hurt?.name, raid: Boolean(s.crisis.raid) };
+  });
+  console.log('kriz durumu kuruldu:', JSON.stringify(made));
+}
 if (options.save) {
   const snapshot = await page.evaluate(async () => {
     const { CONFIG } = await import('/src/config.js');
@@ -703,6 +780,14 @@ console.log(
   console.log(
     `(22. aşama) iç vergi ${k.rate} · ${k.collections} tahsilat (+${k.taxGold} altın, ${k.taxGoods} birim öşür) · Krallık Vergisi ${k.paid}/${k.levies} ödendi (ceza ${k.failed}) · ` +
       `itibar %${k.reputation} · ferman teslim ${k.delivered}, başarısız ${k.decreesFailed} · Kraliyet Beratı ${k.statueRight ? 'var' : 'yok'}, heykel ${k.statues} · terk eden ${k.emigrants} (terk ediş ${k.exodusHours} saat)`
+  );
+}
+{
+  const c = mon.crisis;
+  console.log(
+    `(23. aşama) tehlike sıklığı ${c.difficulty} · Su Kuyusu ${c.wells}, Gözcü Kulesi ${c.towers} (nöbetteki bekçi ${c.guards}, biten nöbet vardiyası ${report.stats.patrolShifts}) · yangın ${c.fires} (söndürülen ${c.extinguished}, hasar bırakan ${c.burned}; ${c.fireHours} yangın saati) · ` +
+      `haydut baskını ${c.raids} (püskürtülen ${c.repelled}, haraç ${c.tributes}, hazırlıksız ${c.caught}; seçimler ${JSON.stringify(report.stats.raidChoices ?? {})}) · yaralanma ${c.injuries} (şifacıda iyileşen ${c.treated}, şu an ${c.injuredNow}; ${c.injuredHours} yaralı saati) · ` +
+      `tamir ${c.repairs} (şu an hasarlı ${c.damagedNow}, yanan ${c.burningNow}; ${c.damagedHours} hasarlı yapı saati, 3 günü aşan ${c.longDamaged})`
   );
 }
 console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);

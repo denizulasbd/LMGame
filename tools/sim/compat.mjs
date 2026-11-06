@@ -22,14 +22,17 @@
 //   save-v18.json: 21. aşamanın oyunu (kayıt sürümü 18): otopilotla 34 gün; sakinlerin keseleri ve çantaları,
 //                  karşılanan / açık dilekçeler, Yönetim Güveni. Eski kayıtlarda (sürüm 2-17) her yetişkine 12, her çocuğa 3
 //                  altın başlangıç harçlığı verilir, çantalar boş başlar, Yönetim Güveni %75'tir, dilekçe ve isyan yoktur
-//   save-v19.json: 22. aşamanın oyunu (kayıt sürümü 19, bugünkü): otopilotla 34 gün; iç vergi kademesi ve tahsilatlar,
+//   save-v19.json: 22. aşamanın oyunu (kayıt sürümü 19): otopilotla 34 gün; iç vergi kademesi ve tahsilatlar,
 //                  ödenen Krallık Vergileri, teslim edilen Kraliyet Fermanları, Kraliyet Beratı ve Aslanlı Heykel. Eski kayıtlarda
 //                  (sürüm 2-18) Standart Vergi, itibar 50, ferman ve terk ediş yoktur; vergi takvimi yüklenince kurulur
+//   save-v20.json: 23. aşamanın oyunu (kayıt sürümü 20, bugünkü): otopilotla 34 gün; Su Kuyusu ve Gözcü Kulesi, yangın / baskın
+//                  sayaçları, tehlike sıklığı. Eski kayıtlarda (sürüm 2-19) hiçbir yapı yanmıyor / hasarlı değil, kimse yaralı
+//                  değil, tehlike sıklığı Dengeli'dir; yüklemeden sonraki ilk 24 saatte doğal kriz çıkmaz
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -111,6 +114,20 @@ for (const { name, raw } of fixtures) {
       petitions: s.petitions.list.map((p) => `${p.id}:${p.kind}:${p.characterId}`),
       made: s.petitions.made,
     };
+    // (23. aşama) krizler: yanan / hasarlı yapılar, yaralılar, tehlike sıklığı, bekleyen baskın (yüklendiği an)
+    loaded.crisis = {
+      difficulty: s.crisis.difficulty,
+      burning: s.buildings.filter((b) => b.isBurning).length,
+      damaged: s.buildings.filter((b) => b.damaged).length,
+      injured: s.characters.filter((c) => c.isInjured).length,
+      raid: s.crisis.raid !== null,
+      fires: s.crisis.fires,
+      raids: s.crisis.raids,
+      repairs: s.crisis.repairs,
+      wells: s.buildings.filter((b) => b.type === 'well').length,
+      towers: s.buildings.filter((b) => b.type === 'guardTower').length,
+      grace: scene.crisis.graceUntil === null ? null : scene.crisis.graceUntil - s.totalMinutes,
+    };
     // (22. aşama) vergi, Krallık, terk ediş (yüklendiği an)
     loaded.crown = {
       rate: s.tax.rate,
@@ -154,6 +171,7 @@ for (const { name, raw } of fixtures) {
     };
     return {
       crownAfter: { pop: s.characters.length, left: s.exodus.left, active: Boolean(s.exodus.active), rate: s.tax.rate },
+      crisisAfter: { fires: s.crisis.fires, raids: s.crisis.raids, raidPending: s.crisis.raid !== null, nextWarn: s.crisis.nextRaidWarnAt, burning: s.buildings.filter((b) => b.isBurning).length, injured: s.characters.filter((c) => c.isInjured).length, day: s.time.day },
       citizensAfter,
       integrityAfter,
       expeditionAfter,
@@ -294,6 +312,30 @@ for (const { name, raw } of fixtures) {
       });
     }
     results.push({ name: `${tag}: bir gün sonra kimse köyü terk etmedi`, ok: !r.crownAfter.active && r.crownAfter.left === K.left, detail: `${r.crownAfter.pop} sakin, terk eden ${r.crownAfter.left}` });
+  }
+  {
+    // (23. aşama) krizler
+    const C = r.loaded.crisis;
+    const A = r.crisisAfter;
+    if (data.version < 20) {
+      results.push({
+        name: `${tag}: hiçbir yapı yanmıyor / hasarlı değil, kimse yaralı değil, Dengeli, baskın yok`,
+        ok: C.burning === 0 && C.damaged === 0 && C.injured === 0 && C.difficulty === 'dengeli' && !C.raid && C.fires === 0 && C.raids === 0 && C.repairs === 0,
+        detail: `${C.difficulty}`,
+      });
+    } else {
+      results.push({
+        name: `${tag}: tehlike sıklığı, kriz sayaçları, Su Kuyusu / Gözcü Kulesi, yanan / hasarlı yapılar ve yaralılar korundu`,
+        ok: C.difficulty === data.crisis.difficulty && C.fires === data.crisis.fires && C.raids === data.crisis.raids && C.repairs === data.crisis.repairs && C.burning === data.buildings.filter((b) => b.isBurning).length && C.damaged === data.buildings.filter((b) => b.damaged).length && C.injured === data.characters.filter((c) => c.isInjured).length && C.wells === data.buildings.filter((b) => b.type === 'well').length && C.towers === data.buildings.filter((b) => b.type === 'guardTower').length && C.raid === (data.crisis.raid !== null),
+        detail: `${C.difficulty} · yangın ${C.fires} · baskın ${C.raids} · tamir ${C.repairs} · kuyu ${C.wells} · kule ${C.towers}`,
+      });
+    }
+    const quiet = C.burning === 0 && !C.raid;
+    results.push({
+      name: `${tag}: yükleme sonrası ilk 24 oyun saatinde ${quiet ? 'koruma var, ' : ''}doğal yangın ya da baskın patlamadı`,
+      ok: (!quiet || C.grace === 1440) && A.fires === C.fires && A.raids === C.raids && (quiet ? !A.raidPending && A.burning === 0 : true),
+      detail: `koruma ${C.grace} dk · yangın ${C.fires}->${A.fires} · baskın ${C.raids}->${A.raids}`,
+    });
   }
   results.push({ name: `${tag}: meslek kıyafetleri deneyimden giyildi`, ok: r.outfitsOk, detail: `${r.outfits} sakin kıyafetli` });
   results.push({ name: `${tag}: harita farkları birebir uygulandı`, ok: r.loaded.terrain === data.terrain.length, detail: `${r.loaded.terrain}/${data.terrain.length} karo` });

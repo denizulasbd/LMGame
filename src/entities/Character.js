@@ -7,6 +7,7 @@
 // 19. aşama: karakter huyu (quirk), son duyduğu dedikodu (lastNews), eşiyle akşam yemeği günü ve randevu zamanı.
 // 21. aşama: kişisel kese (coins) ve çanta (inventory: [{ kind, qty, name? }]; ekipman yuvalarından bağımsız,
 // systems/Citizens.js). Eski kayıtlarda kese yoksa başlangıç harçlığı verilir.
+// 23. aşama: hafif yaralanma (isInjured, injuryTimer: kalan oyun dakikası; yürüme ve çalışma %20 yavaş, ölüm yoktur; CrisisSystem).
 // 22. aşama: köyü terk etmeye karar verdiyse yola çıktığı an ve çıkış karosu (emigrating: { since, exit }; DesertionSystem).
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
@@ -88,6 +89,8 @@ export class Character extends Entity {
     coins = null,
     inventory = [],
     emigrating = null,
+    isInjured = false,
+    injuryTimer = 0,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -133,6 +136,10 @@ export class Character extends Entity {
     this.coins = Number.isFinite(coins) ? Math.max(0, Math.floor(coins)) : startingCoins(growsUpAt !== null);
     this.inventory = sanitizeInventory(inventory);
     this.emigrating = emigrating && Number.isFinite(emigrating.since) ? { since: emigrating.since, exit: emigrating.exit ? { ...emigrating.exit } : null } : null;
+    // 23. aşama: hafif yaralanma (kayda girer); injuryTimer bitince kendiliğinden iyileşir
+    this.injuryTimer = Number.isFinite(injuryTimer) ? Math.max(0, injuryTimer) : 0;
+    this.isInjured = Boolean(isInjured) && this.injuryTimer > 0;
+    this.waterBucket = false; // yangında kovası dolu mu (kaydedilmez)
     this.recall = null;
     this.flowerCrown = false;
     this.profile = buildTraitProfile(traits, { child: this.isChild });
@@ -478,6 +485,8 @@ export class Character extends Entity {
       coins: this.coins,
       inventory: this.inventory,
       emigrating: this.emigrating,
+      isInjured: this.isInjured,
+      injuryTimer: this.isInjured ? Math.round(this.injuryTimer) : 0,
     };
   }
 

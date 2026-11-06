@@ -137,7 +137,7 @@ export class DilemmaSystem {
   }
 
   damageable() {
-    return this.world.getCompleted().filter((b) => DAMAGEABLE_TYPES.includes(b.type) && !b.damaged);
+    return this.world.getCompleted().filter((b) => DAMAGEABLE_TYPES.includes(b.type) && !b.damaged && !b.isBurning);
   }
 
   maybeStart(force = null) {

@@ -28,6 +28,11 @@
 //   - Acıkınca çantasında yiyecek varsa yürümeden çantasından yer ('snack'; çok açken her zaman, değilse yarı yarıya)
 //   - Üşüttüyse çantasındaki şifalı otu demler ('herbTea'), keyfi düşünce hatırasına bakar ('keepsake')
 //   - Boş zamanında kesesi ve çantasında yeri varsa Pazar Yeri'ne alışverişe gider ('shop'; günde en çok bir kez)
+// 23. aşama (krizler; kararlarını krizin kendi üretecinden verir, ana üreteci tüketmez):
+//   - Yangın varsa ve yanan yapıya en yakın sağlam yetişkinlerdendiyse her şeyden önce kova taşır: en yakın Su Kuyusu'na (yoksa
+//     nehir kıyısına) koşup kovasını doldurur ('fetchWater'), yanan yapıya boşaltır ('fightFire')
+//   - Hafif yaralıysa boş zamanında önce Şifacı Kulübesi'ne gider ('tendWound'); şifacı yoksa çantasındaki şifalı otu demler ya da
+//     evinde dinlenir
 //   - İsyancıysa gündüz (08:00-20:00) işe gitmez: meydanda öfkeyle toplanır ('protest') ya da yağma baskınındaysa
 //     depoya yürür ('loot'). Yemek ve uyku önce gelir; şenlik, kutlama ve toplanma zili isyandan önce gelir.
 import { ACTIVITIES } from '../data/activities.js';
@@ -82,7 +87,9 @@ export class Brain {
    *   relationships: import('../systems/RelationshipSystem.js').RelationshipSystem,
    *   crafting: import('../systems/CraftingSystem.js').CraftingSystem }} services
    */
-  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null }) {
+  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null }) {
+    this.crisis = crisis; // (23. aşama) yangın ve yaralanma kararları
+
     this.citizenRng = citizens?.rng ?? rng; // (21. aşama) vatandaşlık kararları kendi üretecinden
     this.health = health;
     this.research = research;
@@ -101,6 +108,11 @@ export class Brain {
     // (22. aşama) Köyü terk etmeye karar verdiyse her şeyden önce harita kenarına yürür
     if (c.emigrating) {
       const plan = this.planEmigrate(c);
+      if (plan) return plan;
+    }
+    // (23. aşama) Yangın: yanan yapıya en yakın sağlam yetişkinler her şeyi bırakıp kova taşır
+    if (this.crisis && !c.isChild) {
+      const plan = this.planFirefight(c);
       if (plan) return plan;
     }
     // (20. aşama) Çağ Kutlaması: Ulu Saat Kulesi tamamlanınca uyanık herkes meydanda kutlar
@@ -182,6 +194,11 @@ export class Brain {
         onBreak = true;
       }
     }
+    // (23. aşama) Hafif yaralı sakin boş zamanında önce yaralarını sarar
+    if (c.isInjured && !c.isChild && (!isWorkHours(hour) || onBreak || !c.task)) {
+      const plan = this.planTreatInjury(c);
+      if (plan) return { ...plan, onBreak };
+    }
     // (19. aşama) Bekâr ve ilişkisi yüksek sakinler boş zamanlarında birbirleriyle vakit geçirmeye öncelik verir
     if (!c.isChild && !c.married && (!isWorkHours(hour) || onBreak)) {
       const plan = this.planDate(c, hour);
@@ -207,6 +224,67 @@ export class Brain {
   // ---------------------------------------------------------------------------
   // (21. aşama) Kişisel çanta, alışveriş, isyan
   // ---------------------------------------------------------------------------
+
+  /** Krizin kendi üretecinden süre (sabit aralıklar üretece dokunmaz). */
+  crisisDuration(activity) {
+    const range = ACTIVITIES[activity].duration;
+    if (!range) return 0;
+    return range[0] === range[1] ? range[0] : (this.crisis?.rng ?? this.rng).int(range[0], range[1]);
+  }
+
+  /**
+   * (23. aşama) Yangın: kovası boşsa en yakın Su Kuyusu'na (yoksa nehir kıyısına) koşup doldurur, doluysa yanan yapının
+   * kapısına koşup boşaltır. Yanan yapıya atanmış değilse ya da yol yoksa null.
+   */
+  planFirefight(c) {
+    if (c.away || c.emigrating) return null;
+    const fire = this.crisis.fireAssignment(c);
+    if (!fire) {
+      c.waterBucket = false;
+      return null;
+    }
+    const origin = this.originTile(c);
+    if (c.waterBucket) {
+      const doors = this.world.getSpots(fire);
+      if (doors.length === 0) return null;
+      const spot = this.nearest(doors, c);
+      if (!this.world.findPath(origin, spot)) return null;
+      return { activity: 'fightFire', buildingId: fire.id, fireId: fire.id, spot, faceTarget: fire.center, duration: this.crisisDuration('fightFire') };
+    }
+    const source = this.crisis.waterSource(fire, c);
+    if (!source) return null;
+    return {
+      activity: 'fetchWater',
+      buildingId: source.building?.id ?? null,
+      fireId: fire.id,
+      spot: source.spot,
+      facing: source.spot.facing,
+      faceTarget: source.building?.center,
+      duration: this.crisisDuration('fetchWater'),
+    };
+  }
+
+  /** (23. aşama) Hafif yaralı: iyileştirici bir Şifacı Kulübesi'ne gider; yoksa şifalı ot demler ya da evinde kestirir. */
+  planTreatInjury(c) {
+    const origin = this.originTile(c);
+    let best = null;
+    for (const clinic of this.world.getCompleted('healerHut')) {
+      if (clinic.damaged || clinic.isBurning) continue;
+      const doors = this.world.getSpots(clinic);
+      if (doors.length === 0) continue;
+      const spot = this.nearest(doors, c);
+      const path = this.world.findPath(origin, spot);
+      if (!path) continue;
+      const cost = this.world.pathCost(path);
+      if (!best || cost < best.cost) best = { clinic, spot, cost };
+    }
+    if (best) {
+      return { activity: 'tendWound', buildingId: best.clinic.id, spot: best.spot, finalPoint: best.clinic.entrancePoint, duration: this.crisisDuration('tendWound') };
+    }
+    if (countItem(c, 'herb') > 0) return { activity: 'herbTea', duration: this.crisisDuration('herbTea') };
+    if (c.needs.energy < 90) return this.planSleep(c, true);
+    return null;
+  }
 
   /** (22. aşama) Köyü terk eden sakin harita kenarındaki çıkışa yürür (yol yoksa null; DesertionSystem süre dolunca çıkarır). */
   planEmigrate(c) {

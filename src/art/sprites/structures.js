@@ -32,6 +32,7 @@ import { getWonderSprite } from './structuresWonder.js';
 import { getCherryTreeSprite, getGazeboLayer, getMarbleArchSprite, getFlowerFenceSprite } from './structuresGarden.js';
 import { getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.js';
 import { getMarbleFountainSprite, getGoldenLanternSprite, getRoyalStatueSprite } from './structuresGoldenAge.js';
+import { getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
 import {
   getWoodFenceSprite,
   getFenceGateSprite,
@@ -621,6 +622,8 @@ const WINTER_ROOFS = {
   lumberHut: { light: ['E'], main: ['X'], dark: ['x'], maxRow: 17 },
   'lumberHut:2': { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 18 },
   watchtower: { light: ['X'], main: ['w'], maxRow: 9 },
+  well: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 4 },
+  guardTower: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 9 },
   supplyCamp: { light: ['S'], main: ['s'], maxRow: 17 },
   workshop: { light: ['c'], main: ['B'], dark: ['n'], maxRow: 17 },
   townHall: { light: ['Z', 'c'], main: ['C', 'B'], dark: ['U', 'n'], maxRow: 36 },
@@ -726,6 +729,11 @@ function getBaseStructureSprite(type, state) {
     // 22. aşama: Kraliyet Beratı'yla dikilen anıt
     case 'royalStatue':
       return getRoyalStatueSprite();
+    // 23. aşama: güvenlik yapıları
+    case 'well':
+      return getWellSprite(state.frame ?? 0);
+    case 'guardTower':
+      return getGuardTowerSprite(Boolean(state.lit ?? state.windowsLit));
     case 'signpost':
       return getSignpostSprite();
     case 'parkBench':

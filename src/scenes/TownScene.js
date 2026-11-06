@@ -67,6 +67,7 @@ import { PetitionSystem } from '../systems/PetitionSystem.js';
 import { TaxSystem } from '../systems/TaxSystem.js';
 import { CrownSystem } from '../systems/CrownSystem.js';
 import { DesertionSystem } from '../systems/DesertionSystem.js';
+import { CrisisSystem } from '../systems/CrisisSystem.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -165,8 +166,11 @@ export class TownScene extends Scene {
     this.tax = new TaxSystem(this.game, this.world, { economy: this.economy, trust: this.trust });
     this.crown = new CrownSystem(this.game, this.world, { economy: this.economy, trust: this.trust }, new Random(state.seed + 24), { attract: this.attract });
     this.desertion = new DesertionSystem(this.game, this.world, { jobs: this.jobs }, new Random(state.seed + 25), { attract: this.attract });
+    // (23. aşama) Yönetilebilir krizler: yangın ve itfaiye, haydut baskınları, hasar / tamir, yaralanma (ana üretece dokunmaz)
+    this.crisis = new CrisisSystem(this.game, this.world, { economy: this.economy, trust: this.trust, construction: this.construction, social: this.social }, new Random(state.seed + 26), { attract: this.attract });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
+      crisis: this.crisis,
       economy: this.economy,
       jobs: this.jobs,
       relationships: this.relationships,
@@ -202,6 +206,7 @@ export class TownScene extends Scene {
       this.health,
       new MovementSystem(this.world),
       this.behavior,
+      this.crisis,
       this.animals,
       this.relationships,
       this.conflicts,
@@ -261,6 +266,7 @@ export class TownScene extends Scene {
       this.tax,
       this.crown,
       this.desertion,
+      this.crisis,
     ];
 
     this.camera = new Camera();

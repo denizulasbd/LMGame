@@ -37,6 +37,7 @@ export async function installMonitor(page) {
     window.__citizens = await import('/src/systems/Citizens.js');
     window.__citizenData = await import('/src/data/citizens.js');
     window.__crownData = await import('/src/data/crown.js');
+    window.__crisisData = await import('/src/data/crisis.js');
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -102,7 +103,8 @@ export async function installMonitor(page) {
       const detail = (c, map, world) => {
         const b = world.getBuilding(map.getOccupant(c.tileX, c.tileY));
         const task = c.task ? { activity: c.task.activity, phase: c.task.phase, buildingId: c.task.buildingId ?? null, jobId: c.task.jobId ?? null, spot: c.task.spot ?? null } : null;
-        return { x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10, task, building: b ? `${b.type}#${b.id}${b.underConstruction ? ' (şantiye)' : ''}` : null, inside: c.insideBuildingId, tile: map.get(c.tileX, c.tileY) };
+        const walk = c.waypoints ? { left: c.waypoints.length - c.waypointIndex, next: c.waypoints[c.waypointIndex] ?? null, tileSpeed: map.getSpeedMultiplier(c.tileX, c.tileY), profileSpeed: c.profile.speed, ill: Boolean(c.illness), injured: Boolean(c.isInjured) } : null;
+        return { x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10, task, building: b ? `${b.type}#${b.id}${b.underConstruction ? ' (şantiye)' : ''}` : null, inside: c.insideBuildingId, tile: map.get(c.tileX, c.tileY), walk, moving: c.isMoving };
       };
       const broke = (text) => {
         m.brokenCount++;
@@ -135,8 +137,11 @@ export async function installMonitor(page) {
           const idleish = c.visible && (!c.task || c.task.phase === 'travel');
           let t = m.track.get(c.id);
           // Süre, sakinin bu karoda boşta / yolda kalmaya BAŞLADIĞI örnekten sayılır (çalışırken geçen süre sayılmaz)
-          if (!t || t.tile !== tile || !idleish) {
-            m.track.set(c.id, { tile, since: idleish ? now : null, flagged: false, blockFlag: false });
+          // (23. aşama) Yalnızca gerçekten kıpırdamayan sakin takılmış sayılır: aynı karoda olmak yetmez, konum da (4 pikselden fazla)
+          // değişmemiş olmalı. Her saat başı aynı kavşaktan (meydan) geçen uzun bir yürüyüş, buçuk saat örneklerinde hep aynı karoda
+          // görünüp yanlışlıkla "takıldı" sayılabiliyordu (tohum 13, G15: Duru uzun yolları normal yürüyordu).
+          if (!t || t.tile !== tile || !idleish || Math.hypot(c.x - t.x, c.y - t.y) > 4) {
+            m.track.set(c.id, { tile, x: c.x, y: c.y, since: idleish ? now : null, flagged: false, blockFlag: false });
             continue;
           }
           if (t.since === null) t.since = now;
@@ -267,6 +272,39 @@ export async function installMonitor(page) {
           if (s.exodus?.active) m.exodusSamples = (m.exodusSamples ?? 0) + 1;
         }
 
+        // ---- (23. aşama) Krizler: yangın, hasar, haydut baskını, yaralanma ----
+        {
+          const KD = window.__crisisData;
+          if (!KD.CRISIS_DIFFICULTY[s.crisis?.difficulty]) broke(`geçersiz tehlike sıklığı (${s.crisis?.difficulty})`);
+          for (const b of s.buildings) {
+            if (b.isBurning) {
+              m.fireSamples = (m.fireSamples ?? 0) + 1;
+              if (b.fireProgress >= 100) broke(`${b.name}: yangın %100'e vardı ama yapı hasara geçmedi`);
+              if (b.damaged) broke(`${b.name}: hem yanıyor hem hasarlı`);
+              if (b.underConstruction) broke(`${b.name}: şantiye yanıyor`);
+              if (!b.fireSince) b.fireSince = now;
+              if (now - b.fireSince > KD.FIRE.burnMinutes + 240) broke(`${b.name}: yangın bitiş vaktini aştı`);
+            } else b.fireSince = null;
+            if (b.damaged) {
+              m.damagedSamples = (m.damagedSamples ?? 0) + 1;
+              if (!b.damagedSince) b.damagedSince = now;
+              if (b.damageKind && !KD.DAMAGE_KINDS[b.damageKind]) broke(`${b.name}: bilinmeyen hasar nedeni ${b.damageKind}`);
+              // Boşta ustalar ya da oyuncu iki günden uzun süre onarmadıysa takılmıştır (kaynak yoksa uyarı)
+              if (now - b.damagedSince > 3 * 1440 && !b.project) m.longDamaged = (m.longDamaged ?? 0) + 1;
+            } else b.damagedSince = null;
+          }
+          for (const c of s.characters) {
+            if (c.isInjured) {
+              m.injuredSamples = (m.injuredSamples ?? 0) + 1;
+              if (!(c.injuryTimer > 0)) broke(`${c.name}: yaralı ama iyileşme süresi yok`);
+              if (c.injuryTimer > KD.INJURY.naturalHours * 60 + 1) broke(`${c.name}: yaralanma süresi sınırı aştı`);
+            }
+          }
+          const rd = s.crisis?.raid;
+          if (rd && now > rd.arriveAt + 180) broke('haydut baskını varış vaktini aştı ama çözülmedi');
+          if (s.buildings.filter((b) => b.type === 'guardTower').some((b) => b.workerIds.size > b.guardSlots)) broke('Gözcü Kulesi: nöbetçi sayısı yuvaları aştı');
+        }
+
         // ---- (20. aşama) Ulu Saat Kulesi ve Altın Çağ ----
         const tower = s.buildings.find((b) => b.type === 'wonder');
         if (tower) {
@@ -371,6 +409,31 @@ export async function installMonitor(page) {
             homesFreed: s.stats.homesFreed ?? 0,
             news: s.social?.gossip.length ?? 0,
             quirks: Object.fromEntries(['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].map((q) => [q, s.characters.filter((c) => c.quirk === q).length])),
+          },
+          // (23. aşama)
+          crisis: {
+            difficulty: s.crisis?.difficulty,
+            fires: s.crisis?.fires ?? 0,
+            extinguished: s.crisis?.extinguished ?? 0,
+            burned: s.crisis?.burned ?? 0,
+            raids: s.crisis?.raids ?? 0,
+            repelled: s.crisis?.repelled ?? 0,
+            tributes: s.crisis?.tributes ?? 0,
+            caught: s.crisis?.caught ?? 0,
+            injuries: s.crisis?.injuries ?? 0,
+            treated: s.crisis?.treated ?? 0,
+            repairs: s.crisis?.repairs ?? 0,
+            injuredNow: s.characters.filter((c) => c.isInjured).length,
+            damagedNow: s.buildings.filter((b) => b.damaged).length,
+            burningNow: s.buildings.filter((b) => b.isBurning).length,
+            fireHours: m.fireSamples ?? 0,
+            damagedHours: m.damagedSamples ?? 0,
+            injuredHours: m.injuredSamples ?? 0,
+            longDamaged: m.longDamaged ?? 0,
+            wells: s.buildings.filter((b) => b.type === 'well' && b.functional).length,
+            towers: s.buildings.filter((b) => b.type === 'guardTower' && b.functional).length,
+            guards: s.buildings.filter((b) => b.type === 'guardTower').reduce((n, b) => n + b.workerIds.size, 0),
+            raidPending: Boolean(s.crisis?.raid),
           },
           // (22. aşama)
           crown: {

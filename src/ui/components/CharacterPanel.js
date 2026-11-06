@@ -34,6 +34,7 @@ import { ITEMS, PETITION_KINDS } from '../../data/citizens.js';
 import { RESOURCES } from '../../data/resources.js';
 import { inventoryCapacity, petitionOf, isRioter, raidOf } from '../../systems/Citizens.js';
 import { petitionProgress, grantStatus, formatRemaining } from '../../systems/Petitions.js';
+import { INJURY } from '../../data/crisis.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -595,6 +596,12 @@ export class CharacterPanel {
     } else if (character.exposure >= ILLNESS.threshold) {
       tags.push({ text: 'Üşütmek üzere', icon: 'cold', cls: 'is-cold' });
     }
+    // 23. aşama: hafif yaralı (yürüme ve çalışma %20 yavaş); yangında kovası dolu
+    if (character.isInjured) {
+      const hours = Math.max(1, Math.ceil(character.injuryTimer / 60));
+      tags.push({ text: `🩹 Hafif Yaralı: %${Math.round((1 - INJURY.speed) * 100)} yavaş (~${hours} sa; Şifacı Kulübesi'nde çabuk sarılır)`, icon: 'bandage', cls: 'is-sick' });
+    }
+    if (character.waterBucket) tags.push({ text: 'Kovası dolu: yangına koşuyor', icon: 'bucket', cls: 'is-vigor' });
     // 12. aşama: okul
     if (character.isChild && (character.schooling ?? 0) > 0) {
       const ratio = Math.min(1, character.schooling / SCHOOL.graduateMinutes);

@@ -40,6 +40,7 @@ import { PETITION_KINDS, REVOLT } from '../../data/citizens.js';
 import { DECREES, TAX_RATES } from '../../data/crown.js';
 import { levyPlan } from '../../systems/Crown.js';
 import { formatRemaining } from '../../systems/Petitions.js';
+import { raidHoursLeft, defenseStatus } from '../../systems/Crisis.js';
 
 const DELTA_MERGE_MS = 500; // bu süre içindeki değişiklikler tek vurguda toplanır
 const DELTA_VISIBLE_MS = 1400;
@@ -152,14 +153,18 @@ export class Hud {
     const sick = state.characters.filter((c) => c.illness).map((c) => c.name);
     const away = state.characters.filter((c) => c.away).map((c) => c.name);
     const storm = state.dilemma?.storm;
-    const damaged = state.buildings.filter((b) => b.damaged).map((b) => b.name);
+    const damaged = state.buildings.filter((b) => b.damaged && !b.isBurning).map((b) => b.name);
+    // (23. aşama) yanan yapılar, bekleyen haydut baskını, hafif yaralılar
+    const burning = state.buildings.filter((b) => b.isBurning);
+    const raidLeft = raidHoursLeft(state);
+    const injured = state.characters.filter((c) => c.isInjured).map((c) => c.name);
     // 14. aşama: duyurulan / süren mevsim festivali ve toplanma zili
     const festival = currentSeasonFestival(state);
     const rally = isRallyActive(state) ? Math.ceil((state.rally.until - state.totalMinutes) / 10) : 0;
     // (21. aşama) açık dilekçeler ve isyan
     const petitions = state.petitions?.list ?? [];
     const revoltNow = state.trust?.revolt ?? null;
-    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}`;
+    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}`;
     if (buffKey !== this.lastBuffs) {
       this.lastBuffs = buffKey;
       const chips = buffs.map((b) =>
@@ -187,7 +192,11 @@ export class Hud {
         const label = storm.kind === 'wolves' ? 'Kurt tehlikesi' : 'Fırtına yaklaşıyor';
         chips.push(chip(storm.kind === 'wolves' ? 'wolf' : 'storm', `${label}${storm.fortified ? ' · hazır' : ''}`, storm.fortified ? 'Kasaba güçlendirildi' : 'Güçlendirilmedi: hasar verebilir', storm.fortified ? '' : ' is-freezing'));
       }
-      if (damaged.length) chips.push(chip('storm', `${damaged.length} hasarlı yapı`, `Onarılmalı: ${damaged.join(', ')}`, ' is-freezing'));
+      if (damaged.length) {
+        const crisisDamage = state.buildings.some((b) => b.damaged && !b.isBurning && (b.damageKind === 'fire' || b.damageKind === 'raid'));
+        chips.push(chip(crisisDamage ? 'repair' : 'storm', `${damaged.length} hasarlı yapı`, `Onarılmalı (panelden "Tamir Et" ya da ustalar kendiliğinden): ${damaged.join(', ')}`, ' is-freezing'));
+      }
+      if (injured.length) chips.push(chip('bandage', `${injured.length} hafif yaralı`, `Yürüme ve çalışma %20 yavaş: ${injured.join(', ')}. Şifacı Kulübesi'nde sarılırlar; yoksa 1,5 günde kendiliğinden geçer.`));
       // (21. aşama) İsyan alarmı ve açık dilekçeler (tıklanabilir)
       const action = (icon, text, title, cls, onClick) => {
         const b = el('button', { className: `buff-chip is-action${cls}`, type: 'button', title, tabIndex: -1 }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
@@ -200,6 +209,15 @@ export class Hud {
         chips.unshift(
           action('torch', `İsyan! ${revoltNow.rioters.length} isyancı${revoltNow.raids.length ? ' · yağma' : ''}`, 'Sakinler işi bıraktı. Tıkla: meydan havuzunda / Belediye Konağı\'nda acil erzak ve altın dağıt', ' is-revolt', () => venue && this.game.events.emit('ui:selectBuilding', venue.id))
         );
+      }
+      // (23. aşama) Yangın alarmı (her yanan yapı için, tıklayınca yapı seçilir) ve haydut izi (tıklayınca karar penceresi)
+      for (const b of burning) {
+        chips.unshift(action('fire', `${b.name} yanıyor · %${Math.round(b.fireProgress)}`, 'Sakinler kovalarla koşuyor. Tıkla: yapıyı seç, panelden "Acil Söndür (Kova Zinciri)" de. %100\'e varırsa yapı hasar alır (silinmez).', ' is-revolt', () => this.game.events.emit('ui:selectBuilding', b.id)));
+      }
+      if (raidLeft !== null) {
+        const ok = defenseStatus(state).ok;
+        const when = raidLeft <= 1 ? 'birazdan' : raidLeft <= 48 ? `${raidLeft} sa` : `${Math.ceil(raidLeft / 24)} gün`;
+        chips.unshift(action('bandit', `Haydut izleri · ${when}`, `Ormanda haydut izleri görüldü. Tıkla: bekçilerle püskürt, haraç öde ya da bekle (${ok ? 'savunma yeterli' : 'savunma yetersiz'}).`, ok ? ' is-crown' : ' is-revolt', () => this.game.events.emit('ui:openRaid')));
       }
       // (22. aşama) Kraliyet Tahsildarı, Kraliyet Fermanı, Ağır Vergi ve terk ediş
       const hall = state.buildings.find((b) => b.functional && BUILDINGS[b.type].civic) ?? state.buildings.find((b) => b.functional && b.type === 'fountain');

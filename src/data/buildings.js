@@ -677,6 +677,52 @@ export const BUILDINGS = {
     townBonus: { happiness: 4 },
     funAura: { radius: 72, perMinute: 0.1 },
   },
+  // --- 23. aşama: yönetilebilir krizler (kurallar data/crisis.js, mantık systems/CrisisSystem.js) ---
+  // well      : Su Kuyusu; çevresindeki 8 karoda yangın ihtimalini %80 azaltır, yangında kova zinciri için su sağlar,
+  //             4 karo yakınındaki bahçelere +%10 sulama verimi verir
+  // guardTower: Gözcü Kulesi; Yönetim Güveni'ne saatlik katkı, geceleri çevresini aydınlatır, 1-2 yetişkin Kasaba Bekçisi
+  //             olarak nöbet tutar (workActivity 'patrol'), haydut baskınını 2 gün önceden haber verir ve püskürtür
+  well: {
+    name: 'Su Kuyusu',
+    size: { w: 1, h: 1 },
+    spots: 'ring',
+    buildable: true,
+    demolishable: true,
+    category: 'Güvenlik',
+    description:
+      'Taş halkalı, çıkrıklı köy kuyusu. Çevresindeki 8 karoluk alanda yangın çıkma ihtimalini %80 azaltır; yangın çıkarsa sakinler buradan kovalarla hızla su taşır. 4 karo yakınındaki bahçeler sulanır (+%10 verim).',
+    cost: { wood: 15, stone: 25 },
+    buildWork: 90,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 2,
+    fireSafety: { radius: 8, reduction: 0.8 },
+    irrigation: { radius: 4, bonus: 0.1 },
+  },
+  guardTower: {
+    name: 'Gözcü Kulesi',
+    size: { w: 2, h: 2 },
+    spots: 'door',
+    doorTiles: [
+      { dx: 0, dy: 2 },
+      { dx: 1, dy: 2 },
+    ],
+    entrance: { x: 16, y: 32 },
+    buildable: true,
+    demolishable: true,
+    category: 'Güvenlik',
+    description:
+      'Ahşap korkuluklu taş gözetleme kulesi. Kasabaya asayiş sağlar (Yönetim Güveni saat başı artar), geceleri çevresini aydınlatır; 1-2 yetişkin Kasaba Bekçisi olarak nöbet tutar. Haydut baskınlarını 2 gün önceden haber verir ve bekçilerle püskürtmeni sağlar.',
+    cost: { wood: 50, stone: 45, iron: 12 },
+    buildWork: 260,
+    workers: 1,
+    workActivity: 'patrol',
+    workPoints: [{ x: 8, y: 33 }, { x: 24, y: 33 }],
+    workFacing: 'down',
+    guard: true,
+    requiresTier: 3,
+    litHours: { from: 18, to: 6 },
+    funAura: { radius: 56, perMinute: 0.05 },
+  },
   parkBench: {
     name: 'Park Bankı',
     size: { w: 1, h: 1 },
@@ -962,6 +1008,8 @@ export const BUILD_MENU = [
   'marbleFountain',
   'goldenLantern',
   'royalStatue',
+  'well',
+  'guardTower',
 ];
 
 /** (18. aşama) Menü öğesinin İnşa sekmesi: 'roads' (zemin fırçaları), 'decor' (süs ve sokak eşyaları), 'buildings'. */

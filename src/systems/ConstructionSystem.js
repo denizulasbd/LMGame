@@ -13,6 +13,7 @@ import { isGoldenAge } from './GoldenAge.js';
 import { BUILDINGS, TILE_BUILDS, TILE_REMOVAL, TILE_BUILD_BY_RESULT, mendSpec, PROJECT_WORDS } from '../data/buildings.js';
 import { STREET_NAMES } from '../data/landscape.js';
 import { STORM } from '../data/dilemmas.js';
+import { mendSpecFor } from './Crisis.js';
 import { OBJECT_TYPES, TILE_TYPES, GROUND_TILES } from '../data/tiles.js';
 import { formatCost } from '../data/resources.js';
 import { Building } from '../entities/Building.js';
@@ -417,7 +418,8 @@ export class ConstructionSystem {
     const def = BUILDINGS[building.type];
     if (building.ruined) return def.ruin ? { kind: 'repair', spec: def.ruin } : null;
     // Fırtınada / kurt saldırısında hasar gören yapı önce onarılır (11. aşama)
-    if (building.damaged) return { kind: 'mend', spec: mendSpec(building.type, STORM.mend) };
+    // (23. aşama) Yangın / baskın hasarı %25 maliyet + kısa iş; fırtına hasarı eski kural
+    if (building.damaged) return { kind: 'mend', spec: mendSpecFor(building) };
     // Çok aşamalı harika: sıradaki aşama (Gövde, Görkemli Kule)
     if (def.wonder && !building.wonderComplete) {
       const stage = def.wonder.stages[building.wonderStage];
@@ -511,9 +513,10 @@ export class ConstructionSystem {
       return;
     }
     if (kind === 'mend') {
-      building.damaged = false;
+      const damageKind = building.damageKind;
+      building.isDamaged = false;
       this.world.invalidateSpots(building);
-      this.events.emit('building:mended', { building });
+      this.events.emit('building:mended', { building, kind: damageKind, instant: false });
       this.events.emit('toast', { text: `${building.name} onarıldı, yeniden çalışıyor`, tone: 'success', icon: 'hammer' });
       return;
     }

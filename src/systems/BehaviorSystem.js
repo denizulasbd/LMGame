@@ -24,6 +24,11 @@
 // 21. aşama: biten her vardiya 'work:shiftEnded' { character, activity, building }, bitirilen iş emri 'work:jobDone'
 // { character, job, yields } yayınlar (PurseSystem yevmiye öder); etkinliğin finishEvent'i bitince yayınlanır (çantadan
 // yemek, alışveriş, yağma). İsyan başlayınca / yağma baskını çıkınca isyancılar elindeki (yarıda kesilebilen) işi bırakır.
+//
+// 23. aşama: yangında kova taşıyanlar ('fetchWater' / 'fightFire', kind 'crisis': yarıda kesilmez) ve yaralının şifacıda tedavisi
+// ('tendWound'); 'crisis:bucketFilled' / 'crisis:bucketThrown' / 'crisis:treated' etkinlik olaylarını CrisisSystem uygular. Yangın
+// başlayınca yanan yapıdaki çalışanlar ve koşacak sakinler elindekini bırakır; yangın bitince kova taşıyanların görevi biter.
+// Gözcü Kulesi'nde nöbet ('patrol', work) üretim yapmaz.
 import { towerMasteryMultiplier, recordTowerWork, towerStageIndex } from './GoldenAge.js';
 import { skillLevel } from './SkillSystem.js';
 import { ACTIVITIES, LEAVING_HOME_LABEL, BREAK_PREFIX, LOVE_BUBBLES, RIVAL_BUBBLES } from '../data/activities.js';
@@ -77,6 +82,7 @@ export class BehaviorSystem {
     this.crafting = services.crafting;
     this.health = services.health;
     this.research = services.research;
+    this.crisis = services.crisis ?? null; // (23. aşama)
     this.state = game.state;
     this.brain = new Brain(world, rng, services);
     this.unsubscribers = [
@@ -119,6 +125,12 @@ export class BehaviorSystem {
       game.events.on('revolt:joined', ({ ids }) => this.interrupt(ids)),
       game.events.on('revolt:raid', ({ raid }) => this.interrupt(raid.members, ['protest'])),
       game.events.on('revolt:ended', ({ rioters }) => this.interrupt(rioters, ['protest'], true)),
+      // (23. aşama) Yangın: yanan yapıdaki çalışanlar ve koşacak sakinler elindeki (yarıda kesilebilen) işi bırakır
+      game.events.on('crisis:fireStarted', ({ building, responders }) => {
+        this.interrupt([...building.workerIds, ...responders]);
+      }),
+      game.events.on('crisis:fireOut', ({ building }) => this.stopFirefighting(building)),
+      game.events.on('crisis:burnedDown', ({ building }) => this.stopFirefighting(building)),
       // (22. aşama) Köyü terk etmeye karar verenler elindeki her işi bırakır (uyuyan uyanır, içerideki kapıdan çıkar)
       game.events.on('exodus:leaving', ({ ids }) => {
         for (const id of ids) {
@@ -151,6 +163,15 @@ export class BehaviorSystem {
       const kind = c.task ? ACTIVITIES[activity].kind : 'idle';
       const hit = extra.includes(activity) || (!only && INTERRUPTIBLE_KINDS.has(kind));
       if (hit) this.endTask(c);
+    }
+  }
+
+  /** (23. aşama) Yangın bitti (söndü ya da yanıp bitti): yangına koşanlar görevi bırakır, kovalar boşalır. */
+  stopFirefighting(building) {
+    const others = this.state.buildings.some((b) => b.isBurning);
+    for (const c of this.world.characters) {
+      if (c.task?.fireId === building.id) this.endTask(c);
+      if (!others) c.waterBucket = false;
     }
   }
 
@@ -627,8 +648,10 @@ export class BehaviorSystem {
     }
 
     const building = this.world.getBuilding(task.workBuildingId);
-    if (!building || building.frozen || building.damaged) return false; // tarla dondu / fırtına yıktı: iş biter
+    if (!building || building.frozen || building.damaged || building.isBurning) return false; // tarla dondu / fırtına yıktı / yapı yanıyor: iş biter
     if (building.definition.academy) return this.research.work(building, amount);
+    // (23. aşama) Gözcü Kulesi: bekçi nöbet tutar (üretim yok; güven katkısı CrisisSystem'de saatliktir)
+    if (building.definition.guard) return true;
     // (12. aşama) Gelişmiş Çarklar: oduncu, taş ocağı, maden ve değirmende verim +%20
     amount *= researchProductionMultiplier(this.state, building.type);
     if (building.definition.apothecary) return this.apothecaryWork(building, task, amount * (task.activity === 'brew' ? healSpeedMultiplier(this.state) : 1));

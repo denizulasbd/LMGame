@@ -20,6 +20,8 @@ import { emptyTrust, emptyPetitions } from '../systems/Citizens.js';
 import { PETITION_KINDS, TRUST } from '../data/citizens.js';
 import { emptyTax, emptyCrown, emptyExodus } from '../systems/Crown.js';
 import { TAX_RATES, DECREES, REPUTATION } from '../data/crown.js';
+import { emptyCrisis } from '../systems/Crisis.js';
+import { CRISIS_DIFFICULTY, CRISIS } from '../data/crisis.js';
 import { SEASON_FESTIVALS } from '../data/festivals.js';
 import { WEATHER_TYPES } from '../data/weather.js';
 import { Character } from '../entities/Character.js';
@@ -110,6 +112,10 @@ export class GameState {
       lootedGold: 0, // yağmalanan altın
       reliefs: 0, // acil erzak / altın dağıtımı
       emigrants: 0, // (22. aşama) köyü terk eden sakinler
+      fires: 0, // (23. aşama) çıkan yangınlar
+      firesPutOut: 0, // el birliğiyle söndürülenler
+      raidsRepelled: 0, // püskürtülen haydut baskınları
+      repairs: 0, // yapılan tamirler
     };
     // Hayvanlar (AnimalSystem, 11. aşama): yaban hayatı (tavşan, geyik) ve kasaba kedileri / köpekleri.
     // animalMeta: wildlifeSeeded yaban hayatı yerleştirildi mi, lastPetDay son evcil hayvanın geldiği gün
@@ -169,6 +175,8 @@ export class GameState {
     this.tax = emptyTax();
     this.crown = emptyCrown();
     this.exodus = emptyExodus();
+    // (23. aşama) Krizler (CrisisSystem): tehlike sıklığı ayarı, sıradaki haydut izi ve bekleyen baskın, sayaçlar
+    this.crisis = emptyCrisis();
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -241,6 +249,7 @@ export class GameState {
       tax: this.tax,
       crown: this.crown,
       exodus: this.exodus,
+      crisis: this.crisis,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -341,6 +350,9 @@ export class GameState {
     next.tax = restoreTax(data.tax);
     next.crown = restoreCrown(data.crown);
     next.exodus = restoreExodus(data.exodus);
+    // 23. aşamadan eski kayıtlarda kriz yoktur: Dengeli, hiçbir yapı hasarlı / yanıyor değil, kimse yaralı değil; yüklemeden
+    // sonraki ilk 24 saatte (aktif kriz kaydedilmediyse) doğal kriz çıkmaz
+    next.crisis = restoreCrisis(data.crisis);
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
@@ -400,6 +412,25 @@ function restoreCrown(data) {
   out.nextDecreeId = Math.max(1, COUNT(data.nextDecreeId), (out.decree?.id ?? 0) + 1);
   out.decreeLog = (Array.isArray(data.decreeLog) ? data.decreeLog : []).filter((l) => l && DECREES[l.kind]).slice(-10);
   out.statueRight = Boolean(data.statueRight);
+  return out;
+}
+
+/**
+ * (23. aşama) Kayıttaki kriz durumu: bilinmeyen tehlike sıklığı Dengeli olur; bekleyen baskın yalnızca geçerliyse sürer. (Kayıt
+ * yüklendikten sonraki ilk CRISIS.graceHours saatin korunması CrisisSystem'de tutulur, kayda girmez.)
+ */
+function restoreCrisis(data) {
+  const out = emptyCrisis();
+  if (data && typeof data === 'object') {
+    if (CRISIS_DIFFICULTY[data.difficulty]) out.difficulty = data.difficulty;
+    out.nextRaidWarnAt = NUM(data.nextRaidWarnAt);
+    const r = data.raid;
+    out.raid = r && Number.isFinite(r.arriveAt) && Number.isFinite(r.warnedAt) ? { id: COUNT(r.id) || 1, warnedAt: r.warnedAt, arriveAt: r.arriveAt, early: Boolean(r.early), tribute: Math.max(1, COUNT(r.tribute)) } : null;
+    out.nextRaidId = Math.max(1, COUNT(data.nextRaidId), (out.raid?.id ?? 0) + 1);
+    out.lastFireDay = NUM(data.lastFireDay);
+    for (const k of ['fires', 'extinguished', 'burned', 'raids', 'repelled', 'tributes', 'caught', 'injuries', 'treated', 'repairs']) out[k] = COUNT(data[k]);
+    out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && Number.isFinite(l.day) && typeof l.text === 'string').slice(-CRISIS.logSize);
+  }
   return out;
 }
 

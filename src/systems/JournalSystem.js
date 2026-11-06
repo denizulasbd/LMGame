@@ -14,6 +14,8 @@
 //   21. aşama: petition:opened / resolved (dilekçeler), revolt:started / ended / raidEnded (isyan ve yağma), relief:given
 //   22. aşama: tax:rateChanged / collected (iç vergi), crown:levyNotice / levyPaid / levyFailed (Krallık Vergisi), crown:decree /
 //              decreeDelivered / decreeFailed (Kraliyet Fermanları), exodus:started / ended, exodus:leaving, population:left
+//   23. aşama: crisis:fireStarted / fireOut / burnedDown (yangın), crisis:raidWarning / raidResolved (haydut baskını), crisis:injured /
+//              healed (hafif yaralanma), crisis:repaired, building:mended (nedene göre)
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
@@ -239,7 +241,15 @@ export class JournalSystem {
       on('character:renamed', ({ character, from }) => this.log(`${from} artık ${character.name} adıyla anılıyor`, 'heart')),
       on('worker:pinned', ({ building, character }) => this.log(`${character.name} ${building.name} işine sabitlendi`, 'pin')),
       on('civic:decreed', ({ project }) => this.log(`Belediye fermanı: ${project.name}`, project.icon)),
-      on('building:mended', ({ building }) => this.log(`${building.name} fırtına hasarından onarıldı`, 'hammer')),
+      on('building:mended', ({ building, kind }) => this.log(`${building.name} ${kind === 'fire' ? 'yangın' : kind === 'raid' ? 'baskın' : 'fırtına'} hasarından onarıldı`, 'hammer')),
+      // 23. aşama: yangın, haydut baskını, yaralanma
+      on('crisis:fireStarted', ({ building, natural }) => this.log(`ALARM · ${building.name} yangın çıktı${natural ? '' : ' (yangın çıkarıldı)'}! Sakinler kovalarla koşuyor`, 'fire')),
+      on('crisis:fireOut', ({ building, byPlayer }) => this.log(byPlayer ? `${building.name} yangını acil kova zinciriyle söndürüldü` : `${building.name} yangını el birliğiyle söndürüldü; yapı hasar görmedi`, 'bucket')),
+      on('crisis:burnedDown', ({ building }) => this.log(`${building.name} söndürülemedi, yanıp hasar gördü (haritadan silinmedi; onarılana kadar çalışmaz)`, 'repair')),
+      on('crisis:raidWarning', ({ raid, early }) => this.log(`Ormanda haydut izleri görüldü${early ? ' (Gözcü Kulesi 2 gün önceden haber verdi)' : ''}: baskın bekleniyor`, 'bandit')),
+      on('crisis:raidResolved', ({ choice, auto, text }) => this.log(`${choice === 'defend' ? 'Haydutlar püskürtüldü' : choice === 'tribute' ? 'Haydutlara haraç verildi' : 'Haydutlar hazırlıksız yakaladı'}${auto ? ' (karar verilmedi, kendiliğinden)' : ''}: ${text}`, choice === 'defend' ? 'shield' : 'bandit')),
+      on('crisis:injured', ({ character, cause }) => this.log(`${character.name} ${cause === 'raid' ? 'haydutlarla çarpışırken' : 'yangını söndürürken'} hafif yaralandı`, 'bandage')),
+      on('crisis:healed', ({ character, how }) => this.log(how === 'healer' ? `${character.name}'in yaraları Şifacı Kulübesi'nde sarıldı` : `${character.name}'in yarası kendiliğinden iyileşti`, 'herb')),
       on('townHall:balanced', ({ building, from, to, amount }) =>
         this.log(`${building.name} erzak dengesini sağladı: ${amount} ${RESOURCES[from].name.toLocaleLowerCase('tr')} ambarlardan ${RESOURCES[to].name.toLocaleLowerCase('tr')} ambarına geçti`, RESOURCES[to].icon)
       ),
