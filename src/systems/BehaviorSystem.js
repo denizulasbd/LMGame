@@ -127,6 +127,12 @@ export class BehaviorSystem {
     const task = c.task;
 
     if (!task) {
+      // Sefere yürürken görevi kesildiyse (ör. rotasına şantiye kuruldu) yeniden harita kenarına yönelir;
+      // aksi hâlde "seferde" bayrağıyla kasabada kalır, kafile onsuz dönerdi
+      if (c.away?.stage === 'leaving') {
+        this.departExpedition([c.id], c.away.until, c.away.exit);
+        return;
+      }
       // Kiler yıkıldıysa sırtındaki yük doğrudan stoğa girer
       if (c.carrying && this.world.getCompleted('storage').length === 0) this.deliver(c);
       this.startPlan(c, this.brain.decide(c, tick.hour), tick.hour);

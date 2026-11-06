@@ -14,7 +14,8 @@
 //                  çitler, kasaba estetiği. Eski kayıtlarda (sürüm 2-14) peyzaj durumu boş başlar, estetik yüklenince hesaplanır
 //   save-v16.json: 19. aşamanın oyunu (kayıt sürümü 16, bugünkü): otopilotla 34 gün; evli çiftler ve ortak evleri, karakter
 //                  huyları, dolaşan dedikodular, son duyulan haberler. Eski kayıtlarda (sürüm 2-15) huylar ilk açılışta
-//                  dağıtılır (dördü de görülür), dedikodu boş başlar; evli çiftler kendi evlerinde kalır
+//                  dağıtılır (dördü de görülür), dedikodu boş başlar; evli çiftler kendi evlerinde kalır. Bu kayıt bir keşif
+//                  seferinin ortasındadır (macera pencereleri açılır ve sefer döner)
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
@@ -86,7 +87,10 @@ for (const { name, raw } of fixtures) {
       news: s.characters.filter((c) => c.lastNews).length,
       party: s.social.party !== null,
     };
+    const startDay = s.time.day;
     window.sim.step(225 * 24); // bir gün
+    // Yolda bir sefer varsa macera pencereleri oyunu (gerçek zamanda 30 sn) durdurur: gün dönene kadar biraz daha ilerlet
+    for (let guard = 0; s.time.day === startDay && guard < 48; guard++) window.sim.step(225);
     game.render(0);
     offs.forEach((off) => off());
     const integrityAfter = integrity();

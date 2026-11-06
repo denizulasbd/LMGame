@@ -1855,6 +1855,91 @@ fidanlar büyümüş sayılır.
 - Sonuç: `tests.mjs` 312/312, `audit.mjs` 85/85, `compat.mjs` 220/220, sayfa hatası yok. **Sanat önizleme** (`tools/art-preview.html`): gerçek `TileMap` kuralıyla çizilen yol
   mozaiği (üç mevsim ve yağmur), çit düzenleri, sokak eşyaları ve üç süs ağacının büyüme kademeleriyle dört mevsimi.
 
+## Sosyal yaşam: flört, evlilik, karakter huyları ve kasaba dedikodusu (19. aşama)
+
+Sakinler artık yalnızca kaynak toplayan işçiler değil: hoşlandıkları kişiyle randevuya çıkar, meydanda konfetiler
+arasında evlenir, eşleriyle aynı kulübeye taşınıp akşamları birlikte yemek yer, kendi huylarına göre boş zaman geçirir
+ve kasabadaki büyük olayları kulaktan kulağa birbirine anlatırlar. Sayılar `data/social.js`'te, birlikte olmanın etkileri
+`systems/SocialSystem.js`'te, planlar `ai/Brain.js`'te (`planDate`, `planHomeDinner`, `planWeddingParty`, huyların
+`planPetAnimal`, `planMusic`, `planViewpoint`, okuma bankı / Bilgelik Evi), yürütme `systems/BehaviorSystem.js`'tedir.
+9. aşamanın aşk, düğün, ortak ev ve çocuk kuralları (`data/relationships.js`, `systems/FamilySystem.js`) aynen geçerlidir;
+19. aşama onları görünür ve yaşanır kılar.
+
+### Flört ve randevular
+
+- İlişki puanı en az **40 (Dost)** olan iki bekâr yetişkin (aşık olabilecekleri biri: aile değil, yaş farkı en çok 14) ya
+  da zaten sevgili olanlar boş zamanlarında birbirlerini **randevuya** çağırır. Brain bunu sohbet ihtiyacından ve boş zaman
+  etkinliklerinden önce dener (her kararda %35, sevgililerde %55; aynı sakin 4 saat ara verir; mesaide yalnızca molada).
+- Randevu yerleri: **çardak** (baş başa: "Elif ile çardakta baş başa buluştu"), **han** (akşam açıkken aynı masa: "…ile handa
+  aynı masayı paylaşıyor") ve **yan yana iki bank** (en çok 3 karo aralıklı; davet edilen yandaki banka oturur: "…ile bankta
+  yan yana oturuyor"). Yolda durum metni "Elif ile randevuya gidiyor" olur, davet edenin başında aşk balonu çıkar.
+- Randevuya çağrılan, sosyalliği dolu olsa da gelir ve süren sohbetini bırakabilir (uyuyan, çalışan, içerideki, seferdeki ya
+  da başka bir randevudaki gelmez).
+- Randevudaki çift yan yanayken dakikada **+0,12** fazladan ilişki puanı, keyif ve sosyallik kazanır; ilk randevuları
+  Yaşam Günlüğü'ne yazılır ("Çardakta Elif ile baş başa ilk randevusuna çıktı"). Bank toplanma yeri olmadığı hâlde bankta
+  yan yana oturan çift de **aşık olabilir** ve akşamları **evlenebilir**. Puan 85'i geçince aşk, en az 2 gün sonra düğün
+  (9. aşama kuralları).
+
+### Düğün kutlaması
+
+- Çift evlenince kasaba meydanında (havuz başı) **45 dakikalık bir kutlama** başlar: çift ve ilişki puanı en az 25 olan en
+  çok **6 dostu** elindeki (yarıda kesilebilen) işi bırakıp meydana koşar. Çift yeni evine taşınmadan önce kutlamaya gider.
+- Havuzun üstünde **konfeti demeti** patlar, renkli kâğıtlar süzülerek yağar, küçük kalpler yükselir (`rendering/WeddingConfetti.js`);
+  kısa bir fanfar çalar, günlüğe "Meydanda düğün kutlaması: Elif ile Emre için konfetiler havada uçuşuyor (4 dostu el
+  çırpıyor)" yazılır. Kutlamadakilerin keyfi dakikada +0,6 dolar, aralarındaki dostluk hızlanır.
+- Kutlama bitince katılan dostların Yaşam Günlüğü'ne "Elif ile Emre'nin düğününde konfeti attı", çiftin defterine "Meydanda
+  dostlarıyla … düğünlerini kutladı" düşer. Düğün aynı zamanda bir dedikodu haberidir (çift ve davetliler bilir).
+
+### Ortak yaşam: aynı kulübe, boşalan ev, akşam yemeği
+
+- Kulübe kapasitesi **2**'dir (Taş Ev 4). Evlenen çift aynı eve taşınır: birinin evinde yer varsa öteki oraya geçer (9. aşama
+  sırası). Taşınanın **boşalan eski kulübesi** göçmenlere açılır: günlüğe "… ortak evlerine taşındı; Kulübe boşaldı ve yeni
+  göçmenlere açık" yazılır (`social:homeFreed`, `stats.homesFreed`). Evli çiftin evindeki boş yatak hâlâ çocuklarına ayrılır.
+- **Akşam yemeği:** 18:00–20:30 arasında acıkan (tokluk 80'in altında) evli sakin, aynı evde yaşayan ve müsait olan eşini
+  evde birlikte yemeğe çağırır (günde bir kez; eş elindeki boş zaman işini bırakır). Kişi başı bir öğün stoktan ödenir.
+  Birlikte yerken ikisinin keyfi (+0,35/dk) ve sosyalliği (+0,9/dk) dolar, durum metni "Eşi Emre ile evde akşam yemeği
+  yiyor" olur, ertesi sabah **Mutlu Yuva** moraliyle uyanırlar; ilk akşam yemekleri anı defterine yazılır.
+
+### Karakter huyları
+
+Her sakine (çocuklar dahil) bir huy düşer; Karakter Kartı'nda kişilik etiketlerinin yanında altın çerçeveli bir çip olarak
+görünür. Yeni kasabanın ilk sakinleri dört huyu paylaşır; göçmenler kasabada en az görülen huyu, çocuklar çoğunlukla (%70)
+bir ebeveyninin huyunu alır. Huy, boş zaman tercih ağırlıklarına eklenir (`QUIRKS[...].leisure`).
+
+| Huy | Ne yapar? |
+|---|---|
+| **Hayvansever** (pati) | Yakındaki (22 karo) bir kediye / köpeğe yürür; hayvan onu bekler. Varınca başını okşar: keyif **+10**, kedinin başında kalp, mırlama / havlama sesi ("Kedi Tekir'in başını okşuyor"). 9 karodan yakında bir hayvan görürse isteği 2,5 katına çıkar |
+| **Kitap Kurdu** (kitap) | Fener altındaki (fenere en çok 3 karo) bir bankta ya da Bilgelik Evi'nde kitap okur; başında kitap balonu |
+| **Müzisyen** (ud) | Akşamları (17:00 sonrası) handa ya da meydan havuzunun başında çalar: çevresindeki (44 piksel) en yakın **4 dinleyicinin** keyfi dakikada +0,55 dolar, başlarında nota / melodi balonları çıkar; çalarken orası herkese 1,6 kat daha cazip gelir |
+| **Doğa Tutkunu** (yaprak) | Süs ağaçlarının gölgesinde (genç fidan da olur) ya da nehir kenarında manzarayı izleyip dinlenir |
+
+### Kasaba dedikodusu
+
+- Büyük olaylar bir **haber** olur: usta işi eser, seferden dönüş (getirilen ganimetle: harita, yazıt, meşale…), barışma
+  (günde bir), düğün, mevsim festivali ve akşam şenliği. Olayın kahramanları (usta, kafile, çift ve davetliler, festivale
+  katılanlar) haberi bilir.
+- Aynı yerde sohbet edenler (dakikada %6) ya da **yolda karşılaşıp selamlaşanlar** (14 piksel, dakikada %35; aynı ikili 3 saat
+  ara verir) haberi bilmeyene anlatır: ikisinin başında **fısıltı / haber balonu** çıkar.
+- Haberi ilk kez duyanın Yaşam Günlüğü'ne bir not düşer: "Leyla'dan, Emre'nin Kayıp Tapınak Seferi'nden getirdiği kadim
+  haritayı duydu". Haberi kahramanın kendisi anlatırsa: "Emre'den, Kayıp Tapınak Seferi'nden getirdikleri kadim haritayı kendi
+  ağzından dinledi". Ad ekleri ünlü uyumuna göre (`utils/turkish.js`: Leyla'dan, Mert'ten, Kemal'in, Ozan'ın). Defterde en çok
+  6 dedikodu notu tutulur (aşk, düğün ve dostluk anıları silinmez).
+- Haber kasabanın %75'ine ulaşınca günlüğe "Kasabada dilden dile dolaşıyor: …" yazılır. Haberler 4 gün dolaşır, en çok 12
+  haber tutulur; sakinin son duyduğu haber kartında kalır.
+
+### Karakter Detay Kartı: Sosyal Hayat
+
+Sağ alttaki kartta **İlişkiler**'in altında yeni **Sosyal Hayat** bölümü vardır:
+
+- **Huyu:** adı ve simgesi (üzerine gelince açıklaması).
+- **Eşi ve evi:** eşin adı (tıklayınca seçilir) ve "Eşiyle 2 numaralı kulübede birlikte yaşıyor" / "…kulübeye taşınıyorlar" /
+  "Eşiyle ortak bir ev bekliyorlar"; sevgilisi varsa "Sevgilisiyle flört ediyor", bekârsa evi.
+- **Son duyduğu:** haberin kendisi, kimin anlattığı ve ne zaman ("Leyla anlattı · Gün 12, 18:00").
+
+### Denge ve test (simülasyon)
+
+STRESS_PLACEHOLDER
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -1897,10 +1982,10 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (312; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 15'e) açar, bir gün yaşatır; referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (382; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 16'ya) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
-| `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
+| `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |
 | `node tools/sim/autopilot.mjs 42 40` | Hilesiz otopilotla 40 günlük oyun (18. aşama: kapıları yola bağlar, parke döşer, süs ve ağaç diker; döşenen yol, estetik ve yürüyüşlerin yoldan geçme oranı raporlanır): günlük özet (araştırma, altın, sefer, harika aşaması, yadigâr ve harcanan altın dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya, altının yadigâr / lüks mal / fermanlara ne kadar harcandığı, peyzaj ve son 12 günün ortalama stoğu; (14. aşama) mevsim festivalleri ve katılımcıları, anı sayıları ve örnek bir sakinin anıları, nadir hava olayları, Büyük İhracat Seferi sayısı. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar, `--speed 1\|2\|4` oyun hızını seçer, `--json rapor.json` bekçi raporunu yazar (takılma ya da kopuk referans varsa çıkış 1) |
 | `node tools/sim/preview.mjs ["başlık"]` | Sanat önizleme sayfasının bölümlerinin ekran görüntüleri (`tools/sim/out/`) |
@@ -1909,7 +1994,9 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 `tools/sim/lib.mjs` ortak yardımcıları içerir: oyunu açma, saat saat ilerletme (oyunun hızına göre adım sayısı),
 `window.sim` (yapı kurma, kaynak verme, olay günlüğü) ve test kaydı. `tools/sim/monitor.mjs` uzun koşuların bekçisidir:
 saat başı sakinlerin takılıp takılmadığını (boşta / yolda aynı karoda 150 dakika, yürünemez karoda 120 dakika), referans
-bütünlüğünü ve iş gücünü denetler.
+bütünlüğünü ve iş gücünü denetler; 19. aşamadan beri evlilik akışını da izler (30 saatte yeni evine taşınamayan sakin, boş yatak
+varken 48 saat ayrı evlerde kalan evli çift, bitiş vaktini aşan kutlama, huyu olmayan sakin, kayıp sakine işaret eden haber) ve en
+düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 
 ## Arayüz yerleşimi ve dar pencereler
 
@@ -1990,6 +2077,10 @@ bütünlüğünü ve iş gücünü denetler.
 | Süsün estetik değeri, yarıçap, refah çarpanı eşikleri | `data/landscape.js` → `AESTHETIC` (mantık `systems/LandscapeSystem.js`) |
 | Karanlıkta ürkme, ışık yarıçapları, çamur | `data/landscape.js` → `DARKNESS`, `MUD` |
 | Süs ağacının büyüme süresi, sokak adları, inşa sekmeleri | `data/landscape.js` → `ORNAMENTAL_TREES`, `STREET_NAMES`, `BUILD_TABS` |
+| (19. aşama) Randevu eşiği, olasılığı ve yerleri, randevu bonusu | `data/social.js` → `DATING` (plan `ai/Brain.js` → `planDate`, etki `systems/SocialSystem.js`) |
+| Düğün kutlamasının süresi, davetli sayısı; evli çiftin akşam yemeği saatleri | `data/social.js` → `WEDDING_PARTY`, `HOME_DINNER` |
+| Yeni bir karakter huyu eklemek | `data/social.js` → `QUIRKS` (simge `art/ui`), boş zaman etkinliği `data/activities.js` + `Brain.resolveLeisure` |
+| Dedikodunun yayılma hızı, haber ömrü, defterdeki not sayısı | `data/social.js` → `GOSSIP` |
 | Birleşen (çit) ya da fırçayla dizilen yeni süs | `data/buildings.js` → `connects: 'grup'`, `brush: true` (+ `art/sprites/structuresLandscape.js`) |
 | Simülasyon / test | `tools/sim/` (bkz. *Simülasyon ve test araçları*) |
 | Günlüğe yeni olay | `systems/JournalSystem.js` (olayı dinle, metnini yaz) |

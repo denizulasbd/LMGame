@@ -205,7 +205,7 @@ export async function installMonitor(page) {
 
         // (16. aşama) Seferde kaybolan ya da takılan kafile
         const exp = s.dilemma.expedition;
-        for (const c of s.characters) if (c.away && !exp?.members.includes(c.id)) broke(`${c.name}: seferde sanılıyor ama süren sefer yok`);
+        for (const c of s.characters) if (c.away && !exp?.members.includes(c.id)) broke(`${c.name}: seferde sanılıyor ama süren sefer yok (${c.away.stage}, ${c.task?.activity ?? 'görevsiz'}/${c.task?.phase ?? '-'}: ${c.activityLabel})`);
         if (exp) {
           for (const id of exp.members) if (!ids.has(id)) broke(`sefer: kafileden ${id} kayıp`);
           if (now > exp.until + 240 && !s.dilemma.active) broke(`sefer: dönüş vakti çoktan geçti (${Math.round((now - exp.until) / 60)} saat)`);

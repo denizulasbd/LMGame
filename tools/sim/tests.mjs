@@ -2023,6 +2023,18 @@ const pageResults = await page.evaluate(async () => {
     const card2 = document.querySelector('.character-panel .social-life')?.textContent ?? '';
     check('kartta son duyduğu dedikodu (kimden, ne zaman)', card2.includes(L.lastNews.text) && card2.includes(`${L.lastNews.from} anlattı`), card2);
     game.events.emit('ui:selectCharacter', null);
+    // (16. aşama hatası, 19. aşamada stres matrisinde bulundu) sefere yürürken görevi kesilen sakin yeniden kenara yönelir
+    {
+      const walker = adults.find((c) => ![A, B, L].includes(c) && !c.away);
+      free(walker);
+      walker.away = { stage: 'leaving', until: st.totalMinutes + 600, exit: W.findEntryTile(S.behavior.rng) };
+      walker.task = null;
+      S.behavior.updateCharacter(walker, { gameMinutes: 1, hour: 11, simDt: 1 / 60 });
+      check('sefere yürürken görevi kesilen sakin yeniden harita kenarına yönelir', walker.task?.activity === 'expedition' || walker.away.stage === 'away', walker.task?.activity);
+      S.behavior.endTask(walker);
+      walker.away = null;
+      free(walker);
+    }
     offs.forEach((off) => off());
     window.__s19 = { a: A.id, b: B.id, home: home.id, quirks: Object.fromEntries(st.characters.map((c) => [c.id, c.quirk])), news: { id: L.id, text: L.lastNews.text, from: L.lastNews.from }, gossip: st.social.gossip.length, dinnerDay: A.dinnerDay, dates: st.stats.dates, dinners: st.stats.familyDinners };
   }
