@@ -120,6 +120,7 @@ LMGame/
     │   ├── WeatherEffects.js Yağmur damlaları, su / yer sıçrama halkaları, bulut gölgeleri
     │   ├── Fireflies.js    Açık gecelerde orman ve nehir kıyısında yanıp sönen ateşböcekleri
     │   ├── FestivalEffects.js Şenlikte renkli fener dizisi ve havada süzülen notalar
+    │   ├── ChimeWaves.js   (20. aşama) Ulu Saat Kulesi çalınca çan odasından yayılan altın ses dalgaları ve notalar
     │   ├── WeddingConfetti.js (19. aşama) Meydandaki düğün kutlamasında konfeti demeti, süzülen kâğıtlar ve kalpler
     │   ├── SeasonalEffects.js Sonbaharda ağaçlardan süzülen yapraklar (kar yağışı WeatherEffects'te)
     │   ├── RenderQueue.js  Y-sıralı çizim kuyruğu (ağacın arkasındaki gerçekten arkada kalır)
@@ -167,6 +168,8 @@ LMGame/
     │   ├── festivals.js    Dört mevsim kapanış festivali: saatler, yerler, bonuslar, süslemeler, anı cümleleri
     │   ├── exploration.js  (16. aşama) Sefer kuralları, dört macera ve seçenekleri (risk, usta / alet kuralları, ganimet),
     │   │                   egzotik ganimetler, üç kadim yazıt ve imar şemaları, üzüm asması
+    │   ├── goldenAge.js    (20. aşama) Ulu Saat Kulesi'nin açılışı ve ustalık katkısı, Kadim Dişli, Çağ Kutlaması, Altın Çağ
+    │   │                   çanı ve çarpanları, Tarihçe, tüccarın nadir malları
     │   ├── social.js       (19. aşama) Flört ve randevu, düğün kutlaması, evli çiftin akşam yemeği, dört karakter
     │   │                   huyu (Hayvansever, Kitap Kurdu, Müzisyen, Doğa Tutkunu) ve dedikodunun sayıları
     │   ├── landscape.js    (18. aşama) Çevre estetiği değerleri ve yarıçapı, refah çarpanı eşikleri, karanlık ve ışıklar,
@@ -250,6 +253,8 @@ LMGame/
     │   ├── ExpeditionSystem.js (16. aşama) Keşif seferleri: yola çıkış, maceralar, kaza, dönüş, ganimet, anılar, handa
     │   │                   hikâye anlatma; harabe yazıtları ve çözme
     │   ├── Exploration.js  (16. aşama) Keşfin saf hesapları: kafile seçimi, risk, sefer durumu, şema etkileri
+    │   ├── GoldenAgeSystem.js (20. aşama) Çağ Kutlaması, 08:00 / 18:00 kule çanı, Tarihçe Kütüğü; GoldenAge.js saf yardımcılar
+    │   │                   (Altın Çağ çarpanları, ustalık katkısı, dişli ihtiyacı, baş usta)
     │   ├── SocialSystem.js (19. aşama) Huyların dağıtımı ve etkileri, randevu bonusu, meydanda düğün kutlaması, boşalan
     │   │                   ev, evli çiftin akşam yemeği, müzisyenin dinleyicileri, kedi okşama, kasaba dedikodusu
     │   ├── LandscapeSystem.js (18. aşama) Çamur, süs fidanlarının büyümesi, çevre estetiği haritası ve kasaba puanı,
@@ -416,8 +421,11 @@ sayaçlar) eklendi. 19. aşamada sakinlerin karakter huyu (`quirk`), son duyduğ
 eşiyle son akşam yemeği günü (`dinnerDay`) ve son randevusu (`lastDateAt`), sosyal durum (`social`: süren düğün kutlaması —
 çift, davetliler, katılanlar, bitiş dakikası —, dolaşan haberler ve kimlerin duyduğu, günün barışma haberi) ve yeni sayaçlar
 (`stats.dates`, `weddingParties`, `familyDinners`, `gossipHeard`, `serenades`, `petCuddles`, `booksRead`, `homesFreed`)
-eklendi; evli çiftin ortak evi zaten `homeId` ile kayda girer. Kayıt sürümü 16'dır; 4.–18. aşamanın (sürüm 2–15) kayıtları da
-açılır (huyu olmayan sakinlere ilk açılışta huy dağıtılır, dedikodu boş başlar, evli çiftler kendi evlerinde kalır) (peyzaj durumu boş başlar) (usta işi eser vitrini ve keşif ganimetleri boş başlar; eski biçimde yarım kalmış bir sefer maceralar
+eklendi; evli çiftin ortak evi zaten `homeId` ile kayda girer. 20. aşamada kulenin aşama günleri, Altın Çağ (`goldenAge`: başladığı an, çan sayısı, süren Çağ Kutlaması, antik kitaplar),
+Tarihçe Kütüğü (`chronicle`: kurucular, ilk evlenen çift, ilk usta eseri, kuleye verilen emek ve baş usta, kulenin aşamaları),
+Kadim Dişli stoğu (`resources.gears`), Mermer Çeşme / Altın Çağ Feneri ve `stats.ageCelebrations` eklendi. Kayıt sürümü
+17'dir; 4.–19. aşamanın (sürüm 2–16) kayıtları da açılır (Tarihçe sakinlerden çıkarılır, tamamlanmış kulesi olan kasaba Altın
+Çağ'a kutlamasız girer, dişli ve kitap 0 başlar) (19. aşama, sürüm 2–15 için: (huyu olmayan sakinlere ilk açılışta huy dağıtılır, dedikodu boş başlar, evli çiftler kendi evlerinde kalır) (peyzaj durumu boş başlar) (usta işi eser vitrini ve keşif ganimetleri boş başlar; eski biçimde yarım kalmış bir sefer maceralar
 açmadan sürer ve döner) (anısı olmayan sakinin anı defteri ilk açılışta "Kasabada yaşamaya başladı" ile açılır): eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
 ve ekipmansız başlar; yün, demir, ekmek ve altın 0 olur; araştırma, ihracat ve yadigâr boş başlar; arşiv ilk açılışta
 kurulur, düğün ve doğum sayaçları evli çiftlerden ve ebeveynli sakinlerden tahmin edilir; yaban hayatı ilk açılışta
@@ -1971,6 +1979,103 @@ Sağ alttaki kartta **İlişkiler**'in altında yeni **Sosyal Hayat** bölümü 
   ilerleyen düğün konfetisi ve küçük sahneler (bank randevusu, fener altında kitap, kedi okşama, müzisyen ve dinleyenler,
   yolda selamlaşma).
 
+## Kasaba Zaferi ve Çağ Dönüm Noktası: Ulu Saat Kulesi, Tarihçe Kütüğü ve Altın Çağ (20. aşama)
+
+Bu bir "oyun bitti" ekranı değildir: kasaba bir zirveye ulaşır, kalıcı bir unvan kazanır ve oyun zenginleşerek sürer.
+Sayılar `data/goldenAge.js`'te, kulenin aşamaları `data/buildings.js` → `wonder`'da; mantık `systems/GoldenAgeSystem.js`
+(saf yardımcılar `systems/GoldenAge.js`), kademeli inşa `systems/ConstructionSystem.js`'tedir.
+
+**Tasarım kararı:** 12. aşamadan beri oyunda üç aşamalı, saat kuleli bir Kasaba Harikası (Büyük Vadi Saat Kulesi) vardı.
+İkinci bir saat kulesi eklemek yerine o harika **Ulu Saat Kulesi**'ne dönüştürüldü (yapı türü aynı: `wonder`). Böylece eski
+kayıtlardaki kule ve aşaması korunur; tamamlanmış kulesi olan eski kasabalar yüklenince Altın Çağ'a sessizce girer.
+
+### Kademeli mega proje: Ulu Saat Kulesi
+
+Kasaba **Kasaba seviyesine** (3) ve **20 sakine** ulaşınca İnşa menüsünde açılır (öncesinde menüde nedeni yazar: "Kasaba
+20 sakine ulaşınca açılır (şu an 14)"). Tek seferde dikilmez; Temel şantiye olarak kurulur, sonraki aşamalar yapının
+panelinden **Aşamayı Başlat** ile başlatılır (maliyet peşin; iptalde çalışılmadıysa tamamı, yoksa yarısı iade).
+
+| Aşama | Maliyet | İş | Ustalık katkısı |
+|---|---|---|---|
+| 1. Temel | Odun 300, Taş 400 (bol taş ve kereste) | 600 | — |
+| 2. Gövde | Taş 450, Demir 150, Odun 100, Altın 400 (kesme taş ve demir) | 900 | **Yapı Ustaları**: İnşaat ya da Taşçılık'ta Kalfa ×1,25, Usta ×1,6 |
+| 3. Mekanizma & Çan | **Kadim Dişli 8**, Demir 120, Taş 150, Altın 900 | 1000 | **Usta zanaatkârlar**: Zanaatkârlık ya da İnşaat'ta Kalfa ×1,25, Usta ×1,6 |
+
+- **Kadim Dişli** (yeni işlenmiş mal, üst çubuktaki **Mallar ▾** listesinde): Gövde bitince Zanaat Atölyesi, hangi üretim
+  seçili olursa olsun, önce Mekanizma için dişli döker (dişli başı Demir 5, Altın 30, Odun 2; 90 iş). Stokta 8 dişli olunca
+  durur ve ekipman üretimine döner; zanaatkârın ustalığı dökümü hızlandırır. İlk dişli günlüğe yazılır. Dişli ihraç edilmez.
+- Kule şantiyesinde çalışan sakinlerin başlarında **çekiç ve ter balonları** çıkar. Kuleye verilen her emek Tarihçe Kütüğü'ne
+  yazılır; en çok emek veren "baş usta" olur.
+
+### Çağ Kutlaması ve Altın Çağ
+
+Kule tamamlanınca oyun durmaz; "Çağ Dönüm Noktası: Altın Çağ!" penceresi açılır ve:
+
+- Kasaba meydanında (havuz başı; yoksa kulenin dibinde) **2 saatlik Çağ Kutlaması** başlar: uyanık bütün sakinler
+  (yarıda kesilebilen) işlerini bırakıp meydana koşar, konfeti yağar, büyük fanfar çalar; kutlamadakilerin keyfi dakikada
+  +0,5 dolar. Bitince katılanların Yaşam Günlüğü'ne "Ulu Saat Kulesi'nin ilk çanını meydanda Çağ Kutlaması'nda dinledi",
+  baş ustanın defterine "adı Tarihçe Kütüğü'ne altın harflerle yazıldı" düşer.
+- Çan **ilk kez** çalar ve kasaba kalıcı **Altın Çağ** unvanını alır:
+  - Kule saati **her sabah 08:00 ve akşam 18:00'de** çalar: çan odasından yayılan altın ses dalgaları ve yükselen notalar
+    (`rendering/ChimeWaves.js`), çan ve kule ezgisi. Sesi duyan (uyanık, seferde olmayan) sakinlerin yorgunluğu azalır
+    (enerji +12, keyif +4), başlarında çan balonu çıkar. (Kule 07:00-22:00 arası saat başı da çalmaya devam eder.)
+  - **Çalışma şevki kalıcı +%10** (bütün iş ve inşaat hızı).
+  - **Kasaba refahına kalıcı +%10 çarpan** (%100'ü aşmaz; 12. aşamanın +12'si ve gece aydınlatıp ısıtması da sürer).
+
+### Tarihçe Kütüğü (Kasaba Arşivi'nin sekmesi)
+
+`I` / dock'taki **Arşiv** penceresinin üstünde iki sekme vardır: **Kasaba Arşivi** (grafikler, tarih, usta işi eserler) ve
+**Tarihçe Kütüğü**. Kütük, parşömen bir berat gibi kasabanın gurur tablosunu altın harflerle gösterir ve istenildiği an açılır:
+
+- **Kurucu Sakinler:** kasabayı ilk kuranlar;
+- **İlk Evlenen Çift** (günüyle);
+- **İlk Usta Eseri:** ilk usta işi eseri yapan zanaatkâr ve eser;
+- **Ulu Saat Kulesi:** üç aşamanın tamamlandığı günler ve **baş usta** (en çok emek veren; kule yükselirken "şu an en çok emek
+  veren" gösterilir);
+- **Altın Çağ:** başladığı gün, kule saatinin kaç kez çaldığı, kitaplıktaki antik kitaplar.
+
+Eski kayıtlarda kütük yüklenince doldurulur: kurucular ilk sakinlerin anısından (yoksa en eski kimlikli yetişkinlerden), ilk
+çift en eski evlilikten, ilk eser vitrinin ilk eserinden çıkarılır.
+
+### Prestij peyzajı ve gezgin bilgeler
+
+- Altın Çağ'da İnşa menüsünün **Peyzaj & Dekorasyon** sekmesinde iki yeni yapı açılır:
+  - **Mermer Çeşme** (2x2; Taş 80, Altın 250): altın kuşaklı beyaz mermer havuz, fışkıran sütun (dört kare animasyon);
+    estetik puanı 6 (kasabanın en şık süsü), yanından geçenlerin keyfi dolar.
+  - **Altın Çağ Feneri** (1x1; Demir 4, Altın 80): altın taçlı fener; 18:30-06:30 arası 96 piksellik altın ışık yayar,
+    karanlıkta ürkmeyi önler, altında yürüyenlerin keyfi yükselir.
+- Kasabanın şanı yayıldığı için **gezgin tüccar daha sık gelir** (ziyaretler arası ×0,6) ve altınla iki nadir mal getirir:
+  - **Nadir Tohumlar** (120 altın): egzotik üzüm fidesi (bir Üzüm Asması dikilir);
+  - **Antik Kitaplar** (150 altın): Bilgelik Evi'nin kitaplığına girer; her kitap araştırmaları kalıcı **%5** hızlandırır
+    (en çok 5 kitap, +%25).
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 428; 44'ü bu aşamanın): kulenin adı ve açılışı (Köy'de kapalı, Kasaba'da 20 sakin),
+  üç aşamanın adları ve malzemeleri, Yapı Ustası / usta zanaatkâr katkısı (Kalfa ×1,25, Usta ×1,6, yanlış meslek ×1), Gövde
+  bitince 8 dişli ihtiyacı, atölyenin önce dişli dökmesi ve dişlinin stoğa girmesi, dişlisiz Mekanizma'nın başlatılamaması,
+  gerçek aşama işi (usta zanaatkâr hızlandırır, emek Tarihçe'ye yazılır, çekiç balonlu kule görevi), Altın Çağ'ın başlangıcı,
+  çalışma şevki ve refah +%10, 08:00 / 18:00 çanı (09:00'da çalmaz; duyanların enerjisi dolar), ses dalgası çizimi, Çağ
+  Kutlaması (meydanda başlar, sakinler koşar, keyif dolar, biter, anı yazılır, oyun sürer), prestij yapılarının kilidi, kurulumu,
+  ışığı ve görselleri, tüccarın nadir malları ve sıklığı, antik kitabın araştırma çarpanı, Tarihçe'nin satırları ve Arşiv'deki
+  sekmesi (altın harfler, sekmeler arası geçiş), kayıt sürümü 17 gidiş-dönüşü. 12. aşamanın harika testleri yeni kurala göre
+  güncellendi.
+- **Denetim** (`audit.mjs`, 92): Çağ Kutlaması sürerken kayıt -> yükleme durum kayması yok, kutlama aynen döner, bir kez biter
+  ve Altın Çağ sürer.
+- **Uyumluluk** (`compat.mjs`, sürüm 2-17, 282): `save-v17.json` bu aşamanın otopilotuyla 34 günlük oyundur (kule G26 / G28 /
+  G31, baş usta Atlas, Altın Çağ G31, 3 antik kitap). Tamamlanmış kulesi olan v14 ve v15 kayıtları Altın Çağ'a sessizce girer,
+  yarım kuleli v13 ve v16 aşamasını korur; her eski kayıtta Tarihçe sakinlerden çıkarılır.
+- **Otopilot** (`autopilot.mjs 42 40`): kuleyi Kasaba seviyesi ve 20 sakinle kurup aşama aşama yükseltti (Temel G26, Gövde G28,
+  Mekanizma & Çan G31; 8 Kadim Dişli döküldü, 5 sakin emek verdi). Altın Çağ'da 9 günde çan 19 kez çaldı (her gün 2 kez + ilk çan),
+  1 Mermer Çeşme ve 2 Altın Çağ Feneri dikildi, 5 antik kitap alındı; takılma 0, kopuk referans 0.
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 36`): takılma 0, kopuk referans 0, taşan ev 0,
+  sosyal sıkışma 0, sayfa hatası 0. Kule dört kasabada 36 gün içinde tamamlandı (Altın Çağ G29-G31; toplam 50 çan, 4 Çağ
+  Kutlaması); iki kasaba 20 sakine ve Kasaba seviyesine geç ulaştığı için kuleyi G35'te başlattı ve koşu bittiğinde hâlâ
+  yükseltiyordu (biri Temel'de, biri Gövde bitmiş ve dişli dökerken). Takılan iş ya da sakin yok.
+- Sonuç: `tests.mjs` 428/428, `audit.mjs` 92/92, `compat.mjs` 282/282, sayfa hatası yok. **Sanat önizleme**
+  (`tools/art-preview.html`): kulenin üç aşaması, zamanla yayılan çan dalgaları, Mermer Çeşme'nin dört karesi, Altın Çağ
+  Feneri'nin gündüz / gece hâli, dişli ve çan simgeleri.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -2013,10 +2118,10 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (382; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 16'ya) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (428; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 17'ye) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
-| `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
+| `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması / Çağ Kutlaması sırasında kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |
 | `node tools/sim/autopilot.mjs 42 40` | Hilesiz otopilotla 40 günlük oyun (18. aşama: kapıları yola bağlar, parke döşer, süs ve ağaç diker; döşenen yol, estetik ve yürüyüşlerin yoldan geçme oranı raporlanır): günlük özet (araştırma, altın, sefer, harika aşaması, yadigâr ve harcanan altın dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya, altının yadigâr / lüks mal / fermanlara ne kadar harcandığı, peyzaj ve son 12 günün ortalama stoğu; (14. aşama) mevsim festivalleri ve katılımcıları, anı sayıları ve örnek bir sakinin anıları, nadir hava olayları, Büyük İhracat Seferi sayısı. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar, `--speed 1\|2\|4` oyun hızını seçer, `--json rapor.json` bekçi raporunu yazar (takılma ya da kopuk referans varsa çıkış 1) |
 | `node tools/sim/preview.mjs ["başlık"]` | Sanat önizleme sayfasının bölümlerinin ekran görüntüleri (`tools/sim/out/`) |
@@ -2108,6 +2213,9 @@ düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 | Süsün estetik değeri, yarıçap, refah çarpanı eşikleri | `data/landscape.js` → `AESTHETIC` (mantık `systems/LandscapeSystem.js`) |
 | Karanlıkta ürkme, ışık yarıçapları, çamur | `data/landscape.js` → `DARKNESS`, `MUD` |
 | Süs ağacının büyüme süresi, sokak adları, inşa sekmeleri | `data/landscape.js` → `ORNAMENTAL_TREES`, `STREET_NAMES`, `BUILD_TABS` |
+| (20. aşama) Ulu Saat Kulesi'nin açılışı, aşamaları ve ustalık katkısı | `data/goldenAge.js` → `TOWER_UNLOCK`, `TOWER_MASTERY`; aşamalar `data/buildings.js` → `wonder.wonder.stages` |
+| Kadim Dişli'nin tarifi, Çağ Kutlaması, çan saatleri ve Altın Çağ çarpanları | `data/goldenAge.js` → `CLOCK_GEAR`, `AGE_CELEBRATION`, `GOLDEN_AGE` |
+| Tüccarın Altın Çağ malları | `data/goldenAge.js` → `GOLDEN_OFFERS` (satış `systems/EventSystem.js` → `grantRare`) |
 | (19. aşama) Randevu eşiği, olasılığı ve yerleri, randevu bonusu | `data/social.js` → `DATING` (plan `ai/Brain.js` → `planDate`, etki `systems/SocialSystem.js`) |
 | Düğün kutlamasının süresi, davetli sayısı; evli çiftin akşam yemeği saatleri | `data/social.js` → `WEDDING_PARTY`, `HOME_DINNER` |
 | Yeni bir karakter huyu eklemek | `data/social.js` → `QUIRKS` (simge `art/ui`), boş zaman etkinliği `data/activities.js` + `Brain.resolveLeisure` |
