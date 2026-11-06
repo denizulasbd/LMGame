@@ -7,11 +7,19 @@
 //                      ve içerideki listeleri, rezervasyonlar, iş emirlerinin atananları; evdeki kişi sayısı kapasiteyi aşıyor mu
 //   İş gücü          : çalışanı olan ama hiç üretmeyen (ya da çalışma noktası kalmamış) yapılar, sonsuz bekleyen iş emirleri
 //
+//   (19. aşama) Sosyal yaşam: evli çift ortak eve taşınamadan RELOCATE_HOURS saatten uzun "taşınıyor" kalırsa ya da
+//                      boş yatak varken MAX_APART_HOURS saat ayrı evlerde yaşarsa sıkışma sayılır; kutlama bitiş vaktini
+//                      aşarsa, huyu olmayan sakin, kayıp sakine işaret eden haber / kutlama kopuk referanstır; nüfusun en
+//                      düşük ve en yüksek değeri, evsiz sakinler ve sosyal sayaçlar (randevu, düğün kutlaması, akşam
+//                      yemeği, dedikodu, müzik, hayvan sevme, kitap, boşalan ev) raporlanır
+//
 // Kullanım (Node tarafı):  await installMonitor(page);  ...  window.__monitor.sample() her saat;  await monitorReport(page)
 
 export const STUCK_MINUTES = 150;     // görevsiz / yolda aynı karoda bu kadar kalan sakin takılmış sayılır
 export const BLOCKED_MINUTES = 120;  // yürünemez karoda (su, yapı) görevsiz / yolda bu kadar kalan takılmış sayılır (3 örnek)
 export const JOB_STALE_DAYS = 4;      // atanmış iş emri bu kadar gün ilerlemezse "sonsuz bekleme" sayılır
+export const RELOCATE_HOURS = 30;     // (19. aşama) yeni evine bu kadar saatte varamayan sakin taşınmada sıkışmış sayılır
+export const MAX_APART_HOURS = 48;    // boş yatak varken evli çift bu kadar saat ayrı evlerde kalırsa sıkışma
 
 export async function installMonitor(page) {
   await page.evaluate(async () => {
@@ -19,7 +27,7 @@ export async function installMonitor(page) {
     window.__charSprite = (await import('/src/art/sprites/index.js')).getCharacterSprite;
   });
   await page.evaluate(
-    ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS }) => {
+    ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
       const game = window.game;
       const m = {
         samples: 0,
@@ -37,6 +45,13 @@ export async function installMonitor(page) {
         minNeeds: { hunger: 100, energy: 100, social: 100, fun: 100 },
         events: { weddings: 0, births: 0, grownUp: 0, quarrels: 0, reconciled: 0, ill: 0, cured: 0, cold: 0, warmed: 0, masterworks: 0, exhibited: 0, sold: 0, expeditions: 0, adventures: 0, mishaps: 0, tales: 0, returned: 0 },
         outfitErrors: [], // (15. aşama) çizilemeyen ya da yanlış kademede kıyafet
+        // (19. aşama) sosyal yaşam
+        socialStuck: [], // taşınmada / ayrı evde sıkışan evli çiftler
+        relocateSince: new Map(), // sakin id -> taşınmaya başladığı dakika
+        apartSince: new Map(), // "a-b" -> ayrı evlerde yaşamaya başladıkları dakika
+        minPop: Infinity,
+        homelessMax: 0,
+        weddingParties: 0,
       };
       const on = (name, key) => game.events.on(name, () => m.events[key]++);
       on('relationship:married', 'weddings');
@@ -54,6 +69,10 @@ export async function installMonitor(page) {
       on('expedition:departed', 'expeditions');
       on('expedition:returned', 'returned');
       on('expedition:taleTold', 'tales');
+      m.events.parties = 0;
+      on('social:partyStarted', 'parties');
+      m.events.homesFreed = 0;
+      on('social:homeFreed', 'homesFreed');
       game.events.on('adventure:resolved', ({ success }) => {
         m.events.adventures++;
         if (!success) m.events.mishaps++;
@@ -149,6 +168,41 @@ export async function installMonitor(page) {
           const residents = homeCount.get(b.id) ?? 0;
           if (b.capacity && residents > b.capacity) m.overfull.push(`G${s.time.day} ${b.type}#${b.id} ${residents}/${b.capacity}`);
         }
+        // ---- (19. aşama) Evlilik akışı: taşınma, ortak ev, kutlama, huylar, dedikodu ----
+        m.minPop = Math.min(m.minPop, s.characters.length);
+        m.homelessMax = Math.max(m.homelessMax, s.characters.filter((c) => c.homeId === null && !c.role).length);
+        const freeBed = s.buildings.some((b) => b.functional && b.capacity && (homeCount.get(b.id) ?? 0) <= b.capacity - 2);
+        for (const c of s.characters) {
+          if (!['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(c.quirk)) broke(`${c.name}: huyu yok (${c.quirk})`);
+          if (c.relocating && !c.away) {
+            if (!m.relocateSince.has(c.id)) m.relocateSince.set(c.id, now);
+            else if (now - m.relocateSince.get(c.id) > RELOCATE_HOURS * 60) {
+              m.socialStuck.push(`G${s.time.day} ${c.name}: ${RELOCATE_HOURS} saattir yeni evine taşınamıyor (${c.activityLabel})`);
+              m.relocateSince.set(c.id, now + 1e9); // bir kez raporla
+            }
+          } else m.relocateSince.delete(c.id);
+          const p = c.married ? byId.get(c.partnerId) : null;
+          if (!p || c.id > p.id) continue;
+          const key = `${c.id}-${p.id}`;
+          if (c.homeId !== p.homeId && freeBed) {
+            if (!m.apartSince.has(key)) m.apartSince.set(key, now);
+            else if (now - m.apartSince.get(key) > MAX_APART_HOURS * 60) {
+              m.socialStuck.push(`G${s.time.day} ${c.name} & ${p.name}: boş yatak varken ${MAX_APART_HOURS} saattir ayrı evlerde`);
+              m.apartSince.set(key, now + 1e9);
+            }
+          } else m.apartSince.delete(key);
+        }
+        const party = s.social?.party;
+        if (party) {
+          if (now > party.until + 60) broke(`düğün kutlaması bitiş vaktini aştı (${Math.round((now - party.until) / 60)} saat)`);
+          for (const id of [...party.coupleIds, ...party.guestIds]) if (!ids.has(id)) broke(`düğün kutlaması: kayıp sakin ${id}`);
+        }
+        for (const n of s.social?.gossip ?? []) {
+          if (n.heardBy.some((id) => !ids.has(id))) broke(`haber #${n.id}: kayıp sakin duymuş`);
+          if (new Set(n.heardBy).size !== n.heardBy.length) broke(`haber #${n.id}: aynı sakin iki kez duymuş`);
+        }
+        for (const c of s.characters) if (c.lastNews && typeof c.lastNews.text !== 'string') broke(`${c.name}: bozuk son haber`);
+
         // (16. aşama) Seferde kaybolan ya da takılan kafile
         const exp = s.dilemma.expedition;
         for (const c of s.characters) if (c.away && !exp?.members.includes(c.id)) broke(`${c.name}: seferde sanılıyor ama süren sefer yok`);
@@ -224,6 +278,24 @@ export async function installMonitor(page) {
           pairs: Object.keys(s.relationships).length,
           quarrels: s.stats.quarrels ?? 0,
           reconciliations: s.stats.reconciliations ?? 0,
+          // (19. aşama) sosyal yaşam
+          social: {
+            stuck: m.socialStuck,
+            minPop: Number.isFinite(m.minPop) ? m.minPop : s.characters.length,
+            homelessMax: m.homelessMax,
+            couples: s.characters.filter((c) => c.married).length / 2,
+            couplesTogether: s.characters.filter((c) => c.married && s.characters.find((p) => p.id === c.partnerId)?.homeId === c.homeId).length / 2,
+            dates: s.stats.dates ?? 0,
+            parties: s.stats.weddingParties ?? 0,
+            dinners: s.stats.familyDinners ?? 0,
+            gossip: s.stats.gossipHeard ?? 0,
+            serenades: s.stats.serenades ?? 0,
+            cuddles: s.stats.petCuddles ?? 0,
+            books: s.stats.booksRead ?? 0,
+            homesFreed: s.stats.homesFreed ?? 0,
+            news: s.social?.gossip.length ?? 0,
+            quirks: Object.fromEntries(['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].map((q) => [q, s.characters.filter((c) => c.quirk === q).length])),
+          },
           events: m.events,
           welfare: Math.round(s.town.welfare ?? 0),
           tier: s.town.tier,
@@ -231,7 +303,7 @@ export async function installMonitor(page) {
       };
       window.__monitor = m;
     },
-    { STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS }
+    { STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }
   );
 }
 

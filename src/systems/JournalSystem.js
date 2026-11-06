@@ -10,6 +10,7 @@
 //   townHall:balanced (belediyenin erzak dengesi)
 //   11. aşama: pet:arrived, health:fellIll / recovered / cured, dilemma:resolved / recruited, storm:struck,
 //   expedition:departed / returned, civic:decreed, building:mended
+//   19. aşama: social:partyStarted (düğün kutlaması), social:homeFreed (boşalan ev), gossip:spread (yayılan haber)
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
@@ -102,6 +103,12 @@ export class JournalSystem {
         const swap = swapped ? `; ${swapped.name} onların eski evine geçti` : '';
         this.log(`${a.name} ile ${b.name} artık aynı evde (${home.name}) yaşıyor${swap}`, 'heart');
       }),
+      // (19. aşama) Sosyal yaşam: meydandaki düğün kutlaması, boşalan ev, kasabaya yayılan dedikodu
+      on('social:partyStarted', ({ party, guests }) =>
+        this.log(`Meydanda düğün kutlaması: ${party.names} için konfetiler havada uçuşuyor${guests.length ? ` (${guests.length} dostu el çırpıyor)` : ''}`, 'ring')
+      ),
+      on('social:homeFreed', ({ home, a, b }) => this.log(`${a.name} ile ${b.name} ortak evlerine taşındı; ${home.name} boşaldı ve yeni göçmenlere açık`, 'heart')),
+      on('gossip:spread', ({ news }) => this.log(`Kasabada dilden dile dolaşıyor: ${news.text}`, 'whisper')),
       on('family:madeRoom', ({ character, to }) => this.log(`${character.name}, ailenin büyümesi için başka bir eve (${to.name}) taşındı`, 'heart')),
       on('family:childBorn', ({ child, parents }) => this.log(`${parents[0].name} ve ${parents[1].name} ailesine küçük ${child.name} katıldı`, 'love')),
       on('family:grownUp', ({ character }) => this.log(`${character.name} büyüdü ve kasabanın genç bir sakini oldu`, 'star')),

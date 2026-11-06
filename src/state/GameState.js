@@ -87,6 +87,14 @@ export class GameState {
       rallies: 0, // çalınan toplanma zili
       quarrels: 0, // (15. aşama) atışma
       reconciliations: 0, // (15. aşama) barışan küs çiftler
+      dates: 0, // (19. aşama) randevular
+      weddingParties: 0, // meydanda kutlanan düğünler
+      familyDinners: 0, // evli çiftlerin evde birlikte yediği akşam yemekleri
+      gossipHeard: 0, // kulaktan kulağa aktarılan haberler
+      serenades: 0, // müzisyenlerin çaldığı akşamlar
+      petCuddles: 0, // hayvanseverlerin kedi / köpek okşaması
+      booksRead: 0, // kitap kurtlarının okuma molaları
+      homesFreed: 0, // evlenen çift taşınınca göçmenlere açılan evler
     };
     // Hayvanlar (AnimalSystem, 11. aşama): yaban hayatı (tavşan, geyik) ve kasaba kedileri / köpekleri.
     // animalMeta: wildlifeSeeded yaban hayatı yerleştirildi mi, lastPetDay son evcil hayvanın geldiği gün
@@ -128,6 +136,9 @@ export class GameState {
     // (18. aşama) Serbest imar ve kasaba estetiği (LandscapeSystem): yıkım fırçasının küsuratlı iade birikimi,
     // kasabanın toplam estetik puanı ve refaha eklediği yüzde (+%0-5), sokak yürüyüşü ve gece sayaçları
     this.landscape = emptyLandscape();
+    // (19. aşama) Sosyal yaşam (SocialSystem): süren düğün kutlaması { venueId, coupleIds, guestIds, names, until } ve
+    // kasaba dedikodusu (dolaşan haberler: { id, kind, text, story, icon, day, hour, heardBy, spread })
+    this.social = emptySocial();
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -192,6 +203,7 @@ export class GameState {
       masterworks: this.masterworks,
       exploration: this.exploration,
       landscape: this.landscape,
+      social: this.social,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -279,6 +291,8 @@ export class GameState {
     next.exploration = restoreExploration(data.exploration);
     // 18. aşamadan eski kayıtlarda peyzaj durumu yoktur: estetik ilk adımda yapılardan ve zeminden yeniden hesaplanır
     next.landscape = restoreLandscape(data.landscape);
+    // 19. aşamadan eski kayıtlarda sosyal durum yoktur: dedikodu boş başlar, huylar ilk açılışta dağıtılır (SocialSystem)
+    next.social = restoreSocial(data.social);
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
@@ -304,6 +318,38 @@ export class GameState {
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
+}
+
+function emptySocial() {
+  return { party: null, gossip: [], nextNewsId: 1, reconcileNewsDay: null };
+}
+
+/** Kayıttaki sosyal durum: bozuk haberler atlanır, kutlama yalnızca geçerliyse sürer. */
+function restoreSocial(data) {
+  const out = emptySocial();
+  if (!data || typeof data !== 'object') return out;
+  const p = data.party;
+  if (p && Number.isFinite(p.until) && Array.isArray(p.coupleIds) && p.coupleIds.length === 2) {
+    const ids = (list) => (Array.isArray(list) ? list.filter(Number.isFinite) : []);
+    out.party = {
+      venueId: p.venueId ?? null,
+      x: Number(p.x) || 0,
+      y: Number(p.y) || 0,
+      coupleIds: [...p.coupleIds],
+      guestIds: ids(p.guestIds),
+      attended: ids(p.attended),
+      names: String(p.names ?? ''),
+      startedAt: Number.isFinite(p.startedAt) ? p.startedAt : p.until,
+      until: p.until,
+    };
+  }
+  out.gossip = (Array.isArray(data.gossip) ? data.gossip : [])
+    .filter((n) => n && Number.isFinite(n.id) && typeof n.text === 'string' && typeof n.story === 'string')
+    .map((n) => ({ ...n, heardBy: Array.isArray(n.heardBy) ? n.heardBy.filter(Number.isFinite) : [], selfStories: { ...(n.selfStories ?? {}) }, spread: Boolean(n.spread) }));
+  const maxId = out.gossip.reduce((m, n) => Math.max(m, n.id), 0);
+  out.nextNewsId = Math.max(maxId + 1, Number(data.nextNewsId) || 1);
+  out.reconcileNewsDay = Number.isFinite(data.reconcileNewsDay) ? data.reconcileNewsDay : null;
+  return out;
 }
 
 function emptyLandscape() {

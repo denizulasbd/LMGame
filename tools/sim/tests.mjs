@@ -18,6 +18,11 @@
 //              yağmurda çamur, A*'ın yolları öncelikli kullanması, yıkım fırçası (%50 iade, küsurat), ahşap çit ve kapı
 //              bağlantıları, mahalle tabelası, çevre estetiği (keyif, anı, refah çarpanı), karanlık ve fener, park bankı,
 //              süs ağaçlarının büyümesi ve gölgesi, kayıt sürümü 15
+//   19. aşama: Türkçe ad ekleri, karakter huyları (dağıtım, kalıtım, Hayvansever / Kitap Kurdu / Müzisyen / Doğa Tutkunu
+//              davranışları), flört ve randevu (çardak, han, yan yana iki bank; ilişki bonusu, ilk randevu anısı, bankta aşk),
+//              evlenen çiftin aynı kulübeye taşınması ve boşalan kulübenin göçmenlere açılması, meydanda düğün kutlaması ve
+//              konfeti, evli çiftin akşam yemeği, dedikodu (haber oluşturma, sohbette ve selamlaşırken aktarma, Yaşam Günlüğü
+//              notu, yayılma, eskime), Karakter Detay Kartı'nın Sosyal Hayat bölümü, kayıt sürümü 16
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
 import { openGame, createChecks } from './lib.mjs';
@@ -1174,7 +1179,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:toggleStats');
     check("Kasaba Arşivi'nin vitrininde eser listelenir ve Sergile düğmesi çalışır", rowEl && fresh.status === 'exhibited');
     window.__mw15 = { count: mw.items.length, made: mw.made, exhibited: MW.exhibitedMasterworks(s).length, makerId: rc.id };
-    rc.skills = { ...skills0, mining: Math.max(2000, ...Object.values(skills0), 0) + 1 }; // ana mesleği madencilik
+    rc.skills = { ...skills0, mining: Math.max(2000, ...Object.values(skills0), 0) + 600 }; // ana mesleği madencilik (sonraki testler saatlerce çalıştırır: pay bırakılır)
     sc().craftsmanship.refreshOutfit(rc);
   }
 
@@ -1635,7 +1640,394 @@ const pageResults = await page.evaluate(async () => {
     window.__l18 = { sign: { id: sign.id, label: sign.label }, tree: { id: tree.id, plantedAt: tree.plantedAt }, credit: { ...st.landscape.refundCredit }, roads: st.landscape.roadsPainted, gateId: gate.id, gate: { x: ax + 2, y: fy } };
   }
 
-  // --- Kayıt gidiş-dönüşü (sürüm 15) ---
+  // ===== 19. aşama: sosyal yaşam, aile kurma, huylar ve dedikodu =====
+  {
+    const S = game.scenes.current;
+    const st = game.state;
+    const W = S.world;
+    const map = W.map;
+    const SO = await import('/src/data/social.js');
+    const TR = await import('/src/utils/turkish.js');
+    const RS = await import('/src/systems/RelationshipSystem.js');
+    const { ACTIVITIES: ACT } = await import('/src/data/activities.js');
+    const { MEAL_FOOD_COST: MEAL } = await import('/src/data/resources.js');
+    const { TILE_TYPES } = await import('/src/data/tiles.js');
+    const { WeddingConfetti } = await import('/src/rendering/WeddingConfetti.js');
+    const brain = S.behavior.brain;
+    const social = S.social;
+    sim.give({ wood: 400, stone: 400, food: 300, iron: 80, wool: 60, bread: 60 });
+    const clearRect = (w, h, from = 4) => {
+      const p = W.landmarks.plaza;
+      for (let r = from; r < 38; r++) {
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+            const x0 = p.centerX + dx;
+            const y0 = p.centerY + dy;
+            let ok = true;
+            for (let y = y0 - 1; y <= y0 + h && ok; y++) for (let x = x0 - 1; x <= x0 + w && ok; x++) if (!map.inBounds(x, y) || !TILE_TYPES[map.get(x, y)].ground || map.getOccupant(x, y)) ok = false;
+            if (!ok) continue;
+            for (let y = y0 - 1; y <= y0 + h; y++) for (let x = x0 - 1; x <= x0 + w; x++) map.setObject(x, y, null);
+            W.refreshStaticData();
+            if (W.isReachable(x0, y0)) return { x: x0, y: y0 };
+          }
+        }
+      }
+      return null;
+    };
+    const placeAt = (type, x, y) => {
+      const r = S.construction.placeSite(type, x, y, { quiet: true });
+      if (!r.ok) return null;
+      const job = S.jobs.jobs.find((j) => j.buildingId === r.building.id);
+      if (job) S.jobs.cancel(job);
+      S.construction.complete(r.building);
+      return r.building;
+    };
+    // Rastgeleliği sabitle (yalnızca bu adımlar için)
+    const forced = (rng, value, fn) => {
+      const keep = rng.next;
+      rng.next = () => value;
+      try {
+        return fn();
+      } finally {
+        rng.next = keep;
+      }
+    };
+    const free = (c, x, y) => {
+      S.behavior.endTask(c);
+      if (c.insideBuildingId) W.getBuilding(c.insideBuildingId)?.occupants.delete(c.id);
+      c.insideBuildingId = null;
+      c.visible = true;
+      c.pose = 'stand';
+      c.newcomer = false;
+      c.relocating = false;
+      c.illness = null;
+      if (x !== undefined) {
+        c.x = x * 16 + 8;
+        c.y = y * 16 + 12;
+      }
+    };
+    const events = [];
+    const offs = ['pet:purred', 'social:partyStarted', 'social:homeFreed', 'gossip:shared', 'gossip:spread', 'social:familyDinner', 'social:date'].map((n) => game.events.on(n, (p) => events.push(n)));
+
+    // --- Türkçe ekler ---
+    check('Türkçe ekler: Emre\'nin, Ozan\'ın, Duru\'nun, Kemal\'in, Gül\'ün', TR.genitive('Emre') === "Emre'nin" && TR.genitive('Ozan') === "Ozan'ın" && TR.genitive('Duru') === "Duru'nun" && TR.genitive('Kemal') === "Kemal'in" && TR.genitive('Gül') === "Gül'ün");
+    check("Türkçe ekler: Leyla'dan, Mert'ten, Deniz'den, Ayşe'den, Ozan'dan", TR.ablative('Leyla') === "Leyla'dan" && TR.ablative('Mert') === "Mert'ten" && TR.ablative('Deniz') === "Deniz'den" && TR.ablative('Ayşe') === "Ayşe'den" && TR.ablative('Ozan') === "Ozan'dan");
+
+    // --- Huylar ---
+    check('her sakinin geçerli bir huyu var', st.characters.every((c) => SO.QUIRK_KEYS.includes(c.quirk)), st.characters.filter((c) => !SO.QUIRKS[c.quirk]).map((c) => c.name).join(','));
+    const counts = Object.fromEntries(SO.QUIRK_KEYS.map((k) => [k, st.characters.filter((c) => c.quirk === k).length]));
+    check('dört huyun dördü de kasabada görülür', SO.QUIRK_KEYS.every((k) => counts[k] > 0), JSON.stringify(counts));
+    const least = social.leastCommonQuirk(null);
+    check('göçmen kasabada en az görülen huyu alır', counts[least] === Math.min(...Object.values(counts)), `${least} ${JSON.stringify(counts)}`);
+    const adults = st.characters.filter((c) => !c.isChild && !c.away && !c.role);
+    const kid = { quirk: null };
+    forced(social.rng, 0.1, () => social.inheritQuirk(kid, [adults[0], adults[1]]));
+    check('çocuk çoğunlukla bir ebeveyninin huyunu alır', kid.quirk === adults[0].quirk || kid.quirk === adults[1].quirk, kid.quirk);
+    const musician = adults.find((c) => c.quirk === 'musician') ?? adults[0];
+    const mw = {};
+    brain.addQuirkLeisure({ ...musician, quirk: 'musician' }, 11, mw);
+    const ew = {};
+    brain.addQuirkLeisure({ ...musician, quirk: 'musician' }, 19, ew);
+    check('Müzisyen gündüz çalmaz, akşam (17:00 sonrası) çalmak ister', mw.music === 0 && ew.music > 0, `${mw.music} / ${ew.music}`);
+
+    // Hayvansever: kediye yürür, kedi bekler, varınca okşar (+10 keyif, mırlama)
+    const pet = st.animals.find((a) => a.isPet);
+    const lover = adults.find((c) => c !== musician);
+    if (pet) {
+      pet.visible = true;
+      pet.mode = 'idle';
+      pet.timer = 5;
+      const tile = { x: Math.floor(pet.x / 16), y: Math.floor(pet.y / 16) };
+      free(lover, tile.x, tile.y + 1);
+      lover.quirk = 'animalLover';
+      const petPlan = brain.planPetAnimal(lover, 8);
+      check('Hayvansever yakındaki kediye / köpeğe yürümeyi planlar', petPlan?.activity === 'petAnimal' && petPlan.petId === pet.id && petPlan.petName.includes(TR.genitive(pet.name)), JSON.stringify(petPlan));
+      lover.task = { ...petPlan, phase: 'travel', elapsed: 0 };
+      social.update({ gameMinutes: 1, hour: 11 });
+      check('yürürken hayvan onu bekler (heldUntil)', pet.heldBy === lover.id && pet.heldUntil > st.totalMinutes);
+      const px = pet.x;
+      const py = pet.y;
+      for (let i = 0; i < 20; i++) S.animals.updatePet(pet, 0.5, 11, 'summer', false);
+      check('bekleyen hayvan yerinden kıpırdamaz', pet.x === px && pet.y === py && pet.pose === 'sit');
+      lover.x = pet.x + 6;
+      lover.y = pet.y;
+      lover.task.phase = 'perform';
+      lover.needs.fun = 40;
+      const cuddles = st.stats.petCuddles ?? 0;
+      social.update({ gameMinutes: 1, hour: 11 });
+      check('varınca başını okşar: keyif +10, kalp ve mırlama', lover.needs.fun >= 50 && st.stats.petCuddles === cuddles + 1 && events.includes('pet:purred') && !pet.heldUntil, lover.needs.fun.toFixed(1));
+      check('durum metni hayvanın adıyla', S.behavior.performLabel(lover, lover.task, ACT.petAnimal).includes(`${TR.genitive(pet.name)} başını okşuyor`), S.behavior.performLabel(lover, lover.task, ACT.petAnimal));
+      free(lover);
+    } else check('kasabada sevilecek bir kedi / köpek var', false);
+
+    // Kitap Kurdu: fener altındaki bank ve Bilgelik Evi
+    const area = clearRect(6, 3);
+    const lantern = placeAt('lantern', area.x, area.y);
+    const benchA = placeAt('bench', area.x + 1, area.y + 1);
+    const benchB = placeAt('bench', area.x + 3, area.y + 1);
+    const reader = adults.find((c) => c !== lover && c !== musician);
+    free(reader, area.x + 2, area.y + 2);
+    const readPlan = brain.resolveLeisure(reader, 'readBench', 11);
+    check('Kitap Kurdu fener altındaki banka oturup kitap okumayı planlar', lantern && readPlan?.activity === 'readBench' && [benchA.id, benchB.id].includes(readPlan.buildingId), JSON.stringify(readPlan));
+    const libPlan = brain.resolveLeisure(reader, 'readLibrary', 11);
+    check("Kitap Kurdu Bilgelik Evi'nde kitap okumayı planlar", libPlan?.activity === 'readLibrary' && W.getBuilding(libPlan.buildingId)?.type === 'academy' && ACT.readLibrary.indoor);
+
+    // Müzisyen: akşam handa / meydanda çalar, en çok 4 dinleyicinin keyfi dolar
+    const fountain = W.getCompleted('fountain')[0];
+    free(musician);
+    const musicPlan = brain.planMusic(musician, 19, 50);
+    check('Müzisyen akşam handa ya da meydan havuzunda çalmayı planlar', musicPlan?.activity === 'music' && ['inn', 'fountain'].includes(W.getBuilding(musicPlan.buildingId)?.type) && ['Handa', 'Meydanda'].includes(musicPlan.placeAt) && brain.planMusic(musician, 10, 50) === null);
+    const stage = clearRect(8, 3, 12);
+    musician.x = stage.x * 16 + 8;
+    musician.y = stage.y * 16 + 12;
+    musician.task = { activity: 'music', phase: 'perform', buildingId: fountain.id, placeAt: 'Meydanda', elapsed: 0, duration: 60 };
+    const crowd = adults.filter((c) => c !== musician && c !== lover && c !== reader).slice(0, 5);
+    crowd.forEach((c, i) => {
+      free(c);
+      c.x = musician.x + (i + 1) * 7;
+      c.y = musician.y;
+      c.needs.fun = 30;
+    });
+    const serenades = st.stats.serenades ?? 0;
+    social.update({ gameMinutes: 10, hour: 19 });
+    const raised = crowd.filter((c) => c.needs.fun > 34).length;
+    check('çalan müzisyenin çevresindeki en yakın 4 dinleyicinin keyfi hızla dolar (5.si uzakta)', raised === 4 && crowd[4].needs.fun === 30 && musician.task.listeners === 4 && st.stats.serenades === serenades + 1, `${raised} ${crowd.map((c) => c.needs.fun.toFixed(1))}`);
+    check('durum metni: "Meydanda melodiler çalıyor"', S.behavior.performLabel(musician, musician.task, ACT.music) === 'Meydanda melodiler çalıyor');
+    free(musician);
+
+    // Doğa Tutkunu: genç süs ağacının gölgesinde ya da nehir kenarında manzara
+    const treeArea = clearRect(3, 3, 6);
+    const young = placeAt('oakTree', treeArea.x + 1, treeArea.y + 1);
+    young.plantedAt = st.totalMinutes - 25 * 60;
+    sim.step(1);
+    const fan = crowd[0];
+    free(fan, treeArea.x + 1, treeArea.y + 3);
+    let viewPlan = null;
+    for (let i = 0; i < 12 && viewPlan?.view !== 'tree'; i++) viewPlan = brain.planViewpoint(fan, 40);
+    check('Doğa Tutkunu genç süs ağacının gölgesinde manzarayı izler', young.growthStage === 1 && viewPlan?.activity === 'viewpoint' && viewPlan.view === 'tree', JSON.stringify(viewPlan));
+    check('durum metni: "Süs ağacının gölgesinde manzarayı izliyor"', S.behavior.performLabel(fan, viewPlan, ACT.viewpoint) === 'Süs ağacının gölgesinde manzarayı izliyor');
+
+    // --- Flört ve randevu ---
+    const singles = adults.filter((c) => c.partnerId === null);
+    let pair = null;
+    for (let i = 0; i < singles.length && !pair; i++) for (let j = i + 1; j < singles.length && !pair; j++) if (RS.canRomance(singles[i], singles[j])) pair = [singles[i], singles[j]];
+    check('randevu için iki bekâr yetişkin bulundu', pair, singles.map((c) => `${c.name}${c.age}`).join(','));
+    const [A, B] = pair;
+    const others = st.characters.filter((c) => c !== A && c !== B);
+    for (const o of others) {
+      for (const c of [A, B]) if (RS.getFriendship(st, c, o) >= SO.DATING.crushScore && RS.canRomance(c, o)) S.relationships.set(c, o, 10); // hoşlandıkları tek kişi birbirleri olsun
+    }
+    S.relationships.set(A, B, 45);
+    free(A, area.x + 2, area.y + 2);
+    free(B, area.x + 4, area.y + 2);
+    A.lastDateAt = null;
+    B.lastDateAt = null;
+    const datePlan = forced(brain.rng, 0.01, () => brain.planDate(A, 18.5));
+    check('ilişkisi yüksek (Dost) bekâr, hoşlandığı kişiyi randevuya çağırır', datePlan && datePlan.dateWithId === B.id && datePlan.inviteId === B.id, JSON.stringify(datePlan));
+    check('randevu yeri çardak, han ya da yan yana iki bank', ['gazebo', 'inn', 'bench'].includes(datePlan.activity));
+    const loner = { ...A, id: -999, homeId: null, partnerId: null, lastDateAt: null, parentIds: [] };
+    check('hoşlandığı (Dost seviyesinde) kimse olmayan bekâr randevu istemez', forced(brain.rng, 0.01, () => brain.planDate(loner, 18.5)) === null);
+    // Yan yana iki bankta randevu
+    const benchPair = brain.benchPair(A);
+    check('yan yana iki boş bank bulunur', benchPair && benchPair.map((b) => b.id).sort().join() === [benchA.id, benchB.id].sort().join(), JSON.stringify(benchPair?.map((b) => b.id)));
+    const benchDate = { ...brain.benchPlan(benchPair[0], 'bench', 40), dateBenchId: benchPair[1].id, inviteId: B.id, dateWithId: B.id };
+    S.behavior.startPlan(A, benchDate, 18.5);
+    check('davet edilen yandaki banka oturmaya gelir (randevu)', B.task?.dateWithId === A.id && B.task.buildingId === benchPair[1].id && B.task.meetWithId === A.id && A.lastDateAt === st.totalMinutes, JSON.stringify(B.task && { a: B.task.activity, b: B.task.buildingId }));
+    check('durum metni: "… ile randevuya gidiyor"', A.activityLabel.includes(`${B.name} ile randevuya gidiyor`), A.activityLabel);
+    // Bankta yan yana: fazladan ilişki puanı, keyif, ilk randevu anısı
+    for (const [c, b] of [[A, benchPair[0]], [B, benchPair[1]]]) {
+      c.clearPath();
+      c.x = b.seatPoint.x;
+      c.y = b.seatPoint.y;
+      c.task.phase = 'perform';
+      c.pose = 'sit';
+    }
+    const before = RS.getFriendship(st, A, B);
+    const dates = st.stats.dates ?? 0;
+    social.update({ gameMinutes: 10, hour: 12 });
+    check('randevudaki çiftin ilişki puanı fazladan artar', RS.getFriendship(st, A, B) >= before + SO.DATING.bonusRate * 10 * 0.5 - 1e-6 && st.stats.dates === dates + 1, `${before.toFixed(2)} -> ${RS.getFriendship(st, A, B).toFixed(2)}`);
+    check('ilk randevu Yaşam Günlüğü\'ne yazılır', A.memories.some((m) => m.kind === 'date' && m.text.includes(B.name)) && B.memories.some((m) => m.kind === 'date' && m.text.includes(A.name)));
+    check('durum metni: "… ile bankta yan yana oturuyor"', A.activityLabel === `${B.name} ile bankta yan yana oturuyor`, A.activityLabel);
+    // Bankta yan yana oturan çift aşık olabilir
+    S.relationships.set(A, B, 90);
+    forced(S.relationships.rng, 0, () => social.update({ gameMinutes: 1, hour: 12 }));
+    check('bankta yan yana oturan çift aşık olur (sevgili)', RS.arePartners(A, B) && !A.married);
+    const loverPlan = forced(brain.rng, 0.01, () => {
+      A.lastDateAt = null;
+      B.lastDateAt = null;
+      free(A, area.x + 2, area.y + 2);
+      free(B, area.x + 4, area.y + 2);
+      return brain.planDate(A, 19);
+    });
+    check('sevgililer de birbirlerini randevuya çağırır', loverPlan?.dateWithId === B.id);
+    free(A, area.x + 2, area.y + 2);
+    free(B, area.x + 4, area.y + 2);
+
+    // --- Ortak ev: evlenen çift aynı kulübeye taşınır, boşalan kulübe göçmenlere açılır ---
+    const homeArea = clearRect(6, 3, 8);
+    const cabin1 = placeAt('cabin', homeArea.x, homeArea.y);
+    const cabin2 = placeAt('cabin', homeArea.x + 3, homeArea.y);
+    check('kulübe kapasitesi 2', cabin1?.capacity === 2 && cabin2?.capacity === 2);
+    A.homeId = cabin1.id;
+    B.homeId = cabin2.id;
+    const freedBefore = st.stats.homesFreed ?? 0;
+    const partiesBefore = st.stats.weddingParties ?? 0;
+    // Dostlar düğüne davetli olsun
+    const guests = others.filter((o) => !o.isChild && !o.away && o.visible).slice(0, 8);
+    for (const g of guests) S.relationships.set(A, g, Math.max(RS.getFriendship(st, A, g), 30));
+    S.relationships.marry(A, B, fountain, false);
+    const home = W.getBuilding(A.homeId);
+    check('evlenen çift aynı eve taşınır (birinin kulübesinde yer varsa oraya)', A.married && B.married && A.homeId === B.homeId && (A.relocating || B.relocating) && (home === cabin1 || home === cabin2 || home.upgraded), `${A.homeId} ${B.homeId}`);
+    const vacated = [cabin1, cabin2].filter((h) => h !== home);
+    check('boşalan kulübe göçmenlere açılır (günlük ve sayaç)', vacated.every((h) => W.getResidents(h).length === 0) && st.stats.homesFreed === freedBefore + vacated.length && events.includes('social:homeFreed') && st.journal.slice(-6).some((j) => j.text.includes('yeni göçmenlere açık')));
+    const eligible = (h) => W.getResidents(h).length < h.capacity && !W.getResidents(h).some((c) => c.married);
+    check('göç sistemi boşalan kulübeyi yeni sakinlere ayırabilir; çiftin evine göçmen yerleşmez', vacated.every(eligible) && !eligible(home) && S.population.findHome() !== null);
+    // --- Düğün kutlaması ---
+    const party = st.social.party;
+    check('meydanda düğün kutlaması başlar (çift ve en çok 6 dost davetli)', party && party.coupleIds.includes(A.id) && party.coupleIds.includes(B.id) && party.guestIds.length > 0 && party.guestIds.length <= SO.WEDDING_PARTY.guests && st.stats.weddingParties === partiesBefore + 1, JSON.stringify(party && { g: party.guestIds.length }));
+    check('davetliler çiftin dostları (puan en az 25)', party.guestIds.every((id) => Math.max(RS.getFriendship(st, A, W.getCharacter(id)), RS.getFriendship(st, B, W.getCharacter(id))) >= SO.WEDDING_PARTY.guestScore));
+    check('düğün kutlaması günlüğe yazılır', st.journal.slice(-8).some((j) => j.text.startsWith('Meydanda düğün kutlaması') && j.text.includes(A.name)));
+    A.needs.energy = 80;
+    A.relocating = true;
+    S.behavior.endTask(A);
+    const partyPlan = brain.decide(A, 19);
+    check('çift yeni evine taşınmadan önce meydandaki kutlamaya koşar', partyPlan.activity === 'weddingParty' && partyPlan.buildingId === fountain.id, JSON.stringify({ a: partyPlan.activity }));
+    check('düğün haberi dedikoduya düşer (çift ve davetliler bilir)', st.social.gossip.some((n) => n.kind === 'wedding' && n.heardBy.includes(A.id) && n.heardBy.includes(party.guestIds[0])));
+    // Konfeti çizilir
+    let pixels = 0;
+    new WeddingConfetti().draw({ fillRect: () => pixels++ }, party, 0.5);
+    check('konfeti yağar (çizim)', pixels > 40, pixels);
+    game.render(0);
+    const guestId = party.guestIds[0];
+    party.attended.push(guestId);
+    sim.step(30);
+    party.until = st.totalMinutes; // kutlama 45 dakika sürer: sonuna atla
+    social.update({ gameMinutes: 1, hour: 19 });
+    const partyDetail = JSON.stringify({ p: st.social.party, g: W.getCharacter(guestId).memories.slice(-3).map((m) => m.text) });
+    check('kutlama biter, katılanların anısına "düğününde konfeti attı" yazılır', st.social.party === null && W.getCharacter(guestId).memories.some((m) => m.text === `${A.name} ile ${TR.genitive(B.name)} düğününde konfeti attı`) && A.memories.some((m) => m.text.includes('düğünlerini kutladı')), partyDetail);
+    check('ev kapasiteleri aşılmaz', st.buildings.filter((b) => b.capacity).every((b) => W.getResidents(b).length <= b.capacity));
+
+    // --- Evli çiftin akşam yemeği ---
+    for (const c of [A, B]) {
+      free(c, home.tileX, home.tileY + 2);
+      c.homeId = home.id;
+      c.dinnerDay = null;
+      c.needs.hunger = 55;
+    }
+    const day = st.time.day;
+    check('akşam yemeği yalnızca 18:00-20:30 arası', brain.planHomeDinner(A, 12) === null && brain.planHomeDinner(A, 21) === null);
+    const dinner = brain.planHomeDinner(A, 18.5);
+    check('acıkan eş, eşini evde birlikte yemeğe çağırır', dinner?.activity === 'homeDinner' && dinner.buildingId === home.id && dinner.dinnerWithId === B.id, JSON.stringify(dinner));
+    S.behavior.startPlan(A, dinner, 18.5);
+    check('eşi de sofraya gelir (günde bir kez)', B.task?.activity === 'homeDinner' && B.task.dinnerWithId === A.id && A.dinnerDay === day && B.dinnerDay === day && brain.planHomeDinner(A, 19) === null);
+    const food = st.resources.food + st.resources.bread * 2.5 + st.pantry.credit;
+    for (const c of [A, B]) {
+      c.clearPath();
+      c.task.phase = 'perform';
+      S.behavior.enterIndoor(c, c.task, home);
+    }
+    const foodAfter = st.resources.food + st.resources.bread * 2.5 + st.pantry.credit;
+    check('evde yenen akşam yemeği stoktan ödenir (kişi başı bir öğün)', Math.abs(food - foodAfter - MEAL * 2) < 1e-6 && A.insideBuildingId === home.id && B.insideBuildingId === home.id, `${food} -> ${foodAfter}`);
+    A.needs.fun = 40;
+    A.needs.social = 40;
+    const dinners = st.stats.familyDinners ?? 0;
+    social.update({ gameMinutes: 10, hour: 18.6 });
+    check('birlikte yerken birbirlerinin keyfini ve sosyalliğini doldururlar', A.needs.fun >= 43 && A.needs.social >= 48 && A.buffs.cozyNight && B.buffs.cozyNight && st.stats.familyDinners === dinners + 1, `${A.needs.fun.toFixed(1)} ${A.needs.social.toFixed(1)}`);
+    check('durum metni: "Eşi … ile evde akşam yemeği yiyor" ve ilk yemek anısı', A.activityLabel === `Eşi ${B.name} ile evde akşam yemeği yiyor` && A.memories.some((m) => m.kind === 'home'), A.activityLabel);
+    for (const c of [A, B]) {
+      S.behavior.endTask(c);
+      free(c, home.tileX, home.tileY + 2);
+    }
+
+    // --- Dedikodu ---
+    const M = adults.find((c) => c !== A && c !== B && !c.away);
+    const L = adults.find((c) => c !== A && c !== B && c !== M && !c.away);
+    const piece = { name: 'İşlemeli Yadigâr Sandık', icon: 'mwChest' };
+    game.events.emit('masterwork:created', { item: {}, piece, character: M, building: null });
+    const mwNews = st.social.gossip[st.social.gossip.length - 1];
+    check('usta işi eser bir haber olur; ustası bilir', mwNews.kind === 'masterwork' && mwNews.heardBy.length === 1 && mwNews.heardBy[0] === M.id && mwNews.story === `${TR.genitive(M.name)} ustalıkla yaptığı ${piece.name} eserini`, mwNews.story);
+    const heard = st.stats.gossipHeard ?? 0;
+    const newsCount = (c) => c.memories.filter((m) => m.kind === 'gossip' && m.text.includes(piece.name)).length;
+    const shared = social.share(M, L);
+    check('sohbette haber aktarılır; dinleyenin son duyduğu haber olur', shared && L.lastNews?.id === mwNews.id && L.lastNews.from === M.name && mwNews.heardBy.includes(L.id) && st.stats.gossipHeard === heard + 1);
+    check('haberi ilk kez duyanın Yaşam Günlüğü\'ne not düşer (ustanın kendi ağzından)', L.memories.some((m) => m.kind === 'gossip' && m.text === `${TR.ablative(M.name)}, ustalıkla yaptığı ${piece.name} eserini kendi ağzından dinledi`), L.memories[L.memories.length - 1]?.text);
+    check('başlarında fısıltı / haber balonu', M.bubble?.icon === 'whisper' || !M.visible);
+    social.share(M, L);
+    check('aynı haber ikinci kez anlatılmaz', mwNews.heardBy.filter((id) => id === L.id).length === 1 && newsCount(L) === 1);
+    // Seferden dönüş haberi: "Leyla'dan, Emre'nin ... getirdiği kadim haritayı duydu"
+    const E = adults.find((c) => c !== M && c !== L && c !== A && c !== B);
+    game.events.emit('expedition:returned', { members: [E], route: 'Kayıp Tapınak', finds: ['cityMap'], loot: {}, memories: {}, text: 'Kadim bir harita buldular.' });
+    const exNews = st.social.gossip[st.social.gossip.length - 1];
+    check('seferden dönüş haberi: "…\'nin Kayıp Tapınak Seferi\'nden getirdiği kadim haritayı"', exNews.kind === 'expedition' && exNews.story === `${TR.genitive(E.name)} Kayıp Tapınak Seferi'nden getirdiği kadim haritayı`, exNews.story);
+    social.share(E, L);
+    check('haberi kahramanı anlatınca: "… getirdikleri kadim haritayı kendi ağzından dinledi"', L.memories.some((m) => m.text === `${TR.ablative(E.name)}, Kayıp Tapınak Seferi'nden getirdikleri kadim haritayı kendi ağzından dinledi`) && L.lastNews.id === exNews.id, L.memories.at(-1)?.text);
+    // Başkasından duyan: "Leyla'dan, Emre'nin Kayıp Tapınak Seferi'nden getirdiği kadim haritayı duydu"
+    const Z = adults.find((c) => ![A, B, M, L, E].includes(c) && !exNews.heardBy.includes(c.id) && c !== adults.find((x) => ![A, B, M, L, E].includes(x)));
+    if (Z) {
+      for (const n of st.social.gossip) if (n !== exNews && !n.heardBy.includes(Z.id)) n.heardBy.push(Z.id);
+      social.share(L, Z);
+      check('Yaşam Günlüğü: "X\'dan, Y\'nin … getirdiği kadim haritayı duydu"', Z.memories.some((m) => m.text === `${TR.ablative(L.name)}, ${TR.genitive(E.name)} Kayıp Tapınak Seferi'nden getirdiği kadim haritayı duydu`), Z.memories.at(-1)?.text);
+    } else check('başkasından duyacak bir sakin var', false);
+    // Sohbet grubunda kendiliğinden yayılır
+    const X = adults.find((c) => ![A, B, M, L, E].includes(c));
+    const keepGroups = S.relationships.groups;
+    S.relationships.groups = [{ kind: 'chat', members: [L, X] }];
+    forced(social.rng, 0, () => social.spreadGossip(1, st.totalMinutes));
+    S.relationships.groups = keepGroups;
+    check('aynı yerde sohbet edenler haberi birbirine aktarır', X.lastNews && exNews.heardBy.includes(X.id), X.lastNews?.text);
+    // Yolda karşılaşıp selamlaşma
+    const Y = adults.find((c) => ![A, B, M, L, E, X, Z].includes(c) && !exNews.heardBy.includes(c.id));
+    for (const [c, dx] of [[X, 0], [Y, 6]]) {
+      free(c, homeArea.x + 1, homeArea.y + 3);
+      c.x += dx;
+      c.task = { activity: 'stroll', phase: 'travel', elapsed: 0 };
+    }
+    S.relationships.groups = [];
+    social.greetCooldowns.clear();
+    forced(social.rng, 0, () => social.spreadGossip(1, st.totalMinutes));
+    check('yolda karşılaşıp selamlaşanlar haberi aktarır', exNews.heardBy.includes(Y.id) && Y.lastNews?.fromId === X.id, Y.lastNews?.text);
+    const heardNow = st.stats.gossipHeard;
+    forced(social.rng, 0, () => social.spreadGossip(1, st.totalMinutes));
+    check('aynı ikili bir süre yeniden selamlaşmaz', st.stats.gossipHeard === heardNow);
+    S.relationships.groups = keepGroups;
+    for (const c of [X, Y]) free(c);
+    // Barışma haberi günde bir kez
+    const recBefore = st.social.gossip.filter((n) => n.kind === 'reconcile').length;
+    st.social.reconcileNewsDay = null;
+    game.events.emit('relationship:reconciled', { a: M, b: L, place: 'inn' });
+    game.events.emit('relationship:reconciled', { a: E, b: X, place: 'chat' });
+    check('barışma haberi olur (günde bir)', st.social.gossip.filter((n) => n.kind === 'reconcile').length === recBefore + 1);
+    // Kasabanın çoğu duyunca günlüğe "dilden dile"
+    const everyone = st.characters.filter((c) => !c.role);
+    const needed = Math.ceil(everyone.length * SO.GOSSIP.spreadShare);
+    for (const c of everyone) if (mwNews.heardBy.length < needed - 1 && !mwNews.heardBy.includes(c.id)) mwNews.heardBy.push(c.id);
+    const lastOne = everyone.find((c) => !mwNews.heardBy.includes(c.id));
+    for (const n of st.social.gossip) if (n !== mwNews && !n.heardBy.includes(lastOne.id)) n.heardBy.push(lastOne.id); // yalnızca bu haberi duymamış olsun
+    social.share(M, lastOne);
+    check('haber kasabanın çoğuna yayılınca günlüğe "dilden dile" yazılır', mwNews.spread && st.journal.slice(-5).some((j) => j.text.startsWith('Kasabada dilden dile')), `${mwNews.heardBy.length}/${everyone.length}`);
+    // Eski haberler dolaşımdan düşer
+    mwNews.at -= 5 * 1440;
+    social.expireNews();
+    check('4 günden eski haber dolaşımdan düşer (sakinin son duyduğu kalır)', !st.social.gossip.includes(mwNews) && L.lastNews);
+
+    // --- Karakter Detay Kartı ---
+    game.events.emit('ui:selectCharacter', A.id);
+    game.render(0);
+    const card = document.querySelector('.character-panel .social-life')?.textContent ?? '';
+    const quirkName = SO.QUIRKS[A.quirk].name;
+    check('kartta Sosyal Hayat: huyu, eşi ve evi', card.includes(quirkName) && card.includes(B.name) && card.includes('Eşiyle') && card.includes('birlikte yaşıyor'), card);
+    check('kartta huy çipi kişilik etiketlerinin yanında', [...document.querySelectorAll('.character-panel .quirk-chip')].some((e) => e.textContent.includes(quirkName)));
+    game.events.emit('ui:selectCharacter', L.id);
+    game.render(0);
+    const card2 = document.querySelector('.character-panel .social-life')?.textContent ?? '';
+    check('kartta son duyduğu dedikodu (kimden, ne zaman)', card2.includes(L.lastNews.text) && card2.includes(`${L.lastNews.from} anlattı`), card2);
+    game.events.emit('ui:selectCharacter', null);
+    offs.forEach((off) => off());
+    window.__s19 = { a: A.id, b: B.id, home: home.id, quirks: Object.fromEntries(st.characters.map((c) => [c.id, c.quirk])), news: { id: L.id, text: L.lastNews.text, from: L.lastNews.from }, gossip: st.social.gossip.length, dinnerDay: A.dinnerDay, dates: st.stats.dates, dinners: st.stats.familyDinners };
+  }
+
+  // --- Kayıt gidiş-dönüşü (sürüm 16) ---
   const ill = s.characters.find((c) => !c.isChild);
   scene.health.fallIll(ill);
   hut.remedies = 4;
@@ -1647,7 +2039,17 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 15', raw.version === 15);
+  check('kayıt sürümü 16', raw.version === 16);
+  // (19. aşama) evlilik, ortak ev, huylar, dedikodu kaydı
+  {
+    const T = window.__s19;
+    const a2 = s2.characters.find((c) => c.id === T.a);
+    const b2 = s2.characters.find((c) => c.id === T.b);
+    check('kayıttan evli çift ve ortak evleri döner', a2?.married && b2?.married && a2.partnerId === T.b && a2.homeId === T.home && b2.homeId === T.home);
+    check('kayıttan karakter huyları döner', s2.characters.every((c) => T.quirks[c.id] === undefined || c.quirk === T.quirks[c.id]));
+    check('kayıttan son duyulan haber ve dolaşan dedikodular döner', s2.characters.find((c) => c.id === T.news.id)?.lastNews?.text === T.news.text && s2.social.gossip.length === T.gossip);
+    check('kayıttan akşam yemeği günü ve sosyal sayaçlar döner', a2.dinnerDay === T.dinnerDay && s2.stats.dates === T.dates && s2.stats.familyDinners === T.dinners);
+  }
   // (18. aşama) peyzaj kaydı
   {
     const L = window.__l18;

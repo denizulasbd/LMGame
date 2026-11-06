@@ -4,6 +4,7 @@
 //
 // 9. aşama: aile bağları (partnerId, married, parentIds), çocukluk (growsUpAt: büyüyeceği oyun
 // dakikası; null = yetişkin) ve kişisel ekipman (equipment: { tool, clothing, bag } -> data/equipment.js).
+// 19. aşama: karakter huyu (quirk), son duyduğu dedikodu (lastNews), eşiyle akşam yemeği günü ve randevu zamanı.
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { NEED_KEYS } from '../data/characters.js';
@@ -76,6 +77,10 @@ export class Character extends Entity {
     customName = false,
     memories = [],
     tale = null,
+    quirk = null,
+    lastNews = null,
+    dinnerDay = null,
+    lastDateAt = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -111,6 +116,12 @@ export class Character extends Entity {
     this.memories = (memories ?? []).filter((m) => m && typeof m.text === 'string').map((m) => ({ ...m }));
     // 16. aşama: seferden dönen maceracının anlatacağı hikâye { until, told, progress, route } (kayda girer)
     this.tale = tale && Number.isFinite(tale.until) ? { told: 0, progress: 0, route: 'Keşif', ...tale } : null;
+    // 19. aşama: karakter huyu (data/social.js -> QUIRKS; SocialSystem dağıtır), son duyduğu haber
+    // { id, text, story, from, fromId, day, hour }, eşiyle son akşam yemeği yediği gün ve son randevu isteği (kayda girer)
+    this.quirk = typeof quirk === 'string' ? quirk : null;
+    this.lastNews = lastNews && typeof lastNews.text === 'string' ? { ...lastNews } : null;
+    this.dinnerDay = Number.isFinite(dinnerDay) ? dinnerDay : null;
+    this.lastDateAt = Number.isFinite(lastDateAt) ? lastDateAt : null;
     this.recall = null;
     this.flowerCrown = false;
     this.profile = buildTraitProfile(traits, { child: this.isChild });
@@ -449,6 +460,10 @@ export class Character extends Entity {
       customName: this.customName,
       memories: this.memories,
       tale: this.tale,
+      quirk: this.quirk,
+      lastNews: this.lastNews,
+      dinnerDay: this.dinnerDay,
+      lastDateAt: this.lastDateAt,
     };
   }
 

@@ -10,13 +10,16 @@
 //   save-v12.json: 14. aşamanın oyunu (kayıt sürümü 12): otopilotla 34 gün; festivaller, anılar
 //   save-v13.json: 15. aşamanın oyunu (kayıt sürümü 13): otopilotla 34 gün; usta işi eserler, barışmalar
 //   save-v14.json: 16. aşamanın oyunu (kayıt sürümü 14): otopilotla 34 gün; seferler, ganimetler, çözülen yazıtlar
-//   save-v15.json: 18. aşamanın oyunu (kayıt sürümü 15, bugünkü): otopilotla 34 gün; döşenen yollar, tabelalar, süs ağaçları,
+//   save-v15.json: 18. aşamanın oyunu (kayıt sürümü 15): otopilotla 34 gün; döşenen yollar, tabelalar, süs ağaçları,
 //                  çitler, kasaba estetiği. Eski kayıtlarda (sürüm 2-14) peyzaj durumu boş başlar, estetik yüklenince hesaplanır
+//   save-v16.json: 19. aşamanın oyunu (kayıt sürümü 16, bugünkü): otopilotla 34 gün; evli çiftler ve ortak evleri, karakter
+//                  huyları, dolaşan dedikodular, son duyulan haberler. Eski kayıtlarda (sürüm 2-15) huylar ilk açılışta
+//                  dağıtılır (dördü de görülür), dedikodu boş başlar; evli çiftler kendi evlerinde kalır
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -74,6 +77,15 @@ for (const { name, raw } of fixtures) {
       return bad;
     };
     loaded.integrity = integrity();
+    // (19. aşama) huylar, ortak evler, dedikodu (yüklendiği an)
+    loaded.social = {
+      quirks: s.characters.map((c) => c.quirk),
+      kinds: [...new Set(s.characters.map((c) => c.quirk))].length,
+      couples: s.characters.filter((c) => c.married).map((c) => [c.id, c.partnerId, c.homeId]),
+      gossip: s.social.gossip.length,
+      news: s.characters.filter((c) => c.lastNews).length,
+      party: s.social.party !== null,
+    };
     window.sim.step(225 * 24); // bir gün
     game.render(0);
     offs.forEach((off) => off());
@@ -141,6 +153,27 @@ for (const { name, raw } of fixtures) {
       ok: JSON.stringify(L.signs) === JSON.stringify(signs) && JSON.stringify(L.trees) === JSON.stringify(trees) && L.fencesLinked && L.field && L.painted === data.landscape.roadsPainted && Math.abs(L.score - data.landscape.score) < 3,
       detail: `${L.signs.join(', ')} · ${L.trees.length} ağaç · estetik ${L.score}/${data.landscape.score} (+%${L.percent})`,
     });
+  }
+  {
+    // (19. aşama) karakter huyları, evli çiftlerin evleri, dedikodu
+    const S = r.loaded.social;
+    const valid = S.quirks.every((q) => ['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(q));
+    const homes = Object.fromEntries(data.characters.map((c) => [c.id, c.homeId]));
+    const homesKept = S.couples.every(([id, , home]) => homes[id] === undefined || homes[id] === home || homes[id] === null);
+    if (data.version < 16) {
+      results.push({
+        name: `${tag}: huylar ilk açılışta dağıtıldı, dedikodu boş başlar, evli çiftlerin evleri korunur`,
+        ok: valid && (S.quirks.length < 4 || S.kinds === 4) && S.gossip === 0 && S.news === 0 && !S.party && homesKept,
+        detail: `${S.kinds} huy, ${S.couples.length / 2} evli çift`,
+      });
+    } else {
+      const quirks = data.characters.map((c) => c.quirk);
+      results.push({
+        name: `${tag}: huylar, ortak evler, son duyulan haberler ve dedikodu korundu`,
+        ok: valid && JSON.stringify(S.quirks) === JSON.stringify(quirks) && homesKept && S.gossip === data.social.gossip.length && S.news === data.characters.filter((c) => c.lastNews).length,
+        detail: `${S.kinds} huy, ${S.couples.length / 2} evli çift, ${S.gossip} haber, ${S.news} sakin haber duymuş`,
+      });
+    }
   }
   results.push({ name: `${tag}: meslek kıyafetleri deneyimden giyildi`, ok: r.outfitsOk, detail: `${r.outfits} sakin kıyafetli` });
   results.push({ name: `${tag}: harita farkları birebir uygulandı`, ok: r.loaded.terrain === data.terrain.length, detail: `${r.loaded.terrain}/${data.terrain.length} karo` });

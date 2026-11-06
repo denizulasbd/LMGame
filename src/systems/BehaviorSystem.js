@@ -91,6 +91,14 @@ export class BehaviorSystem {
       }),
       // (14. aşama) Öncelikli hedef: boştaki en uygun işçiler hemen oraya koşar
       game.events.on('job:urgent', ({ job }) => this.sendToUrgentJob(job)),
+      // (19. aşama) Düğün kutlaması: çift ve davetliler elindeki (yarıda kesilebilen) işi bırakıp meydana koşar
+      game.events.on('social:partyStarted', ({ ids }) => {
+        for (const id of ids) {
+          const c = this.world.getCharacter(id);
+          const kind = c?.task ? ACTIVITIES[c.task.activity].kind : 'idle';
+          if (c && c.visible && !c.away && INTERRUPTIBLE_KINDS.has(kind)) this.endTask(c);
+        }
+      }),
       game.events.on('festival:started', () => {
         for (const c of this.world.characters) {
           const kind = c.task ? ACTIVITIES[c.task.activity].kind : 'idle';
@@ -168,6 +176,7 @@ export class BehaviorSystem {
     if (activity.indoor && c.insideBuildingId && c.insideBuildingId === plan.buildingId) {
       c.task = { ...plan, phase: 'perform', elapsed: 0 };
       this.enterIndoor(c, c.task, this.world.getBuilding(plan.buildingId));
+      if (c.task && plan.dinnerWithId !== undefined && !plan.invited) this.inviteToDinner(c, hour);
       return;
     }
 
@@ -223,7 +232,24 @@ export class BehaviorSystem {
     c.activityLabel = doorTile ? LEAVING_HOME_LABEL : this.travelLabel(c.task, activity);
 
     if (activity.urgentBubble && this.isUrgent(c, plan)) c.showBubble(activity.urgentBubble, 2.6);
+    if (plan.dateWithId !== undefined) c.lastDateAt = this.state.totalMinutes;
     if (plan.inviteId) this.invite(c, hour);
+    if (plan.dinnerWithId !== undefined && !plan.invited) this.inviteToDinner(c, hour);
+  }
+
+  /** (19. aşama) Evli sakin eşini evde birlikte akşam yemeğine çağırır (eş elindeki boş zaman işini bırakır). */
+  inviteToDinner(c, hour) {
+    const day = this.state.time.day;
+    c.dinnerDay = day;
+    const partner = this.world.getCharacter(c.task.dinnerWithId);
+    const home = this.world.getBuilding(c.task.buildingId);
+    if (!partner || !home || !this.brain.canJoinDinner(partner) || partner.dinnerDay === day) return;
+    const plan = this.brain.homeDinnerPlan(partner, home);
+    if (!plan) return;
+    partner.dinnerDay = day;
+    if (partner.task) this.endTask(partner);
+    this.startPlan(partner, { ...plan, dinnerWithId: c.id, invited: true }, hour);
+    if (c.visible) c.showBubble('heart', 2);
   }
 
   /** Evdeyse kapıda belirir; kapı önü karosunu döndürür. */
@@ -253,17 +279,28 @@ export class BehaviorSystem {
   /** Sohbet daveti: davet edilen yarım bıraktığı boş zaman işinden vazgeçip buluşmaya gelir. */
   invite(c, hour) {
     const partner = this.world.getCharacter(c.task.inviteId);
-    if (!partner || !this.brain.isAvailableForChat(partner, hour)) return;
+    const dating = c.task.dateWithId !== undefined;
+    if (!partner || !(dating ? this.brain.isAvailableForDate(partner, c, hour) : this.brain.isAvailableForChat(partner, hour))) return;
     const building = this.world.getBuilding(c.task.buildingId);
-    const partnerPlan = this.brain.planGathering(partner, building, c.task.spot);
+    // (19. aşama) Bank randevusu: davet edilen yandaki banka oturur
+    const benchMate = c.task.dateBenchId ? this.world.getBuilding(c.task.dateBenchId) : null;
+    const partnerPlan = benchMate
+      ? this.world.freeSpots(benchMate, partner.id).length > 0
+        ? this.brain.benchPlan(benchMate, c.task.activity, c.task.duration)
+        : null
+      : this.brain.planGathering(partner, building, c.task.spot);
     if (!partnerPlan) return;
 
     this.endTask(partner);
     partnerPlan.meetWithId = c.id;
+    if (dating) {
+      partnerPlan.dateWithId = c.id;
+      partnerPlan.duration = Math.max(partnerPlan.duration ?? 0, c.task.duration ?? 0);
+    }
     c.task.meetWithId = partner.id;
     c.activityLabel = this.travelLabel(c.task, ACTIVITIES[c.task.activity]);
     this.startPlan(partner, partnerPlan, hour);
-    c.showBubble('chat', 2);
+    c.showBubble(dating ? 'love' : 'chat', 2);
   }
 
   isUrgent(c, plan) {
@@ -275,9 +312,12 @@ export class BehaviorSystem {
   travelLabel(task, activity) {
     if (task.meetWithId) {
       const partner = this.world.getCharacter(task.meetWithId);
-      if (partner) return `${partner.name} ile buluşmaya gidiyor`;
+      if (partner) return `${partner.name} ile ${task.dateWithId !== undefined ? 'randevuya' : 'buluşmaya'} gidiyor`;
     }
     let label = activity.travelLabel ?? activity.label;
+    // (19. aşama) huyların etkinlikleri: hayvanın adı ve çalınan yer
+    if (task.petName) label = label.replace('{pet}', task.petName);
+    if (task.placeTo) label = label.replace('{place}', task.placeTo);
     if (task.activity === 'haul' && task.cargo) label = label.replace('{resource}', RESOURCES[task.cargo].name.toLowerCase());
     if (task.item) label = label.replace('{item}', EQUIPMENT[task.item].name);
     return task.onBreak ? `${BREAK_PREFIX}${label}` : label;
@@ -295,6 +335,11 @@ export class BehaviorSystem {
     if (task.activity === 'teach' && !this.state.research?.active) label = activity.teachLabel;
     if (task.item) label = label.replace('{item}', EQUIPMENT[task.item].name);
     if (building) label = label.replace('{target}', building.name);
+    // (19. aşama) huyların etkinlikleri
+    if (task.activity === 'viewpoint' && task.view === 'tree') label = activity.treeLabel;
+    if (task.petName) label = label.replace('{pet}', task.petName);
+    if (task.placeAt) label = label.replace('{place}', task.placeAt);
+    label = label.charAt(0).toLocaleUpperCase('tr') + label.slice(1);
     return task.onBreak ? `${BREAK_PREFIX}${label}` : label;
   }
 
@@ -363,7 +408,7 @@ export class BehaviorSystem {
       this.endTask(c);
       return;
     }
-    if (task.activity === 'meal') {
+    if (task.activity === 'meal' || task.activity === 'homeDinner') {
       const paid = this.economy.consumeFood(MEAL_FOOD_COST);
       if (!paid.ok) {
         // Yolda stok bitti: kapıdan çıkıp başka çare arasın
@@ -455,7 +500,9 @@ export class BehaviorSystem {
     if (partner) {
       if (activity.faceBuilding) c.faceToward(building.center.x, building.center.y);
       else c.faceToward(partner.x, partner.y);
-      const label = activity.partnerLabel.replace('{partner}', this.partnerName(c, partner));
+      // (19. aşama) randevudaki çift: handa aynı masayı paylaşır, çardakta baş başa oturur
+      const dating = task.dateWithId === partner.id && activity.dateLabel;
+      const label = (dating ? activity.dateLabel : activity.partnerLabel).replace('{partner}', this.partnerName(c, partner));
       c.activityLabel = label.charAt(0).toLocaleUpperCase('tr') + label.slice(1);
       // Sevgilisiyle / eşiyle sohbette çift kalp, anlaşamadığıyla somurtma
       if (arePartners(c, partner)) return LOVE_BUBBLES;

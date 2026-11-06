@@ -1139,6 +1139,32 @@ Object.assign(ICONS, {
   ],
 });
 
+// 19. aşama: karakter huyları (Müzisyen'in udu, Doğa Tutkunu'nun yaprağı; Hayvansever pati, Kitap Kurdu kitap simgesini kullanır)
+Object.assign(ICONS, {
+  lute: [
+    '......KK.',
+    '.....KXK.',
+    '....KwK..',
+    '...KwK...',
+    '.KKKK....',
+    'KXEEXK...',
+    'KEKKEK...',
+    'KXEEXK...',
+    '.KKKK....',
+  ],
+  leaf: [
+    '.......K.',
+    '.....KKvK',
+    '...KKvVvK',
+    '..KvVvvK.',
+    '.KvVvvK..',
+    '.KvvvK...',
+    '.KvKK....',
+    '.K.......',
+    'K........',
+  ],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);
@@ -1272,6 +1298,11 @@ const BUBBLE_ICONS = {
   // 16. aşama: maceracı hikâyesi (karlı dağ) ve hazine sandığı
   adventure: ['...K...', '..KuK..', '.KqrrK.', 'KrRrRrK', 'gggggg.', '.......'],
   treasure: ['.KKKKK.', 'KXPXPXK', 'KKKPKKK', 'KwXXXwK', 'KwwwwwK', '.KKKKK.'],
+  // 19. aşama: dedikodu / haber fısıltısı (menekşe balonda ünlem), müzisyenin melodisi, kitap kurdunun kitabı, pati
+  whisper: ['.KKKKK.', 'KiiYiiK', 'KiiYiiK', 'KiiiiiK', 'KiiYiiK', '.KKKKK.'],
+  melody: ['P..O...', '...OO..', '...O.O.', '.P.O...', '.OOO..P', '.OO....'],
+  book: ['.KK.KK.', 'KuRKRuK', 'KuRKRuK', 'KuuKuuK', 'KBBKBBK', '.KK.KK.'],
+  paw: ['.w...w.', 'www.www', '...w...', '..www..', '.wwwww.', '..www..'],
 };
 
 export const BUBBLE_WIDTH = 11;

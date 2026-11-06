@@ -7,6 +7,8 @@
 // Sabitlenmiş iş yeri ve handaki baharatlı yemeğin hız bonusu durum etiketlerinde görünür.
 // (14. aşama) "Anılar ve Hatıralar": sakinin hayat yolculuğu (en yenisi üstte; ilk 5'i, istenirse tümü); o an
 // hatırladığı anı vurgulanır ve durum satırında "Anılara daldı" etiketi çıkar.
+// (19. aşama) "Sosyal Hayat": huyu (Hayvansever, Kitap Kurdu, Müzisyen, Doğa Tutkunu), eşi ve paylaştıkları ev, son
+// duyduğu dedikodu (kimden, ne zaman). Huy ayrıca kişilik etiketlerinin yanında altın çerçeveli bir çip olarak görünür.
 import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../../art/sprites/index.js';
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
@@ -24,6 +26,7 @@ import { SCHOOL } from '../../data/research.js';
 import { CHARACTER_NAME_MAX_LENGTH } from '../../data/characters.js';
 import { LUXURY_GOODS } from '../../data/luxury.js';
 import { el } from '../dom.js';
+import { QUIRKS } from '../../data/social.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -104,6 +107,7 @@ export class CharacterPanel {
     this.equipmentList = el('div', { className: 'equipment-slots' });
     this.skillsList = el('div', { className: 'relations-list skills-list' });
     this.conditions = el('div', { className: 'character-conditions' });
+    this.socialList = el('div', { className: 'social-life' });
     this.memoryList = el('div', { className: 'memory-list' });
     this.memoryToggle = this.button('Tümünü Göster', 'Sakinin bütün anılarını göster / gizle', () => {
       this.showAllMemories = !this.showAllMemories;
@@ -130,6 +134,7 @@ export class CharacterPanel {
       el('div', { className: 'character-needs' }, needs),
       section('Aile', this.familyList),
       section('İlişkiler', this.relationsList),
+      section('Sosyal Hayat', this.socialList),
       section('Ekipman', this.equipmentList),
       section('Meslekler', this.skillsList),
       section('Anılar ve Hatıralar', this.memoryBox),
@@ -178,7 +183,7 @@ export class CharacterPanel {
 
   /** Kimlik bilgisi değişince yeniden kurulur (karakter, ev, çocukluk, aile durumu). */
   identityKey(character) {
-    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}`;
+    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}`;
   }
 
   /** Değişmedikçe bir kez kurulan kısımlar: ad, yaş, ev, özellik etiketleri. */
@@ -196,12 +201,14 @@ export class CharacterPanel {
     const age = character.isChild ? 'Çocuk' : `${character.age} yaşında`;
     this.meta.textContent = `${age} · ${where}${home ? withWhom : ''}`;
 
+    const quirk = QUIRKS[character.quirk];
     this.traits.replaceChildren(
       ...character.traits.map((key) => {
         const opposite = opposingTrait(key);
         const title = `${TRAITS[key]?.description ?? ''}${opposite ? ` · Zıddı: ${TRAITS[opposite].name} (atışabilirler)` : ''}`;
         return el('span', { className: 'trait-chip', text: TRAITS[key]?.name ?? key, title });
-      })
+      }),
+      ...(quirk ? [el('span', { className: 'trait-chip quirk-chip', title: `Huyu: ${quirk.description}` }, [el('img', { src: getAnyIconURL(quirk.icon), alt: '' }), quirk.name])] : [])
     );
     this.resetCaches();
   }
@@ -217,6 +224,7 @@ export class CharacterPanel {
     this.lastFamily = null;
     this.lastEquipment = null;
     this.lastMemories = null;
+    this.lastSocial = null;
   }
 
   render(game) {
@@ -255,6 +263,52 @@ export class CharacterPanel {
     this.renderBadge(character);
     this.renderConditions(character, game.state);
     this.renderMemories(character, game.state);
+    this.renderSocial(character, game.state);
+  }
+
+  /** (19. aşama) Sosyal Hayat: huyu, eşi ve paylaştıkları ev, son duyduğu haber. */
+  renderSocial(character, state) {
+    const quirk = QUIRKS[character.quirk];
+    const partner = partnerOf(state, character);
+    const news = character.lastNews;
+    const homes = state.buildings.filter((b) => b.type === 'cabin');
+    const homeIndex = homes.findIndex((b) => b.id === character.homeId);
+    const home = homes[homeIndex] ?? null;
+    const key = [character.id, character.quirk, partner?.id, character.married, partner?.homeId, character.homeId, character.relocating, partner?.relocating, homeIndex, home?.upgraded, news?.id, news?.from].join('/');
+    if (key === this.lastSocial) return;
+    this.lastSocial = key;
+
+    const homeName = home ? `${homeIndex + 1} numaralı ${home.upgraded ? 'taş ev' : 'kulübe'}` : null;
+    const row = (icon, label, body, title = '') =>
+      el('div', { className: 'social-row', title }, [
+        el('img', { className: 'social-icon', src: getAnyIconURL(icon), alt: '' }),
+        el('div', { className: 'social-text' }, [el('span', { className: 'social-label', text: label }), ...body]),
+      ]);
+    const rows = [];
+    if (quirk) rows.push(row(quirk.icon, 'Huyu', [el('span', { className: 'social-value', text: quirk.name })], quirk.description));
+
+    // Ev: eşiyle paylaşılan ev ya da taşınma
+    let homeText;
+    if (partner && character.married) {
+      if (partner.homeId === character.homeId && homeName) homeText = character.relocating || partner.relocating ? `Eşiyle ${homeIndex + 1} numaralı ${home.upgraded ? 'taş eve' : 'kulübeye'} taşınıyorlar` : `Eşiyle ${homeName}de birlikte yaşıyor`;
+      else homeText = 'Eşiyle ortak bir ev bekliyorlar (yer açılınca taşınacaklar)';
+    } else if (partner) {
+      homeText = homeName ? `Sevgilisiyle flört ediyor · ${homeName}de oturuyor` : 'Sevgilisiyle flört ediyor';
+    } else {
+      homeText = character.isChild ? (homeName ? `Ailesiyle ${homeName}de` : 'Ailesiyle') : homeName ? `Bekâr · ${homeName}de oturuyor` : 'Bekâr · henüz evi yok';
+    }
+    const homeBody = [el('span', { className: 'social-value', text: homeText })];
+    if (partner) homeBody.unshift(this.personChip(partner));
+    rows.push(row(character.married ? 'ring' : partner ? 'love' : 'heart', partner ? (character.married ? 'Eşi ve evi' : 'Sevgilisi') : 'Evi', homeBody));
+
+    // Son duyduğu dedikodu
+    if (news) {
+      const when = `Gün ${news.day}, ${String(news.hour).padStart(2, '0')}:00`;
+      rows.push(row('whisper', 'Son duyduğu', [el('span', { className: 'social-value social-news', text: `"${news.text}"` }), el('span', { className: 'social-meta', text: `${news.from} anlattı · ${when}` })]));
+    } else {
+      rows.push(row('whisper', 'Son duyduğu', [el('span', { className: 'social-value social-muted', text: 'Henüz kulağına ilginç bir haber gelmedi' })]));
+    }
+    this.socialList.replaceChildren(...rows);
   }
 
   /** Aile: medeni durum (eşi / sevgilisi), çocukları ve ebeveynleri; çocuksa büyümesine kalan süre. */

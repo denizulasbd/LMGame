@@ -368,6 +368,17 @@ export class AnimalSystem {
       }
       return;
     }
+    // (19. aşama) Hayvansever bir sakin onu sevmeye geliyor: oturup bekler (gece / yağmurda sığınak önceliklidir)
+    if (a.heldUntil && !wantsShelter && a.mode !== 'sleep' && a.mode !== 'toShelter') {
+      if (this.state.totalMinutes < a.heldUntil) {
+        const holder = this.world.getCharacter(a.heldBy);
+        a.pose = 'sit';
+        if (holder) a.facing = holder.x < a.x ? 'left' : 'right';
+        return;
+      }
+      a.heldUntil = null;
+      a.heldBy = null;
+    }
     if (wantsShelter && a.mode !== 'sleep' && a.mode !== 'toShelter') {
       const tile = this.shelterTile(a);
       if (tile && this.walkPetTo(a, tile)) a.mode = 'toShelter';

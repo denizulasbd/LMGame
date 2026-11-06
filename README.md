@@ -59,6 +59,7 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 | Liman panelinde **Büyük İhracat Seferi** | Altınla kervan teknesi çağır: 2,5 kat yük, 350'yi aşan mallar gider |
 | `F` / dock'ta **Fotoğraf** | Fotoğraf modu: bütün arayüz gizlenir; kamerayı gezdirip kasabayı seyret (`F`, `Esc` ya da sağ alttaki ipucu geri getirir) |
 | Karakter panelinde eşin, çocuğun, ebeveynin ya da bir ilişkinin adı | O sakini seç |
+| Karakter kartında **Sosyal Hayat** bölümü | Sakinin huyu, eşi ve paylaştıkları ev, son duyduğu dedikodu (eşin adına tıklayınca o seçilir) |
 | `B` / dock'ta **İnşa Et** | İnşa et aracı (dock'un üstünde açılan listeden yapı seç, haritada tıkla; yolu sürükleyerek döşe; düğmeye yeniden basmak aracı bırakır) |
 | `H` / dock'ta **Topla** | Kaynak topla aracı (ağaç, kaya, çalı üzerinde sürükle; emirliden başlarsan kaldırır) |
 | `X` / dock'ta **Yık** | Yık / iptal aracı (yapı, şantiye, yol, toplama emri) |
@@ -119,6 +120,7 @@ LMGame/
     │   ├── WeatherEffects.js Yağmur damlaları, su / yer sıçrama halkaları, bulut gölgeleri
     │   ├── Fireflies.js    Açık gecelerde orman ve nehir kıyısında yanıp sönen ateşböcekleri
     │   ├── FestivalEffects.js Şenlikte renkli fener dizisi ve havada süzülen notalar
+    │   ├── WeddingConfetti.js (19. aşama) Meydandaki düğün kutlamasında konfeti demeti, süzülen kâğıtlar ve kalpler
     │   ├── SeasonalEffects.js Sonbaharda ağaçlardan süzülen yapraklar (kar yağışı WeatherEffects'te)
     │   ├── RenderQueue.js  Y-sıralı çizim kuyruğu (ağacın arkasındaki gerçekten arkada kalır)
     │   └── TileCursor.js   Karo / alan vurgusu (köşe parantezleri; seçili yapı, hayalet önizleme)
@@ -165,6 +167,8 @@ LMGame/
     │   ├── festivals.js    Dört mevsim kapanış festivali: saatler, yerler, bonuslar, süslemeler, anı cümleleri
     │   ├── exploration.js  (16. aşama) Sefer kuralları, dört macera ve seçenekleri (risk, usta / alet kuralları, ganimet),
     │   │                   egzotik ganimetler, üç kadim yazıt ve imar şemaları, üzüm asması
+    │   ├── social.js       (19. aşama) Flört ve randevu, düğün kutlaması, evli çiftin akşam yemeği, dört karakter
+    │   │                   huyu (Hayvansever, Kitap Kurdu, Müzisyen, Doğa Tutkunu) ve dedikodunun sayıları
     │   ├── landscape.js    (18. aşama) Çevre estetiği değerleri ve yarıçapı, refah çarpanı eşikleri, karanlık ve ışıklar,
     │   │                   çamur, süs ağaçlarının büyümesi, sokak adları, inşa menüsü sekmeleri
     │   ├── masterpieces.js (15. aşama) Usta işi eserler: altı eser, meslekleri, iş yerleri, fiyatları; şans ve sergi kuralları
@@ -246,6 +250,8 @@ LMGame/
     │   ├── ExpeditionSystem.js (16. aşama) Keşif seferleri: yola çıkış, maceralar, kaza, dönüş, ganimet, anılar, handa
     │   │                   hikâye anlatma; harabe yazıtları ve çözme
     │   ├── Exploration.js  (16. aşama) Keşfin saf hesapları: kafile seçimi, risk, sefer durumu, şema etkileri
+    │   ├── SocialSystem.js (19. aşama) Huyların dağıtımı ve etkileri, randevu bonusu, meydanda düğün kutlaması, boşalan
+    │   │                   ev, evli çiftin akşam yemeği, müzisyenin dinleyicileri, kedi okşama, kasaba dedikodusu
     │   ├── LandscapeSystem.js (18. aşama) Çamur, süs fidanlarının büyümesi, çevre estetiği haritası ve kasaba puanı,
     │   │                   güzel sokak / bank / çiçek keyfi ve anıları, gece karanlığı
     │   ├── Landscape.js    (18. aşama) Peyzajın saf hesapları: estetik alanı, toplam puan, refah çarpanı, ışık altında mı
@@ -285,7 +291,8 @@ LMGame/
     ├── state/              Kaydedilebilir oyun durumu
     │   ├── GameState.js    Tek doğruluk kaynağı; toJSON / restore ile kayıt dönüşümü
     │   └── SaveManager.js  localStorage yuvaları ('main' ve 'session'), sürüm kontrolü
-    └── utils/              math, random (tohumlu), noise (Perlin), pathfinding (A*)
+    └── utils/              math, random (tohumlu), noise (Perlin), pathfinding (A*), turkish (19. aşama: "Leyla'dan",
+                            "Emre'nin" gibi ünlü uyumlu ad ekleri)
 ```
 
 ## Mimari kurallar
@@ -405,7 +412,12 @@ kırıntısı), süren seferin maceraları (`dilemma.expedition`: planlanan mace
 biriken ganimet, bulgular, yaralananlar, seferin adı), açık macera penceresi (`dilemma.active.kind = 'adventure'`, kafileyle
 risk açıklamaları) ve maceracıların anlatacağı hikâye (`tale`) eklendi. 18. aşamada mahalle tabelasının adı (`label`), süs
 fidanının dikiliş anı (`plantedAt`) ve peyzaj durumu (`landscape`: yıkım iadesinin küsuratı, estetik puanı ve refah yüzdesi,
-sayaçlar) eklendi. Kayıt sürümü 15'tir; 4.–17. aşamanın (sürüm 2–14) kayıtları da açılır (peyzaj durumu boş başlar) (usta işi eser vitrini ve keşif ganimetleri boş başlar; eski biçimde yarım kalmış bir sefer maceralar
+sayaçlar) eklendi. 19. aşamada sakinlerin karakter huyu (`quirk`), son duyduğu haber (`lastNews`: metin, kimden, ne zaman),
+eşiyle son akşam yemeği günü (`dinnerDay`) ve son randevusu (`lastDateAt`), sosyal durum (`social`: süren düğün kutlaması —
+çift, davetliler, katılanlar, bitiş dakikası —, dolaşan haberler ve kimlerin duyduğu, günün barışma haberi) ve yeni sayaçlar
+(`stats.dates`, `weddingParties`, `familyDinners`, `gossipHeard`, `serenades`, `petCuddles`, `booksRead`, `homesFreed`)
+eklendi; evli çiftin ortak evi zaten `homeId` ile kayda girer. Kayıt sürümü 16'dır; 4.–18. aşamanın (sürüm 2–15) kayıtları da
+açılır (huyu olmayan sakinlere ilk açılışta huy dağıtılır, dedikodu boş başlar, evli çiftler kendi evlerinde kalır) (peyzaj durumu boş başlar) (usta işi eser vitrini ve keşif ganimetleri boş başlar; eski biçimde yarım kalmış bir sefer maceralar
 açmadan sürer ve döner) (anısı olmayan sakinin anı defteri ilk açılışta "Kasabada yaşamaya başladı" ile açılır): eksik alanlar varsayılanla dolar (herkes bekâr, yetişkin, sağlıklı
 ve ekipmansız başlar; yün, demir, ekmek ve altın 0 olur; araştırma, ihracat ve yadigâr boş başlar; arşiv ilk açılışta
 kurulur, düğün ve doğum sayaçları evli çiftlerden ve ebeveynli sakinlerden tahmin edilir; yaban hayatı ilk açılışta

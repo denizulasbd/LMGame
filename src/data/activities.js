@@ -21,7 +21,8 @@
 //   bubbles     : etkinlik sırasında çıkan ifade balonları; partnerBubbles: sohbet ederken
 //                 (sevgilisi / eşiyle sohbet ederken LOVE_BUBBLES, anlaşamadığıyla RIVAL_BUBBLES)
 //   urgentBubble: hedefe acil ihtiyaçla yürürken başta gösterilen balon
-//   travelLabel / label / partnerLabel: arayüzde görünen durum metinleri
+//   travelLabel / label / partnerLabel: arayüzde görünen durum metinleri; dateLabel: (19. aşama) randevudaki çiftin
+//   (19. aşama) {pet} hayvanın adı ("Tekir'in"), {place} çalınan yer ("Handa" / "Meydanda") ile değiştirilir
 export const ACTIVITIES = {
   sleep: {
     kind: 'rest',
@@ -91,6 +92,7 @@ export const ACTIVITIES = {
     travelLabel: 'Çardağa yürüyor',
     label: 'Çardakta oturup çiçekleri seyrediyor',
     partnerLabel: '{partner} ile çardakta sohbet ediyor',
+    dateLabel: '{partner} ile çardakta baş başa buluştu',
     duration: [45, 80],
     effects: { fun: 0.6, energy: 0.08 },
     socialGain: 1.4,
@@ -115,6 +117,82 @@ export const ACTIVITIES = {
     faceBuilding: true,
     bubbles: ['note', 'chat'],
     partnerBubbles: ['chat', 'laugh', 'note'],
+  },
+  // 19. aşama: düğün kutlaması — evlenen çift ve dostları meydanda konfetiler arasında kutlar (data/social.js)
+  weddingParty: {
+    kind: 'social',
+    target: 'fountain',
+    travelLabel: 'Düğün kutlamasına koşuyor',
+    label: 'Meydanda düğünü kutluyor',
+    partnerLabel: '{partner} ile meydanda düğünü kutluyor',
+    duration: [45, 45],
+    effects: { fun: 0.3 },
+    socialGain: 1.3,
+    aloneSocialGain: 0.6,
+    friendshipMultiplier: 1.4,
+    bubbles: ['note', 'laugh', 'heart'],
+    partnerBubbles: ['laugh', 'heart', 'note', 'ring'],
+  },
+  // 19. aşama: evli çift akşamları evde birlikte yemek yer (içeride; öğün başı yiyecek değeri öder)
+  homeDinner: {
+    kind: 'need',
+    indoor: true,
+    travelLabel: 'Akşam yemeği için eve dönüyor',
+    label: 'Eşiyle evde akşam yemeği yiyor',
+    partnerLabel: 'Eşi {partner} ile evde akşam yemeği yiyor',
+    duration: [25, 35],
+    effects: { hunger: 3.2 },
+  },
+  // 19. aşama: karakter huyları
+  // Hayvansever: sokaktaki kediye / köpeğe yürüyüp başını okşar
+  petAnimal: {
+    kind: 'leisure',
+    travelLabel: 'Sokaktaki {pet} yanına gidiyor',
+    label: '{pet} başını okşuyor',
+    duration: [6, 10],
+    effects: { fun: 0.2 },
+    pose: 'gather',
+    bubbles: ['heart', 'paw'],
+  },
+  // Kitap Kurdu: fener altındaki bankta ya da Bilgelik Evi'nde kitap okur
+  readBench: {
+    kind: 'leisure',
+    target: 'bench',
+    travelLabel: 'Kitabını alıp fener altındaki banka yürüyor',
+    label: 'Fener altındaki bankta kitap okuyor',
+    duration: [40, 70],
+    effects: { fun: 0.55, energy: 0.1 },
+    pose: 'sit',
+    bubbles: ['book', 'sparkle'],
+  },
+  readLibrary: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: "Bilgelik Evi'ne kitap okumaya gidiyor",
+    label: "Bilgelik Evi'nde kitap okuyor",
+    duration: [45, 75],
+    effects: { fun: 0.6, social: 0.1 },
+  },
+  // Müzisyen: akşamları handa ya da meydan havuzunun başında çalar; dinleyenlerin keyfi dolar (SocialSystem)
+  music: {
+    kind: 'leisure',
+    travelLabel: '{place} çalmaya gidiyor',
+    label: '{place} melodiler çalıyor',
+    duration: [40, 70],
+    effects: { fun: 0.4, social: 0.6 },
+    bubbles: ['melody', 'note', 'melody'],
+  },
+  // Doğa Tutkunu: süs ağacının gölgesinde ya da nehir kenarında manzarayı izler
+  viewpoint: {
+    kind: 'leisure',
+    travelLabel: 'Manzarayı izlemeye yürüyor',
+    label: 'Nehir kenarında manzarayı izleyip dinleniyor',
+    treeLabel: 'Süs ağacının gölgesinde manzarayı izliyor',
+    duration: [35, 60],
+    effects: { fun: 0.75, energy: 0.15 },
+    nature: true,
+    pose: 'sit',
+    bubbles: ['sparkle', 'heart', 'note'],
   },
   // 18. aşama: ulu süs ağacının gölgesinde dinlenmek
   shade: {
@@ -398,6 +476,7 @@ export const ACTIVITIES = {
     travelLabel: 'Hana gidiyor',
     label: 'Hanın önünde dinleniyor',
     partnerLabel: '{partner} ile handa sohbet ediyor',
+    dateLabel: '{partner} ile handa aynı masayı paylaşıyor',
     duration: [50, 90],
     effects: { fun: 0.6 },
     socialGain: 1.4,

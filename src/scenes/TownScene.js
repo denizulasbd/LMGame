@@ -56,6 +56,8 @@ import { RallySystem } from '../systems/RallySystem.js';
 import { CraftsmanshipSystem } from '../systems/CraftsmanshipSystem.js';
 import { ExpeditionSystem } from '../systems/ExpeditionSystem.js';
 import { LandscapeSystem } from '../systems/LandscapeSystem.js';
+import { SocialSystem } from '../systems/SocialSystem.js';
+import { WeddingConfetti } from '../rendering/WeddingConfetti.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -130,6 +132,7 @@ export class TownScene extends Scene {
     this.relationships = new RelationshipSystem(this.game, this.world, new Random(state.seed + 5));
     this.conflicts = new ConflictSystem(this.game, this.world, this.relationships, new Random(state.seed + 6));
     this.family = new FamilySystem(this.game, this.world, new Random(state.seed + 7));
+    this.social = new SocialSystem(this.game, this.world, new Random(state.seed + 19), { relationships: this.relationships });
     this.crafting = new CraftingSystem(this.game, this.world, this.economy);
     this.health = new HealthSystem(this.game, this.world, new Random(state.seed + 8));
     this.animals = new AnimalSystem(this.game, this.world, new Random(state.seed + 9));
@@ -183,6 +186,7 @@ export class TownScene extends Scene {
       this.relationships,
       this.conflicts,
       this.family,
+      this.social,
       this.townEvents,
       this.seasonFestivals,
       this.memories,
@@ -212,6 +216,7 @@ export class TownScene extends Scene {
       this.milestones,
       this.relationships,
       this.family,
+      this.social,
       this.crafting,
       this.townLevel,
       this.animals,
@@ -239,6 +244,7 @@ export class TownScene extends Scene {
     this.weatherFx = new WeatherEffects();
     this.fireflies = new FireflyField(state.seed);
     this.festivalFx = new FestivalEffects();
+    this.confetti = new WeddingConfetti(); // (19. aşama) meydandaki düğün kutlaması
     this.leaves = new LeafFall();
     this.animationTime = 0; // görsel animasyonlar için gerçek zaman (oyun duraklasa da akar)
 
@@ -679,6 +685,8 @@ export class TownScene extends Scene {
     renderer.applyCamera(this.camera);
     this.fireflies.draw(renderer, view, fireflyIntensity(weather, hour), this.animationTime, season.fireflies);
     if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime, env.festivalTheme, this.game.state.seasonFestival);
+    const party = this.game.state.social.party;
+    if (party && this.game.state.totalMinutes < party.until) this.confetti.draw(renderer, party, this.animationTime, view);
     renderer.resetCamera();
     const daylight = 1 - Math.min(1, getAmbientColor(hour).a / 0.55);
     this.weatherFx.drawRain(renderer, this.camera, weather, daylight);

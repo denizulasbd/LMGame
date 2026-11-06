@@ -3773,3 +3773,77 @@ kbd {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   19. aşama: Karakter Kartı'nda Sosyal Hayat (huy, eş ve ev, son duyulan dedikodu)
+   --------------------------------------------------------------------------- */
+.quirk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #ffe9a8;
+  color: var(--ui-ink-dark);
+  border-color: #c98f55;
+  box-shadow: inset -1px -1px 0 #e0a030;
+}
+
+.quirk-chip img {
+  width: 12px;
+  height: 12px;
+  image-rendering: pixelated;
+}
+
+.social-life {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--ui-card);
+  border: 2px solid var(--ui-wood);
+}
+
+.social-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.social-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  image-rendering: pixelated;
+}
+
+.social-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  min-width: 0;
+}
+
+.social-label {
+  font-weight: 700;
+}
+
+.social-label::after {
+  content: ':';
+}
+
+.social-news {
+  font-style: italic;
+}
+
+.social-meta {
+  width: 100%;
+  font-size: 11px;
+  opacity: 0.72;
+}
+
+.social-muted {
+  opacity: 0.7;
+}

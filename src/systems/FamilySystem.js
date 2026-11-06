@@ -10,7 +10,7 @@
 //                yüksekse belli bir olasılıkla bir çocuk katılır (ev doluysa bekâr bir ev arkadaşı boş yatağı
 //                olan başka bir eve geçip yer açar). Çocuk evde uyanır, çalışmaz, oynar; birkaç gün sonra
 //                büyüyüp yetişkin olur.
-// Yayınladığı olaylar: 'family:homeShared' { a, b, home, swapped? }, 'family:madeRoom' { character, from, to },
+// Yayınladığı olaylar: 'family:homeShared' { a, b, home, swapped?, vacated? (boşalan evler) }, 'family:madeRoom' { character, from, to },
 //   'family:childBorn' { child, parents, home }, 'family:grownUp' { character }, 'population:changed'.
 import { compoundName } from '../utils/names.js';
 import { Character } from '../entities/Character.js';
@@ -136,8 +136,11 @@ export class FamilySystem {
     if (options.length > 0) {
       const score = ({ home, movers }) => this.freeBeds(home) - movers.length + (home.upgraded ? 2 : 0) - movers.length * 0.5;
       const best = options.reduce((x, y) => (score(y) > score(x) ? y : x));
+      const left = best.movers.map((c) => this.world.getBuilding(c.homeId)).filter((h) => h && h !== best.home);
       for (const c of best.movers) this.relocate(c, best.home);
-      this.events.emit('family:homeShared', { a, b, home: best.home });
+      // (19. aşama) taşınanların boşalan eski evi göçmenlere açılır (SocialSystem bildirir)
+      const vacated = [...new Set(left)].filter((h) => this.world.getResidents(h).length === 0);
+      this.events.emit('family:homeShared', { a, b, home: best.home, vacated });
       return true;
     }
     // Yer değiştirme: A'nın evindeki bekâr bir ev arkadaşı B'nin yatağına geçer (ya da tersi)

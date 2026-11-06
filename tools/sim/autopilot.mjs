@@ -8,7 +8,9 @@
 // nereye harcandığını (araştırma, ihracat, harika) basar. (18. aşama) İmar: her yeni yapının kapısını en yakın yola
 // toprak patikayla bağlar (en kısa yol BFS ile, yalnızca doğal zemin döşenir), taş bolken meydana yakın patikaları parke
 // taşa çevirir, mahalle tabelası, park bankı, saksı, fener ve süs ağaçları diker, bir bahçeyi ahşap çitle çevirir;
-// sonunda döşenen yolu, estetik puanını ve yürüyüşlerin yollardan geçme oranını raporlar.
+// sonunda döşenen yolu, estetik puanını ve yürüyüşlerin yollardan geçme oranını raporlar. (19. aşama) Sosyal yaşamı
+// raporlar: evli çiftler ve aynı evde yaşayanlar, randevu, düğün kutlaması, akşam yemeği, boşalan ev, dedikodu, huyların
+// davranışları, en düşük nüfus ve evsizler; bekçinin sosyal sıkışma raporu (taşınamayan / ayrı kalan çift) çıkış kodunu etkiler.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
@@ -576,12 +578,18 @@ if (options.save) {
   console.log('kayıt yazıldı:', options.save);
 }
 const mon = await monitorReport(page);
-console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length}`);
+const so = mon.social;
+console.log(
+  `(19. aşama) evli çift ${so.couples} (aynı evde ${so.couplesTogether}) · randevu ${so.dates} · düğün kutlaması ${so.parties} · akşam yemeği ${so.dinners} · ` +
+    `boşalan ev ${so.homesFreed} · dedikodu ${so.gossip} (dolaşan haber ${so.news}) · müzik ${so.serenades} · hayvan sevme ${so.cuddles} · kitap ${so.books} · ` +
+    `huylar ${JSON.stringify(so.quirks)} · nüfus en az ${so.minPop} · en çok evsiz ${so.homelessMax} · sosyal sıkışma ${so.stuck.length}${so.stuck.length ? `: ${so.stuck.slice(0, 3).join(' | ')}` : ''}`
+);
+console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);
 for (const st of mon.stuck.slice(0, 10)) console.log(`  takıldı: G${st.day} ${st.hour}:00 ${st.name} @${st.tile} ${st.reason} (${st.task ?? '-'}/${st.phase ?? '-'}: ${st.label})`);
 for (const b of mon.broken.slice(0, 10)) console.log(`  referans: ${b}`);
 for (const j of mon.staleJobs.slice(0, 5)) console.log(`  iş: ${j}`);
 for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}`);
-const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0;
+const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0 && mon.social.stuck.length === 0;
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
   fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, healthy }, null, 1));

@@ -95,6 +95,10 @@ export class AudioSystem {
       on('expedition:returned', () => this.playFanfare()),
       on('goods:firstProduced', () => this.playMilestone()),
       on('relationship:married', () => this.playWedding()),
+      // (19. aşama) düğün kutlaması, hayvanseverin okşadığı kedinin mırlaması / köpeğin sevinci, müzisyenin ilk notaları
+      on('social:partyStarted', () => this.playFanfare()),
+      on('pet:purred', ({ animal }) => (animal.kind === 'cat' ? this.playMeow() : this.playBark())),
+      on('social:serenade', () => this.playChime()),
       on('relationship:partnered', () => this.playChime()),
       on('family:childBorn', () => this.playLullaby()),
       on('family:grownUp', () => this.playMilestone()),

@@ -77,5 +77,12 @@ console.log(
     `(kaza ${sum((d) => d.monitor.events.mishaps)}) · handa anlatılan hikâye ${sum((d) => d.monitor.events.tales)} · çözülen yazıt ${sum((d) => d.monitor.decoded ?? 0)} · ` +
     `dikilen asma / meşale ${sum((d) => d.monitor.exotic ?? 0)}`
 );
+const so = (f) => sum((d) => (d.monitor.social ? f(d.monitor.social) : 0));
+console.log(
+  `(19. aşama) evli çift ${so((x) => x.couples)} (aynı evde ${so((x) => x.couplesTogether)}) · sosyal sıkışma ${so((x) => x.stuck.length)} · ` +
+    `randevu ${so((x) => x.dates)} · düğün kutlaması ${so((x) => x.parties)} · akşam yemeği ${so((x) => x.dinners)} · boşalan ev ${so((x) => x.homesFreed)} · ` +
+    `dedikodu ${so((x) => x.gossip)} · müzik ${so((x) => x.serenades)} · hayvan sevme ${so((x) => x.cuddles)} · kitap ${so((x) => x.books)} · ` +
+    `en düşük nüfus (toplam) ${so((x) => x.minPop)} · en çok evsiz ${Math.max(0, ...results.map((r) => r.data?.monitor.social?.homelessMax ?? 0))}`
+);
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

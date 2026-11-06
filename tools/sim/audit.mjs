@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -217,6 +217,34 @@ const PAGE_HELPERS = () => {
       hours(0.25);
       const gathered = s.characters.filter((c) => c.task?.activity === 'rally').length;
       check('yüklenen toplanma sürer ve vaktinde biter', s.rally?.until === until && gathered > 0, `${gathered} sakin`);
+    }
+
+    // --- 2h. (19. aşama) Düğün kutlaması sürerken (meydanda konfeti, çift ortak eve taşınacak) ---
+    {
+      const RS = await import('/src/systems/RelationshipSystem.js');
+      while (s.time.hour < 9 || s.time.hour >= 16) hours(1);
+      const singles = s.characters.filter((c) => !c.isChild && !c.away && c.partnerId === null);
+      let pair = null;
+      for (let i = 0; i < singles.length && !pair; i++) for (let j = i + 1; j < singles.length && !pair; j++) if (RS.canRomance(singles[i], singles[j])) pair = [singles[i], singles[j]];
+      const fountain = scene().world.getCompleted('fountain')[0];
+      if (pair && fountain) {
+        const [a, b] = pair;
+        a.partnerId = b.id;
+        b.partnerId = a.id;
+        a.partnerSince = b.partnerSince = s.totalMinutes - 3 * 1440;
+        scene().relationships.marry(a, b, fountain, false);
+        hours(0.2);
+        const party = JSON.stringify(s.social.party);
+        const diff = A.roundtrip();
+        check('düğün kutlaması sırasında kayıt -> yükleme durum kayması yok', s.social.party && diff.length === 0, diff.join(' | '));
+        check('yüklenen kutlama aynen döner (çift, davetliler, bitiş)', JSON.stringify(s.social.party) === party);
+        const ended = counter('social:partyEnded');
+        hours(1);
+        const a2 = s.characters.find((c) => c.id === a.id);
+        const b2 = s.characters.find((c) => c.id === b.id);
+        check('yüklenen kutlama bir kez biter; çift aynı evde', ended.n === 1 && s.social.party === null && a2.homeId === b2.homeId, `${ended.n} · ${a2.homeId}/${b2.homeId}`);
+        ended.off();
+      } else check('kutlama için bekâr çift ve meydan havuzu var', false, `${singles.length} bekâr`);
     }
 
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
