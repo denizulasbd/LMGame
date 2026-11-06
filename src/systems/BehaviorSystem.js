@@ -45,6 +45,8 @@ import { ACTIVITY_SKILLS } from '../data/skills.js';
 
 const JOBS_MAX = Object.fromEntries(Object.entries(JOBS).map(([k, v]) => [k, v.maxWorkers]));
 import { clamp } from '../utils/math.js';
+import { schemeBakeMultiplier } from './Exploration.js';
+import { VINE } from '../data/exploration.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
 
@@ -420,6 +422,8 @@ export class BehaviorSystem {
       // Sıcak yemek bir süre tok tutar (NeedsSystem acıkmayı yavaşlatır)
       if (task.activity === 'innMeal') {
         c.buffs.warmMeal = this.world.state.totalMinutes + WARM_MEAL.hours * 60;
+        // (16. aşama) Kasabada üzüm asması varsa yemeğin yanında soğuk üzüm şerbeti
+        if (this.world.buildings.some((b) => b.type === 'grapeVine' && b.functional)) c.needs.fun = clamp(c.needs.fun + VINE.sherbetFun, 0, 100);
         // (13. aşama) Handa baharat ve kahve varken yiyen sakin bir süre hızlı çalışır ve yürür
         if (isBuffActive(this.state, LUXURY_GOODS.spiceCrate.buff)) {
           c.buffs.spiced = this.state.totalMinutes + LUXURY_GOODS.spiceCrate.personal.hours * 60;
@@ -520,7 +524,7 @@ export class BehaviorSystem {
       return working;
     }
     // (13. aşama) Güneş Saati Küresi üretim ve işleme yapılarında verimi artırır
-    if (building.definition.processing) return this.process(building, amount * relicProductionMultiplier(this.state));
+    if (building.definition.processing) return this.process(building, amount * relicProductionMultiplier(this.state) * (building.type === 'mill' ? schemeBakeMultiplier(this.state) : 1));
     const production = building?.definition.production;
     if (!production) return false;
     // Verim (oduncu için çevredeki ağaç sayısı) StructureSystem'de hesaplanır; Bereket Boynuzu yiyeceği artırır

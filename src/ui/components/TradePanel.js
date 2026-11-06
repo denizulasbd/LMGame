@@ -15,7 +15,7 @@ const pad = (n) => String(n).padStart(2, '0');
 
 export class TradePanel {
   constructor(game) {
-    this.slot = 'right';
+    this.slot = 'cards'; // (17. aşama) sağ alt köşedeki bağımsız bilgi kartı
     this.events = game.events;
     this.open = false;
     this.lastKey = '';

@@ -75,6 +75,7 @@ export class Character extends Entity {
     workplaceId = null,
     customName = false,
     memories = [],
+    tale = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -108,6 +109,8 @@ export class Character extends Entity {
     // 14. aşama: hayat yolculuğu (MemorySystem): { day, hour, text, icon, kind, fond }; o an hatırladığı anı ve
     // Çiçek Şenliği'nde saça takılan çiçek (bu ikisi kaydedilmez)
     this.memories = (memories ?? []).filter((m) => m && typeof m.text === 'string').map((m) => ({ ...m }));
+    // 16. aşama: seferden dönen maceracının anlatacağı hikâye { until, told, progress, route } (kayda girer)
+    this.tale = tale && Number.isFinite(tale.until) ? { told: 0, progress: 0, route: 'Keşif', ...tale } : null;
     this.recall = null;
     this.flowerCrown = false;
     this.profile = buildTraitProfile(traits, { child: this.isChild });
@@ -445,6 +448,7 @@ export class Character extends Entity {
       workplaceId: this.workplaceId,
       customName: this.customName,
       memories: this.memories,
+      tale: this.tale,
     };
   }
 

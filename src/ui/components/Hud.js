@@ -1,18 +1,18 @@
-// Sol üstteki bilgi paneli: gün, saat, hava durumu simgesi, gün evresi, hız kontrolleri, nüfus,
-// kasaba kaynakları (miktar / depo kapasitesi, değişince +5 / -10 vurgusu), Kaydet / Yükle /
-// Yeni Harita düğmeleri, ses aç / kapat, kasaba refahı (ortalama mutluluk), nüfus / konut kapasitesi,
-// etkin kasaba bonusları ve farenin altındaki karonun bilgisi.
-// 10. aşama: kasaba adının yanında seviye unvanı ("Yeşilvadi Kasabası"), seviye armaları (4 pip, üzerine
-// gelince sonraki seviyenin koşulları) ve kaynak çubuğunun altında işlenmiş mallar satırı (Yün, Demir, Ekmek):
-// özet görünümde yalnızca simge ve miktar, açılınca depo kapasitesi ve her malın üreticileri ile bugünkü
-// üretimi. Seçim tarayıcıda hatırlanır.
+// (17. aşama) İnce üst bilgi çubuğu: ekranın en üstünde yarı saydam, tek satırlık HUD.
+//   Sol  : kasaba adı ve unvanı (tıklayınca ad değişir), seviye arması ve dört seviye pipi (üzerine gelince sonraki
+//          seviyenin koşulları)
+//   Orta : mevsim ve günü, gün / saat, gün evresi ve hava simgesi, Duraklat ve 1x / 2x / 4x, ses düğmesi
+//   Sağ  : Odun / Taş / Yiyecek (miktar / depo, değişince +5 / -10 vurgusu), Kasaba Hazinesi (Altın), açılır "Mallar"
+//          listesi (Yün, Demir, Ekmek: depo, üreticiler ve bugünkü üretim; açık / kapalı tercihi hatırlanır), refah
+//          göstergesi ve nüfus (üzerine gelince göç koşulları)
+//   Altında: etkin kasaba bonusları ve uyarılar (ısınma, hasta, sefer, fırtına, festival) küçük çipler hâlinde.
+// Kaydet / Yükle / Yeni Harita Ayarlar penceresine, farenin altındaki karonun bilgisi harita ipucuna taşındı.
 import { CONFIG } from '../../config.js';
 import { getDayPhase } from '../../systems/TimeSystem.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
 import { RESOURCES, RESOURCE_KEYS, BASE_RESOURCE_KEYS, GOODS_KEYS } from '../../data/resources.js';
 import { BUILDINGS } from '../../data/buildings.js';
 import { TOWN_TIERS } from '../../data/town.js';
-import { JOBS } from '../../data/jobs.js';
 import { describeWeather } from '../../data/weather.js';
 import { currentSeasonFestival } from '../../systems/SeasonFestivalSystem.js';
 import { isRallyActive } from '../../systems/RallySystem.js';
@@ -36,7 +36,6 @@ import { el } from '../dom.js';
 const DELTA_MERGE_MS = 500; // bu süre içindeki değişiklikler tek vurguda toplanır
 const DELTA_VISIBLE_MS = 1400;
 const WELFARE_REFRESH_MS = 500; // refah ve nüfus bilgisinin yenilenme aralığı
-const CONFIRM_TIMEOUT_MS = 6000; // "Yeni Harita" onayı bu sürede verilmezse vazgeçilir
 const GOODS_PREF_KEY = 'lmgame.hud.goodsExpanded'; // işlenmiş mallar satırı açık mı (tarayıcıda hatırlanır)
 
 function readGoodsPreference() {
@@ -83,24 +82,16 @@ const pad = (n) => String(n).padStart(2, '0');
 
 export class Hud {
   constructor(game) {
-    this.slot = 'left';
-    this.hoverInfo = null;
-    this.hoverDirty = true;
+    this.slot = 'top';
     this.lastClock = '';
     this.lastIcon = '';
     this.lastWeather = '';
-    this.confirmTimer = null;
     this.lastControls = '';
 
     this.build(game);
     this.setGoodsExpanded(readGoodsPreference());
 
-    game.events.on('map:hover', (info) => {
-      this.hoverInfo = info;
-      this.hoverDirty = true;
-    });
     game.events.on('resources:changed', ({ resource, delta }) => this.showDelta(resource, delta));
-    game.events.on('save:changed', (info) => this.showSaveInfo(info));
     game.events.on('audio:muteChanged', (muted) => {
       this.muteIcon.src = getIconDataURL(muted ? 'mute' : 'sound');
       this.muteButton.title = muted ? 'Sesi aç' : 'Sesi kapat';
@@ -118,18 +109,21 @@ export class Hud {
     const population = state.characters.length;
     const capacity = housingCapacity(state);
     const status = immigrationStatus(state);
-    const key = `${happiness}|${population}|${capacity}|${status.checks.map((c) => c.text).join('|')}`;
+    const key = `${happiness}|${population}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}`;
     if (key !== this.lastWelfare) {
       this.lastWelfare = key;
       this.welfareFill.style.width = `${happiness}%`;
       this.welfareFill.className = `need-fill welfare-fill is-${level.key}`;
       this.welfareValue.textContent = `%${happiness}`;
       this.welfareIcon.src = getIconDataURL(level.key === 'bad' ? 'frown' : 'smile');
-      this.welfareRow.title = `Ortalama mutluluk: ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.`;
-      this.population.textContent = `${population}/${capacity} Sakin`;
+      // (18. aşama) Kasabanın estetiği refaha kalıcı küçük bir çarpan ekler
+      const beauty = state.landscape?.percent ? ` Kasaba estetiği (${state.landscape.score} puan): refah +%${state.landscape.percent}.` : ' Süs, fener, ağaç ve taş plakalarla kasabayı güzelleştirdikçe refah +%5\'e kadar artar.';
+      this.welfareRow.title = `Refah (ortalama mutluluk): ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.${beauty}`;
+      this.population.textContent = `${population}/${capacity}`;
+      this.populationWrap.classList.toggle('is-full', population >= capacity);
       this.population.classList.toggle('is-full', population >= capacity);
       const lines = status.checks.map((c) => `${c.ok ? '✓' : '✗'} ${c.text}`);
-      this.population.title = `Sakin / yatak. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
+      this.populationWrap.title = `${population} sakin / ${capacity} yatak. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
     }
     const buffs = activeBuffs(state);
     const heating = Math.round(heatingPerDay(state) * 10) / 10;
@@ -198,7 +192,7 @@ export class Hud {
     } else {
       lines.push('En yüksek seviye: kasaban artık gelişmiş bir şehir!');
     }
-    lines.push('', 'Adı değiştirmek için tıkla · Ayrıntılar: Hedefler (G)');
+    lines.push('', 'Adı değiştirmek için tıkla · Ayrıntılar: Hedefler (O)');
     this.townName.title = lines.join('\n');
     this.tierBadge.title = lines.slice(0, -2).join('\n');
     this.tierBadge.classList.toggle('is-ready', Boolean(next) && checks.every((c) => c.ok));
@@ -228,27 +222,14 @@ export class Hud {
     }
   }
 
+  /** "Mallar" açılır listesi (Yün, Demir, Ekmek: depo, üreticiler, bugünkü üretim); tercih hatırlanır. */
   setGoodsExpanded(expanded) {
     this.goodsExpanded = expanded;
-    this.goodsRow.classList.toggle('is-expanded', expanded);
-    this.goodsToggle.textContent = expanded ? '▾' : '▸';
-    this.goodsToggle.title = expanded ? 'İşlenmiş malları özet görünüme al' : 'İşlenmiş malları aç: depo ve üreticiler';
+    this.goodsMenu.hidden = !expanded;
+    this.goodsToggle.classList.toggle('is-active', expanded);
+    this.goodsToggle.title = expanded ? 'İşlenmiş malları gizle' : 'İşlenmiş mallar: Yün, Demir, Ekmek (depo ve üreticiler)';
     for (const key of GOODS_KEYS) this.resources[key].last = ''; // miktar metni yeniden yazılsın
     writeGoodsPreference(expanded);
-  }
-
-  /** Kayıt var mı / ne zaman alındı: "Yükle" düğmesini ve bilgi satırını günceller. */
-  showSaveInfo({ exists, label }) {
-    this.loadButton.disabled = !exists;
-    this.saveInfo.textContent = exists ? `Kayıt: ${label}` : 'Henüz kayıt yok';
-    this.loadButton.title = exists ? `Son kayda dön (${label})` : 'Yüklenecek kayıt yok';
-  }
-
-  setConfirming(confirming) {
-    clearTimeout(this.confirmTimer);
-    this.saveButtons.hidden = confirming;
-    this.confirmRow.hidden = !confirming;
-    if (confirming) this.confirmTimer = setTimeout(() => this.setConfirming(false), CONFIRM_TIMEOUT_MS);
   }
 
   /** Kaynak değişince yanında yükselip kaybolan +5 / -10 vurgusu. */
@@ -289,7 +270,6 @@ export class Hud {
     this.tierIcon = el('img', { className: 'hud-icon hud-tier-icon', alt: '' });
     this.tierPips = TOWN_TIERS.map(() => el('span', { className: 'tier-pip' }));
     this.tierBadge = el('span', { className: 'hud-tier' }, this.tierPips);
-    this.townRow = el('div', { className: 'hud-row hud-town' }, [this.tierIcon, this.townName, this.townInput, this.tierBadge]);
     this.lastTitle = '';
     this.lastTownName = null;
     this.game = game;
@@ -313,47 +293,21 @@ export class Hud {
     });
     this.pausedBadge = el('span', { className: 'hud-paused', text: 'DURDU' });
     this.population = el('span', { className: 'hud-population' });
+    this.populationWrap = el('span', { className: 'hud-chip hud-pop' }, [el('img', { className: 'hud-icon', src: getAnyIconURL('people'), alt: '' }), this.population]);
     this.muteButton = button('', 'Sesi kapat / aç', () => game.events.emit('ui:toggleMute'));
     this.muteIcon = el('img', { className: 'hud-btn-icon', alt: '' });
     this.muteButton.append(this.muteIcon);
     this.muteButton.classList.add('hud-mute');
 
-    // Refah: ortalama mutluluk çubuğu, ardından etkin kasaba bonusları
+    // Refah: küçük gösterge (simge, çubuk, yüzde)
     this.welfareIcon = el('img', { className: 'hud-icon', alt: '' });
     this.welfareFill = el('span', { className: 'need-fill welfare-fill' });
     this.welfareValue = el('span', { className: 'welfare-value' });
-    this.welfareRow = el('div', { className: 'hud-row hud-welfare' }, [
-      this.welfareIcon,
-      el('span', { className: 'welfare-label', text: 'Refah' }),
-      el('span', { className: 'need-bar welfare-bar' }, [this.welfareFill]),
-      this.welfareValue,
-    ]);
-    this.buffs = el('div', { className: 'hud-buffs' });
+    this.welfareRow = el('span', { className: 'hud-chip hud-welfare' }, [this.welfareIcon, el('span', { className: 'need-bar welfare-bar' }, [this.welfareFill]), this.welfareValue]);
+    this.buffs = el('div', { className: 'hud-buffs ui-interactive' });
     this.lastWelfare = '';
     this.lastBuffs = '';
     this.welfareAt = -Infinity; // ilk karede hemen çizilsin
-
-    this.saveButton = button('Kaydet', 'Oyunu kaydet (her sabah 06:00\'da otomatik kayıt da alınır)', () => game.events.emit('ui:save'));
-    this.loadButton = button('Yükle', 'Son kayda dön', () => game.events.emit('ui:load'));
-    this.newButton = button('Yeni Harita', 'Rastgele yeni bir harita ile baştan başla', () => this.setConfirming(true));
-    this.saveInfo = el('span', { className: 'hud-save-info' });
-    this.saveButtons = el('div', { className: 'hud-row hud-save' }, [this.saveButton, this.loadButton, this.newButton]);
-    const confirmYes = button('Evet, baştan başla', 'Mevcut oyun silinir', () => {
-      this.setConfirming(false);
-      game.events.emit('ui:newGame');
-    });
-    confirmYes.classList.add('is-danger');
-    const confirmNo = button('Vazgeç', 'Oyuna devam et', () => this.setConfirming(false));
-    this.confirmRow = el('div', { className: 'hud-row hud-save hud-confirm', hidden: true }, [
-      el('span', { className: 'hud-confirm-text', text: 'Yeni harita? Kaydedilmemiş ilerleme kaybolur.' }),
-      confirmYes,
-      confirmNo,
-    ]);
-
-    this.tileName = el('span', { className: 'hud-tile-name' });
-    this.coords = el('span', { className: 'hud-coords' });
-    this.statusDot = el('span', { className: 'status-dot' });
-    this.statusText = el('span');
 
     this.resources = {};
     const resourceBox = (key, goods) => {
@@ -362,7 +316,7 @@ export class Hud {
       const box = el('span', { className: `resource${goods ? ' is-goods' : ''}`, title: `${RESOURCES[key].name}\n${RESOURCES[key].hint}` }, [
         el('img', { className: 'resource-icon', src: getIconDataURL(RESOURCES[key].icon), alt: '' }),
         el('span', { className: 'resource-text' }, [
-          el('span', { className: 'resource-name', text: RESOURCES[key].name }),
+          ...(goods ? [el('span', { className: 'resource-name', text: RESOURCES[key].name })] : []),
           amount,
           ...(goods ? [detail] : []),
         ]),
@@ -370,31 +324,29 @@ export class Hud {
       this.resources[key] = { box, amount, detail, last: '' };
       return box;
     };
-    const resourceBoxes = BASE_RESOURCE_KEYS.map((key) => resourceBox(key, false));
-    // İşlenmiş mallar: özet (simge + miktar) ya da açık (kapasite, üreticiler, bugünkü üretim)
-    this.goodsToggle = button('▸', '', () => this.setGoodsExpanded(!this.goodsExpanded));
+    // Temel kaynaklar ve hazine üst çubukta; işlenmiş mallar açılır listede
+    const goodsKeys = GOODS_KEYS.filter((k) => !RESOURCES[k].treasury);
+    const treasuryKeys = GOODS_KEYS.filter((k) => RESOURCES[k].treasury);
+    const resourceBoxes = [...BASE_RESOURCE_KEYS, ...treasuryKeys].map((key) => resourceBox(key, false));
+    this.goodsSummary = el('span', { className: 'goods-summary' });
+    this.goodsToggle = button('', '', () => this.setGoodsExpanded(!this.goodsExpanded));
     this.goodsToggle.classList.add('goods-toggle');
-    this.goodsRow = el('div', { className: 'hud-row hud-goods' }, [
-      this.goodsToggle,
-      el('span', { className: 'goods-label', text: 'Mallar' }),
-      ...GOODS_KEYS.map((key) => resourceBox(key, true)),
-    ]);
+    this.goodsToggle.append(el('img', { className: 'hud-btn-icon', src: getIconDataURL(RESOURCES.bread.icon), alt: '' }), el('span', { text: 'Mallar' }), this.goodsSummary, el('span', { className: 'goods-caret', text: '▾' }));
+    this.goodsMenu = el('div', { className: 'hud-goods-menu', hidden: true }, goodsKeys.map((key) => resourceBox(key, true)));
+    this.goodsWrap = el('span', { className: 'hud-goods' }, [this.goodsToggle, this.goodsMenu]);
 
-    this.element = el('div', { className: 'panel hud ui-interactive' }, [
-      this.townRow,
-      el('div', { className: 'hud-row' }, [this.icon, this.day, this.clock, this.weatherIcon]),
-      el('div', { className: 'hud-row hud-season-row' }, [this.seasonIcon, this.seasonText, this.phase]),
-      el('div', { className: 'hud-row' }, [this.pauseButton, ...this.speedButtons, this.muteButton, this.pausedBadge, this.population]),
-      this.welfareRow,
+    const zone = (cls, children) => el('div', { className: `hud-zone ${cls}` }, children);
+    this.element = el('div', { className: 'panel hud topbar ui-interactive' }, [
+      zone('hud-zone-town', [this.tierIcon, this.townName, this.townInput, this.tierBadge]),
+      zone('hud-zone-time', [
+        el('span', { className: 'hud-chip hud-season-chip' }, [this.seasonIcon, this.seasonText]),
+        el('span', { className: 'hud-chip hud-clock-chip' }, [this.icon, this.day, this.clock, this.weatherIcon]),
+        el('span', { className: 'hud-speed' }, [this.pauseButton, ...this.speedButtons]),
+        this.pausedBadge,
+        this.muteButton,
+      ]),
+      zone('hud-zone-res', [...resourceBoxes, this.goodsWrap, this.welfareRow, this.populationWrap]),
       this.buffs,
-      el('div', { className: 'hud-row hud-resources' }, resourceBoxes),
-      this.goodsRow,
-      this.saveButtons,
-      this.confirmRow,
-      this.saveInfo,
-      el('div', { className: 'hud-divider' }),
-      el('div', { className: 'hud-row' }, [this.tileName, this.coords]),
-      el('div', { className: 'hud-row hud-status' }, [this.statusDot, this.statusText]),
     ]);
   }
 
@@ -438,10 +390,14 @@ export class Hud {
         slot.box.classList.toggle('is-empty', game.state.resources[key] === 0);
       }
     }
-    if (this.hoverDirty) {
-      this.renderTile(this.hoverInfo);
-      this.hoverDirty = false;
-    }
+    this.renderGoodsSummary(game.state);
+  }
+
+  /** "Mallar" düğmesinin yanında işlenmiş malların toplamı (açılır liste kapalıyken bir bakışta). */
+  renderGoodsSummary(state) {
+    const total = GOODS_KEYS.filter((k) => !RESOURCES[k].treasury).reduce((a, k) => a + (state.resources[k] ?? 0), 0);
+    const text = String(total);
+    if (this.goodsSummary.textContent !== text) this.goodsSummary.textContent = text;
   }
 
   renderTime(time) {
@@ -452,9 +408,10 @@ export class Hud {
       this.day.textContent = `Gün ${time.day}`;
       this.clock.textContent = `${pad(time.hour)}:${pad(time.minute)}`;
       this.phase.textContent = phase.name;
+      this.icon.title = phase.name;
       const season = getSeason(time.day);
-      this.seasonText.textContent = `${season.name} · Gün ${season.dayOfSeason}/${season.daysInSeason}`;
-      this.seasonText.title = `${season.year}. yıl`;
+      this.seasonText.textContent = `${season.name} ${season.dayOfSeason}/${season.daysInSeason}`;
+      this.seasonText.parentElement.title = `${season.name}: mevsimin ${season.dayOfSeason}. günü (${season.daysInSeason} günde biri) · ${season.year}. yıl`;
       if (season.key !== this.lastSeason) {
         this.lastSeason = season.key;
         this.seasonIcon.src = getIconDataURL(season.icon);
@@ -481,54 +438,6 @@ export class Hud {
         b.classList.toggle('is-active', !time.paused && Number(b.dataset.speed) === time.speed);
       }
     }
-  }
-
-  renderTile(info) {
-    if (!info) {
-      this.tileName.textContent = 'Bir karonun üzerine gel';
-      this.coords.textContent = '';
-      this.statusDot.className = 'status-dot';
-      this.statusText.textContent = '—';
-      return;
-    }
-
-    this.coords.textContent = `${info.x}, ${info.y}`;
-
-    if (info.character) {
-      this.tileName.textContent = info.character.name;
-      this.statusDot.className = 'status-dot is-info';
-      this.statusText.textContent = info.character.visitor ? 'Gezgin tüccar · tıkla ve takas et' : 'Kasaba sakini · tıkla ve incele';
-      return;
-    }
-    if (info.building) {
-      this.tileName.textContent = info.building.name;
-      this.statusDot.className = 'status-dot is-info';
-      const job = info.job && info.job !== 'build' ? ` · Emir: ${JOBS[info.job].name}` : '';
-      this.statusText.textContent = `${info.building.detail ?? 'Geçilemez'}${job}`;
-      return;
-    }
-    if (info.job) {
-      this.tileName.textContent = info.objectName ?? info.tileName;
-      this.statusDot.className = 'status-dot is-info';
-      this.statusText.textContent = `Emir verildi: ${JOBS[info.job].name}`;
-      return;
-    }
-
-    const variant = info.variantName && info.variantName !== 'Sade' && !info.biomeHint ? ` (${info.variantName})` : '';
-    const object = info.objectName ? ` · ${info.objectName}` : '';
-    this.tileName.textContent = `${info.tileName}${variant}${object}`;
-
-    let status = 'Geçilemez';
-    let tone = 'is-bad';
-    if (info.buildable) {
-      status = 'İnşa Edilebilir';
-      tone = 'is-ok';
-    } else if (info.walkable) {
-      status = 'Yürünebilir · İnşa Edilemez';
-      tone = 'is-warn';
-    }
-    this.statusDot.className = `status-dot ${tone}`;
-    this.statusText.textContent = info.biomeHint ? `${status} · ${info.biomeHint}` : status;
   }
 }
 

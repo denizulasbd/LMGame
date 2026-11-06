@@ -35,7 +35,7 @@ export async function installMonitor(page) {
         maxPop: 0,
         maxFeuds: 0, // (15. aşama) aynı anda en çok küs (eksi puanlı) çift
         minNeeds: { hunger: 100, energy: 100, social: 100, fun: 100 },
-        events: { weddings: 0, births: 0, grownUp: 0, quarrels: 0, reconciled: 0, ill: 0, cured: 0, cold: 0, warmed: 0, masterworks: 0, exhibited: 0, sold: 0 },
+        events: { weddings: 0, births: 0, grownUp: 0, quarrels: 0, reconciled: 0, ill: 0, cured: 0, cold: 0, warmed: 0, masterworks: 0, exhibited: 0, sold: 0, expeditions: 0, adventures: 0, mishaps: 0, tales: 0, returned: 0 },
         outfitErrors: [], // (15. aşama) çizilemeyen ya da yanlış kademede kıyafet
       };
       const on = (name, key) => game.events.on(name, () => m.events[key]++);
@@ -51,6 +51,13 @@ export async function installMonitor(page) {
       on('masterwork:created', 'masterworks');
       on('masterwork:exhibited', 'exhibited');
       on('masterwork:sold', 'sold');
+      on('expedition:departed', 'expeditions');
+      on('expedition:returned', 'returned');
+      on('expedition:taleTold', 'tales');
+      game.events.on('adventure:resolved', ({ success }) => {
+        m.events.adventures++;
+        if (!success) m.events.mishaps++;
+      });
 
       const stamp = () => ({ day: game.state.time.day, hour: game.state.time.hour });
       // Takılan sakinin ayrıntısı: görevi, bulunduğu karodaki yapı, konumu (hata ayıklamak için)
@@ -142,6 +149,14 @@ export async function installMonitor(page) {
           const residents = homeCount.get(b.id) ?? 0;
           if (b.capacity && residents > b.capacity) m.overfull.push(`G${s.time.day} ${b.type}#${b.id} ${residents}/${b.capacity}`);
         }
+        // (16. aşama) Seferde kaybolan ya da takılan kafile
+        const exp = s.dilemma.expedition;
+        for (const c of s.characters) if (c.away && !exp?.members.includes(c.id)) broke(`${c.name}: seferde sanılıyor ama süren sefer yok`);
+        if (exp) {
+          for (const id of exp.members) if (!ids.has(id)) broke(`sefer: kafileden ${id} kayıp`);
+          if (now > exp.until + 240 && !s.dilemma.active) broke(`sefer: dönüş vakti çoktan geçti (${Math.round((now - exp.until) / 60)} saat)`);
+        }
+        if (s.dilemma.active?.kind === 'adventure' && !exp) broke('macera penceresi açık ama süren sefer yok');
         for (const [key, cid] of world.reservations) if (!ids.has(cid)) broke(`rezervasyon ${key}: var olmayan sakin ${cid}`);
         for (const job of scene.jobs.jobs) {
           for (const a of job.assignees ?? []) if (!ids.has(a)) broke(`iş ${job.type}#${job.id}: atanan sakin yok (${a})`);
@@ -201,6 +216,8 @@ export async function installMonitor(page) {
           stalledWorkplaces: stalled,
           minNeeds: m.minNeeds,
           outfitErrors: m.outfitErrors,
+          decoded: Object.values(s.exploration?.inscriptions ?? {}).filter((i) => i.status === 'decoded').length,
+          exotic: s.buildings.filter((b) => (b.type === 'grapeVine' || b.type === 'ancientTorch') && b.functional).length,
           outfits: s.characters.filter((c) => c.outfit).map((c) => c.outfit),
           feuds: Object.values(s.relationships).filter((v) => v < 0).length,
           maxFeuds: m.maxFeuds,

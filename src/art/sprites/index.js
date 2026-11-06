@@ -23,5 +23,7 @@ export { ACADEMY_ART } from './structuresWisdom.js';
 export { HARBOR_ART, BOAT_ART, getBoatSprite } from './structuresHarbor.js';
 export { WONDER_ART, wonderSpriteHeight } from './structuresWonder.js';
 export { CHERRY_ART, GAZEBO_ART, ARCH_ART, FENCE_ART, getGazeboLayer } from './structuresGarden.js';
+export { VINE_ART, TORCH_ART, getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.js';
+export { IRON_LANTERN_ART, SIGNPOST_ART, getOrnamentalTreeSprite } from './structuresLandscape.js';
 export { getFestivalDecorSprite, getFlowerCrownSprite } from './festival.js';
 export { getAnimalSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite } from './animals.js';

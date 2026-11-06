@@ -40,7 +40,8 @@ const WEATHER_TEXT = {
 
 /** Hazinenin kısa yazımı: "35 odun, 25 taş ve 30 yiyecek". */
 function describeLoot(treasure) {
-  const parts = Object.entries(treasure).map(([r, v]) => `${v} ${RESOURCES[r].name.toLowerCase()}`);
+  // (16. aşama) seferden gelen şifalı otlar kaynak değil, Şifacı Kulübesi'nin stoğudur
+  const parts = Object.entries(treasure).map(([r, v]) => `${v} ${r === 'herbs' ? 'şifalı ot' : RESOURCES[r]?.name.toLocaleLowerCase('tr') ?? r}`);
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} ve ${parts[parts.length - 1]}` : parts[0];
 }
 
@@ -52,9 +53,15 @@ export class JournalSystem {
     const on = (name, handler) => game.events.on(name, handler);
     this.unsubscribers = [
       on('population:joined', ({ character }) => this.log(`${character.name} kasabaya katıldı`, 'heart')),
-      on('building:placed', ({ building }) => this.log(`${building.name} için şantiye kuruldu`, 'hammer')),
+      // (18. aşama) Fırçayla art arda dikilen çit, saksı ve fidanlar günlüğü doldurmasın
+      on('building:placed', ({ building }) => !building.definition.brush && this.log(`${building.name} için şantiye kuruldu`, 'hammer')),
       on('building:completed', (building) => {
-        if (!building.definition.wonder) this.log(`${building.name} tamamlandı`, 'hammer'); // harikanın ilk aşaması aşağıda
+        if (!building.definition.wonder && !building.definition.brush) this.log(`${building.name} tamamlandı`, 'hammer'); // harikanın ilk aşaması aşağıda
+      }),
+      on('sign:renamed', ({ from, name }) => this.log(from ? `${from} tabelasının adı değişti: ${name}` : `Yeni mahalle tabelası: ${name}`, 'signpost')),
+      on('tree:grown', ({ building }) => this.log(`${building.name} ulu bir ağaç oldu; gölgesinde dinlenilebilir`, 'flower')),
+      on('landscape:aestheticChanged', ({ percent, before }) => {
+        if (percent > before) this.log(`Kasaba güzelleşiyor: estetik refaha +%${percent} katıyor`, 'aesthetic');
       }),
       on('building:projectStarted', ({ building, kind }) =>
         this.log(kind === 'upgrade' ? `${building.name} yükseltiliyor` : kind === 'stage' ? `${building.name}: yeni aşamanın inşaatı başladı` : `${building.name} için onarım başladı`, 'hammer')
@@ -65,7 +72,7 @@ export class JournalSystem {
         this.log(`${from} onarıldı, ${building.name} yeniden hayat buldu${loot}`, 'star');
       }),
       on('building:removed', (building) => {
-        if (!building.underConstruction) this.log(`${building.name} yıkıldı`, 'demolish');
+        if (!building.underConstruction && !building.definition.brush) this.log(`${building.name} yıkıldı`, 'demolish');
       }),
       on('relationship:levelUp', ({ a, b, level }) => {
         if (level.key === 'friend') this.log(`${a.name} ve ${b.name} dost oldu`, 'heart');
@@ -141,10 +148,18 @@ export class JournalSystem {
         else this.log(safe ? `${winter ? 'Kar fırtınası' : 'Fırtına'} kasabayı hasarsız geçti` : `${winter ? 'Kar fırtınası' : 'Fırtına'} hasar verdi: ${damaged.map((b) => b.name).join(', ')}`, 'storm');
       }),
       on('expedition:departed', ({ members }) => this.log(`${members.map((c) => c.name).join(' ve ')} keşif seferine çıktı`, 'map')),
-      on('expedition:returned', ({ members, loot, text }) => {
+      on('expedition:returned', ({ members, loot, text, route }) => {
         const got = Object.keys(loot).length ? `: ${describeLoot(loot)}` : '';
-        this.log(`${members.map((c) => c.name).join(' ve ')} seferden döndü. ${text}${got}`, 'map');
+        this.log(`${members.map((c) => c.name).join(', ')} ${route ? `${route} Seferi'nden` : 'seferden'} döndü. ${text}${got}`, 'map');
       }),
+      // (16. aşama) maceralar, egzotik ganimetler ve kadim yazıtlar
+      on('adventure:resolved', ({ scenario, option, success, member }) =>
+        this.log(`Maceracı Günlüğü · ${scenario.title}: ${option.label}${success ? '' : ` (${member?.name} ${option.risk.text})`}`, scenario.icon)
+      ),
+      on('exotic:found', ({ def }) => this.log(`Seferden ${def.name} geldi`, def.icon)),
+      on('inscription:found', ({ inscription, source }) => this.log(`${source === 'ruin' ? 'Onarılan harabenin içinden' : 'Seferden'} kadim bir yazıt çıktı: ${inscription.name}`, 'inscription')),
+      on('inscription:decoded', ({ inscription }) => this.log(`Bilge kadim yazıtı çözdü: ${inscription.name} (${inscription.description})`, 'scheme')),
+      on('expedition:taleTold', ({ teller, listeners, route }) => this.log(`${teller.name} ${route} Seferi'ni anlattı; ${listeners.length} kişi soluksuz dinledi`, 'adventure')),
       // 12. aşama: Bilgelik Evi, okul, liman ve harika
       on('research:started', ({ research }) => this.log(`Bilgelik Evi'nde araştırma başladı: ${research.name}`, 'book')),
       on('research:completed', ({ research }) => this.log(`Araştırma tamamlandı: ${research.name}`, research.icon)),

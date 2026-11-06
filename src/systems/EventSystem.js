@@ -22,6 +22,7 @@ import { isRainActive } from '../data/weather.js';
 import { immigrationStatus, townFun, townTier } from './TownStatus.js';
 import { Random } from '../utils/random.js';
 import { clamp } from '../utils/math.js';
+import { merchantIntervalMultiplier } from './Exploration.js';
 
 const MERCHANT_BUBBLE_SECONDS = 2.4;
 
@@ -255,7 +256,8 @@ export class EventSystem {
     m.leaving = false;
     m.visits++;
     const [minDays, maxDays] = MERCHANT.intervalDays;
-    m.nextVisitDay = this.state.time.day + this.rngFor(4).int(minDays, maxDays);
+    // (16. aşama) Kayıp Şehir Haritası: tüccar kasabanın yolunu iki kat sık bulur
+    m.nextVisitDay = this.state.time.day + Math.max(1, Math.round(this.rngFor(4).int(minDays, maxDays) * merchantIntervalMultiplier(this.state)));
     this.merchant = null;
     this.world.visitors = [];
     this.events.emit('merchant:left', { name, nextVisitDay: m.nextVisitDay });

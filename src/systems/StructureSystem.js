@@ -10,13 +10,15 @@
 // oyun zamanıyla otlar, dolaşır, gece ahırın önünde yatar.
 // 11. aşama: şifacı kulübesi otlar ve iksir raflar doluysa boşta kalır; fırtınada / kurt saldırısında hasar alan
 // yapı onarılana kadar boşta kalır (building.damaged), hasarlı ağılda koyunların bir kısmı kaçmıştır.
-import { BUILDINGS } from '../data/buildings.js';
+import { BUILDINGS, connectGroup } from '../data/buildings.js';
 import { RESOURCES } from '../data/resources.js';
 import { Flock } from '../entities/Flock.js';
 import { TILE_TYPES } from '../data/tiles.js';
 import { isRainActive } from '../data/weather.js';
 import { getSeason } from '../data/seasons.js';
 import { clamp } from '../utils/math.js';
+import { VINE } from '../data/exploration.js';
+import { schemeGardenMultiplier } from './Exploration.js';
 
 const MIN_TREE_EFFICIENCY = 0.25; // oduncunun çevresinde hiç ağaç yokken bile biraz üretir
 
@@ -63,6 +65,10 @@ export function productionFactors(building, world, raining, season) {
   const tile = bonus > 0 ? biomeFor(building.type) : null;
   const biome = 1 + bonus;
   const upgrade = 1 + building.stat('productionBonus', 0);
+  // (16. aşama) Bahçe: Antik Su Kemeri Şeması (kalıcı) ve çevresine dikilen üzüm asmaları
+  const scheme = building.type === 'garden' ? schemeGardenMultiplier(world.state) : 1;
+  const vineCount = building.type === 'garden' ? vinesNear(world, building) : 0;
+  const vines = 1 + vineCount * VINE.gardenBonus;
   return {
     seasonal,
     seasonalRaw,
@@ -72,8 +78,24 @@ export function productionFactors(building, world, raining, season) {
     biomeName: tile?.name ?? null,
     biomeFull: tile ? bonus >= tile.biome.buildingBonus[building.type] - 1e-9 : false,
     upgrade,
-    total: seasonal * trees * rain * biome * upgrade,
+    scheme,
+    vines,
+    vineCount,
+    total: seasonal * trees * rain * biome * upgrade * scheme * vines,
   };
+}
+
+/** Bahçenin çevresindeki (bir karo) üzüm asması sayısı (en çok VINE.maxPerGarden). */
+export function vinesNear(world, building) {
+  const { w, h } = building.definition.size;
+  let n = 0;
+  for (const b of world.buildings) {
+    if (b.type !== 'grapeVine' || !b.functional) continue;
+    const dx = Math.max(building.tileX - b.tileX, 0, b.tileX - (building.tileX + w - 1));
+    const dy = Math.max(building.tileY - b.tileY, 0, b.tileY - (building.tileY + h - 1));
+    if (Math.max(dx, dy) <= VINE.radius) n++;
+  }
+  return Math.min(VINE.maxPerGarden, n);
 }
 
 export class StructureSystem {
@@ -108,10 +130,12 @@ export class StructureSystem {
   /** Birleşen yapıların (çit) dört yandaki komşu bağlantıları: building.connect = { left, right, up, down }. */
   connectFences() {
     const map = this.world.map;
-    const types = new Map(this.world.buildings.map((b) => [b.id, b.type]));
+    // (18. aşama) Aynı bağlantı grubundakiler birleşir: ahşap çit ile çit kapısı (connects: 'woodFence')
+    const groups = new Map(this.world.buildings.map((b) => [b.id, connectGroup(b.type)]));
     for (const b of this.world.buildings) {
-      if (!BUILDINGS[b.type].connects) continue;
-      const same = (x, y) => types.get(map.getOccupant(x, y)) === b.type;
+      const group = connectGroup(b.type);
+      if (!group) continue;
+      const same = (x, y) => groups.get(map.getOccupant(x, y)) === group;
       b.connect = { left: same(b.tileX - 1, b.tileY), right: same(b.tileX + 1, b.tileY), up: same(b.tileX, b.tileY - 1), down: same(b.tileX, b.tileY + 1) };
     }
   }

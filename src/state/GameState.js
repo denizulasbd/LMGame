@@ -12,6 +12,8 @@ import { EQUIPMENT_KEYS } from '../data/equipment.js';
 import { RESEARCH } from '../data/research.js';
 import { RELICS } from '../data/luxury.js';
 import { MASTERPIECES } from '../data/masterpieces.js';
+import { INSCRIPTIONS } from '../data/exploration.js';
+import { emptyExploration } from '../systems/Exploration.js';
 import { SEASON_FESTIVALS } from '../data/festivals.js';
 import { WEATHER_TYPES } from '../data/weather.js';
 import { Character } from '../entities/Character.js';
@@ -120,6 +122,12 @@ export class GameState {
     this.rally = null;
     // Usta işi eserler (CraftsmanshipSystem, 15. aşama): ustaların çıkardığı eserler ve durumları (bkz. systems/Masterworks.js)
     this.masterworks = emptyMasterworks();
+    // Keşif (ExpeditionSystem, 16. aşama): egzotik ganimetler, kadim yazıtlar ve imar şemaları, sefer günlüğü
+    // (bkz. systems/Exploration.js; süren sefer state.dilemma.expedition'da)
+    this.exploration = emptyExploration();
+    // (18. aşama) Serbest imar ve kasaba estetiği (LandscapeSystem): yıkım fırçasının küsuratlı iade birikimi,
+    // kasabanın toplam estetik puanı ve refaha eklediği yüzde (+%0-5), sokak yürüyüşü ve gece sayaçları
+    this.landscape = emptyLandscape();
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -182,6 +190,8 @@ export class GameState {
       seasonFestival: this.seasonFestival,
       rally: this.rally,
       masterworks: this.masterworks,
+      exploration: this.exploration,
+      landscape: this.landscape,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -265,6 +275,10 @@ export class GameState {
     next.rally = data.rally && Number.isFinite(data.rally.until) ? { ...data.rally } : null;
     // 15. aşamadan eski kayıtlarda usta işi eser yoktur: vitrin boş başlar (kıyafetler deneyimden türetilir)
     next.masterworks = restoreMasterworks(data.masterworks);
+    // 16. aşamadan eski kayıtlarda keşif ganimeti ve yazıt yoktur; yarım kalmış eski sefer maceralarsız sürer
+    next.exploration = restoreExploration(data.exploration);
+    // 18. aşamadan eski kayıtlarda peyzaj durumu yoktur: estetik ilk adımda yapılardan ve zeminden yeniden hesaplanır
+    next.landscape = restoreLandscape(data.landscape);
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
@@ -290,6 +304,47 @@ export class GameState {
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
+}
+
+function emptyLandscape() {
+  return { refundCredit: {}, score: 0, percent: 0, strolls: 0, roadsPainted: 0 };
+}
+
+/** Kayıttaki peyzaj durumu: sayılar sınırlanır; estetik puanı yüklenince yeniden hesaplanır. */
+function restoreLandscape(data) {
+  const out = emptyLandscape();
+  if (!data || typeof data !== 'object') return out;
+  for (const [r, v] of Object.entries(data.refundCredit ?? {})) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0 && n < 1) out.refundCredit[r] = n;
+  }
+  out.score = Math.max(0, Number(data.score) || 0);
+  out.percent = Math.min(5, Math.max(0, Math.floor(Number(data.percent) || 0)));
+  out.strolls = Math.max(0, Math.floor(Number(data.strolls) || 0));
+  out.roadsPainted = Math.max(0, Math.floor(Number(data.roadsPainted) || 0));
+  return out;
+}
+
+const INSCRIPTION_STATUSES = new Set(['found', 'decoding', 'decoded']);
+
+/** Kayıttaki keşif durumu: bilinmeyen yazıt ve eşyalar atlanır, sayılar sınırlanır. */
+function restoreExploration(data) {
+  const out = emptyExploration();
+  if (!data || typeof data !== 'object') return out;
+  for (const key of Object.keys(out.items)) out.items[key] = Math.max(0, Math.floor(Number(data.items?.[key]) || 0));
+  out.cityMap = Boolean(data.cityMap);
+  for (const [id, v] of Object.entries(data.inscriptions ?? {})) {
+    if (INSCRIPTIONS[id] && v && INSCRIPTION_STATUSES.has(v.status)) out.inscriptions[id] = { ...v };
+  }
+  const d = data.decoding;
+  out.decoding = d && INSCRIPTIONS[d.id] && out.inscriptions[d.id]?.status === 'decoding' ? { id: d.id, progress: Math.max(0, Number(d.progress) || 0) } : null;
+  // Çözülürken kaydedilmiş ama çözüm kaydı kaybolmuş yazıt yeniden "bulundu" olur
+  for (const [id, v] of Object.entries(out.inscriptions)) if (v.status === 'decoding' && out.decoding?.id !== id) v.status = 'found';
+  out.expeditions = Math.max(0, Number(data.expeditions) || 0);
+  out.lastLaunchDay = Number.isFinite(data.lastLaunchDay) ? data.lastLaunchDay : -99;
+  out.ironCredit = Math.max(0, Number(data.ironCredit) || 0);
+  out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && typeof l.route === 'string').slice(-12);
+  return out;
 }
 
 function emptyMasterworks() {

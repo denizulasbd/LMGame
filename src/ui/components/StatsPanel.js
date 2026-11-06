@@ -1,5 +1,5 @@
-// Kasaba Arşivi (13. aşama): sol sütunda "Arşiv" (I) ve "Fotoğraf" (F) düğmeleri; Arşiv düğmesi ekranın ortasında
-// bir pencere açar. Pencerede son 32 günün dört küçük grafiği (Nüfus, Ortalama Refah, Stok Toplamı, Kasaba Hazinesi;
+// Kasaba Arşivi (13. aşama): dock'ta "Arşiv" (I) ve "Fotoğraf" (F) düğmeleri; Arşiv düğmesi ekranın ortasında
+// bir pencere açar (17. aşama: ModalHost; ✕ / Esc / dışına tıklamak kapatır). Pencerede son 32 günün dört küçük grafiği (Nüfus, Ortalama Refah, Stok Toplamı, Kasaba Hazinesi;
 // canvas'a piksel çizgisiyle) ve kasabanın toplam istatistikleri (üretilen ekmek, düğünler, doğan çocuklar, atlatılan
 // kışlar, sergilenen yadigârlar...) yer alır. Veriyi StatsSystem (state.history) ve diğer sistemler (state.stats,
 // state.trade, state.luxury, state.research) yazar; burası yalnızca GameState'i okur.
@@ -13,45 +13,33 @@ import { townSnapshot } from '../../systems/StatsSystem.js';
 import { MASTERPIECES, MASTERWORK } from '../../data/masterpieces.js';
 import { masterworkSaleStatus, masterworkHappiness, bestMasterworkBuyer } from '../../systems/Masterworks.js';
 import { el } from '../dom.js';
+import { dockButton, modalHeader } from '../dockButton.js';
 
 const CHART_W = 236;
 const CHART_H = 84;
 const PAD = { left: 4, right: 4, top: 8, bottom: 6 };
 const CHARTS = [
-  { key: 'population', title: 'Nüfus', icon: 'heart', color: '#e8463c', fill: 'rgba(232, 70, 60, 0.16)', unit: 'sakin' },
-  { key: 'welfare', title: 'Ortalama Refah', icon: 'smile', color: '#38a046', fill: 'rgba(56, 160, 70, 0.16)', unit: '%', min: 0, max: 100 },
-  { key: 'stock', title: 'Stok Toplamı', icon: 'wood', color: '#a8703f', fill: 'rgba(168, 112, 63, 0.18)', unit: 'birim' },
-  { key: 'gold', title: 'Kasaba Hazinesi', icon: 'coin', color: '#d9a400', fill: 'rgba(255, 210, 63, 0.22)', unit: 'altın' },
+  { key: 'population', title: 'Nüfus', icon: 'heart', color: '#e8463c', fill: 'rgba(232, 70, 60, 0.22)', unit: 'sakin' },
+  { key: 'welfare', title: 'Ortalama Refah', icon: 'smile', color: '#5cc46a', fill: 'rgba(56, 160, 70, 0.22)', unit: '%', min: 0, max: 100 },
+  { key: 'stock', title: 'Stok Toplamı', icon: 'wood', color: '#d69a5c', fill: 'rgba(214, 154, 92, 0.2)', unit: 'birim' },
+  { key: 'gold', title: 'Kasaba Hazinesi', icon: 'coin', color: '#ffd23f', fill: 'rgba(255, 210, 63, 0.2)', unit: 'altın' },
 ];
 
 const formatNumber = (n) => Math.round(n).toLocaleString('tr-TR');
 
 export class StatsPanel {
   constructor(game) {
-    this.slot = 'left';
     this.events = game.events;
     this.open = false;
     this.lastKey = '';
+    this.modalHost = null; // UIManager bağlar
 
-    const button = (icon, label, key, title, onClick) => {
-      const b = el('button', { className: 'hud-btn journal-toggle', type: 'button', title, tabIndex: -1 }, [
-        el('img', { className: 'tool-icon', src: getAnyIconURL(icon), alt: '' }),
-        el('span', { text: label }),
-        el('kbd', { text: key }),
-      ]);
-      b.addEventListener('mousedown', (e) => e.preventDefault());
-      b.addEventListener('click', onClick);
-      return b;
-    };
-    this.toggle = button('chart', 'Arşiv', 'I', 'Kasaba Arşivi: grafikler ve istatistikler (I)', () => this.setOpen(!this.open));
-    this.photo = button('camera', 'Fotoğraf', 'F', 'Fotoğraf modu: arayüzü gizle, kasabayı seyret (F)', () => this.events.emit('ui:toggleCinematic'));
-    this.photo.classList.add('photo-toggle');
-    this.element = el('div', { className: 'archive-buttons ui-interactive' }, [this.toggle, this.photo]);
+    // (17. aşama) Arşiv ve Fotoğraf düğmeleri alt dock'ta
+    this.toggle = dockButton({ icon: 'chart', label: 'Arşiv', key: 'I', tip: 'Kasaba Arşivi: grafikler, tarih ve usta işi eserler', onClick: () => this.setOpen(!this.open), className: 'archive-toggle' });
+    this.photo = dockButton({ icon: 'camera', label: 'Fotoğraf', key: 'F', tip: 'Fotoğraf modu: arayüzü gizle, kasabayı seyret', onClick: () => this.events.emit('ui:toggleCinematic'), className: 'photo-toggle' });
+    this.dockButtons = [this.toggle, this.photo];
 
-    // Pencere: ekranın ortasında (serbest yuva)
-    const close = el('button', { className: 'hud-btn journal-close', type: 'button', text: '✕', title: 'Kapat (I)', tabIndex: -1 });
-    close.addEventListener('mousedown', (e) => e.preventDefault());
-    close.addEventListener('click', () => this.setOpen(false));
+    // Pencere: ekranın ortasında (ModalHost)
     this.subtitle = el('div', { className: 'archive-subtitle' });
     this.charts = CHARTS.map((spec) => {
       const canvas = el('canvas', { className: 'archive-canvas', width: CHART_W, height: CHART_H });
@@ -69,19 +57,17 @@ export class StatsPanel {
     this.vitrineInfo = el('div', { className: 'archive-subtitle masterwork-info' });
     this.vitrine = el('div', { className: 'masterwork-list' });
     this.lastVitrine = '';
-    this.window = el('div', { className: 'archive ui-interactive', hidden: true }, [
-      el('div', { className: 'panel archive-panel' }, [
-        el('div', { className: 'journal-header' }, [el('span', { text: 'Kasaba Arşivi' }), close]),
-        this.subtitle,
-        el('div', { className: 'archive-grid' }, this.charts.map((c) => c.box)),
-        el('div', { className: 'building-section-title', text: 'Kasabanın tarihi' }),
-        this.totals,
-        el('div', { className: 'building-section-title', text: 'Usta İşi Eserler' }),
-        this.vitrineInfo,
-        this.vitrine,
-      ]),
+    this.window = el('div', { className: 'panel archive-panel ui-interactive', hidden: true }, [
+      modalHeader('Kasaba Arşivi', () => this.setOpen(false), { icon: 'chart' }),
+      this.subtitle,
+      el('div', { className: 'archive-grid' }, this.charts.map((c) => c.box)),
+      el('div', { className: 'building-section-title', text: 'Kasabanın tarihi' }),
+      this.totals,
+      el('div', { className: 'building-section-title', text: 'Usta İşi Eserler' }),
+      this.vitrineInfo,
+      this.vitrine,
     ]);
-    this.extra = [{ slot: 'free', element: this.window }];
+    this.modal = { id: 'archive', element: this.window };
 
     game.events.on('ui:toggleStats', () => this.setOpen(!this.open));
   }
@@ -92,6 +78,8 @@ export class StatsPanel {
     this.toggle.classList.toggle('is-active', open);
     this.lastKey = '';
     this.lastVitrine = '';
+    if (open) this.modalHost?.opened('archive');
+    else this.modalHost?.closed('archive');
   }
 
   render(game) {
@@ -130,10 +118,10 @@ export class StatsPanel {
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, CHART_W, CHART_H);
-    // Kâğıt zemin ve yatay kılavuz çizgileri
-    ctx.fillStyle = '#fff6d6';
+    // (17. aşama) Koyu parşömen zemin ve yatay kılavuz çizgileri
+    ctx.fillStyle = '#231813';
     ctx.fillRect(0, 0, CHART_W, CHART_H);
-    ctx.fillStyle = 'rgba(79, 45, 26, 0.12)';
+    ctx.fillStyle = 'rgba(242, 228, 196, 0.1)';
     const plotH = CHART_H - PAD.top - PAD.bottom;
     const plotW = CHART_W - PAD.left - PAD.right;
     for (let i = 0; i <= 4; i++) ctx.fillRect(PAD.left, Math.round(PAD.top + (plotH * i) / 4), plotW, 1);
@@ -163,7 +151,7 @@ export class StatsPanel {
       }
     }
     // Gün noktaları (son nokta büyük)
-    ctx.fillStyle = '#4f2d1a';
+    ctx.fillStyle = '#f2e4c4';
     values.forEach((v, i) => {
       const big = i === values.length - 1;
       ctx.fillRect(xAt(i) - (big ? 2 : 1), yAt(v) - (big ? 2 : 1), big ? 5 : 3, big ? 5 : 3);
@@ -241,6 +229,10 @@ export class StatsPanel {
       ['map', 'Verilen karar', stats.dilemmas ?? 0],
       ['handshake', 'Barışan küsler', stats.reconciliations ?? 0],
       ['masterpiece', 'Usta işi eser', state.masterworks?.made ?? 0],
+      ['map', 'Keşif seferi', state.exploration?.expeditions ?? 0],
+      ['mountain', 'Atlatılan macera', stats.adventures ?? 0],
+      ['adventure', 'Handa anlatılan hikâye', stats.talesTold ?? 0],
+      ['scheme', 'Çözülen kadim yazıt', `${Object.values(state.exploration?.inscriptions ?? {}).filter((i) => i.status === 'decoded').length}/3`],
     ];
     this.totals.replaceChildren(
       ...rows.map(([icon, label, v]) =>

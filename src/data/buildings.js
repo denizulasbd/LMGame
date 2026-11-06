@@ -78,6 +78,13 @@ import { GROUND_TILES } from './tiles.js';
 //   connects     : (Çiçekli Çit) yanındaki aynı türden çitlerle görsel olarak birleşir
 //   seasonalFoliage : (Kiraz Ağacı) dört mevsim kendi görünümü ve rüzgârda dökülen yaprakları vardır
 //
+// 18. aşama — serbest imar ve peyzaj (kurallar data/landscape.js, mantık systems/LandscapeSystem.js):
+//   connects     : true -> aynı türle, 'grup' -> aynı gruptaki türlerle birleşir (ahşap çit + çit kapısı)
+//   brush        : inşa aracında sürükleyerek art arda dikilir (çit, saksı, fidan); tek tek bildirim çıkmaz
+//   seatBench    : oturulabilen bank (park bankı; ahşap bank gibi)
+//   ornamentalTree : { foliage } süs fidanı: dikildikten sonra iki günde büyür, ulu ağacın gölgesinde dinlenilir
+//   grownName    : büyüyünce aldığı ad (Huş Fidanı -> Huş Ağacı)
+//
 // Seviye 2 (8. aşama) — upgrade: yapı yıkılmadan Yapı Bilgi Paneli'nden geliştirilir:
 //   { name, description, cost, buildWork, capacity?, workers?, productionBonus?, seasonalFloor?,
 //     heatingFactor?, sleepFunPerMinute? }
@@ -532,12 +539,13 @@ export const BUILDINGS = {
     description: 'Beyaz boyalı, saksı çiçekli alçak bahçe çiti. Yan yana kurulan çitler birleşir; bahçe kenarlarını süsler.',
     cost: { wood: 5 },
     buildWork: 15,
+    brush: true, // (18. aşama) inşa aracında sürükleyerek art arda dikilir
     allowedTiles: [...GROUND_TILES, 'plaza'],
     connects: true,
     funAura: { radius: 18, perMinute: 0.015 },
   },
   lantern: {
-    name: 'Sokak Feneri',
+    name: 'Ahşap Sokak Feneri',
     size: { w: 1, h: 1 },
     spots: 'none',
     buildable: true,
@@ -549,6 +557,170 @@ export const BUILDINGS = {
     allowedTiles: [...GROUND_TILES, 'plaza'],
     litHours: { from: 19, to: 6 },
     funAura: { radius: 44, perMinute: 0.07 },
+  },
+  // --- 18. aşama: serbest imar, peyzaj ve sokak eşyaları (category 'Peyzaj': inşa menüsünün Peyzaj & Dekorasyon sekmesi) ---
+  woodFence: {
+    name: 'Ahşap Çit',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: 'Kazıklı, iki kuşaklı rustik ahşap çit. Yan yana ve alt alta kurulan çitler (ve çit kapıları) yönüne göre birleşir; bahçeleri, ağılları ve avluları çevreler. Sakinler çitin içinden geçemez: bir Çit Kapısı bırak.',
+    cost: { wood: 2 },
+    buildWork: 8,
+    brush: true, // (18. aşama) inşa aracında sürükleyerek art arda dikilir
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    connects: 'woodFence',
+  },
+  fenceGate: {
+    name: 'Çit Kapısı',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: 'Ahşap çite takılan iki kanatlı bahçe kapısı. Çitlerle birleşir; sakinler kapıyı itip geçer, yolu kapatmaz.',
+    cost: { wood: 4 },
+    buildWork: 10,
+    allowedTiles: [...GROUND_TILES, 'path', 'cobble', 'plaza'],
+    walkable: true,
+    connects: 'woodFence',
+    sortLine: 12,
+  },
+  ironLantern: {
+    name: 'Demir Sokak Feneri',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: 'Dökme demir direkli, cam fanuslu şık sokak feneri. 18:30-06:30 arası ahşap fenerden daha geniş, yumuşak bir ışık yayar; karanlık sokakta yürüyenlerin ürkmesini önler.',
+    cost: { iron: 2, stone: 2 },
+    buildWork: 20,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    litHours: { from: 18.5, to: 6.5 },
+    funAura: { radius: 56, perMinute: 0.08 },
+  },
+  signpost: {
+    name: 'Mahalle Tabelası',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: 'Ahşap direkli sokak / mahalle tabelası. Üzerine tıklayıp semte bir ad ver; imleçle üzerine gelince adı tabelada okunur, yakınında yürüyenlerin anılarında sokağın adı geçer.',
+    cost: { wood: 3 },
+    buildWork: 10,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    sortLine: 13,
+  },
+  parkBench: {
+    name: 'Park Bankı',
+    size: { w: 1, h: 1 },
+    spots: 'self',
+    seat: { x: 8, y: 13 },
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: 'Dökme demir ayaklı, sırtlıklı yeşil park bankı. Sakinler oturup manzarayı izler; çiçekli, güzel bir köşedeyse keyifleri çok daha hızlı dolar.',
+    cost: { wood: 5, iron: 1 },
+    buildWork: 20,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    seatBench: true,
+  },
+  planter: {
+    name: 'Çiçek Saksısı',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: 'Taş çanaklı, rengârenk çiçek arkı. Yanından geçenler çiçek kokusunu içine çeker; sokak kenarlarını ve meydanları süsler.',
+    cost: { wood: 1, stone: 2 },
+    buildWork: 10,
+    brush: true, // (18. aşama) inşa aracında sürükleyerek art arda dikilir
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    funAura: { radius: 22, perMinute: 0.03 },
+  },
+  birchTree: {
+    name: 'Huş Fidanı',
+    grownName: 'Huş Ağacı',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: 'Beyaz gövdeli zarif süs huşu. İki günde büyür; ulu ağacın gölgesinde sakinler dinlenir. Kesilmez, odun vermez.',
+    cost: { wood: 2, food: 2 },
+    buildWork: 10,
+    brush: true, // (18. aşama) inşa aracında sürükleyerek art arda dikilir
+    allowedTiles: [...GROUND_TILES],
+    ornamentalTree: { foliage: 'oak' },
+  },
+  oakTree: {
+    name: 'Meşe Fidanı',
+    grownName: 'Süs Meşesi',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: 'Geniş taçlı gölgelik meşe. İki günde büyür; yazın serin gölgesinde sakinler oturup dinlenir, sonbaharda kızıla döner. Kesilmez.',
+    cost: { wood: 2, food: 2 },
+    buildWork: 10,
+    brush: true, // (18. aşama) inşa aracında sürükleyerek art arda dikilir
+    allowedTiles: [...GROUND_TILES],
+    ornamentalTree: { foliage: 'oak' },
+  },
+  pineTree: {
+    name: 'Çam Fidanı',
+    grownName: 'Süs Çamı',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description: 'Dört mevsim yeşil kalan süs çamı. İki günde büyür; kışın da yeşil gölgesiyle sokakları güzelleştirir. Kesilmez.',
+    cost: { wood: 2, food: 2 },
+    buildWork: 10,
+    brush: true, // (18. aşama) inşa aracında sürükleyerek art arda dikilir
+    allowedTiles: [...GROUND_TILES],
+    ornamentalTree: { foliage: 'pine' },
+  },
+  // (16. aşama) Keşif seferlerinden gelen egzotik ganimetlerle dikilen yapılar (item: harcanan ganimet; kaynak bedeli yok)
+  grapeVine: {
+    name: 'Üzüm Asması',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Süsleme',
+    description:
+      'Seferden gelen egzotik üzüm fidesiyle dikilir; Sebze Bahçesi ya da Ahşap Çardak kenarına kurulur. Yanındaki bahçenin verimi +%10 (en çok iki asma), handa yemek yiyenler soğuk üzüm şerbeti içer, yanından geçenlerin keyfi yerine gelir.',
+    cost: {},
+    item: 'vineSeed',
+    placement: 'nearGarden',
+    buildWork: 20,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    funAura: { radius: 28, perMinute: 0.05 },
+  },
+  ancientTorch: {
+    name: 'Kadim Meşale',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Süsleme',
+    description:
+      'Kayıp bir tapınaktan getirilen mistik meşale. 18:00-06:00 arası mavi alevle yanar; yakınındaki herkesin içini ısıtır (kışın üşütmez) ve keyfini yerine getirir.',
+    cost: {},
+    item: 'ancientTorch',
+    buildWork: 15,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    litHours: { from: 18, to: 6 },
+    funAura: { radius: 44, perMinute: 0.07 },
+    warmAura: { radius: 44 },
   },
   monument: {
     name: 'Kasaba Anıtı',
@@ -643,12 +815,28 @@ export const BUILDINGS = {
 // Zemine anında döşenen yapılar (şantiye kurulmaz). Fırçayla sürüklenerek boyanır.
 export const TILE_BUILDS = {
   path: {
-    name: 'Toprak Yol',
+    name: 'Toprak Patika',
     category: 'Zemin',
-    description: 'Sakinler yollarda daha hızlı yürür ve yolları tercih eder.',
-    cost: {},
+    description: 'Sıkıştırılmış toprak patika: sakinler patikayı tercih eder, üzerinde %10 hızlı yürür. Yağmurda çamurlanır. Sürükleyerek kesintisiz çiz.',
+    cost: { wood: 1 },
     allowedTiles: GROUND_TILES,
     result: 'path',
+  },
+  stonePath: {
+    name: 'Parke Taş Yol',
+    category: 'Zemin',
+    description: 'Arnavut kaldırımı parke yol: üzerinde %25 hızlı yürünür, yağmurda çamur olmaz. Toprak patikanın üstüne de döşenir.',
+    cost: { stone: 1 },
+    allowedTiles: [...GROUND_TILES, 'path'],
+    result: 'cobble',
+  },
+  plazaTile: {
+    name: 'Taş Plaka',
+    category: 'Zemin',
+    description: 'Kesme taş plakalı meydan zemini: en şık döşeme. Çevresine estetik katar, üzerinde %20 hızlı yürünür, çamurlanmaz; banklar, fenerler ve süsler üstüne kurulur.',
+    cost: { stone: 2 },
+    allowedTiles: [...GROUND_TILES, 'path', 'cobble'],
+    result: 'plaza',
   },
   bridge: {
     name: 'Ahşap Köprü',
@@ -658,24 +846,20 @@ export const TILE_BUILDS = {
     allowedTiles: ['water'],
     result: 'bridge',
   },
-  stonePath: {
-    name: 'Taş Yol',
-    category: 'Zemin',
-    description: 'Arnavut kaldırımı: toprak yoldan şık, üzerinde %15 daha hızlı yürünür. Toprak yolun üstüne de döşenir.',
-    cost: { stone: 1 },
-    allowedTiles: [...GROUND_TILES, 'path'],
-    result: 'cobble',
-  },
 };
+
+// (18. aşama) Döşenen zemin -> onu döşeyen fırça (yıkım fırçası harcananın yarısını buradan iade eder)
+export const TILE_BUILD_BY_RESULT = Object.fromEntries(Object.entries(TILE_BUILDS).map(([key, def]) => [def.result, key]));
 
 // Kaldırılınca zeminin döneceği karo (taş yol toprak yola, köprü suya döner; toprak yol çimene ya da
 // harita üretildiğinde orada olan biyom zeminine — bkz. ConstructionSystem.demolishAt)
-export const TILE_REMOVAL = { bridge: 'water', cobble: 'path', path: 'grass' };
+export const TILE_REMOVAL = { bridge: 'water', cobble: 'path', path: 'grass', plaza: 'path' };
 
 // İnşa menüsündeki sıra
 export const BUILD_MENU = [
   'path',
   'stonePath',
+  'plazaTile',
   'bridge',
   'cabin',
   'lumberHut',
@@ -693,16 +877,43 @@ export const BUILD_MENU = [
   'harbor',
   'academy',
   'townHall',
-  'flowerBed',
+  'monument',
+  'wonder',
+  'woodFence',
+  'fenceGate',
   'flowerFence',
+  'lantern',
+  'ironLantern',
+  'signpost',
+  'bench',
+  'parkBench',
+  'planter',
+  'flowerBed',
+  'birchTree',
+  'oakTree',
+  'pineTree',
   'cherryTree',
   'marbleArch',
   'gazebo',
-  'bench',
-  'lantern',
-  'monument',
-  'wonder',
+  'grapeVine',
+  'ancientTorch',
 ];
+
+/** (18. aşama) Menü öğesinin İnşa sekmesi: 'roads' (zemin fırçaları), 'decor' (süs ve sokak eşyaları), 'buildings'. */
+export function buildTabFor(type) {
+  if (TILE_BUILDS[type]) return 'roads';
+  const category = BUILDINGS[type]?.category;
+  return category === 'Süsleme' || category === 'Peyzaj' ? 'decor' : 'buildings';
+}
+
+/** Birleşen yapıların (çit) bağlantı grubu: aynı gruptakiler birbirine bağlanır (ahşap çit ile çit kapısı). */
+export function connectGroup(type) {
+  const c = BUILDINGS[type]?.connects;
+  return c ? (c === true ? type : c) : null;
+}
+
+/** (18. aşama) Oturulabilen banklar (ahşap bank, park bankı). */
+export const BENCH_TYPES = ['bench', 'parkBench'];
 
 /** Bir menü öğesinin tanımı (yapı ya da zemin). */
 export function getBuildDefinition(type) {

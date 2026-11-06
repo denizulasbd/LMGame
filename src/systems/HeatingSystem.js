@@ -133,7 +133,9 @@ export class HeatingSystem {
     const state = this.state;
     if (state.heating.cold) return;
     const until = state.totalMinutes + HEATING.warmHours * 60;
-    const fires = this.world.buildings.filter((b) => b.type === 'campfire' && b.lit);
+    // Kamp ateşi ve (16. aşama) mavi alevli Kadim Meşale gibi ısıtan, yanan yapılar
+    const fires = this.world.buildings.filter((b) => (b.type === 'campfire' || b.definition.warmAura) && b.lit);
+    const radius = (f) => f.definition.warmAura?.radius ?? HEATING.warmRadius;
     // (12. aşama) Tamamlanmış Büyük Saat Kulesi geniş bir yarıçapta herkesi ısıtır
     const wonders = this.world.buildings.filter((b) => b.wonderComplete);
     for (const c of this.world.characters) {
@@ -141,7 +143,7 @@ export class HeatingSystem {
       const warmIndoors = inside && (inside.type === 'cabin' || inside.type === 'inn' || inside.type === 'academy');
       const nearFire =
         c.visible &&
-        (fires.some((f) => Math.hypot(f.center.x - c.x, f.center.y - c.y) <= HEATING.warmRadius) ||
+        (fires.some((f) => Math.hypot(f.center.x - c.x, f.center.y - c.y) <= radius(f)) ||
           wonders.some((w) => Math.hypot(w.center.x - c.x, w.center.y - c.y) <= w.definition.wonder.warmRadius));
       if (warmIndoors || nearFire) {
         const wasCold = (c.buffs.warmUntil ?? -1) <= state.totalMinutes;

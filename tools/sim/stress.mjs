@@ -72,5 +72,10 @@ console.log(
     `Kalfa ${sum((d) => d.monitor.outfits.filter((o) => o.endsWith(':2')).length)} · kıyafet hatası ${sum((d) => d.monitor.outfitErrors.length)} · ` +
     `küs çift (son / en çok / toplam çift): ${sum((d) => d.monitor.feuds ?? 0)} / ${sum((d) => d.monitor.maxFeuds ?? 0)} / ${sum((d) => d.monitor.pairs ?? 0)}`
 );
+console.log(
+  `(16. aşama) sefer ${sum((d) => d.monitor.events.expeditions)} (dönen ${sum((d) => d.monitor.events.returned)}) · macera ${sum((d) => d.monitor.events.adventures)} ` +
+    `(kaza ${sum((d) => d.monitor.events.mishaps)}) · handa anlatılan hikâye ${sum((d) => d.monitor.events.tales)} · çözülen yazıt ${sum((d) => d.monitor.decoded ?? 0)} · ` +
+    `dikilen asma / meşale ${sum((d) => d.monitor.exotic ?? 0)}`
+);
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

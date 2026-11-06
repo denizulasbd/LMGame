@@ -9,6 +9,7 @@ import { HAPPINESS_WEIGHTS, HAPPINESS_LEVELS, IMMIGRATION, TOWN_BUFFS, TOWN_TIER
 import { EXPEDITION } from '../data/dilemmas.js';
 import { RESOURCES, FOOD_KEYS } from '../data/resources.js';
 import { masterworkHappiness } from './Masterworks.js';
+import { aestheticWelfareMultiplier } from './Landscape.js';
 
 /** Bir sakinin mutluluğu 0-100: ihtiyaçlarının ağırlıklı ortalaması. */
 export function happinessOf(character) {
@@ -19,13 +20,14 @@ export function happinessOf(character) {
 
 /**
  * Kasabanın ortalama mutluluğu (sakin yoksa 0); anıt ve onarılmış gözetleme kulesi kalıcı puan ekler
- * (en çok 100).
+ * (en çok 100). (18. aşama) Kasabanın toplam estetiği sakinlerin ortalamasına kalıcı küçük bir çarpan ekler
+ * (+%1 ... +%5; systems/Landscape.js).
  */
 export function townHappiness(state) {
   const people = state.characters;
   if (people.length === 0) return 0;
   const average = people.reduce((sum, c) => sum + happinessOf(c), 0) / people.length;
-  return Math.min(100, average + townHappinessBonus(state));
+  return Math.min(100, average * aestheticWelfareMultiplier(state) + townHappinessBonus(state));
 }
 
 /**

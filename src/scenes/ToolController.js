@@ -7,9 +7,16 @@
 //             emirli bir hedeften başlayan sürükleme emirleri kaldırır
 //   Yık     : yapıyı yıkar / şantiyeyi iptal eder, yolu kaldırır, toplama emrini iptal eder
 //
+// (18. aşama) Serbest imar:
+//   - Yol & Zemin fırçaları (Toprak Patika, Parke Taş Yol, Taş Plaka, Köprü) sürüklenince kesintisiz çizer: fare hızlı
+//     gitse de aradaki karolar dolar (4 yönlü bağlı çizgi), yollar birbirine otomatik bağlanır (köşeler TileMap'te).
+//   - Fırçayla dikilen süsler (çit, çiçekli çit, saksı, fidan) sürükleyerek art arda kurulur; tek tıkla tek kare.
+//   - Yıkım fırçası: tıklanan yapı (her boyutta) yıkılır; sürükleyince yollar, çitler ve küçük süsler (1x1 peyzaj)
+//     geri dönüştürülür. Her biri harcananın yarısını depoya iade eder; fırça bitince tek bir özet bildirimi çıkar.
+//
 // Klavye: B inşa, H topla, X yık, Esc seçime dön. Arayüz 'ui:setTool' ile araç değiştirir;
 // değişiklikler 'tool:changed', fare altındaki durum 'tool:preview' olarak yayınlanır.
-import { BUILDINGS, TILE_BUILDS } from '../data/buildings.js';
+import { BUILDINGS, TILE_BUILDS, buildTabFor } from '../data/buildings.js';
 import { OBJECT_TYPES } from '../data/tiles.js';
 import { formatCost } from '../data/resources.js';
 import { biomeBonus, biomeFor } from '../systems/StructureSystem.js';
@@ -17,6 +24,8 @@ import { drawAreaCursor } from '../rendering/TileCursor.js';
 import { getStructureSprite } from '../art/sprites/index.js';
 import { getTileSprite } from '../art/tiles/index.js';
 import { CONFIG } from '../config.js';
+import { AESTHETIC } from '../data/landscape.js';
+import { aestheticLevel } from '../systems/Landscape.js';
 
 const GHOST_ALPHA = 0.6;
 const T = CONFIG.TILE_SIZE;
@@ -98,49 +107,119 @@ export class ToolController {
     return Boolean(this.buildType && TILE_BUILDS[this.buildType]);
   }
 
+  /** (18. aşama) Sürükleyerek art arda dikilen süs (çit, saksı, fidan) mi? */
+  isBrushBuild() {
+    return Boolean(this.buildType && BUILDINGS[this.buildType]?.brush);
+  }
+
   beginStroke(tile) {
-    if (this.tool === 'build' && !this.isTileBuild()) {
+    if (this.tool === 'build' && !this.isTileBuild() && !this.isBrushBuild()) {
       const anchor = this.construction.anchorFor(this.buildType, tile.tileX, tile.tileY);
       const result = this.construction.placeSite(this.buildType, anchor.x, anchor.y);
       if (!result.ok) this.events.emit('toast', { text: result.reason, tone: 'warn', icon: 'demolish' });
       return;
     }
+    let mode = 'add';
+    if (this.tool === 'harvest' && this.jobs.jobAt(tile.tileX, tile.tileY)) mode = 'remove';
+    this.stroke = { mode, visited: new Set(), changed: false, failure: null, last: null, placed: 0, removed: { tiles: 0, buildings: 0, names: [] }, refund: {} };
     if (this.tool === 'demolish') {
+      // İlk tıklama: toplama emri iptali ya da her boyutta yapı / yol; sürükleme yalnızca yol ve küçük süs
       const job = this.jobs.jobAt(tile.tileX, tile.tileY);
       if (job && job.type !== 'build') {
         this.jobs.cancel(job);
+        this.stroke.mode = 'jobs';
+        this.stroke.visited.add(`${tile.tileX},${tile.tileY}`);
+        this.stroke.last = { x: tile.tileX, y: tile.tileY };
         return;
       }
-      const result = this.construction.demolishAt(tile.tileX, tile.tileY);
-      if (!result.ok) this.events.emit('toast', { text: result.reason, tone: 'warn', icon: 'demolish' });
-      return;
+      this.stroke.first = true;
     }
-    const mode = this.tool === 'harvest' && this.jobs.jobAt(tile.tileX, tile.tileY) ? 'remove' : 'add';
-    this.stroke = { mode, visited: new Set(), changed: false, failure: null };
     this.continueStroke(tile);
   }
 
+  /** Fare bir karodan uzaktaki karoya sıçrasa da aradaki karolar sırayla işlenir (4 yönlü bağlı çizgi). */
   continueStroke(tile) {
-    const key = `${tile.tileX},${tile.tileY}`;
+    const last = this.stroke.last;
+    const points = last ? lineTiles(last.x, last.y, tile.tileX, tile.tileY) : [{ x: tile.tileX, y: tile.tileY }];
+    for (const p of points) this.strokeTile(p.x, p.y);
+    this.stroke.last = { x: tile.tileX, y: tile.tileY };
+  }
+
+  strokeTile(x, y) {
+    const key = `${x},${y}`;
     if (this.stroke.visited.has(key)) return;
     this.stroke.visited.add(key);
 
-    if (this.tool === 'build') {
-      const result = this.construction.paintTile(this.buildType, tile.tileX, tile.tileY);
-      if (result.ok) this.stroke.changed = true;
-      else if (!result.already) this.stroke.failure ??= result.reason;
+    if (this.tool === 'build' && this.isBrushBuild()) {
+      const result = this.construction.placeSite(this.buildType, x, y, { quiet: true });
+      if (result.ok) {
+        this.stroke.placed += 1;
+        this.stroke.changed = true;
+      } else this.stroke.failure ??= result.reason;
+    } else if (this.tool === 'build') {
+      const result = this.construction.paintTile(this.buildType, x, y);
+      if (result.ok) {
+        this.stroke.changed = true;
+        this.stroke.placed += 1;
+      } else if (!result.already) this.stroke.failure ??= result.reason;
     } else if (this.tool === 'harvest') {
-      const job = this.jobs.jobAt(tile.tileX, tile.tileY);
+      const job = this.jobs.jobAt(x, y);
       if (this.stroke.mode === 'remove' && job && job.type !== 'build') this.jobs.cancel(job);
-      if (this.stroke.mode === 'add' && !job) this.jobs.designate(tile.tileX, tile.tileY);
+      if (this.stroke.mode === 'add' && !job) this.jobs.designate(x, y);
+    } else if (this.tool === 'demolish') {
+      this.demolishTile(x, y);
+    }
+  }
+
+  /** Yıkım fırçası: ilk karoda her şey; sürüklerken yalnızca yol / zemin ve 1x1 peyzaj süsleri. */
+  demolishTile(x, y) {
+    const stroke = this.stroke;
+    if (stroke.mode === 'jobs') {
+      const job = this.jobs.jobAt(x, y);
+      if (job && job.type !== 'build') this.jobs.cancel(job);
+      return;
+    }
+    const first = stroke.first;
+    stroke.first = false;
+    const check = this.construction.describeDemolish(x, y);
+    if (!check.ok) {
+      if (first) stroke.failure ??= check.reason;
+      return;
+    }
+    if (check.building && !first && !isSmallDecor(check.building.type)) return;
+    const before = { ...this.world.state.resources };
+    const result = this.construction.demolishAt(x, y, { quiet: true, refresh: false });
+    if (!result.ok) return;
+    stroke.changed = true;
+    if (result.kind === 'tile') stroke.removed.tiles += 1;
+    else {
+      stroke.removed.buildings += 1;
+      if (stroke.removed.names.length < 3 && !stroke.removed.names.includes(check.building.name)) stroke.removed.names.push(check.building.name);
+    }
+    for (const [r, v] of Object.entries(this.world.state.resources)) {
+      const gained = v - (before[r] ?? 0);
+      if (gained > 0) stroke.refund[r] = (stroke.refund[r] ?? 0) + gained;
     }
   }
 
   finishStroke() {
     if (!this.stroke) return;
-    if (this.stroke.changed) this.world.refreshStaticData();
-    if (!this.stroke.changed && this.stroke.failure) {
-      this.events.emit('toast', { text: this.stroke.failure, tone: 'warn', icon: 'demolish' });
+    const stroke = this.stroke;
+    if (stroke.changed) this.world.refreshStaticData();
+    if (!stroke.changed && stroke.failure) {
+      this.events.emit('toast', { text: stroke.failure, tone: 'warn', icon: 'demolish' });
+    }
+    if (this.tool === 'demolish' && stroke.changed) {
+      const parts = [];
+      if (stroke.removed.buildings) parts.push(stroke.removed.buildings === 1 ? stroke.removed.names[0] : `${stroke.removed.buildings} yapı / süs`);
+      if (stroke.removed.tiles) parts.push(`${stroke.removed.tiles} karo zemin`);
+      const refund = Object.keys(stroke.refund).length ? ` · iade: ${formatCost(stroke.refund)}` : '';
+      this.events.emit('toast', { text: `Geri dönüştürüldü: ${parts.join(', ')} (%50 iade)${refund}`, tone: 'info', icon: 'demolish' });
+    }
+    if (this.tool === 'build' && this.isBrushBuild() && stroke.placed > 0) {
+      const def = BUILDINGS[this.buildType];
+      const total = Object.fromEntries(Object.entries(def.cost).map(([r, v]) => [r, v * stroke.placed]));
+      this.events.emit('toast', { text: `${stroke.placed} × ${def.name} dikiliyor (${formatCost(total)})`, tone: 'info', icon: 'hammer' });
     }
     this.stroke = null;
   }
@@ -168,7 +247,7 @@ export class ToolController {
       if (this.isTileBuild()) {
         const def = TILE_BUILDS[this.buildType];
         const check = this.construction.checkPaint(this.buildType, x, y);
-        return { ok: check.ok, text: check.ok ? `${def.name} · ${formatCost(def.cost)}` : check.reason };
+        return { ok: check.ok, text: check.ok ? `${def.name} · ${formatCost(def.cost)} · tıkla ya da sürükleyerek çiz` : check.reason };
       }
       const def = BUILDINGS[this.buildType];
       const anchor = this.construction.anchorFor(this.buildType, x, y);
@@ -176,9 +255,15 @@ export class ToolController {
       // Biyom bonusu (bereketli toprakta bahçe, kayalıkta taş ocağı) kurmadan önce görünsün
       const bonus = biomeBonus(this.world.map, this.buildType, anchor.x, anchor.y);
       const biome = bonus > 0 ? ` · ${biomeFor(this.buildType).name}: verim +%${Math.round(bonus * 100)}` : '';
+      // (18. aşama) Süsün çevreye katacağı estetik ve buradaki mevcut estetik
+      const value = AESTHETIC.values[this.buildType];
+      const here = this.world.aesthetics?.[this.world.map.index(anchor.x, anchor.y)] ?? 0;
+      const level = aestheticLevel(here);
+      const beauty = value ? ` · Çevre estetiği +${value}${level ? ` (burası: ${level})` : ''}` : '';
+      const how = this.isBrushBuild() ? 'tıkla ya da sürükleyerek diz' : 'tıkla ve kur';
       return {
         ok: check.ok,
-        text: check.ok ? `${def.name} · ${formatCost(def.cost)}${biome} · tıkla ve kur` : check.reason,
+        text: check.ok ? `${def.name} · ${formatCost(def.cost)}${biome}${beauty} · ${how}` : check.reason,
         anchor,
         doors: check.doors,
         orientation: check.orientation,
@@ -196,7 +281,11 @@ export class ToolController {
       const job = this.jobs.jobAt(x, y);
       if (job && job.type !== 'build') return { ok: true, text: 'Toplama emrini iptal et' };
       const check = this.construction.describeDemolish(x, y);
-      return { ok: check.ok, text: check.reason };
+      if (check.ok && check.building) {
+        const drag = isSmallDecor(check.building.type) ? ' · sürükleyerek fırçala' : '';
+        return { ok: true, text: `${check.reason} (%50 iade)${drag}` };
+      }
+      return { ok: check.ok, text: check.ok ? `${check.reason} · sürükleyerek fırçala` : check.reason };
     }
     return { ok: false, text: '' };
   }
@@ -228,4 +317,35 @@ export class ToolController {
     }
     drawAreaCursor(renderer, tile.tileX, tile.tileY, 1, 1, env.time, ok);
   }
+}
+
+/** (18. aşama) Yıkım fırçasının sürüklerken kaldırdığı küçük süs: 1x1 peyzaj / süsleme yapısı. */
+function isSmallDecor(type) {
+  const def = BUILDINGS[type];
+  return Boolean(def && def.size.w === 1 && def.size.h === 1 && buildTabFor(type) === 'decor');
+}
+
+/** İki karo arasındaki 4 yönlü bağlı karolar (başlangıç hariç, bitiş dahil): fırça çizgisi kopmasın. */
+export function lineTiles(x0, y0, x1, y1) {
+  const out = [];
+  let x = x0;
+  let y = y0;
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x1 > x0 ? 1 : -1;
+  const sy = y1 > y0 ? 1 : -1;
+  let err = dx - dy;
+  while (x !== x1 || y !== y1) {
+    // Çapraz adım yerine önce yatay, sonra dikey: yol karoları köşeden değil kenardan birleşsin
+    if (x !== x1 && (y === y1 || 2 * err > -dy)) {
+      err -= dy;
+      x += sx;
+    } else {
+      err += dx;
+      y += sy;
+    }
+    out.push({ x, y });
+  }
+  if (out.length === 0) out.push({ x: x1, y: y1 });
+  return out;
 }

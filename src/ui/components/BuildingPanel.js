@@ -42,6 +42,10 @@ import { ACTIVITY_SKILLS, SKILL_LEVELS } from '../../data/skills.js';
 import { skillLevel } from '../../systems/SkillSystem.js';
 import { storedMasterworks, exhibitedMasterworks, masterworkHappiness, masterworkPrice } from '../../systems/Masterworks.js';
 import { MASTERPIECE_BY_ACTIVITY, MASTERPIECES, MASTERWORK } from '../../data/masterpieces.js';
+import { EXPLORATION, EXOTIC_ITEMS, INSCRIPTIONS, INSCRIPTION_KEYS, VINE } from '../../data/exploration.js';
+import { expeditionLaunchStatus, pickParty, decodeStatus } from '../../systems/Exploration.js';
+import { AESTHETIC, ORNAMENTAL_TREES, DARKNESS } from '../../data/landscape.js';
+import { aestheticLevel } from '../../systems/Landscape.js';
 
 const thumbnailCache = new Map();
 
@@ -61,7 +65,7 @@ const percent = (value) => `%${Math.round(value * 100)}`;
 
 export class BuildingPanel {
   constructor(game) {
-    this.slot = 'right';
+    this.slot = 'cards'; // (17. aşama) sağ alt köşedeki bağımsız bilgi kartı
     this.events = game.events;
     this.buildingId = null;
     this.lastKey = '';
@@ -79,7 +83,23 @@ export class BuildingPanel {
     this.harbor = el('div', { className: 'building-decrees building-harbor' });
     this.luxury = el('div', { className: 'building-decrees building-luxury' });
     this.bell = el('div', { className: 'building-decrees building-bell' });
+    this.expedition = el('div', { className: 'building-decrees building-expedition' });
+    this.inscriptions = el('div', { className: 'building-decrees building-inscriptions' });
     this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
+    // (18. aşama) Mahalle tabelasının adı: yazıp Enter (ya da kutudan çıkınca) kaydedilir, Esc vazgeçer
+    this.signInput = el('input', { className: 'sign-name-input', type: 'text', maxLength: 24, placeholder: 'Sokağa / semte bir ad ver' });
+    this.signInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.signInput.blur();
+      if (e.key === 'Escape') {
+        this.signInput.value = this.signLabel ?? '';
+        this.signInput.blur();
+      }
+      e.stopPropagation();
+    });
+    this.signInput.addEventListener('blur', () => {
+      if (this.buildingId !== null && this.signInput.value.trim()) this.events.emit('ui:renameSign', { id: this.buildingId, name: this.signInput.value });
+    });
+    this.sign = el('div', { className: 'building-decrees building-sign', hidden: true }, [el('div', { className: 'decree-title', text: 'Tabelanın adı' }), this.signInput]);
     this.lines = el('div', { className: 'building-lines' });
     this.upgrade = el('div', { className: 'building-upgrade' });
     this.tradeButton = this.button('Takas Penceresini Aç', 'Gezgin tüccarla takas et', () => this.events.emit('ui:openTrade'));
@@ -106,6 +126,9 @@ export class BuildingPanel {
       this.harbor,
       this.luxury,
       this.bell,
+      this.expedition,
+      this.inscriptions,
+      this.sign,
       this.lines,
       this.upgrade,
       this.tradeButton,
@@ -174,7 +197,17 @@ export class BuildingPanel {
         : '';
     const pickerKey = this.pickerFor === building.id ? this.workerCandidates(building, state).map((o) => `${o.character.id}:${o.character.name}:${o.level}:${o.pinnedTo}`).join(',') : '';
     const bellKey = building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}` : '';
+    // (16. aşama) keşif seferi (liman, belediye) ve kadim yazıtlar (Bilgelik Evi)
+    const exploreKey =
+      building.type === 'harbor' || building.type === 'townHall' || building.definition.academy
+        ? JSON.stringify([
+            state.exploration,
+            state.dilemma.expedition ? [state.dilemma.expedition.members, state.dilemma.expedition.log?.length, Math.floor((state.dilemma.expedition.until - state.totalMinutes) / 60)] : null,
+            expeditionLaunchStatus(state, building.type).reason,
+          ])
+        : '';
     const key = [
+      exploreKey,
       bellKey,
       craftKey,
       decreeKey,
@@ -224,6 +257,12 @@ export class BuildingPanel {
     this.renderHarbor(building, state);
     this.renderLuxury(building, state);
     this.renderBell(building, state);
+    this.renderExpedition(building, state);
+    this.renderInscriptions(building, state);
+    // (18. aşama) Mahalle tabelası: ad kutusu (yazılırken üzerine yazılmaz)
+    this.sign.hidden = building.type !== 'signpost';
+    this.signLabel = building.label;
+    if (building.type === 'signpost' && document.activeElement !== this.signInput) this.signInput.value = building.label ?? '';
     this.lines.replaceChildren(...lines.map((text) => el('div', { className: 'building-line', text })));
     this.lines.hidden = lines.length === 0;
     this.renderUpgrade(building, next, state);
@@ -517,6 +556,78 @@ export class BuildingPanel {
     this.research.replaceChildren(el('div', { className: 'building-section-title', text: 'Kasaba Araştırmaları' }), ...cards);
   }
 
+  /**
+   * (16. aşama) Liman ve Belediye Konağı: keşif seferi düzenleme (Sefere Çıkar), yoldaki kafile ve maceraları, son
+   * seferlerin günlüğü ve kasabanın egzotik ganimetleri.
+   */
+  renderExpedition(building, state) {
+    const show = (building.type === 'harbor' || building.type === 'townHall') && building.functional;
+    this.expedition.hidden = !show;
+    if (!show) return;
+    const exp = state.dilemma.expedition;
+    const ex = state.exploration;
+    const children = [el('div', { className: 'building-section-title', text: 'Keşif Seferleri' })];
+    if (exp) {
+      const names = exp.members.map((id) => state.characters.find((c) => c.id === id)?.name).filter(Boolean);
+      const left = Math.max(0, Math.ceil((exp.until - state.totalMinutes) / 60));
+      children.push(el('div', { className: 'upgrade-text is-active', text: `Yolda: ${names.join(', ')} · dönüşe ≈${left} saat` }));
+      for (const l of exp.log ?? []) children.push(el('div', { className: 'upgrade-text', text: `• ${l.text}` }));
+      if ((exp.adventures?.length ?? 0) > (exp.next ?? 0)) children.push(el('div', { className: 'upgrade-text', text: 'Kafile yolda yeni bir maceraya doğru ilerliyor; kararını soracaklar' }));
+    } else {
+      const st = expeditionLaunchStatus(state, building.type);
+      const cost = Object.entries(EXPLORATION.cost).map(([r, v]) =>
+        el('span', { className: `build-cost${state.resources[r] < v ? ' is-missing' : ''}` }, [el('img', { src: getIconDataURL(RESOURCES[r].icon), alt: RESOURCES[r].name }), String(v)])
+      );
+      const party = pickParty(state.characters, EXPLORATION.partySize).map((c) => c.name);
+      const go = this.button('Sefere Çıkar', st.ok ? `${EXPLORATION.partySize} kişilik kafile bir gün sürecek bir sefere çıkar; yolda iki kez kararını isteyecekler` : st.reason, () =>
+        this.events.emit('ui:launchExpedition', { source: building.type })
+      );
+      go.classList.add('upgrade-button');
+      go.disabled = !st.ok;
+      children.push(el('div', { className: 'upgrade-text', text: `Kafile: ${party.join(', ') || '-'} (ustalar ve Sağlam Aletliler maceralarda riski azaltır)` }));
+      children.push(el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, cost), go]));
+      if (!st.ok) children.push(el('div', { className: 'upgrade-text is-active', text: st.reason }));
+    }
+    const last = ex.log[ex.log.length - 1];
+    if (last) children.push(el('div', { className: 'upgrade-text', text: `Son sefer (Gün ${last.day}): ${last.route} Seferi · ${last.members.join(', ')}${last.finds.length ? ` · ${last.finds.length} ganimet` : ''}` }));
+    const inv = [
+      ...['vineSeed', 'ancientTorch', 'relicShard'].filter((k) => ex.items[k] > 0).map((k) => `${EXOTIC_ITEMS[k].name} ×${ex.items[k]}${k === 'relicShard' ? `/${EXPLORATION.shardsPerRelic}` : ''}`),
+      ...(ex.cityMap ? [`${EXOTIC_ITEMS.cityMap.name} (tüccar iki kat sık gelir)`] : []),
+    ];
+    children.push(el('div', { className: 'upgrade-text', text: inv.length ? `Ganimet sandığı: ${inv.join(' · ')}` : `${ex.expeditions} sefer düzenlendi · ganimet sandığı boş` }));
+    this.expedition.replaceChildren(...children);
+  }
+
+  /** (16. aşama) Bilgelik Evi: bulunan kadim yazıtlar, Çöz düğmesi, çözülmekte olanın ilerlemesi ve çözülen şemalar. */
+  renderInscriptions(building, state) {
+    const ex = state.exploration;
+    const found = INSCRIPTION_KEYS.filter((id) => ex.inscriptions[id]);
+    const show = Boolean(building.definition.academy) && building.functional;
+    this.inscriptions.hidden = !show;
+    if (!show) return;
+    const cards = found.map((id) => {
+      const def = INSCRIPTIONS[id];
+      const st = decodeStatus(state, id);
+      const status = ex.inscriptions[id].status;
+      const ratio = status === 'decoding' && ex.decoding ? Math.min(1, ex.decoding.progress / def.work) : 0;
+      const stateText = status === 'decoded' ? 'Çözüldü' : status === 'decoding' ? `Çözülüyor · ${percent(ratio)}` : 'Çözülmeyi bekliyor';
+      const children = [
+        el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL(status === 'decoded' ? 'scheme' : 'inscription'), alt: '' }), def.name, el('span', { className: 'decree-state', text: stateText })]),
+        el('div', { className: 'upgrade-text', text: def.description }),
+      ];
+      if (status === 'decoding') children.push(el('div', { className: 'need-bar building-progress' }, [el('span', { className: 'need-fill need-fun', style: `width: ${Math.floor(ratio * 100)}%` })]));
+      else if (status === 'found') {
+        const go = this.button('Çöz', st.ok ? 'Bilge araştırma yokken yazıtın başına oturur' : st.reason, () => this.events.emit('ui:decodeInscription', { id }));
+        go.classList.add('upgrade-button');
+        go.disabled = !st.ok;
+        children.push(el('div', { className: 'upgrade-row' }, [el('span', { className: 'person-empty', text: state.research.active ? 'Araştırma bitince çözülür' : '' }), go]));
+      }
+      return el('div', { className: `decree${status === 'decoded' ? ' is-done' : ''}` }, children);
+    });
+    const hint = el('div', { className: 'upgrade-text', text: found.length ? 'Bilge, araştırma yokken yazıtları çözer.' : 'Kadim harabeler onarılınca ya da keşif seferlerinden kadim yazıtlar gelir; burada çözülür.' });
+    this.inscriptions.replaceChildren(el('div', { className: 'building-section-title', text: 'Kadim Yazıtlar' }), hint, ...cards);
+  }
+
   /** Liman: fazlalık ihracatı sınırı, ihracat sandığı, tekne ve hazine. */
   renderHarbor(building, state) {
     const show = building.type === 'harbor' && building.functional;
@@ -783,6 +894,40 @@ export class BuildingPanel {
       case 'flowerFence':
         lines.push('Yan yana kurulan çitler birleşir; bahçe kenarlarını süsler');
         break;
+      // 18. aşama: sokak eşyaları ve süs ağaçları
+      case 'woodFence': {
+        const c = building.connect ?? {};
+        const n = ['left', 'right', 'up', 'down'].filter((k) => c[k]).length;
+        lines.push(n ? `${n} yönde komşu çite / kapıya bağlı` : 'Tek başına duruyor: yanına çit ekleyince birleşir');
+        lines.push('Sakinler çitten geçemez; içeri girilecek yere bir Çit Kapısı koy');
+        break;
+      }
+      case 'fenceGate':
+        lines.push('Sakinler kapıyı itip geçer; çitlerle birleşir, yolu kapatmaz');
+        break;
+      case 'ironLantern':
+        lines.push(building.lit ? 'Yanıyor: sokak yumuşak sarı ışıkla aydınlık' : '18:30\'da yanar, 06:30\'da söner');
+        lines.push(`Işığı ${Math.round(DARKNESS.lights.ironLantern / 16)} karoya ulaşır: gece buradan geçenler karanlıktan ürkmez`);
+        break;
+      case 'signpost':
+        lines.push('İmleçle üzerine gelince adı tabelada okunur');
+        lines.push('Yakınında güzel bir sokakta yürüyenlerin anılarında sokağın adı geçer');
+        break;
+      case 'parkBench':
+        lines.push('Sakinler oturup manzarayı izler; çevresi güzelleştikçe keyifleri daha hızlı dolar');
+        break;
+      case 'planter':
+        lines.push('Yanından geçenler çiçek kokusunu içine çeker; çevresindekiler burada çiçek koklar');
+        break;
+      case 'birchTree':
+      case 'oakTree':
+      case 'pineTree': {
+        const left = building.plantedAt === null ? 0 : Math.max(0, Math.ceil(ORNAMENTAL_TREES.growHours - (state.totalMinutes - building.plantedAt) / 60));
+        const stage = ['Fidan', 'Genç ağaç', 'Ulu ağaç'][building.growthStage];
+        lines.push(building.growthStage === 2 ? `${stage}: gölgesinde sakinler oturup dinlenir` : `${stage} · büyüme %${Math.floor(building.growth * 100)} · ulu ağaç olmasına ${left} saat`);
+        lines.push('Süs ağacıdır: kesilmez, odun vermez');
+        break;
+      }
       case 'flowerBed':
         lines.push('Yanından geçenlerin ve etrafında dinlenenlerin keyfi artar');
         lines.push('Gündüzleri çiçeklerin üstünde kelebekler uçar');
@@ -838,10 +983,28 @@ export class BuildingPanel {
         lines.push('Gündüzleri sakinlerin buluşup sohbet ettiği yer');
         break;
       case 'bench':
-        lines.push('Sakinler burada oturup dinlenir');
+        lines.push('Sakinler burada oturup dinlenir; çevresi güzelse manzarayı izleyip keyiflenir');
+        break;
+      // 16. aşama: keşif ganimetleri
+      case 'grapeVine': {
+        const gardens = state.buildings.filter((b) => b.type === 'garden' && b.factors?.vineCount > 0).length;
+        lines.push(gardens ? `Yanındaki ${gardens} bahçenin verimine +%${Math.round(VINE.gardenBonus * 100)} katıyor` : 'Yanında bahçe yok: yalnızca süs ve keyif');
+        lines.push('Handa yemek yiyenler soğuk üzüm şerbeti içer (keyif +5)');
+        break;
+      }
+      case 'ancientTorch':
+        lines.push(building.lit ? 'Mavi alev yanıyor: çevresindekilerin içi ısınıyor' : 'Mavi alevi 18:00\'de yanar, 06:00\'da söner');
+        lines.push('Kışın yakınındakiler üşümez; gece yanından geçenlerin keyfi yerine gelir');
         break;
       default:
         break;
+    }
+    // (18. aşama) Süsün çevreye kattığı estetik ve bulunduğu köşenin güzelliği
+    if (AESTHETIC.values[building.type] && building.functional) {
+      const here = state.landscapeField?.[building.tileY * state.map.width + building.tileX] ?? null;
+      const level = here !== null ? aestheticLevel(here) : null;
+      lines.push(`Çevre estetiği: +${AESTHETIC.values[building.type]} (yaklaşık ${Math.round(AESTHETIC.radius)} karoya yayılır)${level ? ` · burası ${level.toLocaleLowerCase('tr')}` : ''}`);
+      lines.push(`Kasabanın estetiği ${state.landscape?.score ?? 0} puan · refah +%${state.landscape?.percent ?? 0}`);
     }
     // (15. aşama) Ustaların bu iş yerinde çıkarabileceği usta işi eser
     const masterpiece = MASTERPIECES[MASTERPIECE_BY_ACTIVITY[def.workActivity]];
@@ -875,6 +1038,9 @@ export class BuildingPanel {
     for (const [extra, perHour] of Object.entries(production.extra ?? {})) {
       lines.push(`Yan ürün (kişi başı saatte): +${(perHour * f.total).toFixed(1)} ${RESOURCES[extra].name} · bugün +${building.extraToday ?? 0}`);
     }
+    // (16. aşama) Antik Su Kemeri Şeması ve üzüm asmaları
+    if (f.scheme > 1) lines.push(`Antik Su Kemeri Şeması: +${percent(f.scheme - 1)}`);
+    if (f.vines > 1) lines.push(`Üzüm asmaları (${f.vineCount}): +${percent(f.vines - 1)}`);
     return lines;
   }
 

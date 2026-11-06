@@ -55,7 +55,7 @@ export class TitleMenu {
         el('p', { className: 'title-tagline', text: 'Küçük bir kasaba kur, sakinlerini mutlu et, mevsimleri birlikte karşılayın.' }),
         this.mainButtons,
         this.form,
-        el('p', { className: 'title-hint', text: 'İpucu: oyunda B ile inşa et, H ile kaynak topla, J günlük, G hedefler.' }),
+        el('p', { className: 'title-hint', text: 'İpucu: oyunda B ile inşa et, H ile kaynak topla; O hedefler, J günlük, Esc pencereyi kapatır.' }),
       ]),
     ]);
 

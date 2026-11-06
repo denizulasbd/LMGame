@@ -1,4 +1,5 @@
-// Kasaba Hedefleri: sol sütunda HUD'un altında açılıp kapanan başarım listesi (G tuşu ya da düğme).
+// Kasaba Hedefleri: başarım listesi. (17. aşama) Ekranın ortasında açılan bir penceredir (ModalHost); dock'taki
+// "Hedefler" düğmesi ya da O (eski kısayol G de çalışır) açar / kapatır; ✕ / Esc / dışına tıklamak kapatır.
 // Her hedef için simge, ad, açıklama ve ilerleme çubuğu; tamamlananlar tik ve tarihle görünür.
 // 10. aşama: listenin başında "Kasaba Seviyesi" kartı: şimdiki unvan, sonraki seviyenin koşulları (nüfus,
 // yapı, Seviye 2 yapı, ortalama refah) ilerleme çubuklarıyla ve seviyenin ödülleri.
@@ -9,37 +10,29 @@ import { milestoneProgress } from '../../systems/MilestoneSystem.js';
 import { townTier, nextTownTier, tierChecks, formatTownTitle } from '../../systems/TownStatus.js';
 import { getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
+import { dockButton, modalHeader } from '../dockButton.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 const REFRESH_MS = 600;
 
 export class MilestonePanel {
   constructor(game) {
-    this.slot = 'left';
     this.open = false;
     this.lastKey = '';
     this.refreshAt = 0;
+    this.modalHost = null; // UIManager bağlar
 
-    this.count = el('span', { className: 'goal-count' });
-    this.toggle = el('button', { className: 'hud-btn journal-toggle goals-toggle', type: 'button', title: 'Kasaba Hedefleri (G)', tabIndex: -1 }, [
-      el('img', { className: 'tool-icon', src: getAnyIconURL('star'), alt: '' }),
-      el('span', { text: 'Hedefler' }),
-      this.count,
-      el('kbd', { text: 'G' }),
-    ]);
-    this.toggle.addEventListener('mousedown', (e) => e.preventDefault());
-    this.toggle.addEventListener('click', () => this.setOpen(!this.open));
-
-    const close = el('button', { className: 'hud-btn journal-close', type: 'button', text: '✕', title: 'Kapat (G)', tabIndex: -1 });
-    close.addEventListener('mousedown', (e) => e.preventDefault());
-    close.addEventListener('click', () => this.setOpen(false));
+    this.count = el('span', { className: 'dock-badge goal-count' });
+    this.toggle = dockButton({ icon: 'star', label: 'Hedefler', key: 'O', tip: 'Kasaba Hedefleri ve kasaba seviyesi', onClick: () => this.setOpen(!this.open), className: 'goals-toggle' });
+    this.toggle.append(this.count);
+    this.dockButtons = [this.toggle];
 
     this.list = el('div', { className: 'journal-list goal-list' });
     this.panel = el('div', { className: 'panel journal-panel goals-panel ui-interactive', hidden: true }, [
-      el('div', { className: 'journal-header' }, [el('span', { text: 'Kasaba Hedefleri' }), close]),
+      modalHeader('Kasaba Hedefleri', () => this.setOpen(false), { icon: 'star' }),
       this.list,
     ]);
-    this.element = el('div', { className: 'town-journal ui-interactive' }, [this.toggle, this.panel]);
+    this.modal = { id: 'goals', element: this.panel };
 
     game.events.on('ui:toggleGoals', () => this.setOpen(!this.open));
     game.events.on('town:tierUp', () => {
@@ -59,6 +52,9 @@ export class MilestonePanel {
     this.panel.hidden = !open;
     this.toggle.classList.toggle('is-active', open);
     this.lastKey = '';
+    this.refreshAt = 0;
+    if (open) this.modalHost?.opened('goals');
+    else this.modalHost?.closed('goals');
   }
 
   render(game) {

@@ -8,12 +8,15 @@
 //                  tamamlanmış Büyük Vadi Saat Kulesi
 //   save-v11.json: 13. aşamanın oyunu (kayıt sürümü 11): 37. gün, 30 sakin, üç yadigâr, peyzaj, arşiv
 //   save-v12.json: 14. aşamanın oyunu (kayıt sürümü 12): otopilotla 34 gün; festivaller, anılar
-//   save-v13.json: 15. aşamanın oyunu (kayıt sürümü 13, bugünkü): otopilotla 34 gün; usta işi eserler, barışmalar
+//   save-v13.json: 15. aşamanın oyunu (kayıt sürümü 13): otopilotla 34 gün; usta işi eserler, barışmalar
+//   save-v14.json: 16. aşamanın oyunu (kayıt sürümü 14): otopilotla 34 gün; seferler, ganimetler, çözülen yazıtlar
+//   save-v15.json: 18. aşamanın oyunu (kayıt sürümü 15, bugünkü): otopilotla 34 gün; döşenen yollar, tabelalar, süs ağaçları,
+//                  çitler, kasaba estetiği. Eski kayıtlarda (sürüm 2-14) peyzaj durumu boş başlar, estetik yüklenince hesaplanır
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -40,8 +43,21 @@ for (const { name, raw } of fixtures) {
       terrain: scene.saves.snapshot().terrain.length,
       types: [...new Set(s.buildings.map((b) => b.type))],
       projects: s.buildings.filter((b) => b.project).map((b) => ({ id: b.id, job: scene.jobs.jobs.some((j) => j.buildingId === b.id) })),
+      exploration: { items: { ...s.exploration.items }, inscriptions: Object.keys(s.exploration.inscriptions).length, expeditions: s.exploration.expeditions, cityMap: s.exploration.cityMap, tales: s.characters.filter((c) => c.tale).length },
       // yüklendiği an (bir gün yaşarken ustalar yeni eser çıkarabilir)
       masterworks: { items: s.masterworks.items.length, made: s.masterworks.made, exhibited: s.masterworks.items.filter((i) => i.status === 'exhibited').length },
+      // (18. aşama) peyzaj: tabela adları, fidanların dikiliş anı, çit bağlantıları, estetik
+      landscape: {
+        score: s.landscape.score,
+        percent: s.landscape.percent,
+        credit: { ...s.landscape.refundCredit },
+        painted: s.landscape.roadsPainted,
+        field: scene.world.aesthetics.some((v) => v > 0),
+        signs: s.buildings.filter((b) => b.type === 'signpost').map((b) => b.label),
+        trees: s.buildings.filter((b) => b.definition.ornamentalTree).map((b) => b.plantedAt),
+        fencesLinked: s.buildings.filter((b) => b.type === 'woodFence').every((b) => b.connect),
+        speedPath: scene.world.map.getSpeedMultiplier(0, 0) > 0,
+      },
     };
     // Referans bütünlüğü (yüklemeden hemen sonra ve bir gün sonra)
     const integrity = () => {
@@ -62,9 +78,11 @@ for (const { name, raw } of fixtures) {
     game.render(0);
     offs.forEach((off) => off());
     const integrityAfter = integrity();
+    const expeditionAfter = { active: Boolean(s.dilemma.expedition), away: s.characters.filter((c) => c.away).length, adventure: s.dilemma.active?.kind === 'adventure' };
     const { outfitFor } = await import('/src/systems/SkillSystem.js');
     return {
       integrityAfter,
+      expeditionAfter,
       outfits: s.characters.filter((c) => c.outfit).length,
       outfitsOk: s.characters.every((c) => c.outfit === outfitFor(c) || (c.outfit?.split(':')[1] === outfitFor(c)?.split(':')[1])),
       loaded,
@@ -96,6 +114,34 @@ for (const { name, raw } of fixtures) {
   results.push({ name: `${tag}: referanslar sağlam (yüklenince ve bir gün sonra)`, ok: r.loaded.integrity.length === 0 && r.integrityAfter.length === 0, detail: [...r.loaded.integrity, ...r.integrityAfter].slice(0, 4).join(', ') });
   if (data.version < 13) results.push({ name: `${tag}: usta işi eser vitrini boş başlar`, ok: r.loaded.masterworks.items === 0 && r.loaded.masterworks.made === 0 });
   else results.push({ name: `${tag}: usta işi eserler korundu`, ok: r.loaded.masterworks.items === data.masterworks.items.length && r.loaded.masterworks.made === data.masterworks.made && r.loaded.masterworks.exhibited === data.masterworks.items.filter((i) => i.status === 'exhibited').length, detail: `${r.loaded.masterworks.items} eser, ${r.loaded.masterworks.exhibited} sergide` });
+  if (data.dilemma?.expedition && !data.dilemma.expedition.adventures) {
+    results.push({ name: `${tag}: eski biçimde yarım kalan sefer maceralar açmadan sürer ve döner`, ok: !r.expeditionAfter.active && r.expeditionAfter.away === 0 && !r.expeditionAfter.adventure, detail: JSON.stringify(r.expeditionAfter) });
+  }
+  if (data.version < 14) {
+    const e = r.loaded.exploration;
+    results.push({ name: `${tag}: keşif ganimeti ve yazıt boş başlar`, ok: e.inscriptions === 0 && Object.values(e.items).every((v) => v === 0) && !e.cityMap && e.tales === 0 });
+  } else {
+    const e = r.loaded.exploration;
+    const d = data.exploration;
+    results.push({
+      name: `${tag}: keşif ganimetleri, yazıtlar ve sefer sayısı korundu`,
+      ok: e.inscriptions === Object.keys(d.inscriptions).length && e.expeditions === d.expeditions && e.cityMap === d.cityMap && Object.entries(d.items).every(([k, v]) => e.items[k] === v),
+      detail: `${e.expeditions} sefer, ${e.inscriptions} yazıt, ganimet ${JSON.stringify(e.items)}`,
+    });
+  }
+  if (data.version < 15) {
+    const L = r.loaded.landscape;
+    results.push({ name: `${tag}: peyzaj durumu boş başlar, estetik yüklenince hesaplanır`, ok: Object.keys(L.credit).length === 0 && L.painted === 0 && L.percent >= 0 && L.percent <= 5 && L.signs.length === 0, detail: `estetik ${L.score} (+%${L.percent})` });
+  } else {
+    const L = r.loaded.landscape;
+    const signs = data.buildings.filter((b) => b.type === 'signpost').map((b) => b.label);
+    const trees = data.buildings.filter((b) => ['birchTree', 'oakTree', 'pineTree'].includes(b.type)).map((b) => b.plantedAt);
+    results.push({
+      name: `${tag}: tabela adları, fidanların dikiliş anı, çitler ve estetik korundu`,
+      ok: JSON.stringify(L.signs) === JSON.stringify(signs) && JSON.stringify(L.trees) === JSON.stringify(trees) && L.fencesLinked && L.field && L.painted === data.landscape.roadsPainted && Math.abs(L.score - data.landscape.score) < 3,
+      detail: `${L.signs.join(', ')} · ${L.trees.length} ağaç · estetik ${L.score}/${data.landscape.score} (+%${L.percent})`,
+    });
+  }
   results.push({ name: `${tag}: meslek kıyafetleri deneyimden giyildi`, ok: r.outfitsOk, detail: `${r.outfits} sakin kıyafetli` });
   results.push({ name: `${tag}: harita farkları birebir uygulandı`, ok: r.loaded.terrain === data.terrain.length, detail: `${r.loaded.terrain}/${data.terrain.length} karo` });
   if (!data.map) results.push({ name: `${tag}: eski 48x48 biyomsuz harita`, ok: r.loaded.map.width === 48 && r.loaded.map.height === 48 && r.loaded.map.generator === 1, detail: JSON.stringify(r.loaded.map) });

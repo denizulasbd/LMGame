@@ -54,6 +54,8 @@ import { SeasonFestivalSystem } from '../systems/SeasonFestivalSystem.js';
 import { MemorySystem } from '../systems/MemorySystem.js';
 import { RallySystem } from '../systems/RallySystem.js';
 import { CraftsmanshipSystem } from '../systems/CraftsmanshipSystem.js';
+import { ExpeditionSystem } from '../systems/ExpeditionSystem.js';
+import { LandscapeSystem } from '../systems/LandscapeSystem.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -65,6 +67,7 @@ import { FestivalEffects } from '../rendering/FestivalEffects.js';
 import { Random } from '../utils/random.js';
 import { getSelectionRing, getTargetMarker } from '../art/ui/index.js';
 
+const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
 const HOVER_REFRESH_SECONDS = 0.5;
 const PATH_DOT_SPACING = 5;      // seçili karakterin rota noktaları arası (dünya pikseli)
@@ -113,6 +116,8 @@ export class TownScene extends Scene {
         const tile = TILE_BY_ID[this.baseTerrain.tiles[map.index(x, y)]];
         return isGround(tile) ? tile : null;
       },
+      // (18. aşama) Oyuncunun döşediği zemin kaldırılınca harita üretildiğindeki zemin geri gelir
+      baseTileAt: (x, y) => TILE_BY_ID[this.baseTerrain.tiles[map.index(x, y)]] ?? null,
     });
     this.nature = new NatureSystem(this.game, this.world);
     this.population = new PopulationSystem(this.game, this.world, new Random(state.seed + 3));
@@ -154,14 +159,17 @@ export class TownScene extends Scene {
     this.milestones = new MilestoneSystem(this.game, this.world, TILE_TYPES.cobble.id);
     this.townLevel = new TownLevelSystem(this.game, this.world, this.economy, { attract: this.attract });
     this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population }, { attract: this.attract });
+    this.expeditions = new ExpeditionSystem(this.game, this.world, { economy: this.economy, health: this.health, dilemmas: this.dilemmas }, new Random(state.seed + 17));
 
     // Sıra önemlidir: hava, yapı durumu ve kapasite, Bilgelik Evi ve liman durumu, iş temizliği, atölye durumu, ihtiyaç azalması,
     // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar, kasaba seviyesi ve doğa
     this.structures = new StructureSystem(this.game, this.world);
+    this.landscape = new LandscapeSystem(this.game, this.world, new Random(state.seed + 18));
     this.heating = new HeatingSystem(this.game, this.world, this.economy);
     this.systems = [
       this.weather,
       this.structures,
+      this.landscape,
       this.research,
       this.harbor,
       this.economy,
@@ -183,6 +191,7 @@ export class TownScene extends Scene {
       this.milestones,
       this.townLevel,
       this.dilemmas,
+      this.expeditions,
       this.nature,
     ];
 
@@ -216,6 +225,8 @@ export class TownScene extends Scene {
       this.memories,
       this.rally,
       this.craftsmanship,
+      this.expeditions,
+      this.landscape,
     ];
 
     this.camera = new Camera();
@@ -279,6 +290,15 @@ export class TownScene extends Scene {
         c.name = clean;
         c.customName = true;
         events.emit('character:renamed', { character: c, from });
+      }),
+      // (18. aşama) Mahalle tabelasına ad vermek
+      events.on('ui:renameSign', ({ id, name }) => {
+        const sign = this.world.getBuilding(id);
+        const clean = String(name ?? '').trim().replace(/\s+/g, ' ').slice(0, SIGN_NAME_MAX_LENGTH);
+        if (!sign || sign.type !== 'signpost' || !clean || clean === sign.label) return;
+        const from = sign.label;
+        sign.label = clean;
+        events.emit('sign:renamed', { building: sign, from, name: clean });
       }),
       events.on('ui:renameTown', (name) => {
         const clean = String(name ?? '').trim().slice(0, TOWN_NAME_MAX_LENGTH);
@@ -625,7 +645,7 @@ export class TownScene extends Scene {
     const view = this.camera.getViewBounds(renderer.width, renderer.height);
 
     renderer.applyCamera(this.camera);
-    this.map.renderGround(renderer, this.camera, this.animationTime, season.key);
+    this.map.renderGround(renderer, this.camera, this.animationTime, season.key, { wet: env.raining });
     this.weatherFx.drawGround(renderer);
     if (!this.cinematic) this.drawSelectionGround(renderer);
 

@@ -20,6 +20,7 @@ import { lacking } from './Equipment.js';
 import { RESOURCES, formatCost } from '../data/resources.js';
 import { getSeason } from '../data/seasons.js';
 import { isShivering } from './HeatingSystem.js';
+import { schemeIronSaving } from './Exploration.js';
 
 // Ekipmanı alabileceği yerler (yakın olan seçilir)
 const PICKUP_TYPES = ['workshop', 'storage', 'supplyCamp'];
@@ -115,6 +116,22 @@ export class CraftingSystem {
   }
 
   /**
+   * (16. aşama) Kadim Çelik Döküm Tekniği: harcanan demirin bir kısmı dökümde artar ve depoya geri döner
+   * (küsurat state.exploration.ironCredit'te birikir; ortalamada tüketim %20 azalır).
+   */
+  saveIron(spent) {
+    const saving = schemeIronSaving(this.world.state);
+    const ex = this.world.state.exploration;
+    if (!saving || !spent || !ex) return;
+    ex.ironCredit = (ex.ironCredit ?? 0) + spent * saving;
+    const whole = Math.floor(ex.ironCredit + 1e-9);
+    if (whole > 0) {
+      ex.ironCredit -= whole;
+      this.economy.add('iron', whole);
+    }
+  }
+
+  /**
    * Bu ekipmanın şimdi hangi tarifle yapılabileceği:
    *   { cost, kind: 'material' } asıl tarif (demir / yün), { cost, kind: 'fallback' } eski usul tarif ya da
    *   { reason } neden yapılamadığı. Eski usul tarif yalnızca malzemeyi üreten yapı yokken kullanılır.
@@ -139,6 +156,7 @@ export class CraftingSystem {
       const { item, recipe } = this.chooseItem(building);
       if (!item || !this.economy.spend(recipe.cost)) return false;
       building.craft = { item, progress: 0, recipe: recipe.kind };
+      this.saveIron(recipe.cost.iron ?? 0);
     }
     building.craft.progress += amount;
     const item = building.craft.item;

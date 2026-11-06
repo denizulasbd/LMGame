@@ -22,13 +22,13 @@ export const MEMORY = {
   fun: 8,
   social: 3,
   // Hatırlamanın geldiği sakin anlar (etkinlik anahtarları)
-  calmActivities: ['gazebo', 'bench', 'river', 'flowers', 'campfire', 'monument', 'ancientSpring'],
+  calmActivities: ['gazebo', 'bench', 'river', 'flowers', 'campfire', 'monument', 'ancientSpring', 'shade'],
 };
 
 const PLACE_PHRASES = { gazebo: 'Çardakta ', inn: 'Handa ', fountain: 'Meydanda ', campfire: 'Ateş başında ' };
 
 // Defter dolunca önce bunlar silinir (en eskisinden): dostluklar, kasaba olayları, hayvanlar, festivaller, ad
-const MINOR_KINDS = new Set(['friend', 'town', 'pet', 'festival', 'name', 'reconcile']);
+const MINOR_KINDS = new Set(['friend', 'town', 'pet', 'festival', 'name', 'reconcile', 'stroll']); // stroll: (18. aşama) güzel sokak, çiçek kokusu
 
 /**
  * Sakinin anılarına yeni bir satır ekler. Aynı cümle zaten yazılıysa yinelenmez (ör. bozulup yeniden kurulan dostluk;
@@ -101,9 +101,20 @@ export class MemorySystem {
         if (!wasIll) return;
         remember(character, `${this.hardTimes()} hastalandı ama Şifacı'nın iksiriyle iyileşti`, 'remedy', { kind: 'health' });
       }),
-      on('expedition:returned', ({ members, buff }) =>
-        members.forEach((c) => remember(c, buff === 'talisman' ? 'Keşif seferinden Kadim Tılsım\'la döndü' : 'Keşif seferinden ganimetle döndü', 'map', { kind: 'expedition' }))
+      // (16. aşama) Seferin hikâyesi: yolun adı, sağ salim mi döndü, neler keşfetti (ExpeditionSystem yazar)
+      on('expedition:returned', ({ members, buff, memories }) =>
+        members.forEach((c) =>
+          remember(c, memories?.[c.id] ?? (buff === 'talisman' ? 'Keşif seferinden Kadim Tılsım\'la döndü' : 'Keşif seferinden ganimetle döndü'), 'map', { kind: 'expedition' })
+        )
       ),
+      on('adventure:resolved', ({ success, member, option, scenario }) => {
+        if (!success && member) remember(member, `${scenario.title}: ${option.risk.text}, ama kafileyle yola devam etti`, 'mountain', { kind: 'expedition', fond: false });
+      }),
+      on('expedition:taleTold', ({ teller, route }) => {
+        if (!teller.memories?.some((m) => m.text === `${route} Seferi'ni handa ballandıra ballandıra anlattı`)) {
+          remember(teller, `${route} Seferi'ni handa ballandıra ballandıra anlattı`, 'adventure', { kind: 'expedition' });
+        }
+      }),
       on('relationship:reconciled', ({ a, b, place }) => {
         const where = RECONCILE_PLACES[place] ?? '';
         both(a, b, `${where}${b.name} ile barıştı`, `${where}${a.name} ile barıştı`, 'handshake', { kind: 'reconcile' });
