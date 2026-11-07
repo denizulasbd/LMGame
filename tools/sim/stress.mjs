@@ -114,6 +114,8 @@ console.log(
     `unvanı alan bilge ${lf((l) => l.state.elders ?? 0)}, yetişkinliğe geçen genç ${lf((l) => l.state.adults ?? 0)} · nasihat ${Math.round(lf((l) => l.state.adviceMinutes ?? 0))} dk · ` +
     `işteki emekli ${lf((l) => l.retiredWorking)} · en yaşlı ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? Math.max(...r.data.monitor.life.ages) : '-'}`).join(' ')}`
 );
+const hl = (f) => sum((d) => (d.monitor.heirloom ? f(d.monitor.heirloom) : 0));
+console.log(`(25.5) yadigâr: oluşan ${hl((h) => h.state.created)}, devredilen ${hl((h) => h.state.transfers)}, arşivde ${hl((h) => h.state.archive)} · ilk devir ${results.map((r) => `${r.seed}:${r.data?.monitor.heirloom?.first ? `G${r.data.monitor.heirloom.first.day}` : '-'}`).join(' ')}`);
 const lg = (f) => sum((d) => (d.monitor.lineage ? f(d.monitor.lineage) : 0));
 console.log(
   `(25.4) Aile Kütüğü: 2. kuşak sakin (son gün) ${lg((l) => l.generations['2'] ?? 0)} · 2. kuşak düğünü ${lg((l) => l.state.gen2Weddings)} · ilk 2. kuşak düğünü ` +

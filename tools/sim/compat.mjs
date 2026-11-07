@@ -47,14 +47,17 @@
 //   save-v26.json: 25.3'ün oyunu (kayıt sürümü 26): otopilotla 64 gün (--crisis-state); Altın Çağ'da büyüyüp mizacını
 //                  ailesinden, ustasından ya da kendinden alan gençler, yeni nesil huylar ve kaynakları, yeni dilekçe sayaçları. Eski
 //                  kayıtlarda (sürüm 2-25) huylar aynen korunur (yoksa dört kuruluş huyundan dağıtılır), huy kaynağı ve sayaçlar boştur
-//   save-v27.json: 25.4'ün oyunu (kayıt sürümü 27, bugünkü): otopilotla 72 gün (--crisis-state); Aile Kütüğü (kuşaklar, doğum
+//   save-v27.json: 25.4'ün oyunu (kayıt sürümü 27): otopilotla 72 gün (--crisis-state); Aile Kütüğü (kuşaklar, doğum
 //                  ebeveynleri, ocaklar, çocuk listeleri), 2. kuşak düğünleri ve Tarihçe'deki ilki, ocak reisleri. Eski kayıtlarda (sürüm 2-26)
 //                  ebeveyni kayıtlı olmayan herkes 1. kuşaktır (kendi ocağıyla), kasabada doğanlar ebeveyninin bir fazlası
+//   save-v28.json: 25.5'in oyunu (kayıt sürümü 28, bugünkü): otopilotla 72 gün (--crisis-state); Kıdemli Bilge Deniz'in Eski Seyyah
+//                  Pusulası 64. gün "manevi evladı" Ada'ya devredildi (çantasında, hikâyesi ve zinciriyle), Tarihçe'de ilk kuşak mirası.
+//                  Eski kayıtlarda (sürüm 2-27) yadigâr, çırak geçmişi ve yadigâr sayacı yoktur
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -180,6 +183,13 @@ for (const { name, raw } of fixtures) {
     // (25.1) yaşam evreleri (yüklendiği an)
     loaded.life = s.characters.map((c) => ({ id: c.id, age: c.age, days: c.ageInDays, stage: c.lifeStage, child: c.isChild, retired: c.retired, role: Boolean(c.role) }));
     loaded.lifeState = JSON.stringify(s.lifeStages);
+    // (25.5) yadigârlar (yüklendiği an)
+    loaded.heirloom = {
+      carried: s.characters.flatMap((c) => (c.inventory ?? []).filter((x) => x.heirloom).map((x) => [c.id, x.kind, JSON.stringify(x.heirloom.chain), x.heirloom.story])),
+      state: JSON.stringify(s.heirloom),
+      first: s.chronicle.firstHeirloom,
+      mentees: s.characters.reduce((n, c) => n + (c.mentees?.length ?? 0), 0),
+    };
     // (25.4) Aile Kütüğü (yüklendiği an)
     loaded.lineage = {
       people: s.characters.filter((c) => !c.role).map((c) => ({ id: c.id, g: c.generation, f: c.familyId, p: c.parents, pi: c.parentIds, k: c.children, fam: Boolean(s.lineage.families[c.familyId]) })),
@@ -480,6 +490,20 @@ for (const { name, raw } of fixtures) {
       ok: grew.every((x) => (x.days === before.get(x.id).days + 1 || (before.get(x.id).child && !x.child && x.days >= 18 * 16)) && (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage))) && grew.length >= L.filter((x) => !x.role).length - 2,
       detail: `${grew.length} sakin`,
     });
+  }
+  // (25.5) yadigârlar
+  {
+    const H = r.loaded.heirloom;
+    if (data.version < 28) {
+      results.push({ name: `${tag}: yadigâr, çırak geçmişi, yadigâr sayacı ve ilk devir yok`, ok: H.carried.length === 0 && H.mentees === 0 && !H.first && H.state === JSON.stringify({ created: 0, transfers: 0, archive: [], feast: null }) });
+    } else {
+      const saved = data.characters.flatMap((c) => (c.inventory ?? []).filter((x) => x.heirloom).map((x) => [c.id, x.kind, JSON.stringify(x.heirloom.chain), x.heirloom.story]));
+      results.push({
+        name: `${tag}: çantadaki yadigârlar (hikâye, zincir), sayaçlar ve Tarihçe'deki ilk kuşak mirası korundu`,
+        ok: H.carried.length > 0 && JSON.stringify(H.carried) === JSON.stringify(saved) && JSON.parse(H.state).transfers === data.heirloom.transfers && JSON.stringify(H.first) === JSON.stringify(data.chronicle.firstHeirloom),
+        detail: H.carried.map((x) => `${x[1]} ${x[2]}`).join(' · '),
+      });
+    }
   }
   // (25.4) Aile Kütüğü
   {

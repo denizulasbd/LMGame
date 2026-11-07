@@ -33,6 +33,7 @@ import { Building } from '../entities/Building.js';
 import { Animal } from '../entities/Animal.js';
 import { emptyTemperament, restoreTemperament } from '../systems/Temperament.js';
 import { emptyLineage, restoreLineage } from '../systems/Lineage.js';
+import { emptyHeirloomState, restoreHeirloomState } from '../systems/Heirloom.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
 
@@ -192,6 +193,7 @@ export class GameState {
     this.apprenticeship = emptyApprenticeshipState(); // (25.2) açık çırak kapıları ve sayaçlar
     this.temperament = emptyTemperament(); // (25.3) mizaç gelişimi sayaçları
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
+    this.heirloom = emptyHeirloomState(); // (25.5) aile yadigârları: sayaçlar, arşiv, Kuşak Şöleni
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -271,6 +273,7 @@ export class GameState {
       apprenticeship: this.apprenticeship,
       temperament: this.temperament,
       lineage: this.lineage,
+      heirloom: this.heirloom,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -380,7 +383,8 @@ export class GameState {
     next.tradePost = restoreTradePost(data.tradePost);
     next.lifeStages = restoreLifeStages(data.lifeStages);
     next.temperament = restoreTemperament(data.temperament); // (25.3)
-    next.lineage = restoreLineage(data.lineage); // (25.4) sakinlerin soy verisi LineageSystem'de tamamlanır
+    next.lineage = restoreLineage(data.lineage);
+    next.heirloom = restoreHeirloomState(data.heirloom); // (25.5) // (25.4) sakinlerin soy verisi LineageSystem'de tamamlanır
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)
@@ -557,6 +561,7 @@ function restoreChronicle(data) {
   for (const [k, v] of Object.entries(data.towerStages ?? {})) if (v && typeof v.name === 'string') out.towerStages[k] = { ...v };
   out.goldenAge = STAMP(data.goldenAge);
   out.firstGen2Couple = named(data.firstGen2Couple, ['a', 'b']); // (25.4)
+  out.firstHeirloom = named(data.firstHeirloom, ['elder', 'heir', 'item']); // (25.5)
   return out;
 }
 

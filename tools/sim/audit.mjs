@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken, (25.1) Kıdemli Bilge emekliyken, (25.2) çırak ustasının yanındayken, (25.3) yeni nesil huylu sakinler varken, (25.4) Aile Kütüğü ve devredilmiş ocak varken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken, (25.1) Kıdemli Bilge emekliyken, (25.2) çırak ustasının yanındayken, (25.3) yeni nesil huylu sakinler varken, (25.4) Aile Kütüğü ve devredilmiş ocak varken, (25.5) yadigâr taşıyan sakin ve Kuşak Şöleni varken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -516,6 +516,33 @@ const PAGE_HELPERS = () => {
       p3.children = keep.children;
       delete s.lineage.heads[p1.homeId];
       s.chronicle.firstGen2Couple = null;
+    }
+
+    // --- 2r. (25.5) Yadigâr taşıyan sakin, çırak geçmişi, arşiv, Tarihçe'deki ilk devir ve süren Kuşak Şöleni varken ---
+    {
+      const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((a, b) => a.id - b.id);
+      const [h, m] = adults;
+      const keepInv = h.inventory;
+      h.inventory = [...(h.inventory ?? []).slice(0, 2), { kind: 'heirloomCompass', qty: 1, name: 'Eski Seyyah Pusulası', heirloom: { ownerId: m.id, ownerName: m.name, story: `${m.name} Usta'nın 40 yıllık emektar pusulası. Kuşaktan kuşağa aktarılır.`, since: s.time.day, chain: [m.name, h.name] } }];
+      const keepM = m.mentees;
+      m.mentees = [{ id: h.id, progress: 88 }];
+      s.heirloom.transfers += 1;
+      s.heirloom.archive.push({ kind: 'heirloomJournal', name: 'Bilge Günlüğü', story: 'x', day: s.time.day });
+      s.heirloom.feast = { x: 100, y: 100, startedAt: s.totalMinutes, until: s.totalMinutes + 60 };
+      s.chronicle.firstHeirloom = { elder: m.name, heir: h.name, item: 'Eski Seyyah Pusulası', ids: [m.id, h.id], day: s.time.day, hour: 18, minute: 0 };
+      const diff = A.roundtrip();
+      const h2 = s.characters.find((c) => c.id === h.id);
+      const slot = (h2.inventory ?? []).find((x) => x.kind === 'heirloomCompass');
+      check('yadigâr varken kayıt -> yükleme durum kayması yok (hikâye, zincir, çırak geçmişi, arşiv, şölen, Tarihçe)', diff.length === 0 && slot?.heirloom.chain.join() === `${m.name},${h.name}` && s.heirloom.feast && s.chronicle.firstHeirloom?.heir === h.name, diff.join(' | '));
+      hours(12);
+      check('yüklemeden sonra yadigâr çantada kalır (satılmaz, yenmez, öşre gitmez)', (s.characters.find((c) => c.id === h.id).inventory ?? []).some((x) => x.kind === 'heirloomCompass'));
+      const h3 = s.characters.find((c) => c.id === h.id);
+      h3.inventory = (h3.inventory ?? []).filter((x) => x.kind !== 'heirloomCompass');
+      s.characters.find((c) => c.id === m.id).mentees = keepM ?? [];
+      s.heirloom.archive = [];
+      s.heirloom.feast = null;
+      s.chronicle.firstHeirloom = null;
+      void keepInv;
     }
 
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---

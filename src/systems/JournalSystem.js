@@ -34,6 +34,7 @@ import { genitive, ablative } from '../utils/turkish.js';
 import { QUIRKS } from '../data/social.js';
 import { ITEMS } from '../data/citizens.js';
 import { PROFESSIONS } from '../data/apprenticeship.js';
+import { HEIRLOOMS } from '../data/heirloom.js';
 
 // İşlenmiş malların ilk üretimi
 const FIRST_GOODS_TEXT = {
@@ -159,6 +160,12 @@ export class JournalSystem {
           'star'
         )
       ),
+      // (25.5) Aile yadigârları
+      on('heirloom:created', ({ character, kind }) => this.log(`${character.name} çantasında bir aile yadigârı taşıyor: ${HEIRLOOMS[kind].name}`, HEIRLOOMS[kind].icon)),
+      on('heirloom:passed', ({ from, to, kind, first }) =>
+        this.log(first ? `İlk Kuşak Mirası Devredildi: ${from.name} yadigârını (${HEIRLOOMS[kind].name}) ${to.name} adlı mirasçısına teslim etti! Meydanda Kuşak Şöleni` : `${from.name}, ${HEIRLOOMS[kind].name} yadigârını ${to.name} adlı mirasçısına teslim etti`, HEIRLOOMS[kind].icon)
+      ),
+      on('heirloom:archived', ({ character, kind }) => this.log(`${character.name} köyden ayrılırken ${HEIRLOOMS[kind].name} kasabanın arşivine emanet edildi`, HEIRLOOMS[kind].icon)),
       // (25.4) Aile Kütüğü
       on('lineage:gen2Wedding', ({ a, b, first }) => first && this.log(`Kasabanın 2. Kuşak İlk Düğünü: ${a.name} & ${b.name}! Kasabada doğan kuşak yuva kuruyor`, 'ring')),
       on('lineage:newHome', ({ a, b, home }) => this.log(`${a.name} ve ${b.name} kendi yuvalarını kurdu: boş bir eve (${home.name}) taşınıyorlar`, 'heart')),

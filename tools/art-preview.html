@@ -29,6 +29,7 @@
     import { QUIRKS } from '../src/data/social.js';
     import { getStoolSprite } from '../src/art/ui/index.js';
     import { PROFESSIONS } from '../src/data/apprenticeship.js';
+    import { HEIRLOOMS } from '../src/data/heirloom.js';
 
     const root = document.getElementById('root');
     const SCALE = 5;
@@ -56,6 +57,56 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 25.5: aile yadigârları ve törensel devir teslim ---
+    {
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      const kinds = ['heirloomHammer', 'heirloomShuttle', 'heirloomCompass', 'heirloomYeast', 'heirloomTrowel', 'heirloomJournal'];
+      const framed = (name) => {
+        const icon = getIconSprite(name);
+        const c = document.createElement('canvas');
+        c.width = 15;
+        c.height = 15;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#e0a030';
+        ctx.fillRect(0, 0, 15, 15);
+        ctx.fillStyle = '#fff3b0';
+        ctx.fillRect(1, 1, 13, 13);
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(2, 2, 11, 11);
+        ctx.drawImage(icon, 3, 3);
+        return c;
+      };
+      show('Aile yadigârları (25.5): satılmaz, feda edilmez, yok edilmez — çantada parıldayan altın çerçeve', kinds.map((k) => [HEIRLOOMS[k].name, framed(k)]), 8);
+      const elderP = { hair: 'short', hairColor: 'gray', skin: 'tan', shirt: 'forest', pants: 'brown' };
+      const heirP = { hair: 'spiky', hairColor: 'ginger', skin: 'light', shirt: 'sky', pants: 'denim' };
+      const say = (ctx, text, cx, top) => {
+        ctx.font = "7px 'Pixelify Sans', monospace";
+        const w = Math.ceil(ctx.measureText(text).width) + 6;
+        cx = Math.max(w / 2 + 2, Math.min(ctx.canvas.width - w / 2 - 2, cx));
+        ctx.fillStyle = '#1b1423';
+        ctx.fillRect(cx - w / 2 - 1, top - 1, w + 2, 11);
+        ctx.fillStyle = '#fff8e7';
+        ctx.fillRect(cx - w / 2, top, w, 9);
+        ctx.fillStyle = '#3a2a1f';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, cx - w / 2 + 3, top + 5);
+      };
+      const frames = [0, 1, 2].map((i) => {
+        const item = getIconSprite('heirloomHammer');
+        const ix = 58 + i * 10;
+        return [`devir ${i}`, scene(210, 64, [
+          [getCharacterSprite(elderP, 'right', 'idle0', look({ stage: 'elder' })), 50, 58],
+          [getCharacterSprite(heirP, 'left', i === 2 ? 'idle1' : 'idle0', look({ stage: 'youth' })), 88, 58],
+          [item, ix, 46],
+        ], (ctx) => {
+          if (i < 2) say(ctx, 'Bu çekiç artık senin evlat, hakkını ver!', 60, 4);
+          else say(ctx, 'Söz veriyorum, layık olacağım!', 94, 4);
+          if (i === 2) for (let k = 0; k < 6; k++) { ctx.fillStyle = ['#ffd23f', '#f06b8a', '#8a6cf0'][k % 3]; ctx.fillRect(84 + k * 4, 20 + (k % 2) * 3, 1, 1); }
+        })];
+      });
+      show('Törensel devir teslim: Kıdemli Bilge yadigârını evladına uzatır; veda ve söz (metin baloncuğu), ilk devirde Kuşak Şöleni', frames, 4);
+    }
 
     // --- 25.4: Aile Kütüğü — üç kuşaklık soy ağacı, Yeni Yuva ve Ocak Devri ---
     {

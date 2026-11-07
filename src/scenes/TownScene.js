@@ -86,6 +86,7 @@ import { ApprenticeshipSystem } from '../systems/ApprenticeshipSystem.js';
 import { drawSpeechBubbles } from '../rendering/SpeechBubbles.js';
 import { TemperamentSystem } from '../systems/TemperamentSystem.js';
 import { LineageSystem } from '../systems/LineageSystem.js';
+import { HeirloomSystem } from '../systems/HeirloomSystem.js';
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -186,6 +187,8 @@ export class TownScene extends Scene {
     this.apprenticeship = new ApprenticeshipSystem(this.game, this.world, new Random(state.seed + 28));
     // (25.4) Aile Kütüğü, 2. kuşak düğünleri, Yeni Yuva ve Ocak Devri (kendi üreteci; ev değişiklikleri Altın Çağ'da)
     this.lineageSystem = new LineageSystem(this.game, this.world, new Random(state.seed + 30), { petitions: this.petitions });
+    // (25.5) Aile yadigârları, miras intikali ve Kuşak Şöleni (kendi üreteci; Altın Çağ'da)
+    this.heirloomSystem = new HeirloomSystem(this.game, this.world, new Random(state.seed + 31), { economy: this.economy });
     // (25.3) Mizaç kalıtımı ve yeni nesil huylar (kendi üreteci; Altın Çağ'da açılır)
     this.temperament = new TemperamentSystem(this.game, this.world, new Random(state.seed + 29));
     // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
@@ -300,6 +303,7 @@ export class TownScene extends Scene {
       this.apprenticeship,
       this.temperament,
       this.lineageSystem,
+      this.heirloomSystem,
     ];
 
     this.camera = new Camera();
@@ -314,6 +318,7 @@ export class TownScene extends Scene {
     this.festivalFx = new FestivalEffects();
     this.confetti = new WeddingConfetti(); // (19. aşama) meydandaki düğün kutlaması
     this.ageConfetti = new WeddingConfetti(); // (20. aşama) Çağ Kutlaması
+    this.heirloomConfetti = new WeddingConfetti(); // (25.5) Kuşak Şöleni
     this.chimeWaves = new ChimeWaves(); // (20. aşama) kule çanının ses dalgaları
     this.leaves = new LeafFall();
     this.animationTime = 0; // görsel animasyonlar için gerçek zaman (oyun duraklasa da akar)
@@ -760,6 +765,8 @@ export class TownScene extends Scene {
     if (party && this.game.state.totalMinutes < party.until) this.confetti.draw(renderer, party, this.animationTime, view);
     const ageParty = this.game.state.goldenAge?.celebration;
     if (ageParty && this.game.state.totalMinutes < ageParty.until) this.ageConfetti.draw(renderer, ageParty, this.animationTime, view);
+    const feast = this.game.state.heirloom?.feast;
+    if (feast && this.game.state.totalMinutes < feast.until) this.heirloomConfetti.draw(renderer, feast, this.animationTime, view);
     this.chimeWaves.draw(renderer, towerOf(this.game.state), this.animationTime);
     renderer.resetCamera();
     const daylight = 1 - Math.min(1, getAmbientColor(hour).a / 0.55);

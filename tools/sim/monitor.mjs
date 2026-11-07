@@ -47,6 +47,7 @@ export async function installMonitor(page) {
     window.__apprMod = await import('/src/systems/Apprenticeship.js').catch(() => null); // (25.2)
     window.__socialData = await import('/src/data/social.js').catch(() => null); // (25.3)
     window.__lineageMod = await import('/src/systems/Lineage.js').catch(() => null); // (25.4)
+    window.__heirData = await import('/src/data/heirloom.js').catch(() => null); // (25.5)
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -367,6 +368,19 @@ export async function installMonitor(page) {
           m.maxApprentices = Math.max(m.maxApprentices ?? 0, active);
         }
 
+        // ---- (25.5) Yadigârlar: her sakinde en çok bir yadigâr, kasabada yadigâr kaybolmaz ----
+        if (s.heirloom && window.__heirData) {
+          let n = 0;
+          for (const c of s.characters) {
+            const h = (c.inventory ?? []).filter((x) => window.__heirData.HEIRLOOMS[x.kind]);
+            if (h.length > 1) broke(`${c.name}: birden fazla yadigâr`);
+            n += h.length;
+          }
+          const total = n + s.heirloom.archive.length;
+          if (total < (m.heirloomMax ?? 0)) broke(`yadigâr kayboldu (${total} < ${m.heirloomMax})`);
+          m.heirloomMax = Math.max(m.heirloomMax ?? 0, total);
+        }
+
         // ---- (25.4) Aile Kütüğü: kuşak, ocak, çocuk listesi tutarlı; birinci derece akraba çift (ensest) yok ----
         if (s.lineage && window.__lineageMod) {
           const L = window.__lineageMod;
@@ -555,6 +569,14 @@ export async function installMonitor(page) {
                 spoiled: { ...(s.granary?.spoiled ?? {}) },
                 switches: s.granary?.switches ?? 0,
                 granaryCapacity: s.granaryCapacity ?? 0,
+              }
+            : null,
+          // (25.5)
+          heirloom: s.heirloom && window.__heirData
+            ? {
+                carried: s.characters.flatMap((c) => (c.inventory ?? []).filter((x) => window.__heirData.HEIRLOOMS[x.kind]).map((x) => `${c.name}:${x.name}:${x.heirloom?.chain?.join('>')}`)),
+                state: { created: s.heirloom.created, transfers: s.heirloom.transfers, archive: s.heirloom.archive.length },
+                first: s.chronicle?.firstHeirloom ?? null,
               }
             : null,
           // (25.4)

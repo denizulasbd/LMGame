@@ -10,7 +10,7 @@ export function emptyGoldenAge() {
 }
 
 export function emptyChronicle() {
-  return { founders: [], firstCouple: null, firstMasterwork: null, towerWork: {}, towerMaster: null, towerStages: {}, goldenAge: null, firstGen2Couple: null };
+  return { founders: [], firstCouple: null, firstMasterwork: null, towerWork: {}, towerMaster: null, towerStages: {}, goldenAge: null, firstGen2Couple: null, firstHeirloom: null };
 }
 
 /** Kasaba Altın Çağ'da mı (Ulu Saat Kulesi tamamlandı)? */

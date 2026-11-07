@@ -36,6 +36,7 @@ import {
   BUBBLE_HEIGHT,
 } from '../art/ui/index.js';
 import { sanitizeOrigin } from '../systems/Temperament.js';
+import { sanitizeMentees } from '../systems/Heirloom.js';
 
 const HALF_WIDTH = CHARACTER_WIDTH / 2;
 const BUBBLE_POP_TIME = 0.15;
@@ -110,6 +111,7 @@ export class Character extends Entity {
     parents = null,
     familyId = null,
     children = null,
+    mentees = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -176,6 +178,8 @@ export class Character extends Entity {
     this.parents = Array.isArray(parents) ? parents.filter((id) => Number.isFinite(id) && id !== this.id) : [...this.parentIds];
     this.familyId = Number.isFinite(familyId) ? familyId : null;
     this.children = Array.isArray(children) ? children.filter((id) => Number.isFinite(id)) : [];
+    // 25.5: ustanın yetiştirdiği çıraklar [{ id, progress }] (yadigâr mirasçısı için; kayda girer)
+    this.mentees = sanitizeMentees(mentees);
     this.retired = false; // emekli bilge mi (kaydedilmez; LifeStageSystem çekirdek sakin kuralıyla hesaplar)
     this.waterBucket = false; // yangında kovası dolu mu (kaydedilmez)
     this.recall = null;
@@ -578,6 +582,7 @@ export class Character extends Entity {
       parents: this.parents,
       familyId: this.familyId,
       children: this.children,
+      mentees: this.mentees,
     };
   }
 

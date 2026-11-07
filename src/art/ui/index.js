@@ -1255,6 +1255,16 @@ Object.assign(ICONS, {
   quirkFestive: ['p..P..i..', '..o..c...', '.KKKKKK..', '.KyyyyK.p', '.KOOOOK..', '..KOOK.P.', '...KK....', '...KK....', '..KKKK...'],
 });
 
+// (25.5) Aile yadigârları: altın çerçeveli, eski ve değerli görünümlü
+Object.assign(ICONS, {
+  heirloomHammer: ['PKKKKP...', 'KqqqqKK..', 'KKKKKwK..', 'P...KwK..', '....KwK..', '....KwK..', '....KXK..', '...KYYK..', 'P..KKKK.P'],
+  heirloomShuttle: ['P.......P', '.KKKKKKK.', 'KXEEEEEXK', 'KwKpppKwK', 'KXEEEEEXK', '.KKKKKKK.', '...KpK...', '..KpK....', 'P.KK....P'],
+  heirloomCompass: ['P.KKKKK.P', '.KYPPPYK.', 'KYPuoPPYK', 'KPPKoPPPK', 'KPPPKPPPK', 'KPPPbKPPK', 'KYPPPbPYK', '.KYPPPYK.', 'P.KKKKK.P'],
+  heirloomYeast: ['P.KKKKK.P', '..KxxxK..', '.KKKKKKK.', 'KaWWWWWaK', 'KaSSsSSaK', 'KasSSsSaK', 'KaSSSSSaK', '.KaaaaaK.', 'P.KKKKK.P'],
+  heirloomTrowel: ['P......KP', '......KwK', '.....KwK.', '..KKKwK..', '.KqqqKK..', 'KqqqqqK..', 'KrqqqqK..', '.KrrrK...', 'P.KKK...P'],
+  heirloomJournal: ['P.......P', '.KKKKKKK.', 'KoPooooPK', 'KoPoYYoPK', 'KoPoYYoPK', 'KoPooooPK', 'KoPooooPK', '.KKKKKKK.', 'P.......P'],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);

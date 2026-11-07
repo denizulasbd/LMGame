@@ -45,6 +45,7 @@ import { PROFESSIONS, PROUD_MASTER } from '../../data/apprenticeship.js';
 import { apprenticesOf, graduationFor, acceptsApprentice } from '../../systems/Apprenticeship.js';
 import { ORIGIN_NAMES } from '../../data/temperament.js';
 import { generationName } from '../../systems/Lineage.js';
+import { heirloomSlot } from '../../systems/Citizens.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -365,7 +366,7 @@ export class CharacterPanel {
     const raid = rioter ? raidOf(state, character) : null;
     const inv = character.inventory ?? [];
     const leaving = Boolean(character.emigrating); // (22. aşama) köyü terk ediyor
-    const key = `${character.id}:${character.coins}:${capacity}:${rioter}:${leaving}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}`).join(',')}`;
+    const key = `${character.id}:${character.coins}:${capacity}:${rioter}:${leaving}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}${s.heirloom ? s.heirloom.chain.join('>') : ''}`).join(',')}`;
     if (key === this.lastPurse) return;
     this.lastPurse = key;
     const coins = el('div', { className: 'purse-coins', title: 'Kişisel kese: yevmiyeler, usta eseri ödülleri ve alışveriş (kasaba hazinesinden ayrıdır)' }, [
@@ -383,9 +384,11 @@ export class CharacterPanel {
       const item = inv[i];
       const def = item ? ITEMS[item.kind] : null;
       const name = item ? item.name ?? def.name : 'Boş yuva';
-      const hint = def ? `${name}${item.qty > 1 ? ` ×${item.qty}` : ''}${def.hunger ? ` · tokluk +${def.hunger}` : ''}${def.heal ? ' · hastalığı çabuk geçirir' : ''}${def.fun ? ' · bakınca keyif verir' : ''}${def.resource && !def.hunger ? ` · ${RESOURCES[def.resource].name}` : ''}` : 'Boş yuva';
+      // (25.5) Aile yadigârı: hikâyesi ve devir zinciri; satılmaz, feda edilmez
+      const heir = item?.heirloom;
+      const hint = heir ? `${name} · Aile yadigârı (satılmaz, feda edilmez)\n${heir.story}\nKuşaktan kuşağa: ${heir.chain.join(' → ')}` : def ? `${name}${item.qty > 1 ? ` ×${item.qty}` : ''}${def.hunger ? ` · tokluk +${def.hunger}` : ''}${def.heal ? ' · hastalığı çabuk geçirir' : ''}${def.fun ? ' · bakınca keyif verir' : ''}${def.resource && !def.hunger ? ` · ${RESOURCES[def.resource].name}` : ''}` : 'Boş yuva';
       slots.push(
-        el('span', { className: `bag-slot${item ? '' : ' is-empty'}`, title: hint }, [
+        el('span', { className: `bag-slot${item ? '' : ' is-empty'}${heir ? ' is-heirloom' : ''}`, title: hint }, [
           ...(item ? [el('img', { src: getAnyIconURL(def.icon), alt: '' })] : []),
           ...(item && item.qty > 1 ? [el('span', { className: 'bag-qty', text: String(item.qty) })] : []),
         ])
@@ -682,6 +685,9 @@ export class CharacterPanel {
     if ((character.buffs.warmMeal ?? -1) > now) tags.push({ text: 'Sıcak yemekle tok', icon: 'food', cls: 'is-warm' });
     if ((character.buffs.happyHome ?? -1) > now) tags.push({ text: 'Mutlu Yuva', icon: 'love', cls: 'is-love' });
     if ((character.buffs.proudMaster ?? -1) > now) tags.push({ text: 'Gururlu Usta', icon: 'star', cls: 'is-love' }); // (25.2)
+    // (25.5) Ata Mirası Gururu: yadigâr taşıyan yeni nesil
+    const heirSlot = character.lifeStage !== 'elder' ? heirloomSlot(character) : null;
+    if (heirSlot) tags.push({ text: `Ata Mirası Gururu: ${heirSlot.name}`, icon: ITEMS[heirSlot.kind].icon, cls: 'is-love' });
     // 11. aşama: hastalık, Dinçlik, keşif seferi
     if (character.illness) {
       const hours = Math.ceil(character.illness.remaining / 60);

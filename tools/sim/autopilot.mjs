@@ -922,6 +922,12 @@ console.log(
       (r ? ` · (24.2) Dokuma Tezgâhı ${r.looms}, Şerbethane ${r.breweries} · dokunan kumaş ${r.clothWoven}, yapılan fıçı ${r.sherbetMade} (stok ${r.cloth} / ${r.sherbet}) · handa içilen şerbet ${r.served}, handaki fıçı ${r.innCasks} · testi ${r.jugs} (içilen ${r.jugsDrunk}) · Dayanıklı Giysi ${r.garments} (giyen ${r.dressed}) · refah katkısı +${r.welfare} · açken çalışan lüks işçi ${r.hungryLuxury}` : '')
   );
 }
+if (mon.heirloom) {
+  const H = mon.heirloom;
+  console.log(
+    `(25.5) yadigâr: oluşan ${H.state.created}, devredilen ${H.state.transfers}, arşivde ${H.state.archive} · ilk devir ${H.first ? `${H.first.elder} -> ${H.first.heir} (${H.first.item}, G${H.first.day})` : '-'} · taşınan ${H.carried.join(', ') || '-'}`
+  );
+}
 if (mon.lineage) {
   const L = mon.lineage;
   console.log(

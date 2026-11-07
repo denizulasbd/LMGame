@@ -244,7 +244,7 @@ export class StatsPanel {
     const ga = state.goldenAge ?? {};
     const tower = towerOf(state);
     const leader = towerMasterOf(state);
-    const key = JSON.stringify([ch, ga.since, ga.chimes, ga.books, tower?.wonderStage, tower?.underConstruction, leader, state.townName]);
+    const key = JSON.stringify([ch, ga.since, ga.chimes, ga.books, tower?.wonderStage, tower?.underConstruction, leader, state.townName, state.heirloom?.archive?.length]);
     if (key === this.lastChronicle) return;
     this.lastChronicle = key;
     const when = (v) => (v && Number.isFinite(v.day) ? `Gün ${v.day}${Number.isFinite(v.hour) ? `, ${String(v.hour).padStart(2, '0')}:00` : ''}` : '');
@@ -275,6 +275,9 @@ export class StatsPanel {
         ]),
         entry('heart', 'Kurucu Sakinler', ch.founders?.length ? [gold(ch.founders.map((f) => f.name).join(', '))] : [pending('Henüz yazılmadı')], 'Kasabayı ilk kuran ve ilk kulübelere yerleşenler'),
         entry('ring', 'İlk Evlenen Çift', ch.firstCouple ? [gold(`${ch.firstCouple.a} ile ${ch.firstCouple.b}`)] : [pending('Henüz kimse evlenmedi')], when(ch.firstCouple)),
+        // (25.5) İlk kuşak mirası
+        entry('heart', 'İlk Kuşak Mirası Devredildi', ch.firstHeirloom ? [gold(`${ch.firstHeirloom.elder}`), ` ${ch.firstHeirloom.item} yadigârını `, gold(ch.firstHeirloom.heir), ` adlı mirasçısına teslim etti!`] : [pending('Henüz bir aile yadigârı el değiştirmedi')], when(ch.firstHeirloom)),
+        ...(state.heirloom?.archive?.length ? [entry('book', 'Kasaba Arşivindeki Yadigârlar', [state.heirloom.archive.map((a) => a.name).join(', ')])] : []),
         // (25.4) Kasabanın ilk 2. kuşak düğünü
         entry('ring', 'Kasabanın 2. Kuşak İlk Düğünü', ch.firstGen2Couple ? [gold(`${ch.firstGen2Couple.a} & ${ch.firstGen2Couple.b}`)] : [pending('Kasabada doğan kuşaktan henüz kimse evlenmedi')], when(ch.firstGen2Couple)),
         entry('masterpiece', 'İlk Usta Eseri', ch.firstMasterwork ? [gold(ch.firstMasterwork.maker), ` · ${ch.firstMasterwork.piece}`] : [pending('Henüz bir usta eser vermedi')], when(ch.firstMasterwork)),

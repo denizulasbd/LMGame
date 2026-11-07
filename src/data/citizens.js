@@ -36,6 +36,13 @@ export const ITEMS = {
   // (24.2) Pazar Yeri'nin terzisinden Dayanıklı Giysi (kışın soğuğa karşı korur) ve handan Şerbet Testisi (keyif)
   garment: { name: 'Dayanıklı Giysi', icon: 'cloth', stack: 1 },
   sherbetJug: { name: 'Şerbet Testisi', icon: 'sherbet', stack: 2, fun: 15 },
+  // (25.5) Aile yadigârları: satılmaz, feda edilmez, yok edilmez (heirloom, locked); her biri tek ve adlı, hikâyesiyle (data/heirloom.js)
+  heirloomHammer: { name: 'Ata Yadigârı Çekiç', icon: 'heirloomHammer', stack: 1, heirloom: true, locked: true },
+  heirloomShuttle: { name: 'Ata Yadigârı Mekik', icon: 'heirloomShuttle', stack: 1, heirloom: true, locked: true },
+  heirloomCompass: { name: 'Eski Seyyah Pusulası', icon: 'heirloomCompass', stack: 1, heirloom: true, locked: true },
+  heirloomYeast: { name: 'Kadim Maya Kavanozu', icon: 'heirloomYeast', stack: 1, heirloom: true, locked: true },
+  heirloomTrowel: { name: 'Usta Mala', icon: 'heirloomTrowel', stack: 1, heirloom: true, locked: true },
+  heirloomJournal: { name: 'Bilge Günlüğü', icon: 'heirloomJournal', stack: 1, heirloom: true, locked: true },
   // (25.2) Çırak işi: hammadde tüketmeden çıkan küçük yan ürünler (Pazar Yeri'nde value altına satılır); kurabiye yenir
   noviceNails: { name: 'Acemi Çivisi', icon: 'anvil', stack: 6, value: 2, craft: true },
   woodenSpoon: { name: 'Tahta Kaşık', icon: 'wood', stack: 4, value: 2, craft: true },

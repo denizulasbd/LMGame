@@ -21,6 +21,8 @@ import { INN_SHERBET } from '../data/refinery.js';
 import { healthEnergyMultiplier } from './HealthSystem.js';
 import { PROUD_MASTER } from '../data/apprenticeship.js';
 import { clamp } from '../utils/math.js';
+import { heirloomSlot } from './Citizens.js';
+import { HEIRLOOM } from '../data/heirloom.js';
 
 /** Üşüme çarpanının fazlası paltoyla azalır: 1 + (m - 1) × (1 - koruma). */
 function protectedCold(multiplier, protection) {
@@ -55,6 +57,7 @@ export class NeedsSystem {
       const walking = c.task?.phase === 'travel' && c.isMoving;
       const happyHome = (c.buffs.happyHome ?? -1) > now;
       const proud = (c.buffs.proudMaster ?? -1) > now; // (25.2) Gururlu Usta
+      const pride = c.lifeStage !== 'elder' && heirloomSlot(c) !== null; // (25.5) Ata Mirası Gururu
       for (const need of NEED_KEYS) {
         const perMinute = NEEDS[need].decayPerHour / 60;
         let multiplier = c.profile.decay[need] * (sleeping ? SLEEP_DECAY_MULTIPLIER[need] : 1);
@@ -75,6 +78,7 @@ export class NeedsSystem {
         if (walking && need === 'energy') multiplier *= travelFatigue(c);
         if (happyHome && need === 'fun') multiplier *= HAPPY_HOME.funDecay;
         if (proud && need === 'fun') multiplier *= PROUD_MASTER.funDecay;
+        if (pride && need === 'fun') multiplier *= HEIRLOOM.prideFunDecay;
         // (24.2) Handa fıçı şerbeti içen güne "Keyifli Damak"la başlar: keyfi yavaş düşer
         if (need === 'fun' && hasPalate(c, now)) multiplier *= INN_SHERBET.palate.funDecay;
         if (need === 'energy') multiplier *= healthEnergy;
