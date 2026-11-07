@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken, (25.1) Kıdemli Bilge emekliyken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -408,6 +408,33 @@ const PAGE_HELPERS = () => {
       }
       for (const c of s.characters) c.isInjured = false;
       s.crisis.raid = null;
+    }
+
+    // --- 2m. (25.1) Kıdemli Bilge emekliyken ve nasihat verirken, bir Genç 21. doğum gününün eşiğindeyken ---
+    {
+      const Y = 16;
+      const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
+      const sage = adults[0];
+      sage.ageInDays = 70 * Y - 1;
+      sage.age = 69;
+      const youth = adults[1];
+      youth.ageInDays = 21 * Y - 1;
+      youth.age = 20;
+      youth.lifeStage = 'youth';
+      youth.profile = youth.buildProfile();
+      const promoted = counter('lifeStage:changed');
+      scene().lifeStages.ageEveryone();
+      s.lifeStages.adviceMinutes += 5;
+      const diff = A.roundtrip();
+      const sage2 = s.characters.find((c) => c.id === sage.id);
+      const youth2 = s.characters.find((c) => c.id === youth.id);
+      check('Kıdemli Bilge emekliyken kayıt -> yükleme durum kayması yok (evre, gün cinsinden yaş, sayaçlar)', diff.length === 0 && sage2.lifeStage === 'elder' && sage2.retired && youth2.lifeStage === 'adult' && promoted.n === 2, diff.join(' | ') + ` · ${promoted.n} geçiş`);
+      const again = counter('lifeStage:changed');
+      hours(30);
+      check('yüklemeden sonra bilge yeniden kutlanmaz, emekli kalır, yaşlar gün dönümünde bir kez ilerler', again.n === 0 && sage2.retired && sage2.ageInDays === 70 * Y + 1 && s.characters.includes(sage2), `${again.n} geçiş · ${sage2.ageInDays}`);
+      check('emekli bilge işe gitmez (yükleme sonrası 30 saat)', !sage2.task?.jobId && !sage2.task?.workBuildingId);
+      promoted.off();
+      again.off();
     }
 
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---

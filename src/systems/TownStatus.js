@@ -13,6 +13,7 @@ import { masterworkHappiness } from './Masterworks.js';
 import { clothWelfare } from './Refinery.js';
 import { aestheticWelfareMultiplier } from './Landscape.js';
 import { taxWorkMultiplier, reputationForImmigration } from './Crown.js';
+import { elderWelfare } from './LifeStages.js';
 
 /** Bir sakinin mutluluğu 0-100: ihtiyaçlarının ağırlıklı ortalaması. */
 export function happinessOf(character) {
@@ -50,6 +51,8 @@ export function townHappinessBonus(state) {
   bonus += masterworkHappiness(state);
   // (24.2) Dokunan keten kumaş: her 40 topta kalıcı +1 (en çok +3)
   bonus += clothWelfare(state);
+  // (25.1) Emekli Kıdemli Bilgeler: her biri +1 (en çok +3); bilge yoksa 0
+  bonus += elderWelfare(state);
   return bonus;
 }
 

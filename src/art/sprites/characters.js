@@ -13,6 +13,8 @@
 //   coat : kürk yakalı kışlık palto (gömlek palto rengine boyanır, etek kemeri örter)
 //   bag  : sırt çantası (önden askılar, arkadan çanta, yandan sırtta çıkıntı)
 //   outfit: (15. aşama) meslek kıyafeti 'kit:kademe' (ör. 'miner:3'); bkz. outfits.js. Palto gövdeyi örter.
+//   stage : (25.1) yaşam evresi: 'youth' (boynunda turuncu genç fuları, çevik) ya da 'elder' (kırlaşmış saç ve şakaklar,
+//           elinde ahşap yürüyüş bastonu; otururken baston bırakılır). null = standart yetişkin / çocuk.
 import { PALETTE, CHARACTER_COLORS } from '../palette.js';
 import { applyOutfit } from './outfits.js';
 import { getSprite, composeRows, flipRowsHorizontal, squashRows, emptyRows } from '../PixelSprite.js';
@@ -20,7 +22,7 @@ import { getSprite, composeRows, flipRowsHorizontal, squashRows, emptyRows } fro
 export const CHARACTER_WIDTH = 12;
 export const CHARACTER_HEIGHT = 18;
 export const CHILD_HEIGHT = 14;
-export const NO_LOOK = Object.freeze({ child: false, coat: false, bag: false, outfit: null });
+export const NO_LOOK = Object.freeze({ child: false, coat: false, bag: false, outfit: null, stage: null });
 
 /** Görünüşe göre sprite yüksekliği. */
 export function characterHeight(look = NO_LOOK) {
@@ -242,6 +244,38 @@ function dress(rows, view, look) {
   return out.map((row) => row.join(''));
 }
 
+// --- (25.1) Yaşam evresi detayları (yetişkin boyundaki kareye, oturmadan önce) ---
+const ELDER_GRAY_FROM_ROW = 6; // bu satırdan aşağıdaki saç (şakaklar, uzun saç) kırlaşır; saç gölgesi her yerde gümüş
+const CANE_ROWS = { front: [11, 17], side: [11, 17] };
+const CANE_X = { front: 11, side: 10 };
+const CANE_HANDLE = { front: [[10, 10], [11, 10]], side: [[9, 10], [10, 10]] };
+const YOUTH_SCARF = { front: [[5, 10], [6, 10], [6, 11]], back: [[4, 10], [5, 10], [6, 10], [7, 10]], side: [[6, 10], [7, 10]] };
+
+function applyLifeStage(rows, view, look, sitting) {
+  const stage = look.child ? null : look.stage ?? null;
+  if (!stage) return rows;
+  const out = rows.map((row) => [...row]);
+  const kind = view === 'side' ? 'side' : view;
+  if (stage === 'elder') {
+    if (!sitting) {
+      const caneKind = kind === 'side' ? 'side' : 'front';
+      const x = CANE_X[caneKind];
+      const [from, to] = CANE_ROWS[caneKind];
+      for (let y = from; y <= to; y++) if (out[y][x] === '.') out[y][x] = y === to ? 'x' : 'w';
+      for (const [hx, hy] of CANE_HANDLE[caneKind]) if (out[hy][hx] === '.') out[hy][hx] = 'x';
+    }
+  } else if (stage === 'youth') {
+    for (const [x, y] of YOUTH_SCARF[kind]) if (out[y][x] !== 'K') out[y][x] = 'O';
+  }
+  return out.map((row) => row.join(''));
+}
+
+/** (25.1) Bilgenin kırlaşmış saçı: saç gölgesi her yerde, saçın kendisi şakaklardan aşağıda gümüş (son karede; arkadan da). */
+function frostHair(rows, look, rowOffset) {
+  if (look.child || look.stage !== 'elder') return rows;
+  return rows.map((row, y) => row.replace(/[12]/g, (c) => (c === '2' || y - rowOffset >= ELDER_GRAY_FROM_ROW ? 'q' : c)));
+}
+
 // --- Çocuk: yetişkin karesinden üst iki boş satır ve gövdenin iki satırı çıkarılır ---
 const CHILD_REMOVED_ROWS = [0, 1, 11, 12];
 const CHILD_HEAD_OFFSET = 2; // baş iki satır yukarı kayar
@@ -254,6 +288,7 @@ function buildFrame(view, frame, hairStyle, look) {
   const sitting = frame === 'sit0' || frame === 'sit1';
   const legs = frame === 'walk0' || frame === 'walk1' ? frame : 'idle';
   let rows = dress(assemble(sitting ? 'front' : baseView, legs, hairStyle), sitting ? 'front' : view, look);
+  rows = applyLifeStage(rows, sitting ? 'front' : view, look, sitting);
   if (look.child) rows = rows.filter((_, i) => !CHILD_REMOVED_ROWS.includes(i));
   const height = rows.length;
   const offset = look.child ? CHILD_HEAD_OFFSET : 0;
@@ -263,15 +298,16 @@ function buildFrame(view, frame, hairStyle, look) {
     const keep = look.child ? CHILD_SEAT_ROWS : 15;
     const seated = [...emptyRows(height - keep - 1, CHARACTER_WIDTH), ...rows.slice(0, keep), '..K88KK88K..'];
     rows = frame === 'sit1' ? squashRows(seated, [look.child ? CHILD_SIT_SQUASH : 12]) : seated;
-    return view === 'back' ? hideFace(rows, offset - (height - keep - 1)) : rows;
+    return frostHair(view === 'back' ? hideFace(rows, offset - (height - keep - 1)) : rows, look, height - keep - 1);
   }
   if (frame === 'idle1') rows = squashRows(rows, [look.child ? CHILD_HIP_ROW : 14]); // nefes: gövde 1 piksel çöker
-  return view === 'back' ? hideFace(rows, offset) : rows;
+  return frostHair(view === 'back' ? hideFace(rows, offset) : rows, look, 0);
 }
 
-/** Görünüşün önbellek anahtarı: '' (yetişkin), 'c' (çocuk), 'C' (palto), 'B' (çanta), '@kit:kademe' birleşimleri. */
+/** Görünüşün önbellek anahtarı: '' (yetişkin), 'c' (çocuk), 'C' (palto), 'B' (çanta), '@kit:kademe', (25.1) 'Y' / 'E' birleşimleri. */
 export function lookKey(look = NO_LOOK) {
-  return `${look.child ? 'c' : ''}${look.coat ? 'C' : ''}${look.bag ? 'B' : ''}${look.outfit && !look.child ? `@${look.outfit}` : ''}`;
+  const stage = look.child ? '' : look.stage === 'elder' ? 'E' : look.stage === 'youth' ? 'Y' : '';
+  return `${look.child ? 'c' : ''}${look.coat ? 'C' : ''}${look.bag ? 'B' : ''}${look.outfit && !look.child ? `@${look.outfit}` : ''}${stage}`;
 }
 
 const paletteCache = new Map();

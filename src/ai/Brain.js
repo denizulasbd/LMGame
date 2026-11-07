@@ -50,6 +50,7 @@ import { partnerOf, canRomance } from '../systems/RelationshipSystem.js';
 import { genitive } from '../utils/turkish.js';
 import { SHOP, SNACK, REVOLT } from '../data/citizens.js';
 import { foodItemOf, countItem, roomFor, isRioter, raidOf } from '../systems/Citizens.js';
+import { ELDER } from '../data/lifeStages.js';
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
 const PLAYGROUND_TYPES = ['fountain', 'campfire', 'inn', 'monument'];
@@ -821,6 +822,12 @@ export class Brain {
       weights.shade = ((weights.bench ?? 1) + (weights.flowers ?? 1)) * (winter ? 0.15 : 0.5);
     }
     this.addQuirkLeisure(c, hour, weights);
+    // (25.1) Kıdemli Bilge: çardak ve gölge (yukarıda yeniden hesaplanır) ile Bilgelik Evi'nde kitap okumak daha cazip
+    if (c.profile.elder) {
+      if (weights.gazebo) weights.gazebo *= ELDER.leisure.gazebo;
+      if (weights.shade) weights.shade *= ELDER.leisure.shade;
+      if (this.world.getCompleted('academy').length > 0) weights.readLibrary = (weights.readLibrary ?? 0) + ELDER.readLibraryBase * ELDER.leisure.readLibrary;
+    }
 
     const options = Object.entries(weights).filter(([name, w]) => w > 0 && ACTIVITIES[name]);
     while (options.length > 0) {

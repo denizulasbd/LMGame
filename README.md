@@ -2713,6 +2713,105 @@ bilinmeyen mallar, taşan ithalat stoğu ve geçersiz seri temizlenir.
   ve en düşük Yönetim Güveni (%75) her koşuda `main` ile aynı. Altı kasabanın altısı kuleden sonra iskele kurdu: 7 ziyaret, 15 sözleşme,
   +448 altın; 36 günde hiçbir kasabada hammadde kritik eşiğe inmediği için ithalat yapılmadı.
 
+## Kuşaklar: yaşam evreleri ve yaş döngüsü — Çocuk, Genç, Yetişkin, Kıdemli Bilge (25. aşama, 25.1 mikro adımı)
+
+25. aşama ("Kuşaklar, Çıraklık ve Aile Mirası") kasabaya zamanın akışını getiriyor. İlk adımda her sakin artık yaşlanır ve dört
+yaşam evresinden geçer. İlke değişmedi: **Pikselköy'de ölüm ve kalıcı yıkım yoktur.** Yaşlanan sakin oyundan silinmez; **Kıdemli
+Bilge** unvanını alır, ağır işlerden emekli olur ve çardakta, bankta, meydan havuzunun başında ya da Bilgelik Evi'nde oturarak
+kasabaya bilgelik katar. Sayılar `data/lifeStages.js`'te, saf hesaplar `systems/LifeStages.js`'te, yaşlanma / emeklilik / nasihat
+`systems/LifeStageSystem.js`'tedir.
+
+| Evre | Yaş | Davranış | Görünüş |
+|---|---|---|---|
+| **Çocuk** (`child`) | doğumdan büyüyene kadar | Mevcut çocuk düzeni: koşturur, oynar, okula ve meydana gider; çalışmaz | Küçük silüet (12x14) |
+| **Genç** (`youth`) | 18-20 | Büyüyen çocuk ve genç göçmenler; kasabanın işlerine yetişkinler gibi yardım eder (25.2'de çıraklık adayı) | Boynunda turuncu fular, çevik duruş |
+| **Yetişkin** (`adult`) | 21-69 | Tam kapasite çalışan, üretken sakin (bugüne kadarki herkes) | Standart çalışma kıyafetleri |
+| **Kıdemli Bilge** (`elder`) | 70+ | Emekli usta: ağır işlerden muaf, Bilge Nasihati verir, refaha katkı sunar | Kırlaşmış saç ve şakaklar, ahşap yürüyüş bastonu (otururken bırakır) |
+
+### Yaş döngüsü
+
+- Her sakinin `lifeStage` evresi ve gün cinsinden yaşı (`ageInDays`) vardır; `age` (yıl) bundan türetilir. **Bir yaş = bir oyun yılı**
+  (4 mevsim x 4 gün = 16 gün). Yaş yalnızca **gün dönümünde (00:00)** ilerler; gezgin tüccar gibi ziyaretçiler yaşlanmaz.
+- Doğum günleri kimlikten türetilir ve yılın ilk 8 gününe dağılır (herkes aynı gün yaşlanmaz); **rastgelelik yoktur**.
+- Büyüyen çocuk 18 yaşında **Genç** başlar; 21. doğum gününde **Yetişkin**, 70. doğum gününde **Kıdemli Bilge** olur. Evreler geri
+  dönmez (kazanılmış yetişkinlik ve bilgelik korunur). Kuruluş sakinlerinin en yaşlısı (66) ilk kez yaklaşık 57-64. günlerde bilgeleşir;
+  otopilotlu 64 günlük koşuda (tohum 42) Deniz 63. gün 00:00'da kasabanın ilk Kıdemli Bilgesi oldu.
+- **Gönül ilişkisinde yaş farkı** artık **kuşak yaşına** göre ölçülür (kasabaya katıldıkları / büyüdükleri andaki yaş; herkes birlikte
+  yaşlandığı için zamanla değişmez). Bulgu: ilk denemede fark anlık yaşla ölçülüyordu; farklı doğum günleri iki sakinin farkını günden
+  güne 13-15 arasında oynatıyor, tohum 42'de eşleşmeleri ve Altın Çağ'ı G28'den G31'e kaydırıyordu. Kuşak yaşıyla eski kural birebir korunur.
+
+### Kıdemli Bilge: emeklilik, Bilge Nasihati ve refah
+
+- **Emeklilik:** emekli bilge inşaata, toplamaya, üretim yuvalarına (sabit iş yeri olsa bile), itfaiyeye, baskın savunmasına ve
+  keşif seferine gitmez. Boş zamanında **bankı (x3), çardağı (x2,5), meydan havuzunu (x2), ağaç gölgesini (x2)** ve Bilgelik Evi'nde
+  kitap okumayı yeğler; nehir kenarı ve uzun yürüyüşler azalır, adımları %10 ağırdır. Testte bilgenin boş zamanının %83'ü bu oturma
+  yerlerinde geçti (yetişkinde %43).
+- **En az 3 çekirdek sakin kuralı:** kasabada çalışabilir genç / yetişkin sayısı 3'ün altına inerse en düşük kimlikli bilgeler
+  **gönüllü usta** olarak çalışmaya döner (kart "Gönüllü usta" yazar, Kasaba Günlüğü'ne not düşer); yeter sayıya ulaşılınca yeniden
+  emekli olurlar ("yeniden emekliliğin tadını çıkarıyor"). Emeklilik her saat başı ve nüfus değiştiğinde yeniden hesaplanır, kaydedilmez.
+- **Bilge Nasihati:** boş zamanını (bank, çardak, havuz, han, sohbet...) geçiren emekli bilgenin 40 piksel yakınındaki uyanık yetişkin
+  ve gençlerin keyfi dakikada **+0,04**, sosyalliği **+0,02** dolar; bilgenin başında ara sıra kitap / kıvılcım baloncuğu çıkar. Uyuyan,
+  çalışan ya da gönüllü bilge nasihat vermez; çocuklar ve öteki bilgeler etkilenmez.
+- **Refah:** her emekli bilge kasaba refahına **+1** katar (en çok +3).
+- **Kutlama:** bilgeleşen sakinin başında altın kıvılcımlar yükselir; bildirim ve Kasaba Günlüğü aynı cümleyi yazar (ör. "Deniz artık
+  kasabanın kıdemli bir bilgesi oldu, gençlere yol gösterecek!"; üç cümleden biri bu katmanın kendi üretecinden seçilir) ve sakinin
+  anılarına "70 yaşında Kıdemli Bilge unvanını aldı" eklenir. Gencin yetişkinliğe geçişi de günlüğe yazılır.
+
+### Karakter Detay Kartı
+
+Adın altında **yaşam evresi rozeti** (Çocuk pembe, Genç turuncu, Yetişkin ahşap, Kıdemli Bilge gümüş-mor) ve **yaşı** görünür; bilge
+için "Emekli · ağır işlerden muaf" ya da "Gönüllü usta", genç için "Çevik ve hevesli" notu eklenir. Rozetin ipucu evrenin açıklamasını
+ve bir sonraki doğum gününe kalan günü gösterir. `tools/art-preview.html` aynı sakinin dört evresini, bilgenin her saç stili ve yönü
+(yürüyüş, arkadan, bankta, paltolu), gencin fuları ve çardakta / bankta Bilge Nasihati sahneleriyle gösterir.
+
+### Determinizm ve izole üreteç
+
+Yaşlanma ve evre geçişleri **hiçbir rastgele sayı üretecini tüketmez**; katmanın kendi tohumlanmış üreteci (`seed + 27`) yalnızca süs
+için (kutlama cümlesi, nasihat baloncuğu) kullanılır. Emekli bilgenin mola zarı da atılır (`breakChance`), böylece bilge varken bile
+ana üretecin sırası değişmez. Test, 20 günlük yaşlanma + bilgeleşme + emeklilik + nasihat boyunca 24 üretecin ve `Math.random`'un
+hiç ilerlemediğini doğrular.
+
+- **Bulgu (gençlerin enerjisi):** gençlere uykuda %15 hızlı enerji dolumu denendi; tohum 42'de gençler erken uyanıp iş düzeni değişti ve
+  Altın Çağ G28'den G31'e kaydı. "Tohum 42 milim şaşmamalı" kuralı gereği bonus `YOUTH.energyGain = 1` ile kapalı tutuldu ve çıraklıkla
+  birlikte dengelenmek üzere 25.2'ye bırakıldı (profil kancası hazır: `buildTraitProfile(..., { youth })`).
+- 36 günlük stres koşularında kimse 70'e ulaşmaz (en yaşlı 68): bilge mekanikleri ilk 2 ayın dengesine dokunmaz, uzun oyunlarda devreye girer.
+
+### Kayıt (sürüm 24)
+
+Sakinlere `lifeStage`, `ageInDays` ve `agedDays` (kuşak yaşı için kasabada yaşlanılan gün), kayda `lifeStages` sayaçları (nasihat
+dakikası, unvanı alan bilgeler, yetişkinliğe geçen gençler, son kutlama cümlesi) eklendi; emeklilik kaydedilmez, yüklenince sessizce
+(günlüğe yazılmadan) yeniden hesaplanır. **Sürüm 2-23 kayıtlarında** evresi olmayan yetişkinler (18-20 yaşındakiler de) `'adult'`,
+çocuklar `'child'` başlar (70+ olan olsaydı `'elder'`); yaş aynen korunur, gün sayacı yaştan ve kimlikten kurulur, kuşak yaşı yaşın
+kendisidir. Bozuk bir evre ya da yaş sayacı yaştan yeniden kurulur, bozuk sayaçlar sıfırlanır.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 874; 40'ı bu adımın): evre verisi ve saf hesaplar (yaştan evre, geri dönmeyen evreler, doğum
+  günleri, yaş / gün dönüşümü), karakter modeli ve profiller (bilgenin ağır adımları ve oturma sevgisi, gencin yetişkinle aynı iş düzeni),
+  çocuğun büyüyüp Genç olması, gün dönümünde yaşlanma (ziyaretçi hariç, gerçek saatle tek kez), 70. doğum gününde bilgelik (olay,
+  bildirim, aynı günlük cümlesi, anı, ölmeme), görseller (kır saç ve baston, aynı boyut, oturunca bırakılan baston, genç fuları, çocuk
+  silüeti), emeklilik (iş bulucu, sabit iş yeri, itfaiye / savunma, sefer), çekirdek sakin güvencesi (gönüllü usta, savunmaya sayılma,
+  yeniden emeklilik ve günlük notları), refah katkısı, boş zaman tercihleri, Bilge Nasihati (miktar, menzil, uyuyan / gönüllü bilge),
+  Genç -> Yetişkin, ana üreteçlerin ve `Math.random`'un tüketilmemesi, kuşak yaşı (40 gün boyunca sabit fark, büyüyen çocuğun 18'i),
+  Karakter Detay Kartı rozetleri, kayıt sürümü 24 gidiş-dönüşü, bozuk değerler, v23 kaydı ve bir gün yaşaması.
+- **Denetim** (`audit.mjs`): 111/111 (yeni senaryo: Kıdemli Bilge emekliyken ve bir Genç 21. doğum gününü yeni geçmişken kayıt -> yükleme
+  durum kayması yok; yüklemeden sonra kimse yeniden kutlanmaz, bilge emekli kalır, yaş gün dönümünde bir kez ilerler). Bu senaryo iki
+  hatayı yakaladı ve düzeltildi: yüklemede emekliliğin ilk eşitlenmesi günlüğe "yeniden emekli" notu düşürüyordu, nasihat dakikası
+  yüklenirken yuvarlanıyordu. Bekçi (`monitor.mjs`) artık her örnekte evrenin geçerliliğini, çocuklukla uyumunu, yaş sayacını, bilge
+  olmayan emekliyi ve çekirdek sakin güvencesini kopuk referans olarak denetler; işteki emekliyi ve emeklilik gecikmesini sayar.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-24, 680; 75'i bu adımın, yeni fikstürün genel kontrolleri dahil): `save-v24.json` bu adımın otopilotuyla **64 günlük** oyundur (`--crisis-state`;
+  63. günde kendiliğinden bilgeleşen Deniz, 7 Genç, nasihat sayacı). v2-v23 kayıtlarının her birinde evresi olmayan yetişkinler `'adult'`,
+  çocuklar `'child'` başlar, yaşlar değişmez; v24 kaydında evreler, gün sayaçları ve sayaçlar korunur, bilge emeklidir; hepsinde bir gün
+  sonra herkesin yaşı bir gün ilerler ve kimse silinmez.
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 36`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0,
+  üretmeyen iş yeri 0, sosyal sıkışma 0, sayfa hatası 0. **Altı tohumun altısı 24.3 ile (`main`) birebir aynı:** her koşunun günlük
+  olay kaydı ve bekçi raporu (yeni `life` alanı dışında) bayt bayt eşleşti; **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34**
+  (tohum 42: kule G25 / G27 / G28, Altın Çağ **G28**). 36. günde altı kasabada 42 Genç, 138 Yetişkin, 0 bilge (en yaşlı 68); 4 genç
+  yetişkinliğe geçti, işteki emekli 0.
+- **Uzun koşu** (`autopilot.mjs 42 64 --crisis-state`): Ulu Saat Kulesi yine G25 / G27 / G28, Altın Çağ G28. Deniz 63. gün 00:00'da 70 yaşına basıp
+  kasabanın ilk Kıdemli Bilgesi oldu (bildirim ve günlükte aynı cümle, emekli); koşu sonunda 7 Genç, 22 Yetişkin, 1 emekli bilge, 58 dakika
+  Bilge Nasihati, işteki emekli 0, emeklilik gecikmesi 0; takılma, kopuk referans ve sayfa hatası 0.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -2755,8 +2854,8 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (670; 23. aşama: tehlike sıklığı ayarı ve doğal kriz kapıları, Su Kuyusu (yangın ihtimali ×0,2, bahçe sulaması), Gözcü Kulesi ve bekçiler, haydut baskınının üç çözümü (püskürt, haraç, hazırlıksız) ve penceresi, yangın (çıkış, kova zinciri, Acil Söndür, hasarlı ama silinmeyen yapı), Tamir Et ve ustaların onarımı, hafif yaralanma ve Şifacı, ana rastgele sayı üretecinin tüketilmemesi, kayıt sürümü 20; 22. aşama: iç vergi kademeleri ve öşür, Krallık Vergisi (uyarı, ödeme, malla ödeme, ceza), Kraliyet Fermanları ve ödülleri, Kraliyet Beratı ve Aslanlı Heykel, kötü şöhret ve göç, köyü terk etme ve çekirdek sakinler; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 20'ye) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (874; 25.1: yaşam evreleri, yaşlanma, Kıdemli Bilge emekliliği ve çekirdek sakin kuralı, Bilge Nasihati, kuşak yaşı, evre rozeti, kayıt sürümü 24; 23. aşama: tehlike sıklığı ayarı ve doğal kriz kapıları, Su Kuyusu (yangın ihtimali ×0,2, bahçe sulaması), Gözcü Kulesi ve bekçiler, haydut baskınının üç çözümü (püskürt, haraç, hazırlıksız) ve penceresi, yangın (çıkış, kova zinciri, Acil Söndür, hasarlı ama silinmeyen yapı), Tamir Et ve ustaların onarımı, hafif yaralanma ve Şifacı, ana rastgele sayı üretecinin tüketilmemesi, kayıt sürümü 20; 22. aşama: iç vergi kademeleri ve öşür, Krallık Vergisi (uyarı, ödeme, malla ödeme, ceza), Kraliyet Fermanları ve ödülleri, Kraliyet Beratı ve Aslanlı Heykel, kötü şöhret ve göç, köyü terk etme ve çekirdek sakinler; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 24'e; 25.1: yaşam evreleri ve gün cinsinden yaşlar) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
 | `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması / Çağ Kutlaması / isyan ve yağma / tahsildar, ferman ve köyü terk eden sakin sırasında, yangın ve haydut izi sürerken kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |

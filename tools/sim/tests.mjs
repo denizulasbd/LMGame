@@ -52,6 +52,12 @@
 //              ödenmeme, yetersiz mal, günlük), hammadde ithalatı (paketler, stok, altın, depo yeri), pazar doygunluğu (3 peş peşe satış,
 //              düşüş, başka malla ve ziyaretle toparlanma, taban), panel ve tek tıkla tamamlama, görseller, kayıt sürümü 23 (gidiş-dönüş,
 //              bozuk değerler, v22 kaydı)
+//   25. aşama (25.1): yaşam evreleri (Çocuk / Genç / Yetişkin / Kıdemli Bilge; veri, saf hesaplar, doğum günleri), karakter modeli
+//              ve profiller, gün dönümünde yaşlanma (ziyaretçi hariç, gerçek saatle), 70 yaşında bilgelik (olay, bildirim, Kasaba
+//              Günlüğü, anı, ölmeme), görseller (kır saç, baston, oturunca bırakılan baston, genç fuları, çocuk silüeti), emeklilik
+//              (iş bulucu, itfaiye / savunma, sefer), çekirdek sakin güvencesi (gönüllü usta ve yeniden emeklilik), refah katkısı,
+//              boş zaman tercihleri, Bilge Nasihati (menzil, uyku, gönüllü), Genç -> Yetişkin, ana üreteçlerin tüketilmemesi, gönül
+//              ilişkisinde kuşak yaşı, Karakter Detay Kartı rozeti, kayıt sürümü 24 (gidiş-dönüş, bozuk değerler, v23 kaydı)
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
 import { openGame, createChecks } from './lib.mjs';
@@ -2260,7 +2266,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 23', raw.version === 23);
+  check('kayıt sürümü 24', raw.version === 24);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2703,7 +2709,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 23: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 23 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 24: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 24 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -3018,7 +3024,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 23: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 23 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 24: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 24 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3630,7 +3636,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 23: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 23 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 24: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 24 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -3911,7 +3917,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { g: garden.id, o: other.id, switches: st.granary.switches };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 23: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 23 && raw.version === 23 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    check('kayıt sürümü 24: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 24 && raw.version === 24 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
     game.events.emit('ui:load');
     const s2 = game.state;
     const g2 = s2.buildings.find((b) => b.id === T.g);
@@ -4239,7 +4245,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 23: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 23 && raw.version === 23 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    check('kayıt sürümü 24: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 24 && raw.version === 24 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
     game.events.emit('ui:load');
     const s2 = st();
     const inn2 = s2.buildings.find((b) => b.id === T.inn);
@@ -4513,7 +4519,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 23: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 23 && raw.version === 23 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    check('kayıt sürümü 24: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 24 && raw.version === 24 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
     game.events.emit('ui:load');
     const t2 = st().tradePost;
     check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
@@ -4548,6 +4554,297 @@ const pageResults = await page.evaluate(async () => {
       window.__v22dbg = `yapı ${!!b} · takvim ${st().tradePost.nextShipAt} · gemi ${!!st().tradePost.ship} · gün ${d}->${game.state.time.day}`;
       return b && (st().tradePost.nextShipAt !== null || st().tradePost.ship) && st().tradePost.visits <= 1 && game.state.time.day === d + 1;
     })(), window.__v22dbg);
+    offs.forEach((off) => off());
+  }
+
+  // ===== 25. aşama (25.1): yaşam evreleri ve yaş döngüsü (Çocuk -> Genç -> Yetişkin -> Kıdemli Bilge), emeklilik, Bilge Nasihati =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const LD = await import('/src/data/lifeStages.js');
+    const LS = await import('/src/systems/LifeStages.js');
+    const TS = await import('/src/systems/TownStatus.js');
+    const CR = await import('/src/systems/Crisis.js');
+    const EX = await import('/src/systems/Exploration.js');
+    const RS = await import('/src/systems/RelationshipSystem.js');
+    const ART = await import('/src/art/sprites/index.js');
+    const CH = await import('/src/art/sprites/characters.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const { CONFIG } = await import('/src/config.js');
+    const Y = LD.AGING.daysPerYear;
+    const s0 = st();
+    s0.crisis.difficulty = 'huzurlu';
+    s0.crisis.raid = null;
+    s0.crisis.nextRaidWarnAt = null;
+    const residents = () => st().characters.filter((c) => !c.role);
+    const adultsNow = () => residents().filter((c) => !c.isChild && c.lifeStage !== 'elder');
+    const events = [];
+    const offs = ['lifeStage:changed', 'lifeStage:retired', 'toast', 'journal:added'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
+    const lastJournal = () => st().journal.slice(-4).map((e) => e.text).join(' / ');
+    const hrs251 = (h) => {
+      for (let i = 0; i < h; i++) {
+        const active = st().dilemma.active;
+        if (active) {
+          const o = active.options?.find((x) => x.default) ?? active.options?.[0];
+          if (o) game.events.emit('ui:chooseDilemma', { optionId: o.id });
+          st().dilemma.active = null;
+        }
+        st().time.paused = false;
+        st().time.speed = 4;
+        hours(1);
+      }
+    };
+
+    // --- Veri ve saf hesaplar ---
+    check('dört yaşam evresi: Çocuk, Genç, Yetişkin, Kıdemli Bilge', LD.LIFE_STAGE_KEYS.join() === 'child,youth,adult,elder' && LD.LIFE_STAGES.child.name === 'Çocuk' && LD.LIFE_STAGES.youth.name === 'Genç' && LD.LIFE_STAGES.adult.name === 'Yetişkin' && LD.LIFE_STAGES.elder.name === 'Kıdemli Bilge');
+    check('bir yaş = bir oyun yılı (4 mevsim), Genç 21\'e kadar, Kıdemli Bilge 70 yaşında', Y === CONFIG.DAYS_PER_SEASON * 4 && LD.AGING.youthUntil === 21 && LD.AGING.elderAt === 70);
+    check('evre yaştan türetilir; kazanılmış bilge unvanı korunur', LS.stageFor({ isChild: true, age: 40 }) === 'child' && LS.stageFor({ age: 18 }) === 'youth' && LS.stageFor({ age: 20 }) === 'youth' && LS.stageFor({ age: 21 }) === 'adult' && LS.stageFor({ age: 69 }) === 'adult' && LS.stageFor({ age: 70 }) === 'elder' && LS.stageFor({ age: 50, lifeStage: 'elder' }) === 'elder');
+    check('doğum günleri kimlikten (yılın ilk 8 günü), yaş / gün dönüşümü tutarlı', [1, 2, 3, 17, 99].every((id) => LS.birthdayOffset(id) >= 0 && LS.birthdayOffset(id) < 8 && LS.ageFromDays(LS.daysForAge(33, id)) === 33) && new Set([1, 2, 3, 4, 5, 6, 7, 8].map(LS.birthdayOffset)).size === 8);
+
+    // --- Karakter modeli ---
+    check('her sakinin geçerli bir evresi ve gün cinsinden yaşı var', residents().every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && c.age === Math.floor(c.ageInDays / Y) && (c.lifeStage === 'child') === c.isChild));
+    const mk = (age, extra = {}) => new Character({ name: 'Deneme', age, traits: ['cheerful'], appearance: { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'sky', pants: 'navy' }, ...extra });
+    const k27 = mk(27);
+    const k19 = mk(19);
+    const k72 = mk(72);
+    check('yeni sakin: 27 yaşında Yetişkin, 19 yaşında Genç, 72 yaşında Kıdemli Bilge; yaş değişmez', k27.lifeStage === 'adult' && k27.age === 27 && k27.ageInDays === 27 * Y + LS.birthdayOffset(k27.id) && k19.lifeStage === 'youth' && k19.isYouth && k72.lifeStage === 'elder' && k72.isElder && k72.age === 72);
+    check('bilge profili: ağır adımlar, bank / çardak / kütüphane sevgisi; gencin ve yetişkinin profili aynı iş düzeninde', k72.profile.elder && Math.abs(k72.profile.speed / k27.profile.speed - LD.ELDER.speed) < 1e-9 && k72.profile.leisure.bench > k27.profile.leisure.bench * 2.9 && k19.profile.work.breakChance === mk(19, { traits: ['cheerful'] }).profile.work.breakChance && JSON.stringify(k19.profile.thresholds) === JSON.stringify(k27.profile.thresholds));
+    const kid = mk(5, { growsUpAt: 999999 });
+    check('çocuk: evresi Çocuk, yaş sayacı yürür ama büyümesi FamilySystem\'in işidir', kid.lifeStage === 'child' && kid.ageOneDay() === null && kid.lifeStage === 'child' && kid.isChild);
+    kid.growUp();
+    check('büyüyen çocuk 18 yaşında Genç evresine geçer (görünüşü genç fularlı)', kid.lifeStage === 'youth' && kid.age === 18 && kid.ageInDays === 18 * Y && kid.agedDays === 0 && kid.look.stage === 'youth' && !kid.look.child);
+
+    // --- Gün dönümünde yaşlanma ---
+    const sys = S().lifeStages;
+    const before = new Map(st().characters.map((c) => [c.id, c.ageInDays]));
+    const merchant = st().characters.find((c) => c.role);
+    sys.ageEveryone();
+    check('gün dönümünde her kasabalının yaşı bir gün ilerler (ziyaretçi yaşlanmaz)', residents().every((c) => c.ageInDays === before.get(c.id) + 1) && (!merchant || merchant.ageInDays === before.get(merchant.id)));
+    let changed = 0;
+    const offDay = game.events.on('time:newDay', () => changed++);
+    const d0 = st().time.day;
+    const daysBefore = new Map(residents().map((c) => [c.id, { days: c.ageInDays, child: c.isChild }]));
+    hrs251(25);
+    offDay();
+    const aged = residents().filter((c) => daysBefore.has(c.id));
+    check('gerçek saatle de: 00:00\'da bir kez yaşlanılır', changed === 1 && st().time.day === d0 + 1 && aged.length > 3 && aged.every((c) => c.ageInDays === daysBefore.get(c.id).days + 1 || (daysBefore.get(c.id).child && !c.isChild)), `${changed} gün dönümü`);
+
+    // --- Kıdemli Bilge'ye geçiş ---
+    const pool = adultsNow().sort((a, b) => a.id - b.id);
+    const sage = pool[0]; // en düşük kimlik: çekirdek kuralında ilk gönüllü o olur
+    sage.ageInDays = 70 * Y - 1;
+    sage.age = 69;
+    events.length = 0;
+    const memBefore = sage.memories.length;
+    sys.ageEveryone();
+    const toast = events.find((e) => e.n === 'toast' && e.p.text.includes(sage.name));
+    const elderEntry = st().journal.slice(-6).find((e) => e.icon === 'book' && e.text.includes(sage.name));
+    check('70. doğum gününde Kıdemli Bilge olur: olay, kutlama bildirimi, anı', sage.lifeStage === 'elder' && sage.age === 70 && events.some((e) => e.n === 'lifeStage:changed' && e.p.character === sage && e.p.from === 'adult' && e.p.to === 'elder') && toast && sage.memories.length === memBefore + 1 && sage.memories[sage.memories.length - 1].kind === 'elder', toast?.p.text);
+    check('Kasaba Günlüğü\'ne kutlama cümlesi düşer ("... kıdemli bir bilgesi oldu, gençlere yol gösterecek!" ve benzerleri)', LD.ELDER_LINES.map((l) => l.replace('{name}', sage.name)).includes(elderEntry?.text) && st().lifeStages.elders >= 1 && toast?.p.text === st().lifeStages.lastElderLine && elderEntry.text === toast.p.text, `${elderEntry?.text} / ${toast?.p.text}`);
+    check('bilge ölmez / silinmez: kasabada kalır, emekli olur', st().characters.includes(sage) && sage.retired && !sage.away);
+    check('bilge görünüşü: kırlaşmış saç ve baston (aynı 12x18 boyut), sprite yetişkinden farklı', (() => {
+      const a = ART.getCharacterSprite(sage.appearance, 'down', 'idle0', { ...sage.look, stage: null });
+      const e = ART.getCharacterSprite(sage.appearance, 'down', 'idle0', sage.look);
+      return sage.look.stage === 'elder' && e.width === a.width && e.height === a.height && e.toDataURL() !== a.toDataURL() && CH.lookKey(sage.look).endsWith('E');
+    })());
+    check('oturan bilge bastonu bırakır; genç fularlı; çocuk silüeti küçük kalır', (() => {
+      const p = sage.appearance;
+      const sit = ART.getCharacterSprite(p, 'down', 'sit0', { stage: 'elder' });
+      const sitA = ART.getCharacterSprite(p, 'down', 'sit0', {});
+      const youth = ART.getCharacterSprite(p, 'right', 'walk0', { stage: 'youth' });
+      const adult = ART.getCharacterSprite(p, 'right', 'walk0', {});
+      const child = ART.getCharacterSprite(p, 'down', 'idle0', { child: true, stage: 'elder' });
+      const child0 = ART.getCharacterSprite(p, 'down', 'idle0', { child: true });
+      return sit.toDataURL() !== sitA.toDataURL() && youth.toDataURL() !== adult.toDataURL() && child.height === 14 && child.toDataURL() === child0.toDataURL();
+    })());
+
+    // --- Emeklilik ve çekirdek sakin kuralı ---
+    const origin = { x: sage.tileX, y: sage.tileY };
+    check('emekli bilge ağır işlere gitmez (iş bulucu boş döner, sabit iş yeri olsa bile)', S().jobs.findWorkFor(sage, origin) === null && (() => {
+      const b = st().buildings.find((x) => x.functional && x.workerSlots);
+      const prev = sage.workplaceId;
+      sage.workplaceId = b?.id ?? null;
+      const r = S().jobs.findWorkFor(sage, origin);
+      sage.workplaceId = prev;
+      return r === null;
+    })());
+    check('emekli bilge itfaiye / baskın savunmasına ve keşif seferine sayılmaz', !CR.ablePeople(st()).includes(sage) && !EX.idleAdults(st().characters).includes(sage));
+    check('emekli bilge kasaba refahına +1 katar (en çok +3)', LS.elderWelfare(st()) === Math.min(3, residents().filter((c) => c.retired).length) && LS.elderWelfare(st()) >= 1);
+    const others = adultsNow();
+    const keep = others.slice(0, 2);
+    const fake = others.slice(2);
+    for (const c of fake) {
+      c.lifeStage = 'elder';
+      c.retired = true; // zaten emekli bilgeler
+    }
+    events.length = 0;
+    sys.refreshRetirement();
+    const elders = residents().filter((c) => c.lifeStage === 'elder').sort((a, b) => a.id - b.id);
+    const volunteers = elders.filter((c) => !c.retired);
+    check('çekirdek sakin güvencesi: 2 yetişkin kalınca en düşük kimlikli bilge gönüllü usta olarak çalışır (en az 3 çalışan)', keep.length === 2 && volunteers.length === 1 && volunteers[0] === elders[0] && LS.coreWorkers(st()).length + volunteers.length === 3 && events.some((e) => e.n === 'lifeStage:retired' && e.p.retired === false) && lastJournal().includes('gönüllü usta'), lastJournal());
+    check('gönüllü bilge emekli sayılmaz: savunmaya sayılır, refah yalnızca emeklileri sayar (en çok +3)', volunteers[0] === sage && CR.ablePeople(st()).includes(sage) && LS.elderWelfare(st()) === Math.min(3, elders.length - 1));
+    for (const c of fake) c.lifeStage = 'adult';
+    sys.refreshRetirement();
+    check('yeterli yetişkin dönünce bilge yeniden emekli olur (günlük notu); eski "bilgeler" emekli değil', sage.retired && fake.every((c) => !c.retired) && lastJournal().includes('yeniden emekliliğin'), lastJournal());
+    check('refah bonusu townHappinessBonus\'a eklenir (bilge yokken 0)', (() => {
+      const withSage = TS.townHappinessBonus(st());
+      sage.retired = false;
+      const without = TS.townHappinessBonus(st());
+      sage.retired = true;
+      return Math.abs(withSage - without - 1) < 1e-9;
+    })());
+
+    // --- Boş zaman: çardak, bank, kütüphane ---
+    const brain = S().behavior.brain;
+    const sedentary = new Set(['bench', 'gazebo', 'fountain', 'shade', 'readBench', 'readLibrary', 'campfire', 'inn', 'monument', 'ancientSpring']);
+    const share = (c) => {
+      let n = 0;
+      let total = 0;
+      for (let i = 0; i < 120; i++) {
+        const p = brain.planLeisure(c, 15);
+        if (!p) continue;
+        total++;
+        if (sedentary.has(p.activity)) n++;
+      }
+      return total ? n / total : 0;
+    };
+    const adultRef = adultsNow()[0];
+    const elderShare = share(sage);
+    const adultShare = share(adultRef);
+    check('bilge boş zamanında çardak, bank, havuz ve kütüphaneyi yeğler (yetişkinden belirgin fazla)', elderShare > adultShare + 0.15 && elderShare > 0.5, `bilge %${Math.round(elderShare * 100)}, yetişkin %${Math.round(adultShare * 100)}`);
+
+    // --- Bilge Nasihati ---
+    const listener = adultRef;
+    const kidNear = residents().find((c) => c.isChild);
+    sage.visible = true;
+    sage.task = { activity: 'bench', phase: 'perform', elapsed: 0 };
+    listener.visible = true;
+    listener.task = { activity: 'wait', phase: 'perform', elapsed: 0 };
+    listener.x = sage.x + 10;
+    listener.y = sage.y;
+    listener.needs.fun = 40;
+    listener.needs.social = 40;
+    const advice0 = st().lifeStages.adviceMinutes;
+    sys.update({ gameMinutes: 100 });
+    check('Bilge Nasihati: boş zamanını geçiren bilgenin yanındaki yetişkinin keyfi ve sosyalliği dolar', Math.abs(listener.needs.fun - (40 + 100 * LD.ELDER.advice.fun)) < 1e-6 && Math.abs(listener.needs.social - (40 + 100 * LD.ELDER.advice.social)) < 1e-6 && st().lifeStages.adviceMinutes === advice0 + 100, `${listener.needs.fun.toFixed(2)} / ${listener.needs.social.toFixed(2)}`);
+    listener.x = sage.x + LD.ELDER.advice.radius + 20;
+    listener.needs.fun = 40;
+    sys.update({ gameMinutes: 100 });
+    check('uzaktaki sakin nasihat duymaz', listener.needs.fun === 40);
+    listener.x = sage.x + 10;
+    sage.task = { activity: 'sleep', phase: 'perform', elapsed: 0 };
+    sys.update({ gameMinutes: 100 });
+    check('uyuyan / çalışan bilge nasihat vermez', listener.needs.fun === 40);
+    sage.retired = false;
+    sage.task = { activity: 'bench', phase: 'perform', elapsed: 0 };
+    sys.update({ gameMinutes: 100 });
+    check('gönüllü (çalışan) bilge de nasihat vermez; yalnızca emekliler', listener.needs.fun === 40);
+    sage.retired = true;
+    sage.task = null;
+    listener.task = null;
+
+    // --- Genç -> Yetişkin ---
+    const young = adultsNow().find((c) => c !== sage && c !== listener) ?? adultsNow()[1];
+    young.ageInDays = 21 * Y - 1;
+    young.age = 20;
+    young.lifeStage = 'youth';
+    young.profile = young.buildProfile();
+    sys.ageEveryone();
+    check('21. doğum gününde Genç, Yetişkin olur (günlük notu)', young.lifeStage === 'adult' && young.age === 21 && lastJournal().includes(`${young.name} 21 yaşına bastı`), lastJournal());
+
+    // --- İzole üreteç ---
+    const rngs = Object.entries(S()).filter(([k, v]) => k !== 'lifeStages' && v && v.rng && Number.isFinite(v.rng.state)).map(([k, v]) => [k, v.rng]);
+    const states = rngs.map(([, r]) => r.state);
+    let randomCalls = 0;
+    const realRandom = Math.random;
+    Math.random = () => { randomCalls++; return realRandom(); };
+    const t = adultsNow()[2];
+    t.ageInDays = 70 * Y - 1;
+    t.age = 69;
+    for (let i = 0; i < 20; i++) sys.ageEveryone();
+    sys.refreshRetirement();
+    sys.update({ gameMinutes: 30 });
+    Math.random = realRandom;
+    check('yaşlanma, evre geçişi, emeklilik ve nasihat ana üreteçleri ve Math.random\'u tüketmez (kendi üreteci seed + 27)', rngs.length > 5 && rngs.every(([, r], i) => r.state === states[i]) && randomCalls === 0 && sys.rng !== S().behavior.rng && t.lifeStage === 'elder', `${rngs.length} üreteç, Math.random ${randomCalls}`);
+
+    // --- Gönül ilişkisinde yaş farkı ---
+    const [p1, p2] = [mk(27), mk(41)];
+    const gap0 = LS.ageGap(p1, p2);
+    let stable = true;
+    for (let i = 0; i < 40; i++) {
+      p1.ageOneDay();
+      p2.ageOneDay();
+      if (LS.ageGap(p1, p2) !== gap0) stable = false;
+    }
+    check('gönül ilişkisinde yaş farkı kuşak yaşına göre: doğum günleri farkı günden güne değiştirmez (27 / 41 -> 14)', gap0 === 14 && stable && RS.canRomance(p1, p2));
+    const g18 = mk(5, { growsUpAt: 1 });
+    g18.growUp();
+    for (let i = 0; i < 40; i++) g18.ageOneDay();
+    check('büyüyen çocuğun kuşak yaşı 18: 32 yetişkini (fark 14) aşık olabilir, 33 olamaz', LS.ageGap(g18, mk(32)) === 14 && LS.ageGap(g18, mk(33)) === 15 && g18.age === 20);
+
+    // --- Karakter Detay Kartı ---
+    game.events.emit('ui:selectCharacter', sage.id);
+    game.render(0);
+    const badge = document.querySelector('.character-panel .life-stage-badge');
+    const row = document.querySelector('.character-panel .life-stage-row')?.textContent ?? '';
+    check('kartta yaşam evresi rozeti: Kıdemli Bilge, yaşı ve "Emekli"', badge?.classList.contains('is-elder') && badge.textContent.includes('Kıdemli Bilge') && row.includes(`${sage.age} yaşında`) && row.includes('Emekli') && badge.title.includes('doğum gününe'), row);
+    game.events.emit('ui:selectCharacter', residents().find((c) => c.lifeStage === 'adult').id);
+    game.render(0);
+    const row2 = document.querySelector('.character-panel .life-stage-row')?.textContent ?? '';
+    check('yetişkinin rozeti Yetişkin', document.querySelector('.character-panel .life-stage-badge')?.classList.contains('is-adult') && row2.includes('Yetişkin') && row2.includes('yaşında'), row2);
+    const child = residents().find((c) => c.isChild);
+    if (child) {
+      game.events.emit('ui:selectCharacter', child.id);
+      game.render(0);
+      check('çocuğun rozeti Çocuk', document.querySelector('.character-panel .life-stage-badge')?.classList.contains('is-child'));
+    }
+    game.events.emit('ui:selectCharacter', null);
+
+    // --- Kayıt (sürüm 24) ---
+    st().lifeStages.adviceMinutes = 321;
+    const snap = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
+    game.events.emit('ui:save');
+    const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    check('kayıt sürümü 24: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 24 && raw.version === 24 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
+    game.events.emit('ui:load');
+    const back = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
+    const sage2 = st().characters.find((c) => c.id === sage.id);
+    check('kayıttan evreler, yaşlar ve sayaçlar birebir döner; emeklilik yeniden hesaplanır', back === snap && st().lifeStages.adviceMinutes === 321 && sage2.lifeStage === 'elder' && sage2.retired && sage2.profile.elder);
+    // Bozuk değerler
+    game.events.emit('ui:save');
+    const bad = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    const b0 = bad.characters.find((c) => !c.growsUpAt && c.lifeStage === 'adult');
+    b0.lifeStage = 'zombi';
+    b0.ageInDays = -40;
+    b0.age = 33;
+    const b1 = bad.characters.find((c) => c.id === sage.id);
+    b1.ageInDays = 'yetmiş';
+    b1.age = 71;
+    bad.lifeStages = { adviceMinutes: 'çok', elders: -3 };
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(bad));
+    game.events.emit('ui:load');
+    const c0 = st().characters.find((c) => c.id === b0.id);
+    const c1 = st().characters.find((c) => c.id === b1.id);
+    check('bozuk evre ve yaş sayacı yaştan yeniden kurulur, bozuk sayaçlar sıfırlanır', c0.lifeStage === 'adult' && c0.age === 33 && c0.ageInDays === LS.daysForAge(33, c0.id) && c1.lifeStage === 'elder' && c1.age === 71 && st().lifeStages.adviceMinutes === 0 && st().lifeStages.elders === 0);
+    // Eski (v23) kayıt
+    game.events.emit('ui:save');
+    const old = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    old.version = 23;
+    delete old.lifeStages;
+    for (const c of old.characters) {
+      delete c.lifeStage;
+      delete c.ageInDays;
+      delete c.agedDays;
+      if (!c.growsUpAt && c.age >= 70) c.age = 66; // v23'te bilge yoktu
+    }
+    const ages = new Map(old.characters.map((c) => [c.id, c.age]));
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(old));
+    game.events.emit('ui:load');
+    check('v23 kaydı: evresi olmayan yetişkinler (18-20 yaşındakiler de) Yetişkin, çocuklar Çocuk; yaşlar aynı, bilge yok, sayaçlar boş', residents().every((c) => (c.isChild ? c.lifeStage === 'child' : c.lifeStage === 'adult') && (c.isChild || c.age === ages.get(c.id)) && c.agedDays === 0) && residents().some((c) => !c.isChild && c.age < 21) && !residents().some((c) => c.retired) && JSON.stringify(st().lifeStages) === JSON.stringify(LS.emptyLifeStages()));
+    check('yetişkinlik geri dönmez: Yetişkin evresindeki 19 yaşındaki sakin Genç\'e dönmez', LS.stageFor({ age: 19, lifeStage: 'adult' }) === 'adult' && (() => { const c = residents().find((x) => !x.isChild && x.age < 21); c.ageOneDay(); return c.lifeStage === 'adult'; })());
+    const dd = st().time.day;
+    hrs251(26);
+    check('v23 kasabası bir gün sorunsuz yaşar, yaşlar ilerler', st().time.day >= dd + 1 && residents().every((c) => LS.isLifeStage(c.lifeStage) && c.agedDays >= 1));
     offs.forEach((off) => off());
   }
 

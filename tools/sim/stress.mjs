@@ -108,5 +108,11 @@ console.log(
     `yaralanma ${cs((c) => c.injuries)} (şifacıda iyileşen ${cs((c) => c.treated)}) · tamir ${cs((c) => c.repairs)} · koşu sonunda hasarlı ${cs((c) => c.damagedNow)}, yanan ${cs((c) => c.burningNow)}, yaralı ${cs((c) => c.injuredNow)} · ` +
     `Su Kuyusu ${cs((c) => c.wells)}, Gözcü Kulesi ${cs((c) => c.towers)} · 3 günü aşan hasar ${cs((c) => c.longDamaged)} · en düşük güven ${results.map((r) => `${r.seed}:${r.data?.monitor.citizens?.trustMin ?? '-'}`).join(' ')}`
 );
+const lf = (f) => sum((d) => (d.monitor.life ? f(d.monitor.life) : 0));
+console.log(
+  `(25.1) yaşam evreleri (son gün): genç ${lf((l) => l.counts.youth)}, yetişkin ${lf((l) => l.counts.adult)}, Kıdemli Bilge ${lf((l) => l.counts.elder)} (emekli ${lf((l) => l.retired)}) · ` +
+    `unvanı alan bilge ${lf((l) => l.state.elders ?? 0)}, yetişkinliğe geçen genç ${lf((l) => l.state.adults ?? 0)} · nasihat ${Math.round(lf((l) => l.state.adviceMinutes ?? 0))} dk · ` +
+    `işteki emekli ${lf((l) => l.retiredWorking)} · en yaşlı ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? Math.max(...r.data.monitor.life.ages) : '-'}`).join(' ')}`
+);
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

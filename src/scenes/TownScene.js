@@ -81,6 +81,7 @@ import { AudioSystem } from '../systems/AudioSystem.js';
 import { FestivalEffects } from '../rendering/FestivalEffects.js';
 import { Random } from '../utils/random.js';
 import { getSelectionRing, getTargetMarker } from '../art/ui/index.js';
+import { LifeStageSystem } from '../systems/LifeStageSystem.js';
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -177,6 +178,8 @@ export class TownScene extends Scene {
     this.refinery = new RefinerySystem(this.game, this.world, { economy: this.economy });
     // (24.3) Dış ticaret: Ticaret İskelesi / Kervan Konağı, ihracat sözleşmeleri, pazar doygunluğu, ithalat (rastgelelik yok)
     this.tradePost = new TradePostSystem(this.game, this.world, { economy: this.economy });
+    // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
+    this.lifeStages = new LifeStageSystem(this.game, this.world, new Random(state.seed + 27));
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       crisis: this.crisis,
@@ -234,6 +237,7 @@ export class TownScene extends Scene {
       this.expeditions,
       this.nature,
       this.tradePost,
+      this.lifeStages,
     ];
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
@@ -280,6 +284,7 @@ export class TownScene extends Scene {
       this.granary,
       this.refinery,
       this.tradePost,
+      this.lifeStages,
     ];
 
     this.camera = new Camera();

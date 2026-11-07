@@ -109,7 +109,7 @@ export function crisisActive(state) {
 
 /** Yetişkin, kasabada ve sağlam sakinler (savunmaya yarar). */
 export function ablePeople(state) {
-  return state.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.isInjured && !c.emigrating);
+  return state.characters.filter((c) => !c.isChild && !c.retired && !c.role && !c.away && !c.isInjured && !c.emigrating);
 }
 
 /**

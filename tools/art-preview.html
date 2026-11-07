@@ -55,6 +55,39 @@
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
 
+    // --- 25.1: yaşam evreleri — Çocuk (küçük silüet), Genç (turuncu fular), Yetişkin (standart), Kıdemli Bilge (kır saç + baston) ---
+    {
+      const people = [
+        { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'sky', pants: 'navy' },
+        { hair: 'long', hairColor: 'auburn', skin: 'tan', shirt: 'rose', pants: 'denim' },
+        { hair: 'bun', hairColor: 'black', skin: 'dark', shirt: 'mint', pants: 'plum' },
+        { hair: 'hat', hairColor: 'ginger', skin: 'light', shirt: 'red', pants: 'denim' },
+      ];
+      const STAGES = [['Çocuk', { child: true }], ['Genç', { stage: 'youth' }], ['Yetişkin', {}], ['Kıdemli Bilge', { stage: 'elder' }]];
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      show('Yaşam evreleri (25.1): aynı sakinin dört evresi, önden', people.slice(0, 2).flatMap((p, i) => STAGES.map(([name, l]) => [`${i + 1}. ${name}`, getCharacterSprite(p, 'down', 'idle0', look(l))])), 6);
+      show('Kıdemli Bilge: kırlaşmış saç ve şakaklar, ahşap yürüyüş bastonu (otururken bırakır); her saç stili ve yön', [
+        ...people.map((p) => [`${p.hair} önden`, getCharacterSprite(p, 'down', 'idle0', look({ stage: 'elder' }))]),
+        ['yandan yürüyüş 0', getCharacterSprite(people[0], 'right', 'walk0', look({ stage: 'elder' }))],
+        ['yandan yürüyüş 1', getCharacterSprite(people[0], 'left', 'walk1', look({ stage: 'elder' }))],
+        ['arkadan', getCharacterSprite(people[1], 'up', 'idle0', look({ stage: 'elder' }))],
+        ['bankta oturuyor', getCharacterSprite(people[2], 'down', 'sit0', look({ stage: 'elder' }))],
+        ['paltolu (kış)', getCharacterSprite(people[3], 'down', 'idle1', look({ stage: 'elder', coat: true }))],
+      ], 6);
+      show('Genç: boynunda turuncu fular (çevik duruş); yönler ve çanta', [
+        ['önden', getCharacterSprite(people[2], 'down', 'idle0', look({ stage: 'youth' }))],
+        ['yandan koşuyor', getCharacterSprite(people[2], 'right', 'walk0', look({ stage: 'youth' }))],
+        ['arkadan', getCharacterSprite(people[2], 'up', 'idle0', look({ stage: 'youth' }))],
+        ['sırt çantalı', getCharacterSprite(people[0], 'down', 'idle0', look({ stage: 'youth', bag: true }))],
+      ], 6);
+      const gazebo = getStructureSprite('gazebo', {});
+      const bench = getStructureSprite('bench', {});
+      show('Bilge Nasihati: emekli bilge çardakta / bankta oturur, yanındaki gençlerin ve yetişkinlerin morali dolar', [
+        ['çardakta nasihat', scene(Math.max(120, gazebo.width + 70), gazebo.height + 20, [[gazebo, 4, gazebo.height + 10], [getCharacterSprite(people[0], 'down', 'sit0', look({ stage: 'elder' })), gazebo.width / 2 - 2, gazebo.height + 4], [getBubbleSprite('book'), gazebo.width / 2 - 1, gazebo.height - 14], [getCharacterSprite(people[1], 'left', 'idle0', look({ stage: 'youth' })), gazebo.width + 22, gazebo.height + 14], [getBubbleSprite('sparkle'), gazebo.width + 23, gazebo.height - 4], [getCharacterSprite(people[2], 'left', 'idle1', look({})), gazebo.width + 42, gazebo.height + 14]])],
+        ['bankta', scene(Math.max(80, bench.width + 50), 48, [[bench, 10, 40], [getCharacterSprite(people[3], 'down', 'sit1', look({ stage: 'elder' })), 12, 38], [getCharacterSprite(people[1], 'left', 'idle0', look({ child: true })), bench.width + 24, 42]])],
+      ], 4);
+    }
+
     // --- 24.3: dış ticaret — Ticaret İskelesi / Kervan Konağı, Ticaret Gemisi, Kervan ve ihracat sözleşmesi kartı ---
     {
       show('Ticaret İskelesi / Kervan Konağı (3x2): taş temel, ahşap ambar, çizgili tente, sikkeli tabela, terazi, sandık ve balyalar', [

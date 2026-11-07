@@ -12,6 +12,8 @@
 // (21. aşama) "Kişisel Kese & Çanta": sakinin altını ve çantasındaki eşyalar (4 yuva, Sırt Çantası'yla 6); isyancıysa
 // kırmızı "İsyancı" etiketi. Açık bir dilekçesi varsa kartın üstünde parşömen kutusu: isteği, ne yapılmalı, kalan süre ve
 // Kabul Et / Hemen Karşıla / Reddet düğmeleri ('ui:acceptPetition', 'ui:grantPetition', 'ui:rejectPetition').
+// (25.1) Adın altında yaşam evresi rozeti (Çocuk / Genç / Yetişkin / Kıdemli Bilge) ve yaşı; bilge emekliyse "Emekli",
+// çekirdek sakin kuralıyla çalışıyorsa "Gönüllü usta" yazar. Rozetin ipucu evrenin açıklaması ve bir sonraki doğum günüdür.
 import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../../art/sprites/index.js';
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
@@ -35,6 +37,7 @@ import { RESOURCES } from '../../data/resources.js';
 import { inventoryCapacity, petitionOf, isRioter, raidOf } from '../../systems/Citizens.js';
 import { petitionProgress, grantStatus, formatRemaining } from '../../systems/Petitions.js';
 import { INJURY } from '../../data/crisis.js';
+import { LIFE_STAGES, AGING } from '../../data/lifeStages.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -85,6 +88,7 @@ export class CharacterPanel {
       if (e.key === 'Escape') this.editName(false, false);
     });
     this.nameInput.addEventListener('blur', () => this.editName(false, true));
+    this.stageBadge = el('div', { className: 'life-stage-row' });
     this.meta = el('div', { className: 'character-meta' });
     this.traits = el('div', { className: 'character-traits' });
     // (15. aşama) Zanaat rozeti: ana meslek ve kademesi (Çırak bronz, Kalfa gümüş, Usta altın) ve giydiği kıyafet
@@ -138,7 +142,7 @@ export class CharacterPanel {
       closeButton,
       el('div', { className: 'character-header' }, [
         el('div', { className: 'character-portrait-frame' }, [this.portrait]),
-        el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.meta, this.craftBadge, this.traits]),
+        el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.stageBadge, this.meta, this.craftBadge, this.traits]),
       ]),
       el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
       this.petitionBox,
@@ -195,7 +199,7 @@ export class CharacterPanel {
 
   /** Kimlik bilgisi değişince yeniden kurulur (karakter, ev, çocukluk, aile durumu). */
   identityKey(character) {
-    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}`;
+    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}:${character.lifeStage}:${character.age}:${character.retired}`;
   }
 
   /** Değişmedikçe bir kez kurulan kısımlar: ad, yaş, ev, özellik etiketleri. */
@@ -210,8 +214,8 @@ export class CharacterPanel {
       .map((o) => o.name);
     const where = home ? `${homeIndex + 1} numaralı ${home.upgraded ? 'taş ev' : 'kulübe'}` : 'Evsiz';
     const withWhom = roommates.length ? ` · ${roommates.join(', ')} ile` : ' · tek başına';
-    const age = character.isChild ? 'Çocuk' : `${character.age} yaşında`;
-    this.meta.textContent = `${age} · ${where}${home ? withWhom : ''}`;
+    this.renderLifeStage(character);
+    this.meta.textContent = `${where}${home ? withWhom : ''}`;
 
     const quirk = QUIRKS[character.quirk];
     this.traits.replaceChildren(
@@ -223,6 +227,21 @@ export class CharacterPanel {
       ...(quirk ? [el('span', { className: 'trait-chip quirk-chip', title: `Huyu: ${quirk.description}` }, [el('img', { src: getAnyIconURL(quirk.icon), alt: '' }), quirk.name])] : [])
     );
     this.resetCaches();
+  }
+
+  /** (25.1) Yaşam evresi rozeti ve yaş: "Kıdemli Bilge · 70 yaşında · Emekli". */
+  renderLifeStage(character) {
+    const key = LIFE_STAGES[character.lifeStage] ? character.lifeStage : character.isChild ? 'child' : 'adult';
+    const stage = LIFE_STAGES[key];
+    const daysToBirthday = AGING.daysPerYear - (character.ageInDays % AGING.daysPerYear);
+    const note =
+      key === 'elder' ? (character.retired ? 'Emekli · ağır işlerden muaf' : 'Gönüllü usta · kasabada çalışan el az') : key === 'youth' ? 'Çevik ve hevesli' : null;
+    const title = `${stage.description} Bir sonraki doğum gününe ${daysToBirthday} gün var.`;
+    this.stageBadge.replaceChildren(
+      el('span', { className: `life-stage-badge is-${key}`, title }, [el('img', { src: getAnyIconURL(stage.icon), alt: '' }), stage.name]),
+      el('span', { className: 'life-stage-age', text: `${character.age} yaşında` }),
+      ...(note ? [el('span', { className: 'life-stage-note', text: note })] : [])
+    );
   }
 
   /** null: yeni sakinin listeleri boş olsa bile (anahtar '') bir kez çizilsin, öncekinden kalmasın. */

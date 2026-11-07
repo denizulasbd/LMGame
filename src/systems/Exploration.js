@@ -26,7 +26,7 @@ export function emptyExploration() {
 
 /** Sefere gidebilecek sakinler: yetişkin, kasabada, sağlıklı, yeni gelmemiş, ziyaretçi değil. */
 export function idleAdults(characters) {
-  return characters.filter((c) => !c.isChild && !c.away && !c.illness && !c.newcomer && !c.role);
+  return characters.filter((c) => !c.isChild && !c.retired && !c.away && !c.illness && !c.newcomer && !c.role);
 }
 
 const ADVENTURE_SKILLS = ['mining', 'masonry', 'scholarship', 'woodcutting', 'building', 'herbalism', 'fishing'];

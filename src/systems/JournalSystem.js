@@ -16,6 +16,8 @@
 //              decreeDelivered / decreeFailed (Kraliyet Fermanları), exodus:started / ended, exodus:leaving, population:left
 //   23. aşama: crisis:fireStarted / fireOut / burnedDown (yangın), crisis:raidWarning / raidResolved (haydut baskını), crisis:injured /
 //              healed (hafif yaralanma), crisis:repaired, building:mended (nedene göre)
+//   25.1: lifeStage:changed (Genç -> Yetişkin, Yetişkin -> Kıdemli Bilge; kutlama cümlesi LifeStageSystem'in kendi üretecinden),
+//         lifeStage:retired (çekirdek sakin kuralıyla gönüllü çalışmaya dönen / yeniden emekli olan bilge)
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
@@ -132,6 +134,19 @@ export class JournalSystem {
       on('family:madeRoom', ({ character, to }) => this.log(`${character.name}, ailenin büyümesi için başka bir eve (${to.name}) taşındı`, 'heart')),
       on('family:childBorn', ({ child, parents }) => this.log(`${parents[0].name} ve ${parents[1].name} ailesine küçük ${child.name} katıldı`, 'love')),
       on('family:grownUp', ({ character }) => this.log(`${character.name} büyüdü ve kasabanın genç bir sakini oldu`, 'star')),
+      // (25.1) Yaşam evreleri
+      on('lifeStage:changed', ({ character, from, to }) => {
+        if (to === 'elder') this.log(this.state.lifeStages?.lastElderLine ?? `${character.name} artık kasabanın kıdemli bir bilgesi oldu, gençlere yol gösterecek!`, 'book');
+        else if (to === 'adult' && from === 'youth') this.log(`${character.name} ${character.age} yaşına bastı: gençliğini geride bırakıp tam bir yetişkin oldu`, 'star');
+      }),
+      on('lifeStage:retired', ({ character, retired }) =>
+        this.log(
+          retired
+            ? `Kıdemli Bilge ${character.name} yeniden emekliliğin tadını çıkarıyor: kasabada yeterince çalışan el var`
+            : `Kıdemli Bilge ${character.name} kasabada çalışan el azalınca gönüllü usta olarak işe döndü`,
+          'book'
+        )
+      ),
       on('equipment:equipped', ({ character, item }) => this.log(`${character.name} ${EQUIPMENT[item].name} kuşandı`, EQUIPMENT[item].icon)),
       on('worker:dismissed', ({ building, character }) => this.log(`${character.name} ${building.name} işinden çıkarıldı`, 'sulk')),
       on('weather:changed', ({ type }) => this.log(WEATHER_TEXT[type] ?? WEATHER_TYPES[type].name, WEATHER_TYPES[type].icon)),

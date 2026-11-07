@@ -34,14 +34,18 @@
 //   save-v22.json: 24.2'nin oyunu (kayıt sürümü 22): otopilotla 40 gün (--crisis-state); Dokuma Tezgâhı ve Şerbethane,
 //                  Kumaş ve Fıçı Şerbeti stokları, handaki fıçılar, sakinlerin çantasında Dayanıklı Giysi ve Şerbet Testisi. Eski kayıtlarda
 //                  (sürüm 2-21) Kumaş / Fıçı Şerbeti 0, hanlarda fıçı yok, yeni yapı ve çanta eşyası yoktur
-//   save-v23.json: 24.3'ün oyunu (kayıt sürümü 23, bugünkü): otopilotla 44 gün (--crisis-state); Ticaret İskelesi / Kervan Konağı,
+//   save-v23.json: 24.3'ün oyunu (kayıt sürümü 23): otopilotla 44 gün (--crisis-state); Ticaret İskelesi / Kervan Konağı,
 //                  gemi takvimi, tamamlanan ihracat sözleşmeleri, ithalat sayaçları, pazar çarpanları. Eski kayıtlarda (sürüm 2-22) dış
 //                  ticaret boştur; iskele kurulunca takvim kurulur
+//   save-v24.json: 25.1'in oyunu (kayıt sürümü 24, bugünkü): otopilotla 64 gün (--crisis-state); her sakinin yaşam evresi
+//                  (lifeStage) ve gün cinsinden yaşı (ageInDays), Genç evresindeki büyümüş çocuklar ve genç göçmenler, 63. günde
+//                  kendiliğinden unvanını alan bir Kıdemli Bilge (Deniz, 70). Eski kayıtlarda (sürüm 2-23) evresi olmayan yetişkinler
+//                  'adult' (70+ 'elder'), çocuklar 'child' başlar; yaş değişmez, gün sayacı yaştan kurulur, bir gün sonra ilerler
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -164,6 +168,9 @@ for (const { name, raw } of fixtures) {
       json: JSON.stringify({ ship: s.tradePost.ship, next: s.tradePost.nextShipAt, visits: s.tradePost.visits, market: s.tradePost.market, completed: s.tradePost.completed, earned: s.tradePost.goldEarned }),
       empty: !s.tradePost.ship && s.tradePost.nextShipAt === null && s.tradePost.visits === 0 && Object.keys(s.tradePost.market).length === 0 && s.tradePost.completed === 0,
     };
+    // (25.1) yaşam evreleri (yüklendiği an)
+    loaded.life = s.characters.map((c) => ({ id: c.id, age: c.age, days: c.ageInDays, stage: c.lifeStage, child: c.isChild, retired: c.retired, role: Boolean(c.role) }));
+    loaded.lifeState = JSON.stringify(s.lifeStages);
     // (22. aşama) vergi, Krallık, terk ediş (yüklendiği an)
     loaded.crown = {
       rate: s.tax.rate,
@@ -207,6 +214,7 @@ for (const { name, raw } of fixtures) {
     };
     return {
       crownAfter: { pop: s.characters.length, left: s.exodus.left, active: Boolean(s.exodus.active), rate: s.tax.rate },
+      lifeAfter: s.characters.map((c) => ({ id: c.id, days: c.ageInDays, stage: c.lifeStage, child: c.isChild })),
       tradeAfter: { visits: s.tradePost.visits, scheduled: s.tradePost.nextShipAt !== null || Boolean(s.tradePost.ship) },
       agriAfter: { crops: s.buildings.filter((b) => b.type === 'garden').map((b) => b.crop), capacity: s.granaryCapacity },
       crisisAfter: { fires: s.crisis.fires, raids: s.crisis.raids, raidPending: s.crisis.raid !== null, nextWarn: s.crisis.nextRaidWarnAt, burning: s.buildings.filter((b) => b.isBurning).length, injured: s.characters.filter((c) => c.isInjured).length, day: s.time.day },
@@ -407,6 +415,37 @@ for (const { name, raw } of fixtures) {
       results.push({ name: `${tag}: iskele, gemi takvimi, sözleşmeler, pazar çarpanları ve sayaçlar korundu`, ok: D.json === want && D.posts === data.buildings.filter((b) => b.type === 'tradingPost').length, detail: `${t.visits} ziyaret · ${t.completed} sözleşme · +${t.goldEarned} altın` });
       results.push({ name: `${tag}: bir gün sonra takvim sürüyor`, ok: r.tradeAfter.scheduled && r.tradeAfter.visits >= t.visits });
     }
+  }
+  // (25.1) yaşam evreleri
+  {
+    const L = r.loaded.life;
+    const valid = (x) => (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage)) && Number.isInteger(x.days) && x.days >= 0 && x.age === Math.floor(x.days / 16);
+    if (data.version < 24) {
+      const ageOf = new Map(data.characters.map((c) => [c.id, c.age]));
+      const expected = (x) => (x.child ? 'child' : x.age >= 70 ? 'elder' : 'adult');
+      results.push({
+        name: `${tag}: evresi olmayan yetişkinler 'adult', çocuklar 'child' başladı; yaşlar değişmedi, gün sayacı yaştan kuruldu`,
+        ok: L.every(valid) && L.every((x) => x.stage === expected(x)) && L.every((x) => !Number.isFinite(ageOf.get(x.id)) || x.child || x.age === Math.floor(ageOf.get(x.id))) && r.loaded.lifeState === JSON.stringify({ adviceMinutes: 0, elders: 0, adults: 0, lastElderLine: null }),
+        detail: Object.entries(L.reduce((m, x) => ({ ...m, [x.stage]: (m[x.stage] ?? 0) + 1 }), {})).map(([k, v]) => `${k} ${v}`).join(', '),
+      });
+    } else {
+      const saved = new Map(data.characters.map((c) => [c.id, c]));
+      results.push({
+        name: `${tag}: yaşam evreleri, gün cinsinden yaşlar ve evre sayaçları korundu`,
+        ok: L.every(valid) && L.every((x) => saved.get(x.id)?.lifeStage === x.stage && saved.get(x.id)?.ageInDays === x.days) && r.loaded.lifeState === JSON.stringify(data.lifeStages),
+        detail: `${L.filter((x) => x.stage === 'elder').length} bilge, ${L.filter((x) => x.stage === 'youth').length} genç · ${r.loaded.lifeState}`,
+      });
+      const elders = L.filter((x) => x.stage === 'elder');
+      const core = L.filter((x) => !x.child && !x.role && x.stage !== 'elder').length;
+      results.push({ name: `${tag}: bilgeler emekli (çekirdek sakin kuralı), ölmedi`, ok: elders.length > 0 && elders.every((x) => x.retired === core >= 3), detail: `${elders.length} bilge, ${core} çekirdek sakin` });
+    }
+    const before = new Map(L.map((x) => [x.id, x]));
+    const grew = r.lifeAfter.filter((x) => before.has(x.id) && !before.get(x.id).role);
+    results.push({
+      name: `${tag}: bir gün sonra herkesin yaşı bir gün ilerledi, evreler geçerli, kimse silinmedi`,
+      ok: grew.every((x) => (x.days === before.get(x.id).days + 1 || (before.get(x.id).child && !x.child && x.days >= 18 * 16)) && (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage))) && grew.length >= L.filter((x) => !x.role).length - 2,
+      detail: `${grew.length} sakin`,
+    });
   }
   // (24.2) katma değerli üretim
   {

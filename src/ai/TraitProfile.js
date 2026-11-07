@@ -12,6 +12,7 @@ import {
   WORK_HOURS,
 } from '../data/characters.js';
 import { CHILD_SCHEDULE, CHILD_LEISURE, CHILD_SPEED } from '../data/family.js';
+import { YOUTH, ELDER } from '../data/lifeStages.js';
 
 /** İki özellik listesi arasındaki ilk çatışan çift ([a'nınki, b'ninki]) ya da null. */
 export function clashingTraits(traitsA, traitsB) {
@@ -36,9 +37,10 @@ export function clashesWithOwn(traitKeys, key) {
 
 /**
  * @param {string[]} traitKeys
- * @param {{ child?: boolean }} options child: çocuk profili (erken yatar, çalışmaz, oyun oynar)
+ * @param {{ child?: boolean, youth?: boolean, elder?: boolean }} options child: çocuk profili (erken yatar, çalışmaz, oyun oynar);
+ *   (25.1) youth: enerji dolum çarpanı (YOUTH.energyGain; 25.1'de 1); elder: ağır adımlarla yürür, bank / çardak / havuz / kütüphane sever
  */
-export function buildTraitProfile(traitKeys, { child = false } = {}) {
+export function buildTraitProfile(traitKeys, { child = false, youth = false, elder = false } = {}) {
   const profile = {
     decay: Object.fromEntries(NEED_KEYS.map((k) => [k, 1])),
     gain: { ...Object.fromEntries(NEED_KEYS.map((k) => [k, 1])), nature: 1 },
@@ -83,6 +85,12 @@ export function buildTraitProfile(traitKeys, { child = false } = {}) {
     profile.leisure = { ...CHILD_LEISURE };
     profile.speed = CHILD_SPEED;
     profile.bubbleRate *= 1.4;
+  } else if (youth) {
+    if (YOUTH.energyGain !== 1) profile.gain.energy *= YOUTH.energyGain;
+  } else if (elder) {
+    for (const [activity, m] of Object.entries(ELDER.leisure)) profile.leisure[activity] = (profile.leisure[activity] ?? 1) * m;
+    profile.speed *= ELDER.speed;
+    profile.elder = true;
   }
   return profile;
 }

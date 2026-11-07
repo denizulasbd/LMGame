@@ -43,6 +43,7 @@ export async function installMonitor(page) {
     window.__granaryMod = await import('/src/systems/Granary.js').catch(() => null);
     window.__refineryMod = await import('/src/systems/Refinery.js').catch(() => null); // (24.2)
     window.__tradeMod = await import('/src/systems/TradePost.js').catch(() => null); // (24.3)
+    window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -322,6 +323,25 @@ export async function installMonitor(page) {
           m.tradeMinMarket = Math.min(m.tradeMinMarket ?? 1, ...Object.values(tp.market), 1);
         }
 
+        // ---- (25.1) Yaşam evreleri: evre yaşla tutarlı, yaş sayacı geçerli, emekli bilge çalışmıyor, çekirdek sakin güvencesi ----
+        if (window.__lifeMod) {
+          const L = window.__lifeMod;
+          for (const c of s.characters) {
+            if (c.role) continue;
+            if (!L.isLifeStage(c.lifeStage)) broke(`${c.name}: geçersiz yaşam evresi (${c.lifeStage})`);
+            else if ((c.lifeStage === 'child') !== c.isChild) broke(`${c.name}: çocukluk ile evre uyuşmuyor (${c.lifeStage})`);
+            if (!Number.isInteger(c.ageInDays) || c.ageInDays < 0 || c.age !== L.ageFromDays(c.ageInDays)) broke(`${c.name}: geçersiz yaş sayacı (${c.age} / ${c.ageInDays})`);
+            if (c.retired && c.lifeStage !== 'elder') broke(`${c.name}: bilge olmadığı hâlde emekli`);
+            if (c.retired && (c.task?.jobId || c.task?.workBuildingId)) m.retiredWorking = (m.retiredWorking ?? 0) + 1;
+          }
+          const plan = L.retirementPlan(s);
+          if (s.characters.some((c) => c.lifeStage === 'elder' && !c.role && c.retired !== plan.retired.has(c.id))) m.retireLag = (m.retireLag ?? 0) + 1;
+          const counts = L.stageCounts(s);
+          m.maxElders = Math.max(m.maxElders ?? 0, counts.elder);
+          m.maxYouth = Math.max(m.maxYouth ?? 0, counts.youth);
+          if (counts.elder > 0 && L.coreWorkers(s).length + plan.volunteers.size < Math.min(3, counts.youth + counts.adult + counts.elder)) broke('çekirdek sakin güvencesi bozuldu');
+        }
+
         // ---- (23. aşama) Krizler: yangın, hasar, haydut baskını, yaralanma ----
         {
           const KD = window.__crisisData;
@@ -477,6 +497,19 @@ export async function installMonitor(page) {
                 spoiled: { ...(s.granary?.spoiled ?? {}) },
                 switches: s.granary?.switches ?? 0,
                 granaryCapacity: s.granaryCapacity ?? 0,
+              }
+            : null,
+          // (25.1)
+          life: window.__lifeMod
+            ? {
+                counts: window.__lifeMod.stageCounts(s),
+                maxElders: m.maxElders ?? 0,
+                maxYouth: m.maxYouth ?? 0,
+                retired: s.characters.filter((c) => c.retired).length,
+                retiredWorking: m.retiredWorking ?? 0,
+                retireLag: m.retireLag ?? 0,
+                ages: s.characters.filter((c) => !c.role).map((c) => c.age),
+                state: { ...(s.lifeStages ?? {}) },
               }
             : null,
           // (24.3)

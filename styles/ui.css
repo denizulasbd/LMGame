@@ -286,6 +286,59 @@
   margin-bottom: 6px;
 }
 
+/* (25.1) Yaşam evresi rozeti: Çocuk (pembe), Genç (turuncu), Yetişkin (ahşap), Kıdemli Bilge (gümüş-mor, hafif parıltı) */
+.life-stage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+
+.life-stage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px 1px 3px;
+  font-weight: 700;
+  border: 2px solid var(--ui-line);
+  box-shadow: inset -2px -2px 0 rgba(27, 20, 35, 0.18), inset 2px 2px 0 rgba(255, 255, 255, 0.45);
+  cursor: help;
+}
+
+.life-stage-badge img {
+  width: 14px;
+  height: 14px;
+  image-rendering: pixelated;
+}
+
+.life-stage-badge.is-child {
+  background: #f7b3c4;
+}
+
+.life-stage-badge.is-youth {
+  background: #ffb870;
+}
+
+.life-stage-badge.is-adult {
+  background: var(--ui-wood);
+}
+
+.life-stage-badge.is-elder {
+  background: linear-gradient(#e6e3f3, #c7c0e6);
+  color: var(--ui-ink-dark);
+  box-shadow: inset -2px -2px 0 #9d93c9, inset 2px 2px 0 #ffffff, 0 0 0 1px #fff3b0;
+}
+
+.life-stage-age {
+  font-weight: 700;
+}
+
+.life-stage-note {
+  opacity: 0.75;
+}
+
 .character-traits {
   display: flex;
   flex-wrap: wrap;

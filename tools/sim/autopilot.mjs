@@ -34,6 +34,8 @@
 // rezervler korunduğu sürece (en az 10 kumaş, 5 fıçı şerbet, 30 yün; ekmek / erzak satışından sonra kişi başı en az 12 besin)
 // ihracat sözleşmelerini tamamlar; hazinede bol altın varken (vergi ayrıldıktan sonra 400+) odun 60, taş 50, demir 20'nin altına
 // inince hammadde paketi ithal eder. Ziyaretleri, sözleşmeleri, ithalatı ve pazar çarpanlarını raporlar.
+// (25.1) Yaşam evrelerini raporlar: evre sayıları, emekli bilgeler, yaş aralığı, unvanı alan bilgeler, nasihat dakikası ve
+// emekliyken işte görülen bilge (bekçi: evre / yaş sayacı tutarlılığı ve çekirdek sakin güvencesi kopuk referans sayılır).
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //                                         [--crisis huzurlu|dengeli|cetin] [--no-safety] [--crisis-state]
@@ -908,6 +910,15 @@ console.log(
         : '') +
       (mon.trade ? ` · (24.3) Ticaret İskelesi ${mon.trade.posts} · ziyaret ${mon.trade.visits} · sözleşme ${mon.trade.completed} (+${mon.trade.goldEarned} altın; ${JSON.stringify(mon.trade.exported)}) · ithalat ${mon.trade.imports} paket (-${mon.trade.goldSpent} altın; ${JSON.stringify(mon.trade.imported)}) · rezerv için bekletilen ${(report.stats.trade ?? {}).held ?? 0} · pazar ${JSON.stringify(mon.trade.market)}` : '') +
       (r ? ` · (24.2) Dokuma Tezgâhı ${r.looms}, Şerbethane ${r.breweries} · dokunan kumaş ${r.clothWoven}, yapılan fıçı ${r.sherbetMade} (stok ${r.cloth} / ${r.sherbet}) · handa içilen şerbet ${r.served}, handaki fıçı ${r.innCasks} · testi ${r.jugs} (içilen ${r.jugsDrunk}) · Dayanıklı Giysi ${r.garments} (giyen ${r.dressed}) · refah katkısı +${r.welfare} · açken çalışan lüks işçi ${r.hungryLuxury}` : '')
+  );
+}
+if (mon.life) {
+  const L = mon.life;
+  const ages = L.ages.length ? `${Math.min(...L.ages)}-${Math.max(...L.ages)}` : '-';
+  console.log(
+    `(25.1) yaşam evreleri: çocuk ${L.counts.child}, genç ${L.counts.youth}, yetişkin ${L.counts.adult}, Kıdemli Bilge ${L.counts.elder} (emekli ${L.retired}) · ` +
+      `en çok bilge ${L.maxElders}, en çok genç ${L.maxYouth} · yaş aralığı ${ages} · unvanı alan bilge ${L.state.elders ?? 0}, yetişkinliğe geçen genç ${L.state.adults ?? 0} · ` +
+      `nasihat ${Math.round(L.state.adviceMinutes ?? 0)} dk · işteki emekli ${L.retiredWorking} · emeklilik gecikmesi ${L.retireLag}`
   );
 }
 console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);
