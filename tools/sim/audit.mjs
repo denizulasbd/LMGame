@@ -545,6 +545,34 @@ const PAGE_HELPERS = () => {
       void keepInv;
     }
 
+    // --- 2s. (26.1) Mevsimlik panayırın şenlik saatinde (18:00 - 22:00), Tarihçe'deki ilk panayırla ---
+    {
+      const t = s.time;
+      const keepT = { day: t.day, hour: t.hour, minute: t.minute };
+      const keepGA = s.goldenAge.since;
+      const keepFair = s.chronicle.firstFair;
+      const keepStat = s.stats.fairs;
+      if (!s.buildings.some((b) => b.type === 'fountain' && b.functional)) sim.place('fountain', { instant: true });
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      s.events.festival.active = false;
+      s.seasonFestival.stage = null;
+      s.chronicle.firstFair = null; // bu senaryonun kendi ilk panayırı
+      Object.assign(t, { day: 4 * Math.ceil((t.day + 1) / 4), hour: 5, minute: 58 });
+      sim.step(10);
+      while (t.hour < 19) sim.step(30);
+      A.roundtrip(); // gün atlamasının sabah özeti (StatsSystem) yükleme anında bir kez oluşur; ölçüm bundan sonra
+      const live = s.currentFestival;
+      const tBefore = `${t.day} ${t.hour}:${t.minute}`;
+      const diff = A.roundtrip();
+      check('panayırın şenlik saatinde kayıt -> yükleme durum kayması yok (currentFestival, şenlik kuralları, Tarihçe)', live?.phase === 'party' && s.currentFestival?.phase === 'party' && s.currentFestival.type === live.type && s.events.festival.active && diff.length === 0, `${JSON.stringify(live)} ${tBefore} -> ${t.day} ${t.hour}:${t.minute} ${diff.join(' | ')}`);
+      hours(5);
+      check('yüklemeden sonra panayır 22:00\'de kapanır: currentFestival null, şenlik bitti, ilk panayır Tarihçe\'de', s.currentFestival === null && !s.events.festival.active && s.chronicle.firstFair?.type === live?.type, `${s.time.hour}:00 ${JSON.stringify(s.currentFestival)}`);
+      s.goldenAge.since = keepGA;
+      s.chronicle.firstFair = keepFair;
+      s.stats.fairs = keepStat;
+      void keepT;
+    }
+
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();

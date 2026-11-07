@@ -53,11 +53,14 @@
 //   save-v28.json: 25.5'in oyunu (kayıt sürümü 28, bugünkü): otopilotla 72 gün (--crisis-state); Kıdemli Bilge Deniz'in Eski Seyyah
 //                  Pusulası 64. gün "manevi evladı" Ada'ya devredildi (çantasında, hikâyesi ve zinciriyle), Tarihçe'de ilk kuşak mirası.
 //                  Eski kayıtlarda (sürüm 2-27) yadigâr, çırak geçmişi ve yadigâr sayacı yoktur
+//   save-v29.json: 26.1'in oyunu (kayıt sürümü 29, bugünkü): otopilotla 71 gün (--crisis-state); Altın Çağ G28'de başladı, ilk panayır (Kış Dönümü Ateşi)
+//                  32. gün 22:00'de tamamlandı ve Tarihçe'de (firstFair, 18 sakin); kayıt anında panayır yok (currentFestival null). Eski kayıtlarda
+//                  (sürüm 2-28) currentFestival yoktur: null ile açılır, Tarihçe'de ilk panayır ve panayır sayacı yoktur
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -190,6 +193,8 @@ for (const { name, raw } of fixtures) {
       first: s.chronicle.firstHeirloom,
       mentees: s.characters.reduce((n, c) => n + (c.mentees?.length ?? 0), 0),
     };
+    // (26.1) mevsimlik panayır (yüklendiği an)
+    loaded.fair = { cf: s.currentFestival, first: s.chronicle.firstFair, fairs: s.stats.fairs ?? 0, time: { day: s.time.day, hour: s.time.hour } };
     // (25.4) Aile Kütüğü (yüklendiği an)
     loaded.lineage = {
       people: s.characters.filter((c) => !c.role).map((c) => ({ id: c.id, g: c.generation, f: c.familyId, p: c.parents, pi: c.parentIds, k: c.children, fam: Boolean(s.lineage.families[c.familyId]) })),
@@ -490,6 +495,21 @@ for (const { name, raw } of fixtures) {
       ok: grew.every((x) => (x.days === before.get(x.id).days + 1 || (before.get(x.id).child && !x.child && x.days >= 18 * 16)) && (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage))) && grew.length >= L.filter((x) => !x.role).length - 2,
       detail: `${grew.length} sakin`,
     });
+  }
+  // (26.1) mevsimlik panayır
+  {
+    const F = r.loaded.fair;
+    if (data.version < 29) {
+      results.push({ name: `${tag}: currentFestival yok -> null; Tarihçe'de ilk panayır ve panayır sayacı yok`, ok: F.cf === null && F.first === null && F.fairs === 0, detail: JSON.stringify(F.cf) });
+    } else {
+      const saved = data.currentFestival;
+      const live = saved && saved.day === data.time.day && data.time.hour >= 6 && data.time.hour < 22;
+      results.push({
+        name: `${tag}: süren panayır (currentFestival) ve Tarihçe'deki ilk panayır korundu`,
+        ok: JSON.stringify(F.cf) === JSON.stringify(live ? saved : null) && JSON.stringify(F.first) === JSON.stringify(data.chronicle.firstFair),
+        detail: `${JSON.stringify(F.cf)} · ilk: ${F.first?.name ?? 'yok'}`,
+      });
+    }
   }
   // (25.5) yadigârlar
   {

@@ -3219,6 +3219,90 @@ katmanlar kendi kayıt alanıyla eski kayıtlara geriye uyumludur.
   - Gençlerin enerji bonusu kapalı kaldı (`YOUTH.energyGain = 1`).
   - Yeni dilekçeler, Yeni Konut Talebi ve Ocak Devri simülasyonlarda nadir; hedefli testlerle doğrulandı.
 
+## Mevsimlik Panayır Döngüsü ve Meydan Şenlikleri (26. aşama, 26.1 mikro adımı)
+
+26. aşamanın ilk adımında kasaba takvimi dört büyük **panayıra** bağlandı: her mevsimin **son günü**, Altın Çağ başladıktan sonra, meydan havuzunda
+geçici süslerle kurulan bir şenlik. Veriler `data/fair.js`'te, saf yardımcılar `systems/Fair.js`'te, mantık `systems/FairSystem.js`'te, çizim
+`rendering/FairDecor.js`'tedir.
+
+| Mevsim (son gün) | Panayır | Şenlik saatinin süsü |
+|---|---|---|
+| İlkbahar | **Bahar Çiçek Panayırı** | çiçek çelenkleri |
+| Yaz | **Yaz Güneşi Şenliği** | güneş fenerleri |
+| Sonbahar | **Hasat Bayramı** | hasat sepetleri |
+| Kış | **Kış Dönümü Ateşi** | meydan meşaleleri ve şenlik ateşi |
+
+### Panayır günü akışı
+
+| Saat | Evre (`currentFestival.phase`) | Ne olur |
+|---|---|---|
+| 06:00 | `prep` (hazırlık) | Meydan havuzunun çevresine mevsim renklerinde **tentler, direkler ve bayrak flamaları** çizilir. Üst bildirim ve Kasaba Günlüğü: "Meydanda Bahar Çiçek Panayırı başladı! Bu akşam herkes meydanda toplanıyor." Sakinler normal işine gider; **şenlik kuralları kapalıdır** (otopilot ve üretim aksamaz). |
+| 08:00 - 17:00 | `prep` | Normal mesai. Hiç kimse şenliğe gitmez. |
+| 18:00 | `party` (şenlik saati) | İş çıkışı herkes meydanda toplanır (kasabanın şenlik kuralları 22:00'ye kadar), mevsimin süsleri yanar, **Panayır Coşkusu** bonusu etkindir. |
+| 22:00 | - (`currentFestival: null`) | Kapanış: süsler kalkar, katılanların anılarına yazılır, kasaba uykuya geçer. Ertesi sabah meydan temizdir. |
+
+- **Altın Çağ kapısı.** Panayır Altın Çağ'dan **önce hiç kurulmaz**: erken oyun ve Ulu Saat Kulesi'ne kadar olan her olay kaydı bayt bayt aynı kalır
+  (14. aşamanın mevsim festivali o güne dek eskisi gibi sürer). Altın Çağ bir panayır gününün içinde başlarsa o günün festivali eskisi gibidir; ilk
+  panayır sonraki mevsim sonunda kurulur. 06:00'da kurulmuş panayırın olduğu günde eski festival duyurulmaz ve başlamaz: panayır onun yerini alır.
+  Kapanışta eski festivalin **Mevsim Coşkusu** armağanı (24 saat, +keyif) ve **Yönetim Güveni** payı aynen verilir; aynı mevsimin eski festival anısı
+  yeni anıya dönüşür (anı defteri şişmez).
+- **Harita matrisi bozulmaz.** Süsler yalnızca çizilir (`FairDecor`, yalnızca `fillRect`); haritaya, yapı listesine ya da kayda hiçbir şey yazılmaz.
+  Panayır bitince çizim kendiliğinden durur.
+- **Mesai korunur.** Şenlik saati (18:00 - 22:00) mesai bitiminden sonradır; hazırlık evresi yalnızca bir çizimdir.
+- **İzole üreteç.** `FairSystem` kendi tohumlanmış üretecini kullanır (`TownScene` -> **seed + 32**): yalnızca söz seçimi ve konuşma sıklığı. Ana
+  üretece ve `Math.random`'a dokunmaz.
+
+### Sakinler ve şenlik etkisi
+
+- **Panayır Coşkusu.** Şenlik saatinde meydanda dans eden (şenlik etkinliğinin `perform` evresindeki) her sakinin keyfi ve sosyalliği hızlı dolar
+  (dakikada +0,22 / +0,20); şenlik boyunca `fairSpirit` kasaba bonusu etkindir (arkadaşlık çarpanı, keyfin yavaş azalması).
+- **Şenlik Neşesi 2. kuşak.** "Şenlik Neşesi" huylu **2. kuşak** sakin havuz başında dans ederken, 52 piksel içindekilere dakikada +0,07 fazladan keyif
+  yayar ("Haydi hep birlikte oynayalım!"). 1. kuşak Şenlik Neşesi'nde bu ek etki yoktur.
+- **Kıdemli Bilgeler** gençleri izlerken nostalji sözleri söyler ("Ben de gençken bu havuz başında dönerdim.").
+- Sözler 25.2'de kurulan **ayrı metin katmanında** (`c.speech`, `SpeechBubbles`) çizilir; ikon baloncuğunun (`c.bubble`) zar sırasına ve hiçbir
+  üretece dokunulmaz.
+
+### Arayüz ve Tarihçe
+
+- Hazırlık evresinde üst çubukta "Bahar Çiçek Panayırı · 18:00" çipi; şenlik saatinde `Panayır Coşkusu` bonus çipi.
+- Kasaba Günlüğü: panayır başlangıcı, şenlik saati ve kapanış satırları.
+- **Arşiv (I) -> Tarihçe Kütüğü:** tamamlanan **ilk panayır** "İlk Meydan Panayırı" kaydıyla düşer (`chronicle.firstFair`: mevsim, ad, katılan sayısı,
+  gün / saat). Sayaç `stats.fairs`.
+
+### Kayıt (sürüm 29)
+
+`SAVE_VERSION = 29`. Kayda `currentFestival: null | { type, day, phase: 'prep' | 'party' }` ve Tarihçe'ye `firstFair` eklendi. **Sürüm 2-28
+kayıtlarında** alan yoktur: `currentFestival: null` ile açılır, Tarihçe'de ilk panayır olmaz. Bozuk değer (bilinmeyen mevsim / evre, sayı olmayan
+gün) `null` olur; başka güne ait ya da saati geçmiş panayır açılışta temizlenir, süren panayırın evresi saate göre düzeltilir. Fikstür:
+`tools/sim/fixtures/save-v29.json`.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1053; 46'sı bu adımın):
+  - Veri ve takvim: dört panayır, saatler (06:00 / 18:00 / 22:00; 18:00 mesaiden sonra), panayır günleri, mevsime özgü süsler, bonus.
+  - Altın Çağ kapısı: öncesinde panayır kurulmaz, eski mevsim festivali 08:00'de eskisi gibi duyurulur; Altın Çağ gün içinde başlarsa o günün
+    festivali eskisi gibi sürer.
+  - Doğal akışla bütün gün: 06:00 hazırlık (mesaj, günlük), 06:00 - 17:00 hiç kimse şenliğe gitmez, **harita matrisinin özeti** hazırlıkta, şenlikte
+    ve kapanışta aynı, 18:00 şenlik kuralları (22:00'ye kadar), meydanda toplanma, 22:00 kapanış ve Mevsim Coşkusu; Tarihçe, sayaç, anılar.
+  - Dört mevsim ayrı ayrı; Panayır Coşkusu (keyif / sosyallik), 2. kuşak Şenlik Neşesi (yakın +, uzak yok, 1. kuşak yok), Kıdemli Bilge nostaljisi,
+    ayrı metin katmanı (`c.bubble` değişmez).
+  - İzole üreteç (seed + 32): diğer tüm üreteçler ve `Math.random` (0 çağrı) ilerlemez; çizim (4 mevsim x 2 evre, ışıklar).
+  - Kayıt sürümü 29: gidiş-dönüş, bozuk değerler, başka güne ait kalıntı, v28 kaydı.
+  - Mevcut testlerde yapılan değişiklikler: "güncel sürüm" kontrolleri 28 -> 29 (önceki aşamalarla aynı gelenek) ve 25.1'in 70. doğum günü testine
+    bir **ön koşul**: sakinin anı defterinde yer olması (75. günde defter tavana, `MEMORY.max`, denk geliyordu; dolu defterde yeni anı en eski küçük anıyı
+    iter ve uzunluk sabit kalır). Doğrulamanın kendisi (tam bir anı eklenir) aynen duruyor.
+- **Denetim** (`audit.mjs`): 120/120. Yeni senaryo: panayırın şenlik saatinde kayıt -> yükleme durum kayması yok, yüklemeden sonra panayır 22:00'de
+  kapanır ve ilk panayır Tarihçe'de.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-29, 1003): `save-v29.json` bu adımın otopilotuyla 71 günlük oyundur (`--crisis-state`): Altın Çağ G28'de,
+  ilk panayır (Kış Dönümü Ateşi) 32. gün 22:00'de tamamlanmış ve Tarihçe'de. v2-v28 kayıtlarının hepsi `currentFestival: null` ile sorunsuz açılır.
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 36`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen
+  iş yeri 0, sayfa hatası 0. **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34** (25.5'tekiyle aynı).
+- **Tohum 42 determinizmi.** `autopilot.mjs 42 24` (kule G25'ten önce): 25.5 ile bu adımın kayıt anlık görüntüleri karşılaştırıldı; tek fark `version`
+  ile iki yeni boş alan (`currentFestival`, `chronicle.firstFair`). `--json` raporu bayt bayt aynıdır. Uzun koşuda (`42 71`) Ulu Saat Kulesi aşamaları
+  **G25 / G27 / G28**, Altın Çağ **G28**; ilk panayır G32'de.
+- **Önizleme** (`tools/art-preview.html`): dört mevsimin panayır meydanı, hazırlık ve şenlik saati.
+
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.

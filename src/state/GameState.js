@@ -34,6 +34,7 @@ import { Animal } from '../entities/Animal.js';
 import { emptyTemperament, restoreTemperament } from '../systems/Temperament.js';
 import { emptyLineage, restoreLineage } from '../systems/Lineage.js';
 import { emptyHeirloomState, restoreHeirloomState } from '../systems/Heirloom.js';
+import { sanitizeCurrentFestival } from '../systems/Fair.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
 
@@ -194,6 +195,7 @@ export class GameState {
     this.temperament = emptyTemperament(); // (25.3) mizaç gelişimi sayaçları
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
     this.heirloom = emptyHeirloomState(); // (25.5) aile yadigârları: sayaçlar, arşiv, Kuşak Şöleni
+    this.currentFestival = null; // (26.1) mevsimlik panayır (FairSystem): null | { type, day, phase: 'prep' | 'party' }
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -274,6 +276,7 @@ export class GameState {
       temperament: this.temperament,
       lineage: this.lineage,
       heirloom: this.heirloom,
+      currentFestival: this.currentFestival,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -384,6 +387,7 @@ export class GameState {
     next.lifeStages = restoreLifeStages(data.lifeStages);
     next.temperament = restoreTemperament(data.temperament); // (25.3)
     next.lineage = restoreLineage(data.lineage);
+    next.currentFestival = sanitizeCurrentFestival(data.currentFestival); // (26.1) v2-v28 kayıtlarında alan yoktur: null
     next.heirloom = restoreHeirloomState(data.heirloom); // (25.5) // (25.4) sakinlerin soy verisi LineageSystem'de tamamlanır
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
@@ -562,6 +566,7 @@ function restoreChronicle(data) {
   out.goldenAge = STAMP(data.goldenAge);
   out.firstGen2Couple = named(data.firstGen2Couple, ['a', 'b']); // (25.4)
   out.firstHeirloom = named(data.firstHeirloom, ['elder', 'heir', 'item']); // (25.5)
+  out.firstFair = named(data.firstFair, ['type', 'name']); // (26.1)
   return out;
 }
 

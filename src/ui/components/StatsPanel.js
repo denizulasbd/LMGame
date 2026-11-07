@@ -278,6 +278,8 @@ export class StatsPanel {
         // (25.5) İlk kuşak mirası
         entry('heart', 'İlk Kuşak Mirası Devredildi', ch.firstHeirloom ? [gold(`${ch.firstHeirloom.elder}`), ` ${ch.firstHeirloom.item} yadigârını `, gold(ch.firstHeirloom.heir), ` adlı mirasçısına teslim etti!`] : [pending('Henüz bir aile yadigârı el değiştirmedi')], when(ch.firstHeirloom)),
         ...(state.heirloom?.archive?.length ? [entry('book', 'Kasaba Arşivindeki Yadigârlar', [state.heirloom.archive.map((a) => a.name).join(', ')])] : []),
+        // (26.1) Tamamlanan ilk mevsimlik panayır
+        entry('sparkle', 'İlk Meydan Panayırı', ch.firstFair ? [gold(ch.firstFair.name), ` meydanda coşkuyla kutlandı (${ch.firstFair.count} sakin)`] : [pending('Altın Çağ\'dan sonra bir mevsimin son gününde kutlanacak')], when(ch.firstFair)),
         // (25.4) Kasabanın ilk 2. kuşak düğünü
         entry('ring', 'Kasabanın 2. Kuşak İlk Düğünü', ch.firstGen2Couple ? [gold(`${ch.firstGen2Couple.a} & ${ch.firstGen2Couple.b}`)] : [pending('Kasabada doğan kuşaktan henüz kimse evlenmedi')], when(ch.firstGen2Couple)),
         entry('masterpiece', 'İlk Usta Eseri', ch.firstMasterwork ? [gold(ch.firstMasterwork.maker), ` · ${ch.firstMasterwork.piece}`] : [pending('Henüz bir usta eser vermedi')], when(ch.firstMasterwork)),

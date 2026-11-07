@@ -15,6 +15,7 @@ import { SEASON_FESTIVAL, SEASON_FESTIVALS } from '../data/festivals.js';
 import { TOWN_BUFFS } from '../data/town.js';
 import { getSeason } from '../data/seasons.js';
 import { clamp } from '../utils/math.js';
+import { fairOwnsToday } from './Fair.js';
 
 const T = 16;
 
@@ -45,7 +46,7 @@ export class SeasonFestivalSystem {
     this.attract = attract;
     this.unsubscribers = [
       game.events.on('time:hour', (hour) => this.onHour(hour)),
-      game.events.on('festival:ended', ({ theme } = {}) => theme && this.finish(theme)),
+      game.events.on('festival:ended', ({ theme } = {}) => SEASON_FESTIVALS[theme] && this.finish(theme)),
     ];
     // Kayıttan: yarım kalan duyuru eski bir güne aitse temizlenir; süren festivalin taçları yeniden takılır
     const sf = this.sf;
@@ -65,6 +66,8 @@ export class SeasonFestivalSystem {
 
   onHour(hour) {
     const day = this.state.time.day;
+    // (26.1) Altın Çağ'dan sonra o günün festivali panayıra (FairSystem) devredilir; Altın Çağ öncesi hiçbir şey değişmez
+    if (fairOwnsToday(this.state)) return;
     if (hour === SEASON_FESTIVAL.announceHour && isFestivalDay(day) && this.sf.day !== day) this.announce();
     if (hour === SEASON_FESTIVAL.startHour && this.sf.stage === 'announced' && this.sf.day === day) this.start();
   }

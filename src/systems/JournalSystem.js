@@ -196,7 +196,10 @@ export class JournalSystem {
       on('equipment:equipped', ({ character, item }) => this.log(`${character.name} ${EQUIPMENT[item].name} kuşandı`, EQUIPMENT[item].icon)),
       on('worker:dismissed', ({ building, character }) => this.log(`${character.name} ${building.name} işinden çıkarıldı`, 'sulk')),
       on('weather:changed', ({ type }) => this.log(WEATHER_TEXT[type] ?? WEATHER_TYPES[type].name, WEATHER_TYPES[type].icon)),
-      on('festival:started', ({ venue, festival }) => this.log(festival ? `${festival.name} başladı (${venue.name})` : `Kasaba Şenliği başladı (${venue.name})`, festival?.icon ?? 'note')),
+      on('festival:started', ({ venue, festival, fair }) => this.log(fair ? `Şenlik saati: ${festival.name} ${venue.name} başında coşkuyla sürüyor` : festival ? `${festival.name} başladı (${venue.name})` : `Kasaba Şenliği başladı (${venue.name})`, festival?.icon ?? 'note')),
+      // 26.1: mevsimlik panayır
+      on('fair:prep', ({ fair }) => this.log(fair.start, fair.icon)),
+      on('fair:ended', ({ fair, attendees }) => this.log(`${fair.name} 22:00'de sona erdi; ${attendees.length} sakin kutladı`, fair.icon)),
       on('festival:ended', ({ theme } = {}) => !theme && this.log('Şenlik bitti; herkes yarına neşeyle başlayacak', 'sparkle')),
       // 14. aşama: mevsim festivalleri, toplanma zili
       on('seasonFestival:announced', ({ festival }) => this.log(`Duyuru: bugün 15:00'te ${festival.name}`, festival.icon)),

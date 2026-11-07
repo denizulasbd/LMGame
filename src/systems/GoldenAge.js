@@ -1,7 +1,7 @@
 // (20. aşama) Altın Çağ ve Ulu Saat Kulesi için saf yardımcılar: durum okuma ve çarpanlar. Sistemler (BehaviorSystem,
 // TownStatus, CraftingSystem, EventSystem, ResearchSystem) ve arayüz bunları okur; durumu GoldenAgeSystem yazar.
 //   state.goldenAge : { since: { day, hour, minute } | null, chimes, celebration, books, lastChime }
-//   state.chronicle : { founders, firstCouple, firstMasterwork, towerWork, towerMaster, towerStages, goldenAge }
+//   state.chronicle : { founders, firstCouple, firstMasterwork, towerWork, towerMaster, towerStages, goldenAge, firstGen2Couple, firstHeirloom, firstFair }
 import { GOLDEN_AGE, TOWER_MASTERY, CLOCK_GEAR } from '../data/goldenAge.js';
 import { BUILDINGS } from '../data/buildings.js';
 
@@ -10,7 +10,7 @@ export function emptyGoldenAge() {
 }
 
 export function emptyChronicle() {
-  return { founders: [], firstCouple: null, firstMasterwork: null, towerWork: {}, towerMaster: null, towerStages: {}, goldenAge: null, firstGen2Couple: null, firstHeirloom: null };
+  return { founders: [], firstCouple: null, firstMasterwork: null, towerWork: {}, towerMaster: null, towerStages: {}, goldenAge: null, firstGen2Couple: null, firstHeirloom: null, firstFair: null };
 }
 
 /** Kasaba Altın Çağ'da mı (Ulu Saat Kulesi tamamlandı)? */

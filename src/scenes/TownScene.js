@@ -87,6 +87,9 @@ import { drawSpeechBubbles } from '../rendering/SpeechBubbles.js';
 import { TemperamentSystem } from '../systems/TemperamentSystem.js';
 import { LineageSystem } from '../systems/LineageSystem.js';
 import { HeirloomSystem } from '../systems/HeirloomSystem.js';
+import { FairSystem } from '../systems/FairSystem.js';
+import { FairDecor } from '../rendering/FairDecor.js';
+import { currentFair, fairVenue } from '../systems/Fair.js';
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -189,6 +192,8 @@ export class TownScene extends Scene {
     this.lineageSystem = new LineageSystem(this.game, this.world, new Random(state.seed + 30), { petitions: this.petitions });
     // (25.5) Aile yadigârları, miras intikali ve Kuşak Şöleni (kendi üreteci; Altın Çağ'da)
     this.heirloomSystem = new HeirloomSystem(this.game, this.world, new Random(state.seed + 31), { economy: this.economy });
+    // (26.1) Mevsimlik panayırlar (kendi üreteci seed + 32; Altın Çağ'dan sonra, mevsimin son günü)
+    this.fairSystem = new FairSystem(this.game, this.world, new Random(state.seed + 32), { attract: this.attract });
     // (25.3) Mizaç kalıtımı ve yeni nesil huylar (kendi üreteci; Altın Çağ'da açılır)
     this.temperament = new TemperamentSystem(this.game, this.world, new Random(state.seed + 29));
     // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
@@ -253,6 +258,7 @@ export class TownScene extends Scene {
       this.tradePost,
       this.lifeStages,
       this.temperament,
+      this.fairSystem,
     ];
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
@@ -319,6 +325,7 @@ export class TownScene extends Scene {
     this.confetti = new WeddingConfetti(); // (19. aşama) meydandaki düğün kutlaması
     this.ageConfetti = new WeddingConfetti(); // (20. aşama) Çağ Kutlaması
     this.heirloomConfetti = new WeddingConfetti(); // (25.5) Kuşak Şöleni
+    this.fairDecor = new FairDecor(); // (26.1) panayır tentleri, flamalar ve mevsim süsleri (yalnızca çizim)
     this.chimeWaves = new ChimeWaves(); // (20. aşama) kule çanının ses dalgaları
     this.leaves = new LeafFall();
     this.animationTime = 0; // görsel animasyonlar için gerçek zaman (oyun duraklasa da akar)
@@ -755,12 +762,16 @@ export class TownScene extends Scene {
     for (const building of this.world.buildings) building.collectLights(lights, env);
     const festivalVenue = this.festivalVenue();
     if (festivalVenue) this.festivalFx.collectLights(lights, festivalVenue, env.festivalTheme, this.game.state.seasonFestival);
+    const fair = currentFair(this.game.state);
+    const fairSite = fair ? fairVenue(this.world) : null;
+    if (fair && fairSite) this.fairDecor.collectLights(lights, fairSite, fair.type, fair.phase);
     this.dayNight.render(renderer, this.camera, hour, lights, weather, season.tint);
 
     // Atmosferin üstü: ateşböcekleri, yağmur, balonlar, iş işaretleri, araç önizlemesi ve imleç gece de net görünsün
     renderer.applyCamera(this.camera);
     this.fireflies.draw(renderer, view, fireflyIntensity(weather, hour), this.animationTime, season.fireflies);
     if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime, env.festivalTheme, this.game.state.seasonFestival);
+    if (fair && fairSite) this.fairDecor.draw(renderer, fairSite, this.animationTime, fair.type, fair.phase);
     const party = this.game.state.social.party;
     if (party && this.game.state.totalMinutes < party.until) this.confetti.draw(renderer, party, this.animationTime, view);
     const ageParty = this.game.state.goldenAge?.celebration;

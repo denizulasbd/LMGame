@@ -30,6 +30,8 @@
     import { getStoolSprite } from '../src/art/ui/index.js';
     import { PROFESSIONS } from '../src/data/apprenticeship.js';
     import { HEIRLOOMS } from '../src/data/heirloom.js';
+    import { FairDecor } from '../src/rendering/FairDecor.js';
+    import { FAIRS, FAIR_TYPES } from '../src/data/fair.js';
 
     const root = document.getElementById('root');
     const SCALE = 5;
@@ -57,6 +59,36 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 26.1: Mevsimlik Panayır — meydan havuzunun çevresinde geçici tentler, flamalar ve mevsim süsleri (hazırlık / şenlik saati) ---
+    {
+      const decor = new FairDecor();
+      const fountain = getStructureSprite('fountain', {});
+      const W = 170;
+      const H = 120;
+      const fx = Math.round((W - fountain.width) / 2);
+      const fy = Math.round((H - fountain.height) / 2) + 6;
+      const venue = { x: fx, y: fy, width: fountain.width, height: fountain.height, type: 'fountain' };
+      const looks = [
+        { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'rose', pants: 'navy' },
+        { hair: 'long', hairColor: 'black', skin: 'tan', shirt: 'sky', pants: 'brown' },
+        { hair: 'bun', hairColor: 'gray', skin: 'light', shirt: 'lavender', pants: 'plum' },
+      ];
+      const frames = [];
+      for (const phase of ['prep', 'party']) {
+        for (const type of FAIR_TYPES) {
+          const people = phase === 'party'
+            ? [[getCharacterSprite(looks[0], 'down', 'idle0'), fx - 8, fy + fountain.height + 8], [getCharacterSprite(looks[1], 'down', 'idle1'), fx + fountain.width + 4, fy + fountain.height + 4], [getCharacterSprite(looks[2], 'down', 'idle0', { child: false, coat: false, bag: false, outfit: null, stage: 'elder' }), fx + fountain.width / 2, fy + fountain.height + 12]]
+            : [];
+          frames.push([`${FAIRS[type].name} · ${phase === 'prep' ? 'hazırlık 06:00 - 18:00' : 'şenlik 18:00 - 22:00'}`, scene(W, H, [[fountain, fx, fy + fountain.height], ...people], (ctx) => {
+            const r = { fillRect: (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); } };
+            decor.draw(r, venue, 1.0, type, phase);
+            if (phase === 'party') { ctx.fillStyle = 'rgba(20, 16, 50, 0.22)'; ctx.fillRect(0, 0, W, H); decor.draw(r, venue, 1.0, type, phase); }
+          })]);
+        }
+      }
+      show('Mevsimlik Panayır (26.1): meydan havuzu çevresinde tentler ve flamalar (üstte hazırlık), şenlik saatinde ilkbaharda çiçek çelenkleri, yazın güneş fenerleri, sonbaharda hasat sepetleri, kışın meşale ve ateş (altta). Harita matrisine hiçbir şey yazılmaz', frames, 3);
+    }
 
     // --- 25.5: aile yadigârları ve törensel devir teslim ---
     {
