@@ -34,6 +34,7 @@ import { addItem, roomFor, takeItem, addCoins } from './Citizens.js';
 import { addMemory } from './MemorySystem.js';
 import { levelFor } from './SkillSystem.js';
 import { clamp } from '../utils/math.js';
+import { TEMPERAMENT } from '../data/temperament.js';
 
 export class ApprenticeshipSystem {
   /**
@@ -254,10 +255,18 @@ export class ApprenticeshipSystem {
     }
     // Pazar Yeri varsa biriken çırak işleri satılır
     const crafts = (c.inventory ?? []).filter((s) => ITEMS[s.kind]?.craft && s.kind !== 'crispCookie');
-    const count = crafts.reduce((n, s) => n + s.qty, 0);
+    // (25.3) Zanaatkâr Ruhu çırak işlerinden birkaçını satmaz, çantasında saklar
+    const keep = c.quirk === 'craftsman' ? TEMPERAMENT.craftKeep : 0;
+    const count = crafts.reduce((n, s) => n + s.qty, 0) - keep;
     if (count >= APPRENTICE_CRAFT.sellAt && this.world.getCompleted('market').length > 0) {
       let coins = 0;
-      for (const s of [...crafts]) coins += takeItem(c, s.kind, s.qty) * ITEMS[s.kind].value;
+      let left = count;
+      for (const s of [...crafts]) {
+        const take = Math.min(left, s.qty);
+        if (take <= 0) break;
+        coins += takeItem(c, s.kind, take) * ITEMS[s.kind].value;
+        left -= take;
+      }
       addCoins(c, coins);
       this.state.apprenticeship.sold += count;
       this.state.apprenticeship.coins += coins;
@@ -279,7 +288,7 @@ export class ApprenticeshipSystem {
     c.apprenticeship = null;
     if (title) this.state.apprenticeship.graduated += 1;
     if (after.level > before.level) this.events.emit('skill:levelUp', { character: c, skill: prof.skill, level: after });
-    this.events.emit('apprentice:graduated', { character: c, profession: a.profession, title, progress: a.progress });
+    this.events.emit('apprentice:graduated', { character: c, profession: a.profession, title, progress: a.progress, masterId: a.masterId });
     if (title) {
       this.events.emit('toast', { text: `${c.name} çıraklığını tamamladı: artık ${title} ${prof.master}!`, tone: 'success', icon: 'star' });
       addMemory(this.state, c, `Çıraklığını tamamlayıp ${title} ${prof.master} olarak yetişkinliğe adım attı`, 'star', { kind: 'apprentice' });

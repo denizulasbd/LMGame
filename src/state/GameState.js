@@ -31,6 +31,7 @@ import { WEATHER_TYPES } from '../data/weather.js';
 import { Character } from '../entities/Character.js';
 import { Building } from '../entities/Building.js';
 import { Animal } from '../entities/Animal.js';
+import { emptyTemperament, restoreTemperament } from '../systems/Temperament.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
 
@@ -188,6 +189,7 @@ export class GameState {
     this.tradePost = emptyTradePost();
     this.lifeStages = emptyLifeStages(); // (25.1) yaşam evresi sayaçları
     this.apprenticeship = emptyApprenticeshipState(); // (25.2) açık çırak kapıları ve sayaçlar
+    this.temperament = emptyTemperament(); // (25.3) mizaç gelişimi sayaçları
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -265,6 +267,7 @@ export class GameState {
       tradePost: this.tradePost,
       lifeStages: this.lifeStages,
       apprenticeship: this.apprenticeship,
+      temperament: this.temperament,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -373,6 +376,7 @@ export class GameState {
     // (24.3) eski kayıtlarda (sürüm 2-22) dış ticaret yok: boş başlar (iskele kurulunca takvim kurulur)
     next.tradePost = restoreTradePost(data.tradePost);
     next.lifeStages = restoreLifeStages(data.lifeStages);
+    next.temperament = restoreTemperament(data.temperament); // (25.3)
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)

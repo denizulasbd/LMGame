@@ -14,6 +14,7 @@ import { addMemory } from './MemorySystem.js';
 import { clamp } from '../utils/math.js';
 import { GARMENT } from '../data/refinery.js';
 import { getSeason } from '../data/seasons.js';
+import { TEMPERAMENT } from '../data/temperament.js';
 
 export class PurseSystem {
   /**
@@ -48,7 +49,8 @@ export class PurseSystem {
   /** Keseye yevmiye öder (çocuklar ve ziyaretçiler hariç). Ödenen miktar. */
   pay(c, amount) {
     if (!c || c.isChild || c.role || amount <= 0) return 0;
-    const paid = addCoins(c, amount);
+    // (25.3) Girişimci Kanı: her yevmiyede pazarlık payı
+    const paid = addCoins(c, amount + (c.quirk === 'entrepreneur' ? TEMPERAMENT.thriftBonus : 0));
     this.state.stats.wagesPaid = (this.state.stats.wagesPaid ?? 0) + paid;
     return paid;
   }
@@ -122,7 +124,19 @@ export class PurseSystem {
     if (GARMENT.seasons.includes(season) && countItem(c, 'garment') === 0 && this.economy.amount('cloth') >= GARMENT.cloth) options.push('garment');
     if (foodSlots(c) < INVENTORY.foodKeep) options.push('fruit');
     if (options.length === 0) options.push('fruit');
+    // (25.3) Zanaatkâr Ruhu önce tezgâhı için malzeme bakar (çantasında yoksa bir avuç Acemi Çivisi)
+    if (c.quirk === 'craftsman' && countItem(c, TEMPERAMENT.craftShop.item) === 0) options.unshift('craft');
     for (const kind of options) {
+      // (25.3) Girişimci Kanı kesesini korur: alışveriş sonrası thriftReserve'den azı kalacaksa (ilaç dışında) almaz
+      if (c.quirk === 'entrepreneur' && kind !== 'herb' && (c.coins ?? 0) - (prices[kind] ?? GARMENT.price) < TEMPERAMENT.thriftReserve) continue;
+      if (kind === 'craft') {
+        const { item, price } = TEMPERAMENT.craftShop;
+        if ((c.coins ?? 0) < price || roomFor(c, item) <= 0 || addItem(c, item, 1) !== 1) continue;
+        payCoins(c, price);
+        this.state.stats.purchases = (this.state.stats.purchases ?? 0) + 1;
+        this.events.emit('citizen:bought', { character: c, kind: item, price, building });
+        return item;
+      }
       if (kind === 'garment') {
         if ((c.coins ?? 0) < GARMENT.price || roomFor(c, 'garment') <= 0 || !this.economy.spend({ cloth: GARMENT.cloth })) continue;
         addItem(c, 'garment', 1);

@@ -4441,3 +4441,13 @@ kbd {
   background: #ffd23f;
   color: var(--ui-ink-dark);
 }
+
+/* (25.3) Yeni nesil huyların renkli rozetleri */
+.quirk-chip.quirk-craft { background: #c98f55; color: var(--ui-ink-dark); }
+.quirk-chip.quirk-trade { background: #ffd23f; color: var(--ui-ink-dark); }
+.quirk-chip.quirk-sage { background: #b9a6ef; color: var(--ui-ink-dark); }
+.quirk-chip.quirk-festive { background: #f06b8a; color: var(--ui-ink-dark); }
+.quirk-text-craft { color: #e0a56a; }
+.quirk-text-trade { color: #ffd23f; }
+.quirk-text-sage { color: #c7b8f5; }
+.quirk-text-festive { color: #ff9ab0; }

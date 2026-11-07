@@ -1246,6 +1246,15 @@ Object.assign(ICONS, {
   repair: ['.KKKKKKK.', 'KqqqqrRRK', '.KKKwKKK.', '...KwK..o', '...KwK.o.', '...KwKo..', '...KXK.o.', '...KKK..o', '.........'],
 });
 
+// (25.3) Yeni nesil huyların rozetleri: Zanaatkâr Ruhu (çekiç ve örs), Girişimci Kanı (sikkeli kese), Bilge Düşünür (baykuş),
+// Şenlik Neşesi (köpüklü kadeh ve konfeti)
+Object.assign(ICONS, {
+  quirkCraft: ['.KKKK....', '.KqqqKK..', '.KKKKwK..', '....KwK..', 'KKKKKKwK.', 'KqqqqqKK.', '.KKqqKK..', '..KrrrK..', '.KKKKKKK.'],
+  quirkTrade: ['...KKK...', '..KPYPK..', '...KKK...', '.KKwwwKK.', 'KwXXXXXwK', 'KXXKPKXXK', 'KXXPYPXXK', '.KXXKXXK.', '..KKKKK..'],
+  quirkSage: ['.K.....K.', '.KK...KK.', 'KwwKKKwwK', 'KuKuwuKuK', 'KwuwwwuwK', '.KwwPwwK.', '.KXwwwXK.', '..KXXXK..', '..PK.KP..'],
+  quirkFestive: ['p..P..i..', '..o..c...', '.KKKKKK..', '.KyyyyK.p', '.KOOOOK..', '..KOOK.P.', '...KK....', '...KK....', '..KKKK...'],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);

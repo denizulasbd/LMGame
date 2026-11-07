@@ -51,6 +51,7 @@ import { genitive } from '../utils/turkish.js';
 import { SHOP, SNACK, REVOLT } from '../data/citizens.js';
 import { foodItemOf, countItem, roomFor, isRioter, raidOf } from '../systems/Citizens.js';
 import { ELDER } from '../data/lifeStages.js';
+import { TEMPERAMENT } from '../data/temperament.js';
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
 const PLAYGROUND_TYPES = ['fountain', 'campfire', 'inn', 'monument'];
@@ -326,7 +327,8 @@ export class Brain {
     if (c.lastShopAt !== undefined && c.lastShopAt !== null && now - c.lastShopAt < SHOP.cooldownMinutes) return null;
     const markets = this.world.getCompleted('market');
     if (markets.length === 0 || (roomFor(c, 'fruit') <= 0 && roomFor(c, 'souvenir') <= 0)) return null;
-    if (this.citizenRng.next() >= SHOP.chance) return null;
+    // (25.3) Girişimci ve Zanaatkâr Pazar'a daha sık uğrar (zar her sakinde aynı atılır)
+    if (this.citizenRng.next() >= SHOP.chance * (TEMPERAMENT.shopBoost[c.quirk] ?? 1)) return null;
     const origin = this.originTile(c);
     for (const market of markets) {
       const doors = this.world.getSpots(market);

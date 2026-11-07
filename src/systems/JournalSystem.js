@@ -30,7 +30,8 @@ import { formatTownTitle } from './TownStatus.js';
 import { cargoValue } from './HarborSystem.js';
 import { PETITION_KINDS } from '../data/citizens.js';
 import { TAX_RATES, DECREE_ITEMS } from '../data/crown.js';
-import { genitive } from '../utils/turkish.js';
+import { genitive, ablative } from '../utils/turkish.js';
+import { QUIRKS } from '../data/social.js';
 import { ITEMS } from '../data/citizens.js';
 import { PROFESSIONS } from '../data/apprenticeship.js';
 
@@ -158,6 +159,19 @@ export class JournalSystem {
           'star'
         )
       ),
+      // (25.3) Mizaç gelişimi
+      on('temperament:developed', ({ character, quirk, origin }) => {
+        const name = QUIRKS[quirk].name;
+        const text =
+          origin.kind === 'family'
+            ? `${character.name}, ${genitive(origin.fromName)} izinden gidip ${name} bir mizaçla gençliğe adım attı`
+            : origin.kind === 'mentor'
+              ? `${character.name}, ustası ${ablative(origin.fromName)} ${name} mizacını kaptı`
+              : origin.kind === 'craft'
+                ? `${character.name}: ${origin.fromName} çıraklığı ona ${name} mizacı kazandırdı`
+                : `${character.name} kendine özgü bir mizaçla büyüdü: ${name}`;
+        this.log(text, QUIRKS[quirk].icon);
+      }),
       on('lifeStage:retired', ({ character, retired }) =>
         this.log(
           retired

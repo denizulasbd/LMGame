@@ -45,6 +45,7 @@ export async function installMonitor(page) {
     window.__tradeMod = await import('/src/systems/TradePost.js').catch(() => null); // (24.3)
     window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
     window.__apprMod = await import('/src/systems/Apprenticeship.js').catch(() => null); // (25.2)
+    window.__socialData = await import('/src/data/social.js').catch(() => null); // (25.3)
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -204,7 +205,7 @@ export async function installMonitor(page) {
         m.homelessMax = Math.max(m.homelessMax, s.characters.filter((c) => c.homeId === null && !c.role).length);
         const freeBed = s.buildings.some((b) => b.functional && b.capacity && (homeCount.get(b.id) ?? 0) <= b.capacity - 2);
         for (const c of s.characters) {
-          if (!['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(c.quirk)) broke(`${c.name}: huyu yok (${c.quirk})`);
+          if (!(window.__socialData ? window.__socialData.QUIRKS[c.quirk] : ['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(c.quirk))) broke(`${c.name}: huyu yok (${c.quirk})`);
           if (c.relocating && !c.away) {
             if (!m.relocateSince.has(c.id)) m.relocateSince.set(c.id, now);
             else if (now - m.relocateSince.get(c.id) > RELOCATE_HOURS * 60) {
@@ -365,6 +366,18 @@ export async function installMonitor(page) {
           m.maxApprentices = Math.max(m.maxApprentices ?? 0, active);
         }
 
+        // ---- (25.3) Mizaç: huy tanımlı mı, kaynak geçerli mi ----
+        if (s.temperament && window.__socialData) {
+          const Q = window.__socialData.QUIRKS;
+          for (const c of s.characters) {
+            if (c.role) continue;
+            if (c.quirk && !Q[c.quirk]) broke(`${c.name}: bilinmeyen huy (${c.quirk})`);
+            if (c.quirkOrigin && !['family', 'mentor', 'craft', 'self'].includes(c.quirkOrigin.kind)) broke(`${c.name}: geçersiz huy kaynağı`);
+          }
+          const gen = s.characters.filter((c) => Q[c.quirk]?.generation).length;
+          m.maxGeneration = Math.max(m.maxGeneration ?? 0, gen);
+        }
+
         // ---- (23. aşama) Krizler: yangın, hasar, haydut baskını, yaralanma ----
         {
           const KD = window.__crisisData;
@@ -520,6 +533,15 @@ export async function installMonitor(page) {
                 spoiled: { ...(s.granary?.spoiled ?? {}) },
                 switches: s.granary?.switches ?? 0,
                 granaryCapacity: s.granaryCapacity ?? 0,
+              }
+            : null,
+          // (25.3)
+          temperament: s.temperament && window.__socialData
+            ? {
+                counts: Object.fromEntries(Object.keys(window.__socialData.QUIRKS).map((k) => [k, s.characters.filter((c) => c.quirk === k).length])),
+                maxGeneration: m.maxGeneration ?? 0,
+                state: { ...s.temperament },
+                petitions: { ...(s.temperament.petitions ?? {}) },
               }
             : null,
           // (25.2)

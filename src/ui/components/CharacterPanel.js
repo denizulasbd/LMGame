@@ -43,6 +43,7 @@ import { INJURY } from '../../data/crisis.js';
 import { LIFE_STAGES, AGING } from '../../data/lifeStages.js';
 import { PROFESSIONS, PROUD_MASTER } from '../../data/apprenticeship.js';
 import { apprenticesOf, graduationFor, acceptsApprentice } from '../../systems/Apprenticeship.js';
+import { ORIGIN_NAMES } from '../../data/temperament.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -231,7 +232,7 @@ export class CharacterPanel {
         const title = `${TRAITS[key]?.description ?? ''}${opposite ? ` · Zıddı: ${TRAITS[opposite].name} (atışabilirler)` : ''}`;
         return el('span', { className: 'trait-chip', text: TRAITS[key]?.name ?? key, title });
       }),
-      ...(quirk ? [el('span', { className: 'trait-chip quirk-chip', title: `Huyu: ${quirk.description}` }, [el('img', { src: getAnyIconURL(quirk.icon), alt: '' }), quirk.name])] : [])
+      ...(quirk ? [el('span', { className: `trait-chip quirk-chip${quirk.color ? ` quirk-${quirk.color}` : ''}`, title: `Huyu: ${quirk.description}${quirk.generation ? ' (yeni nesil huy)' : ''}` }, [el('img', { src: getAnyIconURL(quirk.icon), alt: '' }), quirk.name])] : [])
     );
     this.resetCaches();
   }
@@ -445,7 +446,7 @@ export class CharacterPanel {
     const homes = state.buildings.filter((b) => b.type === 'cabin');
     const homeIndex = homes.findIndex((b) => b.id === character.homeId);
     const home = homes[homeIndex] ?? null;
-    const key = [character.id, character.quirk, partner?.id, character.married, partner?.homeId, character.homeId, character.relocating, partner?.relocating, homeIndex, home?.upgraded, news?.id, news?.from].join('/');
+    const key = [character.id, character.quirk, character.quirkOrigin?.kind, partner?.id, character.married, partner?.homeId, character.homeId, character.relocating, partner?.relocating, homeIndex, home?.upgraded, news?.id, news?.from].join('/');
     if (key === this.lastSocial) return;
     this.lastSocial = key;
 
@@ -456,7 +457,13 @@ export class CharacterPanel {
         el('div', { className: 'social-text' }, [el('span', { className: 'social-label', text: label }), ...body]),
       ]);
     const rows = [];
-    if (quirk) rows.push(row(quirk.icon, 'Huyu', [el('span', { className: 'social-value', text: quirk.name })], quirk.description));
+    if (quirk) rows.push(row(quirk.icon, 'Huyu', [el('span', { className: `social-value${quirk.color ? ` quirk-text-${quirk.color}` : ''}`, text: quirk.name })], quirk.description));
+    // (25.3) Huyun kaynağı: Aile mirası (kimden), Usta etkisi, Mesleğin doğası, Özgün gelişim
+    const origin = character.quirkOrigin;
+    if (quirk && origin) {
+      const from = origin.fromName ? ` · ${origin.kind === 'craft' ? `${origin.fromName} çıraklığı` : origin.fromName}` : '';
+      rows.push(row(quirk.icon, 'Mizacı', [el('span', { className: 'social-value', text: `${ORIGIN_NAMES[origin.kind]}${from}${origin.day ? ` (Gün ${origin.day})` : ''}` })], 'Altın Çağ kuşağı: evre geçişinde mizacını ailesinden, ustasından ya da kendinden aldı'));
+    }
 
     // Ev: eşiyle paylaşılan ev ya da taşınma
     let homeText;

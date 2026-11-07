@@ -922,6 +922,14 @@ console.log(
       (r ? ` · (24.2) Dokuma Tezgâhı ${r.looms}, Şerbethane ${r.breweries} · dokunan kumaş ${r.clothWoven}, yapılan fıçı ${r.sherbetMade} (stok ${r.cloth} / ${r.sherbet}) · handa içilen şerbet ${r.served}, handaki fıçı ${r.innCasks} · testi ${r.jugs} (içilen ${r.jugsDrunk}) · Dayanıklı Giysi ${r.garments} (giyen ${r.dressed}) · refah katkısı +${r.welfare} · açken çalışan lüks işçi ${r.hungryLuxury}` : '')
   );
 }
+if (mon.temperament) {
+  const T = mon.temperament;
+  const gen = ['craftsman', 'entrepreneur', 'philosopher', 'festive'].map((k) => `${k} ${T.counts[k] ?? 0}`).join(', ');
+  console.log(
+    `(25.3) mizaç: yeni nesil huylar ${gen} (en çok ${T.maxGeneration}) · gelişen ${T.state.developed} (aile ${T.state.family}, usta ${T.state.mentor}, meslek ${T.state.craft}, özgün ${T.state.self}) · ` +
+      `Şenlik aurası ${Math.round(T.state.auraMinutes)} dk · yeni dilekçeler ${JSON.stringify(T.petitions)}`
+  );
+}
 if (mon.apprentice) {
   const P = mon.apprentice;
   console.log(

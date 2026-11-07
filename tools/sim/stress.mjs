@@ -114,6 +114,11 @@ console.log(
     `unvanı alan bilge ${lf((l) => l.state.elders ?? 0)}, yetişkinliğe geçen genç ${lf((l) => l.state.adults ?? 0)} · nasihat ${Math.round(lf((l) => l.state.adviceMinutes ?? 0))} dk · ` +
     `işteki emekli ${lf((l) => l.retiredWorking)} · en yaşlı ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? Math.max(...r.data.monitor.life.ages) : '-'}`).join(' ')}`
 );
+const tp = (f) => sum((d) => (d.monitor.temperament ? f(d.monitor.temperament) : 0));
+console.log(
+  `(25.3) mizaç: yeni nesil huylu sakin (son gün) ${tp((t) => ['craftsman', 'entrepreneur', 'philosopher', 'festive'].reduce((n, k) => n + (t.counts[k] ?? 0), 0))} · gelişen ${tp((t) => t.state.developed)} ` +
+    `(aile ${tp((t) => t.state.family)}, usta ${tp((t) => t.state.mentor)}, meslek ${tp((t) => t.state.craft)}, özgün ${tp((t) => t.state.self)}) · Şenlik aurası ${Math.round(tp((t) => t.state.auraMinutes))} dk`
+);
 const ap = (f) => sum((d) => (d.monitor.apprentice ? f(d.monitor.apprentice) : 0));
 console.log(
   `(25.2) çıraklık: açık kapı ${ap((p) => p.open)} · son gün çırak ${ap((p) => p.active)} (en çok toplam ${ap((p) => p.maxActive)}) · yazılan ${ap((p) => p.state.enrolled)}, mezun ${ap((p) => p.state.graduated)} · ` +

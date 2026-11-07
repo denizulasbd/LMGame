@@ -17,6 +17,7 @@ import { ACTIVITIES } from '../data/activities.js';
 import { retirementPlan, isResident } from './LifeStages.js';
 import { addMemory } from './MemorySystem.js';
 import { clamp } from '../utils/math.js';
+import { TEMPERAMENT } from '../data/temperament.js';
 
 const ADVICE_BUBBLE_PER_MINUTE = 0.02; // nasihat veren bilgenin başında ara sıra bir söz (metin baloncuğu)
 
@@ -106,8 +107,10 @@ export class LifeStageSystem {
     for (const c of this.world.characters) {
       if (c.isChild || c.lifeStage === 'elder' || c.role || !c.visible || c.isSleeping) continue;
       if (!sages.some((s) => (s.x - c.x) ** 2 + (s.y - c.y) ** 2 <= radiusSq)) continue;
-      c.needs.fun = clamp(c.needs.fun + ELDER.advice.fun * minutes, 0, 100);
-      c.needs.social = clamp(c.needs.social + ELDER.advice.social * minutes, 0, 100);
+      // (25.3) Bilge Düşünür nasihatten iki kat moral alır
+      const k = c.quirk === 'philosopher' ? TEMPERAMENT.sageAdvice : 1;
+      c.needs.fun = clamp(c.needs.fun + ELDER.advice.fun * k * minutes, 0, 100);
+      c.needs.social = clamp(c.needs.social + ELDER.advice.social * k * minutes, 0, 100);
       listeners += 1;
     }
     if (listeners === 0) return;

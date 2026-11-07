@@ -41,14 +41,17 @@
 //                  (lifeStage) ve gün cinsinden yaşı (ageInDays), Genç evresindeki büyümüş çocuklar ve genç göçmenler, 63. günde
 //                  kendiliğinden unvanını alan bir Kıdemli Bilge (Deniz, 70). Eski kayıtlarda (sürüm 2-23) evresi olmayan yetişkinler
 //                  'adult' (70+ 'elder'), çocuklar 'child' başlar; yaş değişmez, gün sayacı yaştan kurulur, bir gün sonra ilerler
-//   save-v25.json: 25.2'nin oyunu (kayıt sürümü 25, bugünkü): otopilotla 64 gün (--crisis-state); kuleden sonra açılan Çırak
+//   save-v25.json: 25.2'nin oyunu (kayıt sürümü 25): otopilotla 64 gün (--crisis-state); kuleden sonra açılan Çırak
 //                  Kapıları, ustalarının yanında ilerleyen çıraklar, çırak işleri ve satışları, Gururlu Usta. Eski kayıtlarda
 //                  (sürüm 2-24) çırak yoktur, bütün kapılar kapalıdır, sayaçlar boştur
+//   save-v26.json: 25.3'ün oyunu (kayıt sürümü 26, bugünkü): otopilotla 64 gün (--crisis-state); Altın Çağ'da büyüyüp mizacını
+//                  ailesinden, ustasından ya da kendinden alan gençler, yeni nesil huylar ve kaynakları, yeni dilekçe sayaçları. Eski
+//                  kayıtlarda (sürüm 2-25) huylar aynen korunur (yoksa dört kuruluş huyundan dağıtılır), huy kaynağı ve sayaçlar boştur
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -174,6 +177,19 @@ for (const { name, raw } of fixtures) {
     // (25.1) yaşam evreleri (yüklendiği an)
     loaded.life = s.characters.map((c) => ({ id: c.id, age: c.age, days: c.ageInDays, stage: c.lifeStage, child: c.isChild, retired: c.retired, role: Boolean(c.role) }));
     loaded.lifeState = JSON.stringify(s.lifeStages);
+    // (25.3) mizaç (yüklendiği an)
+    {
+      const SO = await import('/src/data/social.js');
+      loaded.temper = {
+        quirks: s.characters.map((c) => [c.id, c.quirk]),
+        valid: s.characters.every((c) => c.role || SO.QUIRKS[c.quirk]),
+        generation: s.characters.filter((c) => SO.QUIRKS[c.quirk]?.generation).length,
+        origins: s.characters.filter((c) => c.quirkOrigin).map((c) => [c.id, JSON.stringify(c.quirkOrigin, ['kind', 'fromId', 'fromName', 'day'])]),
+        state: JSON.stringify(s.temperament),
+        classic: SO.QUIRK_KEYS,
+        allKeys: SO.ALL_QUIRK_KEYS,
+      };
+    }
     // (25.2) çıraklık (yüklendiği an)
     loaded.appr = { list: s.characters.filter((c) => c.apprenticeship).map((c) => ({ id: c.id, a: JSON.stringify(c.apprenticeship), youth: c.lifeStage === 'youth' })), state: JSON.stringify(s.apprenticeship) };
     // (22. aşama) vergi, Krallık, terk ediş (yüklendiği an)
@@ -290,7 +306,8 @@ for (const { name, raw } of fixtures) {
   {
     // (19. aşama) karakter huyları, evli çiftlerin evleri, dedikodu
     const S = r.loaded.social;
-    const valid = S.quirks.every((q) => ['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(q));
+    // (25.3) v26'dan itibaren dört yeni nesil huy da geçerlidir; daha eski kayıtlarda yalnızca kuruluş huyları
+    const valid = S.quirks.every((q) => (data.version >= 26 ? r.loaded.temper.allKeys : ['animalLover', 'bookworm', 'musician', 'natureEnthusiast']).includes(q));
     const homes = Object.fromEntries(data.characters.map((c) => [c.id, c.homeId]));
     const homesKept = S.couples.every(([id, , home]) => homes[id] === undefined || homes[id] === home || homes[id] === null);
     if (data.version < 16) {
@@ -452,6 +469,26 @@ for (const { name, raw } of fixtures) {
       ok: grew.every((x) => (x.days === before.get(x.id).days + 1 || (before.get(x.id).child && !x.child && x.days >= 18 * 16)) && (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage))) && grew.length >= L.filter((x) => !x.role).length - 2,
       detail: `${grew.length} sakin`,
     });
+  }
+  // (25.3) mizaç
+  {
+    const T = r.loaded.temper;
+    const savedQ = new Map(data.characters.map((c) => [c.id, c.quirk]));
+    const kept = T.quirks.every(([id, q]) => !savedQ.get(id) || savedQ.get(id) === q);
+    if (data.version < 26) {
+      results.push({
+        name: `${tag}: huylar aynen korundu (yoksa dört kuruluş huyundan), yeni nesil huy, huy kaynağı ve mizaç sayacı yok`,
+        ok: T.valid && kept && T.generation === 0 && T.origins.length === 0 && T.quirks.every(([, q]) => T.classic.includes(q)) && T.state === JSON.stringify({ developed: 0, family: 0, mentor: 0, craft: 0, self: 0, auraMinutes: 0, petitions: {} }),
+        detail: `${T.quirks.length} sakin`,
+      });
+    } else {
+      const savedO = new Map(data.characters.filter((c) => c.quirkOrigin).map((c) => [c.id, JSON.stringify(c.quirkOrigin, ['kind', 'fromId', 'fromName', 'day'])]));
+      results.push({
+        name: `${tag}: yeni nesil huylar, huy kaynakları ve mizaç sayaçları korundu`,
+        ok: T.valid && kept && T.generation > 0 && T.origins.length === savedO.size && T.origins.every(([id, o]) => savedO.get(id) === o) && JSON.parse(T.state).developed === data.temperament.developed && JSON.parse(T.state).family === data.temperament.family,
+        detail: `${T.generation} yeni nesil huylu · ${T.origins.length} kaynaklı · ${T.state}`,
+      });
+    }
   }
   // (25.2) Usta-Çırak
   {

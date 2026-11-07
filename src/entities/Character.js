@@ -34,6 +34,7 @@ import {
   BUBBLE_WIDTH,
   BUBBLE_HEIGHT,
 } from '../art/ui/index.js';
+import { sanitizeOrigin } from '../systems/Temperament.js';
 
 const HALF_WIDTH = CHARACTER_WIDTH / 2;
 const BUBBLE_POP_TIME = 0.15;
@@ -103,6 +104,7 @@ export class Character extends Entity {
     ageInDays = null,
     agedDays = 0,
     apprenticeship = null,
+    quirkOrigin = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -162,6 +164,8 @@ export class Character extends Entity {
     // 25.2: çıraklık (yalnızca Genç'te anlamlıdır; kayda girer)
     this.apprenticeship = this.lifeStage === 'youth' ? sanitizeApprenticeship(apprenticeship) : null;
     this.speech = null; // usta / çırak konuşma baloncuğu (kaydedilmez)
+    // 25.3: huyun kaynağı (Aile mirası / Usta etkisi / Mesleğin doğası / Özgün gelişim; kayda girer)
+    this.quirkOrigin = sanitizeOrigin(quirkOrigin);
     this.retired = false; // emekli bilge mi (kaydedilmez; LifeStageSystem çekirdek sakin kuralıyla hesaplar)
     this.waterBucket = false; // yangında kovası dolu mu (kaydedilmez)
     this.recall = null;
@@ -559,6 +563,7 @@ export class Character extends Entity {
       ageInDays: this.ageInDays,
       agedDays: this.agedDays,
       apprenticeship: this.apprenticeship,
+      quirkOrigin: this.quirkOrigin,
     };
   }
 

@@ -109,6 +109,10 @@ export const PETITION_KINDS = {
   stock: { name: 'Kışlık Stok', icon: 'wood', text: 'Kış yaklaşırken odun ve yiyecek stokunun güvenli seviyeye çıkarılmasını istiyorum.' },
   tool: { name: 'Sağlam Alet', icon: 'sturdyTool', text: 'Bana sağlam bir alet verilmesini istiyorum.', grant: { iron: 4, wood: 3 }, grantLabel: 'Aleti Ver' },
   gathering: { name: 'Meydanda Buluşma', icon: 'bell', text: 'Meydanda hep birlikte toplanacağımız bir şenlik ya da buluşma istiyorum.', grantLabel: 'Zili Çal' },
+  // (25.3) Yeni nesil huyların dilekçeleri
+  craftTools: { name: 'Atölye Malzemesi', icon: 'quirkCraft', text: 'Atölyelerimize yeni el aletleri ve tezgâh malzemesi alınsın; elimiz işe daha iyi yatsın.', grant: { iron: 6, wood: 6 }, grantLabel: 'Malzemeyi Ver' },
+  marketFees: { name: 'Pazar Harçları', icon: 'quirkTrade', text: 'Pazar harçları hafifletilsin; adil bir vergiyle esnaf da kasaba da kazansın.', grant: { gold: 25 }, grantLabel: 'Harçları Hafiflet' },
+  sherbetCask: { name: 'Fazladan Şerbet', icon: 'quirkFestive', text: 'Hana fazladan bir şerbet fıçısı açılsın; bu akşam herkes neşelensin!', grant: { sherbet: 3 }, grantLabel: 'Fıçıyı Aç' },
 };
 
 // ---------------------------------------------------------------------------

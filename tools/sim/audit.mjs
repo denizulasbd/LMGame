@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken, (25.1) Kıdemli Bilge emekliyken, (25.2) çırak ustasının yanındayken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken, (25.1) Kıdemli Bilge emekliyken, (25.2) çırak ustasının yanındayken, (25.3) yeni nesil huylu sakinler varken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -469,6 +469,30 @@ const PAGE_HELPERS = () => {
       check('yüklemeden sonra çıraklık sürer (ilerleme artar, veri geçerli) ve kimse takılmaz', p2.apprenticeship && p2.apprenticeship.progress > p0 && p2.apprenticeship.progress <= 100, `%${p0.toFixed(1)} -> %${p2.apprenticeship?.progress.toFixed(1)}`);
       p2.apprenticeship = null;
       s.apprenticeship.open = [];
+    }
+
+    // --- 2o. (25.3) Yeni nesil huylu sakinler (Şenlik Neşesi dans ederken, Bilge Düşünür), mizacın kaynağı ve sayaçlar ---
+    {
+      const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((a, b) => a.id - b.id);
+      const [f, p] = adults;
+      const before = [f.quirk, p.quirk];
+      f.quirk = 'festive';
+      f.quirkOrigin = { kind: 'family', fromId: p.id, fromName: p.name, day: s.time.day };
+      p.quirk = 'philosopher';
+      p.quirkOrigin = { kind: 'self', fromId: null, fromName: null, day: s.time.day };
+      s.temperament.developed += 2;
+      s.temperament.family += 1;
+      s.temperament.self += 1;
+      hours(2);
+      const diff = A.roundtrip();
+      const f2 = s.characters.find((c) => c.id === f.id);
+      check('yeni nesil huylu sakinler varken kayıt -> yükleme durum kayması yok (huy, kaynağı, mizaç sayaçları)', diff.length === 0 && f2.quirk === 'festive' && f2.quirkOrigin?.kind === 'family', diff.join(' | '));
+      hours(12);
+      check('yüklemeden sonra yeni nesil huylar korunur, yeniden dağıtılmaz', s.characters.find((c) => c.id === f.id).quirk === 'festive' && s.characters.find((c) => c.id === p.id).quirk === 'philosopher');
+      const f3 = s.characters.find((c) => c.id === f.id);
+      const p3 = s.characters.find((c) => c.id === p.id);
+      [f3.quirk, p3.quirk] = before;
+      f3.quirkOrigin = p3.quirkOrigin = null;
     }
 
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
