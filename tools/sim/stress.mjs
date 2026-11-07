@@ -114,5 +114,10 @@ console.log(
     `unvanı alan bilge ${lf((l) => l.state.elders ?? 0)}, yetişkinliğe geçen genç ${lf((l) => l.state.adults ?? 0)} · nasihat ${Math.round(lf((l) => l.state.adviceMinutes ?? 0))} dk · ` +
     `işteki emekli ${lf((l) => l.retiredWorking)} · en yaşlı ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? Math.max(...r.data.monitor.life.ages) : '-'}`).join(' ')}`
 );
+const ap = (f) => sum((d) => (d.monitor.apprentice ? f(d.monitor.apprentice) : 0));
+console.log(
+  `(25.2) çıraklık: açık kapı ${ap((p) => p.open)} · son gün çırak ${ap((p) => p.active)} (en çok toplam ${ap((p) => p.maxActive)}) · yazılan ${ap((p) => p.state.enrolled)}, mezun ${ap((p) => p.state.graduated)} · ` +
+    `Gururlu Usta ${ap((p) => p.state.masters)} · çırak mesaisi ${Math.round(ap((p) => p.state.minutes) / 60)} sa · çırak işi ${ap((p) => p.state.crafted)} (satılan ${ap((p) => p.state.sold)}) · yetişkin çırak ${ap((p) => p.adultApprentices)}`
+);
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

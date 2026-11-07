@@ -19,6 +19,7 @@ import { coldProtection, travelFatigue } from './Equipment.js';
 import { hasPalate } from './Refinery.js';
 import { INN_SHERBET } from '../data/refinery.js';
 import { healthEnergyMultiplier } from './HealthSystem.js';
+import { PROUD_MASTER } from '../data/apprenticeship.js';
 import { clamp } from '../utils/math.js';
 
 /** Üşüme çarpanının fazlası paltoyla azalır: 1 + (m - 1) × (1 - koruma). */
@@ -53,6 +54,7 @@ export class NeedsSystem {
       const protection = c.visible ? coldProtection(c) : 0;
       const walking = c.task?.phase === 'travel' && c.isMoving;
       const happyHome = (c.buffs.happyHome ?? -1) > now;
+      const proud = (c.buffs.proudMaster ?? -1) > now; // (25.2) Gururlu Usta
       for (const need of NEED_KEYS) {
         const perMinute = NEEDS[need].decayPerHour / 60;
         let multiplier = c.profile.decay[need] * (sleeping ? SLEEP_DECAY_MULTIPLIER[need] : 1);
@@ -72,6 +74,7 @@ export class NeedsSystem {
         // Sırt çantalı sakin uzun yollarda daha az yorulur; eşiyle mutlu uyanan güne keyifle başlar
         if (walking && need === 'energy') multiplier *= travelFatigue(c);
         if (happyHome && need === 'fun') multiplier *= HAPPY_HOME.funDecay;
+        if (proud && need === 'fun') multiplier *= PROUD_MASTER.funDecay;
         // (24.2) Handa fıçı şerbeti içen güne "Keyifli Damak"la başlar: keyfi yavaş düşer
         if (need === 'fun' && hasPalate(c, now)) multiplier *= INN_SHERBET.palate.funDecay;
         if (need === 'energy') multiplier *= healthEnergy;

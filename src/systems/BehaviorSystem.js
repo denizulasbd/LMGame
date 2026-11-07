@@ -86,6 +86,7 @@ export class BehaviorSystem {
     this.health = services.health;
     this.research = services.research;
     this.crisis = services.crisis ?? null; // (23. aşama)
+    this.apprenticeship = services.apprenticeship ?? null; // (25.2)
     this.state = game.state;
     this.brain = new Brain(world, rng, services);
     this.unsubscribers = [
@@ -623,6 +624,8 @@ export class BehaviorSystem {
    * İş bittiyse ya da hedef kalmadıysa false döner (görev biter).
    */
   performWork(c, task, minutes) {
+    // (25.2) Çırak ustasını izler: yorgunluğu ve öğrenmesi ApprenticeshipSystem'dedir (üretim yok, deneyim yok)
+    if (task.activity === 'apprentice') return this.apprenticeship ? this.apprenticeship.learn(c, task, minutes) : false;
     const work = c.profile.work;
     c.needs.energy = clamp(c.needs.energy - DEFAULT_WORK.energyCost * work.fatigue * minutes, 0, 100);
     c.needs.fun = clamp(c.needs.fun - DEFAULT_WORK.funCost * minutes, 0, 100);
@@ -639,6 +642,8 @@ export class BehaviorSystem {
       spiceWorkMultiplier(c, this.state.totalMinutes);
     // Zanaat Loncası fermanı üretim yapılarında (inşaat ve toplama emirleri hariç) verimi artırır
     if (task.workBuildingId) amount *= civicProductionMultiplier(this.state);
+    // (25.2) Gururlu Usta: %50'yi geçen çırağın getir-götür işi tezgâha +%5 verim (çırak yoksa çarpılmaz)
+    if (task.workBuildingId && this.apprenticeship && c.buffs.proudMaster !== undefined) amount *= this.apprenticeship.masterBoost(c, task);
     // (12. aşama) Mimarlık Loncası inşaatı, yükseltmeyi ve onarımı hızlandırır
     // (13. aşama) Kraliyet Mimarları fermanı inşaatları 3 kat hızlandırır
     if (task.jobId && task.activity === 'build') amount *= researchBuildMultiplier(this.state) * buffMultiplier(this.state, 'buildSpeed');

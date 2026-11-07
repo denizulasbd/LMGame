@@ -1520,6 +1520,13 @@ export function getBackpackSprite(view) {
   });
 }
 
+// (25.2) Çırağın taburesi (8x4): ustasının yanında oturduğu küçük ahşap tabure
+const STOOL = ['KKKKKKKK', 'KEEXXEEK', '.Kx..xK.', '.K....K.'];
+
+export function getStoolSprite() {
+  return getSprite('ui:stool', () => STOOL);
+}
+
 // Şenlikte havada süzülen müzik notası (5x6); renk palet harfi olarak verilir
 const NOTE_SHAPE = ['..cc.', '..c.c', '..c..', '..c..', 'ccc..', 'ccc..'];
 

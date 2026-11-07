@@ -10,6 +10,8 @@
 // 23. aşama: hafif yaralanma (isInjured, injuryTimer: kalan oyun dakikası; yürüme ve çalışma %20 yavaş, ölüm yoktur; CrisisSystem).
 // 25.1: yaşam evresi (lifeStage: 'child' | 'youth' | 'adult' | 'elder') ve gün cinsinden yaş (ageInDays; gün dönümünde ilerler,
 // age = ageInDays / yıl). Kıdemli Bilge ölmez, emekli olur (retired: kaydedilmez, LifeStageSystem her saat yeniden hesaplar).
+// 25.2: çıraklık (apprenticeship: { masterId, profession, buildingId, progress 0-100, since, crafted }; ApprenticeshipSystem)
+// ve konuşma baloncuğu (speech: { text, at, duration }; kaydedilmez, ikon balonundan ayrı bir katmandır).
 // 22. aşama: köyü terk etmeye karar verdiyse yola çıktığı an ve çıkış karosu (emigrating: { since, exit }; DesertionSystem).
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
@@ -18,6 +20,7 @@ import { CHILDREN } from '../data/family.js';
 import { buildTraitProfile } from '../ai/TraitProfile.js';
 import { startingCoins, sanitizeInventory } from '../systems/Citizens.js';
 import { stageFor, daysForAge, ageFromDays, isLifeStage } from '../systems/LifeStages.js';
+import { sanitizeApprenticeship } from '../systems/Apprenticeship.js';
 import { AGING } from '../data/lifeStages.js';
 import { getCharacterSprite, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT, getFlowerCrownSprite } from '../art/sprites/index.js';
 
@@ -27,6 +30,7 @@ import {
   getHeldToolSprite,
   getCarrySprite,
   getBackpackSprite,
+  getStoolSprite,
   BUBBLE_WIDTH,
   BUBBLE_HEIGHT,
 } from '../art/ui/index.js';
@@ -98,6 +102,7 @@ export class Character extends Entity {
     lifeStage = null,
     ageInDays = null,
     agedDays = 0,
+    apprenticeship = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -154,6 +159,9 @@ export class Character extends Entity {
     // Kasabaya katıldığından / büyüdüğünden beri yaşlandığı gün: gönül ilişkisindeki yaş farkı katılım anındaki "kuşak yaşına"
     // göre ölçülür (LifeStages.ageGap), böylece doğum günlerinin yıla dağılması eşleşmeleri günden güne değiştirmez
     this.agedDays = Number.isFinite(agedDays) && agedDays >= 0 ? Math.min(Math.floor(agedDays), this.ageInDays) : 0;
+    // 25.2: çıraklık (yalnızca Genç'te anlamlıdır; kayda girer)
+    this.apprenticeship = this.lifeStage === 'youth' ? sanitizeApprenticeship(apprenticeship) : null;
+    this.speech = null; // usta / çırak konuşma baloncuğu (kaydedilmez)
     this.retired = false; // emekli bilge mi (kaydedilmez; LifeStageSystem çekirdek sakin kuralıyla hesaplar)
     this.waterBucket = false; // yangında kovası dolu mu (kaydedilmez)
     this.recall = null;
@@ -338,6 +346,8 @@ export class Character extends Entity {
     const sprite = this.currentSprite();
     const x = Math.round(this.x);
     const y = Math.round(this.y);
+    // (25.2) Çırak ustasının yanında küçük bir taburede oturur
+    if (this.task?.activity === 'apprentice' && this.pose === 'sit') queue.addImage(this.sortY - 0.01, getStoolSprite(), x - 4, y - 1); // ayakları taburenin önünde, bacakları altından görünür
     queue.addImage(this.sortY, sprite, x - HALF_WIDTH, y - sprite.height + 1);
     // (14. aşama) Çiçek Şenliği: saçta küçük bir çiçek
     if (this.flowerCrown) {
@@ -548,6 +558,7 @@ export class Character extends Entity {
       lifeStage: this.lifeStage,
       ageInDays: this.ageInDays,
       agedDays: this.agedDays,
+      apprenticeship: this.apprenticeship,
     };
   }
 

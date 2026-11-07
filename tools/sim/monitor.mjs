@@ -44,6 +44,7 @@ export async function installMonitor(page) {
     window.__refineryMod = await import('/src/systems/Refinery.js').catch(() => null); // (24.2)
     window.__tradeMod = await import('/src/systems/TradePost.js').catch(() => null); // (24.3)
     window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
+    window.__apprMod = await import('/src/systems/Apprenticeship.js').catch(() => null); // (25.2)
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -342,6 +343,28 @@ export async function installMonitor(page) {
           if (counts.elder > 0 && L.coreWorkers(s).length + plan.volunteers.size < Math.min(3, counts.youth + counts.adult + counts.elder)) broke('çekirdek sakin güvencesi bozuldu');
         }
 
+        // ---- (25.2) Çıraklık: çırak Genç, yapısı var ve zanaat yapısı, ilerleme 0-100, kontenjan aşılmaz, tabure ustanın yanında ----
+        if (window.__apprMod && s.apprenticeship) {
+          const A = window.__apprMod;
+          let active = 0;
+          for (const c of s.characters) {
+            const a = c.apprenticeship;
+            if (!a) {
+              if (c.task?.activity === 'apprentice') broke(`${c.name}: çırak değilken çıraklık yapıyor`);
+              continue;
+            }
+            active++;
+            if (c.lifeStage !== 'youth') m.adultApprentices = (m.adultApprentices ?? 0) + 1;
+            const b = s.buildings.find((x) => x.id === a.buildingId);
+            if (!b || !A.professionFor(b.type)) broke(`${c.name}: çıraklık yapısı yok`);
+            if (!(a.progress >= 0 && a.progress <= 100)) broke(`${c.name}: geçersiz çıraklık ilerlemesi (${a.progress})`);
+            if (a.masterId !== null && !s.characters.some((x) => x.id === a.masterId)) broke(`${c.name}: kayıp usta (${a.masterId})`);
+            if (a.masterId === null) m.orphanSamples = (m.orphanSamples ?? 0) + 1;
+          }
+          for (const b of s.buildings) if (A.professionFor(b.type) && A.apprenticesAt(s, b).length > A.apprenticeSlots(b)) broke(`${b.name}: çırak kontenjanı aşıldı`);
+          m.maxApprentices = Math.max(m.maxApprentices ?? 0, active);
+        }
+
         // ---- (23. aşama) Krizler: yangın, hasar, haydut baskını, yaralanma ----
         {
           const KD = window.__crisisData;
@@ -497,6 +520,18 @@ export async function installMonitor(page) {
                 spoiled: { ...(s.granary?.spoiled ?? {}) },
                 switches: s.granary?.switches ?? 0,
                 granaryCapacity: s.granaryCapacity ?? 0,
+              }
+            : null,
+          // (25.2)
+          apprentice: window.__apprMod && s.apprenticeship
+            ? {
+                open: s.apprenticeship.open.length,
+                active: s.characters.filter((c) => c.apprenticeship).length,
+                maxActive: m.maxApprentices ?? 0,
+                list: s.characters.filter((c) => c.apprenticeship).map((c) => `${c.name}:${c.apprenticeship.profession}:%${Math.floor(c.apprenticeship.progress)}`),
+                orphanSamples: m.orphanSamples ?? 0,
+                adultApprentices: m.adultApprentices ?? 0,
+                state: { ...s.apprenticeship, open: undefined },
               }
             : null,
           // (25.1)

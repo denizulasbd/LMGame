@@ -12,13 +12,13 @@
 // Bu sistem KENDİ tohumlanmış üretecini kullanır (TownScene -> seed + 27) ve onu yalnızca süs için (nasihat baloncuğu, günlük
 // cümlesi) tüketir. Yaş ve evre geçişleri rastgelelik kullanmaz: oyunun ana üretecinin sırası hiç değişmez.
 // Yayınladığı olaylar: 'lifeStage:changed' { character, from, to }, 'lifeStage:retired' { character, retired }, 'toast'.
-import { ELDER, ELDER_LINES, LIFE_STAGES } from '../data/lifeStages.js';
+import { ELDER, ELDER_LINES, ELDER_ADVICE, LIFE_STAGES } from '../data/lifeStages.js';
 import { ACTIVITIES } from '../data/activities.js';
 import { retirementPlan, isResident } from './LifeStages.js';
 import { addMemory } from './MemorySystem.js';
 import { clamp } from '../utils/math.js';
 
-const ADVICE_BUBBLE_PER_MINUTE = 0.02; // nasihat veren bilgenin başında ara sıra kitap / kıvılcım baloncuğu
+const ADVICE_BUBBLE_PER_MINUTE = 0.02; // nasihat veren bilgenin başında ara sıra bir söz (metin baloncuğu)
 
 export class LifeStageSystem {
   /**
@@ -72,7 +72,8 @@ export class LifeStageSystem {
       this.state.lifeStages.elders += 1;
       this.events.emit('toast', { text: line, tone: 'success', icon: LIFE_STAGES.elder.icon });
       addMemory(this.state, c, `${c.age} yaşında Kıdemli Bilge unvanını aldı; artık gençlere yol gösteriyor`, 'book', { kind: 'elder' });
-      c.showBubble('sparkle', 3);
+      // (25.2) Söz ikon balonu yerine metin katmanında: ikon balonu davranış sisteminin balon zarını (ana üreteç) etkilerdi
+      c.speech = { text: 'Yılların birikimi artık gençlerin!', at: -1, duration: 3.5 };
       c.celebrate();
       // Emekliliği sessizce başlar; çekirdek sakin kuralı yüzünden çalışmaya devam ediyorsa günlüğe gönüllü olarak düşer
       c.retired = retirementPlan(this.state).retired.has(c.id);
@@ -111,8 +112,9 @@ export class LifeStageSystem {
     }
     if (listeners === 0) return;
     this.state.lifeStages.adviceMinutes += minutes;
+    // (25.2) Nasihat sözleri metin katmanında (ikon balonu ana üretecin balon zarını değiştirirdi)
     for (const s of sages) {
-      if (!s.bubble && this.rng.next() < ADVICE_BUBBLE_PER_MINUTE * minutes) s.showBubble(this.rng.next() < 0.5 ? 'book' : 'sparkle', 2.4);
+      if (!s.speech && this.rng.next() < ADVICE_BUBBLE_PER_MINUTE * minutes) s.speech = { text: this.rng.pick(ELDER_ADVICE), at: -1, duration: 3.4 };
     }
   }
 

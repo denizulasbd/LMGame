@@ -2812,6 +2812,110 @@ kendisidir. Bozuk bir evre ya da yaş sayacı yaştan yeniden kurulur, bozuk say
   kasabanın ilk Kıdemli Bilgesi oldu (bildirim ve günlükte aynı cümle, emekli); koşu sonunda 7 Genç, 22 Yetişkin, 1 emekli bilge, 58 dakika
   Bilge Nasihati, işteki emekli 0, emeklilik gecikmesi 0; takılma, kopuk referans ve sayfa hatası 0.
 
+## Usta-Çırak sistemi ve mesleki eğitim (25. aşama, 25.2 mikro adımı)
+
+25.1'de evre olarak gelen **Genç**ler (18-20) artık bir ustanın yanında meslek öğrenebiliyor. Çıraklık kasabanın iş gücünü
+**kilitlemeyen** tatlı bir yan katmandır: çırak yalnızca ustası tezgâhtayken onun yanında öğrenir; ustası başka işteyse, kasabada
+gıda kıtlığı varsa ya da çekirdek iş gücü azsa her zamanki işine koşar. Sayılar `data/apprenticeship.js`'te, saf hesaplar
+`systems/Apprenticeship.js`'te, mantık `systems/ApprenticeshipSystem.js`'tedir.
+
+| Yapı | Dal | Usta | Mesleği (deneyim) | Çırak işi |
+|---|---|---|---|---|
+| Zanaat Atölyesi | Demircilik ve Terzilik | Demirci | Zanaatkârlık | Acemi Çivisi (2 altın) |
+| Oduncu Kulübesi | Marangozluk | Marangoz | Odunculuk | Tahta Kaşık (2) |
+| Şifacı Kulübesi | Şifacılık | Şifacı | Şifacılık | Ot Kesesi (3) |
+| Yel Değirmeni ve Fırın | Fırıncılık | Fırıncı | Fırıncılık | Kıtır Kurabiye (2; yenir, tokluk +8) |
+| Dokuma Tezgâhı | Dokumacılık | Dokumacı | Zanaatkârlık | Basit Bez (3) |
+| Şerbethane | Şerbetçilik | Şerbethane Ustası | Aşçılık | Acemi Şerbeti (3) |
+
+### Çırak yazma
+
+- **Oyuncu:** Genç'in kartındaki **Çıraklığa Yaz** (en deneyimli ustanın atölyesine) ya da zanaat yapısının panelindeki **Çırak Al: [İsim]**.
+- **Çırak Kapısı:** yapının panelinde açılır / kapanır; açık kapılara boştaki (bir yere sabitlenmemiş) gençler her sabah **07:00**'de
+  kendiliğinden yazılır. Her yapıda bir çırak yeri vardır (Seviye 2 yapıda iki). Yeni oyunda bütün kapılar kapalıdır.
+- Çırağın verisi `c.apprenticeship = { masterId, profession, buildingId, progress 0-100, since, crafted }`. Usta, o yapıya sabitlenmiş
+  ya da orada çalışan en deneyimli yetişkindir (yoksa kasabada o meslekte en deneyimli olan); emekli olursa ya da köyü terk ederse
+  yapının ustası devralır.
+
+### Mesai, Gururlu Usta ve Çırak İşi
+
+- **Mesai:** ustası yapıda çalışırken (ya da oraya yürürken) çırak mesai saatinde onun yanındaki küçük **taburesine** oturur, izler ve
+  getir-götür işlerine bakar (`apprentice` etkinliği; üretim yuvası ayırmaz, üretim yapmaz, yarı yorulur). Kendi ustası yoksa atölyede
+  o an çalışan en deneyimli yetişkinden öğrenir. İlerleme mesai saati başına **%1,67**tir (60 saatte %100). Ustası yoksa, kişi başı
+  besin 6'nın altındaysa ya da çalışabilir yetişkin 3'ten azsa çırak her zamanki işine gider.
+- **Gururlu Usta:** yanında çırağı çalışan ustanın keyfi 6 saat boyunca **%25 yavaş** düşer (kartta "Gururlu Usta" etiketi; ilk kez
+  olunca Kasaba Günlüğü'ne yazılır). Çırak **%50**'yi geçince getir-götür işleri ustanın tezgâhına **+%5 verim** katar.
+- **Çırak İşi:** %50'den sonra her mesai sonunda %35 olasılıkla **hammadde tüketmeden** mesleğin çırak işinden bir tanesi çantaya girer;
+  ilki anılara ve günlüğe yazılır. Çantada 3 çırak işi birikince Pazar Yeri varsa satılır (kesesine değeri kadar altın).
+- **Sözler:** usta ve çırak ara sıra konuşur: "Öğreniyorum ustam!", "Çekici doğru tut evlat...", "Ateş tam kıvamında!", "Ölç iki
+  kere, kes bir kere!" (dal başına 6-8 söz). Sözler karakterin başının üstünde ekranda net yazılan küçük bir **metin baloncuğudur**
+  (`rendering/SpeechBubbles.js`, `c.speech`; kaydedilmez).
+
+### Mezuniyet
+
+Genç 21 yaşında Yetişkin olunca çıraklık biter: ilerlemesi **%100** ise o meslekte **Yetkin Usta** (Usta kademesi, iş hızı +%40),
+**%60+** ise **Kıdemli Kalfa** (Kalfa kademesi) olarak başlar; daha azsa ilerlemesi kadar deneyim (yüzde başına 6 dakika) ona kalır.
+Unvan bildirime, Kasaba Günlüğü'ne ve anılara yazılır.
+
+### Arayüz
+
+- **Karakter Detay Kartı → Çıraklık:** çırağın ustası (tıklanınca seçilir), meslek dalı ve atölyesi, altın **"%X Çıraklık"** çubuğu,
+  yetişkinlikte alacağı unvan, çırak işleri ve **Çıraklıktan Ayır**; çırak olmayan Genç için **Çıraklığa Yaz**; ustanın kartında
+  **"Çırağı: [İsim]"** ve Gururlu Usta notu. Çırağın durum satırı "Leyla ustanın yanında marangozluk öğreniyor (%57)" gibi yazar.
+- **Atölye paneli → Çıraklık:** dal, usta, Çırak Kapısı düğmesi, çırakların ilerleme çubukları ve boştaki gençler için Çırak Al düğmeleri.
+- `tools/art-preview.html`: oduncu kulübesi (iki kare: balta kalkar / iner), dokuma tezgâhı ve fırının önünde usta ile taburedeki
+  çırak, konuşma baloncukları; tabure ve çırak işi simgeleri.
+
+### Determinizm ve iş gücü
+
+- Çıraklık **kendi tohumlanmış üretecini** (`seed + 28`) kullanır: plan süresi, konuşma, çırak işi ve satış. Brain mola zarını her
+  zamanki gibi attıktan sonra çırak planına bakar; böylece ana üretecin sırası değişmez. Test, kapı kapalıyken 24 saatlik bakımın ve
+  mesai sonunun 24 üreteci ve `Math.random`'u hiç ilerletmediğini doğrular.
+- **Bulgu (balonlar):** davranış sistemi bir sakinin ikon balonu boşken ana üreteçten balon zarı atar. Sözleri ikon balonuyla
+  göstermek bu zarın sırasını değiştirirdi. Bu yüzden sözler ayrı bir metin katmanına alındı ve 25.1'deki bilge kutlaması ile
+  Bilge Nasihati baloncukları da bu katmana taşındı ("Sabır her işin başıdır, evlat.").
+- **Gençlerin enerji bonusu:** 25.1'de determinizm için kapatılan bonus (`YOUTH.energyGain = 1`) kapalı kalır; gençlere asıl avantaj
+  artık çıraklıktan gelir (mezuniyette Usta / Kalfa başlangıcı).
+- Hiç çırak yokken katman hiçbir şeyi değiştirmez (Gururlu Usta çarpanı yalnızca bu bonusu almış ustada hesaplanır, çıraksız
+  sakinin çarpanı tam olarak 1'dir). Otopilot, önceki aşamalardaki silo / tezgâh / iskele gibi, Çırak Kapılarını **Ulu Saat Kulesi
+  tamamlandıktan sonra** açar; `--no-apprentice` kapıları hiç açmaz.
+
+### Kayıt (sürüm 25)
+
+Sakinlere `apprenticeship`, ustalara `buffs.proudMaster`, kayda `apprenticeship` (açık kapılar, yazılan, mezun, Gururlu Usta,
+çırak işi, satış, altın, çırak mesai dakikası) eklendi; konuşma baloncukları kaydedilmez. **Sürüm 2-24 kayıtlarında** çırak yoktur,
+bütün kapılar kapalı ve sayaçlar boştur. Bilinmeyen dal, Genç olmayan sakinde çıraklık, var olmayan ya da zanaat yapısı olmayan
+kapı ve bozuk sayaç temizlenir; yapısı yıkılmış çırak serbest kalır, kayıp ustanın yerine yapının ustası geçer.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 912; 38'i bu adımın): dallar, çırak işleri ve etkinlik; verinin temizlenmesi; mezuniyet kademeleri;
+  Genç / yetişkin uygunluğu; usta seçimi; kapı ve kontenjan; kapalı kapıda etkisizlik ve izole üreteç; Çırak Al ve günlük; kontenjan;
+  plan (ustası tezgâhta değilken, tezgâhtayken tabure ve yer ayırmama, kıtlıkta işe dönüş); öğrenme hızı ve yorgunluk; Gururlu Usta
+  (olay, günlük, gerçek `NeedsSystem` ile %25 yavaş keyif kaybı); %50 altında / üstünde +%5 verim ve çıraksız sakinde 1; ustası kalkınca
+  görevin bitmesi; Çırak İşi (hammadde tüketmeden, ilk iş anısı, %50 altında çıkmaması), Pazar'da satış; sözler (ikon balonu boş kalır);
+  tabure ve çizim; gerçek saatlerle mesai; kart ve atölye paneli (Çırak Kapısı tıklaması); kayıt sürümü 25 gidiş-dönüşü, bozuk değerler,
+  v24 kaydı; sabah 07:00 kapısı; %100'de Yetkin Usta, %70'te Kıdemli Kalfa.
+- **Denetim** (`audit.mjs`): 113/113 (yeni senaryo: çırak ustasının yanındayken, Gururlu Usta etkin ve kapı açıkken kayıt -> yükleme durum
+  kayması yok, yüklemeden sonra çıraklık sürer). Bekçi çıraklığın Genç'te olmasını, yapının ve ustanın var olmasını, ilerlemenin 0-100
+  kalmasını ve kontenjanı denetler; ustasız çırak ve yetişkin çırak örneklerini sayar.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-25, 759): `save-v25.json` bu adımın otopilotuyla 64 günlük oyundur (`--crisis-state`; 9 açık
+  kapı, 7 çırak, ikisi %100, 37 çırak işi). v2-v24 kayıtlarında çırak yoktur; v25 kaydında çıraklar, ustaları, ilerlemeleri, kapılar ve
+  sayaçlar birebir korunur; hepsinde bir gün sonra çıraklık verisi geçerlidir.
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 36`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0,
+  üretmeyen iş yeri 0, sayfa hatası 0. **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34** (25.1 ve `main` ile aynı; tohum 42
+  kule G25 / G27 / G28). Her koşunun olay kaydı kulenin son aşaması tamamlanana kadar 25.1 ile **bayt bayt aynıdır**; ilk fark kuleden
+  sonra, otopilot Çırak Kapılarını açınca başlar. `--no-apprentice` ile tohum 42'nin 36 günlük kaydı ve bekçi raporu 25.1 ile tamamen
+  aynıdır. Altı kasabada kuleden sonra 54 kapı açıldı, 44 genç çırak yazıldı, 352 saat çırak mesaisi, 46 Gururlu Usta; 36 günde hiçbir
+  çırak %50'ye ulaşmadı (çırak işi 0), yetişkin çırak 0.
+  - **Bulgu:** ilk denemede çırak yalnızca kendi ustasından öğreniyordu; usta çoğu zaman başka işte olduğu için 44 çırak toplam 107 saat
+    öğrenebildi. Atölyede o an çalışan en deneyimli yetişkinden de öğrenmesine izin verilince 352 saate çıktı (kayıtlı usta değişmez).
+- **Uzun koşu** (`autopilot.mjs 42 64 --crisis-state`): kule G25 / G27 / G28, Altın Çağ G28. 8 genç G29'da çırak yazıldı (oduncu kulübelerinde
+  dört, fırında iki, atölye ve şifacıda birer); ikisi %100'e, biri %86'ya ulaştı; 364 saat çırak mesaisi, 17 Gururlu Usta, 37 çırak işi
+  (33'ü satıldı, +66 altın). Zanaat Atölyesi ve Şifacı Kulübesi'nde çırak %0'da kaldı (atölye yalnızca sipariş varken, şifacı çoğunlukla
+  doğada çalışır). Çıraklardan yalnızca Can 21'e bastı; çıraklığı %60'a ulaşmadığı için unvan almadı, ilerlemesi kadar Odunculuk
+  deneyimi ona kaldı (unvanlı mezun 0). Takılma, kopuk referans ve sayfa hatası 0.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -2854,8 +2958,8 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (874; 25.1: yaşam evreleri, yaşlanma, Kıdemli Bilge emekliliği ve çekirdek sakin kuralı, Bilge Nasihati, kuşak yaşı, evre rozeti, kayıt sürümü 24; 23. aşama: tehlike sıklığı ayarı ve doğal kriz kapıları, Su Kuyusu (yangın ihtimali ×0,2, bahçe sulaması), Gözcü Kulesi ve bekçiler, haydut baskınının üç çözümü (püskürt, haraç, hazırlıksız) ve penceresi, yangın (çıkış, kova zinciri, Acil Söndür, hasarlı ama silinmeyen yapı), Tamir Et ve ustaların onarımı, hafif yaralanma ve Şifacı, ana rastgele sayı üretecinin tüketilmemesi, kayıt sürümü 20; 22. aşama: iç vergi kademeleri ve öşür, Krallık Vergisi (uyarı, ödeme, malla ödeme, ceza), Kraliyet Fermanları ve ödülleri, Kraliyet Beratı ve Aslanlı Heykel, kötü şöhret ve göç, köyü terk etme ve çekirdek sakinler; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 24'e; 25.1: yaşam evreleri ve gün cinsinden yaşlar) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (912; 25.2: Usta-Çırak, Çırak Kapısı, Gururlu Usta, çırak işi, mezuniyet, metin baloncukları, kayıt sürümü 25; 25.1: yaşam evreleri, yaşlanma, Kıdemli Bilge emekliliği ve çekirdek sakin kuralı, Bilge Nasihati, kuşak yaşı, evre rozeti, kayıt sürümü 24; 23. aşama: tehlike sıklığı ayarı ve doğal kriz kapıları, Su Kuyusu (yangın ihtimali ×0,2, bahçe sulaması), Gözcü Kulesi ve bekçiler, haydut baskınının üç çözümü (püskürt, haraç, hazırlıksız) ve penceresi, yangın (çıkış, kova zinciri, Acil Söndür, hasarlı ama silinmeyen yapı), Tamir Et ve ustaların onarımı, hafif yaralanma ve Şifacı, ana rastgele sayı üretecinin tüketilmemesi, kayıt sürümü 20; 22. aşama: iç vergi kademeleri ve öşür, Krallık Vergisi (uyarı, ödeme, malla ödeme, ceza), Kraliyet Fermanları ve ödülleri, Kraliyet Beratı ve Aslanlı Heykel, kötü şöhret ve göç, köyü terk etme ve çekirdek sakinler; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 25'e; 25.2: çıraklık; 25.1: yaşam evreleri ve gün cinsinden yaşlar) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
 | `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması / Çağ Kutlaması / isyan ve yağma / tahsildar, ferman ve köyü terk eden sakin sırasında, yangın ve haydut izi sürerken kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |

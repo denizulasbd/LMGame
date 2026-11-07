@@ -64,6 +64,8 @@ import { INN_SHERBET, GARMENT, CLOTH_WELFARE } from '../../data/refinery.js';
 import { CONTRACTS, MARKET, IMPORTS, IMPORT_KEYS } from '../../data/tradePost.js';
 import { contractStatus, importStatus, priceMultiplier, shipDocked } from '../../systems/TradePost.js';
 import { clothWelfare } from '../../systems/Refinery.js';
+import { PROFESSIONS } from '../../data/apprenticeship.js';
+import { doorOpen, apprenticesAt, pickMaster, acceptsApprentice, canApprentice, apprenticeSlots } from '../../systems/Apprenticeship.js';
 
 const thumbnailCache = new Map();
 
@@ -101,6 +103,7 @@ export class BuildingPanel {
     this.research = el('div', { className: 'building-decrees building-research' });
     this.harbor = el('div', { className: 'building-decrees building-harbor' });
     this.tradeBox = el('div', { className: 'building-decrees building-trade' }); // (24.3) Ticaret İskelesi / Kervan Konağı
+    this.apprenticeBox = el('div', { className: 'building-decrees building-apprentice' }); // (25.2) çıraklık
     this.luxury = el('div', { className: 'building-decrees building-luxury' });
     this.bell = el('div', { className: 'building-decrees building-bell' });
     this.trustBox = el('div', { className: 'building-decrees building-trust' }); // (21. aşama) Yönetim Güveni
@@ -149,6 +152,7 @@ export class BuildingPanel {
       this.research,
       this.harbor,
       this.tradeBox,
+      this.apprenticeBox,
       this.luxury,
       this.crownBox,
       this.trustBox,
@@ -295,6 +299,7 @@ export class BuildingPanel {
     this.renderResearch(building, state);
     this.renderHarbor(building, state);
     this.renderTradePost(building, state);
+    this.renderApprentices(building, state);
     this.renderLuxury(building, state);
     this.renderCrown(building, state);
     this.renderTrust(building, state);
@@ -955,6 +960,52 @@ export class BuildingPanel {
    * (24.3) Ticaret İskelesi / Kervan Konağı: gemi / kervan buradaysa ihracat sözleşmeleri (tek tıkla tamamlanır) ve ithalat
    * paketleri; değilse sıradaki varış. Pazar doygunluğu çarpanları ve son ziyaretler.
    */
+  /** (25.2) Zanaat yapısında çıraklık: Çırak Kapısı, ustası, çırakları ve ilerlemeleri, boştaki gençler için "Çırak Al". */
+  renderApprentices(building, state) {
+    const prof = PROFESSIONS[building.type];
+    const show = Boolean(prof) && building.functional;
+    this.apprenticeBox.hidden = !show;
+    if (!show) return;
+    const open = doorOpen(state, building);
+    const pupils = apprenticesAt(state, building);
+    const master = pickMaster(state, building);
+    const free = acceptsApprentice(state, building);
+    const youths = state.characters.filter(canApprentice).slice(0, 3);
+    const key = `${building.id}:${open}:${master?.id}:${pupils.map((p) => `${p.id}-${Math.floor(p.apprenticeship.progress)}`).join(',')}:${youths.map((y) => y.id).join(',')}:${free}`;
+    if (key === this.lastApprenticeKey) return;
+    this.lastApprenticeKey = key;
+    const door = this.button(open ? 'Çırak Kapısı: Açık' : 'Çırak Kapısı: Kapalı', open ? 'Boştaki gençler her sabah 07:00\'de buraya çırak yazılır · kapatmak için tıkla' : 'Açınca boştaki gençler her sabah buraya çırak yazılır', () => this.events.emit('ui:toggleApprenticeDoor', { buildingId: building.id }));
+    door.classList.add('craft-mode', 'apprentice-door');
+    door.classList.toggle('is-active', open);
+    const children = [
+      el('div', { className: 'building-section-title', text: `Çıraklık · ${prof.name}` }),
+      el('div', { className: 'upgrade-text', text: master ? `Ustası: ${master.name} (${prof.master})` : 'Bu meslekte deneyimli bir usta yok' }),
+      door,
+    ];
+    for (const p of pupils) {
+      const pct = Math.floor(p.apprenticeship.progress);
+      children.push(
+        el('div', { className: 'apprentice-progress' }, [
+          el('span', { className: 'apprentice-name', text: p.name }),
+          el('span', { className: 'apprentice-bar' }, [el('span', { className: 'apprentice-fill', style: `width: ${pct}%` })]),
+          el('span', { className: 'apprentice-pct', text: `%${pct}` }),
+        ])
+      );
+    }
+    if (free && youths.length) {
+      const picks = youths.map((y) => {
+        const b = this.button(`Çırak Al: ${y.name}`, `${y.name} (Genç, ${y.age}) bu atölyeye çırak olur`, () => this.events.emit('ui:enrollApprentice', { characterId: y.id, buildingId: building.id }));
+        b.classList.add('craft-mode', 'apprentice-pick');
+        return b;
+      });
+      children.push(el('div', { className: 'craft-modes' }, picks));
+    } else if (!free) {
+      children.push(el('div', { className: 'upgrade-text', text: `Çırak kontenjanı dolu (${apprenticeSlots(building)})` }));
+    }
+    children.push(el('div', { className: 'upgrade-text', text: 'Çırak, ustası tezgâhtayken yanındaki taburede öğrenir; ustası yokken ya da kıtlıkta kasabanın işine koşar.' }));
+    this.apprenticeBox.replaceChildren(...children);
+  }
+
   renderTradePost(building, state) {
     const show = building.type === 'tradingPost' && building.functional;
     this.tradeBox.hidden = !show;

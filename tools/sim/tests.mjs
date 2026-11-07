@@ -58,6 +58,9 @@
 //              (iş bulucu, itfaiye / savunma, sefer), çekirdek sakin güvencesi (gönüllü usta ve yeniden emeklilik), refah katkısı,
 //              boş zaman tercihleri, Bilge Nasihati (menzil, uyku, gönüllü), Genç -> Yetişkin, ana üreteçlerin tüketilmemesi, gönül
 //              ilişkisinde kuşak yaşı, Karakter Detay Kartı rozeti, kayıt sürümü 24 (gidiş-dönüş, bozuk değerler, v23 kaydı)
+//   25. aşama (25.2): Usta-Çırak (dallar, çırak işleri, uygunluk, usta seçimi, kontenjan, kapalı kapıda etkisizlik ve izole üreteç,
+//              çırak yazma, plan (ustası yokken / kıtlıkta işe döner), öğrenme, Gururlu Usta ve +%5 verim, Çırak İşi ve Pazar satışı,
+//              metin baloncukları, gerçek mesai, kart ve atölye paneli, kayıt sürümü 25, Çırak Kapısı ve mezuniyet)
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
 import { openGame, createChecks } from './lib.mjs';
@@ -2266,7 +2269,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 24', raw.version === 24);
+  check('kayıt sürümü 25', raw.version === 25);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2709,7 +2712,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 24: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 24 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 25: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 25 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -3024,7 +3027,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 24: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 24 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 25: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 25 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3636,7 +3639,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 24: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 24 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 25: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 25 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -3917,7 +3920,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { g: garden.id, o: other.id, switches: st.granary.switches };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 24: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 24 && raw.version === 24 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    check('kayıt sürümü 25: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 25 && raw.version === 25 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
     game.events.emit('ui:load');
     const s2 = game.state;
     const g2 = s2.buildings.find((b) => b.id === T.g);
@@ -4245,7 +4248,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 24: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 24 && raw.version === 24 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    check('kayıt sürümü 25: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 25 && raw.version === 25 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
     game.events.emit('ui:load');
     const s2 = st();
     const inn2 = s2.buildings.find((b) => b.id === T.inn);
@@ -4519,7 +4522,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 24: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 24 && raw.version === 24 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    check('kayıt sürümü 25: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 25 && raw.version === 25 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
     game.events.emit('ui:load');
     const t2 = st().tradePost;
     check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
@@ -4805,7 +4808,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 24: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 24 && raw.version === 24 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
+    check('kayıt sürümü 25: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 25 && raw.version === 25 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
     game.events.emit('ui:load');
     const back = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     const sage2 = st().characters.find((c) => c.id === sage.id);
@@ -4845,6 +4848,270 @@ const pageResults = await page.evaluate(async () => {
     const dd = st().time.day;
     hrs251(26);
     check('v23 kasabası bir gün sorunsuz yaşar, yaşlar ilerler', st().time.day >= dd + 1 && residents().every((c) => LS.isLifeStage(c.lifeStage) && c.agedDays >= 1));
+    offs.forEach((off) => off());
+  }
+
+  // ===== 25. aşama (25.2): Usta-Çırak sistemi ve mesleki eğitim =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const AD = await import('/src/data/apprenticeship.js');
+    const AP = await import('/src/systems/Apprenticeship.js');
+    const CZ = await import('/src/data/citizens.js');
+    const CI = await import('/src/systems/Citizens.js');
+    const ACT = (await import('/src/data/activities.js')).ACTIVITIES;
+    const SK = await import('/src/systems/SkillSystem.js');
+    const UI = await import('/src/art/ui/index.js');
+    const { CONFIG } = await import('/src/config.js');
+    const Y = 16;
+    const s0 = st();
+    s0.crisis.difficulty = 'huzurlu';
+    s0.crisis.raid = null;
+    s0.crisis.nextRaidWarnAt = null;
+    s0.petitions.list = [];
+    s0.petitions.nextAt = s0.totalMinutes + 1e6;
+    const sys = () => S().apprenticeship;
+    const events = [];
+    const offs = ['apprentice:enrolled', 'apprentice:released', 'apprentice:graduated', 'apprentice:crafted', 'apprentice:proud', 'toast'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
+    const journal = () => st().journal.slice(-6).map((e) => e.text).join(' / ');
+    const hrs252 = (h) => {
+      for (let i = 0; i < h; i++) {
+        const active = st().dilemma.active;
+        if (active) {
+          const o = active.options?.find((x) => x.default) ?? active.options?.[0];
+          if (o) game.events.emit('ui:chooseDilemma', { optionId: o.id });
+          st().dilemma.active = null;
+        }
+        st().time.paused = false;
+        st().time.speed = 4;
+        hours(1);
+      }
+    };
+    const makeYouth = (c, age = 19) => {
+      c.ageInDays = age * Y;
+      c.agedDays = 0;
+      c.age = age;
+      c.lifeStage = 'youth';
+      c.profile = c.buildProfile();
+      c.apprenticeship = null;
+      c.workplaceId = null;
+      return c;
+    };
+
+    // --- Veri ---
+    check('yedi zanaat dalı altı yapıda: Demirci / Terzi, Marangoz, Şifacı, Fırıncı, Dokumacı, Şerbethane Ustası', AD.PROFESSION_TYPES.join() === 'workshop,lumberHut,healerHut,mill,loom,brewery' && AD.PROFESSIONS.workshop.name.includes('Terzi') && AD.PROFESSIONS.brewery.master === 'Şerbethane Ustası' && AD.PROFESSION_TYPES.every((t) => SK.levelFor && AD.PROFESSIONS[t].lines.master.length >= 3 && AD.PROFESSIONS[t].lines.apprentice.length >= 3));
+    check('her dalın çırak işi çantaya girebilen, değeri olan bir eşya (Acemi Çivisi, Basit Bez, Kıtır Kurabiye...)', AD.PROFESSION_TYPES.every((t) => CZ.ITEMS[AD.PROFESSIONS[t].item]?.craft && CZ.ITEMS[AD.PROFESSIONS[t].item].value > 0) && CZ.ITEMS.noviceNails.name === 'Acemi Çivisi' && CZ.ITEMS.plainCloth.name === 'Basit Bez' && CZ.ITEMS.crispCookie.name === 'Kıtır Kurabiye' && CZ.ITEMS.crispCookie.food);
+    check('çırak etkinliği: mesai işi, taburede oturur, üretim yok', ACT.apprentice.kind === 'work' && ACT.apprentice.pose === 'sit' && !ACT.apprentice.effects);
+    check('çırak verisi temizlenir: geçersiz dal / yapı reddedilir, ilerleme 0-100', AP.sanitizeApprenticeship({ profession: 'kuyumcu', buildingId: 3 }) === null && AP.sanitizeApprenticeship({ profession: 'mill' }) === null && AP.sanitizeApprenticeship({ profession: 'mill', buildingId: 3, progress: 250, masterId: 'x' }).progress === 100 && AP.sanitizeApprenticeship({ profession: 'mill', buildingId: 3, progress: -5 }).progress === 0 && AP.sanitizeApprenticeship({ profession: 'mill', buildingId: 3 }).masterId === null);
+    check('mezuniyet: %100 Yetkin Usta (Usta kademesi), %60 Kıdemli Kalfa, altı kısmi deneyim', AP.graduationFor(100).title === 'Yetkin Usta' && SK.levelFor(AP.graduationFor(100).xp).level === 3 && AP.graduationFor(75).title === 'Kıdemli Kalfa' && SK.levelFor(AP.graduationFor(75).xp).level === 2 && AP.graduationFor(30).title === null && AP.graduationFor(30).xp === 180);
+
+    // --- Hazırlık: oduncu kulübesi, usta ve genç ---
+    sim.give({ wood: 400, stone: 300, iron: 80, food: 400, bread: 60 });
+    const hut = sim.place('lumberHut');
+    const adults = st().characters.filter((c) => !c.role && !c.isChild && !c.away && c.lifeStage !== 'elder' && !c.emigrating).sort((a, b) => a.id - b.id);
+    const youth = makeYouth(adults[adults.length - 1]);
+    const master = adults[0];
+    master.workplaceId = hut.id;
+    master.skills.woodcutting = 1600;
+    master.lifeStage = 'adult';
+    check('Genç çırak olabilir, yetişkin olamaz; yetişkin usta olabilir, Genç olamaz', AP.canApprentice(youth) && !AP.canApprentice(master) && AP.canMaster(master) && !AP.canMaster(youth));
+    check('yapının ustası: oraya sabitlenmiş en deneyimli yetişkin', AP.pickMaster(st(), hut) === master);
+    check('çırak kapısı başta kapalı, kontenjan 1 (Seviye 2\'de 2)', !AP.doorOpen(st(), hut) && AP.apprenticeSlots(hut) === 1 && AP.apprenticeSlots({ upgraded: true }) === 2 && AP.acceptsApprentice(st(), hut));
+
+    // --- Çırak kapısı kapalıyken hiçbir şey değişmez ---
+    const rngs = Object.entries(S()).filter(([k, v]) => k !== 'apprenticeship' && v && v.rng && Number.isFinite(v.rng.state)).map(([, v]) => v.rng);
+    const before = rngs.map((r) => r.state);
+    let randomCalls = 0;
+    const realRandom = Math.random;
+    Math.random = () => { randomCalls++; return realRandom(); };
+    for (let h = 0; h < 24; h++) sys().hourly(h);
+    sys().shiftEnded(youth);
+    Math.random = realRandom;
+    check('kapı kapalıyken sabah kimse çırak yazılmaz; çıraklık ana üreteçleri ve Math.random\'u tüketmez', !youth.apprenticeship && rngs.every((r, i) => r.state === before[i]) && randomCalls === 0 && sys().rng !== S().behavior.rng);
+
+    // --- Oyuncu çırak yazar ---
+    events.length = 0;
+    game.events.emit('ui:enrollApprentice', { characterId: youth.id, buildingId: hut.id });
+    const a = youth.apprenticeship;
+    check('"Çırak Al": Genç oduncu kulübesine çırak yazılır { masterId, profession, progress: 0 }', a && a.masterId === master.id && a.profession === 'lumberHut' && a.buildingId === hut.id && a.progress === 0 && events.some((e) => e.n === 'apprentice:enrolled') && journal().includes('Marangozluk çıraklığına başladı'), journal());
+    check('kontenjan dolu: ikinci genç aynı kulübeye yazılamaz', (() => {
+      const other = makeYouth(adults[adults.length - 2]);
+      const ok = !sys().enroll(other, hut);
+      other.lifeStage = 'adult';
+      other.profile = other.buildProfile();
+      other.ageInDays = 30 * Y;
+      other.age = 30;
+      return ok && !AP.acceptsApprentice(st(), hut);
+    })());
+
+    // --- Plan: ustası tezgâhtayken taburesine, değilse her zamanki işine ---
+    master.task = null;
+    check('ustası tezgâhta değilken çırak planı yok (her zamanki işine döner)', sys().planFor(youth) === null);
+    master.task = { activity: 'lumber', workBuildingId: hut.id, buildingId: hut.id, phase: 'perform', elapsed: 0, finalPoint: { x: hut.center.x, y: hut.center.y } };
+    const plan = sys().planFor(youth);
+    check('ustası tezgâhtayken çırak onun yanındaki taburesine gider (yer ayırmaz, üretim yuvası almaz)', plan?.activity === 'apprentice' && plan.buildingId === hut.id && !plan.reserve && !plan.workBuildingId && plan.finalPoint.x === hut.center.x + AD.APPRENTICE.standOffset.x);
+    const food0 = s0.resources.food;
+    s0.resources.food = 0;
+    s0.resources.bread = 0;
+    const pantry0 = s0.pantry.credit;
+    s0.pantry.credit = 0;
+    check('kasabada gıda kıtlığı varken çırak tezgâha değil işe koşar', sys().planFor(youth) === null && !AP.townCanSpare(st()));
+    s0.resources.food = food0 + 400;
+    s0.resources.bread = 60;
+    s0.pantry.credit = pantry0;
+
+    // --- Öğrenme, Gururlu Usta, verim ---
+    const task = { activity: 'apprentice', buildingId: hut.id, phase: 'perform', elapsed: 0 };
+    youth.task = task;
+    const e0 = youth.needs.energy = 80;
+    events.length = 0;
+    const ok = sys().learn(youth, task, 60);
+    check('bir mesai saatinde ilerleme %1,67 (60 saatte %100), çırak yarı yorulur', ok && Math.abs(youth.apprenticeship.progress - 60 * AD.APPRENTICE.perMinute) < 1e-9 && youth.needs.energy < e0 && youth.needs.energy > e0 - 1 && youth.activityLabel.includes(master.name), youth.activityLabel);
+    check('Gururlu Usta: yanında çırağı çalışan ustanın morali (keyfi yavaş düşer) ve günlük notu', master.buffs.proudMaster > st().totalMinutes && events.some((e) => e.n === 'apprentice:proud' && e.p.master === master) && journal().includes('gurur duyuyor'), journal());
+    check('Gururlu Usta etkisi: NeedsSystem\'de ustanın keyfi %25 yavaş düşer', (() => {
+      const NS = S().systems.find((x) => x.constructor.name === 'NeedsSystem');
+      const other = adults[1];
+      const f = (c) => { c.needs.fun = 80; };
+      f(master); f(other);
+      const sm = master.buffs.proudMaster;
+      // aynı koşulda karşılaştırmak için profilleri ve öteki bonusları eşitle
+      const pm = master.profile, po = other.profile;
+      const bm = master.buffs, bo = other.buffs;
+      master.buffs = { proudMaster: st().totalMinutes + 600 };
+      other.buffs = {};
+      const tm = master.task, to = other.task;
+      master.task = other.task = null;
+      master.profile = other.profile;
+      const vis = [master.visible, other.visible];
+      master.visible = other.visible = false;
+      NS.update({ gameMinutes: 60, hour: 12 });
+      const dm = 80 - master.needs.fun, dO = 80 - other.needs.fun;
+      master.profile = pm; other.profile = po;
+      [master.visible, other.visible] = vis;
+      master.buffs = bm; other.buffs = bo;
+      master.task = tm; other.task = to;
+      master.buffs.proudMaster = sm;
+      return dm > 0 && Math.abs(dm / dO - AD.PROUD_MASTER.funDecay) < 0.02;
+    })());
+    check('çırak %50\'nin altındayken ustanın verimi değişmez', sys().masterBoost(master, master.task) === 1);
+    youth.apprenticeship.progress = 55;
+    check('çırak %50\'yi geçince getir-götür işi ustanın tezgâhına +%5 verim', sys().masterBoost(master, master.task) === AD.PROUD_MASTER.workBoost);
+    check('çıraksız sakinin çalışmasına çarpan uygulanmaz (tam olarak 1)', sys().masterBoost(adults[1], { workBuildingId: hut.id }) === 1);
+    master.task = null;
+    check('usta tezgâhtan kalkınca çırak da kalkar (görev biter)', sys().learn(youth, task, 1) === false);
+
+    // --- Çırak İşi ---
+    youth.inventory = [];
+    let crafted = 0;
+    for (let i = 0; i < 40 && crafted < 2; i++) {
+      sys().shiftEnded(youth);
+      crafted = CI.countItem(youth, 'woodenSpoon');
+    }
+    check('Çırak İşi: %50\'den sonra mesai sonunda hammadde tüketmeden çantaya Tahta Kaşık; ilk iş anısı ve günlüğü', crafted >= 1 && youth.apprenticeship.crafted >= 1 && youth.memories.some((m) => m.kind === 'apprentice' && m.text.includes('tahta kaşık')) && st().apprenticeship.crafted >= 1, `${crafted} kaşık`);
+    const wood0 = s0.resources.wood;
+    youth.apprenticeship.progress = 20;
+    const c0 = youth.apprenticeship.crafted;
+    for (let i = 0; i < 20; i++) sys().shiftEnded(youth);
+    check('%50\'nin altında çırak işi çıkmaz; kasaba stoğu hiç azalmaz', youth.apprenticeship.crafted === c0 && s0.resources.wood === wood0);
+    youth.apprenticeship.progress = 60;
+    if (!st().buildings.some((b) => b.type === 'market' && b.functional)) sim.place('market');
+    youth.inventory = [{ kind: 'woodenSpoon', qty: 3 }];
+    const coins0 = youth.coins;
+    sys().shiftEnded(youth);
+    check('3 çırak işi birikince Pazar Yeri\'nde satılır (kesesine değeri kadar altın)', CI.countItem(youth, 'woodenSpoon') <= 1 && youth.coins >= coins0 + 6 && st().apprenticeship.sold >= 3, `${coins0} -> ${youth.coins}`);
+
+    // --- Sözler (metin baloncuğu, ikon balonuna dokunmaz) ---
+    master.task = { activity: 'lumber', workBuildingId: hut.id, buildingId: hut.id, phase: 'perform', elapsed: 0 };
+    youth.visible = master.visible = true;
+    youth.bubble = null;
+    master.bubble = null;
+    let spoke = null;
+    for (let i = 0; i < 200 && !spoke; i++) {
+      youth.speech = master.speech = null;
+      sys().learn(youth, task, 30);
+      spoke = youth.speech ?? master.speech;
+    }
+    const allLines = [...AD.PROFESSIONS.lumberHut.lines.master, ...AD.PROFESSIONS.lumberHut.lines.apprentice];
+    check('usta ve çırak konuşur ("Öğreniyorum ustam!", "Ölç iki kere, kes bir kere!"...); ikon balonu boş kalır', spoke && allLines.includes(spoke.text) && youth.bubble === null && master.bubble === null, spoke?.text);
+    check('tabure ve konuşma baloncuğu çizilir (sprite 8x4)', UI.getStoolSprite().width === 8 && UI.getStoolSprite().height === 4 && (() => { try { game.render(0); return true; } catch { return false; } })());
+
+    // --- Gerçek saatlerle mesai ---
+    youth.apprenticeship.progress = 10;
+    master.task = null;
+    youth.task = null;
+    const p0 = youth.apprenticeship.progress;
+    let seen = 0;
+    for (let h = 0; h < 40; h++) {
+      hrs252(1);
+      if (youth.task?.activity === 'apprentice' && youth.task.phase === 'perform') seen++;
+    }
+    check('gerçek mesaide çırak ustasının yanında oturup öğrenir (ilerleme artar, görev "apprentice")', youth.apprenticeship && youth.apprenticeship.progress > p0 + 2 && seen > 0, `%${p0} -> %${youth.apprenticeship?.progress.toFixed(1)} · ${seen} saat`);
+
+    // --- Karakter Detay Kartı ---
+    game.events.emit('ui:selectCharacter', youth.id);
+    game.render(0);
+    const card = document.querySelector('.character-panel .apprentice-box')?.textContent ?? '';
+    check('çırağın kartında ustası, meslek dalı ve "%X Çıraklık" çubuğu', card.includes(master.name) && card.includes('Marangozluk') && /%\d+ Çıraklık/.test(card) && document.querySelector('.character-panel .apprentice-fill'), card);
+    game.events.emit('ui:selectCharacter', master.id);
+    game.render(0);
+    const card2 = document.querySelector('.character-panel .apprentice-box')?.textContent ?? '';
+    check('ustanın kartında "Çırağı: [İsim]"', card2.includes('Çırağı') && card2.includes(youth.name), card2);
+    game.events.emit('ui:selectBuilding', hut.id);
+    game.render(0);
+    const panel = document.querySelector('.building-apprentice');
+    check('atölye panelinde Çırak Kapısı, usta ve çırağın ilerlemesi', panel && !panel.hidden && panel.textContent.includes('Çırak Kapısı') && panel.textContent.includes(youth.name), panel?.textContent);
+    panel.querySelector('.apprentice-door')?.click();
+    check('Çırak Kapısı düğmesi kapıyı açar', AP.doorOpen(st(), hut));
+    game.events.emit('ui:selectBuilding', null);
+    game.events.emit('ui:selectCharacter', null);
+
+    // --- Kayıt (sürüm 25) ---
+    game.events.emit('ui:save');
+    const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    const snap = JSON.stringify(youth.apprenticeship);
+    check('kayıt sürümü 25: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 25 && raw.version === 25 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
+    game.events.emit('ui:load');
+    const y2 = st().characters.find((c) => c.id === youth.id);
+    check('kayıttan çıraklık, kapı ve sayaçlar birebir döner', JSON.stringify(y2.apprenticeship) === snap && AP.doorOpen(st(), st().buildings.find((b) => b.id === hut.id)) && st().apprenticeship.crafted >= 1);
+    game.events.emit('ui:save');
+    const bad = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    bad.characters.find((c) => c.id === youth.id).apprenticeship = { profession: 'simyacı', buildingId: hut.id };
+    const adultRaw = bad.characters.find((c) => c.id === master.id);
+    adultRaw.apprenticeship = { profession: 'mill', buildingId: hut.id, progress: 40 };
+    bad.apprenticeship = { open: [hut.id, 999999, 'x'], enrolled: -2, minutes: 'uzun' };
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(bad));
+    game.events.emit('ui:load');
+    check('bozuk çıraklık temizlenir (bilinmeyen dal, yetişkine çıraklık, var olmayan kapı, bozuk sayaç)', !st().characters.find((c) => c.id === youth.id).apprenticeship && !st().characters.find((c) => c.id === master.id).apprenticeship && st().apprenticeship.open.join() === String(hut.id) && st().apprenticeship.enrolled === 0 && st().apprenticeship.minutes === 0);
+    game.events.emit('ui:save');
+    const old = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    old.version = 24;
+    delete old.apprenticeship;
+    for (const c of old.characters) delete c.apprenticeship;
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(old));
+    game.events.emit('ui:load');
+    check('v24 kaydı: çırak yok, kapılar kapalı, sayaçlar boş', !st().characters.some((c) => c.apprenticeship) && JSON.stringify(st().apprenticeship) === JSON.stringify(AP.emptyApprenticeshipState()));
+
+    // --- Sabah kapısı ve mezuniyet ---
+    const hut2 = st().buildings.find((b) => b.id === hut.id);
+    const yy = makeYouth(st().characters.find((c) => c.id === youth.id), 20);
+    const m2 = st().characters.find((c) => c.id === master.id);
+    m2.workplaceId = hut2.id;
+    game.events.emit('ui:toggleApprenticeDoor', { buildingId: hut2.id });
+    S().apprenticeship.hourly(AD.APPRENTICE.enrollHour);
+    check('açık Çırak Kapısı: boştaki genç sabah 07:00\'de kendiliğinden çırak yazılır', yy.apprenticeship?.buildingId === hut2.id);
+    yy.apprenticeship.progress = 100;
+    yy.skills.woodcutting = 0;
+    yy.ageInDays = 21 * Y - 1;
+    events.length = 0;
+    S().lifeStages.ageEveryone();
+    check('21 yaşında %100 çırak "Yetkin Usta" olarak yetişkinliğe başlar (Usta kademesi, yüksek verim)', yy.lifeStage === 'adult' && !yy.apprenticeship && SK.skillLevel(yy, 'woodcutting').level === 3 && SK.workBonus(yy, 'lumber') > 1.3 && events.some((e) => e.n === 'apprentice:graduated' && e.p.title === 'Yetkin Usta') && journal().includes('Yetkin Usta'), journal());
+    const y3 = makeYouth(st().characters.find((c) => c.id !== yy.id && c.id !== m2.id && !c.isChild && !c.role && c.lifeStage === 'adult' && !c.away), 20);
+    S().apprenticeship.enroll(y3, hut2);
+    y3.apprenticeship.progress = 70;
+    y3.skills.woodcutting = 0;
+    y3.ageInDays = 21 * Y - 1;
+    S().lifeStages.ageEveryone();
+    check('%70 ile yetişkin olan "Kıdemli Kalfa" (Kalfa kademesi)', SK.skillLevel(y3, 'woodcutting').level === 2 && y3.skills.woodcutting === AD.GRADUATION.journeymanXp && st().apprenticeship.graduated >= 2);
     offs.forEach((off) => off());
   }
 

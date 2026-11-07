@@ -56,3 +56,6 @@ export const ELDER_LINES = [
   '{name} Kıdemli Bilge unvanını aldı: aletlerini gençlere bırakıp çardakta nasihat vermeye başladı!',
   '{name} kasabanın yeni Kıdemli Bilgesi! Yılların birikimi artık meydanda dinleyenlerin.',
 ];
+
+// (25.2) Bilge Nasihati sözleri (metin baloncuğu; kendi üreteciyle seçilir)
+export const ELDER_ADVICE = ['Sabır her işin başıdır, evlat.', 'Ağaç yaşken eğilir.', 'Komşu komşunun külüne muhtaç.', 'Bir elin nesi var, iki elin sesi var.', 'Damlaya damlaya göl olur.'];

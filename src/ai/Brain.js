@@ -88,8 +88,9 @@ export class Brain {
    *   relationships: import('../systems/RelationshipSystem.js').RelationshipSystem,
    *   crafting: import('../systems/CraftingSystem.js').CraftingSystem }} services
    */
-  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null }) {
+  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null, apprenticeship = null }) {
     this.crisis = crisis; // (23. aşama) yangın ve yaralanma kararları
+    this.apprenticeship = apprenticeship; // (25.2) çıraklık (kendi üreteci)
 
     this.citizenRng = citizens?.rng ?? rng; // (21. aşama) vatandaşlık kararları kendi üretecinden
     this.health = health;
@@ -189,7 +190,8 @@ export class Brain {
     let onBreak = false;
     if (isWorkHours(hour) && !c.isChild) {
       if (this.rng.next() >= profile.work.breakChance) {
-        const plan = this.planWork(c);
+        // (25.2) Çırak: ustası tezgâhtaysa onun yanına (mola zarı her zamanki gibi atıldı; çırak planı kendi üretecini kullanır)
+        const plan = (c.apprenticeship && this.apprenticeship?.planFor(c)) || this.planWork(c);
         if (plan) return plan;
       } else {
         onBreak = true;

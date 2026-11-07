@@ -82,6 +82,8 @@ import { FestivalEffects } from '../rendering/FestivalEffects.js';
 import { Random } from '../utils/random.js';
 import { getSelectionRing, getTargetMarker } from '../art/ui/index.js';
 import { LifeStageSystem } from '../systems/LifeStageSystem.js';
+import { ApprenticeshipSystem } from '../systems/ApprenticeshipSystem.js';
+import { drawSpeechBubbles } from '../rendering/SpeechBubbles.js';
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -178,6 +180,8 @@ export class TownScene extends Scene {
     this.refinery = new RefinerySystem(this.game, this.world, { economy: this.economy });
     // (24.3) Dış ticaret: Ticaret İskelesi / Kervan Konağı, ihracat sözleşmeleri, pazar doygunluğu, ithalat (rastgelelik yok)
     this.tradePost = new TradePostSystem(this.game, this.world, { economy: this.economy });
+    // (25.2) Usta-Çırak sistemi: çıraklık, Gururlu Usta, çırak işi, mezuniyet (kendi üreteci; çırak yokken hiçbir şeyi değiştirmez)
+    this.apprenticeship = new ApprenticeshipSystem(this.game, this.world, new Random(state.seed + 28));
     // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
     this.lifeStages = new LifeStageSystem(this.game, this.world, new Random(state.seed + 27));
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
@@ -189,6 +193,7 @@ export class TownScene extends Scene {
       crafting: this.crafting,
       health: this.health,
       research: this.research,
+      apprenticeship: this.apprenticeship,
     });
     this.saves = new SaveSystem(this.game, {
       captureTerrain: () => diffTerrain(this.baseTerrain, this.map),
@@ -285,6 +290,7 @@ export class TownScene extends Scene {
       this.refinery,
       this.tradePost,
       this.lifeStages,
+      this.apprenticeship,
     ];
 
     this.camera = new Camera();
@@ -756,6 +762,10 @@ export class TownScene extends Scene {
     for (const character of this.world.characters) character.drawOverlay(renderer);
     for (const visitor of this.world.visitors) visitor.drawOverlay(renderer);
     for (const animal of this.game.state.animals) animal.drawOverlay(renderer);
+    // (25.2) Usta / çırak / bilge konuşma baloncukları (ekran koordinatında, net yazı)
+    renderer.resetCamera();
+    drawSpeechBubbles(renderer, this.camera, this.world.characters, this.animationTime);
+    renderer.applyCamera(this.camera);
     if (this.cinematic) {
       renderer.resetCamera();
       return; // fotoğraf modunda imleç, seçim ve araç önizlemesi çizilmez

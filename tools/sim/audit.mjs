@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken, (25.1) Kıdemli Bilge emekliyken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken, (25.1) Kıdemli Bilge emekliyken, (25.2) çırak ustasının yanındayken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -435,6 +435,40 @@ const PAGE_HELPERS = () => {
       check('emekli bilge işe gitmez (yükleme sonrası 30 saat)', !sage2.task?.jobId && !sage2.task?.workBuildingId);
       promoted.off();
       again.off();
+    }
+
+    // --- 2n. (25.2) Çırak ustasının yanında taburede otururken, Gururlu Usta etkinken ve kapı açıkken ---
+    {
+      const Y = 16;
+      sim.give({ wood: 300, stone: 200, food: 300 });
+      const hut = sim.place('lumberHut');
+      const people = s.characters.filter((c) => !c.isChild && !c.role && !c.away && c.lifeStage === 'adult' && !c.emigrating).sort((a, b) => a.id - b.id);
+      const master = people[0];
+      const pupil = people[people.length - 1];
+      pupil.ageInDays = 19 * Y;
+      pupil.age = 19;
+      pupil.agedDays = 0;
+      pupil.lifeStage = 'youth';
+      pupil.profile = pupil.buildProfile();
+      pupil.workplaceId = null;
+      master.workplaceId = hut.id;
+      master.skills.woodcutting = 1600;
+      game.events.emit('ui:toggleApprenticeDoor', { buildingId: hut.id });
+      game.events.emit('ui:enrollApprentice', { characterId: pupil.id, buildingId: hut.id });
+      pupil.apprenticeship.progress = 48;
+      while (s.time.hour < 9 || s.time.hour >= 14) hours(1);
+      let guard = 0;
+      while (pupil.task?.activity !== 'apprentice' && guard++ < 12) hours(0.5);
+      const sitting = pupil.task?.activity === 'apprentice';
+      const diff = A.roundtrip();
+      const p2 = s.characters.find((c) => c.id === pupil.id);
+      const m2 = s.characters.find((c) => c.id === master.id);
+      check('çırak ustasının yanındayken kayıt -> yükleme durum kayması yok (çıraklık, kapı, Gururlu Usta, sayaçlar)', diff.length === 0 && p2.apprenticeship?.masterId === m2.id && s.apprenticeship.open.includes(hut.id), diff.join(' | ') + ` · tabure ${sitting}`);
+      const p0 = p2.apprenticeship.progress;
+      hours(30);
+      check('yüklemeden sonra çıraklık sürer (ilerleme artar, veri geçerli) ve kimse takılmaz', p2.apprenticeship && p2.apprenticeship.progress > p0 && p2.apprenticeship.progress <= 100, `%${p0.toFixed(1)} -> %${p2.apprenticeship?.progress.toFixed(1)}`);
+      p2.apprenticeship = null;
+      s.apprenticeship.open = [];
     }
 
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---

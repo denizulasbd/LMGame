@@ -27,6 +27,8 @@
     import { WeddingConfetti } from '../src/rendering/WeddingConfetti.js';
     import { ChimeWaves } from '../src/rendering/ChimeWaves.js';
     import { QUIRKS } from '../src/data/social.js';
+    import { getStoolSprite } from '../src/art/ui/index.js';
+    import { PROFESSIONS } from '../src/data/apprenticeship.js';
 
     const root = document.getElementById('root');
     const SCALE = 5;
@@ -54,6 +56,52 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 25.2: Usta-Çırak — usta tezgâhta çalışırken çırak yanındaki taburede izler; ikisi konuşur (metin baloncuğu) ---
+    {
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      const masterP = { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'forest', pants: 'brown' };
+      const pupilP = { hair: 'spiky', hairColor: 'ginger', skin: 'light', shirt: 'sky', pants: 'denim' };
+      const bubble = (ctx, text, cx, top) => {
+        ctx.font = "7px 'Pixelify Sans', monospace";
+        const w = Math.ceil(ctx.measureText(text).width) + 6;
+        cx = Math.max(w / 2 + 2, Math.min(ctx.canvas.width - w / 2 - 2, cx));
+        ctx.fillStyle = '#1b1423';
+        ctx.fillRect(cx - w / 2 - 1, top - 1, w + 2, 11);
+        ctx.fillStyle = '#fff8e7';
+        ctx.fillRect(cx - w / 2, top, w, 9);
+        ctx.fillRect(cx - 1, top + 9, 2, 2);
+        ctx.fillStyle = '#3a2a1f';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, cx - w / 2 + 3, top + 5);
+      };
+      const shop = (type, tool, frame, lines) => {
+        const b = getStructureSprite(type, {});
+        const w = Math.max(150, b.width + 70);
+        const h = b.height + 34;
+        const kit = frame ? 'idle1' : 'idle0';
+        return scene(w, h, [
+          [b, 4, b.height + 8],
+          [getCharacterSprite(masterP, 'right', kit, look({ outfit: 'lumberjack:3' })), b.width + 8, h - 4],
+          [getHeldToolSprite(tool, false), b.width + 14, h - 10 + (frame ? 4 : 0)],
+          [getStoolSprite(), b.width + 31, h - 2],
+          [getCharacterSprite(pupilP, 'down', frame ? 'sit1' : 'sit0', look({ stage: 'youth' })), b.width + 29, h - 5],
+        ], (ctx) => {
+          if (lines[0]) bubble(ctx, lines[0], b.width + 14, 2);
+          if (lines[1]) bubble(ctx, lines[1], b.width + 34, 14);
+        });
+      };
+      show('Usta-Çırak (25.2): usta tezgâhta çalışırken çırak yanındaki taburede izler ve getir-götür işlerine bakar; ikisi konuşur', [
+        ['oduncu kulübesi, kare 0', shop('lumberHut', 'axe', 0, [PROFESSIONS.lumberHut.lines.master[1], null])],
+        ['kare 1 (balta iner)', shop('lumberHut', 'axe', 1, [null, PROFESSIONS.lumberHut.lines.apprentice[0]])],
+        ['dokuma tezgâhı', shop('loom', 'shuttle', 0, [null, PROFESSIONS.loom.lines.apprentice[1]])],
+        ['fırın', shop('mill', 'peel', 1, [PROFESSIONS.mill.lines.master[1], null])],
+      ], 4);
+      show('Çırak taburesi (8x4) ve çırak işleri', [
+        ['tabure', getStoolSprite()],
+        ...['anvil', 'wood', 'herb', 'bread', 'cloth', 'sherbet'].map((n) => [n, getIconSprite(n)]),
+      ], 8);
+    }
 
     // --- 25.1: yaşam evreleri — Çocuk (küçük silüet), Genç (turuncu fular), Yetişkin (standart), Kıdemli Bilge (kır saç + baston) ---
     {

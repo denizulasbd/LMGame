@@ -18,6 +18,7 @@
 //              healed (hafif yaralanma), crisis:repaired, building:mended (nedene göre)
 //   25.1: lifeStage:changed (Genç -> Yetişkin, Yetişkin -> Kıdemli Bilge; kutlama cümlesi LifeStageSystem'in kendi üretecinden),
 //         lifeStage:retired (çekirdek sakin kuralıyla gönüllü çalışmaya dönen / yeniden emekli olan bilge)
+//   25.2: apprentice:enrolled / proud / crafted (ilk çırak işi) / graduated (Yetkin Usta / Kıdemli Kalfa)
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
@@ -30,6 +31,8 @@ import { cargoValue } from './HarborSystem.js';
 import { PETITION_KINDS } from '../data/citizens.js';
 import { TAX_RATES, DECREE_ITEMS } from '../data/crown.js';
 import { genitive } from '../utils/turkish.js';
+import { ITEMS } from '../data/citizens.js';
+import { PROFESSIONS } from '../data/apprenticeship.js';
 
 // İşlenmiş malların ilk üretimi
 const FIRST_GOODS_TEXT = {
@@ -139,6 +142,22 @@ export class JournalSystem {
         if (to === 'elder') this.log(this.state.lifeStages?.lastElderLine ?? `${character.name} artık kasabanın kıdemli bir bilgesi oldu, gençlere yol gösterecek!`, 'book');
         else if (to === 'adult' && from === 'youth') this.log(`${character.name} ${character.age} yaşına bastı: gençliğini geride bırakıp tam bir yetişkin oldu`, 'star');
       }),
+      // (25.2) Usta-Çırak
+      on('apprentice:enrolled', ({ character, master, building }) =>
+        this.log(`${character.name}, ${master ? `${master.name} ustanın yanında ` : ''}${PROFESSIONS[building.type].name} çıraklığına başladı (${building.name})`, 'hammer')
+      ),
+      on('apprentice:proud', ({ master, apprentice }) => this.log(`${master.name} çırağı ${apprentice.name} ile gurur duyuyor: tezgâhta artık iki kişiler`, 'star')),
+      on('apprentice:crafted', ({ character, item }) => {
+        if (character.apprenticeship?.crafted === 1) this.log(`Çırak ${character.name} ilk çırak işini çıkardı: ${ITEMS[item].name}`, 'sparkle');
+      }),
+      on('apprentice:graduated', ({ character, profession, title, progress }) =>
+        this.log(
+          title
+            ? `${character.name} çıraklığını tamamladı: ${title} ${PROFESSIONS[profession].master} olarak yetişkinliğe adım attı`
+            : `${character.name} yetişkin oldu; ${PROFESSIONS[profession].name} çıraklığı %${Math.floor(progress)}'de kaldı (deneyimi ona kaldı)`,
+          'star'
+        )
+      ),
       on('lifeStage:retired', ({ character, retired }) =>
         this.log(
           retired

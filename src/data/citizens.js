@@ -36,6 +36,13 @@ export const ITEMS = {
   // (24.2) Pazar Yeri'nin terzisinden Dayanıklı Giysi (kışın soğuğa karşı korur) ve handan Şerbet Testisi (keyif)
   garment: { name: 'Dayanıklı Giysi', icon: 'cloth', stack: 1 },
   sherbetJug: { name: 'Şerbet Testisi', icon: 'sherbet', stack: 2, fun: 15 },
+  // (25.2) Çırak işi: hammadde tüketmeden çıkan küçük yan ürünler (Pazar Yeri'nde value altına satılır); kurabiye yenir
+  noviceNails: { name: 'Acemi Çivisi', icon: 'anvil', stack: 6, value: 2, craft: true },
+  woodenSpoon: { name: 'Tahta Kaşık', icon: 'wood', stack: 4, value: 2, craft: true },
+  herbSachet: { name: 'Ot Kesesi', icon: 'herb', stack: 4, value: 3, craft: true },
+  crispCookie: { name: 'Kıtır Kurabiye', icon: 'bread', stack: 6, hunger: 8, value: 2, craft: true, food: true },
+  plainCloth: { name: 'Basit Bez', icon: 'cloth', stack: 4, value: 3, craft: true },
+  syrupVial: { name: 'Acemi Şerbeti', icon: 'sherbet', stack: 3, value: 3, craft: true },
 };
 export const ITEM_KEYS = Object.keys(ITEMS);
 // Pazarda satılan küçük hatıralar (çantada adıyla görünür)

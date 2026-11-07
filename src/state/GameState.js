@@ -23,6 +23,7 @@ import { TAX_RATES, DECREES, REPUTATION } from '../data/crown.js';
 import { emptyCrisis } from '../systems/Crisis.js';
 import { emptyGranary, restoreGranary } from '../systems/Granary.js';
 import { emptyLifeStages, restoreLifeStages } from '../systems/LifeStages.js';
+import { emptyApprenticeshipState, restoreApprenticeshipState } from '../systems/Apprenticeship.js';
 import { emptyTradePost, restoreTradePost } from '../systems/TradePost.js';
 import { CRISIS_DIFFICULTY, CRISIS } from '../data/crisis.js';
 import { SEASON_FESTIVALS } from '../data/festivals.js';
@@ -186,6 +187,7 @@ export class GameState {
     // (24.3) dış ticaret: gemi / kervan takvimi, aktif sözleşmeler, pazar çarpanları, sayaçlar (TradePostSystem)
     this.tradePost = emptyTradePost();
     this.lifeStages = emptyLifeStages(); // (25.1) yaşam evresi sayaçları
+    this.apprenticeship = emptyApprenticeshipState(); // (25.2) açık çırak kapıları ve sayaçlar
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -262,6 +264,7 @@ export class GameState {
       granary: this.granary,
       tradePost: this.tradePost,
       lifeStages: this.lifeStages,
+      apprenticeship: this.apprenticeship,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -391,6 +394,15 @@ export class GameState {
     // Düğün ve doğum sayaçları eski kayıtlarda yoktur: sakinlerden tahmin edilir (evli çiftler, ebeveynli sakinler)
     if (data.stats?.weddings === undefined) next.stats.weddings = Math.floor(next.characters.filter((c) => c.married).length / 2);
     if (data.stats?.births === undefined) next.stats.births = next.characters.filter((c) => c.parentIds.length > 0).length;
+    next.apprenticeship = restoreApprenticeshipState(data.apprenticeship, next.buildings); // (25.2)
+    // (25.2) Kopuk çıraklık: yapısı kalmayan çırak serbest kalır, kayıp usta yapının ustasına devredilir (saatlik bakımda)
+    const bIds = new Set(next.buildings.map((b) => b.id));
+    const cIds = new Set(next.characters.map((c) => c.id));
+    for (const c of next.characters) {
+      if (!c.apprenticeship) continue;
+      if (!bIds.has(c.apprenticeship.buildingId)) c.apprenticeship = null;
+      else if (c.apprenticeship.masterId !== null && !cIds.has(c.apprenticeship.masterId)) c.apprenticeship.masterId = null;
+    }
     sanitizeReferences(next);
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
