@@ -573,6 +573,34 @@ const PAGE_HELPERS = () => {
       void keepT;
     }
 
+    // --- 2t. (26.2) Büyük Ziyafet Sofrası kuruluyken (şenlik saatinde, ikramlar verilmişken) ---
+    {
+      const t = s.time;
+      const keepGA = s.goldenAge.since;
+      const keepStat = [s.stats.feasts, s.stats.feastServings];
+      if (!s.buildings.some((b) => b.type === 'fountain' && b.functional)) sim.place('fountain', { instant: true });
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      s.events.festival.active = false;
+      s.seasonFestival.stage = null;
+      s.currentFeast = null;
+      s.currentFestival = null;
+      s.pantry.credit = 0;
+      Object.assign(s.resources, { food: 400, bread: 30, sherbet: 4, cloth: 2 });
+      Object.assign(t, { day: 4 * Math.ceil((t.day + 1) / 4), hour: 5, minute: 58 });
+      sim.step(10);
+      while (t.hour < 19) sim.step(30);
+      A.roundtrip();
+      const live = JSON.stringify(s.currentFeast);
+      const diff = A.roundtrip();
+      check('sofra kuruluyken kayıt -> yükleme durum kayması yok (currentFeast, ikram sayacı, bonuslar)', s.currentFeast?.tier === 'rich' && s.currentFeast.served > 0 && JSON.stringify(s.currentFeast) === live && diff.length === 0, `${live} ${diff.join(' | ')}`);
+      const food0 = s.resources.food;
+      hours(5);
+      check('yüklemeden sonra sofra 22:00\'de toplanır, yenmeyen erzak kilere döner, besin kişi başı 3\'ün üstünde', s.currentFeast === null && s.resources.food >= food0 && s.stats.feasts === (keepStat[0] ?? 0) + 1 && Math.floor(s.resources.food + s.resources.bread * 2.5) >= s.characters.length * 3, `${s.resources.food} ${food0}`);
+      s.goldenAge.since = keepGA;
+      s.stats.feasts = keepStat[0];
+      s.stats.feastServings = keepStat[1];
+    }
+
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();

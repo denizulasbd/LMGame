@@ -3288,9 +3288,8 @@ gün) `null` olur; başka güne ait ya da saati geçmiş panayır açılışta t
     ayrı metin katmanı (`c.bubble` değişmez).
   - İzole üreteç (seed + 32): diğer tüm üreteçler ve `Math.random` (0 çağrı) ilerlemez; çizim (4 mevsim x 2 evre, ışıklar).
   - Kayıt sürümü 29: gidiş-dönüş, bozuk değerler, başka güne ait kalıntı, v28 kaydı.
-  - Mevcut testlerde yapılan değişiklikler: "güncel sürüm" kontrolleri 28 -> 29 (önceki aşamalarla aynı gelenek) ve 25.1'in 70. doğum günü testine
-    bir **ön koşul**: sakinin anı defterinde yer olması (75. günde defter tavana, `MEMORY.max`, denk geliyordu; dolu defterde yeni anı en eski küçük anıyı
-    iter ve uzunluk sabit kalır). Doğrulamanın kendisi (tam bir anı eklenir) aynen duruyor.
+  - Mevcut testlerde yapılan değişiklik: yalnızca "güncel sürüm" kontrolleri (28 -> 29; önceki aşamalarla aynı gelenek). (İlk yayında 25.1'in 70. doğum
+    günü testine bir anı defteri ön koşulu eklenmişti; 26.2'de eski bölümler panayırsız dünyada koşturulunca gereksiz kaldı ve kaldırıldı.)
 - **Denetim** (`audit.mjs`): 120/120. Yeni senaryo: panayırın şenlik saatinde kayıt -> yükleme durum kayması yok, yüklemeden sonra panayır 22:00'de
   kapanır ve ilk panayır Tarihçe'de.
 - **Geriye uyumluluk** (`compat.mjs`, sürüm 2-29, 1003): `save-v29.json` bu adımın otopilotuyla 71 günlük oyundur (`--crisis-state`): Altın Çağ G28'de,
@@ -3302,6 +3301,69 @@ gün) `null` olur; başka güne ait ya da saati geçmiş panayır açılışta t
   **G25 / G27 / G28**, Altın Çağ **G28**; ilk panayır G32'de.
 - **Önizleme** (`tools/art-preview.html`): dört mevsimin panayır meydanı, hazırlık ve şenlik saati.
 
+
+## Geleneksel İkramlar: Büyük Ziyafet Sofrası ve Refah Patlaması (26. aşama, 26.2 mikro adımı)
+
+26.1'in panayırlarına bir **Büyük Ziyafet Sofrası** eklendi: her panayır günü meydan havuzunun yanına kurulur, kasaba kilerinden erzak ayrılır ve şenlik
+akşamı sakinlere ikram edilir. Veriler `data/feast.js`'te, saf hesaplar `systems/Feast.js`'te, mantık `systems/FeastSystem.js`'te, çizim
+`rendering/FairDecor.js`'tedir (`drawBanquet`).
+
+| Seviye (`tier`) | Ne zaman | Kilerden ayrılan | Etki |
+|---|---|---|---|
+| **Zengin Şölen Sofrası** (`rich`) | Kilerde Fıçı Şerbeti ve Keten Kumaş (sofra örtüsü) var, erzak fazlası yeterli | ekmek + yiyecek, 1 fıçı / 6 sakin şerbet, 1 kumaş | Gelenek Bağı + Bolluk Ziyafeti, güven +10, Keyifli Damak |
+| **Mütevazı Sofra** (`modest`) | Lüks mal yok, erzak fazlası yeterli | ekmek + yiyecek | Gelenek Bağı, güven +5 |
+| **Sembolik İkram** (`symbolic`) | Kişi başı besin 3'ün altında ya da ayrılacak fazla yok | **hiçbir şey** | hafif keyif ve sosyallik (tokluk yok), bonus ve güven desteği yok |
+
+### Gıda güvencesi ve mesai
+
+- **Kişi başı besin değeri hiçbir zaman 3'ün altına inmez** (`FEAST.minPerCapita`, Şerbethane'nin "aç kasaba" eşiğiyle aynı). Bağış, kilerin eşiğin
+  üstündeki fazlasıyla sınırlıdır; fazla yoksa sofra sembolik kalır. 42 farklı kiler durumunda bu özellik testle doğrulanır.
+- Erzak 06:00'da ayrılır ama **kimse gündüz sofraya gitmez**: ikramlar yalnızca 18:00 - 22:00 şenlik saatinde verilir, 08:00 - 17:00 mesaisi aynen sürer.
+- 22:00'de sofra toplanır, **yenmeyen erzak kilere döner** (ekmek ve yiyecek, ikram oranında).
+- Panayır Altın Çağ'dan sonra kurulduğu için **sofra da Altın Çağ'dan önce yoktur**: Tohum 42'nin kule öncesi kayıtları bayt bayt aynı kalır.
+
+### Şenlik akşamı
+
+- **İkram.** Şenlikte dans eden her sakin günde bir kez sofradan ikram alır (tokluk +12 / +20, keyif, sosyallik); sofra boşalınca ikram biter. Zengin
+  sofrada şerbet içenler güne **Keyifli Damak**'la başlar.
+- **Gelenek Bağı** (refah +3, arkadaşlık, keyfin yavaş azalması) ve **Bolluk Ziyafeti** (refah +5, yalnızca zengin sofra): 18:00'den ertesi sabaha kadar.
+  Kasaba güveni tek seferlik +5 / +10 artar (`TrustSystem`, `feast` / `feastRich`).
+- **Şifa.** Bonus sürerken hafif yaralılar **2 kat hızlı** iyileşir (ek `injuryTimer` düşüşü; yara kapanınca `CrisisSystem.heal`).
+- **Huy tepkileri** (ayrı metin katmanı, `c.speech`): **Şenlik Neşesi** sık sık şarkı tutturur ("Bu fıçının başından kimse beni ayıramaz!"), **Zanaatkâr Ruhu**
+  masa ve fıçı işçiliğini över, **Girişimci Kanı** bolluğun dış ticaret itibarını artıracağını söyler; öteki sakinler kadeh / lokma sözü söyler.
+  (Şenlik Neşesi'nin fıçı başında "ayrılmamasını" yürüme hedefi olarak değil, konuşma sıklığı olarak uyguladık.)
+- **İzole üreteç.** `FeastSystem` kendi tohumlanmış üretecini kullanır (`TownScene` -> **seed + 33**): yalnızca söz seçimi. Ana üretece ve `Math.random`'a
+  dokunmaz.
+
+### Görünüm
+
+`FairDecor.drawBanquet`: meydan havuzunun yanında uzun ahşap masa ve mevsim renginde örtü; 06:00'dan itibaren yalnızca örtü, **18:00 - 22:00'de** kalan
+ikram oranı kadar tabak / ekmek / testi ve mumlar (gece ışığı), zengin sofrada uçlarda köpüklü şerbet fıçıları. İkram bitince tabaklar boşalır; 22:00'de
+sofra çizilmeyi bırakır. Haritaya hiçbir şey yazılmaz. `tools/art-preview.html`: üç seviye x (hazırlık, dolu, yarısı yenmiş, boş).
+
+### Kayıt (sürüm 30)
+
+`SAVE_VERSION = 30`. Kayda `currentFeast: null | { tier, day, contributions: { food, bread, sherbet, cloth }, servings, served }` eklendi (sayaçlar
+`stats.feasts`, `stats.feastServings`). **Sürüm 2-29 kayıtlarında** alan yoktur: `null` ile açılır. Bozuk değerler temizlenir (eksik / saçma sayılar düzeltilir);
+panayırı olmayan ya da başka güne ait sofra açılışta kaldırılır. Fikstür: `tools/sim/fixtures/save-v30.json`.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1091; 38'i bu adımın): veri; gıda güvencesi (eşikte ve altında hiçbir şey ayrılmaz, 42 kiler durumunda bağış kişi başı 3'ü
+  korur); panayırsız ve Altın Çağ öncesinde sofra yok; doğal bir panayır gününde 06:00 kuruluş, mesai, 18:00 bonuslar ve güven, ikram, Keyifli Damak, 22:00
+  toplanma ve iade, harita özeti aynı; mütevazı ve sembolik sofra; 2 kat şifa; huy sözleri ve ayrı metin katmanı; izole üreteç (seed + 33); çizim; kayıt sürümü 30
+  (gidiş-dönüş, bozuk değerler, kalıntı, v29 kaydı).
+- **Test dünyası.** 26. aşamadan önceki bölümler panayırsız bir dünyada yazılmıştı; Altın Çağ'dan sonra panayır / sofra kurulunca onların geçmişe bağımlı
+  beklentileri kayıyordu (ör. isyan sırasında Bekçi'nin köyü terk etmesi, hikâyenin eskimesi). Bu yüzden `tests.mjs` panayır kurulumunu 26.1 bölümüne
+  kadar kapalı tutar; eski bölümlerdeki hiçbir doğrulama değişmedi (yalnızca "güncel sürüm" 29 -> 30).
+- **Denetim** (`audit.mjs`): 122/122. Yeni senaryo: sofra kuruluyken ve ikramlar verilmişken kayıt -> yükleme durum kayması yok; yüklemeden sonra 22:00'de sofra
+  toplanır, erzak kilere döner, besin kişi başı 3'ün üstünde.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-30, 1069): `save-v30.json` otopilotla 73 günlük oyundur (`--crisis-state`): 72. gün (Yaz Güneşi Şenliği) hazırlığında
+  kurulmuş Zengin Şölen Sofrası (5 fıçı şerbet, 9 ekmek, 22 yiyecek, 1 kumaş; 32 ikram); daha önce 10 sofra, 171 ikram. v2-v29 kayıtları `currentFeast: null` ile açılır.
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0,
+  sayfa hatası 0. **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34** (değişmedi).
+- **Tohum 42 determinizmi.** `autopilot.mjs 42 24` (kule G25'ten önce): 26.1 ile bu adımın kayıt anlık görüntülerinde tek fark `version` ve yeni boş `currentFeast`;
+  `--json` raporu bayt bayt aynı. Uzun koşuda kule G25 / G27 / G28, Altın Çağ G28.
 
 ## Kod denetimi (15. aşama öncesi)
 

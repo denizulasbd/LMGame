@@ -88,6 +88,8 @@ import { TemperamentSystem } from '../systems/TemperamentSystem.js';
 import { LineageSystem } from '../systems/LineageSystem.js';
 import { HeirloomSystem } from '../systems/HeirloomSystem.js';
 import { FairSystem } from '../systems/FairSystem.js';
+import { FeastSystem } from '../systems/FeastSystem.js';
+import { currentFeastOf } from '../systems/Feast.js';
 import { FairDecor } from '../rendering/FairDecor.js';
 import { currentFair, fairVenue } from '../systems/Fair.js';
 
@@ -194,6 +196,8 @@ export class TownScene extends Scene {
     this.heirloomSystem = new HeirloomSystem(this.game, this.world, new Random(state.seed + 31), { economy: this.economy });
     // (26.1) Mevsimlik panayırlar (kendi üreteci seed + 32; Altın Çağ'dan sonra, mevsimin son günü)
     this.fairSystem = new FairSystem(this.game, this.world, new Random(state.seed + 32), { attract: this.attract });
+    // (26.2) Büyük Ziyafet Sofrası (kendi üreteci seed + 33; panayır günlerinde)
+    this.feastSystem = new FeastSystem(this.game, this.world, new Random(state.seed + 33), { crisis: this.crisis, attract: this.attract });
     // (25.3) Mizaç kalıtımı ve yeni nesil huylar (kendi üreteci; Altın Çağ'da açılır)
     this.temperament = new TemperamentSystem(this.game, this.world, new Random(state.seed + 29));
     // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
@@ -259,6 +263,7 @@ export class TownScene extends Scene {
       this.lifeStages,
       this.temperament,
       this.fairSystem,
+      this.feastSystem,
     ];
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
@@ -764,14 +769,14 @@ export class TownScene extends Scene {
     if (festivalVenue) this.festivalFx.collectLights(lights, festivalVenue, env.festivalTheme, this.game.state.seasonFestival);
     const fair = currentFair(this.game.state);
     const fairSite = fair ? fairVenue(this.world) : null;
-    if (fair && fairSite) this.fairDecor.collectLights(lights, fairSite, fair.type, fair.phase);
+    if (fair && fairSite) this.fairDecor.collectLights(lights, fairSite, fair.type, fair.phase, currentFeastOf(this.game.state));
     this.dayNight.render(renderer, this.camera, hour, lights, weather, season.tint);
 
     // Atmosferin üstü: ateşböcekleri, yağmur, balonlar, iş işaretleri, araç önizlemesi ve imleç gece de net görünsün
     renderer.applyCamera(this.camera);
     this.fireflies.draw(renderer, view, fireflyIntensity(weather, hour), this.animationTime, season.fireflies);
     if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime, env.festivalTheme, this.game.state.seasonFestival);
-    if (fair && fairSite) this.fairDecor.draw(renderer, fairSite, this.animationTime, fair.type, fair.phase);
+    if (fair && fairSite) this.fairDecor.draw(renderer, fairSite, this.animationTime, fair.type, fair.phase, currentFeastOf(this.game.state));
     const party = this.game.state.social.party;
     if (party && this.game.state.totalMinutes < party.until) this.confetti.draw(renderer, party, this.animationTime, view);
     const ageParty = this.game.state.goldenAge?.celebration;

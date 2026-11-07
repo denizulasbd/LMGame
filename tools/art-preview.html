@@ -60,6 +60,31 @@
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
 
+    // --- 26.2: Büyük Ziyafet Sofrası — meydan havuzunun yanında; hazırlıkta yalnızca örtü, şenlikte dolu ve boş hâlleri, üç seviye ---
+    {
+      const decor = new FairDecor();
+      const fountain = getStructureSprite('fountain', {});
+      const W = 170;
+      const H = 100;
+      const fx = Math.round((W - fountain.width) / 2) - 12;
+      const fy = Math.round((H - fountain.height) / 2) + 2;
+      const venue = { x: fx, y: fy, width: fountain.width, height: fountain.height, type: 'fountain' };
+      const TIER_NAMES = { symbolic: 'Sembolik İkram', modest: 'Mütevazı Sofra', rich: 'Zengin Şölen Sofrası' };
+      const cases = [];
+      for (const tier of ['symbolic', 'modest', 'rich']) {
+        cases.push([tier, 'prep', 8, 'hazırlık 06:00 (yalnızca örtü)']);
+        cases.push([tier, 'party', 8, 'şenlik: dolu']);
+        cases.push([tier, 'party', 3, 'şenlik: yarısı yenmiş']);
+        cases.push([tier, 'party', 0, 'şenlik: boş']);
+      }
+      const frames = cases.map(([tier, phase, left, label]) => [`${TIER_NAMES[tier]} · ${label}`, scene(W, H, [[fountain, fx, fy + fountain.height]], (ctx) => {
+        const r = { fillRect: (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); } };
+        decor.draw(r, venue, 1.0, 'summer', phase, { tier, left, total: 8 });
+        if (phase === 'party') { ctx.fillStyle = 'rgba(20, 16, 50, 0.22)'; ctx.fillRect(0, 0, W, H); decor.draw(r, venue, 1.0, 'summer', phase, { tier, left, total: 8 }); }
+      })]);
+      show('Büyük Ziyafet Sofrası (26.2): hazırlıkta yalnızca örtü, şenlik saatinde (18:00 - 22:00) tabaklar, testiler, mumlar; zengin sofrada şerbet fıçıları. Ziyafet bitince tabaklar boşalır, 22:00\'de sofra toplanır', frames, 3);
+    }
+
     // --- 26.1: Mevsimlik Panayır — meydan havuzunun çevresinde geçici tentler, flamalar ve mevsim süsleri (hazırlık / şenlik saati) ---
     {
       const decor = new FairDecor();

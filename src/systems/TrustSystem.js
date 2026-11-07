@@ -67,7 +67,8 @@ export class TrustSystem {
       on('riot:loot', ({ character, building }) => this.loot(character, building)),
       on('festival:started', () => this.onEvent('festival')),
       on('seasonFestival:ended', () => this.onEvent('seasonFestival')),
-      on('fair:ended', () => this.onEvent('seasonFestival')), // 26.1: panayır, Altın Çağ'dan sonra mevsim festivalinin yerini alır
+      on('fair:ended', () => this.onEvent('seasonFestival')),
+      on('feast:started', ({ tier }) => tier !== 'symbolic' && this.onEvent(tier === 'rich' ? 'feastRich' : 'feast')), // 26.2: Büyük Ziyafet Sofrası // 26.1: panayır, Altın Çağ'dan sonra mevsim festivalinin yerini alır
       on('civic:decreed', ({ id }) => id === 'grandFeast' && this.onEvent('grandFeast')),
       on('goldDecree:issued', ({ id }) => id === 'goldBonus' && this.onEvent('goldBonus')),
       on('rally:rung', () => this.onEvent(this.state.trust.revolt ? 'rallyRevolt' : 'rally', true)),

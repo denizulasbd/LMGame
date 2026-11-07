@@ -142,7 +142,7 @@ export const TRUST = {
   starvingMaxPerHour: -0.6,
   coldPerHour: -0.3, // kışın odun bitip evler soğuyunca
   // Kasabadaki olayların tek seferlik etkisi
-  events: { festival: 4, seasonFestival: 6, grandFeast: 8, goldBonus: 6, rally: 2, rallyRevolt: 4, cold: -3 },
+  events: { feast: 5, feastRich: 10, festival: 4, seasonFestival: 6, grandFeast: 8, goldBonus: 6, rally: 2, rallyRevolt: 4, cold: -3 },
   levels: [
     { min: 70, key: 'good', name: 'Güvenli' },
     { min: 45, key: 'ok', name: 'Huzursuz' },

@@ -14,18 +14,80 @@ export class FairDecor {
     return { left: venue.x - 28, right: venue.x + venue.width + 28, top: venue.y - 26, bottom: venue.y + venue.height + 20 };
   }
 
-  /** Dünya katmanında: tentler, flamalar ve (şenlik saatinde) mevsim süsleri. */
-  draw(renderer, venue, time, type, phase) {
+  /** Dünya katmanında: tentler, flamalar, Büyük Ziyafet Sofrası ve (şenlik saatinde) mevsim süsleri. feast: Feast.currentFeastOf sonucu ya da null. */
+  draw(renderer, venue, time, type, phase, feast = null) {
     const fair = FAIRS[type];
     const b = this.bounds(venue);
     this.drawPoles(renderer, b);
     this.drawAwning(renderer, b, fair.colors, time);
     this.drawBunting(renderer, b, fair.colors, time);
+    if (feast) this.drawBanquet(renderer, venue, time, fair.colors[0], feast, phase);
     if (phase !== 'party') return;
     if (fair.prop === 'wreath') this.drawWreaths(renderer, b, time);
     else if (fair.prop === 'sunLantern') this.drawSunLanterns(renderer, b, time);
     else if (fair.prop === 'basket') this.drawBaskets(renderer, b, time);
     else if (fair.prop === 'torch') this.drawTorches(renderer, b, venue, time);
+  }
+
+  /** Sofranın konumu: meydan havuzunun sağında, yanında. */
+  tableRect(venue) {
+    return { x: venue.x + venue.width + 3, y: venue.y + venue.height - 6, w: 26, h: 9 };
+  }
+
+  /**
+   * (26.2) Büyük Ziyafet Sofrası: uzun ahşap masa, mevsim renginde örtü; hazırlıkta yalnızca örtü, şenlik saatinde ikram doludur
+   * (kalan ikram oranı kadar tabak / testi) ve mumlar yanar; zengin sofrada şerbet fıçıları, köpüklü kadehler ve testiler.
+   * Tier: 'symbolic' | 'modest' | 'rich'. left / total: kalan ve toplam ikram.
+   */
+  drawBanquet(renderer, venue, time, cloth, feast, phase) {
+    const t = this.tableRect(venue);
+    // Ayaklar ve masa tablası, örtü
+    renderer.fillRect(t.x + 1, t.y + t.h - 2, 2, 3, POLE);
+    renderer.fillRect(t.x + t.w - 3, t.y + t.h - 2, 2, 3, POLE);
+    renderer.fillRect(t.x, t.y + 2, t.w, 5, OUTLINE);
+    renderer.fillRect(t.x + 1, t.y + 3, t.w - 2, 3, '#a0662f');
+    renderer.fillRect(t.x + 1, t.y + 3, t.w - 2, 1, '#c98a4a');
+    renderer.fillRect(t.x + 2, t.y + 3, t.w - 4, 2, cloth); // sofra örtüsü
+    renderer.fillRect(t.x + 2, t.y + 5, t.w - 4, 1, '#ffffff'); // örtü saçağı
+    if (feast.tier === 'rich') {
+      renderer.fillRect(t.x + 4, t.y + 3, t.w - 8, 1, '#ffd23f'); // altın yol
+    }
+    if (phase !== 'party') return;
+    // İkram doluluğu: kalan ikram oranı kadar tabak
+    const slots = feast.tier === 'symbolic' ? 3 : 7;
+    const filled = feast.total > 0 ? Math.ceil((feast.left / feast.total) * slots) : 0;
+    for (let i = 0; i < slots; i++) {
+      const x = t.x + 3 + Math.round((i * (t.w - 8)) / Math.max(1, slots - 1));
+      if (i >= filled) {
+        renderer.fillRect(x, t.y + 3, 2, 1, '#d8d8d8'); // boş tabak
+        continue;
+      }
+      renderer.fillRect(x, t.y + 4, 3, 1, '#6b4a2a'); // tabağın gölgesi (örtüde seçilsin)
+      if (feast.tier === 'rich' && i % 3 === 1) {
+        renderer.fillRect(x, t.y, 2, 4, '#4aa3df'); // testi
+        renderer.fillRect(x, t.y - 1, 2, 1, '#ffffff'); // köpük
+      } else if (i % 2 === 0) {
+        renderer.fillRect(x, t.y + 2, 3, 2, '#c98a4a'); // ekmek
+        renderer.fillRect(x + 1, t.y + 2, 1, 1, '#f0c850');
+      } else {
+        renderer.fillRect(x, t.y + 2, 3, 2, '#ffffff'); // tabak
+        renderer.fillRect(x + 1, t.y + 2, 1, 1, '#e8463c'); // sebze
+      }
+    }
+    // Zengin sofra: uçlarda şerbet fıçıları
+    if (feast.tier === 'rich') {
+      for (const x of [t.x - 4, t.x + t.w + 1]) {
+        renderer.fillRect(x, t.y + 1, 4, 6, OUTLINE);
+        renderer.fillRect(x + 1, t.y + 2, 2, 4, '#8a5524');
+        renderer.fillRect(x + 1, t.y + 3, 2, 1, '#c0c0c0'); // çember
+        renderer.fillRect(x + 1, t.y, 2, 1, Math.floor(time * 3 + x) % 2 ? '#ffffff' : '#f4f0e0'); // köpük
+      }
+    }
+    // Mumlar
+    for (const x of [t.x + 5, t.x + t.w - 7]) {
+      renderer.fillRect(x, t.y + 1, 1, 2, '#f4f0e0');
+      renderer.fillRect(x, t.y - 1 + (Math.floor(time * 6 + x) % 2), 1, 2, '#ffd23f');
+    }
   }
 
   drawPoles(renderer, b) {
@@ -145,9 +207,13 @@ export class FairDecor {
   }
 
   /** Gece ışıkları: şenlik saatinde fener / meşale / ateş parıltısı (hazırlıkta ışık yok). */
-  collectLights(out, venue, type, phase) {
+  collectLights(out, venue, type, phase, feast = null) {
     if (phase !== 'party') return;
     const b = this.bounds(venue);
+    if (feast) {
+      const t = this.tableRect(venue);
+      out.push({ x: t.x + t.w / 2, y: t.y, radius: 34, color: [255, 214, 140], intensity: 0.6, glow: 0.3 });
+    }
     const prop = FAIRS[type].prop;
     if (prop === 'sunLantern') {
       for (let i = 0; i < 5; i++) out.push({ x: b.left + 12 + (i * (b.right - b.left - 20)) / 4, y: b.top + 12 + (i % 2) * 3, radius: 22, color: [255, 214, 100], intensity: 0.6, glow: 0.3 });

@@ -20,6 +20,7 @@
 //         lifeStage:retired (çekirdek sakin kuralıyla gönüllü çalışmaya dönen / yeniden emekli olan bilge)
 //   25.2: apprentice:enrolled / proud / crafted (ilk çırak işi) / graduated (Yetkin Usta / Kıdemli Kalfa)
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
+import { TIERS } from '../data/feast.js';
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
 import { EQUIPMENT } from '../data/equipment.js';
@@ -199,6 +200,8 @@ export class JournalSystem {
       on('festival:started', ({ venue, festival, fair }) => this.log(fair ? `Şenlik saati: ${festival.name} ${venue.name} başında coşkuyla sürüyor` : festival ? `${festival.name} başladı (${venue.name})` : `Kasaba Şenliği başladı (${venue.name})`, festival?.icon ?? 'note')),
       // 26.1: mevsimlik panayır
       on('fair:prep', ({ fair }) => this.log(fair.start, fair.icon)),
+      on('feast:set', ({ tier }) => this.log(TIERS[tier].set, TIERS[tier].icon)),
+      on('feast:ended', ({ tier, served, total }) => this.log(`${TIERS[tier].name} toplandı: ${served} sakin sofradan pay aldı (${total} ikramın)`, TIERS[tier].icon)),
       on('fair:ended', ({ fair, attendees }) => this.log(`${fair.name} 22:00'de sona erdi; ${attendees.length} sakin kutladı`, fair.icon)),
       on('festival:ended', ({ theme } = {}) => !theme && this.log('Şenlik bitti; herkes yarına neşeyle başlayacak', 'sparkle')),
       // 14. aşama: mevsim festivalleri, toplanma zili
