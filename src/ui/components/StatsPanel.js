@@ -300,6 +300,8 @@ export class StatsPanel {
       ['iron', 'Çıkarılan demir', goods.iron ?? 0],
       ['flax', 'Toplanan keten', goods.flax ?? 0],
       ['hops', 'Toplanan şerbetçiotu', goods.hops ?? 0],
+      ['cloth', 'Dokunan kumaş', goods.cloth ?? 0],
+      ['sherbet', 'Handa içilen şerbet', stats.sherbetServed ?? 0],
       ['food', 'Pişen sıcak yemek', stats.mealsCooked ?? 0],
       ['love', 'Kıyılan düğün', stats.weddings ?? 0],
       ['heart', 'Doğan çocuk', stats.births ?? 0],

@@ -28,14 +28,17 @@
 //   save-v20.json: 23. aşamanın oyunu (kayıt sürümü 20): otopilotla 34 gün; Su Kuyusu ve Gözcü Kulesi, yangın / baskın
 //                  sayaçları, tehlike sıklığı. Eski kayıtlarda (sürüm 2-19) hiçbir yapı yanmıyor / hasarlı değil, kimse yaralı
 //                  değil, tehlike sıklığı Dengeli'dir; yüklemeden sonraki ilk 24 saatte doğal kriz çıkmaz
-//   save-v21.json: 24. aşamanın (24.1) oyunu (kayıt sürümü 21, bugünkü): otopilotla 34 gün (--crisis-state); Ulu Saat Kulesi'nden sonra
+//   save-v21.json: 24. aşamanın (24.1) oyunu (kayıt sürümü 21): otopilotla 34 gün (--crisis-state); Ulu Saat Kulesi'nden sonra
 //                  kurulan Ürün Silosu, Keten ekili bir bahçe, keten stoğu, bozulan mahsul sayacı. Eski kayıtlarda (sürüm 2-20) bütün
 //                  bahçeler Buğday / Sebze ekili, Keten / Şerbetçiotu 0, silo sayaçları boştur
+//   save-v22.json: 24.2'nin oyunu (kayıt sürümü 22, bugünkü): otopilotla 40 gün (--crisis-state); Dokuma Tezgâhı ve Şerbethane,
+//                  Kumaş ve Fıçı Şerbeti stokları, handaki fıçılar, sakinlerin çantasında Dayanıklı Giysi ve Şerbet Testisi. Eski kayıtlarda
+//                  (sürüm 2-21) Kumaş / Fıçı Şerbeti 0, hanlarda fıçı yok, yeni yapı ve çanta eşyası yoktur
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -141,6 +144,16 @@ for (const { name, raw } of fixtures) {
       capacity: s.granaryCapacity,
       spoiled: JSON.stringify(s.granary.spoiled),
       switches: s.granary.switches,
+    };
+    // (24.2) katma değerli üretim: Kumaş / Fıçı Şerbeti, tezgâh ve şerbethane, handaki fıçılar, çanta eşyaları (yüklendiği an)
+    loaded.refinery = {
+      cloth: s.resources.cloth,
+      sherbet: s.resources.sherbet,
+      looms: s.buildings.filter((b) => b.type === 'loom').length,
+      breweries: s.buildings.filter((b) => b.type === 'brewery').length,
+      innCasks: s.buildings.filter((b) => b.type === 'inn').map((b) => b.sherbet).join(','),
+      otherCasks: s.buildings.filter((b) => b.type !== 'inn' && b.sherbet !== 0).length,
+      items: s.characters.reduce((n, c) => n + c.inventory.filter((x) => x.kind === 'garment' || x.kind === 'sherbetJug').length, 0),
     };
     // (22. aşama) vergi, Krallık, terk ediş (yüklendiği an)
     loaded.crown = {
@@ -370,6 +383,24 @@ for (const { name, raw } of fixtures) {
       });
     }
     results.push({ name: `${tag}: bir gün sonra mahsuller geçerli, silo kapasitesi yerinde`, ok: r.agriAfter.crops.every((c) => ['grain', 'flax', 'hops'].includes(c)) && r.agriAfter.capacity === G.capacity, detail: r.agriAfter.crops.join(',') });
+  }
+  // (24.2) katma değerli üretim
+  {
+    const F = r.loaded.refinery;
+    const items = (d) => d.characters.reduce((n, c) => n + (c.inventory ?? []).filter((x) => x.kind === 'garment' || x.kind === 'sherbetJug').length, 0);
+    if (data.version < 22) {
+      results.push({
+        name: `${tag}: Kumaş / Fıçı Şerbeti 0, hanlarda fıçı yok, tezgâh / şerbethane ve yeni çanta eşyası yok`,
+        ok: F.cloth === 0 && F.sherbet === 0 && F.looms === 0 && F.breweries === 0 && F.innCasks.split(',').every((v) => v === '' || v === '0') && F.otherCasks === 0 && F.items === 0,
+        detail: `hanlar ${F.innCasks || '-'}`,
+      });
+    } else {
+      results.push({
+        name: `${tag}: Kumaş / Fıçı Şerbeti, tezgâh ve şerbethane, handaki fıçılar ve çanta eşyaları korundu`,
+        ok: F.cloth === data.resources.cloth && F.sherbet === data.resources.sherbet && F.looms === data.buildings.filter((b) => b.type === 'loom').length && F.breweries === data.buildings.filter((b) => b.type === 'brewery').length && F.innCasks === data.buildings.filter((b) => b.type === 'inn').map((b) => b.sherbet).join(',') && F.otherCasks === 0 && F.items === items(data),
+        detail: `kumaş ${F.cloth} · fıçı ${F.sherbet} · hanlar ${F.innCasks} · eşya ${F.items}`,
+      });
+    }
   }
   results.push({ name: `${tag}: meslek kıyafetleri deneyimden giyildi`, ok: r.outfitsOk, detail: `${r.outfits} sakin kıyafetli` });
   results.push({ name: `${tag}: harita farkları birebir uygulandı`, ok: r.loaded.terrain === data.terrain.length, detail: `${r.loaded.terrain}/${data.terrain.length} karo` });

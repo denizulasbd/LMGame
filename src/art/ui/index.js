@@ -441,6 +441,30 @@ Object.assign(ICONS, {
     '..KKKKK..',
     '.........',
   ],
+  // (24.2) Kumaş: katlanmış iki top keten kumaş (açık bej, mavi şeritli)
+  cloth: [
+    '.........',
+    '.KKKKKKK.',
+    'KSSSSSSSK',
+    'KcccccccK',
+    'KSSSSSSSK',
+    'KzKKKKKzK',
+    'KSSSSSSSK',
+    'KcccccccK',
+    '.KKKKKKK.',
+  ],
+  // (24.2) Fıçı Şerbeti: demir çemberli küçük ahşap fıçı, kehribar şerbet damlası
+  sherbet: [
+    '....Y....',
+    '..KKKKK..',
+    '.KXEXXwK.',
+    '.QQQQQQQ.',
+    'KXEXXwwxK',
+    'KXEXXwwxK',
+    '.QQQQQQQ.',
+    '.KXEXwwK.',
+    '..KKKKK..',
+  ],
   // (24. aşama) Keten: mavi çiçekli, iple bağlanmış lif demeti
   flax: [
     '.c.a.c...',
@@ -1225,6 +1249,9 @@ const HELD_TOOLS = {
   hoe: ['KKKw.', 'Kq.w.', '...w.', '...w.', '...w.', '...x.'],
   // Havan eli (11. aşama, şifacı)
   pestle: ['..KK.', '.KqqK', '.KqK.', '..r..', '..r..', '..R..'],
+  // (24.2) Dokuma mekiği (dokumacı) ve uzun saplı kepçe (mahzen ustası)
+  shuttle: ['.....', 'KXXK.', 'KSSK.', 'KXXK.', '.w...', '.w...'],
+  ladle: ['KKK..', 'KYK..', '.Kw..', '..w..', '..w..', '..x..'],
   // Fırın küreği: geniş yassı ağız, uzun sap (10. aşama)
   peel: ['KEEK.', 'KXXK.', '.Kw..', '..w..', '..w..', '..x..'],
   // Çoban değneği (5x15): tepesi kıvrık uzun asa; çoban onu yere dayayıp dik tutar ('tend' pozu)
@@ -1277,6 +1304,8 @@ const CARRY_BUNDLES = {
   wool: ['.KKKKKK.', 'Kuu6uuuK', 'Ku6uu6uK', 'K6uuuu6K', '.KKKKKK.'],
   iron: ['..KKKK..', '.KCUrCK.', 'KUCRCUCK', 'KRRRRRRK', '.KKKKKK.'],
   bread: ['.K....K.', '.KKKKKK.', 'KYOYOYOK', 'KXwXwXwK', '.KKKKKK.'],
+  cloth: ['.KKKKKK.', 'KSSSSSSK', 'KccccccK', 'KSSSSSSK', '.KKKKKK.'],
+  sherbet: ['..KKKK..', '.KXEXwK.', 'QQQQQQQQ', '.KXEXwK.', '..KKKK..'],
   flax: ['.c.a.c..', 'KvKvKvK.', 'KvXXXvK.', 'KvKvKvK.', '.KKKKK..'],
   hops: ['..KKKK..', '.KlFmFK.', 'KFmlFlFK', 'KfFlfFfK', '.KKKKKK.'],
 };
@@ -1367,6 +1396,9 @@ const BUBBLE_ICONS = {
   bandit: ['..KKK..', '.KxxxK.', 'KKxxxKK', 'KuKKKuK', 'KoooooK', '.KKKKK.'],
   bandage: ['.......', '.KKKKK.', 'KSSSSSK', 'KSsKsSK', '.KKKKK.', '.......'],
   repair: ['KKKK...', 'KqrRK.o', '.Kw..o.', '..w.o..', '..x..o.', '.....o.'],
+  // (24.2) bir bardak fıçı şerbeti ve dikilen Dayanıklı Giysi
+  sherbet: ['..Y....', '.KKKKK.', 'KYYYYYK', 'KYOYOYK', '.KYYYK.', '..KKK..'],
+  cloth: ['.......', 'KKKKKKK', 'KSSSSSK', 'KcccccK', 'KSSSSSK', 'KKKKKKK'],
 };
 
 export const BUBBLE_WIDTH = 11;

@@ -21,6 +21,7 @@ import { VINE } from '../data/exploration.js';
 import { schemeGardenMultiplier } from './Exploration.js';
 import { wellGardenMultiplier } from './Crisis.js';
 import { storageLimit } from './Granary.js';
+import { luxuryHungry } from './Refinery.js';
 
 const MIN_TREE_EFFICIENCY = 0.25; // oduncunun çevresinde hiç ağaç yokken bile biraz üretir
 
@@ -156,9 +157,13 @@ export class StructureSystem {
     if (!building.functional) {
       building.idle = true;
       building.processStatus = null;
+    } else if (building.definition.luxury && luxuryHungry(this.state)) {
+      // (24.2) Kasaba açken dokumacı ve mahzen ustası tezgâhı bırakıp gıdaya döner
+      building.idle = true;
+      building.processStatus = 'Kasabada besin azaldı: lüks işler durdu, herkes gıda işlerinde';
     } else if (missing.length) {
       building.idle = true;
-      building.processStatus = `${missing.map(([r]) => RESOURCES[r].name).join(', ')} bekleniyor: kilerde un yapılacak bir şey yok`;
+      building.processStatus = `${missing.map(([r]) => RESOURCES[r].name).join(', ')} bekleniyor: ${processing.waiting ?? 'kilerde un yapılacak bir şey yok'}`;
     } else if (full.length) {
       building.idle = true;
       building.processStatus = `${full.map((r) => RESOURCES[r].name).join(', ')} deposu dolu: kiler ya da ürün silosu kurarak yer aç`;

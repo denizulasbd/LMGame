@@ -36,6 +36,8 @@ const FIRST_GOODS_TEXT = {
   bread: 'Fırından ilk sıcak ekmekler çıktı: kasabanın sofrası bereketlendi',
   // (24. aşama) bahçenin ekim tercihi
   flax: 'Bahçeden ilk keten demetleri toplandı: mavi çiçekli liflerden ileride kumaş dokunacak',
+  cloth: 'Dokuma Tezgâhı\'ndan ilk top keten kumaş çıktı: terzi tezgâhında kışlık giysiler dikilecek',
+  sherbet: 'Şerbethane\'nin mahzeninden ilk fıçı şerbet çıktı: handa kadehler kalkacak',
   hops: 'Bahçeden ilk şerbetçiotu salkımları ve tatlı meyveler toplandı: hanın şerbeti için kokulu bir hasat',
 };
 

@@ -16,6 +16,8 @@ import { buffMultiplier, prestige } from './TownStatus.js';
 import { HEATING, getSeason } from '../data/seasons.js';
 import { isShivering, isFreezing } from './HeatingSystem.js';
 import { coldProtection, travelFatigue } from './Equipment.js';
+import { hasPalate } from './Refinery.js';
+import { INN_SHERBET } from '../data/refinery.js';
 import { healthEnergyMultiplier } from './HealthSystem.js';
 import { clamp } from '../utils/math.js';
 
@@ -70,6 +72,8 @@ export class NeedsSystem {
         // Sırt çantalı sakin uzun yollarda daha az yorulur; eşiyle mutlu uyanan güne keyifle başlar
         if (walking && need === 'energy') multiplier *= travelFatigue(c);
         if (happyHome && need === 'fun') multiplier *= HAPPY_HOME.funDecay;
+        // (24.2) Handa fıçı şerbeti içen güne "Keyifli Damak"la başlar: keyfi yavaş düşer
+        if (need === 'fun' && hasPalate(c, now)) multiplier *= INN_SHERBET.palate.funDecay;
         if (need === 'energy') multiplier *= healthEnergy;
         c.needs[need] = clamp(c.needs[need] - perMinute * multiplier * tick.gameMinutes, 0, 100);
       }

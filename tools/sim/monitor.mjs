@@ -41,6 +41,7 @@ export async function installMonitor(page) {
     window.__foodSupplyOf = (await import('/src/systems/TownStatus.js')).foodSupply;
     // (24. aşama) eski sürümlerde (karşılaştırma koşuları) bu modül yoktur: tarım denetimi atlanır, gıda güvencesi yine ölçülür
     window.__granaryMod = await import('/src/systems/Granary.js').catch(() => null);
+    window.__refineryMod = await import('/src/systems/Refinery.js').catch(() => null); // (24.2)
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -296,6 +297,18 @@ export async function installMonitor(page) {
           }
         }
 
+        // ---- (24.2) Katma değerli üretim: handaki fıçılar geçerli mi, açken lüks işçi çalışıyor mu ----
+        if (window.__refineryMod) {
+          for (const b of s.buildings) {
+            if (b.type === 'inn' && !(b.sherbet >= 0 && b.sherbet <= 12)) broke(`${b.name}: geçersiz fıçı sayısı (${b.sherbet})`);
+            if (b.type !== 'inn' && b.sherbet) broke(`${b.name}: han olmayan yapıda fıçı (${b.sherbet})`);
+          }
+          if (window.__refineryMod.luxuryHungry(s)) {
+            const working = s.characters.filter((c) => c.task?.phase === 'perform' && ['weave', 'brewSherbet'].includes(c.task.activity)).length;
+            m.hungryLuxury = (m.hungryLuxury ?? 0) + working;
+          }
+        }
+
         // ---- (23. aşama) Krizler: yangın, hasar, haydut baskını, yaralanma ----
         {
           const KD = window.__crisisData;
@@ -451,6 +464,25 @@ export async function installMonitor(page) {
                 spoiled: { ...(s.granary?.spoiled ?? {}) },
                 switches: s.granary?.switches ?? 0,
                 granaryCapacity: s.granaryCapacity ?? 0,
+              }
+            : null,
+          // (24.2)
+          refinery: window.__refineryMod
+            ? {
+                looms: s.buildings.filter((b) => b.type === 'loom' && b.functional).length,
+                breweries: s.buildings.filter((b) => b.type === 'brewery' && b.functional).length,
+                clothWoven: s.stats.goods?.cloth ?? 0,
+                sherbetMade: s.stats.goods?.sherbet ?? 0,
+                cloth: s.resources.cloth ?? 0,
+                sherbet: s.resources.sherbet ?? 0,
+                served: s.stats.sherbetServed ?? 0,
+                innCasks: s.buildings.filter((b) => b.type === 'inn').map((b) => b.sherbet).join(','),
+                jugs: s.stats.sherbetJugs ?? 0,
+                jugsDrunk: s.stats.jugsDrunk ?? 0,
+                garments: s.stats.garments ?? 0,
+                dressed: s.characters.filter((c) => c.inventory.some((x) => x.kind === 'garment')).length,
+                welfare: window.__refineryMod.clothWelfare(s),
+                hungryLuxury: m.hungryLuxury ?? 0,
               }
             : null,
           // (23. aşama)

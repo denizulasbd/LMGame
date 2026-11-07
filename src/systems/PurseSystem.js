@@ -12,6 +12,8 @@ import { PURSE, ITEMS, INVENTORY, SHIFT_SHARES, SHOP, SOUVENIRS } from '../data/
 import { addCoins, payCoins, addItem, takeItem, countItem, roomFor, foodSlots } from './Citizens.js';
 import { addMemory } from './MemorySystem.js';
 import { clamp } from '../utils/math.js';
+import { GARMENT } from '../data/refinery.js';
+import { getSeason } from '../data/seasons.js';
 
 export class PurseSystem {
   /**
@@ -115,9 +117,22 @@ export class PurseSystem {
     if ((c.illness || (c.exposure ?? 0) > 40) && countItem(c, 'herb') === 0) options.push('herb');
     // Kesesi bolsa ve hiç hatırası yoksa önce kendine küçük bir hatıra alır
     if (countItem(c, 'souvenir') === 0 && (c.coins ?? 0) >= prices.souvenir + 2) options.push('souvenir');
+    // (24.2) Sonbaharda ve kışta kasabanın kumaşından Dayanıklı Giysi diktirir (terzi tezgâhı)
+    const season = getSeason(this.state.time.day).key;
+    if (GARMENT.seasons.includes(season) && countItem(c, 'garment') === 0 && this.economy.amount('cloth') >= GARMENT.cloth) options.push('garment');
     if (foodSlots(c) < INVENTORY.foodKeep) options.push('fruit');
     if (options.length === 0) options.push('fruit');
     for (const kind of options) {
+      if (kind === 'garment') {
+        if ((c.coins ?? 0) < GARMENT.price || roomFor(c, 'garment') <= 0 || !this.economy.spend({ cloth: GARMENT.cloth })) continue;
+        addItem(c, 'garment', 1);
+        payCoins(c, GARMENT.price);
+        this.state.stats.purchases = (this.state.stats.purchases ?? 0) + 1;
+        this.state.stats.garments = (this.state.stats.garments ?? 0) + 1;
+        if (c.visible) c.showBubble('cloth', 2);
+        this.events.emit('citizen:bought', { character: c, kind, price: GARMENT.price, building });
+        return kind;
+      }
       if ((c.coins ?? 0) < prices[kind] || roomFor(c, kind) <= 0) continue;
       const name = kind === 'souvenir' ? this.rng.pick(SOUVENIRS) : null;
       if (addItem(c, kind, 1, name) !== 1) continue;

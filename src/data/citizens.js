@@ -33,6 +33,9 @@ export const ITEMS = {
   herb: { name: 'Şifalı Ot', icon: 'herb', stack: 3, heal: 0.4 },
   souvenir: { name: 'Hatıra', icon: 'souvenir', stack: 1, fun: 14 },
   firewood: { name: 'Odun Demeti', icon: 'wood', stack: 15, resource: 'wood' },
+  // (24.2) Pazar Yeri'nin terzisinden Dayanıklı Giysi (kışın soğuğa karşı korur) ve handan Şerbet Testisi (keyif)
+  garment: { name: 'Dayanıklı Giysi', icon: 'cloth', stack: 1 },
+  sherbetJug: { name: 'Şerbet Testisi', icon: 'sherbet', stack: 2, fun: 15 },
 };
 export const ITEM_KEYS = Object.keys(ITEMS);
 // Pazarda satılan küçük hatıralar (çantada adıyla görünür)

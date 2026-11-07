@@ -27,6 +27,9 @@
 // Keten, (4 bahçeyle) birine Şerbetçiotu ektirir.
 // Gıda kritikse (kişi başı besin 6'nın altında) bütün bahçeleri hemen Buğday'a döndürür; ekilen malın deposu dolunca da o bahçe
 // Buğday'a döner. Ekim değişikliklerini, kritik gıda saatlerini, keten / şerbetçiotu hasadını ve bozulan mahsulü raporlar.
+// (24.2) Kule tamamlanmış, nüfus 22+ ve kişi başı besin 10'un üstündeyken (temel gıda ve kule hedefleri güvende) silodan sonra
+// dördüncü bir bahçe (Şerbetçiotu için), handa ya da pazarın yanında bir Dokuma Tezgâhı ve bir Şerbethane kurar; dokumacı ve mahzen
+// ustası iş seçiminde temel üretimden sonra gelir. Dokunan kumaşı, yapılan fıçıları, handa içilen şerbeti, testileri ve giysileri raporlar.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //                                         [--crisis huzurlu|dengeli|cetin] [--no-safety] [--crisis-state]
@@ -121,12 +124,12 @@ await page.evaluate((passive) => {
   // yakın boş yerleri (Ulu Saat Kulesi gibi büyük yapılara lazım) kapatmasın
   const SAFETY = ['well', 'guardTower'];
   const safetySpot = (type) => {
-    if (!SAFETY.includes(type) && type !== 'silo') return null;
+    if (!SAFETY.includes(type) && !['silo', 'loom', 'brewery'].includes(type)) return null;
     const scene = game.scenes.current;
     const plaza = scene.world.landmarks.plaza;
-    const anchorTypes = type === 'silo' ? ['garden', 'mill'] : ['mill', 'workshop'];
-    const anchor = type === 'well' || type === 'silo' ? game.state.buildings.find((b) => b.functional && anchorTypes.includes(b.type)) : null;
-    if (type === 'silo' && !anchor) return null;
+    const anchorTypes = type === 'silo' ? ['garden', 'mill'] : type === 'loom' || type === 'brewery' ? ['inn', 'market', 'workshop'] : ['mill', 'workshop'];
+    const anchor = ['well', 'silo', 'loom', 'brewery'].includes(type) ? game.state.buildings.find((b) => b.functional && anchorTypes.includes(b.type)) : null;
+    if (['silo', 'loom', 'brewery'].includes(type) && !anchor) return null;
     const [ax, ay, from, to] = anchor ? [anchor.tileX, anchor.tileY, 2, 7] : [plaza.centerX, plaza.centerY, 13, 34];
     for (let r = from; r <= to; r++) {
       for (let dy = -r; dy <= r; dy++) {
@@ -504,6 +507,21 @@ await page.evaluate((passive) => {
       const spot = safetySpot('silo') ?? sim.findSpot('silo', 30);
       if (spot) scene.construction.placeSite('silo', spot.x, spot.y);
     }
+    // (24.2) Katma değerli üretim: kule bitmiş, nüfus 22+ ve kiler rahatken dördüncü bahçe, Dokuma Tezgâhı ve Şerbethane (birer tane)
+    if (!window.__noAgri && wonder?.wonderComplete && s.buildings.some((b) => b.type === 'silo' && b.functional) && s.characters.length >= 22 && window.__foodSupply(s) >= s.characters.length * 10) {
+      const has = (t) => s.buildings.some((b) => b.type === t);
+      const gardens = s.buildings.filter((b) => b.type === 'garden').length;
+      const busyRefinery = s.buildings.some((b) => ['loom', 'brewery', 'garden'].includes(b.type) && b.underConstruction);
+      const place = (type) => {
+        const spot = safetySpot(type) ?? sim.findSpot(type, 30);
+        if (spot) scene.construction.placeSite(type, spot.x, spot.y);
+      };
+      if (!busyRefinery) {
+        if (!has('loom') && res.wood >= 90 && res.stone >= 60 && res.iron >= 30) place('loom');
+        else if (!has('brewery') && res.wood >= 80 && res.stone >= 80) place('brewery');
+        else if (has('brewery') && gardens < 4 && res.wood >= 60 && res.stone >= 30) place('garden');
+      }
+    }
     // (20. aşama) Altın Çağ: prestij peyzajı (bir Mermer Çeşme, iki Altın Çağ Feneri) ve tüccarın nadir malları
     if (wonder?.wonderComplete && s.goldenAge?.since) {
       const count = (t) => s.buildings.filter((b) => b.type === t).length;
@@ -841,12 +859,14 @@ console.log(
   const f = mon.food;
   const a = mon.agri;
   const A = report.stats.agri ?? {};
+  const r = mon.refinery;
   console.log(
     `(24. aşama) gıda güvencesi: kişi başı en düşük besin ${f.minPerCap} (ortalama ${f.avgPerCap}), kritik gıda saati ${f.criticalHours}, sonda ${f.end} besin` +
       (a
         ? ` · Ürün Silosu ${a.silos} (+${a.granaryCapacity}) · bahçeler ${a.gardens || '-'} · bahçe-saat ${JSON.stringify(a.cropHours)} · keten ${a.flax}, şerbetçiotu ${a.hops} · ` +
           `bozulan ${JSON.stringify(a.spoiled)} · ekim değişikliği ${a.switches} (Buğday'a ${A.toGrain ?? 0}, Keten'e ${A.toFlax ?? 0}, Şerbetçiotu'na ${A.toHops ?? 0}; gıda kritik ${A.critical ?? 0}, depo dolu ${A.fullBack ?? 0})`
-        : '')
+        : '') +
+      (r ? ` · (24.2) Dokuma Tezgâhı ${r.looms}, Şerbethane ${r.breweries} · dokunan kumaş ${r.clothWoven}, yapılan fıçı ${r.sherbetMade} (stok ${r.cloth} / ${r.sherbet}) · handa içilen şerbet ${r.served}, handaki fıçı ${r.innCasks} · testi ${r.jugs} (içilen ${r.jugsDrunk}) · Dayanıklı Giysi ${r.garments} (giyen ${r.dressed}) · refah katkısı +${r.welfare} · açken çalışan lüks işçi ${r.hungryLuxury}` : '')
   );
 }
 console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);

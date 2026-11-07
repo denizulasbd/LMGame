@@ -34,6 +34,7 @@ import { getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.j
 import { getMarbleFountainSprite, getGoldenLanternSprite, getRoyalStatueSprite } from './structuresGoldenAge.js';
 import { getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
 import { getSiloSprite } from './structuresGranary.js';
+import { getLoomSprite, getBrewerySprite } from './structuresRefinery.js';
 import {
   getWoodFenceSprite,
   getFenceGateSprite,
@@ -662,6 +663,8 @@ const WINTER_ROOFS = {
   well: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 4 },
   guardTower: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 9 },
   silo: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 15 },
+  loom: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 12 },
+  brewery: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 14 },
   supplyCamp: { light: ['S'], main: ['s'], maxRow: 17 },
   workshop: { light: ['c'], main: ['B'], dark: ['n'], maxRow: 17 },
   townHall: { light: ['Z', 'c'], main: ['C', 'B'], dark: ['U', 'n'], maxRow: 36 },
@@ -721,6 +724,11 @@ function getBaseStructureSprite(type, state) {
     // 24. aşama: tarımsal depolama
     case 'silo':
       return getSiloSprite();
+    // 24.2: katma değerli üretim
+    case 'loom':
+      return getLoomSprite(Boolean(state.active), state.frame ?? 0);
+    case 'brewery':
+      return getBrewerySprite(Boolean(state.active), state.frame ?? 0);
     case 'quarry':
       return getQuarrySprite(state.active ? (state.frame ?? 0) % 2 : 0);
     case 'fishingPier':

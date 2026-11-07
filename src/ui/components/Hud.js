@@ -301,7 +301,7 @@ export class Hud {
     this.goodsExpanded = expanded;
     this.goodsMenu.hidden = !expanded;
     this.goodsToggle.classList.toggle('is-active', expanded);
-    this.goodsToggle.title = expanded ? 'İşlenmiş malları gizle' : 'İşlenmiş mallar: Yün, Demir, Ekmek, Keten, Şerbetçiotu (depo ve üreticiler)';
+    this.goodsToggle.title = expanded ? 'İşlenmiş malları gizle' : 'İşlenmiş mallar: Yün, Demir, Ekmek, Keten, Şerbetçiotu, Kumaş, Fıçı Şerbeti (depo ve üreticiler)';
     for (const key of GOODS_KEYS) this.resources[key].last = ''; // miktar metni yeniden yazılsın
     writeGoodsPreference(expanded);
   }

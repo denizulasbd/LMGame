@@ -60,6 +60,8 @@ import { FIRE, WELL, GUARD, REPAIR } from '../../data/crisis.js';
 import { raidCard } from './crisisCards.js';
 import { productionOf, storageLimit, cropOf, hasGranary } from '../../systems/Granary.js';
 import { CROPS, AGRI_KEYS, SPOILAGE } from '../../data/crops.js';
+import { INN_SHERBET, GARMENT, CLOTH_WELFARE } from '../../data/refinery.js';
+import { clothWelfare } from '../../systems/Refinery.js';
 
 const thumbnailCache = new Map();
 
@@ -1016,7 +1018,7 @@ export class BuildingPanel {
     if (building.isBurning) lines.push(`Yanıyor: yangın %${Math.round(building.fireProgress)} (%100'de yapı hasar alır, silinmez) · ${building.fireWater} kova atıldı`);
     else if (building.damaged) lines.push(building.project ? 'Hasarlı: inşaatçılar onarıyor' : `Hasarlı (${building.damageKind === 'fire' ? 'yangın' : building.damageKind === 'raid' ? 'baskın' : 'fırtına'}): onarılana kadar kimse çalışamaz`);
     if (def.production && building.factors) lines.push(...this.productionLines(building, state));
-    if (def.processing) lines.push(...this.processingLines(building));
+    if (def.processing) lines.push(...this.processingLines(building, state));
 
     switch (building.type) {
       case 'cabin': {
@@ -1197,6 +1199,10 @@ export class BuildingPanel {
         lines.push('Burada yiyenler çabuk doyar, keyiflenir ve 8 saat yavaş acıkır');
         lines.push(building.lit ? 'Akşam açık: sakinler önünde toplanıp sohbet ediyor' : 'Akşam 17:00\'de kapısı sohbete açılır');
         lines.push(`Bugün pişen: ${building.producedToday} porsiyon`);
+        // (24.2) Şerbethane'den taşınan fıçılar
+        if (building.sherbet > 0 || state.buildings.some((b) => b.type === 'brewery' && b.functional)) {
+          lines.push(`Fıçı şerbeti: ${building.sherbet}/${INN_SHERBET.capacity} · içen sakinin keyfi +${INN_SHERBET.fun}, handa keyif ve sosyallik iki kat hızlı dolar, güne Keyifli Damak'la başlar`);
+        }
         break;
       }
       case 'market': {
@@ -1313,14 +1319,25 @@ export class BuildingPanel {
   }
 
   /** İşleme yapısı (değirmen-fırın): saatlik dönüşüm, yiyecek değeri, durum ve bugünkü üretim. */
-  processingLines(building) {
-    const { perHour, input, output } = building.definition.processing;
+  processingLines(building, state) {
+    const processing = building.definition.processing;
+    const { perHour, input, output } = processing;
     const scale = (cost) => Object.fromEntries(Object.entries(cost).map(([r, v]) => [r, v * perHour]));
     const value = Object.entries(output).reduce((sum, [r, v]) => sum + v * perHour * (RESOURCES[r].foodValue ?? 0), 0);
-    const lines = [`Saatlik (fırıncı başı): ${formatCost(scale(input))} → ${formatCost(scale(output))}${value ? ` (${String(value).replace('.', ',')} yiyecek değeri)` : ''}`];
-    lines.push(building.processStatus ?? (building.active ? 'Değirmen öğütüyor, fırın yanıyor' : 'Hazır: fırıncı mesaide gelir'));
+    const lines = [`Saatlik (${processing.worker ?? 'fırıncı'} başı): ${formatCost(scale(input))} → ${formatCost(scale(output))}${value ? ` (${String(value).replace('.', ',')} yiyecek değeri)` : ''}`];
+    lines.push(building.processStatus ?? (building.active ? processing.active ?? 'Değirmen öğütüyor, fırın yanıyor' : processing.ready ?? 'Hazır: fırıncı mesaide gelir'));
     lines.push(`Bugün çıkan: +${building.producedToday} ${RESOURCES[Object.keys(output)[0]].name.toLocaleLowerCase('tr')}`);
-    lines.push('Öğünlerde önce ekmek yenir: 1 ekmek 2,5 yiyecek sayılır ve biraz keyif verir');
+    if (building.type === 'mill') lines.push('Öğünlerde önce ekmek yenir: 1 ekmek 2,5 yiyecek sayılır ve biraz keyif verir');
+    // (24.2) lüks işler
+    if (building.type === 'loom') {
+      lines.push(`Dokunan toplam kumaş: ${state.stats.goods?.cloth ?? 0} · refaha kalıcı katkı +${clothWelfare(state)} (her ${CLOTH_WELFARE.per} topta +1, en çok +${CLOTH_WELFARE.max})`);
+      lines.push(`Pazar Yeri'nin terzisi kumaştan Dayanıklı Giysi diker (${GARMENT.price} altın): sonbaharda ve kışın soğuğa karşı korur · dikilen ${state.stats.garments ?? 0}`);
+    }
+    if (building.type === 'brewery') {
+      const inns = state.buildings.filter((b) => b.type === 'inn' && b.functional);
+      lines.push(inns.length ? `Hanlardaki fıçı: ${inns.map((b) => `${b.sherbet}/${INN_SHERBET.capacity}`).join(', ')} · içilen bardak ${state.stats.sherbetServed ?? 0}` : 'Fıçılar hana taşınır: kasabada bir Kasaba Hanı olmalı');
+    }
+    if (building.definition.luxury) lines.push('Lüks iş: fırıncı, çiftçi ve yapı ustası yuvaları doluyken çalışılır; kasaba açken durur');
     return lines;
   }
 }

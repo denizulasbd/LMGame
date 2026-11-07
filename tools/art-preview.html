@@ -54,6 +54,44 @@
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
 
+    // --- 24.2: katma değerli üretim — Dokuma Tezgâhı, Şerbethane, Kumaş ve Fıçı Şerbeti ---
+    {
+      show('Dokuma Tezgâhı (2x2): taş temel, ahşap atölye, kiremit çatı; mavi-bej çözgülü tezgâh, kumaş topları ve keten demeti (çalışırken mekik gider gelir)', [
+        ['boşta', getStructureSprite('loom', {})],
+        ['mekik sol', getStructureSprite('loom', { active: true, frame: 0 })],
+        ['mekik sağ', getStructureSprite('loom', { active: true, frame: 1 })],
+        ['kış', getStructureSprite('loom', { season: 'winter' })],
+        ['şantiye', getConstructionSiteSprite(2, 2, 1, 'loom')],
+      ], 6);
+      show('Şerbethane (2x2): kesme taş mahzen, kemerli kapı, kiremit çatı ve baca; önde çemberli fıçılar ve bakır kazan (çalışırken altında ateş)', [
+        ['boşta', getStructureSprite('brewery', {})],
+        ['ateş 1', getStructureSprite('brewery', { active: true, frame: 0 })],
+        ['ateş 2', getStructureSprite('brewery', { active: true, frame: 1 })],
+        ['kış', getStructureSprite('brewery', { season: 'winter' })],
+      ], 6);
+      show('Yeni mal simgeleri, taşıma demetleri, balonlar ve aletler: Kumaş, Fıçı Şerbeti (yanında Keten ve Şerbetçiotu), mekik ve kepçe', [
+        ['kumaş', getIconSprite('cloth')],
+        ['fıçı şerbeti', getIconSprite('sherbet')],
+        ['keten', getIconSprite('flax')],
+        ['şerbetçiotu', getIconSprite('hops')],
+        ['kumaş topu', getCarrySprite('cloth')],
+        ['fıçı', getCarrySprite('sherbet')],
+        ['şerbet balonu', getBubbleSprite('sherbet')],
+        ['giysi balonu', getBubbleSprite('cloth')],
+        ['mekik', getHeldToolSprite('shuttle', false)],
+        ['kepçe', getHeldToolSprite('ladle', false)],
+      ], 8);
+      const weaver = { hair: 'bun', hairColor: 'blonde', skin: 'light', shirt: 'sky', pants: 'plum' };
+      const brewer = { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'red', pants: 'brown' };
+      const guest = { hair: 'long', hairColor: 'auburn', skin: 'light', shirt: 'rose', pants: 'navy' };
+      const loom = getStructureSprite('loom', { active: true, frame: 1 });
+      const brewery = getStructureSprite('brewery', { active: true, frame: 0 });
+      const inn = getStructureSprite('inn', { lit: true });
+      show('Zanaat sahnesi: tezgâhta dokumacı, kazanın başında mahzen ustası, handa şerbet içen sakinler', [
+        ['işlik', scene(224, 96, [[loom, 4, 90], [getCharacterSprite(weaver, 'up', 'work0'), 14, 94], [getHeldToolSprite('shuttle', false), 22, 86], [brewery, 48, 90], [getCharacterSprite(brewer, 'up', 'work1'), 70, 94], [getHeldToolSprite('ladle', false), 78, 86], [inn, 108, 90], [getCharacterSprite(guest, 'down', 'idle0'), 162, 94], [getBubbleSprite('sherbet'), 163, 76], [getCharacterSprite(weaver, 'down', 'idle1'), 182, 94], [getBubbleSprite('laugh'), 183, 76]])],
+      ], 4);
+    }
+
     // --- 24. aşama (24.1): tarımsal çeşitlilik — üç mahsulün tarla pikselleri, Ürün Silosu, Keten ve Şerbetçiotu simgeleri ---
     {
       const CROPS = { grain: 'Buğday / Sebze', flax: 'Keten', hops: 'Meyve / Şerbetçiotu' };
