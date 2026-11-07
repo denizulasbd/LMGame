@@ -30,6 +30,10 @@
 // (24.2) Kule tamamlanmış, nüfus 22+ ve kişi başı besin 10'un üstündeyken (temel gıda ve kule hedefleri güvende) silodan sonra
 // dördüncü bir bahçe (Şerbetçiotu için), handa ya da pazarın yanında bir Dokuma Tezgâhı ve bir Şerbethane kurar; dokumacı ve mahzen
 // ustası iş seçiminde temel üretimden sonra gelir. Dokunan kumaşı, yapılan fıçıları, handa içilen şerbeti, testileri ve giysileri raporlar.
+// (24.3) Kule ve Dokuma Tezgâhı tamamlandıktan sonra yolun / nehrin kenarına bir Ticaret İskelesi kurar. Gemi / kervan buradayken
+// rezervler korunduğu sürece (en az 10 kumaş, 5 fıçı şerbet, 30 yün; ekmek / erzak satışından sonra kişi başı en az 12 besin)
+// ihracat sözleşmelerini tamamlar; hazinede bol altın varken (vergi ayrıldıktan sonra 400+) odun 60, taş 50, demir 20'nin altına
+// inince hammadde paketi ithal eder. Ziyaretleri, sözleşmeleri, ithalatı ve pazar çarpanlarını raporlar.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //                                         [--crisis huzurlu|dengeli|cetin] [--no-safety] [--crisis-state]
@@ -421,6 +425,36 @@ await page.evaluate((passive) => {
           }
         }
       }
+      // (24.3) Dış ticaret: rezervleri koruyarak ihracat, altın bolken kritik hammaddeyi ithal et
+      if (!window.__noAgri && s.tradePost?.ship && window.__tradePost.shipDocked(s)) {
+        const TPm = window.__tradePost;
+        const X = (window.__stats.trade ??= { contracts: 0, gold: 0, imports: 0, held: 0 });
+        const pop = Math.max(1, s.characters.length);
+        const RESERVE = { cloth: 10, sherbet: 5, wool: 30 };
+        s.tradePost.ship.contracts.forEach((c, i) => {
+          if (c.done || !TPm.contractStatus(s, i).ok) return;
+          const value = c.resource === 'bread' ? 2.5 : c.resource === 'food' ? 1 : 0;
+          const keep = value ? window.__foodSupply(s) - c.qty * value >= pop * 12 : res[c.resource] - c.qty >= (RESERVE[c.resource] ?? 0);
+          if (!keep) {
+            X.held++;
+            return;
+          }
+          const gold = TPm.contractStatus(s, i).gold;
+          game.events.emit('ui:completeContract', { index: i });
+          if (c.done) {
+            X.contracts++;
+            X.gold += gold;
+          }
+        });
+        const reserveGold = 400 + (s.crown.notice ? s.crown.notice.amount : 0);
+        const LOW = { wood: 60, stone: 50, iron: 20 };
+        for (const kind of ['wood', 'stone', 'iron']) {
+          if (res[kind] < LOW[kind] && res.gold >= reserveGold && TPm.importStatus(s, kind).ok) {
+            game.events.emit('ui:importPackage', { kind });
+            X.imports++;
+          }
+        }
+      }
       // Güven düşerse (ya da isyan çıkarsa) acil dağıtım
       const T = window.__trust;
       if (s.trust.revolt || s.trust.value < 40) {
@@ -520,6 +554,11 @@ await page.evaluate((passive) => {
         if (!has('loom') && res.wood >= 90 && res.stone >= 60 && res.iron >= 30) place('loom');
         else if (!has('brewery') && res.wood >= 80 && res.stone >= 80) place('brewery');
         else if (has('brewery') && gardens < 4 && res.wood >= 60 && res.stone >= 30) place('garden');
+        // (24.3) Ticaret İskelesi: tezgâh kurulduktan sonra, yolun ya da nehrin kenarına
+        else if (has('loom') && !has('tradingPost') && res.wood >= 110 && res.stone >= 80 && res.iron >= 40) {
+          const spot = sim.findSpot('tradingPost', 30);
+          if (spot) scene.construction.placeSite('tradingPost', spot.x, spot.y);
+        }
       }
     }
     // (20. aşama) Altın Çağ: prestij peyzajı (bir Mermer Çeşme, iki Altın Çağ Feneri) ve tüccarın nadir malları
@@ -657,6 +696,7 @@ await page.evaluate(async () => {
   window.__crown = await import('/src/systems/Crown.js');
   window.__crisis = await import('/src/systems/Crisis.js');
   window.__granary = await import('/src/systems/Granary.js');
+  window.__tradePost = await import('/src/systems/TradePost.js');
   window.__foodSupply = (await import('/src/systems/TownStatus.js')).foodSupply;
 });
 
@@ -866,6 +906,7 @@ console.log(
         ? ` · Ürün Silosu ${a.silos} (+${a.granaryCapacity}) · bahçeler ${a.gardens || '-'} · bahçe-saat ${JSON.stringify(a.cropHours)} · keten ${a.flax}, şerbetçiotu ${a.hops} · ` +
           `bozulan ${JSON.stringify(a.spoiled)} · ekim değişikliği ${a.switches} (Buğday'a ${A.toGrain ?? 0}, Keten'e ${A.toFlax ?? 0}, Şerbetçiotu'na ${A.toHops ?? 0}; gıda kritik ${A.critical ?? 0}, depo dolu ${A.fullBack ?? 0})`
         : '') +
+      (mon.trade ? ` · (24.3) Ticaret İskelesi ${mon.trade.posts} · ziyaret ${mon.trade.visits} · sözleşme ${mon.trade.completed} (+${mon.trade.goldEarned} altın; ${JSON.stringify(mon.trade.exported)}) · ithalat ${mon.trade.imports} paket (-${mon.trade.goldSpent} altın; ${JSON.stringify(mon.trade.imported)}) · rezerv için bekletilen ${(report.stats.trade ?? {}).held ?? 0} · pazar ${JSON.stringify(mon.trade.market)}` : '') +
       (r ? ` · (24.2) Dokuma Tezgâhı ${r.looms}, Şerbethane ${r.breweries} · dokunan kumaş ${r.clothWoven}, yapılan fıçı ${r.sherbetMade} (stok ${r.cloth} / ${r.sherbet}) · handa içilen şerbet ${r.served}, handaki fıçı ${r.innCasks} · testi ${r.jugs} (içilen ${r.jugsDrunk}) · Dayanıklı Giysi ${r.garments} (giyen ${r.dressed}) · refah katkısı +${r.welfare} · açken çalışan lüks işçi ${r.hungryLuxury}` : '')
   );
 }

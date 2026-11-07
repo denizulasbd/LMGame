@@ -29,5 +29,6 @@ export { MARBLE_FOUNTAIN_ART, GOLDEN_LANTERN_ART, ROYAL_STATUE_ART, getMarbleFou
 export { WELL_ART, GUARD_TOWER_ART, getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
 export { SILO_ART, getSiloSprite } from './structuresGranary.js';
 export { LOOM_ART, BREWERY_ART, getLoomSprite, getBrewerySprite } from './structuresRefinery.js';
+export { TRADING_POST_ART, TRADE_SHIP_ART, CARAVAN_ART, getTradingPostSprite, getTradeShipSprite, getCaravanSprite } from './structuresTrade.js';
 export { getFestivalDecorSprite, getFlowerCrownSprite } from './festival.js';
 export { getAnimalSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite } from './animals.js';

@@ -4338,3 +4338,12 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+/* (24.3) Ticaret İskelesi: tamamlanan ihracat sözleşmesi soluk, ithalat paketleri alt alta */
+.trade-contract.is-done {
+  opacity: 0.6;
+}
+.import-button {
+  flex: 1 1 100%;
+  text-align: left;
+}

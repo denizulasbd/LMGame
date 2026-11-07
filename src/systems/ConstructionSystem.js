@@ -114,6 +114,10 @@ export class ConstructionSystem {
       reason = 'Sebze Bahçesi ya da Ahşap Çardak kenarına dikilmeli';
     }
 
+    // (24.3) Ticaret İskelesi / Kervan Konağı: ayak izinin bir kenarı suya ya da yola değmeli
+    if (!reason && def.placement === 'tradeSite' && !this.touchesTile(tileX, tileY, def.size, ['water', 'path', 'cobble', 'plaza', 'bridge'])) {
+      reason = 'Nehir kıyısına (iskele) ya da bir yolun kenarına (kervan konağı) kurulmalı';
+    }
     // İskele: bir sütun kum, yanındaki sütun su olmalı; su yönü belirler
     if (!reason && def.placement === 'shore') {
       orientation = this.shoreOrientation(tileX, tileY) ?? null;
@@ -206,6 +210,15 @@ export class ConstructionSystem {
     if (all(columns[0], 'sand') && columns.slice(1).every((c) => all(c, 'water'))) return 'right';
     if (all(columns[width - 1], 'sand') && columns.slice(0, -1).every((c) => all(c, 'water'))) return 'left';
     return null;
+  }
+
+  /** (24.3) Ayak izinin dört yanındaki karolardan biri verilen zeminlerden mi (çaprazlar hariç)? */
+  touchesTile(tileX, tileY, size, tiles) {
+    const map = this.world.map;
+    const around = [];
+    for (let x = tileX; x < tileX + size.w; x++) around.push([x, tileY - 1], [x, tileY + size.h]);
+    for (let y = tileY; y < tileY + size.h; y++) around.push([tileX - 1, y], [tileX + size.w, y]);
+    return around.some(([x, y]) => map.inBounds(x, y) && tiles.includes(map.get(x, y)));
   }
 
   /** Ayak izi, verilen türlerden bir yapıya (şantiye dahil) bitişik mi (çaprazlar dahil)? */

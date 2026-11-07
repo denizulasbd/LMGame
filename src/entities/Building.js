@@ -38,6 +38,8 @@ import {
   GUARD_TOWER_ART,
   WORKSHOP_ART,
   BREWERY_ART,
+  getTradeShipSprite,
+  getCaravanSprite,
   MILL_ART,
   IRON_MINE_ART,
   TOWN_HALL_ART,
@@ -112,6 +114,8 @@ const BASELINE_INSET = {
   // 24.2
   loom: 2,
   brewery: 2,
+  // 24.3
+  tradingPost: 2,
 };
 // Çardağın çatısı kışın karla örtülür (arka katman çatı altında kalır, karlanmaz)
 const GAZEBO_WINTER_ROOF = { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 };
@@ -225,6 +229,7 @@ export class Building extends Entity {
     // 24. aşama: bahçenin ekim tercihi (data/crops.js); eski kayıtlarda (sürüm 2-20) ve geçersiz değerde Buğday / Sebze
     this.crop = normalizeCrop(type, crop);
     // 24.2: handaki fıçı şerbeti (RefinerySystem kasaba deposundan taşır); eski kayıtlarda 0
+    this.visitor = null; // (24.3) iskelede yanaşan gemi / kervan { mode, x, y, side } (TradePostSystem yazar; kayda girmez)
     this.sherbet = type === 'inn' ? Math.max(0, Math.floor(Number(sherbet) || 0)) : 0;
   }
 
@@ -504,6 +509,7 @@ export class Building extends Entity {
       scaffold: this.project?.kind === 'stage',
       step: Math.min(3, Math.floor(this.projectRatio * 4)),
       crop: this.crop,
+      docked: Boolean(this.visitor),
     });
   }
 
@@ -539,6 +545,16 @@ export class Building extends Entity {
     }
     const sprite = this.currentSprite(env);
     queue.addImage(this.sortY, sprite, this.x, this.y + this.height - sprite.height);
+    // (24.3) Ticaret İskelesi'ne yanaşan gemi (suda) ya da kervan (yolda): yanaştığı karonun dibine hizalı
+    if (this.type === 'tradingPost' && this.visitor && !this.underConstruction) {
+      const v = this.visitor;
+      const flipped = v.side === 'left';
+      const art = v.mode === 'ship' ? getTradeShipSprite(Boolean(env.windowsLit), flipped) : getCaravanSprite(flipped);
+      const tileX = v.x * T;
+      const x = v.side === 'left' ? tileX + T - art.width : v.side === 'right' ? tileX : this.x + (this.width - art.width) / 2;
+      const bottom = (v.y + 1) * T;
+      queue.addImage(bottom - 1, art, Math.round(x), bottom - art.height);
+    }
   }
 
   /**

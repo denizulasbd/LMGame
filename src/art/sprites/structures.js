@@ -35,6 +35,7 @@ import { getMarbleFountainSprite, getGoldenLanternSprite, getRoyalStatueSprite }
 import { getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
 import { getSiloSprite } from './structuresGranary.js';
 import { getLoomSprite, getBrewerySprite } from './structuresRefinery.js';
+import { getTradingPostSprite } from './structuresTrade.js';
 import {
   getWoodFenceSprite,
   getFenceGateSprite,
@@ -665,6 +666,7 @@ const WINTER_ROOFS = {
   silo: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 15 },
   loom: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 12 },
   brewery: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 14 },
+  tradingPost: { light: ['E'], main: ['X'], dark: ['x'], maxRow: 12 },
   supplyCamp: { light: ['S'], main: ['s'], maxRow: 17 },
   workshop: { light: ['c'], main: ['B'], dark: ['n'], maxRow: 17 },
   townHall: { light: ['Z', 'c'], main: ['C', 'B'], dark: ['U', 'n'], maxRow: 36 },
@@ -729,6 +731,9 @@ function getBaseStructureSprite(type, state) {
       return getLoomSprite(Boolean(state.active), state.frame ?? 0);
     case 'brewery':
       return getBrewerySprite(Boolean(state.active), state.frame ?? 0);
+    // 24.3: dış ticaret
+    case 'tradingPost':
+      return getTradingPostSprite(Boolean(state.lit ?? state.windowsLit), Boolean(state.docked));
     case 'quarry':
       return getQuarrySprite(state.active ? (state.frame ?? 0) % 2 : 0);
     case 'fishingPier':

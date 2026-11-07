@@ -70,6 +70,7 @@ import { DesertionSystem } from '../systems/DesertionSystem.js';
 import { CrisisSystem } from '../systems/CrisisSystem.js';
 import { GranarySystem } from '../systems/GranarySystem.js';
 import { RefinerySystem } from '../systems/RefinerySystem.js';
+import { TradePostSystem } from '../systems/TradePostSystem.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -174,6 +175,8 @@ export class TownScene extends Scene {
     this.granary = new GranarySystem(this.game, this.world, { economy: this.economy });
     // (24.2) Katma değerli üretim: handa fıçı şerbeti, Şerbet Testisi (tezgâh ve mahzen işleme yapısıdır; rastgelelik yok)
     this.refinery = new RefinerySystem(this.game, this.world, { economy: this.economy });
+    // (24.3) Dış ticaret: Ticaret İskelesi / Kervan Konağı, ihracat sözleşmeleri, pazar doygunluğu, ithalat (rastgelelik yok)
+    this.tradePost = new TradePostSystem(this.game, this.world, { economy: this.economy });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       crisis: this.crisis,
@@ -230,6 +233,7 @@ export class TownScene extends Scene {
       this.dilemmas,
       this.expeditions,
       this.nature,
+      this.tradePost,
     ];
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
@@ -275,6 +279,7 @@ export class TownScene extends Scene {
       this.crisis,
       this.granary,
       this.refinery,
+      this.tradePost,
     ];
 
     this.camera = new Camera();

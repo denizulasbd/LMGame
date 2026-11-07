@@ -61,6 +61,8 @@ import { raidCard } from './crisisCards.js';
 import { productionOf, storageLimit, cropOf, hasGranary } from '../../systems/Granary.js';
 import { CROPS, AGRI_KEYS, SPOILAGE } from '../../data/crops.js';
 import { INN_SHERBET, GARMENT, CLOTH_WELFARE } from '../../data/refinery.js';
+import { CONTRACTS, MARKET, IMPORTS, IMPORT_KEYS } from '../../data/tradePost.js';
+import { contractStatus, importStatus, priceMultiplier, shipDocked } from '../../systems/TradePost.js';
 import { clothWelfare } from '../../systems/Refinery.js';
 
 const thumbnailCache = new Map();
@@ -98,6 +100,7 @@ export class BuildingPanel {
     this.decrees = el('div', { className: 'building-decrees' });
     this.research = el('div', { className: 'building-decrees building-research' });
     this.harbor = el('div', { className: 'building-decrees building-harbor' });
+    this.tradeBox = el('div', { className: 'building-decrees building-trade' }); // (24.3) Ticaret İskelesi / Kervan Konağı
     this.luxury = el('div', { className: 'building-decrees building-luxury' });
     this.bell = el('div', { className: 'building-decrees building-bell' });
     this.trustBox = el('div', { className: 'building-decrees building-trust' }); // (21. aşama) Yönetim Güveni
@@ -145,6 +148,7 @@ export class BuildingPanel {
       this.decrees,
       this.research,
       this.harbor,
+      this.tradeBox,
       this.luxury,
       this.crownBox,
       this.trustBox,
@@ -235,7 +239,10 @@ export class BuildingPanel {
     const crisisKey = this.crisisKeyOf(building, state);
     // (24. aşama) ekim tercihi ve silo / bozulma durumu
     const cropKey = cropOf(building) || building.definition.granary ? [building.crop, hasGranary(state), JSON.stringify(state.granary?.spoiled ?? {})].join(':') : '';
+    // (24.3) dış ticaret: ziyaret, sözleşmeler, pazar, ithalat stoğu ve ilgili stoklar
+    const tradeKey = building.type === 'tradingPost' ? JSON.stringify([state.tradePost, state.resources, Math.floor(state.totalMinutes / 60)]) : '';
     const key = [
+      tradeKey,
       cropKey,
       crisisKey,
       exploreKey,
@@ -287,6 +294,7 @@ export class BuildingPanel {
     this.renderDecrees(building, state);
     this.renderResearch(building, state);
     this.renderHarbor(building, state);
+    this.renderTradePost(building, state);
     this.renderLuxury(building, state);
     this.renderCrown(building, state);
     this.renderTrust(building, state);
@@ -941,6 +949,69 @@ export class BuildingPanel {
     );
     children.push(el('div', { className: 'upgrade-text', text: `Birim başına altın: ${values}` }));
     this.harbor.replaceChildren(...children);
+  }
+
+  /**
+   * (24.3) Ticaret İskelesi / Kervan Konağı: gemi / kervan buradaysa ihracat sözleşmeleri (tek tıkla tamamlanır) ve ithalat
+   * paketleri; değilse sıradaki varış. Pazar doygunluğu çarpanları ve son ziyaretler.
+   */
+  renderTradePost(building, state) {
+    const show = building.type === 'tradingPost' && building.functional;
+    this.tradeBox.hidden = !show;
+    if (!show) return;
+    const tp = state.tradePost;
+    const now = state.totalMinutes;
+    const ship = shipDocked(state) ? tp.ship : null;
+    const who = ship?.mode === 'caravan' ? 'Kervan' : 'Ticaret Gemisi';
+    const children = [el('div', { className: 'building-section-title', text: ship ? `${who} burada` : 'Dış Ticaret' })];
+    if (ship) {
+      children.push(el('div', { className: 'upgrade-text is-active', text: `${who} ${Math.max(1, Math.ceil((ship.leavesAt - now) / 60))} saat daha kalacak · ziyaret ${tp.visits}` }));
+      ship.contracts.forEach((c, index) => {
+        const def = CONTRACTS[c.resource];
+        const status = contractStatus(state, index);
+        const mult = priceMultiplier(state, c.resource);
+        const button = this.button(c.done ? 'Tamamlandı' : 'Sözleşmeyi Tamamla', status.ok ? `${c.qty} ${RESOURCES[c.resource].name.toLocaleLowerCase('tr')} yüklenir, hazineye ${status.gold} altın girer` : status.reason, () =>
+          this.events.emit('ui:completeContract', { index })
+        );
+        button.classList.add('upgrade-button', 'contract-button');
+        button.dataset.index = String(index);
+        button.disabled = !status.ok;
+        children.push(
+          el('div', { className: `decree luxury-card trade-contract${c.done ? ' is-done' : ''}` }, [
+            el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL('contract'), alt: '' }), def.title, el('span', { className: 'decree-state', text: def.buyer })]),
+            el('div', { className: 'upgrade-row' }, [
+              el('span', { className: 'build-costs' }, [
+                el('span', { className: `build-cost${(state.resources[c.resource] ?? 0) < c.qty && !c.done ? ' is-missing' : ''}` }, [el('img', { src: getIconDataURL(RESOURCES[c.resource].icon), alt: RESOURCES[c.resource].name }), `${c.qty}`]),
+                ' → ',
+                el('span', { className: 'luxury-price' }, [el('img', { src: getIconDataURL('coin'), alt: 'Altın' }), String(c.done ? c.paid ?? status.gold : status.gold)]),
+              ]),
+              button,
+            ]),
+            el('div', { className: 'upgrade-text', text: c.done ? 'Mallar yüklendi' : mult < 1 ? `Pazar doygun: fiyat %${Math.round(mult * 100)} (taban ${c.gold} altın)` : status.ok ? `Depoda ${state.resources[c.resource]} var` : status.reason }),
+          ])
+        );
+      });
+      const packs = IMPORT_KEYS.map((kind) => {
+        const def = IMPORTS[kind];
+        const st = importStatus(state, kind);
+        const [r, v] = Object.entries(def.get)[0];
+        const b = this.button(`${def.name}: ${v} ${RESOURCES[r].name} → ${def.give.gold} Altın`, st.ok ? `Anında ambara iner · bu ziyarette ${ship.stock[kind]} paket kaldı` : st.reason, () => this.events.emit('ui:importPackage', { kind }));
+        b.classList.add('craft-mode', 'import-button');
+        b.dataset.kind = kind;
+        b.disabled = !st.ok;
+        return b;
+      });
+      children.push(el('div', { className: 'upgrade-text', text: 'Hammadde ithalatı (altınla, anında ambara):' }), el('div', { className: 'craft-modes' }, packs));
+    } else {
+      const at = tp.nextShipAt;
+      const hoursLeft = at === null ? null : Math.max(0, Math.ceil((at - now) / 60));
+      children.push(el('div', { className: 'upgrade-text is-active', text: at === null ? 'Gemi / kervan iskele tamamlanınca yola çıkar' : `Sıradaki gemi / kervan ${hoursLeft} saat sonra (Gün ${Math.floor(at / 1440) + 1}, 09:00)` }));
+      children.push(el('div', { className: 'upgrade-text', text: `3-4 günde bir gelir, 24 saat kalır; her seferinde 3 ihracat talebi getirir (Kumaş, Fıçı Şerbeti ve sırayla Ekmek / Erzak / Yün)` }));
+    }
+    const low = Object.entries(tp.market).map(([r, m]) => `${RESOURCES[r].name} %${Math.round(m * 100)}`);
+    children.push(el('div', { className: 'upgrade-text', text: low.length ? `Pazar fiyatları: ${low.join(' · ')} (aynı mal ${MARKET.streak} kez peş peşe satılınca %${Math.round(MARKET.drop * 100)} düşer; başka mal satılınca toparlanır)` : `Pazar fiyatları tam · aynı mal ${MARKET.streak} kez peş peşe satılınca %${Math.round(MARKET.drop * 100)} düşer` }));
+    children.push(el('div', { className: 'upgrade-text', text: `Toplam ${tp.completed} sözleşme, +${tp.goldEarned} altın · ${tp.imports} ithalat paketi, -${tp.goldSpent} altın` }));
+    this.tradeBox.replaceChildren(...children);
   }
 
   /** Sıradaki geliştirme: harabeyse onarım, yükseltilebiliyorsa Seviye 2, yoksa null. */

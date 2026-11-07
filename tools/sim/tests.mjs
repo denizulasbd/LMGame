@@ -47,6 +47,11 @@
 //              vardiya (sabit dokumacı, yevmiye, deneyim), han ikmali, handa şerbet (+15 keyif, iki kat keyif ve sosyallik, Keyifli
 //              Damak), Şerbet Testisi alma / içme, Dayanıklı Giysi (mevsim, kumaş stoğu, soğuk koruması), kumaşın refah katkısı, HUD ve
 //              paneller, görseller, kayıt sürümü 22 (gidiş-dönüş, bozuk değerler, v21 kaydı)
+//   24. aşama (24.3): Ticaret İskelesi / Kervan Konağı (tanım, Kasaba kilidi, yol / su kenarı yerleşimi, gemi ya da kervan), takvim
+//              (ilk varış, 24 saat, 3 ve 4 günlük aralık, hasarlı iskele, gerçek saatler), ihracat sözleşmeleri (tamamlama, ikinci kez
+//              ödenmeme, yetersiz mal, günlük), hammadde ithalatı (paketler, stok, altın, depo yeri), pazar doygunluğu (3 peş peşe satış,
+//              düşüş, başka malla ve ziyaretle toparlanma, taban), panel ve tek tıkla tamamlama, görseller, kayıt sürümü 23 (gidiş-dönüş,
+//              bozuk değerler, v22 kaydı)
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
 import { openGame, createChecks } from './lib.mjs';
@@ -2255,7 +2260,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 22', raw.version === 22);
+  check('kayıt sürümü 23', raw.version === 23);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2698,7 +2703,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 22: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 22 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 23: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 23 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -3013,7 +3018,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 22: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 22 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 23: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 23 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3625,7 +3630,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 22: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 22 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 23: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 23 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -3906,7 +3911,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { g: garden.id, o: other.id, switches: st.granary.switches };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 22: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 22 && raw.version === 22 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    check('kayıt sürümü 23: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 23 && raw.version === 23 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
     game.events.emit('ui:load');
     const s2 = game.state;
     const g2 = s2.buildings.find((b) => b.id === T.g);
@@ -4234,7 +4239,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 22: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 22 && raw.version === 22 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    check('kayıt sürümü 23: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 23 && raw.version === 23 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
     game.events.emit('ui:load');
     const s2 = st();
     const inn2 = s2.buildings.find((b) => b.id === T.inn);
@@ -4272,6 +4277,277 @@ const pageResults = await page.evaluate(async () => {
     const s3 = st();
     check('v21 kaydı yüklenince Kumaş / Fıçı Şerbeti 0, hanlarda fıçı yok, yeni yapı ve eşya yok', s3.resources.cloth === 0 && s3.resources.sherbet === 0 && s3.buildings.filter((b) => b.type === 'inn').every((b) => b.sherbet === 0) && !s3.buildings.some((b) => b.type === 'loom' || b.type === 'brewery') && s3.characters.every((c) => !c.inventory.some((x) => x.kind === 'garment' || x.kind === 'sherbetJug')));
     check('v21 kaydında kumaşın refah katkısı 0, bir gün sorunsuz yaşar', RX.clothWelfare(s3) === 0 && (() => { const d = s3.time.day; hours(24); return game.state.time.day === d + 1; })());
+    offs.forEach((off) => off());
+  }
+
+  // ===== 24. aşama (24.3): Ticaret İskelesi / Kervan Konağı, ihracat sözleşmeleri, pazar doygunluğu, hammadde ithalatı =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const BD = await import('/src/data/buildings.js');
+    const TD = await import('/src/data/tradePost.js');
+    const TP = await import('/src/systems/TradePost.js');
+    const TR = await import('/src/data/trade.js');
+    const ART = await import('/src/art/sprites/index.js');
+    const UI = await import('/src/art/ui/index.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    s0.time.speed = 4; // hours() 4x hızı varsayar
+    s0.time.paused = false;
+    s0.crisis.difficulty = 'huzurlu';
+    s0.crisis.raid = null;
+    s0.crisis.nextRaidWarnAt = null;
+    s0.petitions.list = [];
+    s0.petitions.nextAt = s0.totalMinutes + 1e6;
+    s0.crown.decree = null;
+    s0.crown.nextDecreeAt = s0.totalMinutes + 1e6;
+    s0.crown.nextLevyAt = s0.totalMinutes + 1e6;
+    const events = [];
+    const offs = ['trade:shipArrived', 'trade:shipLeft', 'trade:contractDone', 'trade:imported', 'toast'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
+    // Saat ilerletirken açılan karar penceresini varsayılan seçenekle kapat (oyun durmasın)
+    const hrs = (h) => {
+      for (let i = 0; i < h; i++) {
+        const active = st().dilemma.active;
+        if (active) {
+          const o = active.options?.find((x) => x.default) ?? active.options?.[0];
+          if (o) game.events.emit('ui:chooseDilemma', { optionId: o.id });
+          st().dilemma.active = null;
+        }
+        st().time.paused = false;
+        st().time.speed = 4;
+        hours(1);
+      }
+    };
+    const setTime = (total) => {
+      s0.time.day = Math.floor(total / 1440) + 1;
+      s0.time.hour = Math.floor((total % 1440) / 60);
+      s0.time.minute = total % 60;
+    };
+
+    // --- Veri ---
+    const def = BD.BUILDINGS.tradingPost;
+    check('Ticaret İskelesi: 3x2, Kasaba seviyesi, kereste + taş + demir, tek, Ticaret kategorisi', def && def.size.w === 3 && def.size.h === 2 && def.requiresTier === 3 && def.cost.wood > 0 && def.cost.stone > 0 && def.cost.iron > 0 && def.unique && def.category === 'Ticaret' && def.placement === 'tradeSite');
+    check('Ticaret İskelesi inşa menüsünde, Büyük Ticaret Limanı\'nın ardından', BD.BUILD_MENU.indexOf('tradingPost') === BD.BUILD_MENU.indexOf('harbor') + 1 && BD.buildTabFor('tradingPost') === 'buildings');
+    check('talepler: Kumaş 10 -> 40, Şerbet 8 -> 35, Ekmek 25 -> 20 altın; ziyaret 3-4 günde bir, 24 saat', TD.CONTRACTS.cloth.qty === 10 && TD.CONTRACTS.cloth.gold === 40 && TD.CONTRACTS.sherbet.qty === 8 && TD.CONTRACTS.sherbet.gold === 35 && TD.CONTRACTS.bread.qty === 25 && TD.CONTRACTS.bread.gold === 20 && TD.VISIT.intervalDays.join() === '3,4' && TD.VISIT.stayHours === 24);
+    check('ithalat paketleri: 30 odun 15, 25 taş 15, 10 demir 20 altın', TD.IMPORTS.wood.get.wood === 30 && TD.IMPORTS.wood.give.gold === 15 && TD.IMPORTS.stone.get.stone === 25 && TD.IMPORTS.stone.give.gold === 15 && TD.IMPORTS.iron.get.iron === 10 && TD.IMPORTS.iron.give.gold === 20);
+    check('ziyaretin üç talebi: Kumaş, Şerbet ve sırayla Ekmek / Erzak / Yün', [0, 1, 2, 3].map((v) => TP.contractsFor(v).map((c) => c.resource).join('+')).join(',') === 'cloth+sherbet+bread,cloth+sherbet+food,cloth+sherbet+wool,cloth+sherbet+bread');
+    check('Büyük Ticaret Limanı da kumaş ve fıçı şerbetini ihraç eder', TR.EXPORT.values.cloth > TR.EXPORT.values.bread && TR.EXPORT.values.sherbet > TR.EXPORT.values.bread);
+
+    // --- Seviye kilidi ve yerleşim ---
+    sim.give({ wood: 900, stone: 900, iron: 300, food: 400, bread: 120, gold: 1000, cloth: 0, sherbet: 0, wool: 60 });
+    s0.town.tier = 4;
+    const spot = sim.findSpot('tradingPost');
+    s0.town.tier = 2;
+    const locked = spot ? S().construction.checkPlacement('tradingPost', spot.x, spot.y) : { ok: true };
+    s0.town.tier = 4;
+    check('Ticaret İskelesi Köy\'de kilitli, Kasaba\'da yolun / suyun kenarına kurulabilir', spot && !locked.ok && /Kasaba/.test(locked.reason) && S().construction.checkPlacement('tradingPost', spot.x, spot.y).ok, locked.reason);
+    // Ne yola ne suya değen bir yer reddedilir
+    let far = null;
+    const map = S().world.map;
+    for (let y = 2; y < map.height - 3 && !far; y++) for (let x = 2; x < map.width - 4 && !far; x++) {
+      const c = S().construction.checkPlacement('tradingPost', x, y);
+      if (!c.ok && /yolun kenarına/.test(c.reason)) far = c;
+    }
+    check('yoldan ve sudan uzak yer reddedilir (nedeni yazılır)', far && /Nehir kıyısına/.test(far.reason));
+    // Su kenarında gemi, yolda kervan
+    let waterAt = null;
+    for (let y = 2; y < map.height - 3 && !waterAt; y++) for (let x = 4; x < map.width; x++) if (map.get(x, y) === 'water' && map.get(x, y + 1) === 'water' && map.get(x - 1, y) !== 'water') { waterAt = { x, y }; break; }
+    const fakeRiver = { definition: def, tileX: waterAt.x - 3, tileY: waterAt.y, type: 'tradingPost' };
+    const vRiver = S().tradePost.visitorFor(fakeRiver);
+    check('yanında su varsa Ticaret Gemisi (iskele), yoksa Kervan (konak) gelir', vRiver.mode === 'ship' && vRiver.side === 'right');
+
+    // --- Takvim ---
+    const post = sim.place('tradingPost');
+    const tp = s0.tradePost;
+    const T0 = s0.totalMinutes;
+    check('iskele kurulunca ilk gemi / kervan en az 12 saat sonra 09:00\'da gelir', post && tp.nextShipAt >= T0 + 720 && tp.nextShipAt % 1440 === 540 && tp.nextShipAt - T0 < 720 + 1440, `${T0} -> ${tp.nextShipAt}`);
+    const mode = S().tradePost.visitorFor(post).mode;
+    check('köydeki iskele yol kenarında: kervan gelecek (ya da suyun yanında gemi)', ['ship', 'caravan'].includes(mode));
+    const R = S().tradePost;
+    const arriveNow = () => {
+      setTime(tp.nextShipAt);
+      R.hourly();
+    };
+    const leaveNow = () => {
+      setTime(tp.ship.leavesAt);
+      R.hourly();
+    };
+    setTime(tp.nextShipAt - 60);
+    R.hourly();
+    check('vakti gelmeden gelen olmaz', !tp.ship);
+    events.length = 0;
+    arriveNow();
+    const ship = tp.ship;
+    check('gemi / kervan geldi: 24 saat kalır, 3 talep ve ithalat stoğu getirir', ship && tp.visits === 1 && ship.leavesAt - ship.arrivedAt === 1440 && ship.contracts.length === 3 && ship.contracts.map((c) => c.resource).join() === 'cloth,sherbet,bread' && ship.stock.wood === 3 && ship.mode === mode && TP.shipDocked(s0));
+    check('varışta bildirim ve Kasaba Günlüğü notu', events.some((e) => e.n === 'trade:shipArrived') && events.some((e) => e.n === 'toast' && /24 saat/.test(e.p.text)) && s0.journal.some((j) => /talep ediliyor/.test(j.text)));
+    R.update();
+    check('yanaşan gemi / kervan iskelede çizilir (flamalı ambar)', post.visitor && post.visitor.mode === mode && post.currentSprite({ season: 'summer', time: 0 }) === ART.getStructureSprite('tradingPost', { docked: true }));
+
+    // --- İhracat sözleşmeleri ---
+    sim.give({ cloth: 25, sherbet: 3, bread: 30 });
+    const gold0 = s0.resources.gold;
+    events.length = 0;
+    const g1 = R.complete(0);
+    check('Kumaş Talebi tamamlanır: 10 kumaş düşer, hazineye 40 altın', g1 === 40 && s0.resources.cloth === 15 && s0.resources.gold === gold0 + 40 && ship.contracts[0].done && tp.completed === 1 && tp.goldEarned === 40 && tp.exported.cloth === 10 && events.some((e) => e.n === 'trade:contractDone'));
+    check('tamamlanan sözleşme ikinci kez ödenmez', R.complete(0) === 0 && s0.resources.cloth === 15 && TP.contractStatus(s0, 0).reason === 'Bu sözleşme tamamlandı');
+    const short = TP.contractStatus(s0, 1);
+    check('depoda yetmeyen mal reddedilir (nedeni yazılır)', !short.ok && /Yetersiz fıçı şerbeti \(3\/8\)/.test(short.reason) && R.complete(1) === 0 && s0.resources.sherbet === 3, short.reason);
+    check('Ekmek Talebi: 25 ekmek -> 20 altın', R.complete(2) === 20 && s0.resources.bread === 5);
+    check('Kasaba günlüğüne sözleşme notu', s0.journal.some((j) => /İhracat sözleşmesi: 10 kumaş/.test(j.text)));
+
+    // --- İthalat ---
+    sim.give({ wood: 100, stone: 100, iron: 10, gold: 100 });
+    const ok1 = R.buy('wood');
+    check('Odun Paketi: 15 altın, 30 odun anında ambara iner', ok1 && s0.resources.wood === 130 && s0.resources.gold === 85 && ship.stock.wood === 2 && tp.imports === 1 && tp.goldSpent === 15 && tp.imported.wood === 30);
+    R.buy('wood');
+    R.buy('wood');
+    check('her paketten ziyaret başına 3 tane; sonra tüccarın stoğu biter', !R.buy('wood') && ship.stock.wood === 0 && /stoğu bitti/.test(TP.importStatus(s0, 'wood').reason));
+    check('Taş ve Demir Paketi: 25 taş 15, 10 demir 20 altın', R.buy('stone') && R.buy('iron') && s0.resources.stone === 125 && s0.resources.iron === 20);
+    sim.give({ gold: 10 });
+    check('altın yetmezse ithalat yapılmaz', !R.buy('iron') && /Yetersiz altın/.test(TP.importStatus(s0, 'iron').reason));
+    sim.give({ gold: 500, stone: S().economy.limit('stone') });
+    check('depoda yer yoksa ithalat yapılmaz', !R.buy('stone') && /yer yok/.test(TP.importStatus(s0, 'stone').reason));
+    sim.give({ stone: 100 });
+
+    // --- Ayrılış ve 3-4 günlük takvim ---
+    events.length = 0;
+    leaveNow();
+    check('24 saat dolunca ayrılır; sözleşme ve ithalat kapanır', !tp.ship && events.some((e) => e.n === 'trade:shipLeft') && !TP.contractStatus(s0, 0).ok && /kasabada değil/.test(TP.importStatus(s0, 'wood').reason) && tp.log.length === 1);
+    R.update();
+    check('ayrılınca iskele boş çizilir', post.visitor === null);
+    const leftAt = s0.totalMinutes;
+    check('sonraki ziyaret 3 gün sonra 09:00', tp.nextShipAt === Math.floor(leftAt / 1440) * 1440 + 3 * 1440 + 540 || tp.nextShipAt === leftAt + 3 * 1440, `${leftAt} -> ${tp.nextShipAt}`);
+    arriveNow();
+    const a2 = s0.totalMinutes;
+    check('ikinci ziyaretin üçüncü talebi Erzak', tp.ship.contracts[2].resource === 'food' && tp.visits === 2);
+    leaveNow();
+    check('sonraki ziyaret 4 gün sonra (sırayla 3 ve 4)', Math.round((tp.nextShipAt - s0.totalMinutes) / 1440) === 4 || Math.floor(tp.nextShipAt / 1440) - Math.floor(s0.totalMinutes / 1440) === 4, `${a2} ${s0.totalMinutes} -> ${tp.nextShipAt}`);
+
+    // --- Pazar doygunluğu ---
+    tp.market = {};
+    tp.streak = { resource: 'cloth', count: 1 }; // ilk ziyarette kumaş satıldı
+    sim.give({ cloth: 200, sherbet: 100, bread: 100, food: 300, wool: 100, gold: 500 });
+    const sell = (resource) => R.complete(tp.ship.contracts.findIndex((c) => c.resource === resource));
+    arriveNow();
+    const p2 = sell('cloth');
+    leaveNow();
+    arriveNow();
+    const p3 = sell('cloth');
+    check('Kumaş 3 kez peş peşe satılınca bir sonraki fiyat %12 düşer', p2 === 40 && p3 === 40 && Math.abs(tp.market.cloth - 0.88) < 1e-9 && TP.contractPrice(s0, tp.ship.contracts[0]) === 35, JSON.stringify(tp.market));
+    leaveNow();
+    arriveNow();
+    const p4 = sell('cloth');
+    check('dördüncü satış düşük fiyattan (35 altın) ve çarpan yeniden düşer (%76)', p4 === 35 && Math.abs(tp.market.cloth - 0.76) < 1e-9);
+    const p5 = sell('sherbet');
+    check('başka mal (şerbet) satılınca kumaşın fiyatı %5 toparlanır, seri bozulur', p5 === 35 && Math.abs(tp.market.cloth - 0.81) < 1e-9 && tp.streak.resource === 'sherbet' && tp.streak.count === 1);
+    leaveNow();
+    arriveNow();
+    check('kumaş satılmayan ziyaretten sonra da her varışta %5 toparlanır', Math.abs(tp.market.cloth - 0.81) < 1e-9 || Math.abs(tp.market.cloth - 0.86) < 1e-9);
+    sell('sherbet');
+    leaveNow();
+    arriveNow();
+    check('satılmayan kumaş varışta toparlanır', Math.abs(tp.market.cloth - 0.86) < 1e-9 + 0.05 && tp.market.cloth > 0.81, JSON.stringify(tp.market));
+    for (let i = 0; i < 6; i++) {
+      leaveNow();
+      arriveNow();
+    }
+    check('zamanla eski kârlı seviyesine (tam fiyat) döner', tp.market.cloth === undefined && TP.priceMultiplier(s0, 'cloth') === 1 && TP.contractPrice(s0, tp.ship.contracts[0]) === 40);
+    tp.market = { cloth: 0.5 };
+    check('çarpan en düşük %55\'te durur (kayıttan bile)', TP.restoreTradePost({ market: { cloth: 0.1 } }).market.cloth === 0.55);
+    tp.market = {};
+    tp.streak = { resource: null, count: 0 };
+
+    // --- Gerçek saatler: takvim olaylarla işler; iskele çalışmıyorsa gelen olmaz ---
+    leaveNow();
+    tp.nextShipAt = s0.totalMinutes + 30;
+    post.isDamaged = true;
+    post.damaged = true;
+    hrs(2);
+    check('iskele hasarlıyken gemi / kervan gelmez', !tp.ship && tp.nextShipAt !== null);
+    post.damaged = false;
+    post.isDamaged = false;
+    hrs(2);
+    check('iskele onarılınca ilk saatte gelir (time:hour)', tp.ship && TP.shipDocked(s0), `gemi ${!!tp.ship} · sıradaki ${tp.nextShipAt} · şimdi ${s0.totalMinutes} · hazır ${TP.tradePostReady(s0)} · proje ${post.project?.kind} · işler ${post.functional} · state ${st() === s0} · hız ${s0.time.speed} · durdu ${s0.time.paused} · karar ${s0.dilemma.active?.id ?? '-'} · saat ${s0.time.hour}:${s0.time.minute}`);
+    hrs(26);
+    check('gerçek saatlerle 24 saat sonra ayrılır', !tp.ship && tp.nextShipAt > s0.totalMinutes);
+
+    // --- Panel: sözleşme kartları ve tek tıkla tamamlama ---
+    arriveNow();
+    sim.give({ cloth: 30, sherbet: 2, gold: 300, wood: 50 });
+    const panel = game.ui.components.find((x) => x.renderCrafting);
+    const show = () => { panel.buildingId = post.id; panel.element.hidden = false; panel.lastKey = ''; panel.render(game); };
+    show();
+    const cards = panel.tradeBox.querySelectorAll('.trade-contract');
+    const btns = [...panel.tradeBox.querySelectorAll('.contract-button')];
+    check('iskele panelinde üç sözleşme kartı ve ithalat düğmeleri', !panel.tradeBox.hidden && cards.length === 3 && btns.length === 3 && panel.tradeBox.querySelectorAll('.import-button').length === 3 && /burada/.test(panel.tradeBox.textContent));
+    check('yetmeyen malın düğmesi kapalı, yetenin açık', !btns[0].disabled && btns[1].disabled);
+    const c0 = s0.resources.cloth;
+    btns[0].click();
+    show();
+    check('karttaki düğmeye tıklayınca sözleşme tamamlanır', s0.resources.cloth === c0 - 10 && tp.ship.contracts[0].done && panel.tradeBox.querySelector('.trade-contract.is-done'));
+    const w0 = s0.resources.wood;
+    panel.tradeBox.querySelector('.import-button[data-kind="wood"]').click();
+    check('ithalat düğmesiyle Odun Paketi alınır', s0.resources.wood === w0 + 30);
+    leaveNow();
+    show();
+    check('gemi yokken panel sıradaki varışı gösterir', /Sıradaki gemi \/ kervan/.test(panel.tradeBox.textContent) && panel.tradeBox.querySelectorAll('.trade-contract').length === 0);
+    panel.buildingId = null;
+    panel.element.hidden = true;
+
+    // --- Görseller ---
+    const p0 = ART.getStructureSprite('tradingPost', {});
+    const pd = ART.getStructureSprite('tradingPost', { docked: true });
+    const shipS = ART.getTradeShipSprite(false, false);
+    const shipL = ART.getTradeShipSprite(true, true);
+    const car = ART.getCaravanSprite(false);
+    check('iskele 48x40 (gemi gelince flamalı), gemi 40x32, kervan 40x28; aynalı ve gece fenerli çeşitleri', p0.width === 48 && p0.height === 40 && pd.toDataURL() !== p0.toDataURL() && shipS.width === 40 && shipS.height === 32 && car.width === 40 && car.height === 28 && shipL.toDataURL() !== shipS.toDataURL() && ART.getStructureSprite('tradingPost', { season: 'winter' }).toDataURL() !== p0.toDataURL());
+    check('sözleşme simgesi', UI.getIconDataURL('contract'));
+
+    // --- Kayıt gidiş-dönüşü (sürüm 23) ---
+    arriveNow();
+    sim.give({ cloth: 40 });
+    R.complete(0);
+    R.buy('iron');
+    tp.market = { sherbet: 0.76 };
+    tp.streak = { resource: 'cloth', count: 2 };
+    const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
+    game.events.emit('ui:save');
+    const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    check('kayıt sürümü 23: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 23 && raw.version === 23 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    game.events.emit('ui:load');
+    const t2 = st().tradePost;
+    check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
+    check('yüklenen kasabada gemi hâlâ burada, kalan sözleşme tamamlanabilir', TP.shipDocked(st()) && (() => { sim.give({ bread: 50, food: 100, wool: 50 }); return game.scenes.current.tradePost.complete(2) > 0; })());
+    // Bozuk değerler
+    game.events.emit('ui:save');
+    const bad = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    bad.tradePost.market = { cloth: 'ucuz', sherbet: 7, iron: 0.2 };
+    bad.tradePost.ship.contracts.push({ resource: 'altın', qty: 5, gold: 999 });
+    bad.tradePost.ship.stock.wood = 99;
+    bad.tradePost.streak = { resource: 'kömür', count: 5 };
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(bad));
+    game.events.emit('ui:load');
+    const t3 = st().tradePost;
+    check('bozuk çarpan, bilinmeyen mal, taşan stok ve seri temizlenir', Object.keys(t3.market).length === 0 && t3.ship.contracts.length === 3 && t3.ship.stock.wood === 3 && t3.streak.resource === null);
+    // Eski (v22) kayıt
+    game.events.emit('ui:save');
+    const old = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    old.version = 22;
+    delete old.tradePost;
+    old.buildings = old.buildings.filter((b) => b.type !== 'tradingPost');
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(old));
+    game.events.emit('ui:load');
+    const t4 = st().tradePost;
+    check('v22 kaydı yüklenince dış ticaret boş: gemi, takvim, sözleşme ve çarpan yok', !t4.ship && t4.nextShipAt === null && t4.visits === 0 && Object.keys(t4.market).length === 0 && t4.completed === 0 && !st().buildings.some((b) => b.type === 'tradingPost'));
+    check('v22 kasabasına iskele kurulunca takvim kurulur (ilk gemi gelir) ve bir gün sorunsuz yaşar', (() => {
+      st().town.tier = 4;
+      sim.give({ wood: 400, stone: 400, iron: 100 });
+      const b = sim.place('tradingPost');
+      const d = st().time.day;
+      hrs(24);
+      window.__v22dbg = `yapı ${!!b} · takvim ${st().tradePost.nextShipAt} · gemi ${!!st().tradePost.ship} · gün ${d}->${game.state.time.day}`;
+      return b && (st().tradePost.nextShipAt !== null || st().tradePost.ship) && st().tradePost.visits <= 1 && game.state.time.day === d + 1;
+    })(), window.__v22dbg);
     offs.forEach((off) => off());
   }
 

@@ -92,7 +92,7 @@ export const MERCHANT = {
 //   grandVoyage  : (14. aşama) Büyük İhracat Seferi fermanı: fiyat (altın), bekleme, kapasite katı, geçici sınır, değer bonusu
 // ---------------------------------------------------------------------------
 export const EXPORT = {
-  values: { wood: 1, stone: 1, food: 1, wool: 3, iron: 4, bread: 3 },
+  values: { wood: 1, stone: 1, food: 1, wool: 3, iron: 4, bread: 3, cloth: 6, sherbet: 7 }, // (24.3) kumaş ve fıçı şerbeti limanla da gider
   thresholds: [null, 250, 400, 550],
   defaultThreshold: 400,
   crate: { perResource: 40, minStock: 100 },

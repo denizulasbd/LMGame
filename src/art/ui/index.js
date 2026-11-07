@@ -441,6 +441,18 @@ Object.assign(ICONS, {
     '..KKKKK..',
     '.........',
   ],
+  // (24.3) İhracat sözleşmesi: kırmızı mühürlü parşömen
+  contract: [
+    '.KKKKKKK.',
+    'KSSSSSSSK',
+    '.KsKKKsK.',
+    '.KSSSSSK.',
+    '.KsKKsSK.',
+    '.KSSSooK.',
+    '.KsKoooK.',
+    'KSSSSoSSK',
+    '.KKKKKKK.',
+  ],
   // (24.2) Kumaş: katlanmış iki top keten kumaş (açık bej, mavi şeritli)
   cloth: [
     '.........',

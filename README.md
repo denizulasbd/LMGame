@@ -37,6 +37,7 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 | Yapı panelinde **Yükselt** / **Onarımı Başlat** | Yapıyı Seviye 2'ye yükselt ya da harabeyi onar (maliyet peşin) |
 | Yapı panelinde **İşten Çıkar** / **Geri Al** | Çalışanı o iş yerinden çıkar (başka iş arar) / yeniden çalışabilsin |
 | Zanaat Atölyesi panelinde **Otomatik / Alet / Palto / Çanta** | Atölyenin ne üreteceğini seç |
+| Ticaret İskelesi panelinde **Sözleşmeyi Tamamla** / **Odun · Taş · Demir Paketi** | (24.3) Gemi / kervan buradayken ihracat talebini tek tıkla tamamla (mallar depodan düşer, hazineye altın girer) ya da altınla hammadde paketi ithal et (anında ambara iner) |
 | Dokuma Tezgâhı / Şerbethane paneli | (24.2) Saatlik oran (2 keten → 1 kumaş, 2 şerbetçiotu → 1 fıçı), dokunan kumaş ve refah katkısı, hanlardaki fıçılar; **İşçi Ata** ile dokumacı / mahzen ustası sabitlenebilir |
 | Sebze Bahçesi panelinde **Ekim Tercihi: Buğday / Keten / Şerbetçiotu** | (24. aşama) Bahçeye ne ekileceğini seç: Buğday / Sebze yiyecek, Keten ve Meyve / Şerbetçiotu yeni hammadde üretir |
 | Üst çubukta **Mallar ▾** | İşlenmiş malların (Yün, Demir, Ekmek) açılır listesi: miktar, depo sınırı, üreticiler (seçim hatırlanır) |
@@ -473,8 +474,11 @@ izi, bekleyen baskın, sayaçlar, son olaylar), binalara `isBurning` / `fireProg
 Ürün Silosu'nun kapasitesi kayda girmez, yüklenince yapılardan yeniden hesaplanır. 24.2'de Kumaş ve Fıçı Şerbeti stokları
 (`resources.cloth`, `resources.sherbet`; toplam üretim `stats.goods.cloth / sherbet`), Dokuma Tezgâhı ve Şerbethane, handaki fıçılar
 (`buildings[].sherbet`), çantada Dayanıklı Giysi ve Şerbet Testisi (`inventory`: `garment`, `sherbetJug`), "Keyifli Damak" morali
-(`buffs.merryPalate`) ve yeni sayaçlar (`stats.sherbetServed`, `sherbetJugs`, `jugsDrunk`, `garments`) eklendi. Kayıt sürümü 22'dir;
-24.1'in (sürüm 21) kayıtları da açılır (Kumaş / Fıçı Şerbeti 0, hanlarda fıçı yok); 4.–23. aşamanın (sürüm 2–20) kayıtları da
+(`buffs.merryPalate`) ve yeni sayaçlar (`stats.sherbetServed`, `sherbetJugs`, `jugsDrunk`, `garments`) eklendi. 24.3'te dış ticaret
+(`tradePost`: demirli gemi / kervan — varış ve ayrılış anı, gemi mi kervan mı, üç ihracat sözleşmesi ve tamamlanma durumları, ödenen
+fiyat, ithalat stoğu, bu ziyarette satılanlar —, sıradaki varış, ziyaret sayısı, pazar çarpanları, peş peşe satış serisi, sayaçlar,
+son ziyaretlerin günlüğü) ve Ticaret İskelesi eklendi. Kayıt sürümü 23'tür; 24.2'nin (sürüm 22) kayıtları da açılır (dış ticaret boş;
+iskele kurulunca takvim kurulur); 24.1'in (sürüm 21) kayıtları da açılır (Kumaş / Fıçı Şerbeti 0, hanlarda fıçı yok); 4.–23. aşamanın (sürüm 2–20) kayıtları da
 açılır (bütün bahçeler Buğday / Sebze ekili başlar, Keten ve Şerbetçiotu 0, silo sayaçları boştur; geçersiz bir mahsul değeri de Buğday'a döner);
 4.–22. aşamanın (sürüm 2–19) kayıtları da açılır (hiçbir yapı yanmaz / hasarlı değildir, kimse yaralı değildir, Dengeli,
 ilk yükleme gününde kriz çıkmaz); 4.–21. aşamanın (sürüm 2–18) kayıtları da
@@ -2638,6 +2642,77 @@ Bozuk bir fıçı değeri 0'a döner; han olmayan yapıda fıçı tutulmaz.
   tezgâh ve şerbethane kurdu (kuleden sonraki birkaç günde): 379 top kumaş, 262 fıçı, handa 115 bardak, 57 testi, 24 Dayanıklı Giysi; açken
   çalışan lüks işçi 0.
 
+## Dış ticaret: Ticaret İskelesi / Kervan Konağı, ihracat sözleşmeleri ve hammadde ithalatı (24. aşama, 24.3 mikro adımı)
+
+24.1-24.2'de kurulan tarım ve işleme zinciri dış dünyaya açıldı: Kumaş, Fıçı Şerbeti ve erzak düzenli bir ticaret döngüsüyle hazineye,
+hazinedeki altın da geç oyunda azalan ağaç ve taş rezervlerinin yerine hammaddeye dönüşüyor. Sayılar `data/tradePost.js`'te, saf
+hesaplar `systems/TradePost.js`'te, takvim ve olaylar `systems/TradePostSystem.js`'tedir. Katman **rastgelelik kullanmaz**: talepler ve
+takvim ziyaret sayısından türetilir, hiçbir üretecin sırası değişmez.
+
+### Ticaret İskelesi / Kervan Konağı (`tradingPost`, 3x2, Kasaba seviyesi)
+
+- Odun 70, Taş 50, Demir 20; kasabada bir tane. Ayak izinin bir kenarı **suya** (iskele) ya da bir **yola** (patika, parke, taş plaka,
+  köprü; kervan konağı) değmelidir; ikisinden uzak yer "Nehir kıyısına (iskele) ya da bir yolun kenarına (kervan konağı) kurulmalı"
+  diye reddedilir.
+- İskele tamamlanınca en az 12 saat sonra, 09:00'da ilk **Ticaret Gemisi** (yanında su varsa; suya doğru demir atar) ya da **Kervan**
+  (çadırını yol tarafına kurar) gelir ve **24 saat kalır**. Sonraki ziyaretler sırayla **3 ve 4 gün** sonra 09:00'dadır. İskele çalışmıyorsa
+  (şantiye, hasar, yangın) gelen olmaz, vakti geçmişse ilk uygun saatte uğrar. Varış Kasaba Günlüğü'ne ve bildirime yazılır; gemi / kervan
+  buradayken iskelenin tentesine renkli flamalar asılır.
+
+### İhracat sözleşmeleri ve pazar doygunluğu
+
+| Talep | Teslim | Taban altın |
+|---|---|---|
+| Kumaş Talebi (her ziyarette) | 10 Kumaş | 40 |
+| Şerbet Talebi (her ziyarette) | 8 Fıçı Şerbeti | 35 |
+| Ekmek Talebi / Erzak Talebi / Yün Talebi (sırayla) | 25 Ekmek / 40 Yiyecek / 15 Yün | 20 / 18 / 30 |
+
+- Panelde her talep bir kart olarak görünür; depoda yeterli mal varsa **Sözleşmeyi Tamamla** tek tıkla malları yükler ve toplu altını
+  Kasaba Hazinesi'ne yazar. Her sözleşme bir ziyarette bir kez tamamlanır.
+- **Doygunluk:** aynı mal **3 kez peş peşe** ihraç edilince o malın fiyatı **%12 düşer** (sonraki her peş peşe satışta yeniden; en düşük %55).
+  Başka bir mal satılınca öteki malların fiyatı %5 toparlanır; her yeni ziyarette, önceki ziyarette satılmayan malların fiyatı %5 toparlanır.
+  Böylece satış çeşitlendikçe fiyat eski kârlı seviyesine döner. Panel düşük çarpanları gösterir.
+- Büyük Ticaret Limanı'nın otomatik fazlalık ihracatı da artık kumaşı (birim 6 altın) ve fıçı şerbetini (7 altın) götürür.
+
+### Hammadde ithalatı
+
+Gemi / kervan buradayken panelden altınla **Odun Paketi** (30 odun → 15 altın), **Taş Paketi** (25 taş → 15 altın) ve **Demir Paketi**
+(10 demir → 20 altın) alınır; mallar **anında ambara iner** (depoda yer olmalı). Her paketten ziyaret başına 3 tane vardır.
+
+### Kayıt (sürüm 23)
+
+`tradePost` (gemi takvimi, demirli gemi ve sözleşmeleri, pazar çarpanları, seri, sayaçlar) kayda girer; demirli bir gemiyle kaydedilen oyun
+yüklenince gemi kalan süresi ve tamamlanmış sözleşmeleriyle yerinde durur. Sürüm 2-22 kayıtlarında dış ticaret boştur. Bozuk çarpanlar,
+bilinmeyen mallar, taşan ithalat stoğu ve geçersiz seri temizlenir.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 834; 53'ü bu adımın): tanım, menü, talepler ve paketler; Kasaba kilidi; yol / su kenarı yerleşimi ve
+  uzak yerin reddi; suyun yanında gemi, yolda kervan; ilk varış (12 saat sonra 09:00), vakti gelmeden gelmeme, 24 saatlik kalış, varış
+  bildirimi ve günlük, iskelede çizilen gemi / kervan; Kumaş (10 → 40) ve Ekmek (25 → 20) sözleşmeleri, ikinci kez ödenmeme, yetersiz mal;
+  ithalat (paketler, ziyaret başına 3, yetersiz altın, depoda yer yok, gemi yokken kapalı); ayrılış ve 3 / 4 günlük aralık, üçüncü talebin
+  sırası; doygunluk (3 peş peşe satışta %12 düşüş, dördüncüde yeniden, başka malla %5 toparlanma ve serinin bozulması, ziyaretlerle tam
+  fiyata dönüş, %55 taban); gerçek saatlerle hasarlı iskeleye gelmeme, onarılınca gelme ve 24 saat sonra ayrılma; panelde üç kart, kapalı /
+  açık düğmeler, tıklayınca tamamlama ve ithalat; görseller; kayıt sürümü 23 gidiş-dönüşü (demirli gemi dahil), bozuk değerler, v22 kaydı ve
+  v22 kasabasına iskele kurulması.
+- **Denetim** (`audit.mjs`): 108/108 (bekçi gemi / kervanın 24 saati aşmamasını, 3 sözleşmeyi, iskelesiz gemiyi ve pazar çarpanlarını da
+  denetler). **Geriye uyumluluk** (`compat.mjs`, sürüm 2-23, 605): `save-v23.json` bu adımın otopilotuyla 44 günlük oyundur (`--crisis-state`;
+  4 ziyaret, 10 sözleşme, +313 altın). v2-v22 kayıtlarında dış ticaret boştur; v23 kaydında takvim, sözleşmeler ve sayaçlar korunur.
+  - **Uyumluluk kontrolü düzeltmesi:** fikstürler aktif bir krizle (yanan yapı, bekleyen baskın) kaydedilir; oyunun kuralı gereği böyle bir
+    kayıt yüklenince ilk 24 saatte kriz koruması yoktur. 23. aşamanın kontrolü buna rağmen yeni yangın çıkmamasını şart koşuyordu (v20-v22'de
+    şans eseri geçiyordu; v23'te yüklemeden sonra bir doğal yangın çıktı). Kontrol artık korumalı kayıtta eskisi gibi sıkı, aktif kriz
+    kaydında yalnızca sayaçların tutarlılığını denetler.
+- **Otopilot:** Ulu Saat Kulesi ve Dokuma Tezgâhı tamamlandıktan sonra yolun / nehrin kenarına bir Ticaret İskelesi kurar. Gemi / kervan
+  buradayken rezervler korunduğu sürece (en az 10 kumaş, 5 fıçı şerbet, 30 yün; ekmek / erzak satışından sonra kişi başı en az 12 besin)
+  sözleşmeleri tamamlar; hazinede vergi ayrıldıktan sonra 400+ altın varken odun 60, taş 50, demir 20'nin altına inince paket ithal eder.
+  `autopilot.mjs 42 44`: kule G25 / G27 / G28 (`main` ile aynı), iskele G29, 4 ziyaret, 10 sözleşme (+313 altın; 30 kumaş, 24 fıçı, 50 ekmek,
+  40 erzak, 15 yün), rezerv için bekletilen 3 sözleşme, ithalat 0 (hammadde hiç kritik eşiğin altına inmedi).
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 36`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0,
+  üretmeyen iş yeri 0, sayfa hatası 0. **Ulu Saat Kulesi 6/6; Altın Çağ G31, G33, G31, G28, G34, G34** (24.1 / 24.2 ile birebir aynı; `main`'de
+  G31, G34, G31, G28, G35, G34). Gıda arzı (kişi başı en düşük besin 1,2 / 0,2 / 1,0 / 0,8 / 1,7 / 0,2; kritik gıda saati 15 / 36 / 15 / 25 / 2 / 39)
+  ve en düşük Yönetim Güveni (%75) her koşuda `main` ile aynı. Altı kasabanın altısı kuleden sonra iskele kurdu: 7 ziyaret, 15 sözleşme,
+  +448 altın; 36 günde hiçbir kasabada hammadde kritik eşiğe inmediği için ithalat yapılmadı.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -2685,7 +2760,7 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
 | `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması / Çağ Kutlaması / isyan ve yağma / tahsildar, ferman ve köyü terk eden sakin sırasında, yangın ve haydut izi sürerken kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |
-| `node tools/sim/autopilot.mjs 42 40` | Hilesiz otopilotla 40 günlük oyun (24.2: kuleden sonra Dokuma Tezgâhı, Şerbethane ve dördüncü bahçe kurar; kumaş, fıçı, handa içilen şerbet, testi ve giysiler raporlanır; 24. aşama: gıda kritikse bahçeleri Buğday'a döndürür, kuleden sonra Ürün Silosu kurar ve bir bahçeye Keten, birine Şerbetçiotu ektirir; `--no-agri` bunu kapatır; gıda güvencesi (kişi başı en düşük besin, kritik gıda saati), ekim değişiklikleri ve bozulan mahsul raporlanır; 23. aşama: Su Kuyusu ve Gözcü Kulesi diker, yangını söndürür, hasarı tamir eder, baskına karşı püskürtür / haraç öder; `--crisis huzurlu|dengeli|cetin`, `--no-safety` (22. aşamayla bire bir aynı koşu), `--crisis-state` (fikstür için kriz durumu kurar); 18. aşama: kapıları yola bağlar, parke döşer, süs ve ağaç diker; döşenen yol, estetik ve yürüyüşlerin yoldan geçme oranı raporlanır): günlük özet (araştırma, altın, sefer, harika aşaması, yadigâr ve harcanan altın dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya, altının yadigâr / lüks mal / fermanlara ne kadar harcandığı, peyzaj ve son 12 günün ortalama stoğu; (14. aşama) mevsim festivalleri ve katılımcıları, anı sayıları ve örnek bir sakinin anıları, nadir hava olayları, Büyük İhracat Seferi sayısı. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar, `--speed 1\|2\|4` oyun hızını seçer, `--json rapor.json` bekçi raporunu yazar (takılma ya da kopuk referans varsa çıkış 1) |
+| `node tools/sim/autopilot.mjs 42 40` | Hilesiz otopilotla 40 günlük oyun (24.3: kuleden ve tezgâhtan sonra Ticaret İskelesi kurar, rezervleri koruyarak ihracat sözleşmelerini tamamlar, altın bolken kritik hammaddeyi ithal eder; ziyaretler, sözleşmeler, ithalat ve pazar çarpanları raporlanır; 24.2: kuleden sonra Dokuma Tezgâhı, Şerbethane ve dördüncü bahçe kurar; kumaş, fıçı, handa içilen şerbet, testi ve giysiler raporlanır; 24. aşama: gıda kritikse bahçeleri Buğday'a döndürür, kuleden sonra Ürün Silosu kurar ve bir bahçeye Keten, birine Şerbetçiotu ektirir; `--no-agri` bunu kapatır; gıda güvencesi (kişi başı en düşük besin, kritik gıda saati), ekim değişiklikleri ve bozulan mahsul raporlanır; 23. aşama: Su Kuyusu ve Gözcü Kulesi diker, yangını söndürür, hasarı tamir eder, baskına karşı püskürtür / haraç öder; `--crisis huzurlu|dengeli|cetin`, `--no-safety` (22. aşamayla bire bir aynı koşu), `--crisis-state` (fikstür için kriz durumu kurar); 18. aşama: kapıları yola bağlar, parke döşer, süs ve ağaç diker; döşenen yol, estetik ve yürüyüşlerin yoldan geçme oranı raporlanır): günlük özet (araştırma, altın, sefer, harika aşaması, yadigâr ve harcanan altın dahil), olay günlüğü, ekipman ve refah özeti, sonunda stokların araştırma / ihracat / harikaya, altının yadigâr / lüks mal / fermanlara ne kadar harcandığı, peyzaj ve son 12 günün ortalama stoğu; (14. aşama) mevsim festivalleri ve katılımcıları, anı sayıları ve örnek bir sakinin anıları, nadir hava olayları, Büyük İhracat Seferi sayısı. `--passive` kararları zaman aşımına bırakır, `--quiet` yalnızca sonu basar, `--save dosya.json` kaydı yazar, `--speed 1\|2\|4` oyun hızını seçer, `--json rapor.json` bekçi raporunu yazar (takılma ya da kopuk referans varsa çıkış 1) |
 | `node tools/sim/preview.mjs ["başlık"]` | Sanat önizleme sayfasının bölümlerinin ekran görüntüleri (`tools/sim/out/`) |
 | `node tools/sim/showcase.mjs 11` | Oyun içi vitrin: yeni yapılar ve hayvanlar, liman ve yanaşan tekne, Bilgelik Evi, harika, peyzaj ve çardak, yadigârlı konak, yapı panelleri, Kasaba Arşivi, fotoğraf modu, karar penceresi, fermanlar, gece görünümü, dört mevsim festivali, sabah sisi, Toplanma Zili, yaz fırtınası, anılar paneli |
 

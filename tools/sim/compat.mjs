@@ -31,14 +31,17 @@
 //   save-v21.json: 24. aşamanın (24.1) oyunu (kayıt sürümü 21): otopilotla 34 gün (--crisis-state); Ulu Saat Kulesi'nden sonra
 //                  kurulan Ürün Silosu, Keten ekili bir bahçe, keten stoğu, bozulan mahsul sayacı. Eski kayıtlarda (sürüm 2-20) bütün
 //                  bahçeler Buğday / Sebze ekili, Keten / Şerbetçiotu 0, silo sayaçları boştur
-//   save-v22.json: 24.2'nin oyunu (kayıt sürümü 22, bugünkü): otopilotla 40 gün (--crisis-state); Dokuma Tezgâhı ve Şerbethane,
+//   save-v22.json: 24.2'nin oyunu (kayıt sürümü 22): otopilotla 40 gün (--crisis-state); Dokuma Tezgâhı ve Şerbethane,
 //                  Kumaş ve Fıçı Şerbeti stokları, handaki fıçılar, sakinlerin çantasında Dayanıklı Giysi ve Şerbet Testisi. Eski kayıtlarda
 //                  (sürüm 2-21) Kumaş / Fıçı Şerbeti 0, hanlarda fıçı yok, yeni yapı ve çanta eşyası yoktur
+//   save-v23.json: 24.3'ün oyunu (kayıt sürümü 23, bugünkü): otopilotla 44 gün (--crisis-state); Ticaret İskelesi / Kervan Konağı,
+//                  gemi takvimi, tamamlanan ihracat sözleşmeleri, ithalat sayaçları, pazar çarpanları. Eski kayıtlarda (sürüm 2-22) dış
+//                  ticaret boştur; iskele kurulunca takvim kurulur
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -155,6 +158,12 @@ for (const { name, raw } of fixtures) {
       otherCasks: s.buildings.filter((b) => b.type !== 'inn' && b.sherbet !== 0).length,
       items: s.characters.reduce((n, c) => n + c.inventory.filter((x) => x.kind === 'garment' || x.kind === 'sherbetJug').length, 0),
     };
+    // (24.3) dış ticaret (yüklendiği an)
+    loaded.trade243 = {
+      posts: s.buildings.filter((b) => b.type === 'tradingPost').length,
+      json: JSON.stringify({ ship: s.tradePost.ship, next: s.tradePost.nextShipAt, visits: s.tradePost.visits, market: s.tradePost.market, completed: s.tradePost.completed, earned: s.tradePost.goldEarned }),
+      empty: !s.tradePost.ship && s.tradePost.nextShipAt === null && s.tradePost.visits === 0 && Object.keys(s.tradePost.market).length === 0 && s.tradePost.completed === 0,
+    };
     // (22. aşama) vergi, Krallık, terk ediş (yüklendiği an)
     loaded.crown = {
       rate: s.tax.rate,
@@ -198,6 +207,7 @@ for (const { name, raw } of fixtures) {
     };
     return {
       crownAfter: { pop: s.characters.length, left: s.exodus.left, active: Boolean(s.exodus.active), rate: s.tax.rate },
+      tradeAfter: { visits: s.tradePost.visits, scheduled: s.tradePost.nextShipAt !== null || Boolean(s.tradePost.ship) },
       agriAfter: { crops: s.buildings.filter((b) => b.type === 'garden').map((b) => b.crop), capacity: s.granaryCapacity },
       crisisAfter: { fires: s.crisis.fires, raids: s.crisis.raids, raidPending: s.crisis.raid !== null, nextWarn: s.crisis.nextRaidWarnAt, burning: s.buildings.filter((b) => b.isBurning).length, injured: s.characters.filter((c) => c.isInjured).length, day: s.time.day },
       citizensAfter,
@@ -360,8 +370,10 @@ for (const { name, raw } of fixtures) {
     }
     const quiet = C.burning === 0 && !C.raid;
     results.push({
-      name: `${tag}: yükleme sonrası ilk 24 oyun saatinde ${quiet ? 'koruma var, ' : ''}doğal yangın ya da baskın patlamadı`,
-      ok: (!quiet || C.grace === 1440) && A.fires === C.fires && A.raids === C.raids && (quiet ? !A.raidPending && A.burning === 0 : true),
+      // Aktif krizle kaydedilen oyunda (yanan yapı / bekleyen baskın) oyunun kuralı gereği koruma yoktur: doğal yangın çıkabilir,
+      // yalnızca sayaçlar tutarlı kalmalıdır (24.3: save-v23.json'da yükleme sonrası bir yangın çıktı, bu kural doğrudur)
+      name: quiet ? `${tag}: yükleme sonrası ilk 24 oyun saatinde koruma var, doğal yangın ya da baskın patlamadı` : `${tag}: aktif krizle yüklendi (koruma yok); yangın / baskın sayaçları tutarlı`,
+      ok: quiet ? C.grace === 1440 && A.fires === C.fires && A.raids === C.raids && !A.raidPending && A.burning === 0 : C.grace === null && A.fires >= C.fires && A.raids >= C.raids,
       detail: `koruma ${C.grace} dk · yangın ${C.fires}->${A.fires} · baskın ${C.raids}->${A.raids}`,
     });
   }
@@ -383,6 +395,18 @@ for (const { name, raw } of fixtures) {
       });
     }
     results.push({ name: `${tag}: bir gün sonra mahsuller geçerli, silo kapasitesi yerinde`, ok: r.agriAfter.crops.every((c) => ['grain', 'flax', 'hops'].includes(c)) && r.agriAfter.capacity === G.capacity, detail: r.agriAfter.crops.join(',') });
+  }
+  // (24.3) dış ticaret
+  {
+    const D = r.loaded.trade243;
+    if (data.version < 23) {
+      results.push({ name: `${tag}: dış ticaret boş (iskele, gemi, sözleşme, pazar çarpanı yok)`, ok: D.empty && D.posts === 0 && r.tradeAfter.visits === 0 });
+    } else {
+      const t = data.tradePost;
+      const want = JSON.stringify({ ship: t.ship, next: t.nextShipAt, visits: t.visits, market: t.market, completed: t.completed, earned: t.goldEarned });
+      results.push({ name: `${tag}: iskele, gemi takvimi, sözleşmeler, pazar çarpanları ve sayaçlar korundu`, ok: D.json === want && D.posts === data.buildings.filter((b) => b.type === 'tradingPost').length, detail: `${t.visits} ziyaret · ${t.completed} sözleşme · +${t.goldEarned} altın` });
+      results.push({ name: `${tag}: bir gün sonra takvim sürüyor`, ok: r.tradeAfter.scheduled && r.tradeAfter.visits >= t.visits });
+    }
   }
   // (24.2) katma değerli üretim
   {

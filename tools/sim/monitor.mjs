@@ -42,6 +42,7 @@ export async function installMonitor(page) {
     // (24. aşama) eski sürümlerde (karşılaştırma koşuları) bu modül yoktur: tarım denetimi atlanır, gıda güvencesi yine ölçülür
     window.__granaryMod = await import('/src/systems/Granary.js').catch(() => null);
     window.__refineryMod = await import('/src/systems/Refinery.js').catch(() => null); // (24.2)
+    window.__tradeMod = await import('/src/systems/TradePost.js').catch(() => null); // (24.3)
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -309,6 +310,18 @@ export async function installMonitor(page) {
           }
         }
 
+        // ---- (24.3) Dış ticaret: gemi 24 saatten fazla kalmaz, sözleşmeler ve çarpanlar geçerli ----
+        if (window.__tradeMod && s.tradePost) {
+          const tp = s.tradePost;
+          if (tp.ship) {
+            if (now > tp.ship.leavesAt + 120) broke('ticaret gemisi / kervanı ayrılma vaktini aştı');
+            if (tp.ship.contracts.length !== 3) broke(`ticaret gemisinde ${tp.ship.contracts.length} sözleşme`);
+            if (!s.buildings.some((b) => b.type === 'tradingPost')) broke('iskele yokken gemi / kervan var');
+          }
+          for (const [r, v] of Object.entries(tp.market)) if (!(v >= 0.55 && v < 1)) broke(`geçersiz pazar çarpanı ${r}: ${v}`);
+          m.tradeMinMarket = Math.min(m.tradeMinMarket ?? 1, ...Object.values(tp.market), 1);
+        }
+
         // ---- (23. aşama) Krizler: yangın, hasar, haydut baskını, yaralanma ----
         {
           const KD = window.__crisisData;
@@ -464,6 +477,21 @@ export async function installMonitor(page) {
                 spoiled: { ...(s.granary?.spoiled ?? {}) },
                 switches: s.granary?.switches ?? 0,
                 granaryCapacity: s.granaryCapacity ?? 0,
+              }
+            : null,
+          // (24.3)
+          trade: window.__tradeMod && s.tradePost
+            ? {
+                posts: s.buildings.filter((b) => b.type === 'tradingPost' && b.functional).length,
+                visits: s.tradePost.visits,
+                completed: s.tradePost.completed,
+                goldEarned: s.tradePost.goldEarned,
+                goldSpent: s.tradePost.goldSpent,
+                imports: s.tradePost.imports,
+                exported: { ...s.tradePost.exported },
+                imported: { ...s.tradePost.imported },
+                market: { ...s.tradePost.market },
+                minMarket: m.tradeMinMarket ?? 1,
               }
             : null,
           // (24.2)

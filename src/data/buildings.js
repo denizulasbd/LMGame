@@ -23,6 +23,7 @@ import { GROUND_TILES } from './tiles.js';
 //   storageBonus : depo kapasitesine eklenen miktar
 //   granary      : (24. aşama) { capacity } yalnızca tarımsal kaynakların (data/crops.js -> AGRI_KEYS) depo kapasitesine
 //                  eklenen miktar; kasabada işleyen bir silo varsa mahsuller yağmurda / kışın bozulmaz (Ürün Silosu)
+//   placement 'tradeSite' : (24.3) ayak izi suya (iskele) ya da yola (kervan konağı) bitişik olmalı (Ticaret İskelesi)
 //   luxury       : (24.2) lüks / ticaret fazlası iş: iş seçiminde üretimden sonra gelir, kasaba açken boşta kalır (data/refinery.js)
 //   processing.worker / waiting / active / ready : (24.2) işleme yapısının panel metinleri (değirmenin eski metinleri varsayılan)
 //   crops        : (24. aşama) yapının ekebileceği mahsuller (data/crops.js; ilki varsayılan). Seçilen mahsul production'ın
@@ -493,6 +494,24 @@ export const BUILDINGS = {
     cost: { wood: 30, stone: 20 },
     buildWork: 200,
     storageBonus: 100,
+  },
+  // --- 24.3: dış ticaret (data/tradePost.js) ---
+  tradingPost: {
+    name: 'Ticaret İskelesi',
+    size: { w: 3, h: 2 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Ticaret',
+    description:
+      'Nehir kıyısında iskele ya da yol kenarında kervan konağı: ahşap ambar, tartı ve sandıklar. 3-4 günde bir Ticaret Gemisi (yanında su varsa) ya da Kervanı gelir, 24 saat kalır; ihracat sözleşmeleriyle kumaş, şerbet ve erzak satılır, altınla odun, taş ve demir ithal edilir.',
+    cost: { wood: 70, stone: 50, iron: 20 },
+    buildWork: 260,
+    allowedTiles: [...GROUND_TILES, 'sand'],
+    placement: 'tradeSite',
+    requiresTier: 3,
+    litHours: { from: 18.5, to: 6.5 },
   },
   // --- 24.2: katma değerli üretim (lüks / ticaret fazlası işler; data/refinery.js) ---
   loom: {
@@ -1062,6 +1081,7 @@ export const BUILD_MENU = [
   'healerHut',
   'market',
   'harbor',
+  'tradingPost',
   'academy',
   'townHall',
   'monument',
