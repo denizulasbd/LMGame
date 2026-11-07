@@ -68,6 +68,9 @@ import { TaxSystem } from '../systems/TaxSystem.js';
 import { CrownSystem } from '../systems/CrownSystem.js';
 import { DesertionSystem } from '../systems/DesertionSystem.js';
 import { CrisisSystem } from '../systems/CrisisSystem.js';
+import { GranarySystem } from '../systems/GranarySystem.js';
+import { RefinerySystem } from '../systems/RefinerySystem.js';
+import { TradePostSystem } from '../systems/TradePostSystem.js';
 import { getFestivalDecorSprite } from '../art/sprites/index.js';
 import { SNOWMAN_STAGES } from '../data/festivals.js';
 import { TILE_TYPES, TILE_BY_ID, isGround, OBJECT_TYPES } from '../data/tiles.js';
@@ -168,6 +171,12 @@ export class TownScene extends Scene {
     this.desertion = new DesertionSystem(this.game, this.world, { jobs: this.jobs }, new Random(state.seed + 25), { attract: this.attract });
     // (23. aşama) Yönetilebilir krizler: yangın ve itfaiye, haydut baskınları, hasar / tamir, yaralanma (ana üretece dokunmaz)
     this.crisis = new CrisisSystem(this.game, this.world, { economy: this.economy, trust: this.trust, construction: this.construction, social: this.social }, new Random(state.seed + 26), { attract: this.attract });
+    // (24. aşama) Tarımsal çeşitlilik: bahçenin ekim tercihi, Ürün Silosu ve silosuz kasabada mahsul bozulması (rastgelelik yok)
+    this.granary = new GranarySystem(this.game, this.world, { economy: this.economy });
+    // (24.2) Katma değerli üretim: handa fıçı şerbeti, Şerbet Testisi (tezgâh ve mahzen işleme yapısıdır; rastgelelik yok)
+    this.refinery = new RefinerySystem(this.game, this.world, { economy: this.economy });
+    // (24.3) Dış ticaret: Ticaret İskelesi / Kervan Konağı, ihracat sözleşmeleri, pazar doygunluğu, ithalat (rastgelelik yok)
+    this.tradePost = new TradePostSystem(this.game, this.world, { economy: this.economy });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       crisis: this.crisis,
@@ -224,6 +233,7 @@ export class TownScene extends Scene {
       this.dilemmas,
       this.expeditions,
       this.nature,
+      this.tradePost,
     ];
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
@@ -267,6 +277,9 @@ export class TownScene extends Scene {
       this.crown,
       this.desertion,
       this.crisis,
+      this.granary,
+      this.refinery,
+      this.tradePost,
     ];
 
     this.camera = new Camera();

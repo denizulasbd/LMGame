@@ -17,6 +17,7 @@
   <p>Geliştirme aracı: <code>python3 tools/serve.py</code> çalışırken <code>/tools/art-preview.html</code> adresinden açılır. Yapılar 5 kat büyütülmüş çizilir.</p>
   <div id="root"></div>
   <script type="module">
+    import { getTradeShipSprite, getCaravanSprite } from '../src/art/sprites/index.js';
     import { getStructureSprite, getConstructionSiteSprite, getSheepFarmLayer, getSheepSprite, getRabbitSprite, getDeerSprite, getCatSprite, getDogSprite, getBoatSprite, getGazeboLayer, getFestivalDecorSprite, getFlowerCrownSprite } from '../src/art/sprites/index.js';
     import { getIconSprite, getBackpackSprite, getNoteSprite, getBubbleSprite, getHeldToolSprite, getCarrySprite } from '../src/art/ui/index.js';
     import { getCharacterSprite } from '../src/art/sprites/index.js';
@@ -53,6 +54,150 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 24.3: dış ticaret — Ticaret İskelesi / Kervan Konağı, Ticaret Gemisi, Kervan ve ihracat sözleşmesi kartı ---
+    {
+      show('Ticaret İskelesi / Kervan Konağı (3x2): taş temel, ahşap ambar, çizgili tente, sikkeli tabela, terazi, sandık ve balyalar', [
+        ['boş', getStructureSprite('tradingPost', {})],
+        ['gemi / kervan burada (flamalar)', getStructureSprite('tradingPost', { docked: true })],
+        ['gece (fener)', getStructureSprite('tradingPost', { lit: true, docked: true })],
+        ['kış', getStructureSprite('tradingPost', { season: 'winter' })],
+        ['şantiye', getConstructionSiteSprite(3, 2, 1, 'tradingPost')],
+      ], 5);
+      show('Ticaret Gemisi (suya bakan yana göre aynalanır; gece kamara pencereleri ve kıç feneri yanar) ve Kervan', [
+        ['gemi (sağda su)', getTradeShipSprite(false, false)],
+        ['gemi (solda su, gece)', getTradeShipSprite(true, true)],
+        ['kervan', getCaravanSprite(false)],
+        ['kervan (aynalı)', getCaravanSprite(true)],
+      ], 5);
+      // İskele sahnesi: nehir kıyısında demirli gemi; yol kenarında çadırlı kervan
+      const post = getStructureSprite('tradingPost', { docked: true });
+      const river = scene(112, 64, [[post, 4, 60], [getTradeShipSprite(false, false), 56, 62]], (ctx) => {
+        ctx.fillStyle = '#2f6fb5';
+        ctx.fillRect(52, 30, 60, 34);
+        ctx.fillStyle = '#4aa3df';
+        for (let x = 56; x < 112; x += 9) ctx.fillRect(x, 40 + (x % 3) * 6, 4, 1);
+        ctx.drawImage(post, 4, 60 - post.height);
+        const ship = getTradeShipSprite(false, false);
+        ctx.drawImage(ship, 56, 62 - ship.height);
+      });
+      const road = scene(112, 64, [], (ctx) => {
+        ctx.fillStyle = '#a8754a';
+        ctx.fillRect(0, 52, 112, 12);
+        ctx.drawImage(post, 4, 52 - post.height);
+        const car = getCaravanSprite(false);
+        ctx.drawImage(car, 58, 62 - car.height);
+      });
+      show('Dış ticaret sahneleri: nehir kıyısında iskele ve demirli gemi; yol kenarında konak ve kervan', [['iskele', river], ['kervan konağı', road]], 4);
+      // İhracat sözleşmesi kartı (panelin kartıyla aynı düzen: başlık, alıcı, mal → altın, durum)
+      const card = (title, buyer, icon, qty, gold, note, done = false) => {
+        const c = document.createElement('canvas');
+        c.width = 150;
+        c.height = 52;
+        const ctx = c.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.fillStyle = '#1b1423';
+        ctx.fillRect(0, 0, 150, 52);
+        ctx.fillStyle = done ? '#c9b88f' : '#f6e6b4';
+        ctx.fillRect(1, 1, 148, 50);
+        ctx.drawImage(getIconSprite('contract'), 4, 3);
+        ctx.fillStyle = '#1b1423';
+        ctx.font = 'bold 8px monospace';
+        ctx.fillText(title, 16, 10);
+        ctx.font = '6px monospace';
+        ctx.fillText(buyer, 90, 10);
+        ctx.drawImage(getIconSprite(icon), 6, 20);
+        ctx.font = 'bold 8px monospace';
+        ctx.fillText(`${qty}  →`, 18, 28);
+        ctx.drawImage(getIconSprite('coin'), 50, 20);
+        ctx.fillText(String(gold), 62, 28);
+        ctx.fillStyle = done ? '#7d5233' : '#2f6b3a';
+        ctx.fillRect(96, 18, 50, 13);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '6px monospace';
+        ctx.fillText(done ? 'Tamamlandı' : 'Tamamla', 101, 27);
+        ctx.fillStyle = '#4f2d1a';
+        ctx.fillText(note, 6, 45);
+        return c;
+      };
+      show('İhracat sözleşmesi kartları (İskele paneli): Kumaş, Şerbet, Ekmek; pazar doygunluğunda fiyat düşer', [
+        ['kumaş', card('Kumaş Talebi', 'dokuma loncası', 'cloth', 10, 40, 'Depoda 62 var')],
+        ['şerbet (doygun)', card('Şerbet Talebi', 'saray mahzeni', 'sherbet', 8, 31, 'Pazar doygun: %88 (taban 35)')],
+        ['ekmek (tamam)', card('Ekmek Talebi', 'garnizon fırını', 'bread', 25, 20, 'Mallar yüklendi', true)],
+        ['sözleşme simgesi', getIconSprite('contract')],
+      ], 3);
+    }
+
+    // --- 24.2: katma değerli üretim — Dokuma Tezgâhı, Şerbethane, Kumaş ve Fıçı Şerbeti ---
+    {
+      show('Dokuma Tezgâhı (2x2): taş temel, ahşap atölye, kiremit çatı; mavi-bej çözgülü tezgâh, kumaş topları ve keten demeti (çalışırken mekik gider gelir)', [
+        ['boşta', getStructureSprite('loom', {})],
+        ['mekik sol', getStructureSprite('loom', { active: true, frame: 0 })],
+        ['mekik sağ', getStructureSprite('loom', { active: true, frame: 1 })],
+        ['kış', getStructureSprite('loom', { season: 'winter' })],
+        ['şantiye', getConstructionSiteSprite(2, 2, 1, 'loom')],
+      ], 6);
+      show('Şerbethane (2x2): kesme taş mahzen, kemerli kapı, kiremit çatı ve baca; önde çemberli fıçılar ve bakır kazan (çalışırken altında ateş)', [
+        ['boşta', getStructureSprite('brewery', {})],
+        ['ateş 1', getStructureSprite('brewery', { active: true, frame: 0 })],
+        ['ateş 2', getStructureSprite('brewery', { active: true, frame: 1 })],
+        ['kış', getStructureSprite('brewery', { season: 'winter' })],
+      ], 6);
+      show('Yeni mal simgeleri, taşıma demetleri, balonlar ve aletler: Kumaş, Fıçı Şerbeti (yanında Keten ve Şerbetçiotu), mekik ve kepçe', [
+        ['kumaş', getIconSprite('cloth')],
+        ['fıçı şerbeti', getIconSprite('sherbet')],
+        ['keten', getIconSprite('flax')],
+        ['şerbetçiotu', getIconSprite('hops')],
+        ['kumaş topu', getCarrySprite('cloth')],
+        ['fıçı', getCarrySprite('sherbet')],
+        ['şerbet balonu', getBubbleSprite('sherbet')],
+        ['giysi balonu', getBubbleSprite('cloth')],
+        ['mekik', getHeldToolSprite('shuttle', false)],
+        ['kepçe', getHeldToolSprite('ladle', false)],
+      ], 8);
+      const weaver = { hair: 'bun', hairColor: 'blonde', skin: 'light', shirt: 'sky', pants: 'plum' };
+      const brewer = { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'red', pants: 'brown' };
+      const guest = { hair: 'long', hairColor: 'auburn', skin: 'light', shirt: 'rose', pants: 'navy' };
+      const loom = getStructureSprite('loom', { active: true, frame: 1 });
+      const brewery = getStructureSprite('brewery', { active: true, frame: 0 });
+      const inn = getStructureSprite('inn', { lit: true });
+      show('Zanaat sahnesi: tezgâhta dokumacı, kazanın başında mahzen ustası, handa şerbet içen sakinler', [
+        ['işlik', scene(224, 96, [[loom, 4, 90], [getCharacterSprite(weaver, 'up', 'work0'), 14, 94], [getHeldToolSprite('shuttle', false), 22, 86], [brewery, 48, 90], [getCharacterSprite(brewer, 'up', 'work1'), 70, 94], [getHeldToolSprite('ladle', false), 78, 86], [inn, 108, 90], [getCharacterSprite(guest, 'down', 'idle0'), 162, 94], [getBubbleSprite('sherbet'), 163, 76], [getCharacterSprite(weaver, 'down', 'idle1'), 182, 94], [getBubbleSprite('laugh'), 183, 76]])],
+      ], 4);
+    }
+
+    // --- 24. aşama (24.1): tarımsal çeşitlilik — üç mahsulün tarla pikselleri, Ürün Silosu, Keten ve Şerbetçiotu simgeleri ---
+    {
+      const CROPS = { grain: 'Buğday / Sebze', flax: 'Keten', hops: 'Meyve / Şerbetçiotu' };
+      const DESC = {
+        grain: 'altın sarısı başaklar arasında lahana, havuç, domates; ilkbaharda yeşil başak, sonbaharda biçilmiş demet ve kabak',
+        flax: 'açık mavi çiçekli ince yeşil saplar; ilkbaharda filiz, sonbaharda kuruyan saman sarısı demetler',
+        hops: 'tel gerili ahşap sırıklara sarılmış koyu yeşil yapraklar ve mor salkımlar; sonbaharda kehribar meyveler, kışın çıplak sırık',
+      };
+      for (const [crop, name] of Object.entries(CROPS)) {
+        show(`Sebze Bahçesi — ${name} (3x3): ${DESC[crop]}`, SEASONS.map((season) => [NAMES[season], getStructureSprite('garden', { season, crop })]), 4);
+      }
+      show('Yan yana üç ekim tercihi (yaz)', Object.entries(CROPS).map(([crop, name]) => [name, getStructureSprite('garden', { season: 'summer', crop })]), 5);
+      show('Ürün Silosu (2x2): taş temel, demir çemberli ahşap gövde, konik kiremit çatı, yükleme kapağı, buğday çuvalı ve keten demeti', [
+        ['yaz', getStructureSprite('silo', {})],
+        ['kış', getStructureSprite('silo', { season: 'winter' })],
+        ['şantiye', getConstructionSiteSprite(2, 2, 1, 'silo')],
+      ], 6);
+      show('Yeni mal simgeleri ve sırtta taşıma demetleri: Keten, Şerbetçiotu (yanında Yiyecek ve Ekmek)', [
+        ['keten', getIconSprite('flax')],
+        ['şerbetçiotu', getIconSprite('hops')],
+        ['yiyecek', getIconSprite('food')],
+        ['ekmek', getIconSprite('bread')],
+        ['keten demeti', getCarrySprite('flax')],
+        ['şerbetçiotu sepeti', getCarrySprite('hops')],
+      ], 8);
+      const farmer = { hair: 'hat', hairColor: 'ginger', skin: 'light', shirt: 'forest', pants: 'brown' };
+      const silo = getStructureSprite('silo', {});
+      const fields = ['grain', 'flax', 'hops'].map((crop) => getStructureSprite('garden', { season: 'summer', crop }));
+      show('Tarım sahnesi: üç tarla, bahçıvan ve Ürün Silosu', [
+        ['çiftlik', scene(200, 72, [[fields[0], 4, 68], [fields[1], 56, 68], [fields[2], 108, 68], [silo, 162, 68], [getCharacterSprite(farmer, 'down', 'idle0'), 72, 70], [getHeldToolSprite('hoe', false), 80, 62]])],
+      ], 4);
+    }
 
     // --- 23. aşama: yönetilebilir krizler — Su Kuyusu, Gözcü Kulesi, alev / duman, kova, kalkan, haydut, bandaj ve tamir ---
     {

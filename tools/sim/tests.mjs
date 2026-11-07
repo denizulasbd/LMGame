@@ -37,6 +37,21 @@
 //              Fermanları (seviye kilidi, beş ferman, teslim ve ödüller, Kraliyet Beratı ve Aslanlı Heykel, süre dolması ve
 //              ret cezası), kötü şöhretin göçe etkisi, köyü terk etme (eşik, aile, çekirdek sakinler, referans temizliği,
 //              bitişi), kayıt sürümü 19
+//   23. aşama: yangın ve itfaiye, Su Kuyusu, Gözcü Kulesi ve bekçiler, haydut baskınları, hasar / tamir, yaralanma, kayıt sürümü 20
+//   24. aşama (24.1): bahçenin ekim tercihi (Buğday / Keten / Şerbetçiotu; değiştirme döngüsü, geçersiz seçimler, gerçek hasat,
+//              ilk mal, etkinlik metni, kışın donma), Mallar listesindeki yeni kalemler, Ürün Silosu (seviye kilidi, +150 tarımsal
+//              kapasite, iki silo, fırının ekmek deposu), silosuz kasabada yağmurda / kışın mahsul bozulması ve silonun koruması,
+//              Ekim Tercihi paneli, tarla ve silo görselleri, kayıt sürümü 21 (gidiş-dönüş, bozuk değerler, v20 kaydı)
+//   24. aşama (24.2): Dokuma Tezgâhı ve Şerbethane (tanım, Kasaba kilidi, 2:1 girdi-çıktı oranları gerçek performWork ile, ilk mal,
+//              malzemesizken / depo doluyken / kasaba açken boşta kalma), lüks iş önceliği (temel yuvalar önce, dolunca tezgâha), gerçek
+//              vardiya (sabit dokumacı, yevmiye, deneyim), han ikmali, handa şerbet (+15 keyif, iki kat keyif ve sosyallik, Keyifli
+//              Damak), Şerbet Testisi alma / içme, Dayanıklı Giysi (mevsim, kumaş stoğu, soğuk koruması), kumaşın refah katkısı, HUD ve
+//              paneller, görseller, kayıt sürümü 22 (gidiş-dönüş, bozuk değerler, v21 kaydı)
+//   24. aşama (24.3): Ticaret İskelesi / Kervan Konağı (tanım, Kasaba kilidi, yol / su kenarı yerleşimi, gemi ya da kervan), takvim
+//              (ilk varış, 24 saat, 3 ve 4 günlük aralık, hasarlı iskele, gerçek saatler), ihracat sözleşmeleri (tamamlama, ikinci kez
+//              ödenmeme, yetersiz mal, günlük), hammadde ithalatı (paketler, stok, altın, depo yeri), pazar doygunluğu (3 peş peşe satış,
+//              düşüş, başka malla ve ziyaretle toparlanma, taban), panel ve tek tıkla tamamlama, görseller, kayıt sürümü 23 (gidiş-dönüş,
+//              bozuk değerler, v22 kaydı)
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
 import { openGame, createChecks } from './lib.mjs';
@@ -2245,7 +2260,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 20', raw.version === 20);
+  check('kayıt sürümü 23', raw.version === 23);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2688,7 +2703,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 20: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 20 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 23: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 23 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -3003,7 +3018,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 20: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 20 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 23: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 23 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3615,7 +3630,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 20: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 20 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 23: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 23 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -3640,6 +3655,900 @@ const pageResults = await page.evaluate(async () => {
       check('v19 kaydı yüklenince hiçbir yapı yanmıyor / hasarlı değil, kimse yaralı değil, kriz boş ve Dengeli', s7.buildings.every((x) => !x.isBurning && !x.isDamaged) && s7.characters.every((c) => !c.isInjured) && s7.crisis.difficulty === 'dengeli' && !s7.crisis.raid && s7.crisis.fires === 0);
       check('v19 kaydı yüklenince ilk 24 saatte kriz çıkmaz', game.scenes.current.crisis.graceUntil === s7.totalMinutes + 1440);
     }
+  }
+
+  // ===== 24. aşama (24.1): tarımsal çeşitlilik, bahçenin ekim tercihi, Keten ve Şerbetçiotu, Ürün Silosu, mahsul bozulması =====
+  {
+    const S = () => game.scenes.current;
+    const st = game.state;
+    const CR = await import('/src/data/crops.js');
+    const GR = await import('/src/systems/Granary.js');
+    const BD = await import('/src/data/buildings.js');
+    const RS = await import('/src/data/resources.js');
+    const TS = await import('/src/systems/TownStatus.js');
+    const ART = await import('/src/art/sprites/index.js');
+    const UI = await import('/src/art/ui/index.js');
+    const { CONFIG } = await import('/src/config.js');
+    // Testi doğal krizler, dilekçe ve fermanlar bozmasın
+    st.crisis.difficulty = 'huzurlu';
+    st.crisis.raid = null;
+    st.crisis.nextRaidWarnAt = null;
+    st.petitions.list = [];
+    st.petitions.nextAt = st.totalMinutes + 1e6;
+    st.crown.decree = null;
+    st.crown.nextDecreeAt = st.totalMinutes + 1e6;
+    st.crown.nextLevyAt = st.totalMinutes + 1e6;
+    const placeAt = (type, x, y) => {
+      const res = S().construction.placeSite(type, x, y);
+      if (!res.ok) return null;
+      const job = S().jobs.jobs.find((j) => j.buildingId === res.building.id);
+      if (job) S().jobs.cancel(job);
+      S().construction.complete(res.building);
+      return res.building;
+    };
+    const events = [];
+    const offs = ['crop:changed', 'goods:firstProduced', 'granary:spoiled', 'toast'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
+    const recalc = () => S().economy.recalculateCapacity();
+
+    // --- Veri ---
+    check('üç mahsul: Buğday / Sebze (varsayılan, yiyecek), Keten, Meyve / Şerbetçiotu', CR.CROP_KEYS.join(',') === 'grain,flax,hops' && CR.DEFAULT_CROP === 'grain' && CR.CROPS.grain.resource === 'food' && CR.CROPS.flax.resource === 'flax' && CR.CROPS.hops.resource === 'hops');
+    check('Sebze Bahçesi üç mahsulü seçebilir; öteki üretim yapıları seçemez', BD.BUILDINGS.garden.crops.join(',') === 'grain,flax,hops' && GR.canChooseCrop('garden') && !GR.canChooseCrop('lumberHut') && !GR.canChooseCrop('sheepFarm'));
+    check('Buğday verimi bahçenin eski verimiyle aynı (saatte 5 yiyecek)', CR.CROPS.grain.perHour === BD.BUILDINGS.garden.production.perHour && BD.BUILDINGS.garden.production.resource === 'food');
+    check('Keten ve Şerbetçiotu yeni mal kalemleri (Mallar listesinde, gıda değil)', RS.GOODS_KEYS.includes('flax') && RS.GOODS_KEYS.includes('hops') && !RS.RESOURCES.flax.foodValue && !RS.RESOURCES.hops.foodValue && !RS.FOOD_KEYS.includes('flax') && RS.STARTING_RESOURCES.flax === 0 && RS.STARTING_RESOURCES.hops === 0);
+    check('tarımsal kaynaklar: yiyecek, ekmek, keten, şerbetçiotu', CR.AGRI_KEYS.join(',') === 'food,bread,flax,hops' && GR.isAgricultural('bread') && !GR.isAgricultural('wood') && !GR.isAgricultural('wool'));
+    const siloDef = BD.BUILDINGS.silo;
+    check('Ürün Silosu: 2x2, Depolama, Köy seviyesinde, odun ve taş maliyetli, +150 tarımsal kapasite', siloDef && siloDef.size.w === 2 && siloDef.size.h === 2 && siloDef.category === 'Depolama' && siloDef.requiresTier === 2 && Object.keys(siloDef.cost).sort().join(',') === 'stone,wood' && siloDef.granary.capacity === 150 && siloDef.buildable && siloDef.demolishable);
+    check('Ürün Silosu Yapılar sekmesinde, Kiler\'in hemen ardından', BD.BUILD_MENU.indexOf('silo') === BD.BUILD_MENU.indexOf('storage') + 1 && BD.buildTabFor('silo') === 'buildings');
+
+    // --- Seviye kilidi ---
+    sim.give({ wood: 600, stone: 600, food: 120, bread: 0, flax: 0, hops: 0 });
+    const tierWas = st.town.tier;
+    st.town.tier = Math.max(2, tierWas);
+    const spot = sim.findSpot('silo');
+    st.town.tier = 1;
+    const locked = spot ? S().construction.checkPlacement('silo', spot.x, spot.y) : { ok: true };
+    st.town.tier = 2;
+    const open = spot ? S().construction.checkPlacement('silo', spot.x, spot.y) : { ok: false };
+    check('Ürün Silosu Mezra\'da kilitli, Köy seviyesinde kurulabilir', spot && !locked.ok && open.ok, locked.reason);
+    st.town.tier = Math.max(2, tierWas);
+
+    // --- Bahçe ve ekim tercihi ---
+    for (const b of st.buildings.filter((x) => x.type === 'silo')) S().construction.demolish?.(b);
+    const garden = sim.place('garden');
+    check('yeni bahçe Buğday / Sebze ekili başlar ve yiyecek üretir', garden && garden.crop === 'grain' && GR.productionOf(garden).resource === 'food' && GR.productionOf(garden).perHour === 5);
+    const switchesBefore = st.granary.switches;
+    events.length = 0;
+    garden.productionBuffer = 0.7;
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'flax' });
+    check('ekim tercihi Keten\'e geçer: ürün keten, saatte 3', garden.crop === 'flax' && GR.productionOf(garden).resource === 'flax' && GR.productionOf(garden).perHour === 3);
+    check('mahsul değişince olay, bildirim ve sayaç; yarım kalan hasat sıfırlanır', events.some((e) => e.n === 'crop:changed' && e.p.crop === 'flax' && e.p.from === 'grain') && events.some((e) => e.n === 'toast' && /Keten/.test(e.p.text)) && st.granary.switches === switchesBefore + 1 && garden.productionBuffer === 0);
+    events.length = 0;
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'flax' });
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'wheat' });
+    const lumber = st.buildings.find((b) => b.type === 'lumberHut');
+    if (lumber) game.events.emit('ui:setCrop', { buildingId: lumber.id, crop: 'flax' });
+    check('aynı mahsul, geçersiz mahsul ve bahçe olmayan yapı reddedilir', garden.crop === 'flax' && !events.some((e) => e.n === 'crop:changed') && (!lumber || lumber.crop === null));
+    const cycle = [];
+    for (const c of ['hops', 'grain', 'flax', 'hops']) {
+      game.events.emit('ui:setCrop', { buildingId: garden.id, crop: c });
+      cycle.push(`${garden.crop}:${GR.productionOf(garden).resource}`);
+    }
+    check('mahsul değiştirme döngüsü (Şerbetçiotu → Buğday → Keten → Şerbetçiotu) üretimi her seferinde izler', cycle.join(',') === 'hops:hops,grain:food,flax:flax,hops:hops', cycle.join(','));
+    check('Buğday dışı mahsulde bahçe tanımı değişmez (yalnızca yapıya özgü üretim)', BD.BUILDINGS.garden.production.resource === 'food' && GR.productionOf(garden) !== BD.BUILDINGS.garden.production);
+
+    // --- Hasat (gerçek BehaviorSystem.performWork) ---
+    const worker = st.characters.find((c) => !c.isChild && !c.role);
+    const work = (b, minutes) => {
+      for (let i = 0; i < minutes; i++) S().behavior.performWork(worker, { workBuildingId: b.id, activity: 'farm' }, 1);
+    };
+    st.time.day = 6; // yaz (mevsim verimi 1'in üstünde)
+    S().structures.update({ hour: 10, gameMinutes: 0 });
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'flax' });
+    sim.give({ food: 50, flax: 0, hops: 0 });
+    st.stats.goods.flax = 0;
+    events.length = 0;
+    garden.producedToday = 0;
+    const foodBefore = st.resources.food;
+    work(garden, 120);
+    check('Keten hasadı: bahçıvan çalıştıkça keten birikir, bahçeden yiyecek gelmez', st.resources.flax > 0 && st.resources.food === foodBefore && garden.producedToday === st.resources.flax, `keten ${st.resources.flax}, yiyecek ${foodBefore}->${st.resources.food}`);
+    check('ilk keten: ilk mal olayı ve Kasaba Günlüğü\'ne not', events.some((e) => e.n === 'goods:firstProduced' && e.p.resource === 'flax') && st.journal.some((j) => /keten/.test(j.text)) && st.stats.goods.flax === st.resources.flax);
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'hops' });
+    st.stats.goods.hops = 0;
+    work(garden, 120);
+    check('Şerbetçiotu hasadı: şerbetçiotu birikir, keten artmaz', st.resources.hops > 0 && st.stats.goods.hops === st.resources.hops && st.journal.some((j) => /şerbetçiotu/.test(j.text)));
+    const flaxPer = (() => {
+      game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'grain' });
+      const f0 = st.resources.food;
+      work(garden, 120);
+      return st.resources.food - f0;
+    })();
+    check('Buğday\'a dönünce yine yiyecek gelir (verim keten / şerbetçiotundan yüksek)', flaxPer > st.resources.hops, `buğday +${flaxPer}, şerbetçiotu ${st.resources.hops}`);
+    check('Keten ve Şerbetçiotu gıda sayılmaz (göç koşulu / toplam besin)', (() => { const a = TS.foodSupply(st); sim.give({ flax: 90, hops: 90 }); const b = TS.foodSupply(st); return a === b; })());
+    // Bahçıvanın etkinlik metni
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'flax' });
+    const lbl = S().behavior.performLabel(worker, { activity: 'farm', buildingId: garden.id }, { label: 'Bahçeyi çapalıyor' });
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'grain' });
+    const lbl2 = S().behavior.performLabel(worker, { activity: 'farm', buildingId: garden.id }, { label: 'Bahçeyi çapalıyor' });
+    check('bahçıvanın etkinlik metni mahsule göre (Buğday\'da eski metin)', /keten/i.test(lbl) && lbl2 === 'Bahçeyi çapalıyor', `${lbl} / ${lbl2}`);
+    // Zanaat ve mevsim: kışın keten de donar
+    st.time.day = 14;
+    S().structures.update({ hour: 10, gameMinutes: 0 });
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'flax' });
+    check('kışın keten tarlası da donar (mevsim çarpanı her mahsule uygulanır)', garden.upgraded || garden.frozen);
+    st.time.day = 6;
+    S().structures.update({ hour: 10, gameMinutes: 0 });
+
+    // --- HUD: Mallar listesi ---
+    game.render(0);
+    const hud = game.ui.components.find((x) => x.renderWelfare);
+    check('üst çubuktaki Mallar listesinde Keten ve Şerbetçiotu kalemleri', hud.resources.flax && hud.resources.hops && hud.goodsMenu.contains(hud.resources.flax.box) && hud.goodsMenu.contains(hud.resources.hops.box));
+    hud.renderGoodsDetail(st);
+    check('Mallar ipucu keteni üreten bahçeyi sayar', /1 yapı/.test(hud.resources.flax.box.title) && /Keten/.test(hud.resources.flax.box.title), hud.resources.flax.box.title.split('\n')[0]);
+    check('Keten ve Şerbetçiotu simgeleri (arayüz ve sırtta taşıma demeti)', ['flax', 'hops'].every((n) => UI.getIconDataURL(n) && UI.getCarrySprite(n)));
+
+    // --- Ürün Silosu: kapasite ---
+    recalc();
+    const base = st.storageCapacity;
+    check('silo yokken tarımsal sınır genel kapasiteyle aynı', st.granaryCapacity === 0 && GR.storageLimit(st, 'food') === base && GR.storageLimit(st, 'flax') === base && GR.storageLimit(st, 'gold') === Infinity);
+    const silo = sim.place('silo');
+    recalc();
+    check('Ürün Silosu kurulunca yiyecek, ekmek, keten ve şerbetçiotu sınırı +150', silo && st.granaryCapacity === 150 && ['food', 'bread', 'flax', 'hops'].every((r) => GR.storageLimit(st, r) === base + 150));
+    check('silo odun, taş, yün ve demirin sınırını değiştirmez; genel kapasite aynı', st.storageCapacity === base && ['wood', 'stone', 'wool', 'iron'].every((r) => GR.storageLimit(st, r) === base));
+    sim.give({ food: base, wood: base, flax: base });
+    const addedFood = S().economy.add('food', 400);
+    const addedWood = S().economy.add('wood', 50);
+    const addedFlax = S().economy.add('flax', 400);
+    check('depoya giriş: yiyecek ve keten 150 fazla sığar, odun sığmaz', addedFood === 150 && addedWood === 0 && addedFlax === 150 && st.resources.food === base + 150);
+    const silo2 = sim.place('silo');
+    recalc();
+    check('iki silo +300', silo2 && st.granaryCapacity === 300 && GR.storageLimit(st, 'hops') === base + 300);
+    // Değirmen: ekmek deposu dolu sayılmaz
+    sim.give({ bread: base + 10 });
+    const mill = st.buildings.find((b) => b.type === 'mill' && b.functional) ?? sim.place('mill');
+    if (mill) {
+      S().structures.updateProcessing(mill, BD.BUILDINGS.mill.processing);
+      check('ekmek genel kapasiteyi aşsa da siloda yer varsa fırın çalışır', !/dolu/.test(mill.processStatus ?? ''), mill.processStatus);
+    }
+    // Panel
+    const panel = game.ui.components.find((x) => x.renderCrafting);
+    const show = (b) => {
+      panel.buildingId = b.id;
+      panel.element.hidden = false;
+      panel.lastKey = '';
+      panel.render(game);
+    };
+    show(silo);
+    check('Silo panelinde tarımsal depo katkısı ve stok sınırları', panel.lines.textContent.includes('Tarımsal depo katkısı: +150') && panel.lines.textContent.includes(`Yiyecek ${st.resources.food}/${base + 300}`) && /çürümez/.test(panel.lines.textContent));
+    show(garden);
+    const btns = [...panel.cropBox.querySelectorAll('button')];
+    check('bahçe panelinde Ekim Tercihi: üç düğme, seçili olan vurgulu', !panel.cropBox.hidden && /Ekim Tercihi/.test(panel.cropBox.textContent) && btns.length === 3 && btns.filter((b) => b.classList.contains('is-active')).map((b) => b.dataset.crop).join() === garden.crop);
+    btns.find((b) => b.dataset.crop === 'hops').click();
+    panel.render(game);
+    check('düğmeye tıklayınca mahsul değişir ve panel yenilenir', garden.crop === 'hops' && panel.cropBox.querySelector('.is-active').dataset.crop === 'hops' && /Şerbetçiotu/.test(panel.cropBox.textContent));
+    check('silo varken panel bozulmanın önlendiğini söyler', /bozulmaz/.test(panel.cropBox.textContent));
+    show(lumber ?? silo);
+    check('bahçe olmayan yapıda Ekim Tercihi gizli', panel.cropBox.hidden);
+    panel.buildingId = null;
+    panel.element.hidden = true;
+
+    // --- Bozulma (yağmur / kış, silosuz) ---
+    const G = S().granary;
+    const removeSilos = () => {
+      for (const b of st.buildings.filter((x) => x.type === 'silo')) {
+        b.underConstruction = true; // işlemez hale getir (yıkımdan bağımsız)
+      }
+      recalc();
+    };
+    const restoreSilos = () => {
+      for (const b of st.buildings.filter((x) => x.type === 'silo')) b.underConstruction = false;
+      recalc();
+    };
+    const setWeather = (type) => {
+      st.weather.type = type;
+      st.weather.rain = type === 'rainy' ? 1 : 0;
+    };
+    removeSilos();
+    st.granary.spoiled = {};
+    st.granary.buffers = {};
+    st.time.day = 6;
+    setWeather('sunny');
+    sim.give({ food: 180, flax: 180, hops: 180, bread: 80 });
+    G.spoil(10);
+    check('kuru yaz havasında mahsul bozulmaz', st.resources.food === 180 && st.resources.flax === 180);
+    setWeather('rainy');
+    const rainy = G.spoilWeather();
+    const lost = G.spoil(10);
+    check('silosuz kasabada yağmurda güvenli stoğun (80) üstündeki ham mahsul bozulur', rainy && lost.food === 4 && lost.flax === 4 && lost.hops === 4 && st.resources.food === 176, JSON.stringify(lost));
+    check('ekmek bozulmaz; bozulan miktar sayaçta, bildirim bir kez', st.resources.bread === 80 && st.granary.spoiled.food === 4 && events.filter((e) => e.n === 'toast' && /Nem ve soğuk/.test(e.p.text)).length === 1, `ekmek ${st.resources.bread}, sayaç ${JSON.stringify(st.granary.spoiled)}, bildirim ${events.filter((e) => e.n === 'toast').map((e) => e.p.text).join(' | ')}`);
+    events.length = 0;
+    G.spoil(1);
+    check('aynı gün ikinci bozulmada yeni bildirim yok; küsurat birikir', !events.some((e) => e.n === 'toast') && st.granary.buffers.food > 0 && st.granary.buffers.food < 1);
+    setWeather('sunny');
+    st.time.day = 14; // kış
+    sim.give({ food: 60, flax: 200 });
+    const w = G.spoil(10);
+    check('kışın da bozulur; güvenli stok altındaki yiyecek korunur', !w.food && w.flax > 0 && st.resources.food === 60);
+    // Gerçek saat olayı
+    sim.give({ flax: 200 });
+    const f0 = st.resources.flax;
+    for (let i = 0; i < 5; i++) game.events.emit('time:hour', 10);
+    check('saat başı (time:hour) bozulma işler', st.resources.flax < f0 && st.resources.flax >= f0 - 5, `${f0}->${st.resources.flax}`);
+    restoreSilos();
+    sim.give({ food: 300, flax: 300, hops: 300 });
+    setWeather('rainy');
+    const safe = G.spoil(24);
+    check('Ürün Silosu varken yağmurda ve kışın hiçbir mahsul bozulmaz', Object.keys(safe).length === 0 && st.resources.food === 300 && st.resources.flax === 300 && GR.spoilageAt(st, 'food', 24) === 0);
+    setWeather('sunny');
+    st.time.day = 6;
+
+    // --- Görseller ---
+    const sprites = ['grain', 'flax', 'hops'].map((c) => ART.getStructureSprite('garden', { season: 'summer', crop: c }));
+    const reader = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    const pixels = (cv) => {
+      reader.canvas.width = cv.width;
+      reader.canvas.height = cv.height;
+      reader.clearRect(0, 0, cv.width, cv.height);
+      reader.drawImage(cv, 0, 0);
+      return reader.getImageData(0, 0, cv.width, cv.height).data;
+    };
+    const px = (cv) => { const d = pixels(cv); let h = 0; for (let i = 0; i < d.length; i += 7) h = (h * 31 + d[i]) | 0; return h; };
+    check('üç mahsulün tarla dokusu farklı (48x48)', sprites.every((sp) => sp.width === 48 && sp.height === 48) && new Set(sprites.map(px)).size === 3);
+    const goldPixels = (cv) => { const d = pixels(cv); let n = 0, blue = 0, purple = 0; for (let i = 0; i < d.length; i += 4) { if (d[i] > 230 && d[i + 1] > 190 && d[i + 2] < 110) n++; if (d[i] < 120 && d[i + 1] > 150 && d[i + 2] > 200) blue++; if (d[i] > 120 && d[i + 1] < 80 && d[i + 2] > 100) purple++; } return { n, blue, purple }; };
+    const [gp, fp, hp] = sprites.map(goldPixels);
+    check('Buğday altın sarısı, Keten açık mavi çiçekli, Şerbetçiotu mor salkımlı', gp.n > 40 && fp.blue > 20 && hp.purple > 10 && fp.n < gp.n, JSON.stringify([gp, fp, hp]));
+    check('mahsul tarlası her mevsim çizilir; kışın karla örtülür', ['grain', 'flax', 'hops'].every((c) => ['spring', 'summer', 'autumn', 'winter'].every((s2) => ART.getStructureSprite('garden', { season: s2, crop: c }).width === 48)));
+    const siloSprite = ART.getStructureSprite('silo', {});
+    check('Ürün Silosu görseli 32x48; kışın çatısı karlanır', siloSprite.width === 32 && siloSprite.height === 48 && ART.getStructureSprite('silo', { season: 'winter' }) !== siloSprite);
+    check('yapının görseli seçili mahsulü kullanır', garden.currentSprite({ season: 'summer', time: 0 }) === ART.getStructureSprite('garden', { season: 'summer', crop: garden.crop }));
+
+    // --- Kayıt gidiş-dönüşü (sürüm 21) ---
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'flax' });
+    const other = sim.place('garden');
+    game.events.emit('ui:setCrop', { buildingId: other.id, crop: 'hops' });
+    sim.give({ flax: 77, hops: 33 });
+    st.granary.spoiled = { food: 12, flax: 5 };
+    st.granary.buffers = { hops: 0.25 };
+    const T = { g: garden.id, o: other.id, switches: st.granary.switches };
+    game.events.emit('ui:save');
+    const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    check('kayıt sürümü 23: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 23 && raw.version === 23 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    game.events.emit('ui:load');
+    const s2 = game.state;
+    const g2 = s2.buildings.find((b) => b.id === T.g);
+    const o2 = s2.buildings.find((b) => b.id === T.o);
+    check('kayıttan bahçelerin mahsulü ve üretimi döner', g2.crop === 'flax' && o2.crop === 'hops' && GR.productionOf(g2).resource === 'flax' && GR.productionOf(o2).resource === 'hops');
+    check('kayıttan Keten / Şerbetçiotu stoğu, bozulma sayaçları, küsurat ve değişiklik sayısı döner', s2.resources.flax === 77 && s2.resources.hops === 33 && s2.granary.spoiled.food === 12 && s2.granary.spoiled.flax === 5 && s2.granary.buffers.hops === 0.25 && s2.granary.switches === T.switches);
+    check('yüklemeden sonra silo kapasitesi yeniden hesaplanır', s2.granaryCapacity === 300 && GR.storageLimit(s2, 'food') === s2.storageCapacity + 300);
+    check('yüklenen kasabada ekim tercihi değiştirilebilir', (() => { game.events.emit('ui:setCrop', { buildingId: g2.id, crop: 'grain' }); return g2.crop === 'grain'; })());
+    // Bozuk mahsul değeri
+    game.events.emit('ui:save');
+    const bad = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    bad.buildings.find((b) => b.id === T.o).crop = 'tütün';
+    bad.granary = { spoiled: { food: -5, gold: 9 }, buffers: { food: 7 }, switches: 'x' };
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(bad));
+    game.events.emit('ui:load');
+    check('geçersiz mahsul Buğday\'a, bozuk silo sayaçları boşa döner', game.state.buildings.find((b) => b.id === T.o).crop === 'grain' && !game.state.granary.spoiled.food && !game.state.granary.spoiled.gold && !game.state.granary.buffers.food && game.state.granary.switches === 0);
+    // Eski (v20) kayıt: mahsul, keten / şerbetçiotu ve silo yok
+    game.events.emit('ui:save');
+    const old = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    old.version = 20;
+    delete old.granary;
+    delete old.resources.flax;
+    delete old.resources.hops;
+    old.buildings = old.buildings.filter((b) => b.type !== 'silo');
+    for (const b of old.buildings) delete b.crop;
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(old));
+    game.events.emit('ui:load');
+    const s3 = game.state;
+    check('v20 kaydı yüklenince bütün bahçeler Buğday / Sebze ekili, yiyecek üretir', s3.buildings.filter((b) => b.type === 'garden').length >= 2 && s3.buildings.filter((b) => b.type === 'garden').every((b) => b.crop === 'grain' && GR.productionOf(b).resource === 'food'));
+    check('v20 kaydında Keten / Şerbetçiotu 0, silo kapasitesi 0, silo sayaçları boş', s3.resources.flax === 0 && s3.resources.hops === 0 && s3.granaryCapacity === 0 && Object.keys(s3.granary.spoiled).length === 0 && s3.granary.switches === 0);
+    check('v20 kaydında bahçe dışı yapıların mahsulü yok', s3.buildings.filter((b) => b.type !== 'garden').every((b) => b.crop === null));
+    offs.forEach((off) => off());
+  }
+
+  // ===== 24. aşama (24.2): Dokuma Tezgâhı ve Kumaş, Şerbethane ve Fıçı Şerbeti, han tüketimi, Dayanıklı Giysi, lüks iş önceliği =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const BD = await import('/src/data/buildings.js');
+    const RS = await import('/src/data/resources.js');
+    const RF = await import('/src/data/refinery.js');
+    const RX = await import('/src/systems/Refinery.js');
+    const EQ = await import('/src/systems/Equipment.js');
+    const TS = await import('/src/systems/TownStatus.js');
+    const CZ = await import('/src/systems/Citizens.js');
+    const ACT = (await import('/src/data/activities.js')).ACTIVITIES;
+    const SK = await import('/src/data/skills.js');
+    const ART = await import('/src/art/sprites/index.js');
+    const UI = await import('/src/art/ui/index.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    s0.crisis.difficulty = 'huzurlu';
+    s0.crisis.raid = null;
+    s0.crisis.nextRaidWarnAt = null;
+    s0.petitions.list = [];
+    s0.petitions.nextAt = s0.totalMinutes + 1e6;
+    s0.crown.decree = null;
+    s0.crown.nextDecreeAt = s0.totalMinutes + 1e6;
+    s0.crown.nextLevyAt = s0.totalMinutes + 1e6;
+    const events = [];
+    const offs = ['goods:firstProduced', 'citizen:sherbet', 'citizen:bought', 'processing:made'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
+
+    // --- Veri ---
+    check('Kumaş ve Fıçı Şerbeti yeni mal kalemleri (Mallar listesinde, gıda değil, başlangıçta 0)', ['cloth', 'sherbet'].every((k) => RS.GOODS_KEYS.includes(k) && !RS.RESOURCES[k].foodValue && RS.STARTING_RESOURCES[k] === 0));
+    const loomDef = BD.BUILDINGS.loom;
+    const brewDef = BD.BUILDINGS.brewery;
+    check('Dokuma Tezgâhı: 2x2, Kasaba seviyesi, odun + taş + demir, 1 dokumacı, 2 keten -> 1 kumaş, lüks iş', loomDef.size.w === 2 && loomDef.size.h === 2 && loomDef.requiresTier === 3 && loomDef.cost.wood > 0 && loomDef.cost.stone > 0 && loomDef.cost.iron > 0 && loomDef.workers === 1 && loomDef.workActivity === 'weave' && loomDef.processing.input.flax === 2 && loomDef.processing.output.cloth === 1 && loomDef.luxury === true);
+    check('Şerbethane: 2x2, Kasaba seviyesi, taş + kereste, 1 mahzen ustası, 2 şerbetçiotu -> 1 fıçı, lüks iş', brewDef.size.w === 2 && brewDef.size.h === 2 && brewDef.requiresTier === 3 && Object.keys(brewDef.cost).sort().join() === 'stone,wood' && brewDef.workers === 1 && brewDef.workActivity === 'brewSherbet' && brewDef.processing.input.hops === 2 && brewDef.processing.output.sherbet === 1 && brewDef.luxury === true);
+    check('iki yapı Yapılar sekmesinde, Kasaba Hanı\'nın ardından', BD.BUILD_MENU.indexOf('loom') === BD.BUILD_MENU.indexOf('inn') + 1 && BD.BUILD_MENU.indexOf('brewery') === BD.BUILD_MENU.indexOf('loom') + 1 && BD.buildTabFor('loom') === 'buildings');
+    check('dokumacı zanaatkârlık, mahzen ustası aşçılık deneyimi kazanır; etkinlik metinleri ve aletleri var', SK.ACTIVITY_SKILLS.weave === 'crafting' && SK.ACTIVITY_SKILLS.brewSherbet === 'cooking' && ACT.weave.tool === 'shuttle' && ACT.brewSherbet.tool === 'ladle' && ACT.weave.idleLabel && ACT.brewSherbet.idleLabel);
+    check('çanta eşyaları: Dayanıklı Giysi ve Şerbet Testisi', (await import('/src/data/citizens.js')).ITEMS.garment && (await import('/src/data/citizens.js')).ITEMS.sherbetJug.fun === 15);
+
+    // --- Seviye kilidi ---
+    sim.give({ wood: 800, stone: 800, iron: 200, food: 300, bread: 60, flax: 0, hops: 0, cloth: 0, sherbet: 0 });
+    s0.town.tier = 3;
+    const spot = sim.findSpot('loom');
+    s0.town.tier = 2;
+    const lockedLoom = spot ? S().construction.checkPlacement('loom', spot.x, spot.y) : { ok: true };
+    const lockedBrew = spot ? S().construction.checkPlacement('brewery', spot.x, spot.y) : { ok: true };
+    s0.town.tier = 3;
+    check('Dokuma Tezgâhı ve Şerbethane Köy\'de kilitli, Kasaba seviyesinde kurulabilir', spot && !lockedLoom.ok && !lockedBrew.ok && /Kasaba/.test(lockedLoom.reason) && S().construction.checkPlacement('loom', spot.x, spot.y).ok, lockedLoom.reason);
+    s0.town.tier = 4;
+
+    // --- Girdi / çıktı oranları (gerçek performWork) ---
+    const loom = sim.place('loom');
+    const brewery = sim.place('brewery');
+    const worker = s0.characters.find((c) => !c.isChild && !c.role);
+    const work = (b, activity, minutes) => {
+      for (let i = 0; i < minutes; i++) S().behavior.performWork(worker, { workBuildingId: b.id, activity }, 1);
+    };
+    const refresh = () => S().structures.update({ hour: 10, gameMinutes: 0 });
+    check('iki yapı kuruldu ve iş yuvası var', loom && brewery && loom.workerSlots === 1 && brewery.workerSlots === 1);
+    sim.give({ flax: 0, cloth: 0 });
+    refresh();
+    check('kilerde keten yokken tezgâh boşta, panelde nedeni', loom.idle && /Keten bekleniyor/.test(loom.processStatus) && /Keten/.test(loom.processStatus), loom.processStatus);
+    sim.give({ flax: 40, cloth: 0, food: 300 });
+    s0.stats.goods.cloth = 0;
+    events.length = 0;
+    refresh();
+    check('keten gelince tezgâh hazır', !loom.idle && loom.processStatus === null);
+    loom.producedToday = 0;
+    work(loom, 'weave', 180);
+    const woven = s0.resources.cloth;
+    check('dokuma: her top kumaş tam 2 keten harcar', woven > 0 && 40 - s0.resources.flax === woven * 2 && loom.producedToday === woven, `kumaş ${woven}, keten ${s0.resources.flax}`);
+    check('ilk kumaş: ilk mal olayı, günlük notu ve toplam sayaç', events.some((e) => e.n === 'goods:firstProduced' && e.p.resource === 'cloth') && s0.journal.some((j) => /kumaş/.test(j.text)) && s0.stats.goods.cloth === woven);
+    sim.give({ flax: 1 });
+    work(loom, 'weave', 120);
+    check('tek keten kalınca dokuma durur (yarım top yok)', s0.resources.flax === 1 && s0.resources.cloth === woven);
+    sim.give({ hops: 30, sherbet: 0 });
+    s0.stats.goods.sherbet = 0;
+    refresh();
+    work(brewery, 'brewSherbet', 180);
+    check('şerbethane: her fıçı tam 2 şerbetçiotu harcar', s0.resources.sherbet > 0 && 30 - s0.resources.hops === s0.resources.sherbet * 2 && s0.stats.goods.sherbet === s0.resources.sherbet, `fıçı ${s0.resources.sherbet}, şerbetçiotu ${s0.resources.hops}`);
+    sim.give({ flax: 40, cloth: S().economy.limit('cloth') });
+    refresh();
+    check('kumaş deposu doluysa tezgâh boşta', loom.idle && /dolu/.test(loom.processStatus), loom.processStatus);
+    sim.give({ cloth: 0 });
+    // Kasaba açken lüks işler durur
+    const pop = s0.characters.length;
+    sim.give({ food: Math.floor(pop * 2), bread: 0, hops: 10 });
+    s0.pantry.credit = 0;
+    refresh();
+    check('kasaba açken (kişi başı besin 3\'ün altında) tezgâh ve mahzen boşta', RX.luxuryHungry(s0) && loom.idle && brewery.idle && /besin azaldı/.test(loom.processStatus));
+    sim.give({ food: 300, hops: 10, flax: 10 });
+    refresh();
+    check('besin gelince lüks işler yeniden açılır', !RX.luxuryHungry(s0) && !loom.idle && !brewery.idle);
+    check('boşta tezgâhta dokumacının etkinlik metni', (() => { loom.idle = true; const l = S().behavior.performLabel(worker, { activity: 'weave', buildingId: loom.id }, ACT.weave); loom.idle = false; return /keten bekliyor/.test(l); })());
+
+    // --- İş gücü önceliği ---
+    {
+      const J = S().jobs;
+      const savedJobs = J.jobs;
+      J.jobs = [];
+      const idler = s0.characters.find((c) => !c.isChild && !c.role && c.workplaceId == null && !c.away && !building_has(c));
+      function building_has(c) { return s0.buildings.some((b) => b.workerIds.has(c.id)); }
+      const origin = { x: idler.tileX, y: idler.tileY };
+      const first = J.findWorkFor(idler, origin);
+      // Bütün temel iş yerlerini dolu / boşta say: geriye yalnızca lüks işler kalsın
+      const basics = s0.buildings.filter((b) => b.functional && b.workerSlots && !b.definition.luxury);
+      const saved = basics.map((b) => b.idle);
+      for (const b of basics) b.idle = true;
+      const second = J.findWorkFor(idler, origin);
+      basics.forEach((b, i) => (b.idle = saved[i]));
+      J.jobs = savedJobs;
+      check('iş seçiminde temel üretim yerleri (bahçe, fırın, ...) lüks işlerden önce gelir', first && first.building && !first.building.definition.luxury, first?.building?.type);
+      check('temel yuvalar dolunca boştaki sakin dokuma tezgâhına / mahzene geçer (ticaret fazlası)', second && second.building && second.building.definition.luxury, second?.building?.type);
+    }
+
+    // --- Gerçek vardiya: sabitlenen dokumacı mesaide gelir, dokur ve yevmiye alır ---
+    {
+      st().time.day = 6;
+      st().time.hour = 8;
+      st().time.minute = 0;
+      sim.give({ flax: 60, cloth: 0, food: 300 });
+      const weaver = s0.characters.find((c) => !c.isChild && !c.role && !c.away && !c.illness && !c.isInjured && c.id !== worker.id);
+      game.events.emit('ui:pinWorker', { buildingId: loom.id, characterId: weaver.id });
+      const coins0 = weaver.coins;
+      const xp0 = weaver.skills?.crafting ?? 0;
+      let sawWeave = false;
+      for (let h = 0; h < 10; h++) {
+        hours(1);
+        if (weaver.task?.activity === 'weave' && weaver.task.phase === 'perform') sawWeave = true;
+      }
+      check('sabitlenen dokumacı mesaide tezgâhta çalışır (weave) ve kumaş dokur', weaver.workplaceId === loom.id && sawWeave && s0.resources.cloth > 0, `kumaş ${s0.resources.cloth}`);
+      check('dokumacının vardiyası yevmiye ve zanaatkârlık deneyimi kazandırır', weaver.coins > coins0 && (weaver.skills?.crafting ?? 0) > xp0, `${coins0}->${weaver.coins}`);
+      game.events.emit('ui:unpinWorker', { buildingId: loom.id, characterId: weaver.id });
+    }
+
+    // --- Han: fıçı ikmali, şerbet, iki kat dolum, Keyifli Damak, testi ---
+    const inn = s0.buildings.find((b) => b.type === 'inn' && b.functional) ?? sim.place('inn');
+    const R = S().refinery;
+    inn.sherbet = 0;
+    sim.give({ sherbet: 30 });
+    const moved = R.restock();
+    check('saat başı kasaba deposundan hana en çok 2 fıçı taşınır', moved >= 2 && inn.sherbet === 2 && s0.resources.sherbet === 30 - moved);
+    for (let i = 0; i < 10; i++) R.restock();
+    check('handa en çok 12 fıçı durur', inn.sherbet === 12);
+    const guest = s0.characters.find((c) => !c.isChild && !c.role && !c.away && c.id !== worker.id);
+    guest.needs.fun = 40;
+    guest.coins = 30;
+    guest.inventory = [];
+    delete guest.buffs.merryPalate;
+    const served0 = s0.stats.sherbetServed ?? 0;
+    const task = { activity: 'inn', phase: 'perform', buildingId: inn.id, elapsed: 0 };
+    events.length = 0;
+    const ok = R.serve(guest, task, inn);
+    check('handa sohbete oturan sakin fıçı şerbeti içer: +15 keyif', ok && task.sherbet === true && guest.needs.fun === 55 && s0.stats.sherbetServed === served0 + 1 && events.some((e) => e.n === 'citizen:sherbet'));
+    const until = guest.buffs.merryPalate;
+    const nextNoon = (Math.floor(s0.totalMinutes / 1440) + 1) * 1440 + 12 * 60;
+    check('Keyifli Damak: ertesi gün 12:00\'ye kadar sürer', until === nextNoon && RX.hasPalate(guest, s0.totalMinutes) && !RX.hasPalate(guest, nextNoon));
+    check('kesesi yeten sakin çantasına bir Şerbet Testisi alır (5 altın, handan 1 fıçı)', CZ.countItem(guest, 'sherbetJug') === 1 && guest.coins === 25 && inn.sherbet === 10 && events.some((e) => e.n === 'citizen:bought' && e.p.kind === 'sherbetJug'));
+    const t2 = { activity: 'inn', phase: 'perform', buildingId: inn.id, elapsed: 0 };
+    R.serve(guest, t2, inn);
+    check('testisi olan ikinci testiyi almaz', CZ.countItem(guest, 'sherbetJug') === 1 && inn.sherbet === 9);
+    inn.sherbet = 0;
+    const t3 = { activity: 'inn', phase: 'perform', buildingId: inn.id, elapsed: 0 };
+    check('handa fıçı yoksa şerbet yok', !R.serve(guest, t3, inn) && !t3.sherbet);
+    // İki kat sosyallik ve keyif (gerçek BehaviorSystem.perform)
+    {
+      const B = S().behavior;
+      const a = ACT.inn;
+      const run = (withSherbet) => {
+        inn.sherbet = withSherbet ? 5 : 0;
+        guest.needs.social = 20;
+        guest.needs.fun = 20;
+        const tk = { activity: 'inn', phase: 'perform', buildingId: inn.id, elapsed: 0, duration: 1e6 };
+        guest.task = tk;
+        B.perform(guest, tk, a, { gameMinutes: 1, hour: 19 });
+        const f1 = guest.needs.fun;
+        const s1 = guest.needs.social;
+        B.perform(guest, tk, a, { gameMinutes: 10, hour: 19 });
+        return { social: guest.needs.social - s1, fun: guest.needs.fun - f1, sherbet: tk.sherbet, jumped: f1 - 20 };
+      };
+      const plain = run(false);
+      const merry = run(true);
+      check('handa şerbet içen sakinin sosyallik barı iki kat hızlı dolar', merry.sherbet && !plain.sherbet && plain.social > 0 && Math.abs(merry.social - 2 * plain.social) < 1e-6, `${plain.social.toFixed(3)} / ${merry.social.toFixed(3)}`);
+      check('… keyif barı da iki kat hızlı dolar ve +15 ilk bardakta', merry.fun > plain.fun * 1.9 && merry.jumped >= 15, `${plain.fun.toFixed(3)} / ${merry.fun.toFixed(3)} / +${merry.jumped.toFixed(1)}`);
+      check('perform şerbeti yalnızca bir kez ikram eder (ilk adımda)', inn.sherbet === 4);
+      guest.task = null;
+    }
+    // Keyifli Damak: keyif yavaş düşer (gerçek NeedsSystem)
+    {
+      const needs = S().systems.find((x) => x.constructor.name === 'NeedsSystem');
+      const drop = (palate) => {
+        if (palate) guest.buffs.merryPalate = s0.totalMinutes + 600;
+        else delete guest.buffs.merryPalate;
+        guest.needs.fun = 80;
+        needs.update({ gameMinutes: 60, hour: 10, realDt: 0, simDt: 0 });
+        return 80 - guest.needs.fun;
+      };
+      const normal = drop(false);
+      const merryDrop = drop(true);
+      check('Keyifli Damak varken keyif %25 yavaş düşer', normal > 0 && Math.abs(merryDrop - normal * RF.INN_SHERBET.palate.funDecay) < normal * 0.05, `${normal.toFixed(3)} / ${merryDrop.toFixed(3)}`);
+      delete guest.buffs.merryPalate;
+    }
+    // Testiden içme
+    guest.needs.fun = 20;
+    guest.inventory = [{ kind: 'sherbetJug', qty: 1 }];
+    const asleep = guest.task;
+    const drank = R.drinkJugs();
+    check('keyfi düşen sakin çantasındaki testiden içer (+15 keyif, testi biter)', drank >= 1 && guest.needs.fun === 35 && CZ.countItem(guest, 'sherbetJug') === 0);
+    guest.needs.fun = 80;
+    guest.inventory = [{ kind: 'sherbetJug', qty: 1 }];
+    R.drinkJugs();
+    check('keyfi yerindeyse testiye dokunmaz', CZ.countItem(guest, 'sherbetJug') === 1);
+    guest.inventory = [];
+
+    // --- Kumaş: Dayanıklı Giysi, soğuk direnci, refah ---
+    {
+      const market = s0.buildings.find((b) => b.type === 'market' && b.functional) ?? sim.place('market');
+      const P = S().purse;
+      const buyer = s0.characters.find((c) => !c.isChild && !c.role && c.id !== guest.id && c.id !== worker.id);
+      const setup = (day, cloth) => {
+        s0.time.day = day;
+        sim.give({ cloth });
+        buyer.coins = 40;
+        buyer.inventory = [{ kind: 'souvenir', qty: 1, name: 'Boncuk Kolye' }, { kind: 'ration', qty: 6 }, { kind: 'ration', qty: 6 }];
+        buyer.illness = null;
+        buyer.exposure = 0;
+      };
+      setup(6, 10);
+      const summer = P.shop(buyer, market);
+      setup(10, 10);
+      const g0 = s0.stats.garments ?? 0;
+      const autumn = P.shop(buyer, market);
+      check('sonbaharda Pazar Yeri\'nin terzisi kumaştan Dayanıklı Giysi diker (8 altın, 1 kumaş)', summer !== 'garment' && autumn === 'garment' && CZ.countItem(buyer, 'garment') === 1 && buyer.coins === 32 && s0.resources.cloth === 9 && s0.stats.garments === g0 + 1, `${summer} / ${autumn}`);
+      check('giysisi olan ikinciyi almaz', P.shop(buyer, market) !== 'garment' || CZ.countItem(buyer, 'garment') === 1);
+      setup(14, 0);
+      buyer.inventory = buyer.inventory.filter((x) => x.kind !== 'garment');
+      check('kasabada kumaş yokken giysi dikilmez', P.shop(buyer, market) !== 'garment');
+      const bare = { equipment: { tool: null, clothing: null, bag: null }, inventory: [] };
+      const dressed = { equipment: { tool: null, clothing: null, bag: null }, inventory: [{ kind: 'garment', qty: 1 }] };
+      const coat = { equipment: { tool: null, clothing: 'winterCoat', bag: null }, inventory: [{ kind: 'garment', qty: 1 }] };
+      check('Dayanıklı Giysi kışın soğuğa karşı +0,3 korur; paltoyla toplanır (en çok 1)', EQ.coldProtection(bare) === 0 && Math.abs(EQ.coldProtection(dressed) - 0.3) < 1e-9 && EQ.coldProtection(coat) <= 1 && EQ.coldProtection(coat) > EQ.coldProtection({ ...coat, inventory: [] }));
+      const cloth0 = s0.stats.goods.cloth;
+      s0.stats.goods.cloth = 0;
+      const b0 = TS.townHappinessBonus(s0);
+      s0.stats.goods.cloth = 85;
+      const b1 = TS.townHappinessBonus(s0);
+      s0.stats.goods.cloth = 900;
+      const b2 = TS.townHappinessBonus(s0);
+      s0.stats.goods.cloth = cloth0;
+      check('dokunan kumaş refaha kalıcı katkı verir: her 40 topta +1, en çok +3', RX.clothWelfare({ stats: { goods: { cloth: 39 } } }) === 0 && b1 - b0 === 2 && b2 - b0 === 3);
+      s0.time.day = 6;
+    }
+
+    // --- HUD, panel ---
+    game.render(0);
+    const hud = game.ui.components.find((x) => x.renderWelfare);
+    check('Mallar listesinde Kumaş ve Fıçı Şerbeti', hud.resources.cloth && hud.resources.sherbet && hud.goodsMenu.contains(hud.resources.cloth.box) && hud.goodsMenu.contains(hud.resources.sherbet.box));
+    hud.renderGoodsDetail(s0);
+    check('Kumaş ipucu tezgâhı üretici sayar', /1 yapı/.test(hud.resources.cloth.box.title), hud.resources.cloth.box.title.split('\n')[0]);
+    const panel = game.ui.components.find((x) => x.renderCrafting);
+    const show = (b) => { panel.buildingId = b.id; panel.element.hidden = false; panel.lastKey = ''; panel.render(game); return panel.lines.textContent; };
+    sim.give({ flax: 20, cloth: 0 });
+    refresh();
+    const loomText = show(loom);
+    check('Dokuma Tezgâhı paneli: saatlik oran, toplam kumaş ve refah katkısı, giysi ve lüks iş notu', /dokumacı başı/.test(loomText) && /Keten 4 → Kumaş 2/.test(loomText) && /Dokunan toplam kumaş/.test(loomText) && /Dayanıklı Giysi/.test(loomText) && /Lüks iş/.test(loomText), loomText.slice(0, 160));
+    inn.sherbet = 7;
+    const brewText = show(brewery);
+    check('Şerbethane paneli: oran ve hanlardaki fıçılar', /mahzen ustası başı/.test(brewText) && /Şerbetçiotu 4 → Fıçı Şerbeti 2/.test(brewText) && /7\/12/.test(brewText));
+    const innText = show(inn);
+    check('Han paneli handaki fıçıyı ve etkisini gösterir', /Fıçı şerbeti: 7\/12/.test(innText) && /iki kat/.test(innText));
+    const millB = s0.buildings.find((b) => b.type === 'mill' && b.functional);
+    if (millB) check('değirmen paneli eski metinlerini korur', /fırıncı başı/.test(show(millB)) && /Öğünlerde önce ekmek/.test(panel.lines.textContent));
+    panel.buildingId = null;
+    panel.element.hidden = true;
+
+    // --- Görseller ---
+    const L0 = ART.getStructureSprite('loom', {});
+    const L1 = ART.getStructureSprite('loom', { active: true, frame: 1 });
+    const B0 = ART.getStructureSprite('brewery', {});
+    const B1 = ART.getStructureSprite('brewery', { active: true, frame: 1 });
+    check('Dokuma Tezgâhı ve Şerbethane görselleri 32x40; çalışırken mekik / ateş kareleri farklı; kışın çatı karlanır', [L0, L1, B0, B1].every((x) => x.width === 32 && x.height === 40) && L0 !== L1 && B0 !== B1 && L0.toDataURL() !== L1.toDataURL() && B0.toDataURL() !== B1.toDataURL() && ART.getStructureSprite('loom', { season: 'winter' }).toDataURL() !== L0.toDataURL());
+    check('yeni simgeler, balonlar, taşıma demetleri ve aletler (kumaş, fıçı, mekik, kepçe)', ['cloth', 'sherbet'].every((n) => UI.getIconDataURL(n) && UI.getCarrySprite(n) && UI.getBubbleSprite(n)) && UI.getHeldToolSprite('shuttle', false) && UI.getHeldToolSprite('ladle', true));
+
+    // --- Kayıt gidiş-dönüşü (sürüm 22) ---
+    inn.sherbet = 6;
+    sim.give({ cloth: 21, sherbet: 13 });
+    guest.inventory = [{ kind: 'sherbetJug', qty: 2 }, { kind: 'garment', qty: 1 }];
+    guest.buffs.merryPalate = s0.totalMinutes + 500;
+    s0.stats.sherbetServed = 17;
+    s0.stats.garments = 4;
+    s0.stats.goods.cloth = 55;
+    const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
+    game.events.emit('ui:save');
+    const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    check('kayıt sürümü 23: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 23 && raw.version === 23 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    game.events.emit('ui:load');
+    const s2 = st();
+    const inn2 = s2.buildings.find((b) => b.id === T.inn);
+    const g2 = s2.characters.find((c) => c.id === T.guest);
+    check('kayıttan yapılar, stoklar ve handaki fıçılar döner', s2.buildings.find((b) => b.id === T.loom)?.type === 'loom' && s2.buildings.find((b) => b.id === T.brew)?.type === 'brewery' && s2.resources.cloth === 21 && s2.resources.sherbet === 13 && inn2.sherbet === 6);
+    check('kayıttan testi, giysi, Keyifli Damak ve sayaçlar döner', CZ.countItem(g2, 'sherbetJug') === 2 && CZ.countItem(g2, 'garment') === 1 && g2.buffs.merryPalate === T.palate && s2.stats.sherbetServed === 17 && s2.stats.garments === 4 && s2.stats.goods.cloth === 55 && TS.townHappinessBonus(s2) >= 1);
+    check('yüklenen kasabada tezgâh yeniden dokuyabilir', (() => { sim.give({ flax: 10, food: 300 }); game.scenes.current.structures.update({ hour: 10, gameMinutes: 0 }); return !s2.buildings.find((b) => b.id === T.loom).idle; })());
+    // Bozuk değer
+    game.events.emit('ui:save');
+    const bad = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    bad.buildings.find((b) => b.id === T.inn).sherbet = 'çok';
+    bad.buildings.find((b) => b.id === T.loom).sherbet = 9;
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(bad));
+    game.events.emit('ui:load');
+    check('bozuk fıçı değeri 0\'a döner; han olmayan yapıda fıçı tutulmaz', st().buildings.find((b) => b.id === T.inn).sherbet === 0 && st().buildings.find((b) => b.id === T.loom).sherbet === 0);
+    // Eski (v21) kayıt
+    game.events.emit('ui:save');
+    const old = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    old.version = 21;
+    delete old.resources.cloth;
+    delete old.resources.sherbet;
+    old.buildings = old.buildings.filter((b) => b.type !== 'loom' && b.type !== 'brewery');
+    for (const b of old.buildings) delete b.sherbet;
+    for (const c of old.characters) {
+      c.inventory = (c.inventory ?? []).filter((x) => x.kind !== 'garment' && x.kind !== 'sherbetJug');
+      if (c.buffs) delete c.buffs.merryPalate;
+    }
+    delete old.stats.sherbetServed;
+    delete old.stats.garments;
+    delete old.stats.jugsDrunk;
+    delete old.stats.sherbetJugs;
+    if (old.stats.goods) { delete old.stats.goods.cloth; delete old.stats.goods.sherbet; }
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(old));
+    game.events.emit('ui:load');
+    const s3 = st();
+    check('v21 kaydı yüklenince Kumaş / Fıçı Şerbeti 0, hanlarda fıçı yok, yeni yapı ve eşya yok', s3.resources.cloth === 0 && s3.resources.sherbet === 0 && s3.buildings.filter((b) => b.type === 'inn').every((b) => b.sherbet === 0) && !s3.buildings.some((b) => b.type === 'loom' || b.type === 'brewery') && s3.characters.every((c) => !c.inventory.some((x) => x.kind === 'garment' || x.kind === 'sherbetJug')));
+    check('v21 kaydında kumaşın refah katkısı 0, bir gün sorunsuz yaşar', RX.clothWelfare(s3) === 0 && (() => { const d = s3.time.day; hours(24); return game.state.time.day === d + 1; })());
+    offs.forEach((off) => off());
+  }
+
+  // ===== 24. aşama (24.3): Ticaret İskelesi / Kervan Konağı, ihracat sözleşmeleri, pazar doygunluğu, hammadde ithalatı =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const BD = await import('/src/data/buildings.js');
+    const TD = await import('/src/data/tradePost.js');
+    const TP = await import('/src/systems/TradePost.js');
+    const TR = await import('/src/data/trade.js');
+    const ART = await import('/src/art/sprites/index.js');
+    const UI = await import('/src/art/ui/index.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    s0.time.speed = 4; // hours() 4x hızı varsayar
+    s0.time.paused = false;
+    s0.crisis.difficulty = 'huzurlu';
+    s0.crisis.raid = null;
+    s0.crisis.nextRaidWarnAt = null;
+    s0.petitions.list = [];
+    s0.petitions.nextAt = s0.totalMinutes + 1e6;
+    s0.crown.decree = null;
+    s0.crown.nextDecreeAt = s0.totalMinutes + 1e6;
+    s0.crown.nextLevyAt = s0.totalMinutes + 1e6;
+    const events = [];
+    const offs = ['trade:shipArrived', 'trade:shipLeft', 'trade:contractDone', 'trade:imported', 'toast'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
+    // Saat ilerletirken açılan karar penceresini varsayılan seçenekle kapat (oyun durmasın)
+    const hrs = (h) => {
+      for (let i = 0; i < h; i++) {
+        const active = st().dilemma.active;
+        if (active) {
+          const o = active.options?.find((x) => x.default) ?? active.options?.[0];
+          if (o) game.events.emit('ui:chooseDilemma', { optionId: o.id });
+          st().dilemma.active = null;
+        }
+        st().time.paused = false;
+        st().time.speed = 4;
+        hours(1);
+      }
+    };
+    const setTime = (total) => {
+      s0.time.day = Math.floor(total / 1440) + 1;
+      s0.time.hour = Math.floor((total % 1440) / 60);
+      s0.time.minute = total % 60;
+    };
+
+    // --- Veri ---
+    const def = BD.BUILDINGS.tradingPost;
+    check('Ticaret İskelesi: 3x2, Kasaba seviyesi, kereste + taş + demir, tek, Ticaret kategorisi', def && def.size.w === 3 && def.size.h === 2 && def.requiresTier === 3 && def.cost.wood > 0 && def.cost.stone > 0 && def.cost.iron > 0 && def.unique && def.category === 'Ticaret' && def.placement === 'tradeSite');
+    check('Ticaret İskelesi inşa menüsünde, Büyük Ticaret Limanı\'nın ardından', BD.BUILD_MENU.indexOf('tradingPost') === BD.BUILD_MENU.indexOf('harbor') + 1 && BD.buildTabFor('tradingPost') === 'buildings');
+    check('talepler: Kumaş 10 -> 40, Şerbet 8 -> 35, Ekmek 25 -> 20 altın; ziyaret 3-4 günde bir, 24 saat', TD.CONTRACTS.cloth.qty === 10 && TD.CONTRACTS.cloth.gold === 40 && TD.CONTRACTS.sherbet.qty === 8 && TD.CONTRACTS.sherbet.gold === 35 && TD.CONTRACTS.bread.qty === 25 && TD.CONTRACTS.bread.gold === 20 && TD.VISIT.intervalDays.join() === '3,4' && TD.VISIT.stayHours === 24);
+    check('ithalat paketleri: 30 odun 15, 25 taş 15, 10 demir 20 altın', TD.IMPORTS.wood.get.wood === 30 && TD.IMPORTS.wood.give.gold === 15 && TD.IMPORTS.stone.get.stone === 25 && TD.IMPORTS.stone.give.gold === 15 && TD.IMPORTS.iron.get.iron === 10 && TD.IMPORTS.iron.give.gold === 20);
+    check('ziyaretin üç talebi: Kumaş, Şerbet ve sırayla Ekmek / Erzak / Yün', [0, 1, 2, 3].map((v) => TP.contractsFor(v).map((c) => c.resource).join('+')).join(',') === 'cloth+sherbet+bread,cloth+sherbet+food,cloth+sherbet+wool,cloth+sherbet+bread');
+    check('Büyük Ticaret Limanı da kumaş ve fıçı şerbetini ihraç eder', TR.EXPORT.values.cloth > TR.EXPORT.values.bread && TR.EXPORT.values.sherbet > TR.EXPORT.values.bread);
+
+    // --- Seviye kilidi ve yerleşim ---
+    sim.give({ wood: 900, stone: 900, iron: 300, food: 400, bread: 120, gold: 1000, cloth: 0, sherbet: 0, wool: 60 });
+    s0.town.tier = 4;
+    const spot = sim.findSpot('tradingPost');
+    s0.town.tier = 2;
+    const locked = spot ? S().construction.checkPlacement('tradingPost', spot.x, spot.y) : { ok: true };
+    s0.town.tier = 4;
+    check('Ticaret İskelesi Köy\'de kilitli, Kasaba\'da yolun / suyun kenarına kurulabilir', spot && !locked.ok && /Kasaba/.test(locked.reason) && S().construction.checkPlacement('tradingPost', spot.x, spot.y).ok, locked.reason);
+    // Ne yola ne suya değen bir yer reddedilir
+    let far = null;
+    const map = S().world.map;
+    for (let y = 2; y < map.height - 3 && !far; y++) for (let x = 2; x < map.width - 4 && !far; x++) {
+      const c = S().construction.checkPlacement('tradingPost', x, y);
+      if (!c.ok && /yolun kenarına/.test(c.reason)) far = c;
+    }
+    check('yoldan ve sudan uzak yer reddedilir (nedeni yazılır)', far && /Nehir kıyısına/.test(far.reason));
+    // Su kenarında gemi, yolda kervan
+    let waterAt = null;
+    for (let y = 2; y < map.height - 3 && !waterAt; y++) for (let x = 4; x < map.width; x++) if (map.get(x, y) === 'water' && map.get(x, y + 1) === 'water' && map.get(x - 1, y) !== 'water') { waterAt = { x, y }; break; }
+    const fakeRiver = { definition: def, tileX: waterAt.x - 3, tileY: waterAt.y, type: 'tradingPost' };
+    const vRiver = S().tradePost.visitorFor(fakeRiver);
+    check('yanında su varsa Ticaret Gemisi (iskele), yoksa Kervan (konak) gelir', vRiver.mode === 'ship' && vRiver.side === 'right');
+
+    // --- Takvim ---
+    const post = sim.place('tradingPost');
+    const tp = s0.tradePost;
+    const T0 = s0.totalMinutes;
+    check('iskele kurulunca ilk gemi / kervan en az 12 saat sonra 09:00\'da gelir', post && tp.nextShipAt >= T0 + 720 && tp.nextShipAt % 1440 === 540 && tp.nextShipAt - T0 < 720 + 1440, `${T0} -> ${tp.nextShipAt}`);
+    const mode = S().tradePost.visitorFor(post).mode;
+    check('köydeki iskele yol kenarında: kervan gelecek (ya da suyun yanında gemi)', ['ship', 'caravan'].includes(mode));
+    const R = S().tradePost;
+    const arriveNow = () => {
+      setTime(tp.nextShipAt);
+      R.hourly();
+    };
+    const leaveNow = () => {
+      setTime(tp.ship.leavesAt);
+      R.hourly();
+    };
+    setTime(tp.nextShipAt - 60);
+    R.hourly();
+    check('vakti gelmeden gelen olmaz', !tp.ship);
+    events.length = 0;
+    arriveNow();
+    const ship = tp.ship;
+    check('gemi / kervan geldi: 24 saat kalır, 3 talep ve ithalat stoğu getirir', ship && tp.visits === 1 && ship.leavesAt - ship.arrivedAt === 1440 && ship.contracts.length === 3 && ship.contracts.map((c) => c.resource).join() === 'cloth,sherbet,bread' && ship.stock.wood === 3 && ship.mode === mode && TP.shipDocked(s0));
+    check('varışta bildirim ve Kasaba Günlüğü notu', events.some((e) => e.n === 'trade:shipArrived') && events.some((e) => e.n === 'toast' && /24 saat/.test(e.p.text)) && s0.journal.some((j) => /talep ediliyor/.test(j.text)));
+    R.update();
+    check('yanaşan gemi / kervan iskelede çizilir (flamalı ambar)', post.visitor && post.visitor.mode === mode && post.currentSprite({ season: 'summer', time: 0 }) === ART.getStructureSprite('tradingPost', { docked: true }));
+
+    // --- İhracat sözleşmeleri ---
+    sim.give({ cloth: 25, sherbet: 3, bread: 30 });
+    const gold0 = s0.resources.gold;
+    events.length = 0;
+    const g1 = R.complete(0);
+    check('Kumaş Talebi tamamlanır: 10 kumaş düşer, hazineye 40 altın', g1 === 40 && s0.resources.cloth === 15 && s0.resources.gold === gold0 + 40 && ship.contracts[0].done && tp.completed === 1 && tp.goldEarned === 40 && tp.exported.cloth === 10 && events.some((e) => e.n === 'trade:contractDone'));
+    check('tamamlanan sözleşme ikinci kez ödenmez', R.complete(0) === 0 && s0.resources.cloth === 15 && TP.contractStatus(s0, 0).reason === 'Bu sözleşme tamamlandı');
+    const short = TP.contractStatus(s0, 1);
+    check('depoda yetmeyen mal reddedilir (nedeni yazılır)', !short.ok && /Yetersiz fıçı şerbeti \(3\/8\)/.test(short.reason) && R.complete(1) === 0 && s0.resources.sherbet === 3, short.reason);
+    check('Ekmek Talebi: 25 ekmek -> 20 altın', R.complete(2) === 20 && s0.resources.bread === 5);
+    check('Kasaba günlüğüne sözleşme notu', s0.journal.some((j) => /İhracat sözleşmesi: 10 kumaş/.test(j.text)));
+
+    // --- İthalat ---
+    sim.give({ wood: 100, stone: 100, iron: 10, gold: 100 });
+    const ok1 = R.buy('wood');
+    check('Odun Paketi: 15 altın, 30 odun anında ambara iner', ok1 && s0.resources.wood === 130 && s0.resources.gold === 85 && ship.stock.wood === 2 && tp.imports === 1 && tp.goldSpent === 15 && tp.imported.wood === 30);
+    R.buy('wood');
+    R.buy('wood');
+    check('her paketten ziyaret başına 3 tane; sonra tüccarın stoğu biter', !R.buy('wood') && ship.stock.wood === 0 && /stoğu bitti/.test(TP.importStatus(s0, 'wood').reason));
+    check('Taş ve Demir Paketi: 25 taş 15, 10 demir 20 altın', R.buy('stone') && R.buy('iron') && s0.resources.stone === 125 && s0.resources.iron === 20);
+    sim.give({ gold: 10 });
+    check('altın yetmezse ithalat yapılmaz', !R.buy('iron') && /Yetersiz altın/.test(TP.importStatus(s0, 'iron').reason));
+    sim.give({ gold: 500, stone: S().economy.limit('stone') });
+    check('depoda yer yoksa ithalat yapılmaz', !R.buy('stone') && /yer yok/.test(TP.importStatus(s0, 'stone').reason));
+    sim.give({ stone: 100 });
+
+    // --- Ayrılış ve 3-4 günlük takvim ---
+    events.length = 0;
+    leaveNow();
+    check('24 saat dolunca ayrılır; sözleşme ve ithalat kapanır', !tp.ship && events.some((e) => e.n === 'trade:shipLeft') && !TP.contractStatus(s0, 0).ok && /kasabada değil/.test(TP.importStatus(s0, 'wood').reason) && tp.log.length === 1);
+    R.update();
+    check('ayrılınca iskele boş çizilir', post.visitor === null);
+    const leftAt = s0.totalMinutes;
+    check('sonraki ziyaret 3 gün sonra 09:00', tp.nextShipAt === Math.floor(leftAt / 1440) * 1440 + 3 * 1440 + 540 || tp.nextShipAt === leftAt + 3 * 1440, `${leftAt} -> ${tp.nextShipAt}`);
+    arriveNow();
+    const a2 = s0.totalMinutes;
+    check('ikinci ziyaretin üçüncü talebi Erzak', tp.ship.contracts[2].resource === 'food' && tp.visits === 2);
+    leaveNow();
+    check('sonraki ziyaret 4 gün sonra (sırayla 3 ve 4)', Math.round((tp.nextShipAt - s0.totalMinutes) / 1440) === 4 || Math.floor(tp.nextShipAt / 1440) - Math.floor(s0.totalMinutes / 1440) === 4, `${a2} ${s0.totalMinutes} -> ${tp.nextShipAt}`);
+
+    // --- Pazar doygunluğu ---
+    tp.market = {};
+    tp.streak = { resource: 'cloth', count: 1 }; // ilk ziyarette kumaş satıldı
+    sim.give({ cloth: 200, sherbet: 100, bread: 100, food: 300, wool: 100, gold: 500 });
+    const sell = (resource) => R.complete(tp.ship.contracts.findIndex((c) => c.resource === resource));
+    arriveNow();
+    const p2 = sell('cloth');
+    leaveNow();
+    arriveNow();
+    const p3 = sell('cloth');
+    check('Kumaş 3 kez peş peşe satılınca bir sonraki fiyat %12 düşer', p2 === 40 && p3 === 40 && Math.abs(tp.market.cloth - 0.88) < 1e-9 && TP.contractPrice(s0, tp.ship.contracts[0]) === 35, JSON.stringify(tp.market));
+    leaveNow();
+    arriveNow();
+    const p4 = sell('cloth');
+    check('dördüncü satış düşük fiyattan (35 altın) ve çarpan yeniden düşer (%76)', p4 === 35 && Math.abs(tp.market.cloth - 0.76) < 1e-9);
+    const p5 = sell('sherbet');
+    check('başka mal (şerbet) satılınca kumaşın fiyatı %5 toparlanır, seri bozulur', p5 === 35 && Math.abs(tp.market.cloth - 0.81) < 1e-9 && tp.streak.resource === 'sherbet' && tp.streak.count === 1);
+    leaveNow();
+    arriveNow();
+    check('kumaş satılmayan ziyaretten sonra da her varışta %5 toparlanır', Math.abs(tp.market.cloth - 0.81) < 1e-9 || Math.abs(tp.market.cloth - 0.86) < 1e-9);
+    sell('sherbet');
+    leaveNow();
+    arriveNow();
+    check('satılmayan kumaş varışta toparlanır', Math.abs(tp.market.cloth - 0.86) < 1e-9 + 0.05 && tp.market.cloth > 0.81, JSON.stringify(tp.market));
+    for (let i = 0; i < 6; i++) {
+      leaveNow();
+      arriveNow();
+    }
+    check('zamanla eski kârlı seviyesine (tam fiyat) döner', tp.market.cloth === undefined && TP.priceMultiplier(s0, 'cloth') === 1 && TP.contractPrice(s0, tp.ship.contracts[0]) === 40);
+    tp.market = { cloth: 0.5 };
+    check('çarpan en düşük %55\'te durur (kayıttan bile)', TP.restoreTradePost({ market: { cloth: 0.1 } }).market.cloth === 0.55);
+    tp.market = {};
+    tp.streak = { resource: null, count: 0 };
+
+    // --- Gerçek saatler: takvim olaylarla işler; iskele çalışmıyorsa gelen olmaz ---
+    leaveNow();
+    tp.nextShipAt = s0.totalMinutes + 30;
+    post.isDamaged = true;
+    post.damaged = true;
+    hrs(2);
+    check('iskele hasarlıyken gemi / kervan gelmez', !tp.ship && tp.nextShipAt !== null);
+    post.damaged = false;
+    post.isDamaged = false;
+    hrs(2);
+    check('iskele onarılınca ilk saatte gelir (time:hour)', tp.ship && TP.shipDocked(s0), `gemi ${!!tp.ship} · sıradaki ${tp.nextShipAt} · şimdi ${s0.totalMinutes} · hazır ${TP.tradePostReady(s0)} · proje ${post.project?.kind} · işler ${post.functional} · state ${st() === s0} · hız ${s0.time.speed} · durdu ${s0.time.paused} · karar ${s0.dilemma.active?.id ?? '-'} · saat ${s0.time.hour}:${s0.time.minute}`);
+    hrs(26);
+    check('gerçek saatlerle 24 saat sonra ayrılır', !tp.ship && tp.nextShipAt > s0.totalMinutes);
+
+    // --- Panel: sözleşme kartları ve tek tıkla tamamlama ---
+    arriveNow();
+    sim.give({ cloth: 30, sherbet: 2, gold: 300, wood: 50 });
+    const panel = game.ui.components.find((x) => x.renderCrafting);
+    const show = () => { panel.buildingId = post.id; panel.element.hidden = false; panel.lastKey = ''; panel.render(game); };
+    show();
+    const cards = panel.tradeBox.querySelectorAll('.trade-contract');
+    const btns = [...panel.tradeBox.querySelectorAll('.contract-button')];
+    check('iskele panelinde üç sözleşme kartı ve ithalat düğmeleri', !panel.tradeBox.hidden && cards.length === 3 && btns.length === 3 && panel.tradeBox.querySelectorAll('.import-button').length === 3 && /burada/.test(panel.tradeBox.textContent));
+    check('yetmeyen malın düğmesi kapalı, yetenin açık', !btns[0].disabled && btns[1].disabled);
+    const c0 = s0.resources.cloth;
+    btns[0].click();
+    show();
+    check('karttaki düğmeye tıklayınca sözleşme tamamlanır', s0.resources.cloth === c0 - 10 && tp.ship.contracts[0].done && panel.tradeBox.querySelector('.trade-contract.is-done'));
+    const w0 = s0.resources.wood;
+    panel.tradeBox.querySelector('.import-button[data-kind="wood"]').click();
+    check('ithalat düğmesiyle Odun Paketi alınır', s0.resources.wood === w0 + 30);
+    leaveNow();
+    show();
+    check('gemi yokken panel sıradaki varışı gösterir', /Sıradaki gemi \/ kervan/.test(panel.tradeBox.textContent) && panel.tradeBox.querySelectorAll('.trade-contract').length === 0);
+    panel.buildingId = null;
+    panel.element.hidden = true;
+
+    // --- Görseller ---
+    const p0 = ART.getStructureSprite('tradingPost', {});
+    const pd = ART.getStructureSprite('tradingPost', { docked: true });
+    const shipS = ART.getTradeShipSprite(false, false);
+    const shipL = ART.getTradeShipSprite(true, true);
+    const car = ART.getCaravanSprite(false);
+    check('iskele 48x40 (gemi gelince flamalı), gemi 40x32, kervan 40x28; aynalı ve gece fenerli çeşitleri', p0.width === 48 && p0.height === 40 && pd.toDataURL() !== p0.toDataURL() && shipS.width === 40 && shipS.height === 32 && car.width === 40 && car.height === 28 && shipL.toDataURL() !== shipS.toDataURL() && ART.getStructureSprite('tradingPost', { season: 'winter' }).toDataURL() !== p0.toDataURL());
+    check('sözleşme simgesi', UI.getIconDataURL('contract'));
+
+    // --- Kayıt gidiş-dönüşü (sürüm 23) ---
+    arriveNow();
+    sim.give({ cloth: 40 });
+    R.complete(0);
+    R.buy('iron');
+    tp.market = { sherbet: 0.76 };
+    tp.streak = { resource: 'cloth', count: 2 };
+    const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
+    game.events.emit('ui:save');
+    const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    check('kayıt sürümü 23: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 23 && raw.version === 23 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    game.events.emit('ui:load');
+    const t2 = st().tradePost;
+    check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
+    check('yüklenen kasabada gemi hâlâ burada, kalan sözleşme tamamlanabilir', TP.shipDocked(st()) && (() => { sim.give({ bread: 50, food: 100, wool: 50 }); return game.scenes.current.tradePost.complete(2) > 0; })());
+    // Bozuk değerler
+    game.events.emit('ui:save');
+    const bad = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    bad.tradePost.market = { cloth: 'ucuz', sherbet: 7, iron: 0.2 };
+    bad.tradePost.ship.contracts.push({ resource: 'altın', qty: 5, gold: 999 });
+    bad.tradePost.ship.stock.wood = 99;
+    bad.tradePost.streak = { resource: 'kömür', count: 5 };
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(bad));
+    game.events.emit('ui:load');
+    const t3 = st().tradePost;
+    check('bozuk çarpan, bilinmeyen mal, taşan stok ve seri temizlenir', Object.keys(t3.market).length === 0 && t3.ship.contracts.length === 3 && t3.ship.stock.wood === 3 && t3.streak.resource === null);
+    // Eski (v22) kayıt
+    game.events.emit('ui:save');
+    const old = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    old.version = 22;
+    delete old.tradePost;
+    old.buildings = old.buildings.filter((b) => b.type !== 'tradingPost');
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(old));
+    game.events.emit('ui:load');
+    const t4 = st().tradePost;
+    check('v22 kaydı yüklenince dış ticaret boş: gemi, takvim, sözleşme ve çarpan yok', !t4.ship && t4.nextShipAt === null && t4.visits === 0 && Object.keys(t4.market).length === 0 && t4.completed === 0 && !st().buildings.some((b) => b.type === 'tradingPost'));
+    check('v22 kasabasına iskele kurulunca takvim kurulur (ilk gemi gelir) ve bir gün sorunsuz yaşar', (() => {
+      st().town.tier = 4;
+      sim.give({ wood: 400, stone: 400, iron: 100 });
+      const b = sim.place('tradingPost');
+      const d = st().time.day;
+      hrs(24);
+      window.__v22dbg = `yapı ${!!b} · takvim ${st().tradePost.nextShipAt} · gemi ${!!st().tradePost.ship} · gün ${d}->${game.state.time.day}`;
+      return b && (st().tradePost.nextShipAt !== null || st().tradePost.ship) && st().tradePost.visits <= 1 && game.state.time.day === d + 1;
+    })(), window.__v22dbg);
+    offs.forEach((off) => off());
   }
 
   return out;

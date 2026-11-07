@@ -58,6 +58,12 @@ import { estimateTax, levyAmount, levyPlan, decreeStatus, reputationLevel } from
 import { mendSpecFor, repairCost, wellNear, defenseStatus } from '../../systems/Crisis.js';
 import { FIRE, WELL, GUARD, REPAIR } from '../../data/crisis.js';
 import { raidCard } from './crisisCards.js';
+import { productionOf, storageLimit, cropOf, hasGranary } from '../../systems/Granary.js';
+import { CROPS, AGRI_KEYS, SPOILAGE } from '../../data/crops.js';
+import { INN_SHERBET, GARMENT, CLOTH_WELFARE } from '../../data/refinery.js';
+import { CONTRACTS, MARKET, IMPORTS, IMPORT_KEYS } from '../../data/tradePost.js';
+import { contractStatus, importStatus, priceMultiplier, shipDocked } from '../../systems/TradePost.js';
+import { clothWelfare } from '../../systems/Refinery.js';
 
 const thumbnailCache = new Map();
 
@@ -90,9 +96,11 @@ export class BuildingPanel {
     this.progress = el('div', { className: 'need-bar building-progress' }, [el('span', { className: 'need-fill need-fun' })]);
     this.people = el('div', { className: 'building-people' });
     this.crafting = el('div', { className: 'building-crafting' });
+    this.cropBox = el('div', { className: 'building-crafting building-crops' }); // (24. aşama) bahçenin ekim tercihi
     this.decrees = el('div', { className: 'building-decrees' });
     this.research = el('div', { className: 'building-decrees building-research' });
     this.harbor = el('div', { className: 'building-decrees building-harbor' });
+    this.tradeBox = el('div', { className: 'building-decrees building-trade' }); // (24.3) Ticaret İskelesi / Kervan Konağı
     this.luxury = el('div', { className: 'building-decrees building-luxury' });
     this.bell = el('div', { className: 'building-decrees building-bell' });
     this.trustBox = el('div', { className: 'building-decrees building-trust' }); // (21. aşama) Yönetim Güveni
@@ -135,10 +143,12 @@ export class BuildingPanel {
       this.description,
       this.progress,
       this.people,
+      this.cropBox,
       this.crafting,
       this.decrees,
       this.research,
       this.harbor,
+      this.tradeBox,
       this.luxury,
       this.crownBox,
       this.trustBox,
@@ -227,7 +237,13 @@ export class BuildingPanel {
         : '';
     // (23. aşama) kriz: yangın ilerlemesi, tamir bedeli, bekleyen baskın, kule ve bekçiler
     const crisisKey = this.crisisKeyOf(building, state);
+    // (24. aşama) ekim tercihi ve silo / bozulma durumu
+    const cropKey = cropOf(building) || building.definition.granary ? [building.crop, hasGranary(state), JSON.stringify(state.granary?.spoiled ?? {})].join(':') : '';
+    // (24.3) dış ticaret: ziyaret, sözleşmeler, pazar, ithalat stoğu ve ilgili stoklar
+    const tradeKey = building.type === 'tradingPost' ? JSON.stringify([state.tradePost, state.resources, Math.floor(state.totalMinutes / 60)]) : '';
     const key = [
+      tradeKey,
+      cropKey,
       crisisKey,
       exploreKey,
       bellKey,
@@ -273,10 +289,12 @@ export class BuildingPanel {
     this.progress.firstElementChild.style.width = `${Math.floor(ratio * 100)}%`;
 
     this.renderPeople(building, people);
+    this.renderCrops(building, state);
     this.renderCrafting(building, state);
     this.renderDecrees(building, state);
     this.renderResearch(building, state);
     this.renderHarbor(building, state);
+    this.renderTradePost(building, state);
     this.renderLuxury(building, state);
     this.renderCrown(building, state);
     this.renderTrust(building, state);
@@ -425,6 +443,37 @@ export class BuildingPanel {
       );
     }
     this.people.replaceChildren(...children);
+  }
+
+  /**
+   * (24. aşama) Sebze Bahçesi'nin ekim tercihi: Buğday / Sebze, Keten, Meyve / Şerbetçiotu. Seçilen mahsul bahçenin ürününü
+   * ve saatlik verimini belirler; seçim hemen geçerlidir (bahçıvan yeni mahsulle çalışır, tarla yeni dokuyla çizilir).
+   */
+  renderCrops(building, state) {
+    const crop = cropOf(building);
+    const show = Boolean(crop) && !building.underConstruction && !building.ruined;
+    this.cropBox.hidden = !show;
+    if (!show) return;
+    const buttons = building.definition.crops.map((key) => {
+      const def = CROPS[key];
+      const b = this.button(def.shortName, `${def.name}: ${def.description}\nSaatte ${def.perHour} ${RESOURCES[def.resource].name.toLocaleLowerCase('tr')} (kişi başı, tam verimde)`, () =>
+        this.events.emit('ui:setCrop', { buildingId: building.id, crop: key })
+      );
+      b.classList.add('craft-mode', 'crop-mode');
+      b.dataset.crop = key;
+      b.classList.toggle('is-active', crop === key);
+      return b;
+    });
+    const def = CROPS[crop];
+    const note = hasGranary(state)
+      ? 'Ürün Silosu var: hasat yağmurda ve kışın bozulmaz'
+      : `Silo yok: yağmurda ve kışın kilerdeki ${SPOILAGE.safeStock}'i aşan ham mahsulün bir kısmı bozulur`;
+    this.cropBox.replaceChildren(
+      el('div', { className: 'building-section-title', text: 'Ekim Tercihi' }),
+      el('div', { className: 'craft-modes crop-modes' }, buttons),
+      el('div', { className: 'upgrade-text is-active', text: `Ekili: ${def.name} → ${RESOURCES[def.resource].name} (saatte ${def.perHour})` }),
+      el('div', { className: 'upgrade-text', text: note })
+    );
   }
 
   /** Zanaat atölyesi: üretim seçimi, tezgâhtaki iş ve depodaki ekipman (eksik sayısıyla). */
@@ -902,6 +951,69 @@ export class BuildingPanel {
     this.harbor.replaceChildren(...children);
   }
 
+  /**
+   * (24.3) Ticaret İskelesi / Kervan Konağı: gemi / kervan buradaysa ihracat sözleşmeleri (tek tıkla tamamlanır) ve ithalat
+   * paketleri; değilse sıradaki varış. Pazar doygunluğu çarpanları ve son ziyaretler.
+   */
+  renderTradePost(building, state) {
+    const show = building.type === 'tradingPost' && building.functional;
+    this.tradeBox.hidden = !show;
+    if (!show) return;
+    const tp = state.tradePost;
+    const now = state.totalMinutes;
+    const ship = shipDocked(state) ? tp.ship : null;
+    const who = ship?.mode === 'caravan' ? 'Kervan' : 'Ticaret Gemisi';
+    const children = [el('div', { className: 'building-section-title', text: ship ? `${who} burada` : 'Dış Ticaret' })];
+    if (ship) {
+      children.push(el('div', { className: 'upgrade-text is-active', text: `${who} ${Math.max(1, Math.ceil((ship.leavesAt - now) / 60))} saat daha kalacak · ziyaret ${tp.visits}` }));
+      ship.contracts.forEach((c, index) => {
+        const def = CONTRACTS[c.resource];
+        const status = contractStatus(state, index);
+        const mult = priceMultiplier(state, c.resource);
+        const button = this.button(c.done ? 'Tamamlandı' : 'Sözleşmeyi Tamamla', status.ok ? `${c.qty} ${RESOURCES[c.resource].name.toLocaleLowerCase('tr')} yüklenir, hazineye ${status.gold} altın girer` : status.reason, () =>
+          this.events.emit('ui:completeContract', { index })
+        );
+        button.classList.add('upgrade-button', 'contract-button');
+        button.dataset.index = String(index);
+        button.disabled = !status.ok;
+        children.push(
+          el('div', { className: `decree luxury-card trade-contract${c.done ? ' is-done' : ''}` }, [
+            el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL('contract'), alt: '' }), def.title, el('span', { className: 'decree-state', text: def.buyer })]),
+            el('div', { className: 'upgrade-row' }, [
+              el('span', { className: 'build-costs' }, [
+                el('span', { className: `build-cost${(state.resources[c.resource] ?? 0) < c.qty && !c.done ? ' is-missing' : ''}` }, [el('img', { src: getIconDataURL(RESOURCES[c.resource].icon), alt: RESOURCES[c.resource].name }), `${c.qty}`]),
+                ' → ',
+                el('span', { className: 'luxury-price' }, [el('img', { src: getIconDataURL('coin'), alt: 'Altın' }), String(c.done ? c.paid ?? status.gold : status.gold)]),
+              ]),
+              button,
+            ]),
+            el('div', { className: 'upgrade-text', text: c.done ? 'Mallar yüklendi' : mult < 1 ? `Pazar doygun: fiyat %${Math.round(mult * 100)} (taban ${c.gold} altın)` : status.ok ? `Depoda ${state.resources[c.resource]} var` : status.reason }),
+          ])
+        );
+      });
+      const packs = IMPORT_KEYS.map((kind) => {
+        const def = IMPORTS[kind];
+        const st = importStatus(state, kind);
+        const [r, v] = Object.entries(def.get)[0];
+        const b = this.button(`${def.name}: ${v} ${RESOURCES[r].name} → ${def.give.gold} Altın`, st.ok ? `Anında ambara iner · bu ziyarette ${ship.stock[kind]} paket kaldı` : st.reason, () => this.events.emit('ui:importPackage', { kind }));
+        b.classList.add('craft-mode', 'import-button');
+        b.dataset.kind = kind;
+        b.disabled = !st.ok;
+        return b;
+      });
+      children.push(el('div', { className: 'upgrade-text', text: 'Hammadde ithalatı (altınla, anında ambara):' }), el('div', { className: 'craft-modes' }, packs));
+    } else {
+      const at = tp.nextShipAt;
+      const hoursLeft = at === null ? null : Math.max(0, Math.ceil((at - now) / 60));
+      children.push(el('div', { className: 'upgrade-text is-active', text: at === null ? 'Gemi / kervan iskele tamamlanınca yola çıkar' : `Sıradaki gemi / kervan ${hoursLeft} saat sonra (Gün ${Math.floor(at / 1440) + 1}, 09:00)` }));
+      children.push(el('div', { className: 'upgrade-text', text: `3-4 günde bir gelir, 24 saat kalır; her seferinde 3 ihracat talebi getirir (Kumaş, Fıçı Şerbeti ve sırayla Ekmek / Erzak / Yün)` }));
+    }
+    const low = Object.entries(tp.market).map(([r, m]) => `${RESOURCES[r].name} %${Math.round(m * 100)}`);
+    children.push(el('div', { className: 'upgrade-text', text: low.length ? `Pazar fiyatları: ${low.join(' · ')} (aynı mal ${MARKET.streak} kez peş peşe satılınca %${Math.round(MARKET.drop * 100)} düşer; başka mal satılınca toparlanır)` : `Pazar fiyatları tam · aynı mal ${MARKET.streak} kez peş peşe satılınca %${Math.round(MARKET.drop * 100)} düşer` }));
+    children.push(el('div', { className: 'upgrade-text', text: `Toplam ${tp.completed} sözleşme, +${tp.goldEarned} altın · ${tp.imports} ithalat paketi, -${tp.goldSpent} altın` }));
+    this.tradeBox.replaceChildren(...children);
+  }
+
   /** Sıradaki geliştirme: harabeyse onarım, yükseltilebiliyorsa Seviye 2, yoksa null. */
   nextStep(building) {
     const def = BUILDINGS[building.type];
@@ -977,7 +1089,7 @@ export class BuildingPanel {
     if (building.isBurning) lines.push(`Yanıyor: yangın %${Math.round(building.fireProgress)} (%100'de yapı hasar alır, silinmez) · ${building.fireWater} kova atıldı`);
     else if (building.damaged) lines.push(building.project ? 'Hasarlı: inşaatçılar onarıyor' : `Hasarlı (${building.damageKind === 'fire' ? 'yangın' : building.damageKind === 'raid' ? 'baskın' : 'fırtına'}): onarılana kadar kimse çalışamaz`);
     if (def.production && building.factors) lines.push(...this.productionLines(building, state));
-    if (def.processing) lines.push(...this.processingLines(building));
+    if (def.processing) lines.push(...this.processingLines(building, state));
 
     switch (building.type) {
       case 'cabin': {
@@ -1158,6 +1270,10 @@ export class BuildingPanel {
         lines.push('Burada yiyenler çabuk doyar, keyiflenir ve 8 saat yavaş acıkır');
         lines.push(building.lit ? 'Akşam açık: sakinler önünde toplanıp sohbet ediyor' : 'Akşam 17:00\'de kapısı sohbete açılır');
         lines.push(`Bugün pişen: ${building.producedToday} porsiyon`);
+        // (24.2) Şerbethane'den taşınan fıçılar
+        if (building.sherbet > 0 || state.buildings.some((b) => b.type === 'brewery' && b.functional)) {
+          lines.push(`Fıçı şerbeti: ${building.sherbet}/${INN_SHERBET.capacity} · içen sakinin keyfi +${INN_SHERBET.fun}, handa keyif ve sosyallik iki kat hızlı dolar, güne Keyifli Damak'la başlar`);
+        }
         break;
       }
       case 'market': {
@@ -1175,6 +1291,15 @@ export class BuildingPanel {
         lines.push(`Stok: ${RESOURCE_KEYS.filter((r) => !RESOURCES[r].treasury).map((r) => `${RESOURCES[r].name} ${state.resources[r]}`).join(' · ')} / ${state.storageCapacity}`);
         if (building.type === 'supplyCamp') lines.push('Uzak yollarda yorulanlar burada soluklanır');
         break;
+      case 'silo': {
+        // (24. aşama) Ürün Silosu: tarımsal kaynakların depo sınırı ve bozulmaya karşı koruma
+        lines.push(`Tarımsal depo katkısı: +${def.granary.capacity} (${AGRI_KEYS.map((r) => RESOURCES[r].name).join(', ')})`);
+        lines.push(`Tarımsal stok: ${AGRI_KEYS.map((r) => `${RESOURCES[r].name} ${state.resources[r] ?? 0}/${storageLimit(state, r)}`).join(' · ')}`);
+        lines.push('Kuru ve havadar ambar: yağmurda ve kışın mahsul çürümez');
+        const spoiled = Object.entries(state.granary?.spoiled ?? {}).filter(([, v]) => v > 0);
+        if (spoiled.length) lines.push(`Silodan önce bozulan mahsul: ${spoiled.map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`).join(', ')}`);
+        break;
+      }
       case 'berryBush':
         if (getSeason(state.time.day).berries === 0) lines.push('Kış: çalı dondu, ilkbaharda yeniden meyve verir');
         lines.push(`Stok · porsiyon: ${building.berries}/${def.maxBerries}`);
@@ -1238,7 +1363,7 @@ export class BuildingPanel {
 
   /** Saatlik üretim ve onu oluşturan çarpanlar (StructureSystem her karede building.factors'a yazar). */
   productionLines(building, state) {
-    const production = BUILDINGS[building.type].production;
+    const production = productionOf(building); // (24. aşama) bahçede seçili mahsul
     const season = getSeason(state.time.day);
     const f = building.factors;
     const resource = RESOURCES[production.resource].name;
@@ -1265,14 +1390,25 @@ export class BuildingPanel {
   }
 
   /** İşleme yapısı (değirmen-fırın): saatlik dönüşüm, yiyecek değeri, durum ve bugünkü üretim. */
-  processingLines(building) {
-    const { perHour, input, output } = building.definition.processing;
+  processingLines(building, state) {
+    const processing = building.definition.processing;
+    const { perHour, input, output } = processing;
     const scale = (cost) => Object.fromEntries(Object.entries(cost).map(([r, v]) => [r, v * perHour]));
     const value = Object.entries(output).reduce((sum, [r, v]) => sum + v * perHour * (RESOURCES[r].foodValue ?? 0), 0);
-    const lines = [`Saatlik (fırıncı başı): ${formatCost(scale(input))} → ${formatCost(scale(output))}${value ? ` (${String(value).replace('.', ',')} yiyecek değeri)` : ''}`];
-    lines.push(building.processStatus ?? (building.active ? 'Değirmen öğütüyor, fırın yanıyor' : 'Hazır: fırıncı mesaide gelir'));
+    const lines = [`Saatlik (${processing.worker ?? 'fırıncı'} başı): ${formatCost(scale(input))} → ${formatCost(scale(output))}${value ? ` (${String(value).replace('.', ',')} yiyecek değeri)` : ''}`];
+    lines.push(building.processStatus ?? (building.active ? processing.active ?? 'Değirmen öğütüyor, fırın yanıyor' : processing.ready ?? 'Hazır: fırıncı mesaide gelir'));
     lines.push(`Bugün çıkan: +${building.producedToday} ${RESOURCES[Object.keys(output)[0]].name.toLocaleLowerCase('tr')}`);
-    lines.push('Öğünlerde önce ekmek yenir: 1 ekmek 2,5 yiyecek sayılır ve biraz keyif verir');
+    if (building.type === 'mill') lines.push('Öğünlerde önce ekmek yenir: 1 ekmek 2,5 yiyecek sayılır ve biraz keyif verir');
+    // (24.2) lüks işler
+    if (building.type === 'loom') {
+      lines.push(`Dokunan toplam kumaş: ${state.stats.goods?.cloth ?? 0} · refaha kalıcı katkı +${clothWelfare(state)} (her ${CLOTH_WELFARE.per} topta +1, en çok +${CLOTH_WELFARE.max})`);
+      lines.push(`Pazar Yeri'nin terzisi kumaştan Dayanıklı Giysi diker (${GARMENT.price} altın): sonbaharda ve kışın soğuğa karşı korur · dikilen ${state.stats.garments ?? 0}`);
+    }
+    if (building.type === 'brewery') {
+      const inns = state.buildings.filter((b) => b.type === 'inn' && b.functional);
+      lines.push(inns.length ? `Hanlardaki fıçı: ${inns.map((b) => `${b.sherbet}/${INN_SHERBET.capacity}`).join(', ')} · içilen bardak ${state.stats.sherbetServed ?? 0}` : 'Fıçılar hana taşınır: kasabada bir Kasaba Hanı olmalı');
+    }
+    if (building.definition.luxury) lines.push('Lüks iş: fırıncı, çiftçi ve yapı ustası yuvaları doluyken çalışılır; kasaba açken durur');
     return lines;
   }
 }

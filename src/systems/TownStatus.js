@@ -10,6 +10,7 @@ import { HAPPINESS_WEIGHTS, HAPPINESS_LEVELS, IMMIGRATION, TOWN_BUFFS, TOWN_TIER
 import { EXPEDITION } from '../data/dilemmas.js';
 import { RESOURCES, FOOD_KEYS } from '../data/resources.js';
 import { masterworkHappiness } from './Masterworks.js';
+import { clothWelfare } from './Refinery.js';
 import { aestheticWelfareMultiplier } from './Landscape.js';
 import { taxWorkMultiplier, reputationForImmigration } from './Crown.js';
 
@@ -47,6 +48,8 @@ export function townHappinessBonus(state) {
   bonus += silkPrestige(state);
   // (15. aşama) Kasaba Arşivi'nin vitrininde sergilenen usta işi eserler
   bonus += masterworkHappiness(state);
+  // (24.2) Dokunan keten kumaş: her 40 topta kalıcı +1 (en çok +3)
+  bonus += clothWelfare(state);
   return bonus;
 }
 

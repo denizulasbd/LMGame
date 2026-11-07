@@ -24,6 +24,7 @@ import { foodSupply } from './TownStatus.js';
 import { addMemory } from './MemorySystem.js';
 import { clamp } from '../utils/math.js';
 import { genitive } from '../utils/turkish.js';
+import { storageLimit } from './Granary.js';
 
 const OUTDOOR_TRADES = ['woodcutting', 'masonry', 'mining'];
 const HEARD_BUFF = 'heard';
@@ -151,7 +152,8 @@ export class PetitionSystem {
     const pop = s.characters.length;
     const target = (current) => Math.round(Math.min(cap * 0.7, Math.max(current + 30, pop * 5)));
     const wood = target(s.resources.wood ?? 0);
-    const food = target(Math.floor(foodSupply(s)));
+    const foodCap = storageLimit(s, 'food'); // (24. aşama) Ürün Silosu yiyeceğe yer açar
+    const food = Math.round(Math.min(foodCap * 0.7, Math.max(Math.floor(foodSupply(s)) + 30, pop * 5)));
     if ((s.resources.wood ?? 0) >= wood && foodSupply(s) >= food) return null;
     return { wood, food };
   }

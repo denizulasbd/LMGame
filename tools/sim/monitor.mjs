@@ -38,6 +38,11 @@ export async function installMonitor(page) {
     window.__citizenData = await import('/src/data/citizens.js');
     window.__crownData = await import('/src/data/crown.js');
     window.__crisisData = await import('/src/data/crisis.js');
+    window.__foodSupplyOf = (await import('/src/systems/TownStatus.js')).foodSupply;
+    // (24. aşama) eski sürümlerde (karşılaştırma koşuları) bu modül yoktur: tarım denetimi atlanır, gıda güvencesi yine ölçülür
+    window.__granaryMod = await import('/src/systems/Granary.js').catch(() => null);
+    window.__refineryMod = await import('/src/systems/Refinery.js').catch(() => null); // (24.2)
+    window.__tradeMod = await import('/src/systems/TradePost.js').catch(() => null); // (24.3)
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -272,6 +277,51 @@ export async function installMonitor(page) {
           if (s.exodus?.active) m.exodusSamples = (m.exodusSamples ?? 0) + 1;
         }
 
+        // ---- (24. aşama) Gıda güvencesi ve tarım: kişi başı besin, kritik saatler, geçerli mahsul ----
+        // (stok sınırı denetlenmez: kiler yıkılınca ya da testler kaynak verince stok sınırın üstünde kalabilir, oyun bunu kırpmaz)
+        {
+          const pop = Math.max(1, s.characters.length);
+          const perCap = window.__foodSupplyOf(s) / pop;
+          if (s.time.day >= 3) {
+            m.foodMinPerCap = Math.min(m.foodMinPerCap ?? Infinity, perCap);
+            if (perCap < 3) m.foodCriticalSamples = (m.foodCriticalSamples ?? 0) + 1; // bir öğünlük bile besin yok
+            m.foodPerCapSum = (m.foodPerCapSum ?? 0) + perCap;
+            m.foodPerCapN = (m.foodPerCapN ?? 0) + 1;
+          }
+          const GR = window.__granaryMod;
+          if (GR) {
+            for (const b of s.buildings) {
+              if (b.type === 'garden' && !['grain', 'flax', 'hops'].includes(b.crop)) broke(`${b.name}: geçersiz mahsul (${b.crop})`);
+              if (b.type !== 'garden' && b.crop !== null) broke(`${b.name}: bahçe olmayan yapıda mahsul (${b.crop})`);
+              if (b.type === 'garden' && b.functional) m.cropHours = { ...(m.cropHours ?? {}), [b.crop]: ((m.cropHours ?? {})[b.crop] ?? 0) + 1 };
+            }
+          }
+        }
+
+        // ---- (24.2) Katma değerli üretim: handaki fıçılar geçerli mi, açken lüks işçi çalışıyor mu ----
+        if (window.__refineryMod) {
+          for (const b of s.buildings) {
+            if (b.type === 'inn' && !(b.sherbet >= 0 && b.sherbet <= 12)) broke(`${b.name}: geçersiz fıçı sayısı (${b.sherbet})`);
+            if (b.type !== 'inn' && b.sherbet) broke(`${b.name}: han olmayan yapıda fıçı (${b.sherbet})`);
+          }
+          if (window.__refineryMod.luxuryHungry(s)) {
+            const working = s.characters.filter((c) => c.task?.phase === 'perform' && ['weave', 'brewSherbet'].includes(c.task.activity)).length;
+            m.hungryLuxury = (m.hungryLuxury ?? 0) + working;
+          }
+        }
+
+        // ---- (24.3) Dış ticaret: gemi 24 saatten fazla kalmaz, sözleşmeler ve çarpanlar geçerli ----
+        if (window.__tradeMod && s.tradePost) {
+          const tp = s.tradePost;
+          if (tp.ship) {
+            if (now > tp.ship.leavesAt + 120) broke('ticaret gemisi / kervanı ayrılma vaktini aştı');
+            if (tp.ship.contracts.length !== 3) broke(`ticaret gemisinde ${tp.ship.contracts.length} sözleşme`);
+            if (!s.buildings.some((b) => b.type === 'tradingPost')) broke('iskele yokken gemi / kervan var');
+          }
+          for (const [r, v] of Object.entries(tp.market)) if (!(v >= 0.55 && v < 1)) broke(`geçersiz pazar çarpanı ${r}: ${v}`);
+          m.tradeMinMarket = Math.min(m.tradeMinMarket ?? 1, ...Object.values(tp.market), 1);
+        }
+
         // ---- (23. aşama) Krizler: yangın, hasar, haydut baskını, yaralanma ----
         {
           const KD = window.__crisisData;
@@ -410,6 +460,59 @@ export async function installMonitor(page) {
             news: s.social?.gossip.length ?? 0,
             quirks: Object.fromEntries(['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].map((q) => [q, s.characters.filter((c) => c.quirk === q).length])),
           },
+          // (24. aşama) gıda güvencesi (her sürümde) ve tarımsal çeşitlilik
+          food: {
+            minPerCap: Number.isFinite(m.foodMinPerCap) ? Math.round(m.foodMinPerCap * 10) / 10 : null,
+            avgPerCap: m.foodPerCapN ? Math.round((m.foodPerCapSum / m.foodPerCapN) * 10) / 10 : null,
+            criticalHours: m.foodCriticalSamples ?? 0,
+            end: Math.round(window.__foodSupplyOf(s)),
+          },
+          agri: window.__granaryMod
+            ? {
+                silos: s.buildings.filter((b) => b.type === 'silo' && b.functional).length,
+                gardens: s.buildings.filter((b) => b.type === 'garden' && b.functional).map((b) => b.crop).join(','),
+                cropHours: m.cropHours ?? {},
+                flax: s.stats.goods?.flax ?? 0,
+                hops: s.stats.goods?.hops ?? 0,
+                spoiled: { ...(s.granary?.spoiled ?? {}) },
+                switches: s.granary?.switches ?? 0,
+                granaryCapacity: s.granaryCapacity ?? 0,
+              }
+            : null,
+          // (24.3)
+          trade: window.__tradeMod && s.tradePost
+            ? {
+                posts: s.buildings.filter((b) => b.type === 'tradingPost' && b.functional).length,
+                visits: s.tradePost.visits,
+                completed: s.tradePost.completed,
+                goldEarned: s.tradePost.goldEarned,
+                goldSpent: s.tradePost.goldSpent,
+                imports: s.tradePost.imports,
+                exported: { ...s.tradePost.exported },
+                imported: { ...s.tradePost.imported },
+                market: { ...s.tradePost.market },
+                minMarket: m.tradeMinMarket ?? 1,
+              }
+            : null,
+          // (24.2)
+          refinery: window.__refineryMod
+            ? {
+                looms: s.buildings.filter((b) => b.type === 'loom' && b.functional).length,
+                breweries: s.buildings.filter((b) => b.type === 'brewery' && b.functional).length,
+                clothWoven: s.stats.goods?.cloth ?? 0,
+                sherbetMade: s.stats.goods?.sherbet ?? 0,
+                cloth: s.resources.cloth ?? 0,
+                sherbet: s.resources.sherbet ?? 0,
+                served: s.stats.sherbetServed ?? 0,
+                innCasks: s.buildings.filter((b) => b.type === 'inn').map((b) => b.sherbet).join(','),
+                jugs: s.stats.sherbetJugs ?? 0,
+                jugsDrunk: s.stats.jugsDrunk ?? 0,
+                garments: s.stats.garments ?? 0,
+                dressed: s.characters.filter((c) => c.inventory.some((x) => x.kind === 'garment')).length,
+                welfare: window.__refineryMod.clothWelfare(s),
+                hungryLuxury: m.hungryLuxury ?? 0,
+              }
+            : null,
           // (23. aşama)
           crisis: {
             difficulty: s.crisis?.difficulty,

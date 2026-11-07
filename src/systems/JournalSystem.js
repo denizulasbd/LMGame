@@ -34,6 +34,11 @@ const FIRST_GOODS_TEXT = {
   wool: 'Koyun Ağılı\'nda ilk yün kırkıldı: artık paltolar ve çantalar yünden dokunacak',
   iron: 'Demir Madeni\'nden ilk demir cevheri çıktı: zanaatkâr çelik başlı aletler dövebilir',
   bread: 'Fırından ilk sıcak ekmekler çıktı: kasabanın sofrası bereketlendi',
+  // (24. aşama) bahçenin ekim tercihi
+  flax: 'Bahçeden ilk keten demetleri toplandı: mavi çiçekli liflerden ileride kumaş dokunacak',
+  cloth: 'Dokuma Tezgâhı\'ndan ilk top keten kumaş çıktı: terzi tezgâhında kışlık giysiler dikilecek',
+  sherbet: 'Şerbethane\'nin mahzeninden ilk fıçı şerbet çıktı: handa kadehler kalkacak',
+  hops: 'Bahçeden ilk şerbetçiotu salkımları ve tatlı meyveler toplandı: hanın şerbeti için kokulu bir hasat',
 };
 
 // (15. aşama) barışılan yer; 'chat' sohbet edilen herhangi bir yer
@@ -153,6 +158,9 @@ export class JournalSystem {
       on('town:renamed', ({ name }) => this.log(`Kasabanın yeni adı: ${name}`, 'heart')),
       on('resource:depleted', ({ resource }) => this.log(`${RESOURCES[resource].name} stoğu tükendi`, RESOURCES[resource].icon)),
       on('goods:firstProduced', ({ resource }) => this.log(FIRST_GOODS_TEXT[resource] ?? `İlk ${RESOURCES[resource].name} üretildi`, RESOURCES[resource].icon)),
+      // (24.3) dış ticaret
+      on('trade:shipArrived', ({ ship }) => this.log(`${ship.mode === 'caravan' ? 'Kervan konağa çadır kurdu' : 'Ticaret Gemisi iskeleye demir attı'}: ${ship.contracts.map((c) => RESOURCES[c.resource].name.toLocaleLowerCase('tr')).join(', ')} talep ediliyor`, 'coin')),
+      on('trade:contractDone', ({ contract, gold }) => this.log(`İhracat sözleşmesi: ${contract.qty} ${RESOURCES[contract.resource].name.toLocaleLowerCase('tr')} yüklendi, hazineye ${gold} altın girdi`, 'contract')),
       on('town:tierUp', ({ tier, townName }) =>
         this.log(`${townName} büyüdü: artık bir ${tier.name}! ${formatTownTitle(townName, tier)} adını gururla taşıyor`, tier.icon)
       ),

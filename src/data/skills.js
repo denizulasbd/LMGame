@@ -41,6 +41,9 @@ export const ACTIVITY_SKILLS = {
   brew: 'herbalism',
   gatherHerbs: 'herbalism',
   teach: 'scholarship',
+  // (24.2) dokumacı zanaatkârlığı, mahzen ustası aşçılığı geliştirir
+  weave: 'crafting',
+  brewSherbet: 'cooking',
 };
 
 export const SKILL_LEVELS = [

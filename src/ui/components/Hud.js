@@ -3,7 +3,7 @@
 //          seviyenin koşulları)
 //   Orta : mevsim ve günü, gün / saat, gün evresi ve hava simgesi, Duraklat ve 1x / 2x / 4x, ses düğmesi
 //   Sağ  : Odun / Taş / Yiyecek (miktar / depo, değişince +5 / -10 vurgusu), Kasaba Hazinesi (Altın), açılır "Mallar"
-//          listesi (Yün, Demir, Ekmek: depo, üreticiler ve bugünkü üretim; açık / kapalı tercihi hatırlanır), refah
+//          listesi (Yün, Demir, Ekmek, Keten, Şerbetçiotu: depo, üreticiler ve bugünkü üretim; açık / kapalı tercihi hatırlanır), refah
 //          göstergesi ve nüfus (üzerine gelince göç koşulları)
 //   Altında: etkin kasaba bonusları ve uyarılar (ısınma, hasta, sefer, fırtına, festival) küçük çipler hâlinde.
 // (21. aşama) Refah göstergesinin yanında küçük kalkanla Yönetim Güveni (üzerine gelince güven ve isyan durumu); durum
@@ -41,6 +41,7 @@ import { DECREES, TAX_RATES } from '../../data/crown.js';
 import { levyPlan } from '../../systems/Crown.js';
 import { formatRemaining } from '../../systems/Petitions.js';
 import { raidHoursLeft, defenseStatus } from '../../systems/Crisis.js';
+import { productionOf, storageLimit } from '../../systems/Granary.js';
 
 const DELTA_MERGE_MS = 500; // bu süre içindeki değişiklikler tek vurguda toplanır
 const DELTA_VISIBLE_MS = 1400;
@@ -73,7 +74,7 @@ function producersOf(state, resource) {
   for (const b of state.buildings) {
     if (!b.functional) continue;
     const def = BUILDINGS[b.type];
-    if (def.production?.resource === resource) {
+    if (productionOf(b)?.resource === resource) {
       count++;
       today += b.producedToday;
     } else if (def.production?.extra?.[resource] !== undefined) {
@@ -291,16 +292,16 @@ export class Hud {
       const { count, today } = producersOf(state, key);
       const text = count ? `${count} yapı · bugün +${today}` : 'üreten yapı yok';
       if (slot.detail.textContent !== text) slot.detail.textContent = text;
-      slot.box.title = `${RESOURCES[key].longName}: ${state.resources[key]}/${state.storageCapacity}\n${RESOURCES[key].hint}\n${count ? `${count} yapı üretiyor, bugün +${today}` : 'Henüz üreten yapı yok'}`;
+      slot.box.title = `${RESOURCES[key].longName}: ${state.resources[key]}/${storageLimit(state, key)}\n${RESOURCES[key].hint}\n${count ? `${count} yapı üretiyor, bugün +${today}` : 'Henüz üreten yapı yok'}`;
     }
   }
 
-  /** "Mallar" açılır listesi (Yün, Demir, Ekmek: depo, üreticiler, bugünkü üretim); tercih hatırlanır. */
+  /** "Mallar" açılır listesi (Yün, Demir, Ekmek, Keten, Şerbetçiotu: depo, üreticiler, bugünkü üretim); tercih hatırlanır. */
   setGoodsExpanded(expanded) {
     this.goodsExpanded = expanded;
     this.goodsMenu.hidden = !expanded;
     this.goodsToggle.classList.toggle('is-active', expanded);
-    this.goodsToggle.title = expanded ? 'İşlenmiş malları gizle' : 'İşlenmiş mallar: Yün, Demir, Ekmek (depo ve üreticiler)';
+    this.goodsToggle.title = expanded ? 'İşlenmiş malları gizle' : 'İşlenmiş mallar: Yün, Demir, Ekmek, Keten, Şerbetçiotu, Kumaş, Fıçı Şerbeti (depo ve üreticiler)';
     for (const key of GOODS_KEYS) this.resources[key].last = ''; // miktar metni yeniden yazılsın
     writeGoodsPreference(expanded);
   }
@@ -465,11 +466,12 @@ export class Hud {
       const slot = this.resources[key];
       const treasury = Boolean(RESOURCES[key].treasury); // hazinenin (altın) depo sınırı yok
       const compact = (RESOURCES[key].processed && !this.goodsExpanded) || treasury;
-      const text = compact ? String(game.state.resources[key]) : `${game.state.resources[key]}/${game.state.storageCapacity}`;
+      const limit = storageLimit(game.state, key); // (24. aşama) tarımsal kaynaklarda Ürün Silosu dahil
+      const text = compact ? String(game.state.resources[key]) : `${game.state.resources[key]}/${limit}`;
       if (text !== slot.last) {
         slot.last = text;
         slot.amount.textContent = text;
-        slot.box.classList.toggle('is-full', !treasury && game.state.resources[key] >= game.state.storageCapacity);
+        slot.box.classList.toggle('is-full', !treasury && game.state.resources[key] >= limit);
         slot.box.classList.toggle('is-empty', game.state.resources[key] === 0);
       }
     }

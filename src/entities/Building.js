@@ -22,6 +22,7 @@ import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { BUILDINGS, PROJECT_WORDS } from '../data/buildings.js';
 import { DAMAGE_KINDS } from '../data/crisis.js';
+import { normalizeCrop } from '../systems/Granary.js';
 import { EQUIPMENT } from '../data/equipment.js';
 import {
   getStructureSprite,
@@ -36,6 +37,9 @@ import {
   WATCHTOWER_ART,
   GUARD_TOWER_ART,
   WORKSHOP_ART,
+  BREWERY_ART,
+  getTradeShipSprite,
+  getCaravanSprite,
   MILL_ART,
   IRON_MINE_ART,
   TOWN_HALL_ART,
@@ -105,6 +109,13 @@ const BASELINE_INSET = {
   // 23. aşama
   well: 3,
   guardTower: 2,
+  // 24. aşama
+  silo: 2,
+  // 24.2
+  loom: 2,
+  brewery: 2,
+  // 24.3
+  tradingPost: 2,
 };
 // Çardağın çatısı kışın karla örtülür (arka katman çatı altında kalır, karlanmaz)
 const GAZEBO_WINTER_ROOF = { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 };
@@ -112,7 +123,7 @@ const SITE_BASELINE_INSET = 2;
 const RECENT_WORKERS_EXTRA = 2; // panelde çalışan yuvasından bu kadar fazla "son çalışan" hatırlanır
 
 // Animasyon kare hızı (kare / saniye): ateş titrer, tabela ve flama sallanır, çiçekler eğilir
-const FRAME_RATES = { campfire: 8, flowerBed: 1.4, planter: 1.2, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3, academy: 2.5, harbor: 1.6, wonder: 2.4, marbleFountain: 4, well: 1.5 };
+const FRAME_RATES = { campfire: 8, flowerBed: 1.4, planter: 1.2, inn: 2.5, market: 3, ancientFountain: 4, workshop: 5, loom: 4, brewery: 3, mill: 6, ironMine: 1.4, townHall: 2.5, healerHut: 3, academy: 2.5, harbor: 1.6, wonder: 2.4, marbleFountain: 4, well: 1.5 };
 const DEFAULT_FRAME_RATE = 3;
 const MAX_OVERHANG = 70; // yapıların karolarının üstüne taşabileceği en fazla piksel (görünürlük testi; harika 64)
 // Değirmen kanatları: saniyede kaç kare (çeyrek tur = MILL_ART.sailFrames kare) döner
@@ -155,6 +166,8 @@ export class Building extends Entity {
     crate = null,
     label = null,
     plantedAt = null,
+    crop = undefined,
+    sherbet = 0,
   }) {
     super({ id, x: tileX * T, y: tileY * T });
     this.type = type;
@@ -213,6 +226,11 @@ export class Building extends Entity {
     this.label = typeof label === 'string' && label.trim() ? label.trim() : null;
     this.plantedAt = Number.isFinite(plantedAt) ? plantedAt : null;
     this.growth = 1; // süs fidanı: 0-1 büyüme (LandscapeSystem her adımda yazar)
+    // 24. aşama: bahçenin ekim tercihi (data/crops.js); eski kayıtlarda (sürüm 2-20) ve geçersiz değerde Buğday / Sebze
+    this.crop = normalizeCrop(type, crop);
+    // 24.2: handaki fıçı şerbeti (RefinerySystem kasaba deposundan taşır); eski kayıtlarda 0
+    this.visitor = null; // (24.3) iskelede yanaşan gemi / kervan { mode, x, y, side } (TradePostSystem yazar; kayda girmez)
+    this.sherbet = type === 'inn' ? Math.max(0, Math.floor(Number(sherbet) || 0)) : 0;
   }
 
   /** (18. aşama) Süs fidanının büyüme kademesi: 0 fidan, 1 genç ağaç, 2 ulu ağaç. */
@@ -490,6 +508,8 @@ export class Building extends Entity {
       growthStage: this.growthStage,
       scaffold: this.project?.kind === 'stage',
       step: Math.min(3, Math.floor(this.projectRatio * 4)),
+      crop: this.crop,
+      docked: Boolean(this.visitor),
     });
   }
 
@@ -525,6 +545,16 @@ export class Building extends Entity {
     }
     const sprite = this.currentSprite(env);
     queue.addImage(this.sortY, sprite, this.x, this.y + this.height - sprite.height);
+    // (24.3) Ticaret İskelesi'ne yanaşan gemi (suda) ya da kervan (yolda): yanaştığı karonun dibine hizalı
+    if (this.type === 'tradingPost' && this.visitor && !this.underConstruction) {
+      const v = this.visitor;
+      const flipped = v.side === 'left';
+      const art = v.mode === 'ship' ? getTradeShipSprite(Boolean(env.windowsLit), flipped) : getCaravanSprite(flipped);
+      const tileX = v.x * T;
+      const x = v.side === 'left' ? tileX + T - art.width : v.side === 'right' ? tileX : this.x + (this.width - art.width) / 2;
+      const bottom = (v.y + 1) * T;
+      queue.addImage(bottom - 1, art, Math.round(x), bottom - art.height);
+    }
   }
 
   /**
@@ -559,6 +589,13 @@ export class Building extends Entity {
         if (this.active) {
           const artTop = this.y + this.height - WORKSHOP_ART.height;
           this.drawChimneySmoke(renderer, env, this.x + WORKSHOP_ART.chimney.x, artTop + WORKSHOP_ART.chimney.y, 1);
+        }
+        break;
+      case 'brewery':
+        // (24.2) Mahzen ustası çalışırken kazanın bacası tüter
+        if (this.active) {
+          const artTop = this.y + this.height - BREWERY_ART.height;
+          this.drawChimneySmoke(renderer, env, this.x + BREWERY_ART.chimney.x, artTop + BREWERY_ART.chimney.y, 1);
         }
         break;
       case 'fishingPier':
@@ -972,6 +1009,8 @@ export class Building extends Entity {
       crate: this.crate,
       label: this.label,
       plantedAt: this.plantedAt,
+      crop: this.crop,
+      sherbet: this.sherbet,
     };
   }
 }

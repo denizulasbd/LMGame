@@ -2,6 +2,7 @@
 // NeedsSystem (üşüme, yol yorgunluğu), HeatingSystem (üşüme balonu), CraftingSystem (kimin ihtiyacı var)
 // ve arayüz aynı kuralı kullansın diye tek yerde. Sayılar src/data/equipment.js'te.
 import { EQUIPMENT } from '../data/equipment.js';
+import { garmentProtection } from './Refinery.js';
 
 /** Kuşanılan ekipmanların iş hızı çarpanı (Sağlam Alet 1,25 × Sırt Çantası 1,15). */
 export function equipmentWorkSpeed(c) {
@@ -14,7 +15,8 @@ export function equipmentWorkSpeed(c) {
 export function coldProtection(c) {
   let value = 0;
   for (const item of Object.values(c.equipment)) if (item) value = Math.max(value, EQUIPMENT[item].coldProtection ?? 0);
-  return value;
+  // (24.2) çantadaki Dayanıklı Giysi paltoya eklenir (en çok tam koruma)
+  return Math.min(1, value + garmentProtection(c));
 }
 
 /** Yürürken enerji azalma çarpanı (sırt çantası 0,6). */

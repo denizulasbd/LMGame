@@ -21,6 +21,13 @@ import { GROUND_TILES } from './tiles.js';
 //   allowedTiles (varsayılan GROUND_TILES: çimen ve biyom zeminleri), demolishable
 //   workers / production / workActivity : üretim binası
 //   storageBonus : depo kapasitesine eklenen miktar
+//   granary      : (24. aşama) { capacity } yalnızca tarımsal kaynakların (data/crops.js -> AGRI_KEYS) depo kapasitesine
+//                  eklenen miktar; kasabada işleyen bir silo varsa mahsuller yağmurda / kışın bozulmaz (Ürün Silosu)
+//   placement 'tradeSite' : (24.3) ayak izi suya (iskele) ya da yola (kervan konağı) bitişik olmalı (Ticaret İskelesi)
+//   luxury       : (24.2) lüks / ticaret fazlası iş: iş seçiminde üretimden sonra gelir, kasaba açken boşta kalır (data/refinery.js)
+//   processing.worker / waiting / active / ready : (24.2) işleme yapısının panel metinleri (değirmenin eski metinleri varsayılan)
+//   crops        : (24. aşama) yapının ekebileceği mahsuller (data/crops.js; ilki varsayılan). Seçilen mahsul production'ın
+//                  ana ürününü ve saatlik verimini belirler (systems/Granary.js -> productionOf)
 //   funAura      : { radius, perMinute } yanından geçenin / dinlenenin keyfi (litHours varsa yalnızca yanarken)
 //   production.rainBonus : yağmurda üretime eklenen oran (bahçe)
 //   production.seasonal  : verimi mevsimin bu alanıyla çarpılır (bahçe: 'farm'; kışın 0 = donar)
@@ -156,12 +163,14 @@ export const BUILDINGS = {
     buildable: true,
     demolishable: true,
     category: 'Üretim',
-    description: 'Lahana, havuç ve domates yetişen bahçe. Çalışan sakin düzenli yiyecek üretir.',
+    description: 'Buğday, lahana, havuç ve domates yetişen bahçe. Çalışan sakin düzenli yiyecek üretir; panelden ekim tercihi (Buğday / Keten / Şerbetçiotu) seçilir.',
     cost: { wood: 15, stone: 5 },
     buildWork: 120,
     workers: 1,
     workActivity: 'farm',
     production: { resource: 'food', perHour: 5, rainBonus: 0.25, seasonal: 'farm' },
+    // (24. aşama) Ekim tercihi: ana ürün ve saatlik verim seçilen mahsulden gelir (data/crops.js; ilki varsayılan)
+    crops: ['grain', 'flax', 'hops'],
     upgrade: {
       name: 'Cam Sera',
       description: 'Cam çatılı sera: kışın donmaz, kar yağarken bile %60 verimle taze yiyecek üretir.',
@@ -485,6 +494,92 @@ export const BUILDINGS = {
     cost: { wood: 30, stone: 20 },
     buildWork: 200,
     storageBonus: 100,
+  },
+  // --- 24.3: dış ticaret (data/tradePost.js) ---
+  tradingPost: {
+    name: 'Ticaret İskelesi',
+    size: { w: 3, h: 2 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Ticaret',
+    description:
+      'Nehir kıyısında iskele ya da yol kenarında kervan konağı: ahşap ambar, tartı ve sandıklar. 3-4 günde bir Ticaret Gemisi (yanında su varsa) ya da Kervanı gelir, 24 saat kalır; ihracat sözleşmeleriyle kumaş, şerbet ve erzak satılır, altınla odun, taş ve demir ithal edilir.',
+    cost: { wood: 70, stone: 50, iron: 20 },
+    buildWork: 260,
+    allowedTiles: [...GROUND_TILES, 'sand'],
+    placement: 'tradeSite',
+    requiresTier: 3,
+    litHours: { from: 18.5, to: 6.5 },
+  },
+  // --- 24.2: katma değerli üretim (lüks / ticaret fazlası işler; data/refinery.js) ---
+  loom: {
+    name: 'Dokuma Tezgâhı',
+    size: { w: 2, h: 2 },
+    spots: 'front',
+    buildable: true,
+    demolishable: true,
+    category: 'Zanaat',
+    description:
+      'Ahşap çatılı dokuma atölyesi. Dokumacı 2 ketenden 1 top kumaş dokur. Kumaş Pazar Yeri\'nde Dayanıklı Giysi olur ve refaha kalıcı katkı verir. Lüks iş: temel işler doluyken çalışılır.',
+    cost: { wood: 45, stone: 25, iron: 10 },
+    buildWork: 200,
+    workers: 1,
+    workActivity: 'weave',
+    workFacing: 'up',
+    luxury: true,
+    processing: {
+      perHour: 2,
+      input: { flax: 2 },
+      output: { cloth: 1 },
+      worker: 'dokumacı',
+      waiting: 'kilerde dokunacak keten yok (bahçeye Keten ektir)',
+      active: 'Mekik gidip geliyor: kumaş dokunuyor',
+      ready: 'Hazır: dokumacı mesaide gelir',
+    },
+    requiresTier: 3,
+  },
+  brewery: {
+    name: 'Şerbethane',
+    size: { w: 2, h: 2 },
+    spots: 'front',
+    buildable: true,
+    demolishable: true,
+    category: 'Zanaat',
+    description:
+      'Taş mahzenli şerbethane. Mahzen ustası 2 şerbetçiotundan 1 fıçı şerbet yapar; fıçılar hana taşınır, handa içenlerin keyfi ve sosyalliği iki kat hızlı dolar. Lüks iş: temel işler doluyken çalışılır.',
+    cost: { wood: 35, stone: 40 },
+    buildWork: 200,
+    workers: 1,
+    workActivity: 'brewSherbet',
+    workFacing: 'up',
+    luxury: true,
+    processing: {
+      perHour: 2,
+      input: { hops: 2 },
+      output: { sherbet: 1 },
+      worker: 'mahzen ustası',
+      waiting: 'kilerde şerbetçiotu yok (bahçeye Şerbetçiotu ektir)',
+      active: 'Kazanlar kaynıyor: fıçılara şerbet doluyor',
+      ready: 'Hazır: mahzen ustası mesaide gelir',
+    },
+    requiresTier: 3,
+  },
+  // --- 24. aşama: tarımsal çeşitlilik ---
+  silo: {
+    name: 'Ürün Silosu',
+    size: { w: 2, h: 2 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Depolama',
+    description:
+      'Taş temelli, ahşap gövdeli tahıl ambarı. Buğday / yiyecek, un / ekmek, keten ve şerbetçiotunun depo kapasitesini +150 artırır; yağmurda ve kışın kilerdeki mahsulün çürümesini önler.',
+    cost: { wood: 40, stone: 25 },
+    buildWork: 180,
+    granary: { capacity: 150 },
+    requiresTier: 2,
   },
   bench: {
     name: 'Ahşap Bank',
@@ -978,11 +1073,15 @@ export const BUILD_MENU = [
   'mill',
   'fishingPier',
   'storage',
+  'silo',
   'inn',
+  'loom',
+  'brewery',
   'workshop',
   'healerHut',
   'market',
   'harbor',
+  'tradingPost',
   'academy',
   'townHall',
   'monument',

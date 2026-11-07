@@ -14,6 +14,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { ACTIVITY_SKILLS, SKILL_PREFERENCE_TILES } from '../data/skills.js';
 import { getSeason } from '../data/seasons.js';
 import { skillLevel } from './SkillSystem.js';
+import { LUXURY_WORK } from '../data/refinery.js';
 
 const PRODUCTION_PRIORITY = 2; // üretim binalarında çalışmak, emirli işlerden sonra gelir
 const PATH_CHECKS = 5; // en yakın birkaç aday için gerçek yol aranır
@@ -279,7 +280,8 @@ export class JobSystem {
       if (!building.workerIds.has(c.id) && this.expertWaiting(c, building)) continue;
       const spot = freeSpot(this.world.getSpots(building));
       // (23. aşama) Gözcü Kulesi'nde nöbet, üretim yuvaları dolunca boşta kalan yetişkinlerin işidir (üretimden daha az öncelikli)
-      const priority = def.guard ? PRODUCTION_PRIORITY + 1 : PRODUCTION_PRIORITY;
+      // (24.2) Dokuma Tezgâhı ve Şerbethane lüks / ticaret fazlası işlerdir: fırıncı, çiftçi ve inşaat yuvalarından sonra gelir
+      const priority = def.guard ? PRODUCTION_PRIORITY + 1 : def.luxury ? PRODUCTION_PRIORITY + LUXURY_WORK.priority : PRODUCTION_PRIORITY;
       if (spot) candidates.push({ priority, d: dist(spot, origin) - preference(def.workActivity), building, spot });
     }
 

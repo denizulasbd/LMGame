@@ -25,14 +25,23 @@
 //   save-v19.json: 22. aşamanın oyunu (kayıt sürümü 19): otopilotla 34 gün; iç vergi kademesi ve tahsilatlar,
 //                  ödenen Krallık Vergileri, teslim edilen Kraliyet Fermanları, Kraliyet Beratı ve Aslanlı Heykel. Eski kayıtlarda
 //                  (sürüm 2-18) Standart Vergi, itibar 50, ferman ve terk ediş yoktur; vergi takvimi yüklenince kurulur
-//   save-v20.json: 23. aşamanın oyunu (kayıt sürümü 20, bugünkü): otopilotla 34 gün; Su Kuyusu ve Gözcü Kulesi, yangın / baskın
+//   save-v20.json: 23. aşamanın oyunu (kayıt sürümü 20): otopilotla 34 gün; Su Kuyusu ve Gözcü Kulesi, yangın / baskın
 //                  sayaçları, tehlike sıklığı. Eski kayıtlarda (sürüm 2-19) hiçbir yapı yanmıyor / hasarlı değil, kimse yaralı
 //                  değil, tehlike sıklığı Dengeli'dir; yüklemeden sonraki ilk 24 saatte doğal kriz çıkmaz
+//   save-v21.json: 24. aşamanın (24.1) oyunu (kayıt sürümü 21): otopilotla 34 gün (--crisis-state); Ulu Saat Kulesi'nden sonra
+//                  kurulan Ürün Silosu, Keten ekili bir bahçe, keten stoğu, bozulan mahsul sayacı. Eski kayıtlarda (sürüm 2-20) bütün
+//                  bahçeler Buğday / Sebze ekili, Keten / Şerbetçiotu 0, silo sayaçları boştur
+//   save-v22.json: 24.2'nin oyunu (kayıt sürümü 22): otopilotla 40 gün (--crisis-state); Dokuma Tezgâhı ve Şerbethane,
+//                  Kumaş ve Fıçı Şerbeti stokları, handaki fıçılar, sakinlerin çantasında Dayanıklı Giysi ve Şerbet Testisi. Eski kayıtlarda
+//                  (sürüm 2-21) Kumaş / Fıçı Şerbeti 0, hanlarda fıçı yok, yeni yapı ve çanta eşyası yoktur
+//   save-v23.json: 24.3'ün oyunu (kayıt sürümü 23, bugünkü): otopilotla 44 gün (--crisis-state); Ticaret İskelesi / Kervan Konağı,
+//                  gemi takvimi, tamamlanan ihracat sözleşmeleri, ithalat sayaçları, pazar çarpanları. Eski kayıtlarda (sürüm 2-22) dış
+//                  ticaret boştur; iskele kurulunca takvim kurulur
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -128,6 +137,33 @@ for (const { name, raw } of fixtures) {
       towers: s.buildings.filter((b) => b.type === 'guardTower').length,
       grace: scene.crisis.graceUntil === null ? null : scene.crisis.graceUntil - s.totalMinutes,
     };
+    // (24. aşama) tarım: bahçelerin mahsulü, Keten / Şerbetçiotu, Ürün Silosu ve bozulma sayaçları (yüklendiği an)
+    loaded.agri = {
+      crops: s.buildings.filter((b) => b.type === 'garden').map((b) => b.crop),
+      otherCrops: s.buildings.filter((b) => b.type !== 'garden' && b.crop !== null).length,
+      flax: s.resources.flax,
+      hops: s.resources.hops,
+      silos: s.buildings.filter((b) => b.type === 'silo' && b.functional).length,
+      capacity: s.granaryCapacity,
+      spoiled: JSON.stringify(s.granary.spoiled),
+      switches: s.granary.switches,
+    };
+    // (24.2) katma değerli üretim: Kumaş / Fıçı Şerbeti, tezgâh ve şerbethane, handaki fıçılar, çanta eşyaları (yüklendiği an)
+    loaded.refinery = {
+      cloth: s.resources.cloth,
+      sherbet: s.resources.sherbet,
+      looms: s.buildings.filter((b) => b.type === 'loom').length,
+      breweries: s.buildings.filter((b) => b.type === 'brewery').length,
+      innCasks: s.buildings.filter((b) => b.type === 'inn').map((b) => b.sherbet).join(','),
+      otherCasks: s.buildings.filter((b) => b.type !== 'inn' && b.sherbet !== 0).length,
+      items: s.characters.reduce((n, c) => n + c.inventory.filter((x) => x.kind === 'garment' || x.kind === 'sherbetJug').length, 0),
+    };
+    // (24.3) dış ticaret (yüklendiği an)
+    loaded.trade243 = {
+      posts: s.buildings.filter((b) => b.type === 'tradingPost').length,
+      json: JSON.stringify({ ship: s.tradePost.ship, next: s.tradePost.nextShipAt, visits: s.tradePost.visits, market: s.tradePost.market, completed: s.tradePost.completed, earned: s.tradePost.goldEarned }),
+      empty: !s.tradePost.ship && s.tradePost.nextShipAt === null && s.tradePost.visits === 0 && Object.keys(s.tradePost.market).length === 0 && s.tradePost.completed === 0,
+    };
     // (22. aşama) vergi, Krallık, terk ediş (yüklendiği an)
     loaded.crown = {
       rate: s.tax.rate,
@@ -171,6 +207,8 @@ for (const { name, raw } of fixtures) {
     };
     return {
       crownAfter: { pop: s.characters.length, left: s.exodus.left, active: Boolean(s.exodus.active), rate: s.tax.rate },
+      tradeAfter: { visits: s.tradePost.visits, scheduled: s.tradePost.nextShipAt !== null || Boolean(s.tradePost.ship) },
+      agriAfter: { crops: s.buildings.filter((b) => b.type === 'garden').map((b) => b.crop), capacity: s.granaryCapacity },
       crisisAfter: { fires: s.crisis.fires, raids: s.crisis.raids, raidPending: s.crisis.raid !== null, nextWarn: s.crisis.nextRaidWarnAt, burning: s.buildings.filter((b) => b.isBurning).length, injured: s.characters.filter((c) => c.isInjured).length, day: s.time.day },
       citizensAfter,
       integrityAfter,
@@ -332,10 +370,61 @@ for (const { name, raw } of fixtures) {
     }
     const quiet = C.burning === 0 && !C.raid;
     results.push({
-      name: `${tag}: yükleme sonrası ilk 24 oyun saatinde ${quiet ? 'koruma var, ' : ''}doğal yangın ya da baskın patlamadı`,
-      ok: (!quiet || C.grace === 1440) && A.fires === C.fires && A.raids === C.raids && (quiet ? !A.raidPending && A.burning === 0 : true),
+      // Aktif krizle kaydedilen oyunda (yanan yapı / bekleyen baskın) oyunun kuralı gereği koruma yoktur: doğal yangın çıkabilir,
+      // yalnızca sayaçlar tutarlı kalmalıdır (24.3: save-v23.json'da yükleme sonrası bir yangın çıktı, bu kural doğrudur)
+      name: quiet ? `${tag}: yükleme sonrası ilk 24 oyun saatinde koruma var, doğal yangın ya da baskın patlamadı` : `${tag}: aktif krizle yüklendi (koruma yok); yangın / baskın sayaçları tutarlı`,
+      ok: quiet ? C.grace === 1440 && A.fires === C.fires && A.raids === C.raids && !A.raidPending && A.burning === 0 : C.grace === null && A.fires >= C.fires && A.raids >= C.raids,
       detail: `koruma ${C.grace} dk · yangın ${C.fires}->${A.fires} · baskın ${C.raids}->${A.raids}`,
     });
+  }
+  // (24. aşama) tarımsal çeşitlilik
+  {
+    const G = r.loaded.agri;
+    if (data.version < 21) {
+      results.push({
+        name: `${tag}: bütün bahçeler Buğday / Sebze ekili, Keten / Şerbetçiotu 0, silo sayaçları boş`,
+        ok: G.crops.every((c) => c === 'grain') && G.otherCrops === 0 && G.flax === 0 && G.hops === 0 && G.capacity === 0 && G.spoiled === '{}' && G.switches === 0,
+        detail: `${G.crops.length} bahçe`,
+      });
+    } else {
+      const crops = data.buildings.filter((b) => b.type === 'garden').map((b) => b.crop);
+      results.push({
+        name: `${tag}: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu, silo kapasitesi ve bozulma sayaçları korundu`,
+        ok: G.crops.join() === crops.join() && G.otherCrops === 0 && G.flax === data.resources.flax && G.hops === data.resources.hops && G.capacity === 150 * G.silos && G.silos === data.buildings.filter((b) => b.type === 'silo' && !b.underConstruction).length && G.spoiled === JSON.stringify(data.granary.spoiled) && G.switches === data.granary.switches,
+        detail: `${G.crops.join(',')} · keten ${G.flax} · şerbetçiotu ${G.hops} · silo ${G.silos} (+${G.capacity})`,
+      });
+    }
+    results.push({ name: `${tag}: bir gün sonra mahsuller geçerli, silo kapasitesi yerinde`, ok: r.agriAfter.crops.every((c) => ['grain', 'flax', 'hops'].includes(c)) && r.agriAfter.capacity === G.capacity, detail: r.agriAfter.crops.join(',') });
+  }
+  // (24.3) dış ticaret
+  {
+    const D = r.loaded.trade243;
+    if (data.version < 23) {
+      results.push({ name: `${tag}: dış ticaret boş (iskele, gemi, sözleşme, pazar çarpanı yok)`, ok: D.empty && D.posts === 0 && r.tradeAfter.visits === 0 });
+    } else {
+      const t = data.tradePost;
+      const want = JSON.stringify({ ship: t.ship, next: t.nextShipAt, visits: t.visits, market: t.market, completed: t.completed, earned: t.goldEarned });
+      results.push({ name: `${tag}: iskele, gemi takvimi, sözleşmeler, pazar çarpanları ve sayaçlar korundu`, ok: D.json === want && D.posts === data.buildings.filter((b) => b.type === 'tradingPost').length, detail: `${t.visits} ziyaret · ${t.completed} sözleşme · +${t.goldEarned} altın` });
+      results.push({ name: `${tag}: bir gün sonra takvim sürüyor`, ok: r.tradeAfter.scheduled && r.tradeAfter.visits >= t.visits });
+    }
+  }
+  // (24.2) katma değerli üretim
+  {
+    const F = r.loaded.refinery;
+    const items = (d) => d.characters.reduce((n, c) => n + (c.inventory ?? []).filter((x) => x.kind === 'garment' || x.kind === 'sherbetJug').length, 0);
+    if (data.version < 22) {
+      results.push({
+        name: `${tag}: Kumaş / Fıçı Şerbeti 0, hanlarda fıçı yok, tezgâh / şerbethane ve yeni çanta eşyası yok`,
+        ok: F.cloth === 0 && F.sherbet === 0 && F.looms === 0 && F.breweries === 0 && F.innCasks.split(',').every((v) => v === '' || v === '0') && F.otherCasks === 0 && F.items === 0,
+        detail: `hanlar ${F.innCasks || '-'}`,
+      });
+    } else {
+      results.push({
+        name: `${tag}: Kumaş / Fıçı Şerbeti, tezgâh ve şerbethane, handaki fıçılar ve çanta eşyaları korundu`,
+        ok: F.cloth === data.resources.cloth && F.sherbet === data.resources.sherbet && F.looms === data.buildings.filter((b) => b.type === 'loom').length && F.breweries === data.buildings.filter((b) => b.type === 'brewery').length && F.innCasks === data.buildings.filter((b) => b.type === 'inn').map((b) => b.sherbet).join(',') && F.otherCasks === 0 && F.items === items(data),
+        detail: `kumaş ${F.cloth} · fıçı ${F.sherbet} · hanlar ${F.innCasks} · eşya ${F.items}`,
+      });
+    }
   }
   results.push({ name: `${tag}: meslek kıyafetleri deneyimden giyildi`, ok: r.outfitsOk, detail: `${r.outfits} sakin kıyafetli` });
   results.push({ name: `${tag}: harita farkları birebir uygulandı`, ok: r.loaded.terrain === data.terrain.length, detail: `${r.loaded.terrain}/${data.terrain.length} karo` });

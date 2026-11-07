@@ -22,7 +22,18 @@
 // vergileri, Krallık Vergisi ödemelerini, fermanları ve terk edenleri raporlar. (23. aşama) Krizleri yönetir: kasabaya bir Su Kuyusu
 // ve (Kasaba seviyesinde) bir Gözcü Kulesi diker; yangın çıkınca "Acil Söndür" der, hasarlı yapıyı "Tamir Et" ile hemen onarır;
 // haydut izi gelince savunma yetiyorsa püskürtür, yetmiyorsa haraç öder (ikisi de olmazsa hazırlıksız yakalanır); yangın, hasar,
-// baskın, yaralanma ve iyileşme sayılarını raporlar.
+// baskın, yaralanma ve iyileşme sayılarını raporlar. (24. aşama) Tarımsal çeşitlilik: Ulu Saat Kulesi tamamlanınca (kulenin taşı, kerestesi
+// ve altını kısılmasın) bahçelerin yanına bir Ürün Silosu kurar; silo varken ve kişi başı besin bolken (en az 3 bahçeyle) bir bahçeye
+// Keten, (4 bahçeyle) birine Şerbetçiotu ektirir.
+// Gıda kritikse (kişi başı besin 6'nın altında) bütün bahçeleri hemen Buğday'a döndürür; ekilen malın deposu dolunca da o bahçe
+// Buğday'a döner. Ekim değişikliklerini, kritik gıda saatlerini, keten / şerbetçiotu hasadını ve bozulan mahsulü raporlar.
+// (24.2) Kule tamamlanmış, nüfus 22+ ve kişi başı besin 10'un üstündeyken (temel gıda ve kule hedefleri güvende) silodan sonra
+// dördüncü bir bahçe (Şerbetçiotu için), handa ya da pazarın yanında bir Dokuma Tezgâhı ve bir Şerbethane kurar; dokumacı ve mahzen
+// ustası iş seçiminde temel üretimden sonra gelir. Dokunan kumaşı, yapılan fıçıları, handa içilen şerbeti, testileri ve giysileri raporlar.
+// (24.3) Kule ve Dokuma Tezgâhı tamamlandıktan sonra yolun / nehrin kenarına bir Ticaret İskelesi kurar. Gemi / kervan buradayken
+// rezervler korunduğu sürece (en az 10 kumaş, 5 fıçı şerbet, 30 yün; ekmek / erzak satışından sonra kişi başı en az 12 besin)
+// ihracat sözleşmelerini tamamlar; hazinede bol altın varken (vergi ayrıldıktan sonra 400+) odun 60, taş 50, demir 20'nin altına
+// inince hammadde paketi ithal eder. Ziyaretleri, sözleşmeleri, ithalatı ve pazar çarpanlarını raporlar.
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //                                         [--crisis huzurlu|dengeli|cetin] [--no-safety] [--crisis-state]
@@ -32,6 +43,7 @@
 //   --crisis  : (23. aşama) tehlike sıklığı (varsayılan dengeli); huzurlu + --no-safety, 22. aşamayla bire bir aynı koşuyu verir
 //   --crisis-state : (23. aşama) kayıttan hemen önce bir yangın, bir hasarlı yapı, bir yaralı ve bekleyen bir haydut baskını oluşturur
 //               (save-v20.json fikstürü bu bayrakla üretilir: kriz alanlarının hepsi kayda girer)
+//   --no-agri : (24. aşama) Ürün Silosu kurulmaz ve bahçeler hep Buğday ekili kalır (mahsul bozulması yine işler)
 //   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
 //               oyunun ana üretecini tüketmediğini göstermek için: --crisis huzurlu ile 22. aşamanın koşusunu bire bir verir)
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
@@ -50,8 +62,9 @@ await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
 await page.evaluate((o) => {
   window.__noSafety = o.noSafety;
+  window.__noAgri = o.noAgri; // (24. aşama)
   if (o.crisis) window.game.state.crisis.difficulty = o.crisis; // doğrudan durumdan (bildirim / ses tüketmesin: huzurlu + --no-safety koşusu 22. aşamayla bire bir aynı olmalı)
-}, { noSafety: Boolean(options['no-safety']), crisis: options.crisis ?? null });
+}, { noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), crisis: options.crisis ?? null });
 
 await page.evaluate((passive) => {
   const game = window.game;
@@ -109,16 +122,18 @@ await page.evaluate((passive) => {
     PLAN.splice(PLAN.indexOf('townHall') + 1, 0, 'guardTower');
   }
   const UPGRADES = ['cabin', 'cabin', 'lumberHut', 'garden', 'cabin', 'quarry', 'cabin', 'garden', 'cabin', 'cabin', 'lumberHut', 'cabin'];
-  const WOOD = { storage: 30, lumberHut: 20, garden: 15, cabin: 25, quarry: 35, inn: 45, workshop: 25, sheepFarm: 30, market: 40, ironMine: 40, mill: 40, fishingPier: 30, townHall: 60, monument: 40, healerHut: 30, flowerBed: 8, academy: 70, harbor: 120, well: 15, guardTower: 50 };
+  const WOOD = { storage: 30, lumberHut: 20, garden: 15, cabin: 25, quarry: 35, inn: 45, workshop: 25, sheepFarm: 30, market: 40, ironMine: 40, mill: 40, fishingPier: 30, townHall: 60, monument: 40, healerHut: 30, flowerBed: 8, academy: 70, harbor: 120, well: 15, guardTower: 50, silo: 40 };
   const ESSENTIAL = ['storage', 'lumberHut', 'garden', 'cabin'];
   // (23. aşama) Su Kuyusu ateşli yapıların (fırın, atölye) yanına, Gözcü Kulesi meydandan uzağa (kenar mahalleye) dikilir: meydana
   // yakın boş yerleri (Ulu Saat Kulesi gibi büyük yapılara lazım) kapatmasın
   const SAFETY = ['well', 'guardTower'];
   const safetySpot = (type) => {
-    if (!SAFETY.includes(type)) return null;
+    if (!SAFETY.includes(type) && !['silo', 'loom', 'brewery'].includes(type)) return null;
     const scene = game.scenes.current;
     const plaza = scene.world.landmarks.plaza;
-    const anchor = type === 'well' ? game.state.buildings.find((b) => b.functional && ['mill', 'workshop'].includes(b.type)) : null;
+    const anchorTypes = type === 'silo' ? ['garden', 'mill'] : type === 'loom' || type === 'brewery' ? ['inn', 'market', 'workshop'] : ['mill', 'workshop'];
+    const anchor = ['well', 'silo', 'loom', 'brewery'].includes(type) ? game.state.buildings.find((b) => b.functional && anchorTypes.includes(b.type)) : null;
+    if (['silo', 'loom', 'brewery'].includes(type) && !anchor) return null;
     const [ax, ay, from, to] = anchor ? [anchor.tileX, anchor.tileY, 2, 7] : [plaza.centerX, plaza.centerY, 13, 34];
     for (let r = from; r <= to; r++) {
       for (let dy = -r; dy <= r; dy++) {
@@ -131,7 +146,7 @@ await page.evaluate((passive) => {
     return null;
   };
   // İsteğe bağlı yapılar: kaçıncı kopyasından itibaren (kurulamıyorsa sıra beklemeden atlanır)
-  const OPTIONAL = { academy: 1, harbor: 1, ironMine: 1, mill: 2, cherryTree: 1, gazebo: 1, marbleArch: 1, flowerFence: 1, well: 1, guardTower: 1 };
+  const OPTIONAL = { academy: 1, harbor: 1, ironMine: 1, mill: 2, cherryTree: 1, gazebo: 1, marbleArch: 1, flowerFence: 1, well: 1, guardTower: 1, silo: 1 };
 
   /** Karar politikası: kasabanın yararına olan ve gücü yeten seçenek. */
   const PREFER = {
@@ -378,6 +393,68 @@ await page.evaluate((passive) => {
           window.__stats.raidChoices[choice] = (window.__stats.raidChoices[choice] ?? 0) + 1;
         }
       }
+      // (24. aşama) Ekim tercihi: gıda kritikse hepsi Buğday; silo varken ve besin bolken bir bahçe Keten, biri Şerbetçiotu
+      if (!window.__noAgri) {
+        const GR = window.__granary;
+        const A = (window.__stats.agri ??= { toGrain: 0, toFlax: 0, toHops: 0, critical: 0, fullBack: 0 });
+        const gardens = world.getCompleted('garden').filter((b) => !b.damaged).sort((a, b) => a.id - b.id);
+        const pop = Math.max(1, s.characters.length);
+        const supply = window.__foodSupply(s);
+        const setCrop = (b, crop, why) => {
+          if (b.crop === crop) return;
+          game.events.emit('ui:setCrop', { buildingId: b.id, crop });
+          if (b.crop !== crop) return;
+          if (crop === 'grain') A.toGrain++;
+          else A[crop === 'flax' ? 'toFlax' : 'toHops']++;
+          if (why) A[why]++;
+        };
+        if (supply < pop * 6) {
+          if (gardens.some((b) => b.crop !== 'grain')) A.critical++;
+          for (const b of gardens) setCrop(b, 'grain');
+        } else {
+          const silo = s.buildings.some((b) => b.type === 'silo' && b.functional);
+          const ample = silo && supply > pop * 10;
+          const want = new Map();
+          if (ample && gardens.length >= 3) want.set(gardens[gardens.length - 1], 'flax');
+          if (ample && gardens.length >= 4) want.set(gardens[gardens.length - 2], 'hops');
+          for (const b of gardens) {
+            const crop = want.get(b);
+            const room = crop && res[crop] < GR.storageLimit(s, crop) * 0.9;
+            if (crop && room) setCrop(b, crop);
+            else if (b.crop !== 'grain' && (!crop || !room)) setCrop(b, 'grain', crop ? 'fullBack' : null);
+          }
+        }
+      }
+      // (24.3) Dış ticaret: rezervleri koruyarak ihracat, altın bolken kritik hammaddeyi ithal et
+      if (!window.__noAgri && s.tradePost?.ship && window.__tradePost.shipDocked(s)) {
+        const TPm = window.__tradePost;
+        const X = (window.__stats.trade ??= { contracts: 0, gold: 0, imports: 0, held: 0 });
+        const pop = Math.max(1, s.characters.length);
+        const RESERVE = { cloth: 10, sherbet: 5, wool: 30 };
+        s.tradePost.ship.contracts.forEach((c, i) => {
+          if (c.done || !TPm.contractStatus(s, i).ok) return;
+          const value = c.resource === 'bread' ? 2.5 : c.resource === 'food' ? 1 : 0;
+          const keep = value ? window.__foodSupply(s) - c.qty * value >= pop * 12 : res[c.resource] - c.qty >= (RESERVE[c.resource] ?? 0);
+          if (!keep) {
+            X.held++;
+            return;
+          }
+          const gold = TPm.contractStatus(s, i).gold;
+          game.events.emit('ui:completeContract', { index: i });
+          if (c.done) {
+            X.contracts++;
+            X.gold += gold;
+          }
+        });
+        const reserveGold = 400 + (s.crown.notice ? s.crown.notice.amount : 0);
+        const LOW = { wood: 60, stone: 50, iron: 20 };
+        for (const kind of ['wood', 'stone', 'iron']) {
+          if (res[kind] < LOW[kind] && res.gold >= reserveGold && TPm.importStatus(s, kind).ok) {
+            game.events.emit('ui:importPackage', { kind });
+            X.imports++;
+          }
+        }
+      }
       // Güven düşerse (ya da isyan çıkarsa) acil dağıtım
       const T = window.__trust;
       if (s.trust.revolt || s.trust.value < 40) {
@@ -459,6 +536,31 @@ await page.evaluate((passive) => {
       if (Object.entries(stage.cost).every(([r, v]) => res[r] >= v)) scene.construction.startProject(wonder);
     }
 
+    // (24. aşama) Ürün Silosu: kule bittikten sonra, kaynak bolken bahçelerin (ya da değirmenin) yanına
+    if (!window.__noAgri && wonder?.wonderComplete && !s.buildings.some((b) => b.type === 'silo') && res.wood >= 90 && res.stone >= 70) {
+      const spot = safetySpot('silo') ?? sim.findSpot('silo', 30);
+      if (spot) scene.construction.placeSite('silo', spot.x, spot.y);
+    }
+    // (24.2) Katma değerli üretim: kule bitmiş, nüfus 22+ ve kiler rahatken dördüncü bahçe, Dokuma Tezgâhı ve Şerbethane (birer tane)
+    if (!window.__noAgri && wonder?.wonderComplete && s.buildings.some((b) => b.type === 'silo' && b.functional) && s.characters.length >= 22 && window.__foodSupply(s) >= s.characters.length * 10) {
+      const has = (t) => s.buildings.some((b) => b.type === t);
+      const gardens = s.buildings.filter((b) => b.type === 'garden').length;
+      const busyRefinery = s.buildings.some((b) => ['loom', 'brewery', 'garden'].includes(b.type) && b.underConstruction);
+      const place = (type) => {
+        const spot = safetySpot(type) ?? sim.findSpot(type, 30);
+        if (spot) scene.construction.placeSite(type, spot.x, spot.y);
+      };
+      if (!busyRefinery) {
+        if (!has('loom') && res.wood >= 90 && res.stone >= 60 && res.iron >= 30) place('loom');
+        else if (!has('brewery') && res.wood >= 80 && res.stone >= 80) place('brewery');
+        else if (has('brewery') && gardens < 4 && res.wood >= 60 && res.stone >= 30) place('garden');
+        // (24.3) Ticaret İskelesi: tezgâh kurulduktan sonra, yolun ya da nehrin kenarına
+        else if (has('loom') && !has('tradingPost') && res.wood >= 110 && res.stone >= 80 && res.iron >= 40) {
+          const spot = sim.findSpot('tradingPost', 30);
+          if (spot) scene.construction.placeSite('tradingPost', spot.x, spot.y);
+        }
+      }
+    }
     // (20. aşama) Altın Çağ: prestij peyzajı (bir Mermer Çeşme, iki Altın Çağ Feneri) ve tüccarın nadir malları
     if (wonder?.wonderComplete && s.goldenAge?.since) {
       const count = (t) => s.buildings.filter((b) => b.type === t).length;
@@ -593,6 +695,9 @@ await page.evaluate(async () => {
   window.__trust = await import('/src/systems/TrustSystem.js');
   window.__crown = await import('/src/systems/Crown.js');
   window.__crisis = await import('/src/systems/Crisis.js');
+  window.__granary = await import('/src/systems/Granary.js');
+  window.__tradePost = await import('/src/systems/TradePost.js');
+  window.__foodSupply = (await import('/src/systems/TownStatus.js')).foodSupply;
 });
 
 function summary() {
@@ -788,6 +893,21 @@ console.log(
     `(23. aşama) tehlike sıklığı ${c.difficulty} · Su Kuyusu ${c.wells}, Gözcü Kulesi ${c.towers} (nöbetteki bekçi ${c.guards}, biten nöbet vardiyası ${report.stats.patrolShifts}) · yangın ${c.fires} (söndürülen ${c.extinguished}, hasar bırakan ${c.burned}; ${c.fireHours} yangın saati) · ` +
       `haydut baskını ${c.raids} (püskürtülen ${c.repelled}, haraç ${c.tributes}, hazırlıksız ${c.caught}; seçimler ${JSON.stringify(report.stats.raidChoices ?? {})}) · yaralanma ${c.injuries} (şifacıda iyileşen ${c.treated}, şu an ${c.injuredNow}; ${c.injuredHours} yaralı saati) · ` +
       `tamir ${c.repairs} (şu an hasarlı ${c.damagedNow}, yanan ${c.burningNow}; ${c.damagedHours} hasarlı yapı saati, 3 günü aşan ${c.longDamaged})`
+  );
+}
+{
+  const f = mon.food;
+  const a = mon.agri;
+  const A = report.stats.agri ?? {};
+  const r = mon.refinery;
+  console.log(
+    `(24. aşama) gıda güvencesi: kişi başı en düşük besin ${f.minPerCap} (ortalama ${f.avgPerCap}), kritik gıda saati ${f.criticalHours}, sonda ${f.end} besin` +
+      (a
+        ? ` · Ürün Silosu ${a.silos} (+${a.granaryCapacity}) · bahçeler ${a.gardens || '-'} · bahçe-saat ${JSON.stringify(a.cropHours)} · keten ${a.flax}, şerbetçiotu ${a.hops} · ` +
+          `bozulan ${JSON.stringify(a.spoiled)} · ekim değişikliği ${a.switches} (Buğday'a ${A.toGrain ?? 0}, Keten'e ${A.toFlax ?? 0}, Şerbetçiotu'na ${A.toHops ?? 0}; gıda kritik ${A.critical ?? 0}, depo dolu ${A.fullBack ?? 0})`
+        : '') +
+      (mon.trade ? ` · (24.3) Ticaret İskelesi ${mon.trade.posts} · ziyaret ${mon.trade.visits} · sözleşme ${mon.trade.completed} (+${mon.trade.goldEarned} altın; ${JSON.stringify(mon.trade.exported)}) · ithalat ${mon.trade.imports} paket (-${mon.trade.goldSpent} altın; ${JSON.stringify(mon.trade.imported)}) · rezerv için bekletilen ${(report.stats.trade ?? {}).held ?? 0} · pazar ${JSON.stringify(mon.trade.market)}` : '') +
+      (r ? ` · (24.2) Dokuma Tezgâhı ${r.looms}, Şerbethane ${r.breweries} · dokunan kumaş ${r.clothWoven}, yapılan fıçı ${r.sherbetMade} (stok ${r.cloth} / ${r.sherbet}) · handa içilen şerbet ${r.served}, handaki fıçı ${r.innCasks} · testi ${r.jugs} (içilen ${r.jugsDrunk}) · Dayanıklı Giysi ${r.garments} (giyen ${r.dressed}) · refah katkısı +${r.welfare} · açken çalışan lüks işçi ${r.hungryLuxury}` : '')
   );
 }
 console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);

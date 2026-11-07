@@ -381,6 +381,25 @@ export const ACTIVITIES = {
     tool: 'peel',
     bubbles: ['fire', 'sparkle', 'note'],
   },
+  // (24.2) Dokuma Tezgâhı ve Şerbethane
+  weave: {
+    kind: 'work',
+    travelLabel: 'Dokuma tezgâhına gidiyor',
+    label: 'Tezgâhta mekik atıp keten kumaş dokuyor',
+    idleLabel: 'Tezgâhın başında keten bekliyor',
+    pose: 'work',
+    tool: 'shuttle',
+    bubbles: ['sparkle', 'note'],
+  },
+  brewSherbet: {
+    kind: 'work',
+    travelLabel: 'Şerbethaneye gidiyor',
+    label: 'Mahzende şerbet kaynatıp fıçılara dolduruyor',
+    idleLabel: 'Mahzende şerbetçiotu bekliyor',
+    pose: 'work',
+    tool: 'ladle',
+    bubbles: ['sparkle', 'note'],
+  },
   mineIron: {
     kind: 'work',
     travelLabel: 'Demir madenine gidiyor',
