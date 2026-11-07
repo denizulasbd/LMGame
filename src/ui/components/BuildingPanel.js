@@ -66,6 +66,7 @@ import { contractStatus, importStatus, priceMultiplier, shipDocked } from '../..
 import { clothWelfare } from '../../systems/Refinery.js';
 import { PROFESSIONS } from '../../data/apprenticeship.js';
 import { doorOpen, apprenticesAt, pickMaster, acceptsApprentice, canApprentice, apprenticeSlots } from '../../systems/Apprenticeship.js';
+import { headOf } from '../../systems/Lineage.js';
 
 const thumbnailCache = new Map();
 
@@ -1152,6 +1153,12 @@ export class BuildingPanel {
           const spouse = people.find((o) => arePartners(couple, o));
           lines.push(`Aile: ${couple.name} ile ${spouse.name} evli${kids.length ? ` · çocukları ${kids.map((k) => k.name).join(', ')}` : ''}`);
           if (residents < building.capacity) lines.push('Boş yatak var: kasaba mutluysa aileye bir çocuk katılabilir');
+        }
+        // (25.4) Aile Kütüğü: ocak reisi (sembolik tapu) ve evdeki ocaklar
+        const head = headOf(state, building);
+        if (head) {
+          const fams = [...new Set(people.map((c) => state.lineage?.families?.[c.familyId]?.name).filter(Boolean))];
+          lines.push(`Ocak reisi: ${head.name}${state.lineage?.heads?.[building.id] === head.id ? ' (ocak devredildi)' : ''}${fams.length ? ` · ${fams.join(', ')}` : ''}`);
         }
         if (residents < building.capacity) lines.push('Boş yatak var: yarın 08:00\'de yeni sakin gelebilir');
         lines.push(`İçeride: ${building.occupants.size} kişi`);

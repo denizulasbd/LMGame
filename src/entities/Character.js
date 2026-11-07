@@ -12,6 +12,7 @@
 // age = ageInDays / yıl). Kıdemli Bilge ölmez, emekli olur (retired: kaydedilmez, LifeStageSystem her saat yeniden hesaplar).
 // 25.2: çıraklık (apprenticeship: { masterId, profession, buildingId, progress 0-100, since, crafted }; ApprenticeshipSystem)
 // ve konuşma baloncuğu (speech: { text, at, duration }; kaydedilmez, ikon balonundan ayrı bir katmandır).
+// 25.4: Aile Kütüğü (generation, parents: doğum ebeveynleri, familyId: ocak, children; LineageSystem).
 // 22. aşama: köyü terk etmeye karar verdiyse yola çıktığı an ve çıkış karosu (emigrating: { since, exit }; DesertionSystem).
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
@@ -105,6 +106,10 @@ export class Character extends Entity {
     agedDays = 0,
     apprenticeship = null,
     quirkOrigin = null,
+    generation = null,
+    parents = null,
+    familyId = null,
+    children = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -166,6 +171,11 @@ export class Character extends Entity {
     this.speech = null; // usta / çırak konuşma baloncuğu (kaydedilmez)
     // 25.3: huyun kaynağı (Aile mirası / Usta etkisi / Mesleğin doğası / Özgün gelişim; kayda girer)
     this.quirkOrigin = sanitizeOrigin(quirkOrigin);
+    // 25.4: Aile Kütüğü (kayda girer; eksikse LineageSystem yüklemede tamamlar): kuşak, doğum ebeveynleri, ocak, çocuklar
+    this.generation = Number.isInteger(generation) && generation >= 1 ? generation : null;
+    this.parents = Array.isArray(parents) ? parents.filter((id) => Number.isFinite(id) && id !== this.id) : [...this.parentIds];
+    this.familyId = Number.isFinite(familyId) ? familyId : null;
+    this.children = Array.isArray(children) ? children.filter((id) => Number.isFinite(id)) : [];
     this.retired = false; // emekli bilge mi (kaydedilmez; LifeStageSystem çekirdek sakin kuralıyla hesaplar)
     this.waterBucket = false; // yangında kovası dolu mu (kaydedilmez)
     this.recall = null;
@@ -564,6 +574,10 @@ export class Character extends Entity {
       agedDays: this.agedDays,
       apprenticeship: this.apprenticeship,
       quirkOrigin: this.quirkOrigin,
+      generation: this.generation,
+      parents: this.parents,
+      familyId: this.familyId,
+      children: this.children,
     };
   }
 

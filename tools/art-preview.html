@@ -57,6 +57,46 @@
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
 
+    // --- 25.4: Aile Kütüğü — üç kuşaklık soy ağacı, Yeni Yuva ve Ocak Devri ---
+    {
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      const A = { hair: 'bun', hairColor: 'gray', skin: 'light', shirt: 'lavender', pants: 'plum' };
+      const B = { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'forest', pants: 'brown' };
+      const C1 = { hair: 'long', hairColor: 'brown', skin: 'light', shirt: 'rose', pants: 'navy' };
+      const C2 = { hair: 'spiky', hairColor: 'ginger', skin: 'tan', shirt: 'sky', pants: 'denim' };
+      const K = { hair: 'short', hairColor: 'ginger', skin: 'light', shirt: 'mustard', pants: 'navy' };
+      const tree = scene(200, 112, [
+        [getCharacterSprite(A, 'down', 'idle0', look({ stage: 'elder' })), 54, 30],
+        [getCharacterSprite(B, 'down', 'idle0', look({})), 84, 30],
+        [getBubbleSprite('heart'), 69, 14],
+        [getCharacterSprite(C1, 'down', 'idle0', look({ stage: 'youth' })), 54, 70],
+        [getCharacterSprite(C2, 'down', 'idle0', look({})), 84, 70],
+        [getBubbleSprite('ring'), 69, 54],
+        [getCharacterSprite(K, 'down', 'idle0', look({ child: true })), 69, 106],
+      ], (ctx) => {
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(66, 31, 18, 1); // eşler
+        ctx.fillRect(75, 31, 1, 12);
+        ctx.fillRect(60, 42, 16, 1); // çocuğuna
+        ctx.fillRect(60, 42, 1, 8);
+        ctx.fillRect(66, 71, 18, 1);
+        ctx.fillRect(75, 71, 1, 18);
+        ctx.font = "7px 'Pixelify Sans', monospace";
+        ctx.fillStyle = '#1b1423';
+        ctx.fillText('1. Kuşak Kurucu', 98, 22);
+        ctx.fillText('2. Kuşak Kasabalı', 98, 62);
+        ctx.fillText('3. Kuşak Torun', 98, 100);
+      });
+      const cabin = getStructureSprite('cabin', { tone: 1 });
+      const home = scene(cabin.width + 64, cabin.height + 22, [
+        [cabin, 4, cabin.height + 4],
+        [getCharacterSprite(C1, 'right', 'walk0', look({ stage: 'youth' })), cabin.width + 14, cabin.height + 18],
+        [getCharacterSprite(C2, 'left', 'walk1', look({})), cabin.width + 30, cabin.height + 18],
+        [getBubbleSprite('love'), cabin.width + 22, cabin.height + 1],
+      ]);
+      show('Aile Kütüğü (25.4): üç kuşaklık soy ağacı; evlenen 2. kuşak çift boş kulübeye "Yeni Yuva" kurar', [['soy ağacı', tree], ['Yeni Yuva', home]], 4);
+    }
+
     // --- 25.3: yeni nesil huylar — rozetler, karakter portreleri ve mizaç sahneleri ---
     {
       const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });

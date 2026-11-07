@@ -922,6 +922,14 @@ console.log(
       (r ? ` · (24.2) Dokuma Tezgâhı ${r.looms}, Şerbethane ${r.breweries} · dokunan kumaş ${r.clothWoven}, yapılan fıçı ${r.sherbetMade} (stok ${r.cloth} / ${r.sherbet}) · handa içilen şerbet ${r.served}, handaki fıçı ${r.innCasks} · testi ${r.jugs} (içilen ${r.jugsDrunk}) · Dayanıklı Giysi ${r.garments} (giyen ${r.dressed}) · refah katkısı +${r.welfare} · açken çalışan lüks işçi ${r.hungryLuxury}` : '')
   );
 }
+if (mon.lineage) {
+  const L = mon.lineage;
+  console.log(
+    `(25.4) Aile Kütüğü: kuşaklar ${JSON.stringify(L.generations)} · ocak ${L.families} · evli 2. kuşak ${L.gen2Married} · 2. kuşak düğünü ${L.state.gen2Weddings} ` +
+      `(ilki ${L.firstGen2Couple ? `${L.firstGen2Couple.a} & ${L.firstGen2Couple.b}, G${L.firstGen2Couple.day}` : '-'}) · Yeni Yuva ${L.state.newHomes}, Geniş Aile ${L.state.extended}, ` +
+      `konut dilekçesi ${L.state.petitions} · Ocak Devri ${L.state.handovers}`
+  );
+}
 if (mon.temperament) {
   const T = mon.temperament;
   const gen = ['craftsman', 'entrepreneur', 'philosopher', 'festive'].map((k) => `${k} ${T.counts[k] ?? 0}`).join(', ');

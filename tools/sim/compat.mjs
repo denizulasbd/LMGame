@@ -44,14 +44,17 @@
 //   save-v25.json: 25.2'nin oyunu (kayıt sürümü 25): otopilotla 64 gün (--crisis-state); kuleden sonra açılan Çırak
 //                  Kapıları, ustalarının yanında ilerleyen çıraklar, çırak işleri ve satışları, Gururlu Usta. Eski kayıtlarda
 //                  (sürüm 2-24) çırak yoktur, bütün kapılar kapalıdır, sayaçlar boştur
-//   save-v26.json: 25.3'ün oyunu (kayıt sürümü 26, bugünkü): otopilotla 64 gün (--crisis-state); Altın Çağ'da büyüyüp mizacını
+//   save-v26.json: 25.3'ün oyunu (kayıt sürümü 26): otopilotla 64 gün (--crisis-state); Altın Çağ'da büyüyüp mizacını
 //                  ailesinden, ustasından ya da kendinden alan gençler, yeni nesil huylar ve kaynakları, yeni dilekçe sayaçları. Eski
 //                  kayıtlarda (sürüm 2-25) huylar aynen korunur (yoksa dört kuruluş huyundan dağıtılır), huy kaynağı ve sayaçlar boştur
+//   save-v27.json: 25.4'ün oyunu (kayıt sürümü 27, bugünkü): otopilotla 72 gün (--crisis-state); Aile Kütüğü (kuşaklar, doğum
+//                  ebeveynleri, ocaklar, çocuk listeleri), 2. kuşak düğünleri ve Tarihçe'deki ilki, ocak reisleri. Eski kayıtlarda (sürüm 2-26)
+//                  ebeveyni kayıtlı olmayan herkes 1. kuşaktır (kendi ocağıyla), kasabada doğanlar ebeveyninin bir fazlası
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -177,6 +180,14 @@ for (const { name, raw } of fixtures) {
     // (25.1) yaşam evreleri (yüklendiği an)
     loaded.life = s.characters.map((c) => ({ id: c.id, age: c.age, days: c.ageInDays, stage: c.lifeStage, child: c.isChild, retired: c.retired, role: Boolean(c.role) }));
     loaded.lifeState = JSON.stringify(s.lifeStages);
+    // (25.4) Aile Kütüğü (yüklendiği an)
+    loaded.lineage = {
+      people: s.characters.filter((c) => !c.role).map((c) => ({ id: c.id, g: c.generation, f: c.familyId, p: c.parents, pi: c.parentIds, k: c.children, fam: Boolean(s.lineage.families[c.familyId]) })),
+      families: Object.keys(s.lineage.families).length,
+      first: s.chronicle.firstGen2Couple,
+      weddings: s.lineage.gen2Weddings,
+      kin: s.characters.filter((c) => c.partnerId !== null).some((c) => { const o = s.characters.find((x) => x.id === c.partnerId); const pa = new Set([...(c.parents ?? []), ...c.parentIds]); const pb = new Set([...(o?.parents ?? []), ...(o?.parentIds ?? [])]); return o && (pa.has(o.id) || pb.has(c.id) || [...pa].some((id) => pb.has(id))); }),
+    };
     // (25.3) mizaç (yüklendiği an)
     {
       const SO = await import('/src/data/social.js');
@@ -469,6 +480,29 @@ for (const { name, raw } of fixtures) {
       ok: grew.every((x) => (x.days === before.get(x.id).days + 1 || (before.get(x.id).child && !x.child && x.days >= 18 * 16)) && (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage))) && grew.length >= L.filter((x) => !x.role).length - 2,
       detail: `${grew.length} sakin`,
     });
+  }
+  // (25.4) Aile Kütüğü
+  {
+    const L = r.loaded.lineage;
+    const byId = new Map(L.people.map((x) => [x.id, x]));
+    const consistent = L.people.every((x) => {
+      const ps = x.p.map((id) => byId.get(id)).filter(Boolean);
+      return Number.isInteger(x.g) && x.fam && (ps.length ? x.g === Math.max(...ps.map((p) => p.g)) + 1 : x.g >= 1) && ps.every((p) => p.k.includes(x.id)) && x.k.every((id) => byId.get(id)?.p.includes(x.id));
+    });
+    if (data.version < 27) {
+      results.push({
+        name: `${tag}: ebeveyni kayıtlı olmayan herkes 1. kuşak (kendi ocağıyla), kasabada doğanlar ebeveyninin bir fazlası; 2. kuşak düğünü yok`,
+        ok: consistent && L.people.every((x) => (x.p.filter((id) => byId.has(id)).length ? x.g >= 2 : x.g === 1)) && L.families === L.people.filter((x) => x.g === 1 || !x.p.some((id) => byId.has(id))).length && !L.first && L.weddings === 0 && !L.kin,
+        detail: `${L.people.filter((x) => x.g === 1).length} kurucu / göçmen, ${L.people.filter((x) => x.g >= 2).length} kasabalı · ${L.families} ocak`,
+      });
+    } else {
+      const saved = new Map(data.characters.map((c) => [c.id, c]));
+      results.push({
+        name: `${tag}: kuşaklar, doğum ebeveynleri, ocaklar, çocuklar ve 2. kuşak ilk düğünü korundu; akraba çift yok`,
+        ok: consistent && L.people.every((x) => saved.get(x.id)?.generation === x.g && saved.get(x.id)?.familyId === x.f) && L.families === Object.keys(data.lineage.families).length && JSON.stringify(L.first) === JSON.stringify(data.chronicle.firstGen2Couple ?? null) && L.weddings === data.lineage.gen2Weddings && !L.kin,
+        detail: `${L.people.filter((x) => x.g >= 2).length} kasabalı · ${L.families} ocak · ilk 2. kuşak düğünü ${L.first ? `${L.first.a} & ${L.first.b}` : '-'}`,
+      });
+    }
   }
   // (25.3) mizaç
   {

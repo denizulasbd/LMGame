@@ -275,6 +275,8 @@ export class StatsPanel {
         ]),
         entry('heart', 'Kurucu Sakinler', ch.founders?.length ? [gold(ch.founders.map((f) => f.name).join(', '))] : [pending('Henüz yazılmadı')], 'Kasabayı ilk kuran ve ilk kulübelere yerleşenler'),
         entry('ring', 'İlk Evlenen Çift', ch.firstCouple ? [gold(`${ch.firstCouple.a} ile ${ch.firstCouple.b}`)] : [pending('Henüz kimse evlenmedi')], when(ch.firstCouple)),
+        // (25.4) Kasabanın ilk 2. kuşak düğünü
+        entry('ring', 'Kasabanın 2. Kuşak İlk Düğünü', ch.firstGen2Couple ? [gold(`${ch.firstGen2Couple.a} & ${ch.firstGen2Couple.b}`)] : [pending('Kasabada doğan kuşaktan henüz kimse evlenmedi')], when(ch.firstGen2Couple)),
         entry('masterpiece', 'İlk Usta Eseri', ch.firstMasterwork ? [gold(ch.firstMasterwork.maker), ` · ${ch.firstMasterwork.piece}`] : [pending('Henüz bir usta eser vermedi')], when(ch.firstMasterwork)),
         entry('wonder', 'Ulu Saat Kulesi', towerBody),
         el('ul', { className: 'chronicle-stages' }, stageRows),

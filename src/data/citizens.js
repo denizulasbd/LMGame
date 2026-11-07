@@ -112,6 +112,8 @@ export const PETITION_KINDS = {
   // (25.3) Yeni nesil huyların dilekçeleri
   craftTools: { name: 'Atölye Malzemesi', icon: 'quirkCraft', text: 'Atölyelerimize yeni el aletleri ve tezgâh malzemesi alınsın; elimiz işe daha iyi yatsın.', grant: { iron: 6, wood: 6 }, grantLabel: 'Malzemeyi Ver' },
   marketFees: { name: 'Pazar Harçları', icon: 'quirkTrade', text: 'Pazar harçları hafifletilsin; adil bir vergiyle esnaf da kasaba da kazansın.', grant: { gold: 25 }, grantLabel: 'Harçları Hafiflet' },
+  // (25.4) Altın Çağ'da evlenip aynı çatı altında yer bulamayan 2. kuşak çift (LineageSystem açar)
+  newHome: { name: 'Yeni Konut Talebi', icon: 'heart', text: 'Yeni evlendik; Belediye Konağı\'ndan kendi yuvamızı kuracağımız bir kulübe istiyoruz.' },
   sherbetCask: { name: 'Fazladan Şerbet', icon: 'quirkFestive', text: 'Hana fazladan bir şerbet fıçısı açılsın; bu akşam herkes neşelensin!', grant: { sherbet: 3 }, grantLabel: 'Fıçıyı Aç' },
 };
 

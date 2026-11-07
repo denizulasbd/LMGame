@@ -31,6 +31,7 @@ import { clashingTraits } from '../ai/TraitProfile.js';
 import { clamp } from '../utils/math.js';
 import { buffMultiplier } from './TownStatus.js';
 import { ageGap } from './LifeStages.js';
+import { closeKin } from './Lineage.js';
 
 const FESTIVAL_NEAR_PIXELS = 34; // şenlikte iki karodan yakın olanlar
 
@@ -83,7 +84,8 @@ export function canRomance(a, b) {
   if (a.isChild || b.isChild || a.partnerId !== null || b.partnerId !== null) return false;
   if (a.role || b.role) return false;
   // (25.1) yaşlar artık ilerlediği için fark kuşak yaşına göre ölçülür (katılım / büyüme anındaki yaş; zamanla değişmez)
-  return !isFamily(a, b) && ageGap(a, b) <= ROMANCE.maxAgeGap;
+  // (25.4) birinci derece kan bağı doğum kaydından da denetlenir (köyden ayrılan ebeveynin çocukları kardeş kalır)
+  return !isFamily(a, b) && !closeKin(a, b) && ageGap(a, b) <= ROMANCE.maxAgeGap;
 }
 
 /**

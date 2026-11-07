@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken, (25.1) Kıdemli Bilge emekliyken, (25.2) çırak ustasının yanındayken, (25.3) yeni nesil huylu sakinler varken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken, (25.1) Kıdemli Bilge emekliyken, (25.2) çırak ustasının yanındayken, (25.3) yeni nesil huylu sakinler varken, (25.4) Aile Kütüğü ve devredilmiş ocak varken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -493,6 +493,29 @@ const PAGE_HELPERS = () => {
       const p3 = s.characters.find((c) => c.id === p.id);
       [f3.quirk, p3.quirk] = before;
       f3.quirkOrigin = p3.quirkOrigin = null;
+    }
+
+    // --- 2p. (25.4) Aile Kütüğü: 2. kuşak sakin, devredilmiş ocak reisi ve Tarihçe'deki ilk 2. kuşak düğünü varken ---
+    {
+      const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.homeId !== null).sort((a, b) => a.id - b.id);
+      const [p1, kid] = adults;
+      const keep = { g: kid.generation, parents: kid.parents, children: p1.children };
+      kid.generation = p1.generation + 1;
+      kid.parents = [p1.id];
+      if (!p1.children.includes(kid.id)) p1.children = [...p1.children, kid.id];
+      s.lineage.heads[p1.homeId] = kid.id;
+      s.chronicle.firstGen2Couple = { a: kid.name, b: p1.name, ids: [kid.id, p1.id], day: s.time.day, hour: 10, minute: 0 };
+      hours(1);
+      const diff = A.roundtrip();
+      const k2 = s.characters.find((c) => c.id === kid.id);
+      check('Aile Kütüğü varken kayıt -> yükleme durum kayması yok (kuşak, doğum ebeveynleri, ocak, çocuklar, reis, Tarihçe)', diff.length === 0 && k2.generation === s.characters.find((c) => c.id === p1.id).generation + 1 && k2.parents.includes(p1.id) && s.lineage.heads[p1.homeId] === kid.id && s.chronicle.firstGen2Couple?.a === kid.name, diff.join(' | '));
+      const k3 = s.characters.find((c) => c.id === kid.id);
+      const p3 = s.characters.find((c) => c.id === p1.id);
+      k3.generation = keep.g;
+      k3.parents = keep.parents;
+      p3.children = keep.children;
+      delete s.lineage.heads[p1.homeId];
+      s.chronicle.firstGen2Couple = null;
     }
 
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---

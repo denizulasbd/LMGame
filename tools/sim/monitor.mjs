@@ -46,6 +46,7 @@ export async function installMonitor(page) {
     window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
     window.__apprMod = await import('/src/systems/Apprenticeship.js').catch(() => null); // (25.2)
     window.__socialData = await import('/src/data/social.js').catch(() => null); // (25.3)
+    window.__lineageMod = await import('/src/systems/Lineage.js').catch(() => null); // (25.4)
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -366,6 +367,27 @@ export async function installMonitor(page) {
           m.maxApprentices = Math.max(m.maxApprentices ?? 0, active);
         }
 
+        // ---- (25.4) Aile Kütüğü: kuşak, ocak, çocuk listesi tutarlı; birinci derece akraba çift (ensest) yok ----
+        if (s.lineage && window.__lineageMod) {
+          const L = window.__lineageMod;
+          const ids = new Map(s.characters.map((c) => [c.id, c]));
+          for (const c of s.characters) {
+            if (c.role) continue;
+            if (!Number.isInteger(c.generation) || c.generation < 1) broke(`${c.name}: geçersiz kuşak (${c.generation})`);
+            if (!s.lineage.families[c.familyId]) broke(`${c.name}: ocağı yok (${c.familyId})`);
+            for (const pid of c.parents ?? []) {
+              const p = ids.get(pid);
+              if (p && c.generation !== Math.max(...c.parents.map((x) => ids.get(x)?.generation ?? 0)) + 1) broke(`${c.name}: kuşağı ebeveyniyle uyuşmuyor`);
+              if (p && !p.children.includes(c.id)) broke(`${p.name}: çocuk listesinde ${c.name} yok`);
+            }
+            if (c.partnerId !== null) {
+              const o = ids.get(c.partnerId);
+              if (o && L.closeKin(c, o)) broke(`${c.name} ve ${o.name}: birinci derece akraba çift`);
+            }
+          }
+          m.maxGeneration2 = Math.max(m.maxGeneration2 ?? 0, ...s.characters.map((c) => c.generation ?? 1));
+        }
+
         // ---- (25.3) Mizaç: huy tanımlı mı, kaynak geçerli mi ----
         if (s.temperament && window.__socialData) {
           const Q = window.__socialData.QUIRKS;
@@ -533,6 +555,17 @@ export async function installMonitor(page) {
                 spoiled: { ...(s.granary?.spoiled ?? {}) },
                 switches: s.granary?.switches ?? 0,
                 granaryCapacity: s.granaryCapacity ?? 0,
+              }
+            : null,
+          // (25.4)
+          lineage: s.lineage
+            ? {
+                generations: s.characters.filter((c) => !c.role).reduce((m2, c) => ({ ...m2, [c.generation]: (m2[c.generation] ?? 0) + 1 }), {}),
+                families: Object.keys(s.lineage.families).length,
+                maxGeneration: m.maxGeneration2 ?? 1,
+                gen2Married: s.characters.filter((c) => c.married && (c.generation ?? 1) >= 2).length,
+                firstGen2Couple: s.chronicle?.firstGen2Couple ?? null,
+                state: { ...s.lineage, families: undefined, heads: Object.keys(s.lineage.heads).length },
               }
             : null,
           // (25.3)

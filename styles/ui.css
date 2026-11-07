@@ -4451,3 +4451,9 @@ kbd {
 .quirk-text-trade { color: #ffd23f; }
 .quirk-text-sage { color: #c7b8f5; }
 .quirk-text-festive { color: #ff9ab0; }
+
+/* (25.4) Aile Kütüğü: kuşak rozeti */
+.lineage-badge { display: inline-block; padding: 0 6px; font-size: 11px; font-weight: 700; border: 2px solid var(--ui-line); color: var(--ui-ink-dark); }
+.lineage-badge.gen-1 { background: #c98f55; }
+.lineage-badge.gen-2 { background: #a4dd5c; }
+.lineage-badge.gen-3 { background: #9be3f2; }

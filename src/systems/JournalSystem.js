@@ -159,6 +159,12 @@ export class JournalSystem {
           'star'
         )
       ),
+      // (25.4) Aile Kütüğü
+      on('lineage:gen2Wedding', ({ a, b, first }) => first && this.log(`Kasabanın 2. Kuşak İlk Düğünü: ${a.name} & ${b.name}! Kasabada doğan kuşak yuva kuruyor`, 'ring')),
+      on('lineage:newHome', ({ a, b, home }) => this.log(`${a.name} ve ${b.name} kendi yuvalarını kurdu: boş bir eve (${home.name}) taşınıyorlar`, 'heart')),
+      on('lineage:extendedFamily', ({ a, b }) => this.log(`${a.name} ve ${b.name} şimdilik ailenin evinde Geniş Aile olarak yaşıyor`, 'heart')),
+      on('lineage:housingPetition', ({ a, b }) => this.log(`${a.name} ve ${b.name} aynı çatı altında yer bulamadı: Belediye Konağı'na Yeni Konut Talebi verdiler`, 'scroll')),
+      on('lineage:handover', ({ elder, heir }) => this.log(`Ocak Devri: Kıdemli Bilge ${elder.name} ocağın reisliğini ${heir.name} adlı evladına devretti`, 'heart')),
       // (25.3) Mizaç gelişimi
       on('temperament:developed', ({ character, quirk, origin }) => {
         const name = QUIRKS[quirk].name;

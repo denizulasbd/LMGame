@@ -114,6 +114,12 @@ console.log(
     `unvanı alan bilge ${lf((l) => l.state.elders ?? 0)}, yetişkinliğe geçen genç ${lf((l) => l.state.adults ?? 0)} · nasihat ${Math.round(lf((l) => l.state.adviceMinutes ?? 0))} dk · ` +
     `işteki emekli ${lf((l) => l.retiredWorking)} · en yaşlı ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? Math.max(...r.data.monitor.life.ages) : '-'}`).join(' ')}`
 );
+const lg = (f) => sum((d) => (d.monitor.lineage ? f(d.monitor.lineage) : 0));
+console.log(
+  `(25.4) Aile Kütüğü: 2. kuşak sakin (son gün) ${lg((l) => l.generations['2'] ?? 0)} · 2. kuşak düğünü ${lg((l) => l.state.gen2Weddings)} · ilk 2. kuşak düğünü ` +
+    `${results.map((r) => `${r.seed}:${r.data?.monitor.lineage?.firstGen2Couple ? `G${r.data.monitor.lineage.firstGen2Couple.day}` : '-'}`).join(' ')} · Yeni Yuva ${lg((l) => l.state.newHomes)}, Geniş Aile ${lg((l) => l.state.extended)}, ` +
+    `konut dilekçesi ${lg((l) => l.state.petitions)} · Ocak Devri ${lg((l) => l.state.handovers)}`
+);
 const tp = (f) => sum((d) => (d.monitor.temperament ? f(d.monitor.temperament) : 0));
 console.log(
   `(25.3) mizaç: yeni nesil huylu sakin (son gün) ${tp((t) => ['craftsman', 'entrepreneur', 'philosopher', 'festive'].reduce((n, k) => n + (t.counts[k] ?? 0), 0))} · gelişen ${tp((t) => t.state.developed)} ` +

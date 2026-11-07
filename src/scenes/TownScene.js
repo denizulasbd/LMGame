@@ -85,6 +85,7 @@ import { LifeStageSystem } from '../systems/LifeStageSystem.js';
 import { ApprenticeshipSystem } from '../systems/ApprenticeshipSystem.js';
 import { drawSpeechBubbles } from '../rendering/SpeechBubbles.js';
 import { TemperamentSystem } from '../systems/TemperamentSystem.js';
+import { LineageSystem } from '../systems/LineageSystem.js';
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -183,6 +184,8 @@ export class TownScene extends Scene {
     this.tradePost = new TradePostSystem(this.game, this.world, { economy: this.economy });
     // (25.2) Usta-Çırak sistemi: çıraklık, Gururlu Usta, çırak işi, mezuniyet (kendi üreteci; çırak yokken hiçbir şeyi değiştirmez)
     this.apprenticeship = new ApprenticeshipSystem(this.game, this.world, new Random(state.seed + 28));
+    // (25.4) Aile Kütüğü, 2. kuşak düğünleri, Yeni Yuva ve Ocak Devri (kendi üreteci; ev değişiklikleri Altın Çağ'da)
+    this.lineageSystem = new LineageSystem(this.game, this.world, new Random(state.seed + 30), { petitions: this.petitions });
     // (25.3) Mizaç kalıtımı ve yeni nesil huylar (kendi üreteci; Altın Çağ'da açılır)
     this.temperament = new TemperamentSystem(this.game, this.world, new Random(state.seed + 29));
     // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
@@ -296,6 +299,7 @@ export class TownScene extends Scene {
       this.lifeStages,
       this.apprenticeship,
       this.temperament,
+      this.lineageSystem,
     ];
 
     this.camera = new Camera();

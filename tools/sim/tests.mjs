@@ -65,6 +65,9 @@
 //              Usta etkisi ve mesleğin doğası, Zanaatkâr şevki, Pazar sıklığı, malzeme, Girişimci tutumluluğu ve pazarlık payı,
 //              sözleşme sevinci, Şenlik testisi / aurası, Bilge Düşünür nasihati, mizaç sözleri, çırak işini saklama, üç yeni dilekçe,
 //              izole üreteç, kart rozeti ve mizacın kaynağı, kayıt sürümü 26 (gidiş-dönüş, bozuk değerler, v25 kaydı)
+//   25. aşama (25.4): Aile Kütüğü (kuşak, doğum ebeveynleri, ocak, çocuklar; doğum ve göç), kuşak adları, birinci derece kan bağı
+//              engeli (ebeveyni ayrılmış kardeşler dahil), 2. kuşak ilk düğünü (Tarihçe, günlük), Altın Çağ kapısı, Yeni Yuva, Geniş Aile,
+//              Yeni Konut Talebi, Ocak Devri, kart ve ev paneli, izole üreteç, kayıt sürümü 27 (gidiş-dönüş, bozuk değerler, v26 kaydı)
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
 import { openGame, createChecks } from './lib.mjs';
@@ -2273,7 +2276,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 26', raw.version === 26);
+  check('kayıt sürümü 27', raw.version === 27);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2716,7 +2719,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 26: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 26 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 27: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 27 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -3031,7 +3034,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 26: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 26 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 27: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 27 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3643,7 +3646,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 26: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 26 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 27: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 27 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -3924,7 +3927,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { g: garden.id, o: other.id, switches: st.granary.switches };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 26: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 26 && raw.version === 26 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    check('kayıt sürümü 27: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 27 && raw.version === 27 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
     game.events.emit('ui:load');
     const s2 = game.state;
     const g2 = s2.buildings.find((b) => b.id === T.g);
@@ -4252,7 +4255,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 26: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 26 && raw.version === 26 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    check('kayıt sürümü 27: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 27 && raw.version === 27 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
     game.events.emit('ui:load');
     const s2 = st();
     const inn2 = s2.buildings.find((b) => b.id === T.inn);
@@ -4526,7 +4529,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 26: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 26 && raw.version === 26 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    check('kayıt sürümü 27: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 27 && raw.version === 27 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
     game.events.emit('ui:load');
     const t2 = st().tradePost;
     check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
@@ -4812,7 +4815,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 26: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 26 && raw.version === 26 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
+    check('kayıt sürümü 27: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 27 && raw.version === 27 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
     game.events.emit('ui:load');
     const back = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     const sage2 = st().characters.find((c) => c.id === sage.id);
@@ -5073,7 +5076,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const snap = JSON.stringify(youth.apprenticeship);
-    check('kayıt sürümü 26: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 26 && raw.version === 26 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
+    check('kayıt sürümü 27: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 27 && raw.version === 27 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
     game.events.emit('ui:load');
     const y2 = st().characters.find((c) => c.id === youth.id);
     check('kayıttan çıraklık, kapı ve sayaçlar birebir döner', JSON.stringify(y2.apprenticeship) === snap && AP.doorOpen(st(), st().buildings.find((b) => b.id === hut.id)) && st().apprenticeship.crafted >= 1);
@@ -5457,7 +5460,7 @@ const pageResults = await page.evaluate(async () => {
     // --- Kayıt (sürüm 26) ---
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 26: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 26 && raw.version === 26 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
+    check('kayıt sürümü 27: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 27 && raw.version === 27 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
     const snapT = JSON.stringify(st().temperament);
     game.events.emit('ui:load');
     const sh2 = st().characters.find((c) => c.id === shown.id);
@@ -5482,6 +5485,209 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     check('v25 kaydı: eski huylar aynen korunur, huy kaynağı yok, mizaç sayaçları boş', st().characters.map((c) => `${c.id}:${c.quirk}`).join(',') === quirks && st().characters.every((c) => !c.quirkOrigin) && JSON.stringify(st().temperament) === JSON.stringify(TM.emptyTemperament()));
     s0.goldenAge && (st().goldenAge.since = savedSince);
+  }
+
+  // ===== 25. aşama (25.4): Aile Kütüğü, yeni evlilikler ve konut mirası =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const LN = await import('/src/systems/Lineage.js');
+    const LD = await import('/src/data/lineage.js');
+    const RS = await import('/src/systems/RelationshipSystem.js');
+    const PT = await import('/src/systems/Petitions.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    s0.crisis.difficulty = 'huzurlu';
+    s0.crisis.raid = null;
+    s0.crisis.nextRaidWarnAt = null;
+    s0.petitions.list = [];
+    s0.petitions.nextAt = s0.totalMinutes + 1e6;
+    const sys = () => S().lineageSystem;
+    const people = () => st().characters.filter((c) => !c.role && !c.away && !c.emigrating).sort((a, b) => a.id - b.id);
+    const mk = (name, parents = [], age = 25) => new Character({ name, age, traits: ['cheerful'], appearance: { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'sky', pants: 'navy' }, parentIds: parents.map((p) => p.id) });
+    const journal = () => st().journal.slice(-6).map((e) => e.text).join(' / ');
+    const events = [];
+    const offs = ['lineage:newHome', 'lineage:extendedFamily', 'lineage:housingPetition', 'lineage:handover', 'lineage:gen2Wedding'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
+
+    // --- Veri modeli ---
+    check('her sakinin kütük verisi var: kuşak, doğum ebeveynleri, ocak, çocuklar', people().every((c) => Number.isInteger(c.generation) && c.generation >= 1 && Array.isArray(c.parents) && Array.isArray(c.children) && st().lineage.families[c.familyId]));
+    check('kurucu ve göçmenler 1. kuşak, kasabada doğanlar ebeveyninin bir fazlası; çocuk listesi ebeveyn kayıtlarıyla tutarlı', people().every((c) => {
+      const ps = c.parents.map((id) => st().characters.find((x) => x.id === id)).filter(Boolean);
+      return (ps.length ? c.generation === Math.max(...ps.map((p) => p.generation)) + 1 : c.generation === 1) && ps.every((p) => p.children.includes(c.id));
+    }));
+    check('kuşak adları: 1. Kuşak Kurucu, 1. Kuşak Göçmen, 2. Kuşak Kasabalı, 3. Kuşak Torun', (() => {
+      const f = st().chronicle.founders[0];
+      const founder = st().characters.find((c) => c.id === f?.id);
+      const x = { id: -1, generation: 1 };
+      return (!founder || LN.generationName(st(), founder) === '1. Kuşak Kurucu') && LN.generationName(st(), x) === '1. Kuşak Göçmen' && LN.generationName(st(), { id: -2, generation: 2 }) === '2. Kuşak Kasabalı' && LN.generationName(st(), { id: -3, generation: 3 }) === '3. Kuşak Torun';
+    })());
+
+    // --- Doğum ve göç ---
+    const [ma, pa] = people();
+    const baby = mk('Bebek', [ma, pa], 5);
+    baby.growsUpAt = 1e9;
+    st().characters.push(baby);
+    game.events.emit('family:childBorn', { child: baby, parents: [ma, pa], home: st().buildings.find((b) => b.id === ma.homeId) ?? null });
+    check('doğum: çocuk ebeveyninin bir fazla kuşağı, ilk ebeveyninin ocağı; ebeveynlerin çocuk listesine girer', baby.generation === Math.max(ma.generation, pa.generation) + 1 && baby.familyId === ma.familyId && ma.children.includes(baby.id) && pa.children.includes(baby.id) && baby.parents.join() === [ma.id, pa.id].join());
+    const comer = mk('Gezgin');
+    const fams0 = Object.keys(st().lineage.families).length;
+    sys().onJoined(comer);
+    check('göçmen 1. kuşaktır ve kendi ocağını açar ("[Ad] Ocağı")', comer.generation === 1 && Object.keys(st().lineage.families).length === fams0 + 1 && st().lineage.families[comer.familyId].name === 'Gezgin Ocağı');
+
+    // --- Akrabalık engeli ---
+    const sib1 = mk('Kardeş1', [ma, pa]);
+    const sib2 = mk('Kardeş2', [ma]);
+    const cousin = mk('Kuzen', [comer]);
+    check('birinci derece kan bağı: ebeveyn-çocuk ve (üvey de olsa) kardeşler akrabadır; kuzen ve yabancı değildir', LN.closeKin(ma, sib1) && LN.closeKin(sib1, ma) && LN.closeKin(sib1, sib2) && !LN.closeKin(sib1, cousin) && !LN.closeKin(ma, comer));
+    sib1.parentIds = [];
+    sib2.parentIds = [];
+    check('ebeveyni köyden ayrılıp kaydı temizlense de (parentIds boş) kardeşler doğum kaydından tanınır, aşık olamazlar', LN.closeKin(sib1, sib2) && !RS.isFamily(sib1, sib2) && !RS.canRomance(sib1, sib2) && RS.canRomance(sib1, cousin));
+    check('ebeveyn ile çocuğu flört edemez (canRomance)', !RS.canRomance(ma, mk('Evlat', [ma])));
+
+    // --- 2. kuşak düğünü: Tarihçe (Altın Çağ öncesinde ev değişmez) ---
+    const savedSince = st().goldenAge.since;
+    st().goldenAge.since = null;
+    st().chronicle.firstGen2Couple = null;
+    const g2a = people().find((c) => c.generation === 1 && c !== ma && c !== pa) ?? people()[2];
+    const g2b = people().filter((c) => c !== g2a && c !== ma && c !== pa)[0];
+    const keep = [g2a.generation, g2b.generation, g2a.homeId, g2b.homeId, g2a.parents, g2b.parents];
+    g2a.generation = 2;
+    g2a.parents = [ma.id];
+    events.length = 0;
+    game.events.emit('relationship:married', { a: g2a, b: g2b, venue: null, festival: false });
+    const ch = st().chronicle.firstGen2Couple;
+    check('Kasabanın 2. Kuşak İlk Düğünü Tarihçe\'ye ve Kasaba Günlüğü\'ne yazılır', ch && ch.a === g2a.name && ch.b === g2b.name && journal().includes('Kasabanın 2. Kuşak İlk Düğünü') && events.some((e) => e.n === 'lineage:gen2Wedding' && e.p.first), journal());
+    check('Altın Çağ öncesinde konut mirası evlere dokunmaz (kule öncesi oyun aynı kalır)', !events.some((e) => ['lineage:newHome', 'lineage:extendedFamily', 'lineage:housingPetition'].includes(e.n)));
+    events.length = 0;
+    game.events.emit('relationship:married', { a: g2a, b: g2b, venue: null, festival: false });
+    check('ikinci 2. kuşak düğünü Tarihçe\'deki ilk çifti değiştirmez', st().chronicle.firstGen2Couple.a === ch.a && events.some((e) => e.n === 'lineage:gen2Wedding' && !e.p.first) && st().lineage.gen2Weddings >= 2);
+    game.events.emit('ui:toggleStats');
+    const archive = document.querySelector('.archive-panel');
+    archive.querySelector('.archive-tab[data-tab="chronicle"]').click();
+    game.render(0);
+    const chText = archive.querySelector('.chronicle-view')?.textContent ?? '';
+    check('Arşiv\'deki Tarihçe Kütüğü\'nde altın harflerle: "Kasabanın 2. Kuşak İlk Düğünü: [İsim] & [İsim]"', chText.includes('Kasabanın 2. Kuşak İlk Düğünü') && chText.includes(`${ch.a} & ${ch.b}`), chText.slice(0, 200));
+    game.events.emit('ui:toggleStats');
+
+    // --- Yeni Yuva (Altın Çağ) ---
+    st().goldenAge.since = st().time.day;
+    sim.give({ wood: 600, stone: 400, food: 300 });
+    const fresh = sim.place('cabin');
+    for (const c of st().characters) if (c.homeId === fresh.id) c.homeId = null;
+    events.length = 0;
+    const r1 = sys().settle(g2a, g2b);
+    check('Yeni Yuva: boş kulübe varsa yeni çift oraya taşınır; reisliği 2. kuşak eş alır', r1 === 'newHome' && g2a.homeId === g2b.homeId && st().characters.filter((c) => c.homeId === g2a.homeId).length === 2 && g2a.relocating && st().lineage.heads[g2a.homeId] === g2a.id && journal().includes('kendi yuvalarını kurdu'), journal());
+    // Geniş Aile: boş kulübe yok, çift ebeveyn evinde
+    const homeP = st().buildings.find((b) => b.id === ma.homeId);
+    g2a.homeId = g2b.homeId = homeP.id; // önce çift ebeveyn evine, sonra boş kulübeler doldurulur
+    const blockers = [];
+    for (const h of st().buildings.filter((b) => b.type === 'cabin' && b.functional)) {
+      if (S().world.getResidents(h).length === 0) {
+        const filler = people().find((c) => c !== g2a && c !== g2b && c !== ma && c !== pa && c.homeId !== h.id && !blockers.some(([x]) => x === c));
+        blockers.push([filler, filler.homeId]);
+        filler.homeId = h.id;
+      }
+    }
+    g2a.homeId = g2b.homeId = homeP.id;
+    events.length = 0;
+    const r2 = sys().settle(g2a, g2b);
+    check('Geniş Aile: boş kulübe yoksa çift ebeveyninin evinde birlikte yaşar', r2 === 'extended' && events.some((e) => e.n === 'lineage:extendedFamily') && journal().includes('Geniş Aile'), `${r2} · ma ev ${ma.homeId} / ${homeP.id} · çift ${g2a.homeId},${g2b.homeId} · ${g2a.parents} · boş ${st().buildings.filter((b) => b.type === 'cabin' && b.functional && S().world.getResidents(b).length === 0).length}`);
+    // Yeni Konut Talebi: ayrı evlerde kaldılar
+    const other = st().buildings.find((b) => b.type === 'cabin' && b.functional && b.id !== homeP.id);
+    g2b.homeId = other.id;
+    st().petitions.list = [];
+    events.length = 0;
+    const r3 = sys().settle(g2a, g2b);
+    const pet = st().petitions.list.find((p) => p.kind === 'newHome');
+    check('Yeni Konut Talebi: aynı çatı altında yer yoksa Belediye Konağı\'na dilekçe verilir', r3 === 'petition' && pet && pet.baseline.partnerId && journal().includes('Yeni Konut Talebi'), journal());
+    check('Yeni Konut Talebi çift aynı eve yerleşince karşılanır', !PT.petitionMet(st(), pet) && (() => { g2b.homeId = g2a.homeId; return PT.petitionMet(st(), pet); })());
+    st().petitions.list = [];
+    for (const [c, h] of blockers) c.homeId = h;
+
+    // --- Ocak Devri ---
+    const elder = people().find((c) => !c.isChild && c !== g2a && c !== g2b && c.homeId !== null) ?? people()[3];
+    const heir = g2a;
+    const ek = [elder.lifeStage, elder.children, heir.married, heir.parents];
+    elder.children = [heir.id];
+    heir.married = true;
+    st().lineage.heads[elder.homeId] = elder.id;
+    events.length = 0;
+    game.events.emit('lifeStage:changed', { character: elder, from: 'adult', to: 'elder' });
+    check('Ocak Devri: Kıdemli Bilge olan reis ocağın reisliğini evli yetişkin çocuğuna devreder (anı ve günlük)', st().lineage.heads[elder.homeId] === heir.id && heir.memories.some((m) => m.kind === 'home' && m.text.includes(elder.name)) && journal().includes('Ocak Devri') && st().lineage.handovers >= 1, journal());
+    game.events.emit('ui:selectBuilding', elder.homeId);
+    game.render(0);
+    const panelText = document.querySelector('.building-panel')?.textContent ?? '';
+    check('ev panelinde ocak reisi (devredildi) ve ocaklar', panelText.includes(`Ocak reisi: ${heir.name}`) && panelText.includes('ocak devredildi'), panelText.slice(0, 300));
+    game.events.emit('ui:selectBuilding', null);
+    [elder.lifeStage, elder.children, heir.married, heir.parents] = ek;
+    heir.parents = [ma.id];
+
+    // --- Karakter Detay Kartı ---
+    game.events.emit('ui:selectCharacter', g2a.id);
+    game.render(0);
+    const fam = document.querySelector('.character-panel .family-list')?.textContent ?? '';
+    check('kartta kuşak rozeti ("2. Kuşak Kasabalı"), ocağı ve anne-baba / çocuklar', document.querySelector('.character-panel .lineage-badge.gen-2') && fam.includes('2. Kuşak Kasabalı') && fam.includes(st().lineage.families[g2a.familyId].name), fam);
+    game.events.emit('ui:selectCharacter', ma.id);
+    game.render(0);
+    const fam2 = document.querySelector('.character-panel .family-list')?.textContent ?? '';
+    check('ebeveynin kartında çocukları listelenir', fam2.includes('Çocukları') && fam2.includes('Bebek'), fam2);
+    game.events.emit('ui:selectCharacter', null);
+
+    // --- İzole üreteç ---
+    const rngs = Object.entries(S()).filter(([k, v]) => k !== 'lineageSystem' && v && v.rng && Number.isFinite(v.rng.state)).map(([, v]) => v.rng);
+    const states = rngs.map((r) => r.state);
+    const traveller = mk('Yolcu'); // Character kurucusu animasyon için Math.random kullanır: denetimden önce
+    let randomCalls = 0;
+    const realRandom = Math.random;
+    Math.random = () => { randomCalls++; return realRandom(); };
+    for (const c of st().characters) if (c.homeId === fresh.id) c.homeId = null;
+    sys().settle(g2a, g2b);
+    LN.rebuildLineage(st());
+    sys().onJoined(traveller);
+    Math.random = realRandom;
+    check('kütük, Yeni Yuva ve kurulum ana üreteçleri ve Math.random\'u tüketmez (kendi üreteci seed + 30)', rngs.length > 5 && rngs.every((r, i) => r.state === states[i]) && randomCalls === 0 && sys().rng !== S().behavior.rng);
+    st().characters.splice(st().characters.indexOf(baby), 1);
+    ma.children = ma.children.filter((id) => id !== baby.id);
+    pa.children = pa.children.filter((id) => id !== baby.id);
+
+    // --- Kayıt (sürüm 27) ---
+    game.events.emit('ui:save');
+    const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    const rc = raw.characters.find((c) => c.id === g2a.id);
+    check('kayıt sürümü 27: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 27 && raw.version === 27 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
+    const snap = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
+    game.events.emit('ui:load');
+    const back = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
+    check('kayıttan kütük birebir döner', back === snap && st().chronicle.firstGen2Couple?.a === ch.a && st().lineage.gen2Weddings >= 2);
+    game.events.emit('ui:save');
+    const bad = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    const bc = bad.characters.find((c) => c.id === g2a.id);
+    bc.generation = -4;
+    bc.familyId = 99999;
+    bc.children = ['x', 5e9];
+    bad.lineage.heads = { 123456: 1, [bc.homeId]: 777777 };
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(bad));
+    game.events.emit('ui:load');
+    const c2 = st().characters.find((c) => c.id === g2a.id);
+    check('bozuk kuşak, ocak, çocuk listesi ve reis temizlenir / yeniden kurulur', c2.generation === 2 && st().lineage.families[c2.familyId] && c2.children.every((id) => st().characters.some((x) => x.id === id)) && !st().lineage.heads[123456] && st().lineage.heads[bc.homeId] === undefined);
+    game.events.emit('ui:save');
+    const old = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+    old.version = 26;
+    delete old.lineage;
+    delete old.chronicle.firstGen2Couple;
+    for (const c of old.characters) {
+      delete c.generation;
+      delete c.parents;
+      delete c.familyId;
+      delete c.children;
+    }
+    localStorage.setItem('lmgame.save.v2', JSON.stringify(old));
+    game.events.emit('ui:load');
+    const ps = st().characters.filter((c) => !c.role);
+    check('v26 kaydı: ebeveyni kayıtlı olmayan herkes 1. Kuşak (Kurucu / Göçmen), kendi ocağıyla; kasabada doğanlar 2. kuşak; Tarihçe boş', ps.every((c) => (c.parentIds.length ? c.generation >= 2 : c.generation === 1) && st().lineage.families[c.familyId]) && !st().chronicle.firstGen2Couple && st().lineage.gen2Weddings === 0 && Object.keys(st().lineage.families).length === ps.filter((c) => c.generation === 1).length);
+    st().goldenAge.since = savedSince;
+    offs.forEach((off) => off());
   }
 
   return out;

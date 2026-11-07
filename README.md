@@ -2998,6 +2998,96 @@ temizlenir.
   Şenlik aurası, üç mezun çırak, 49 çırak işi; takılma, kopuk referans ve sayfa hatası 0. 72 günde yeni huylu sakinlerden dilekçe çıkmadı
   (dilekçeler 1-2 günde bir, rastgele bir sakinden gelir); üç yeni dilekçe hedefli testlerle doğrulandı.
 
+## Aile Kütüğü, yeni evlilikler ve konut mirası (25. aşama, 25.4 mikro adımı)
+
+Kasabada doğan çocuklar artık bir **soy kütüğünde** yer alıyor. Altın Çağ'da evlenen 2. kuşak çiftler kendi yuvalarını kuruyor,
+yaşlanan ocak reisleri reisliği evlatlarına devrediyor. 19. aşamanın flört, evlilik ve ortak ev kuralları aynen geçerlidir; bu adım
+üzerlerine ince bir **kuşak katmanı** ekler. Adlar `data/lineage.js`'te, saf hesaplar `systems/Lineage.js`'te, mantık
+`systems/LineageSystem.js`'tedir.
+
+### Soy veri modeli
+
+| Alan | Anlamı |
+|---|---|
+| `generation` | 1: kurucular ve göçmenler ("1. Kuşak Kurucu" / "1. Kuşak Göçmen"); 2: kasabada doğan çocukları ("2. Kuşak Kasabalı"); 3+: torunlar ("3. Kuşak Torun") |
+| `parents` | Doğum ebeveynleri `[id, id]` (kurucularda boş). Eski `parentIds` yüklemede kopuk referanslardan temizlenir; `parents` köyden ayrılan ebeveyni de saklar |
+| `familyId` | Ocak kimliği. Her kurucu ve göçmen kendi adıyla bir ocak açar ("Zeynep Ocağı"); çocuk ilk ebeveyninin ocağını taşır |
+| `children` | Kasabada doğan çocukların kimlikleri (doğumda eklenir, yüklemede ebeveyn kayıtlarından yeniden kurulur) |
+
+Kütük doğumda ve göçte yazılır; her yüklemede ve yeni kasabada kimlik sırasıyla, deterministik olarak tutarlı kılınır.
+
+### İkinci kuşak evlilikleri ve akrabalık engeli
+
+- Bekâr 2. kuşak gençler ve yetişkinler, 19. aşamanın kurallarıyla kasabanın öteki bekârlarıyla flört eder ve evlenir. Düğün havuz başında
+  konfetiyle kutlanır. Kurallar 19. aşamadaki gibidir: Genç evresi de evlenebilir; bunu yalnızca yetişkinlere kısıtlamak kule öncesi
+  oyunu değiştirirdi.
+- **Akrabalık engeli** (`Lineage.closeKin`, `RelationshipSystem.canRomance`): ebeveyn ile çocuğu ve en az bir ortak ebeveyni olan
+  kardeşler (üvey kardeşler dahil) aşık olamaz. 19. aşamanın `isFamily` denetimi `parentIds`'e bakıyordu; yüklemede köyden ayrılmış
+  ebeveynin kimliği temizlenince iki kardeş birbirinin kardeşi olduğunu "unutabiliyordu". Engel artık doğum kaydını (`parents`) da
+  okur. Kuzenler engelli değildir. Bekçi her örnekte birinci derece akraba bir çift olup olmadığını denetler.
+- **Tarihçe:** kasabada doğan kuşaktan ilk evlenen çift, Arşiv'in Tarihçe Kütüğü'ne altın harflerle "Kasabanın 2. Kuşak İlk Düğünü:
+  [İsim] & [İsim]" olarak ve Kasaba Günlüğü'ne yazılır.
+
+### Konut mirası ve yeni yuva (Altın Çağ kuşağı)
+
+Kasabanın Altın Çağı başladıktan sonra evlenen ve en az biri 2. kuşak olan çift için (19. aşamanın ortak eve taşınma kuralından sonra):
+
+1. **Yeni Yuva:** kasabada hiç kimsenin yaşamadığı bir kulübe varsa çift en yakınına taşınır; eşit uzaklıktakiler arasından bu katmanın
+   üreteci seçer. Reislik 2. kuşak eşe geçer.
+2. **Geniş Aile:** boş kulübe yoksa ve çift ebeveynlerinden birinin evinde birlikte yaşıyorsa orada Geniş Aile olarak kalır.
+3. **Yeni Konut Talebi:** aynı çatı altında yer bulamadılarsa Belediye Konağı'na dilekçe verirler ("Yeni evlendik; kendi yuvamızı
+   kuracağımız bir kulübe istiyoruz"). Yeni bir kulübe kurulunca ya da çift aynı eve yerleşince dilekçe karşılanır.
+
+**Ocak Devri:** Kıdemli Bilge olan ocak reisi, evinin reisliğini (sembolik tapu) evli yetişkin çocuğuna devreder; aynı evde yaşayan çocuk
+önceliklidir. Devir anılara ve günlüğe yazılır. Ev panelinde "Ocak reisi: X (ocak devredildi) · Zeynep Ocağı" görünür. Reis
+belirlenmemişse evin en yaşlı yetişkinidir.
+
+### Arayüz
+
+- **Karakter Detay Kartı → Aile:** kuşak rozeti (1. kuşak bakır, 2. kuşak yeşil, 3. kuşak mavi), ocağın adı, anne-babası, çocukları;
+  kasabadan ayrılmış bir doğum ebeveyni varsa o da belirtilir.
+- **Arşiv (I) → Tarihçe Kütüğü:** "Kasabanın 2. Kuşak İlk Düğünü" satırı (gün ve saatiyle).
+- `tools/art-preview.html`: üç kuşaklık soy ağacı (bağ çizgileri ve kuşak adlarıyla) ve boş kulübeye taşınan Yeni Yuva çifti.
+
+### Determinizm
+
+- Katman **kendi tohumlanmış üretecini** (`seed + 30`) kullanır ve onu yalnızca eşit uzaklıktaki boş kulübeler arasında seçmek için
+  tüketir. Kütüğün kurulması ve yeniden kurulması rastgelelik kullanmaz.
+- Altın Çağ öncesinde katman yalnızca **veri** yazar (kütük, Tarihçe, günlük, sayaç). Hiçbir sakinin evini ya da davranışını değiştirmez.
+- Akrabalık engelinin genişlemesi yalnızca ebeveyni köyden ayrılmış kardeşleri etkiler; stres koşularında hiç kimse köyü terk etmediği
+  için sonuç değişmez.
+
+### Kayıt (sürüm 27)
+
+Sakinlere `generation`, `parents`, `familyId`, `children`; kayda `lineage` (ocaklar, sıradaki ocak kimliği, ocak reisleri; 2. kuşak
+düğünü, Yeni Yuva, Geniş Aile, konut dilekçesi ve Ocak Devri sayaçları) ve Tarihçe'ye `firstGen2Couple` eklendi.
+
+**Sürüm 2-26 kayıtlarında** ebeveyni kayıtlı olmayan her sakin **1. kuşaktır** ve kendi ocağını açar. Kasabada doğup ebeveyni kayıtlı
+olanlar ebeveyninin bir fazlası (2. kuşak) olarak etiketlenir. Böylece eski kayıttaki aile bağları kaybolmaz; kayıttaki ebeveyni artık
+kasabada olmayan sakin 1. kuşak sayılır. Bozuk kuşak, ocak, çocuk listesi ve reis yeniden kurulur ya da temizlenir.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 975; 25'i bu adımın): kütük verisi ve tutarlılığı; kuşak adları; doğumda kuşak, ocak ve çocuk listesi;
+  göçmenin ocağı; birinci derece kan bağı (ebeveyn-çocuk, kardeş, üvey kardeş; kuzen değil; ebeveyni ayrılmış kardeşler); 2. kuşak
+  ilk düğünü (Tarihçe, günlük, ikinci düğün ilki değiştirmez, Arşiv'de altın harfler); Altın Çağ kapısı; Yeni Yuva, Geniş Aile ve Yeni
+  Konut Talebi (karşılanması dahil); Ocak Devri ve ev paneli; kart; izole üreteç; kayıt sürümü 27 gidiş-dönüşü, bozuk değerler, v26 kaydı.
+- **Denetim** (`audit.mjs`): 116/116. Yeni senaryo: 2. kuşak sakin, devredilmiş reis ve Tarihçe'deki ilk 2. kuşak düğünü varken kayıt ->
+  yükleme durum kayması yok. Bekçi kuşağı, ocağı, çocuk listesini ve akraba çifti denetler.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-27, 877): `save-v27.json` bu adımın otopilotuyla 72 günlük oyundur (`--crisis-state`; 7 kasabalı,
+  23 ocak, üç 2. kuşak düğünü, Tarihçe'de "Ada & Lina"). v2-v26 kayıtlarının her birinde kütük ebeveyn kayıtlarından kurulur, 2. kuşak
+  düğünü yoktur; v27 kaydında kuşaklar, ebeveynler, ocaklar, çocuklar ve Tarihçe korunur; hiçbirinde akraba çift yoktur.
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 36`):
+  - Takılma 0, kopuk referans (akraba çift dahil) 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0.
+  - **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34** (tohum 42 kule G25 / G27 / G28). Her koşunun olay kaydı kule
+    tamamlanana kadar 25.3 ile bayt bayt aynıdır; ilk farklar önceki adımlardaki satırlardadır.
+  - Altı kasabada 36. günde 38 tane 2. kuşak sakin ve 13 tane 2. kuşak düğünü var. İlk 2. kuşak düğünleri G29, G30, G30, G29, G33,
+    G29'da oldu; tohum 7 ve 13'te kule öncesindeydi ve yalnızca Tarihçe'ye yazıldı. Altın Çağ'da 2 Yeni Yuva ve 2 Geniş Aile kuruldu;
+    konut dilekçesi 0, Ocak Devri 0.
+- **Uzun koşu** (`autopilot.mjs 42 72 --crisis-state`): kule G25 / G27 / G28, Altın Çağ G28. Üç tane 2. kuşak düğünü oldu; ilki Ada & Lina,
+  G29. Hepsi 19. aşamanın kuralıyla zaten ortak bir eve yerleşti (boş kulübe yoktu, ebeveyn evi değildi). Kütük 23 ocak ve 7 kasabalı;
+  takılma, kopuk referans ve sayfa hatası 0. Ocak Devri hedefli testlerle doğrulandı: tek bilge Deniz'in çocuğu yok.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -3040,8 +3130,8 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (950; 25.3: yeni nesil huylar, mizaç kalıtımı ve usta etkisi, yeni dilekçeler, kayıt sürümü 26; 25.2: Usta-Çırak, Çırak Kapısı, Gururlu Usta, çırak işi, mezuniyet, metin baloncukları, kayıt sürümü 25; 25.1: yaşam evreleri, yaşlanma, Kıdemli Bilge emekliliği ve çekirdek sakin kuralı, Bilge Nasihati, kuşak yaşı, evre rozeti, kayıt sürümü 24; 23. aşama: tehlike sıklığı ayarı ve doğal kriz kapıları, Su Kuyusu (yangın ihtimali ×0,2, bahçe sulaması), Gözcü Kulesi ve bekçiler, haydut baskınının üç çözümü (püskürt, haraç, hazırlıksız) ve penceresi, yangın (çıkış, kova zinciri, Acil Söndür, hasarlı ama silinmeyen yapı), Tamir Et ve ustaların onarımı, hafif yaralanma ve Şifacı, ana rastgele sayı üretecinin tüketilmemesi, kayıt sürümü 20; 22. aşama: iç vergi kademeleri ve öşür, Krallık Vergisi (uyarı, ödeme, malla ödeme, ceza), Kraliyet Fermanları ve ödülleri, Kraliyet Beratı ve Aslanlı Heykel, kötü şöhret ve göç, köyü terk etme ve çekirdek sakinler; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 26'ya; 25.3: mizaç; 25.2: çıraklık; 25.1: yaşam evreleri ve gün cinsinden yaşlar) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (975; 25.4: Aile Kütüğü, akrabalık engeli, 2. kuşak ilk düğünü, Yeni Yuva / Geniş Aile / Yeni Konut Talebi, Ocak Devri, kayıt sürümü 27; 25.3: yeni nesil huylar, mizaç kalıtımı ve usta etkisi, yeni dilekçeler, kayıt sürümü 26; 25.2: Usta-Çırak, Çırak Kapısı, Gururlu Usta, çırak işi, mezuniyet, metin baloncukları, kayıt sürümü 25; 25.1: yaşam evreleri, yaşlanma, Kıdemli Bilge emekliliği ve çekirdek sakin kuralı, Bilge Nasihati, kuşak yaşı, evre rozeti, kayıt sürümü 24; 23. aşama: tehlike sıklığı ayarı ve doğal kriz kapıları, Su Kuyusu (yangın ihtimali ×0,2, bahçe sulaması), Gözcü Kulesi ve bekçiler, haydut baskınının üç çözümü (püskürt, haraç, hazırlıksız) ve penceresi, yangın (çıkış, kova zinciri, Acil Söndür, hasarlı ama silinmeyen yapı), Tamir Et ve ustaların onarımı, hafif yaralanma ve Şifacı, ana rastgele sayı üretecinin tüketilmemesi, kayıt sürümü 20; 22. aşama: iç vergi kademeleri ve öşür, Krallık Vergisi (uyarı, ödeme, malla ödeme, ceza), Kraliyet Fermanları ve ödülleri, Kraliyet Beratı ve Aslanlı Heykel, kötü şöhret ve göç, köyü terk etme ve çekirdek sakinler; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 27'ye; 25.4: Aile Kütüğü; 25.3: mizaç; 25.2: çıraklık; 25.1: yaşam evreleri ve gün cinsinden yaşlar) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
 | `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması / Çağ Kutlaması / isyan ve yağma / tahsildar, ferman ve köyü terk eden sakin sırasında, yangın ve haydut izi sürerken kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |

@@ -71,6 +71,13 @@ export function petitionMet(state, p) {
       return Boolean(p.met) || ['low', 'exempt'].includes(state.tax?.rate);
     case 'sherbetCask':
       return Boolean(p.met) || Boolean(state.events?.festival?.active);
+    // (25.4) Yeni Konut Talebi: çift aynı çatı altında buluştu ya da kasabaya yeni bir kulübe kuruldu
+    case 'newHome': {
+      const a = state.characters.find((x) => x.id === p.characterId);
+      const b = state.characters.find((x) => x.id === base.partnerId);
+      if (a && b && a.homeId !== null && a.homeId === b.homeId) return true;
+      return state.buildings.filter((x) => x.type === 'cabin' && x.functional).length > (base.cabins ?? Infinity);
+    }
     default:
       return false;
   }
@@ -109,6 +116,8 @@ export function petitionProgress(state, p) {
       return 'Hemen karşıla (Kasaba Hazinesi\'nden esnafa destek) ya da iç vergiyi Düşük / Muaf kademesine indir';
     case 'sherbetCask':
       return 'Hemen karşıla (depodan hana 3 fıçı) ya da meydanda bir şenlik düzenle';
+    case 'newHome':
+      return 'İnşa menüsünden yeni bir kulübe kur (çift oraya taşınır)';
     default:
       return '';
   }

@@ -44,6 +44,7 @@ import { LIFE_STAGES, AGING } from '../../data/lifeStages.js';
 import { PROFESSIONS, PROUD_MASTER } from '../../data/apprenticeship.js';
 import { apprenticesOf, graduationFor, acceptsApprentice } from '../../systems/Apprenticeship.js';
 import { ORIGIN_NAMES } from '../../data/temperament.js';
+import { generationName } from '../../systems/Lineage.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -495,7 +496,7 @@ export class CharacterPanel {
     const children = childrenOf(state, character);
     const parents = character.parentIds.map((id) => state.characters.find((c) => c.id === id)).filter(Boolean);
     const daysLeft = character.isChild ? Math.max(0, Math.ceil((character.growsUpAt - state.totalMinutes) / 1440)) : null;
-    const key = [partner?.id, character.married, children.map((c) => c.id).join(','), parents.map((c) => c.id).join(','), daysLeft].join('/');
+    const key = [partner?.id, character.married, children.map((c) => c.id).join(','), parents.map((c) => c.id).join(','), daysLeft, character.generation, character.familyId, (character.parents ?? []).join(',')].join('/');
     if (key === this.lastFamily) return;
     this.lastFamily = key;
 
@@ -514,6 +515,16 @@ export class CharacterPanel {
     }
     if (children.length) rows.push(row('Çocukları', children));
     if (parents.length) rows.push(row('Ebeveynleri', parents));
+    // (25.4) Aile Kütüğü: kuşak, ocak ve köyden ayrılmış doğum ebeveynleri
+    const gone = (character.parents ?? []).filter((id) => !parents.some((p) => p.id === id)).length;
+    const fam = state.lineage?.families?.[character.familyId];
+    rows.push(
+      el('div', { className: 'family-row lineage-row' }, [
+        el('span', { className: `lineage-badge gen-${Math.min(3, character.generation ?? 1)}`, text: generationName(state, character) }),
+        ...(fam ? [el('span', { className: 'family-label', text: ` · ${fam.name}` })] : []),
+        ...(gone ? [el('span', { className: 'family-label', text: ` · ${gone} ebeveyni kasabadan ayrıldı` })] : []),
+      ])
+    );
     this.familyList.replaceChildren(...rows);
   }
 
