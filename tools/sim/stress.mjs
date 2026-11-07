@@ -108,5 +108,29 @@ console.log(
     `yaralanma ${cs((c) => c.injuries)} (şifacıda iyileşen ${cs((c) => c.treated)}) · tamir ${cs((c) => c.repairs)} · koşu sonunda hasarlı ${cs((c) => c.damagedNow)}, yanan ${cs((c) => c.burningNow)}, yaralı ${cs((c) => c.injuredNow)} · ` +
     `Su Kuyusu ${cs((c) => c.wells)}, Gözcü Kulesi ${cs((c) => c.towers)} · 3 günü aşan hasar ${cs((c) => c.longDamaged)} · en düşük güven ${results.map((r) => `${r.seed}:${r.data?.monitor.citizens?.trustMin ?? '-'}`).join(' ')}`
 );
+const lf = (f) => sum((d) => (d.monitor.life ? f(d.monitor.life) : 0));
+console.log(
+  `(25.1) yaşam evreleri (son gün): genç ${lf((l) => l.counts.youth)}, yetişkin ${lf((l) => l.counts.adult)}, Kıdemli Bilge ${lf((l) => l.counts.elder)} (emekli ${lf((l) => l.retired)}) · ` +
+    `unvanı alan bilge ${lf((l) => l.state.elders ?? 0)}, yetişkinliğe geçen genç ${lf((l) => l.state.adults ?? 0)} · nasihat ${Math.round(lf((l) => l.state.adviceMinutes ?? 0))} dk · ` +
+    `işteki emekli ${lf((l) => l.retiredWorking)} · en yaşlı ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? Math.max(...r.data.monitor.life.ages) : '-'}`).join(' ')}`
+);
+const hl = (f) => sum((d) => (d.monitor.heirloom ? f(d.monitor.heirloom) : 0));
+console.log(`(25.5) yadigâr: oluşan ${hl((h) => h.state.created)}, devredilen ${hl((h) => h.state.transfers)}, arşivde ${hl((h) => h.state.archive)} · ilk devir ${results.map((r) => `${r.seed}:${r.data?.monitor.heirloom?.first ? `G${r.data.monitor.heirloom.first.day}` : '-'}`).join(' ')}`);
+const lg = (f) => sum((d) => (d.monitor.lineage ? f(d.monitor.lineage) : 0));
+console.log(
+  `(25.4) Aile Kütüğü: 2. kuşak sakin (son gün) ${lg((l) => l.generations['2'] ?? 0)} · 2. kuşak düğünü ${lg((l) => l.state.gen2Weddings)} · ilk 2. kuşak düğünü ` +
+    `${results.map((r) => `${r.seed}:${r.data?.monitor.lineage?.firstGen2Couple ? `G${r.data.monitor.lineage.firstGen2Couple.day}` : '-'}`).join(' ')} · Yeni Yuva ${lg((l) => l.state.newHomes)}, Geniş Aile ${lg((l) => l.state.extended)}, ` +
+    `konut dilekçesi ${lg((l) => l.state.petitions)} · Ocak Devri ${lg((l) => l.state.handovers)}`
+);
+const tp = (f) => sum((d) => (d.monitor.temperament ? f(d.monitor.temperament) : 0));
+console.log(
+  `(25.3) mizaç: yeni nesil huylu sakin (son gün) ${tp((t) => ['craftsman', 'entrepreneur', 'philosopher', 'festive'].reduce((n, k) => n + (t.counts[k] ?? 0), 0))} · gelişen ${tp((t) => t.state.developed)} ` +
+    `(aile ${tp((t) => t.state.family)}, usta ${tp((t) => t.state.mentor)}, meslek ${tp((t) => t.state.craft)}, özgün ${tp((t) => t.state.self)}) · Şenlik aurası ${Math.round(tp((t) => t.state.auraMinutes))} dk`
+);
+const ap = (f) => sum((d) => (d.monitor.apprentice ? f(d.monitor.apprentice) : 0));
+console.log(
+  `(25.2) çıraklık: açık kapı ${ap((p) => p.open)} · son gün çırak ${ap((p) => p.active)} (en çok toplam ${ap((p) => p.maxActive)}) · yazılan ${ap((p) => p.state.enrolled)}, mezun ${ap((p) => p.state.graduated)} · ` +
+    `Gururlu Usta ${ap((p) => p.state.masters)} · çırak mesaisi ${Math.round(ap((p) => p.state.minutes) / 60)} sa · çırak işi ${ap((p) => p.state.crafted)} (satılan ${ap((p) => p.state.sold)}) · yetişkin çırak ${ap((p) => p.adultApprentices)}`
+);
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

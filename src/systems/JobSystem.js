@@ -232,7 +232,7 @@ export class JobSystem {
     const mine = skillLevel(c, skill).level;
     return this.world.characters.some((other) => {
       // Hasta ya da seferdeki usta beklenmez: yoksa son yuva o iyileşene kadar boş kalırdı
-      if (other === c || !other.visible || other.newcomer || other.isChild || other.illness || other.away || building.excludedWorkers.has(other.id)) return false;
+      if (other === c || !other.visible || other.newcomer || other.isChild || other.retired || other.illness || other.away || building.excludedWorkers.has(other.id)) return false;
       if (other.workplaceId !== null && other.workplaceId !== undefined && other.workplaceId !== building.id) return false; // başka yere sabitli
       if (other.task?.workBuildingId || other.task?.jobId) return false; // zaten çalışıyor
       const level = skillLevel(other, skill).level;
@@ -247,7 +247,8 @@ export class JobSystem {
    * Dönüş: { job?, building?, spot } ya da null
    */
   findWorkFor(c, origin) {
-    if (c.isChild) return null;
+    // (25.1) Emekli Kıdemli Bilge ağır işlere gitmez (çekirdek sakin kuralıyla gönüllü bilgeler çalışır)
+    if (c.isChild || c.retired) return null;
     // (13. aşama) Oyuncunun sabitlediği sakin yalnızca kendi iş yerinde çalışır (orası boştaysa dinlenir)
     if (c.workplaceId !== null && c.workplaceId !== undefined) return this.pinnedWork(c, origin);
     const candidates = [];

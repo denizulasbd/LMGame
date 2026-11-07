@@ -2,7 +2,7 @@
 //
 //   1. Olay aboneliği sızıntısı: Yükle / Yeni Harita sahneyi yeniden kurunca dinleyici sayısı sabit kalır
 //   2. Kayıt / yükleme senaryoları: festivalin ortası, tüccar pazardayken, karar penceresi açıkken, harabe onarılırken,
-//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken. Her birinde kayıt -> yükleme -> yeniden
+//      fırtına yaklaşırken / gök gürültülü fırtınada, toplanma zili çalarken, (16. aşama) sefer yoldayken macera penceresi açıkken, (19. aşama) meydanda düğün kutlaması sürerken, (20. aşama) Çağ Kutlaması sürerken, (21. aşama) isyan ve yağma baskını sürerken, (22. aşama) tahsildar yolda / ferman sürerken / sakin köyü terk ederken, (23. aşama) yangın sürerken / haydut izi beklerken / hasarlı yapı ve yaralı sakin varken, (25.1) Kıdemli Bilge emekliyken, (25.2) çırak ustasının yanındayken, (25.3) yeni nesil huylu sakinler varken, (25.4) Aile Kütüğü ve devredilmiş ocak varken, (25.5) yadigâr taşıyan sakin ve Kuşak Şöleni varken. Her birinde kayıt -> yükleme -> yeniden
 //      kayıt birebir aynıdır (durum kayması yok) ve olay yüklemeden sonra bir kez, doğru biçimde sonuçlanır
 //   3. Kış ve kıtlık krizi: odunsuz, yiyeceksiz, böğürtlensiz bir kasaba kışı çökmeden geçirir (donma, hastalık),
 //      stok gelince toparlanır; kimse takılmaz, ihtiyaçlar 0-100 arasında kalır
@@ -408,6 +408,220 @@ const PAGE_HELPERS = () => {
       }
       for (const c of s.characters) c.isInjured = false;
       s.crisis.raid = null;
+    }
+
+    // --- 2m. (25.1) Kıdemli Bilge emekliyken ve nasihat verirken, bir Genç 21. doğum gününün eşiğindeyken ---
+    {
+      const Y = 16;
+      const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
+      const sage = adults[0];
+      sage.ageInDays = 70 * Y - 1;
+      sage.age = 69;
+      const youth = adults[1];
+      youth.ageInDays = 21 * Y - 1;
+      youth.age = 20;
+      youth.lifeStage = 'youth';
+      youth.profile = youth.buildProfile();
+      const promoted = counter('lifeStage:changed');
+      scene().lifeStages.ageEveryone();
+      s.lifeStages.adviceMinutes += 5;
+      const diff = A.roundtrip();
+      const sage2 = s.characters.find((c) => c.id === sage.id);
+      const youth2 = s.characters.find((c) => c.id === youth.id);
+      check('Kıdemli Bilge emekliyken kayıt -> yükleme durum kayması yok (evre, gün cinsinden yaş, sayaçlar)', diff.length === 0 && sage2.lifeStage === 'elder' && sage2.retired && youth2.lifeStage === 'adult' && promoted.n === 2, diff.join(' | ') + ` · ${promoted.n} geçiş`);
+      const again = counter('lifeStage:changed');
+      hours(30);
+      check('yüklemeden sonra bilge yeniden kutlanmaz, emekli kalır, yaşlar gün dönümünde bir kez ilerler', again.n === 0 && sage2.retired && sage2.ageInDays === 70 * Y + 1 && s.characters.includes(sage2), `${again.n} geçiş · ${sage2.ageInDays}`);
+      check('emekli bilge işe gitmez (yükleme sonrası 30 saat)', !sage2.task?.jobId && !sage2.task?.workBuildingId);
+      promoted.off();
+      again.off();
+    }
+
+    // --- 2n. (25.2) Çırak ustasının yanında taburede otururken, Gururlu Usta etkinken ve kapı açıkken ---
+    {
+      const Y = 16;
+      sim.give({ wood: 300, stone: 200, food: 300 });
+      const hut = sim.place('lumberHut');
+      const people = s.characters.filter((c) => !c.isChild && !c.role && !c.away && c.lifeStage === 'adult' && !c.emigrating).sort((a, b) => a.id - b.id);
+      const master = people[0];
+      const pupil = people[people.length - 1];
+      pupil.ageInDays = 19 * Y;
+      pupil.age = 19;
+      pupil.agedDays = 0;
+      pupil.lifeStage = 'youth';
+      pupil.profile = pupil.buildProfile();
+      pupil.workplaceId = null;
+      master.workplaceId = hut.id;
+      master.skills.woodcutting = 1600;
+      game.events.emit('ui:toggleApprenticeDoor', { buildingId: hut.id });
+      game.events.emit('ui:enrollApprentice', { characterId: pupil.id, buildingId: hut.id });
+      pupil.apprenticeship.progress = 48;
+      while (s.time.hour < 9 || s.time.hour >= 14) hours(1);
+      let guard = 0;
+      while (pupil.task?.activity !== 'apprentice' && guard++ < 12) hours(0.5);
+      const sitting = pupil.task?.activity === 'apprentice';
+      const diff = A.roundtrip();
+      const p2 = s.characters.find((c) => c.id === pupil.id);
+      const m2 = s.characters.find((c) => c.id === master.id);
+      check('çırak ustasının yanındayken kayıt -> yükleme durum kayması yok (çıraklık, kapı, Gururlu Usta, sayaçlar)', diff.length === 0 && p2.apprenticeship?.masterId === m2.id && s.apprenticeship.open.includes(hut.id), diff.join(' | ') + ` · tabure ${sitting}`);
+      const p0 = p2.apprenticeship.progress;
+      hours(30);
+      check('yüklemeden sonra çıraklık sürer (ilerleme artar, veri geçerli) ve kimse takılmaz', p2.apprenticeship && p2.apprenticeship.progress > p0 && p2.apprenticeship.progress <= 100, `%${p0.toFixed(1)} -> %${p2.apprenticeship?.progress.toFixed(1)}`);
+      p2.apprenticeship = null;
+      s.apprenticeship.open = [];
+    }
+
+    // --- 2o. (25.3) Yeni nesil huylu sakinler (Şenlik Neşesi dans ederken, Bilge Düşünür), mizacın kaynağı ve sayaçlar ---
+    {
+      const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((a, b) => a.id - b.id);
+      const [f, p] = adults;
+      const before = [f.quirk, p.quirk];
+      f.quirk = 'festive';
+      f.quirkOrigin = { kind: 'family', fromId: p.id, fromName: p.name, day: s.time.day };
+      p.quirk = 'philosopher';
+      p.quirkOrigin = { kind: 'self', fromId: null, fromName: null, day: s.time.day };
+      s.temperament.developed += 2;
+      s.temperament.family += 1;
+      s.temperament.self += 1;
+      hours(2);
+      const diff = A.roundtrip();
+      const f2 = s.characters.find((c) => c.id === f.id);
+      check('yeni nesil huylu sakinler varken kayıt -> yükleme durum kayması yok (huy, kaynağı, mizaç sayaçları)', diff.length === 0 && f2.quirk === 'festive' && f2.quirkOrigin?.kind === 'family', diff.join(' | '));
+      hours(12);
+      check('yüklemeden sonra yeni nesil huylar korunur, yeniden dağıtılmaz', s.characters.find((c) => c.id === f.id).quirk === 'festive' && s.characters.find((c) => c.id === p.id).quirk === 'philosopher');
+      const f3 = s.characters.find((c) => c.id === f.id);
+      const p3 = s.characters.find((c) => c.id === p.id);
+      [f3.quirk, p3.quirk] = before;
+      f3.quirkOrigin = p3.quirkOrigin = null;
+    }
+
+    // --- 2p. (25.4) Aile Kütüğü: 2. kuşak sakin, devredilmiş ocak reisi ve Tarihçe'deki ilk 2. kuşak düğünü varken ---
+    {
+      const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.homeId !== null).sort((a, b) => a.id - b.id);
+      const [p1, kid] = adults;
+      const keep = { g: kid.generation, parents: kid.parents, children: p1.children };
+      kid.generation = p1.generation + 1;
+      kid.parents = [p1.id];
+      if (!p1.children.includes(kid.id)) p1.children = [...p1.children, kid.id];
+      s.lineage.heads[p1.homeId] = kid.id;
+      s.chronicle.firstGen2Couple = { a: kid.name, b: p1.name, ids: [kid.id, p1.id], day: s.time.day, hour: 10, minute: 0 };
+      hours(1);
+      const diff = A.roundtrip();
+      const k2 = s.characters.find((c) => c.id === kid.id);
+      check('Aile Kütüğü varken kayıt -> yükleme durum kayması yok (kuşak, doğum ebeveynleri, ocak, çocuklar, reis, Tarihçe)', diff.length === 0 && k2.generation === s.characters.find((c) => c.id === p1.id).generation + 1 && k2.parents.includes(p1.id) && s.lineage.heads[p1.homeId] === kid.id && s.chronicle.firstGen2Couple?.a === kid.name, diff.join(' | '));
+      const k3 = s.characters.find((c) => c.id === kid.id);
+      const p3 = s.characters.find((c) => c.id === p1.id);
+      k3.generation = keep.g;
+      k3.parents = keep.parents;
+      p3.children = keep.children;
+      delete s.lineage.heads[p1.homeId];
+      s.chronicle.firstGen2Couple = null;
+    }
+
+    // --- 2r. (25.5) Yadigâr taşıyan sakin, çırak geçmişi, arşiv, Tarihçe'deki ilk devir ve süren Kuşak Şöleni varken ---
+    {
+      const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((a, b) => a.id - b.id);
+      const [h, m] = adults;
+      const keepInv = h.inventory;
+      h.inventory = [...(h.inventory ?? []).slice(0, 2), { kind: 'heirloomCompass', qty: 1, name: 'Eski Seyyah Pusulası', heirloom: { ownerId: m.id, ownerName: m.name, story: `${m.name} Usta'nın 40 yıllık emektar pusulası. Kuşaktan kuşağa aktarılır.`, since: s.time.day, chain: [m.name, h.name] } }];
+      const keepM = m.mentees;
+      m.mentees = [{ id: h.id, progress: 88 }];
+      s.heirloom.transfers += 1;
+      s.heirloom.archive.push({ kind: 'heirloomJournal', name: 'Bilge Günlüğü', story: 'x', day: s.time.day });
+      s.heirloom.feast = { x: 100, y: 100, startedAt: s.totalMinutes, until: s.totalMinutes + 60 };
+      s.chronicle.firstHeirloom = { elder: m.name, heir: h.name, item: 'Eski Seyyah Pusulası', ids: [m.id, h.id], day: s.time.day, hour: 18, minute: 0 };
+      const diff = A.roundtrip();
+      const h2 = s.characters.find((c) => c.id === h.id);
+      const slot = (h2.inventory ?? []).find((x) => x.kind === 'heirloomCompass');
+      check('yadigâr varken kayıt -> yükleme durum kayması yok (hikâye, zincir, çırak geçmişi, arşiv, şölen, Tarihçe)', diff.length === 0 && slot?.heirloom.chain.join() === `${m.name},${h.name}` && s.heirloom.feast && s.chronicle.firstHeirloom?.heir === h.name, diff.join(' | '));
+      hours(12);
+      check('yüklemeden sonra yadigâr çantada kalır (satılmaz, yenmez, öşre gitmez)', (s.characters.find((c) => c.id === h.id).inventory ?? []).some((x) => x.kind === 'heirloomCompass'));
+      const h3 = s.characters.find((c) => c.id === h.id);
+      h3.inventory = (h3.inventory ?? []).filter((x) => x.kind !== 'heirloomCompass');
+      s.characters.find((c) => c.id === m.id).mentees = keepM ?? [];
+      s.heirloom.archive = [];
+      s.heirloom.feast = null;
+      s.chronicle.firstHeirloom = null;
+      void keepInv;
+    }
+
+    // --- 2s. (26.1) Mevsimlik panayırın şenlik saatinde (18:00 - 22:00), Tarihçe'deki ilk panayırla ---
+    {
+      const t = s.time;
+      const keepT = { day: t.day, hour: t.hour, minute: t.minute };
+      const keepGA = s.goldenAge.since;
+      const keepFair = s.chronicle.firstFair;
+      const keepStat = s.stats.fairs;
+      if (!s.buildings.some((b) => b.type === 'fountain' && b.functional)) sim.place('fountain', { instant: true });
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      s.events.festival.active = false;
+      s.seasonFestival.stage = null;
+      s.chronicle.firstFair = null; // bu senaryonun kendi ilk panayırı
+      Object.assign(t, { day: 4 * Math.ceil((t.day + 1) / 4), hour: 5, minute: 58 });
+      sim.step(10);
+      while (t.hour < 19) sim.step(30);
+      A.roundtrip(); // gün atlamasının sabah özeti (StatsSystem) yükleme anında bir kez oluşur; ölçüm bundan sonra
+      const live = s.currentFestival;
+      const tBefore = `${t.day} ${t.hour}:${t.minute}`;
+      const diff = A.roundtrip();
+      check('panayırın şenlik saatinde kayıt -> yükleme durum kayması yok (currentFestival, şenlik kuralları, Tarihçe)', live?.phase === 'party' && s.currentFestival?.phase === 'party' && s.currentFestival.type === live.type && s.events.festival.active && diff.length === 0, `${JSON.stringify(live)} ${tBefore} -> ${t.day} ${t.hour}:${t.minute} ${diff.join(' | ')}`);
+      hours(5);
+      check('yüklemeden sonra panayır 22:00\'de kapanır: currentFestival null, şenlik bitti, ilk panayır Tarihçe\'de', s.currentFestival === null && !s.events.festival.active && s.chronicle.firstFair?.type === live?.type, `${s.time.hour}:00 ${JSON.stringify(s.currentFestival)}`);
+      s.goldenAge.since = keepGA;
+      s.chronicle.firstFair = keepFair;
+      s.stats.fairs = keepStat;
+      void keepT;
+    }
+
+    // --- 2t. (26.2) Büyük Ziyafet Sofrası kuruluyken (şenlik saatinde, ikramlar verilmişken) ---
+    {
+      const t = s.time;
+      const keepGA = s.goldenAge.since;
+      const keepStat = [s.stats.feasts, s.stats.feastServings];
+      if (!s.buildings.some((b) => b.type === 'fountain' && b.functional)) sim.place('fountain', { instant: true });
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      s.events.festival.active = false;
+      s.seasonFestival.stage = null;
+      s.currentFeast = null;
+      s.currentFestival = null;
+      s.pantry.credit = 0;
+      Object.assign(s.resources, { food: 400, bread: 30, sherbet: 4, cloth: 2 });
+      Object.assign(t, { day: 4 * Math.ceil((t.day + 1) / 4), hour: 5, minute: 58 });
+      sim.step(10);
+      while (t.hour < 19) sim.step(30);
+      A.roundtrip();
+      const live = JSON.stringify(s.currentFeast);
+      const diff = A.roundtrip();
+      check('sofra kuruluyken kayıt -> yükleme durum kayması yok (currentFeast, ikram sayacı, bonuslar)', s.currentFeast?.tier === 'rich' && s.currentFeast.served > 0 && JSON.stringify(s.currentFeast) === live && diff.length === 0, `${live} ${diff.join(' | ')}`);
+      const food0 = s.resources.food;
+      hours(5);
+      check('yüklemeden sonra sofra 22:00\'de toplanır, yenmeyen erzak kilere döner, besin kişi başı 3\'ün üstünde', s.currentFeast === null && s.resources.food >= food0 && s.stats.feasts === (keepStat[0] ?? 0) + 1 && Math.floor(s.resources.food + s.resources.bread * 2.5) >= s.characters.length * 3, `${s.resources.food} ${food0}`);
+      s.goldenAge.since = keepGA;
+      s.stats.feasts = keepStat[0];
+      s.stats.feastServings = keepStat[1];
+    }
+
+    // --- 2u. (26.3) Gezgin konuk haritadayken (masal anlatırken, dinlenirken) ---
+    {
+      const t = s.time;
+      const keepGA = s.goldenAge.since;
+      const keepBook = JSON.stringify(s.guestBook);
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      s.activeGuest = null;
+      sim.scene().world.guests = [];
+      s.guestBook.nextDay = t.day + 1;
+      Object.assign(t, { day: t.day + 1, hour: 8, minute: 58 });
+      sim.step(10);
+      while (t.hour < 11) sim.step(30);
+      A.roundtrip();
+      const live = JSON.stringify(s.activeGuest);
+      const pop = s.characters.length;
+      const diff = A.roundtrip();
+      check('gezgin konuk haritadayken kayıt -> yükleme durum kayması yok (activeGuest, konuk defteri); konuk nüfusa sayılmaz', s.activeGuest !== null && JSON.stringify(s.activeGuest) === live && sim.scene().world.guests.length === 1 && s.characters.length === pop && !s.characters.some((c) => c.isGuest) && diff.length === 0, `${live} ${diff.join(' | ')}`);
+      hours(60);
+      check('yüklemeden sonra konuk süresini doldurup ayrılır (activeGuest null, world.guests boş), sakin listesine hiç karışmaz', s.activeGuest === null && sim.scene().world.guests.length === 0 && !s.characters.some((c) => c.isGuest), JSON.stringify(s.activeGuest));
+      s.goldenAge.since = keepGA;
+      s.guestBook = JSON.parse(keepBook);
     }
 
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---

@@ -25,6 +25,7 @@ import { addMemory } from './MemorySystem.js';
 import { clamp } from '../utils/math.js';
 import { genitive } from '../utils/turkish.js';
 import { storageLimit } from './Granary.js';
+import { CRAFT_TYPES, innForCask } from './Petitions.js';
 
 const OUTDOOR_TRADES = ['woodcutting', 'masonry', 'mining'];
 const HEARD_BUFF = 'heard';
@@ -141,7 +142,16 @@ export class PetitionSystem {
     const outdoor = OUTDOOR_TRADES.includes(skill);
     if ((outdoor || season === 'autumn' || season === 'winter') && this.stockTarget()) out.push(['stock', outdoor ? 4 : 2]);
     if (skill && c.equipment.tool !== 'sturdyTool' && has('workshop')) out.push(['tool', outdoor ? 4 : 2]);
-    if (s.buildings.some((b) => (b.type === 'fountain' || b.type === 'campfire') && b.functional)) out.push(['gathering', quirk === 'musician' ? 5 : 1]);
+    if (s.buildings.some((b) => (b.type === 'fountain' || b.type === 'campfire') && b.functional)) out.push(['gathering', quirk === 'musician' || quirk === 'festive' ? 5 : 1]);
+    // (25.3) Yeni nesil huylar (yalnızca o huydaki sakinler; öteki sakinlerin seçenekleri ve zarları değişmez)
+    if (quirk === 'philosopher') {
+      if (!s.buildings.some((b) => BUILDINGS[b.type].academy)) out.push(['academy', 5]);
+      else if (!s.research.active && researchLeft(s)) out.push(['research', 4]);
+      if (isGoldenAge(s) && (s.goldenAge.books ?? 0) < GOLDEN_AGE.maxBooks) out.push(['books', 5]);
+    }
+    if (quirk === 'craftsman' && s.buildings.some((b) => CRAFT_TYPES.includes(b.type) && b.functional)) out.push(['craftTools', 5]);
+    if (quirk === 'entrepreneur' && !['low', 'exempt'].includes(s.tax?.rate)) out.push(['marketFees', 5]);
+    if (quirk === 'festive' && innForCask(s)) out.push(['sherbetCask', 5]);
     return out;
   }
 
@@ -183,6 +193,7 @@ export class PetitionSystem {
       baseline.active = s.research.active?.id ?? null;
     }
     if (kind === 'books') baseline.books = s.goldenAge?.books ?? 0;
+    if (kind === 'craftTools') baseline.upgraded = s.buildings.filter((b) => CRAFT_TYPES.includes(b.type) && b.upgraded).length;
     const p = {
       id: pt.nextId++,
       kind,
@@ -260,6 +271,13 @@ export class PetitionSystem {
       }
     } else if (p.kind === 'gathering') {
       this.events.emit('ui:rallyBell');
+    } else if (p.kind === 'craftTools' || p.kind === 'marketFees' || p.kind === 'sherbetCask') {
+      // (25.3) bedel depodan / hazineden düşer; Fazladan Şerbet'te fıçılar hana taşınır
+      const inn = p.kind === 'sherbetCask' ? innForCask(this.state) : null;
+      if (p.kind === 'sherbetCask' && !inn) return fail('Fıçıya yer olan bir han yok');
+      if (!this.economy.spend(status.cost)) return fail('Yetersiz kaynak');
+      if (inn) inn.sherbet = Math.min(12, (inn.sherbet ?? 0) + status.cost.sherbet);
+      p.met = true;
     }
     this.checkAll();
     return { ok: !this.find(id) };

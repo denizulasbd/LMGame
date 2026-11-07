@@ -53,7 +53,13 @@ export function sanitizeInventory(list) {
       if (qty > room) out.push({ kind: slot.kind, qty: Math.min(def.stack, qty - room) });
       continue;
     }
-    out.push({ kind: slot.kind, qty: Math.min(def.stack, qty), ...(typeof slot.name === 'string' ? { name: slot.name.slice(0, 32) } : {}) });
+    out.push({
+      kind: slot.kind,
+      qty: Math.min(def.stack, qty),
+      ...(typeof slot.name === 'string' ? { name: slot.name.slice(0, 32) } : {}),
+      // (25.5) yadigârın hikâyesi ve devir zinciri
+      ...(def.heirloom ? { heirloom: sanitizeHeirloomMeta(slot.heirloom) } : {}),
+    });
   }
   return out;
 }
@@ -99,7 +105,25 @@ export function addItem(c, kind, qty = 1, name = null) {
 }
 
 /** Çantadan eşya çıkarır (en son konulandan). Gerçekten çıkan miktarı döndürür. */
+/** (25.5) Yadigâr bilgisi: { ownerId, ownerName, story, since, chain: [ad, ...] }. */
+export function sanitizeHeirloomMeta(m) {
+  const o = m && typeof m === 'object' ? m : {};
+  return {
+    ownerId: Number.isFinite(o.ownerId) ? o.ownerId : null,
+    ownerName: typeof o.ownerName === 'string' ? o.ownerName : null,
+    story: typeof o.story === 'string' ? o.story.slice(0, 200) : 'Kuşaktan kuşağa aktarılan bir aile yadigârı.',
+    since: Number.isFinite(o.since) ? o.since : 1,
+    chain: (Array.isArray(o.chain) ? o.chain : []).filter((n) => typeof n === 'string').slice(-8),
+  };
+}
+
+/** (25.5) Çantadaki yadigâr yuvası (yoksa null). */
+export function heirloomSlot(c) {
+  return (c?.inventory ?? []).find((s) => ITEMS[s.kind]?.heirloom) ?? null;
+}
+
 export function takeItem(c, kind, qty = 1) {
+  if (ITEMS[kind]?.locked) return 0; // (25.5) yadigâr satılmaz, feda edilmez, yok edilmez
   const inv = c.inventory ?? [];
   let left = qty;
   for (let i = inv.length - 1; i >= 0 && left > 0; i--) {

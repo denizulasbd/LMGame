@@ -1246,6 +1246,25 @@ Object.assign(ICONS, {
   repair: ['.KKKKKKK.', 'KqqqqrRRK', '.KKKwKKK.', '...KwK..o', '...KwK.o.', '...KwKo..', '...KXK.o.', '...KKK..o', '.........'],
 });
 
+// (25.3) Yeni nesil huyların rozetleri: Zanaatkâr Ruhu (çekiç ve örs), Girişimci Kanı (sikkeli kese), Bilge Düşünür (baykuş),
+// Şenlik Neşesi (köpüklü kadeh ve konfeti)
+Object.assign(ICONS, {
+  quirkCraft: ['.KKKK....', '.KqqqKK..', '.KKKKwK..', '....KwK..', 'KKKKKKwK.', 'KqqqqqKK.', '.KKqqKK..', '..KrrrK..', '.KKKKKKK.'],
+  quirkTrade: ['...KKK...', '..KPYPK..', '...KKK...', '.KKwwwKK.', 'KwXXXXXwK', 'KXXKPKXXK', 'KXXPYPXXK', '.KXXKXXK.', '..KKKKK..'],
+  quirkSage: ['.K.....K.', '.KK...KK.', 'KwwKKKwwK', 'KuKuwuKuK', 'KwuwwwuwK', '.KwwPwwK.', '.KXwwwXK.', '..KXXXK..', '..PK.KP..'],
+  quirkFestive: ['p..P..i..', '..o..c...', '.KKKKKK..', '.KyyyyK.p', '.KOOOOK..', '..KOOK.P.', '...KK....', '...KK....', '..KKKK...'],
+});
+
+// (25.5) Aile yadigârları: altın çerçeveli, eski ve değerli görünümlü
+Object.assign(ICONS, {
+  heirloomHammer: ['PKKKKP...', 'KqqqqKK..', 'KKKKKwK..', 'P...KwK..', '....KwK..', '....KwK..', '....KXK..', '...KYYK..', 'P..KKKK.P'],
+  heirloomShuttle: ['P.......P', '.KKKKKKK.', 'KXEEEEEXK', 'KwKpppKwK', 'KXEEEEEXK', '.KKKKKKK.', '...KpK...', '..KpK....', 'P.KK....P'],
+  heirloomCompass: ['P.KKKKK.P', '.KYPPPYK.', 'KYPuoPPYK', 'KPPKoPPPK', 'KPPPKPPPK', 'KPPPbKPPK', 'KYPPPbPYK', '.KYPPPYK.', 'P.KKKKK.P'],
+  heirloomYeast: ['P.KKKKK.P', '..KxxxK..', '.KKKKKKK.', 'KaWWWWWaK', 'KaSSsSSaK', 'KasSSsSaK', 'KaSSSSSaK', '.KaaaaaK.', 'P.KKKKK.P'],
+  heirloomTrowel: ['P......KP', '......KwK', '.....KwK.', '..KKKwK..', '.KqqqKK..', 'KqqqqqK..', 'KrqqqqK..', '.KrrrK...', 'P.KKK...P'],
+  heirloomJournal: ['P.......P', '.KKKKKKK.', 'KoPooooPK', 'KoPoYYoPK', 'KoPoYYoPK', 'KoPooooPK', 'KoPooooPK', '.KKKKKKK.', 'P.......P'],
+});
+
 /** Dünyada (canvas) çizilecek simge: iş işaretleri, kaynak simgeleri. */
 export function getIconSprite(name) {
   return getSprite(`ui:icon:${name}`, ICONS[name]);
@@ -1518,6 +1537,13 @@ export function getBackpackSprite(view) {
     if (view === 'front') return BACKPACK_FRONT;
     return view === 'left' ? BACKPACK_SIDE.map((r) => [...r].reverse().join('')) : BACKPACK_SIDE;
   });
+}
+
+// (25.2) Çırağın taburesi (8x4): ustasının yanında oturduğu küçük ahşap tabure
+const STOOL = ['KKKKKKKK', 'KEEXXEEK', '.Kx..xK.', '.K....K.'];
+
+export function getStoolSprite() {
+  return getSprite('ui:stool', () => STOOL);
 }
 
 // Şenlikte havada süzülen müzik notası (5x6); renk palet harfi olarak verilir

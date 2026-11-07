@@ -34,6 +34,8 @@
 // rezervler korunduğu sürece (en az 10 kumaş, 5 fıçı şerbet, 30 yün; ekmek / erzak satışından sonra kişi başı en az 12 besin)
 // ihracat sözleşmelerini tamamlar; hazinede bol altın varken (vergi ayrıldıktan sonra 400+) odun 60, taş 50, demir 20'nin altına
 // inince hammadde paketi ithal eder. Ziyaretleri, sözleşmeleri, ithalatı ve pazar çarpanlarını raporlar.
+// (25.1) Yaşam evrelerini raporlar: evre sayıları, emekli bilgeler, yaş aralığı, unvanı alan bilgeler, nasihat dakikası ve
+// emekliyken işte görülen bilge (bekçi: evre / yaş sayacı tutarlılığı ve çekirdek sakin güvencesi kopuk referans sayılır).
 //
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet]
 //                                         [--crisis huzurlu|dengeli|cetin] [--no-safety] [--crisis-state]
@@ -44,6 +46,7 @@
 //   --crisis-state : (23. aşama) kayıttan hemen önce bir yangın, bir hasarlı yapı, bir yaralı ve bekleyen bir haydut baskını oluşturur
 //               (save-v20.json fikstürü bu bayrakla üretilir: kriz alanlarının hepsi kayda girer)
 //   --no-agri : (24. aşama) Ürün Silosu kurulmaz ve bahçeler hep Buğday ekili kalır (mahsul bozulması yine işler)
+//   --no-apprentice : (25.2) Çırak Kapısı hiç açılmaz (çıraklık katmanının kapalıyken oyunu hiç değiştirmediğini göstermek için)
 //   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
 //               oyunun ana üretecini tüketmediğini göstermek için: --crisis huzurlu ile 22. aşamanın koşusunu bire bir verir)
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
@@ -63,8 +66,9 @@ await installMonitor(page);
 await page.evaluate((o) => {
   window.__noSafety = o.noSafety;
   window.__noAgri = o.noAgri; // (24. aşama)
+  window.__noApprentice = o.noApprentice; // (25.2)
   if (o.crisis) window.game.state.crisis.difficulty = o.crisis; // doğrudan durumdan (bildirim / ses tüketmesin: huzurlu + --no-safety koşusu 22. aşamayla bire bir aynı olmalı)
-}, { noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), crisis: options.crisis ?? null });
+}, { noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null });
 
 await page.evaluate((passive) => {
   const game = window.game;
@@ -561,6 +565,13 @@ await page.evaluate((passive) => {
         }
       }
     }
+    // (25.2) Usta-Çırak: Ulu Saat Kulesi tamamlandıktan sonra (kule günleri değişmesin) her zanaat yapısının Çırak Kapısı'nı açar;
+    // boştaki gençler ertesi sabah 07:00'de oraya çırak yazılır (gıda ve çekirdek iş gücü güvende değilse çıraklar işe koşar)
+    if (!window.__noApprentice && wonder?.wonderComplete && s.apprenticeship) {
+      for (const b of s.buildings) {
+        if (b.functional && window.__appr.professionFor(b.type) && !s.apprenticeship.open.includes(b.id)) game.events.emit('ui:toggleApprenticeDoor', { buildingId: b.id });
+      }
+    }
     // (20. aşama) Altın Çağ: prestij peyzajı (bir Mermer Çeşme, iki Altın Çağ Feneri) ve tüccarın nadir malları
     if (wonder?.wonderComplete && s.goldenAge?.since) {
       const count = (t) => s.buildings.filter((b) => b.type === t).length;
@@ -697,6 +708,7 @@ await page.evaluate(async () => {
   window.__crisis = await import('/src/systems/Crisis.js');
   window.__granary = await import('/src/systems/Granary.js');
   window.__tradePost = await import('/src/systems/TradePost.js');
+  window.__appr = await import('/src/systems/Apprenticeship.js'); // (25.2)
   window.__foodSupply = (await import('/src/systems/TownStatus.js')).foodSupply;
 });
 
@@ -908,6 +920,45 @@ console.log(
         : '') +
       (mon.trade ? ` · (24.3) Ticaret İskelesi ${mon.trade.posts} · ziyaret ${mon.trade.visits} · sözleşme ${mon.trade.completed} (+${mon.trade.goldEarned} altın; ${JSON.stringify(mon.trade.exported)}) · ithalat ${mon.trade.imports} paket (-${mon.trade.goldSpent} altın; ${JSON.stringify(mon.trade.imported)}) · rezerv için bekletilen ${(report.stats.trade ?? {}).held ?? 0} · pazar ${JSON.stringify(mon.trade.market)}` : '') +
       (r ? ` · (24.2) Dokuma Tezgâhı ${r.looms}, Şerbethane ${r.breweries} · dokunan kumaş ${r.clothWoven}, yapılan fıçı ${r.sherbetMade} (stok ${r.cloth} / ${r.sherbet}) · handa içilen şerbet ${r.served}, handaki fıçı ${r.innCasks} · testi ${r.jugs} (içilen ${r.jugsDrunk}) · Dayanıklı Giysi ${r.garments} (giyen ${r.dressed}) · refah katkısı +${r.welfare} · açken çalışan lüks işçi ${r.hungryLuxury}` : '')
+  );
+}
+if (mon.heirloom) {
+  const H = mon.heirloom;
+  console.log(
+    `(25.5) yadigâr: oluşan ${H.state.created}, devredilen ${H.state.transfers}, arşivde ${H.state.archive} · ilk devir ${H.first ? `${H.first.elder} -> ${H.first.heir} (${H.first.item}, G${H.first.day})` : '-'} · taşınan ${H.carried.join(', ') || '-'}`
+  );
+}
+if (mon.lineage) {
+  const L = mon.lineage;
+  console.log(
+    `(25.4) Aile Kütüğü: kuşaklar ${JSON.stringify(L.generations)} · ocak ${L.families} · evli 2. kuşak ${L.gen2Married} · 2. kuşak düğünü ${L.state.gen2Weddings} ` +
+      `(ilki ${L.firstGen2Couple ? `${L.firstGen2Couple.a} & ${L.firstGen2Couple.b}, G${L.firstGen2Couple.day}` : '-'}) · Yeni Yuva ${L.state.newHomes}, Geniş Aile ${L.state.extended}, ` +
+      `konut dilekçesi ${L.state.petitions} · Ocak Devri ${L.state.handovers}`
+  );
+}
+if (mon.temperament) {
+  const T = mon.temperament;
+  const gen = ['craftsman', 'entrepreneur', 'philosopher', 'festive'].map((k) => `${k} ${T.counts[k] ?? 0}`).join(', ');
+  console.log(
+    `(25.3) mizaç: yeni nesil huylar ${gen} (en çok ${T.maxGeneration}) · gelişen ${T.state.developed} (aile ${T.state.family}, usta ${T.state.mentor}, meslek ${T.state.craft}, özgün ${T.state.self}) · ` +
+      `Şenlik aurası ${Math.round(T.state.auraMinutes)} dk · yeni dilekçeler ${JSON.stringify(T.petitions)}`
+  );
+}
+if (mon.apprentice) {
+  const P = mon.apprentice;
+  console.log(
+    `(25.2) çıraklık: açık kapı ${P.open} · çırak ${P.active} (en çok ${P.maxActive}; ${P.list.join(', ') || '-'}) · yazılan ${P.state.enrolled}, mezun ${P.state.graduated} · ` +
+      `Gururlu Usta ${P.state.masters} · çırak mesaisi ${Math.round(P.state.minutes / 60)} sa · çırak işi ${P.state.crafted} (satılan ${P.state.sold}, +${P.state.coins} altın) · ` +
+      `ustasız çırak ${P.orphanSamples} örnek · yetişkin çırak ${P.adultApprentices}`
+  );
+}
+if (mon.life) {
+  const L = mon.life;
+  const ages = L.ages.length ? `${Math.min(...L.ages)}-${Math.max(...L.ages)}` : '-';
+  console.log(
+    `(25.1) yaşam evreleri: çocuk ${L.counts.child}, genç ${L.counts.youth}, yetişkin ${L.counts.adult}, Kıdemli Bilge ${L.counts.elder} (emekli ${L.retired}) · ` +
+      `en çok bilge ${L.maxElders}, en çok genç ${L.maxYouth} · yaş aralığı ${ages} · unvanı alan bilge ${L.state.elders ?? 0}, yetişkinliğe geçen genç ${L.state.adults ?? 0} · ` +
+      `nasihat ${Math.round(L.state.adviceMinutes ?? 0)} dk · işteki emekli ${L.retiredWorking} · emeklilik gecikmesi ${L.retireLag}`
   );
 }
 console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);

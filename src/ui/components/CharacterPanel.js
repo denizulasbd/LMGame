@@ -12,6 +12,11 @@
 // (21. aşama) "Kişisel Kese & Çanta": sakinin altını ve çantasındaki eşyalar (4 yuva, Sırt Çantası'yla 6); isyancıysa
 // kırmızı "İsyancı" etiketi. Açık bir dilekçesi varsa kartın üstünde parşömen kutusu: isteği, ne yapılmalı, kalan süre ve
 // Kabul Et / Hemen Karşıla / Reddet düğmeleri ('ui:acceptPetition', 'ui:grantPetition', 'ui:rejectPetition').
+// (25.1) Adın altında yaşam evresi rozeti (Çocuk / Genç / Yetişkin / Kıdemli Bilge) ve yaşı; bilge emekliyse "Emekli",
+// çekirdek sakin kuralıyla çalışıyorsa "Gönüllü usta" yazar. Rozetin ipucu evrenin açıklaması ve bir sonraki doğum günüdür.
+// (25.2) "Çıraklık": çırağın ustası, meslek dalı, ilerleme çubuğu (%X Çıraklık), çırak işleri ve mezuniyet beklentisi
+// ('ui:releaseApprentice'); çırak olmayan Genç için "Çıraklığa Yaz" ('ui:enrollApprentice'); ustanın kartında "Çırağı: ..."
+// ve Gururlu Usta etiketi.
 import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../../art/sprites/index.js';
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
@@ -35,6 +40,12 @@ import { RESOURCES } from '../../data/resources.js';
 import { inventoryCapacity, petitionOf, isRioter, raidOf } from '../../systems/Citizens.js';
 import { petitionProgress, grantStatus, formatRemaining } from '../../systems/Petitions.js';
 import { INJURY } from '../../data/crisis.js';
+import { LIFE_STAGES, AGING } from '../../data/lifeStages.js';
+import { PROFESSIONS, PROUD_MASTER } from '../../data/apprenticeship.js';
+import { apprenticesOf, graduationFor, acceptsApprentice } from '../../systems/Apprenticeship.js';
+import { ORIGIN_NAMES } from '../../data/temperament.js';
+import { generationName } from '../../systems/Lineage.js';
+import { heirloomSlot } from '../../systems/Citizens.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -85,6 +96,7 @@ export class CharacterPanel {
       if (e.key === 'Escape') this.editName(false, false);
     });
     this.nameInput.addEventListener('blur', () => this.editName(false, true));
+    this.stageBadge = el('div', { className: 'life-stage-row' });
     this.meta = el('div', { className: 'character-meta' });
     this.traits = el('div', { className: 'character-traits' });
     // (15. aşama) Zanaat rozeti: ana meslek ve kademesi (Çırak bronz, Kalfa gümüş, Usta altın) ve giydiği kıyafet
@@ -117,6 +129,7 @@ export class CharacterPanel {
     this.conditions = el('div', { className: 'character-conditions' });
     this.socialList = el('div', { className: 'social-life' });
     this.purseBox = el('div', { className: 'purse-box' });
+    this.apprenticeBox = el('div', { className: 'apprentice-box' });
     this.petitionBox = el('div', { className: 'petition-box', hidden: true });
     this.memoryList = el('div', { className: 'memory-list' });
     this.memoryToggle = this.button('Tümünü Göster', 'Sakinin bütün anılarını göster / gizle', () => {
@@ -138,7 +151,7 @@ export class CharacterPanel {
       closeButton,
       el('div', { className: 'character-header' }, [
         el('div', { className: 'character-portrait-frame' }, [this.portrait]),
-        el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.meta, this.craftBadge, this.traits]),
+        el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.stageBadge, this.meta, this.craftBadge, this.traits]),
       ]),
       el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
       this.petitionBox,
@@ -146,6 +159,7 @@ export class CharacterPanel {
       section('Aile', this.familyList),
       section('İlişkiler', this.relationsList),
       section('Sosyal Hayat', this.socialList),
+      (this.apprenticeSection = section('Çıraklık', this.apprenticeBox)),
       section('Ekipman', this.equipmentList),
       section('Kişisel Kese & Çanta', this.purseBox),
       section('Meslekler', this.skillsList),
@@ -195,7 +209,7 @@ export class CharacterPanel {
 
   /** Kimlik bilgisi değişince yeniden kurulur (karakter, ev, çocukluk, aile durumu). */
   identityKey(character) {
-    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}`;
+    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}:${character.lifeStage}:${character.age}:${character.retired}`;
   }
 
   /** Değişmedikçe bir kez kurulan kısımlar: ad, yaş, ev, özellik etiketleri. */
@@ -210,8 +224,8 @@ export class CharacterPanel {
       .map((o) => o.name);
     const where = home ? `${homeIndex + 1} numaralı ${home.upgraded ? 'taş ev' : 'kulübe'}` : 'Evsiz';
     const withWhom = roommates.length ? ` · ${roommates.join(', ')} ile` : ' · tek başına';
-    const age = character.isChild ? 'Çocuk' : `${character.age} yaşında`;
-    this.meta.textContent = `${age} · ${where}${home ? withWhom : ''}`;
+    this.renderLifeStage(character);
+    this.meta.textContent = `${where}${home ? withWhom : ''}`;
 
     const quirk = QUIRKS[character.quirk];
     this.traits.replaceChildren(
@@ -220,9 +234,24 @@ export class CharacterPanel {
         const title = `${TRAITS[key]?.description ?? ''}${opposite ? ` · Zıddı: ${TRAITS[opposite].name} (atışabilirler)` : ''}`;
         return el('span', { className: 'trait-chip', text: TRAITS[key]?.name ?? key, title });
       }),
-      ...(quirk ? [el('span', { className: 'trait-chip quirk-chip', title: `Huyu: ${quirk.description}` }, [el('img', { src: getAnyIconURL(quirk.icon), alt: '' }), quirk.name])] : [])
+      ...(quirk ? [el('span', { className: `trait-chip quirk-chip${quirk.color ? ` quirk-${quirk.color}` : ''}`, title: `Huyu: ${quirk.description}${quirk.generation ? ' (yeni nesil huy)' : ''}` }, [el('img', { src: getAnyIconURL(quirk.icon), alt: '' }), quirk.name])] : [])
     );
     this.resetCaches();
+  }
+
+  /** (25.1) Yaşam evresi rozeti ve yaş: "Kıdemli Bilge · 70 yaşında · Emekli". */
+  renderLifeStage(character) {
+    const key = LIFE_STAGES[character.lifeStage] ? character.lifeStage : character.isChild ? 'child' : 'adult';
+    const stage = LIFE_STAGES[key];
+    const daysToBirthday = AGING.daysPerYear - (character.ageInDays % AGING.daysPerYear);
+    const note =
+      key === 'elder' ? (character.retired ? 'Emekli · ağır işlerden muaf' : 'Gönüllü usta · kasabada çalışan el az') : key === 'youth' ? 'Çevik ve hevesli' : null;
+    const title = `${stage.description} Bir sonraki doğum gününe ${daysToBirthday} gün var.`;
+    this.stageBadge.replaceChildren(
+      el('span', { className: `life-stage-badge is-${key}`, title }, [el('img', { src: getAnyIconURL(stage.icon), alt: '' }), stage.name]),
+      el('span', { className: 'life-stage-age', text: `${character.age} yaşında` }),
+      ...(note ? [el('span', { className: 'life-stage-note', text: note })] : [])
+    );
   }
 
   /** null: yeni sakinin listeleri boş olsa bile (anahtar '') bir kez çizilsin, öncekinden kalmasın. */
@@ -238,6 +267,7 @@ export class CharacterPanel {
     this.lastMemories = null;
     this.lastSocial = null;
     this.lastPurse = null;
+    this.lastApprentice = null;
     this.lastPetition = null;
   }
 
@@ -279,7 +309,54 @@ export class CharacterPanel {
     this.renderMemories(character, game.state);
     this.renderSocial(character, game.state);
     this.renderPurse(character, game.state);
+    this.renderApprenticeship(character, game.state);
     this.renderPetition(character, game.state);
+  }
+
+  /** (25.2) Çıraklık: çırağın ustası, dalı ve ilerlemesi; ustanın çırakları; Genç için "Çıraklığa Yaz". */
+  renderApprenticeship(character, state) {
+    const a = character.apprenticeship;
+    const pupils = apprenticesOf(state, character);
+    const youth = character.lifeStage === 'youth' && !character.role;
+    const proud = (character.buffs.proudMaster ?? -1) > state.totalMinutes;
+    const canEnroll = youth && !a && state.buildings.some((b) => acceptsApprentice(state, b));
+    const key = a
+      ? `a:${a.masterId}:${a.buildingId}:${Math.floor(a.progress)}:${a.crafted}`
+      : `${youth}:${canEnroll}:${pupils.map((p) => `${p.id}-${Math.floor(p.apprenticeship.progress)}`).join(',')}:${proud}`;
+    if (key === this.lastApprentice) return;
+    this.lastApprentice = key;
+    this.apprenticeSection.hidden = !a && !youth && pupils.length === 0;
+    const rows = [];
+    const row = (label, value) => el('div', { className: 'social-row' }, [el('span', { className: 'social-label', text: label }), el('span', { className: 'social-value' }, value)]);
+    if (a) {
+      const prof = PROFESSIONS[a.profession];
+      const master = state.characters.find((c) => c.id === a.masterId);
+      const building = state.buildings.find((b) => b.id === a.buildingId);
+      const pct = Math.floor(a.progress);
+      const grad = graduationFor(a.progress);
+      rows.push(row('Ustası', [master ? this.personChip(master) : el('span', { className: 'social-muted', text: 'Usta bekleniyor' })]));
+      rows.push(row('Meslek dalı', [el('span', { text: `${prof.name} · ${building?.name ?? ''}` })]));
+      rows.push(
+        el('div', { className: 'apprentice-progress', title: `Ustası tezgâhtayken mesai saatlerinde ilerler. %${PROUD_MASTER.workBoostFrom}'den sonra çırak işi çıkarır ve ustanın verimine katkı sağlar.` }, [
+          el('span', { className: 'apprentice-bar' }, [el('span', { className: 'apprentice-fill', style: `width: ${pct}%` })]),
+          el('span', { className: 'apprentice-pct', text: `%${pct} Çıraklık` }),
+        ])
+      );
+      rows.push(row('Yetişkinlikte', [el('span', { text: grad.title ? `${grad.title} ${prof.master}` : `${prof.master} deneyimiyle (%${pct})` })]));
+      if (a.crafted) rows.push(row('Çırak işi', [el('span', { text: `${a.crafted} parça` })]));
+      const leave = this.button('Çıraklıktan Ayır', 'Genç her zamanki işlerine döner (ilerlemesi silinir)', () => this.events.emit('ui:releaseApprentice', { characterId: character.id }));
+      rows.push(el('div', { className: 'apprentice-actions' }, [leave]));
+    } else if (youth) {
+      rows.push(el('div', { className: 'social-row' }, [el('span', { className: 'social-value social-muted', text: 'Henüz bir ustanın yanında değil' })]));
+      const join = this.button('Çıraklığa Yaz', canEnroll ? 'En deneyimli ustanın atölyesine çırak olur' : 'Çırak alabilecek bir zanaat yapısı yok (ya da hepsi dolu)', () => this.events.emit('ui:enrollApprentice', { characterId: character.id }));
+      join.disabled = !canEnroll;
+      rows.push(el('div', { className: 'apprentice-actions' }, [join]));
+    }
+    if (pupils.length) {
+      rows.push(row(pupils.length > 1 ? 'Çırakları' : 'Çırağı', pupils.map((p) => this.personChip(p))));
+      if (proud) rows.push(el('div', { className: 'social-row' }, [el('span', { className: 'social-value', text: 'Gururlu Usta: keyfi yavaş düşüyor' })]));
+    }
+    this.apprenticeBox.replaceChildren(...rows);
   }
 
   /** (21. aşama) Kişisel Kese & Çanta: altını ve çantasındaki eşyalar (boş yuvalar soluk). */
@@ -289,7 +366,7 @@ export class CharacterPanel {
     const raid = rioter ? raidOf(state, character) : null;
     const inv = character.inventory ?? [];
     const leaving = Boolean(character.emigrating); // (22. aşama) köyü terk ediyor
-    const key = `${character.id}:${character.coins}:${capacity}:${rioter}:${leaving}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}`).join(',')}`;
+    const key = `${character.id}:${character.coins}:${capacity}:${rioter}:${leaving}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}${s.heirloom ? s.heirloom.chain.join('>') : ''}`).join(',')}`;
     if (key === this.lastPurse) return;
     this.lastPurse = key;
     const coins = el('div', { className: 'purse-coins', title: 'Kişisel kese: yevmiyeler, usta eseri ödülleri ve alışveriş (kasaba hazinesinden ayrıdır)' }, [
@@ -307,9 +384,11 @@ export class CharacterPanel {
       const item = inv[i];
       const def = item ? ITEMS[item.kind] : null;
       const name = item ? item.name ?? def.name : 'Boş yuva';
-      const hint = def ? `${name}${item.qty > 1 ? ` ×${item.qty}` : ''}${def.hunger ? ` · tokluk +${def.hunger}` : ''}${def.heal ? ' · hastalığı çabuk geçirir' : ''}${def.fun ? ' · bakınca keyif verir' : ''}${def.resource && !def.hunger ? ` · ${RESOURCES[def.resource].name}` : ''}` : 'Boş yuva';
+      // (25.5) Aile yadigârı: hikâyesi ve devir zinciri; satılmaz, feda edilmez
+      const heir = item?.heirloom;
+      const hint = heir ? `${name} · Aile yadigârı (satılmaz, feda edilmez)\n${heir.story}\nKuşaktan kuşağa: ${heir.chain.join(' → ')}` : def ? `${name}${item.qty > 1 ? ` ×${item.qty}` : ''}${def.hunger ? ` · tokluk +${def.hunger}` : ''}${def.heal ? ' · hastalığı çabuk geçirir' : ''}${def.fun ? ' · bakınca keyif verir' : ''}${def.resource && !def.hunger ? ` · ${RESOURCES[def.resource].name}` : ''}` : 'Boş yuva';
       slots.push(
-        el('span', { className: `bag-slot${item ? '' : ' is-empty'}`, title: hint }, [
+        el('span', { className: `bag-slot${item ? '' : ' is-empty'}${heir ? ' is-heirloom' : ''}`, title: hint }, [
           ...(item ? [el('img', { src: getAnyIconURL(def.icon), alt: '' })] : []),
           ...(item && item.qty > 1 ? [el('span', { className: 'bag-qty', text: String(item.qty) })] : []),
         ])
@@ -371,7 +450,7 @@ export class CharacterPanel {
     const homes = state.buildings.filter((b) => b.type === 'cabin');
     const homeIndex = homes.findIndex((b) => b.id === character.homeId);
     const home = homes[homeIndex] ?? null;
-    const key = [character.id, character.quirk, partner?.id, character.married, partner?.homeId, character.homeId, character.relocating, partner?.relocating, homeIndex, home?.upgraded, news?.id, news?.from].join('/');
+    const key = [character.id, character.quirk, character.quirkOrigin?.kind, partner?.id, character.married, partner?.homeId, character.homeId, character.relocating, partner?.relocating, homeIndex, home?.upgraded, news?.id, news?.from].join('/');
     if (key === this.lastSocial) return;
     this.lastSocial = key;
 
@@ -382,7 +461,13 @@ export class CharacterPanel {
         el('div', { className: 'social-text' }, [el('span', { className: 'social-label', text: label }), ...body]),
       ]);
     const rows = [];
-    if (quirk) rows.push(row(quirk.icon, 'Huyu', [el('span', { className: 'social-value', text: quirk.name })], quirk.description));
+    if (quirk) rows.push(row(quirk.icon, 'Huyu', [el('span', { className: `social-value${quirk.color ? ` quirk-text-${quirk.color}` : ''}`, text: quirk.name })], quirk.description));
+    // (25.3) Huyun kaynağı: Aile mirası (kimden), Usta etkisi, Mesleğin doğası, Özgün gelişim
+    const origin = character.quirkOrigin;
+    if (quirk && origin) {
+      const from = origin.fromName ? ` · ${origin.kind === 'craft' ? `${origin.fromName} çıraklığı` : origin.fromName}` : '';
+      rows.push(row(quirk.icon, 'Mizacı', [el('span', { className: 'social-value', text: `${ORIGIN_NAMES[origin.kind]}${from}${origin.day ? ` (Gün ${origin.day})` : ''}` })], 'Altın Çağ kuşağı: evre geçişinde mizacını ailesinden, ustasından ya da kendinden aldı'));
+    }
 
     // Ev: eşiyle paylaşılan ev ya da taşınma
     let homeText;
@@ -414,7 +499,7 @@ export class CharacterPanel {
     const children = childrenOf(state, character);
     const parents = character.parentIds.map((id) => state.characters.find((c) => c.id === id)).filter(Boolean);
     const daysLeft = character.isChild ? Math.max(0, Math.ceil((character.growsUpAt - state.totalMinutes) / 1440)) : null;
-    const key = [partner?.id, character.married, children.map((c) => c.id).join(','), parents.map((c) => c.id).join(','), daysLeft].join('/');
+    const key = [partner?.id, character.married, children.map((c) => c.id).join(','), parents.map((c) => c.id).join(','), daysLeft, character.generation, character.familyId, (character.parents ?? []).join(',')].join('/');
     if (key === this.lastFamily) return;
     this.lastFamily = key;
 
@@ -433,6 +518,16 @@ export class CharacterPanel {
     }
     if (children.length) rows.push(row('Çocukları', children));
     if (parents.length) rows.push(row('Ebeveynleri', parents));
+    // (25.4) Aile Kütüğü: kuşak, ocak ve köyden ayrılmış doğum ebeveynleri
+    const gone = (character.parents ?? []).filter((id) => !parents.some((p) => p.id === id)).length;
+    const fam = state.lineage?.families?.[character.familyId];
+    rows.push(
+      el('div', { className: 'family-row lineage-row' }, [
+        el('span', { className: `lineage-badge gen-${Math.min(3, character.generation ?? 1)}`, text: generationName(state, character) }),
+        ...(fam ? [el('span', { className: 'family-label', text: ` · ${fam.name}` })] : []),
+        ...(gone ? [el('span', { className: 'family-label', text: ` · ${gone} ebeveyni kasabadan ayrıldı` })] : []),
+      ])
+    );
     this.familyList.replaceChildren(...rows);
   }
 
@@ -589,6 +684,10 @@ export class CharacterPanel {
     }
     if ((character.buffs.warmMeal ?? -1) > now) tags.push({ text: 'Sıcak yemekle tok', icon: 'food', cls: 'is-warm' });
     if ((character.buffs.happyHome ?? -1) > now) tags.push({ text: 'Mutlu Yuva', icon: 'love', cls: 'is-love' });
+    if ((character.buffs.proudMaster ?? -1) > now) tags.push({ text: 'Gururlu Usta', icon: 'star', cls: 'is-love' }); // (25.2)
+    // (25.5) Ata Mirası Gururu: yadigâr taşıyan yeni nesil
+    const heirSlot = character.lifeStage !== 'elder' ? heirloomSlot(character) : null;
+    if (heirSlot) tags.push({ text: `Ata Mirası Gururu: ${heirSlot.name}`, icon: ITEMS[heirSlot.kind].icon, cls: 'is-love' });
     // 11. aşama: hastalık, Dinçlik, keşif seferi
     if (character.illness) {
       const hours = Math.ceil(character.illness.remaining / 60);

@@ -8,6 +8,11 @@
 // 21. aşama: kişisel kese (coins) ve çanta (inventory: [{ kind, qty, name? }]; ekipman yuvalarından bağımsız,
 // systems/Citizens.js). Eski kayıtlarda kese yoksa başlangıç harçlığı verilir.
 // 23. aşama: hafif yaralanma (isInjured, injuryTimer: kalan oyun dakikası; yürüme ve çalışma %20 yavaş, ölüm yoktur; CrisisSystem).
+// 25.1: yaşam evresi (lifeStage: 'child' | 'youth' | 'adult' | 'elder') ve gün cinsinden yaş (ageInDays; gün dönümünde ilerler,
+// age = ageInDays / yıl). Kıdemli Bilge ölmez, emekli olur (retired: kaydedilmez, LifeStageSystem her saat yeniden hesaplar).
+// 25.2: çıraklık (apprenticeship: { masterId, profession, buildingId, progress 0-100, since, crafted }; ApprenticeshipSystem)
+// ve konuşma baloncuğu (speech: { text, at, duration }; kaydedilmez, ikon balonundan ayrı bir katmandır).
+// 25.4: Aile Kütüğü (generation, parents: doğum ebeveynleri, familyId: ocak, children; LineageSystem).
 // 22. aşama: köyü terk etmeye karar verdiyse yola çıktığı an ve çıkış karosu (emigrating: { since, exit }; DesertionSystem).
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
@@ -15,6 +20,9 @@ import { NEED_KEYS } from '../data/characters.js';
 import { CHILDREN } from '../data/family.js';
 import { buildTraitProfile } from '../ai/TraitProfile.js';
 import { startingCoins, sanitizeInventory } from '../systems/Citizens.js';
+import { stageFor, daysForAge, ageFromDays, isLifeStage } from '../systems/LifeStages.js';
+import { sanitizeApprenticeship } from '../systems/Apprenticeship.js';
+import { AGING } from '../data/lifeStages.js';
 import { getCharacterSprite, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT, getFlowerCrownSprite } from '../art/sprites/index.js';
 
 const CELEBRATION_SECONDS = 2.6; // (15. aşama) usta işi eser kutlamasının süresi
@@ -23,9 +31,12 @@ import {
   getHeldToolSprite,
   getCarrySprite,
   getBackpackSprite,
+  getStoolSprite,
   BUBBLE_WIDTH,
   BUBBLE_HEIGHT,
 } from '../art/ui/index.js';
+import { sanitizeOrigin } from '../systems/Temperament.js';
+import { sanitizeMentees } from '../systems/Heirloom.js';
 
 const HALF_WIDTH = CHARACTER_WIDTH / 2;
 const BUBBLE_POP_TIME = 0.15;
@@ -91,6 +102,16 @@ export class Character extends Entity {
     emigrating = null,
     isInjured = false,
     injuryTimer = 0,
+    lifeStage = null,
+    ageInDays = null,
+    agedDays = 0,
+    apprenticeship = null,
+    quirkOrigin = null,
+    generation = null,
+    parents = null,
+    familyId = null,
+    children = null,
+    mentees = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -139,10 +160,31 @@ export class Character extends Entity {
     // 23. aşama: hafif yaralanma (kayda girer); injuryTimer bitince kendiliğinden iyileşir
     this.injuryTimer = Number.isFinite(injuryTimer) ? Math.max(0, injuryTimer) : 0;
     this.isInjured = Boolean(isInjured) && this.injuryTimer > 0;
+    // 25.1: yaşam evresi ve gün cinsinden yaş. Yeni sakinde yaştan (18-20 'youth', 70+ 'elder'), eski kayıtlarda (v2-v23,
+    // fromJSON) yetişkinler 'adult' başlar; gün cinsinden yaş yaştan ve kimlikten türetilir. Kazanılmış evre geri dönmez
+    this.ageInDays = Number.isFinite(ageInDays) && ageInDays >= 0 ? Math.floor(ageInDays) : daysForAge(Number.isFinite(this.age) ? this.age : 20, this.id);
+    this.age = ageFromDays(this.ageInDays);
+    this.lifeStage = stageFor({ isChild: this.isChild, age: this.age, lifeStage: isLifeStage(lifeStage) ? lifeStage : null });
+    // Kasabaya katıldığından / büyüdüğünden beri yaşlandığı gün: gönül ilişkisindeki yaş farkı katılım anındaki "kuşak yaşına"
+    // göre ölçülür (LifeStages.ageGap), böylece doğum günlerinin yıla dağılması eşleşmeleri günden güne değiştirmez
+    this.agedDays = Number.isFinite(agedDays) && agedDays >= 0 ? Math.min(Math.floor(agedDays), this.ageInDays) : 0;
+    // 25.2: çıraklık (yalnızca Genç'te anlamlıdır; kayda girer)
+    this.apprenticeship = this.lifeStage === 'youth' ? sanitizeApprenticeship(apprenticeship) : null;
+    this.speech = null; // usta / çırak konuşma baloncuğu (kaydedilmez)
+    // 25.3: huyun kaynağı (Aile mirası / Usta etkisi / Mesleğin doğası / Özgün gelişim; kayda girer)
+    this.quirkOrigin = sanitizeOrigin(quirkOrigin);
+    // 25.4: Aile Kütüğü (kayda girer; eksikse LineageSystem yüklemede tamamlar): kuşak, doğum ebeveynleri, ocak, çocuklar
+    this.generation = Number.isInteger(generation) && generation >= 1 ? generation : null;
+    this.parents = Array.isArray(parents) ? parents.filter((id) => Number.isFinite(id) && id !== this.id) : [...this.parentIds];
+    this.familyId = Number.isFinite(familyId) ? familyId : null;
+    this.children = Array.isArray(children) ? children.filter((id) => Number.isFinite(id)) : [];
+    // 25.5: ustanın yetiştirdiği çıraklar [{ id, progress }] (yadigâr mirasçısı için; kayda girer)
+    this.mentees = sanitizeMentees(mentees);
+    this.retired = false; // emekli bilge mi (kaydedilmez; LifeStageSystem çekirdek sakin kuralıyla hesaplar)
     this.waterBucket = false; // yangında kovası dolu mu (kaydedilmez)
     this.recall = null;
     this.flowerCrown = false;
-    this.profile = buildTraitProfile(traits, { child: this.isChild });
+    this.profile = this.buildProfile();
 
     // Anlık durum (kaydedilmez, yapay zekâ yeniden kurar)
     this.facing = 'down';
@@ -175,14 +217,51 @@ export class Character extends Entity {
     return this.growsUpAt !== null;
   }
 
-  /** Sprite görünüşü: çocuk / palto / sırt çantası (önbellekli nesne; anahtar değişince yenilenir). */
+  /** (25.1) Kıdemli Bilge mi? */
+  get isElder() {
+    return this.lifeStage === 'elder';
+  }
+
+  /** (25.1) Genç mi? */
+  get isYouth() {
+    return this.lifeStage === 'youth';
+  }
+
+  /** Evreye göre davranış profili (çocuk / genç / yetişkin / bilge). */
+  buildProfile() {
+    return buildTraitProfile(this.traits, { child: this.isChild, youth: this.lifeStage === 'youth', elder: this.lifeStage === 'elder' });
+  }
+
+  /**
+   * (25.1) Bir gün yaşlanır (gün dönümünde LifeStageSystem çağırır). Evre değiştiyse { from, to }, değilse null.
+   * Çocuğun büyümesi FamilySystem'in işidir (growsUpAt); çocukken yalnızca yaş sayacı ilerler.
+   */
+  ageOneDay() {
+    this.ageInDays += 1;
+    this.agedDays += 1;
+    this.age = ageFromDays(this.ageInDays);
+    return this.refreshLifeStage();
+  }
+
+  /** Evreyi yaşa göre günceller; değiştiyse profili yeniler. Dönüş { from, to } ya da null. */
+  refreshLifeStage() {
+    const from = this.lifeStage;
+    const to = stageFor(this);
+    if (to === from) return null;
+    this.lifeStage = to;
+    this.profile = this.buildProfile();
+    return { from, to };
+  }
+
+  /** Sprite görünüşü: çocuk / palto / sırt çantası / (25.1) evre (önbellekli nesne; anahtar değişince yenilenir). */
   get look() {
     const child = this.isChild;
     const coat = !child && this.coatVisible;
     const bag = !child && this.equipment.bag === 'backpack';
     const outfit = child ? null : this.outfit; // (15. aşama) meslek kıyafeti (CraftsmanshipSystem yazar)
+    const stage = this.lifeStage === 'youth' || this.lifeStage === 'elder' ? this.lifeStage : null;
     const cached = this.lookCache;
-    if (!cached || cached.child !== child || cached.coat !== coat || cached.bag !== bag || cached.outfit !== outfit) this.lookCache = { child, coat, bag, outfit };
+    if (!cached || cached.child !== child || cached.coat !== coat || cached.bag !== bag || cached.outfit !== outfit || cached.stage !== stage) this.lookCache = { child, coat, bag, outfit, stage };
     return this.lookCache;
   }
 
@@ -194,7 +273,12 @@ export class Character extends Entity {
   growUp() {
     this.growsUpAt = null;
     this.age = CHILDREN.adultAge;
-    this.profile = buildTraitProfile(this.traits);
+    // (25.1) büyüyen çocuk Genç evresine geçer (18 yaşının doğum gününden başlar)
+    this.ageInDays = Math.max(this.ageInDays, this.age * AGING.daysPerYear);
+    this.agedDays = 0; // yetişkin hayatının kuşak yaşı 18
+    this.age = ageFromDays(this.ageInDays);
+    this.lifeStage = stageFor(this);
+    this.profile = this.buildProfile();
   }
 
   get tileX() {
@@ -280,6 +364,8 @@ export class Character extends Entity {
     const sprite = this.currentSprite();
     const x = Math.round(this.x);
     const y = Math.round(this.y);
+    // (25.2) Çırak ustasının yanında küçük bir taburede oturur
+    if (this.task?.activity === 'apprentice' && this.pose === 'sit') queue.addImage(this.sortY - 0.01, getStoolSprite(), x - 4, y - 1); // ayakları taburenin önünde, bacakları altından görünür
     queue.addImage(this.sortY, sprite, x - HALF_WIDTH, y - sprite.height + 1);
     // (14. aşama) Çiçek Şenliği: saçta küçük bir çiçek
     if (this.flowerCrown) {
@@ -487,11 +573,22 @@ export class Character extends Entity {
       emigrating: this.emigrating,
       isInjured: this.isInjured,
       injuryTimer: this.isInjured ? Math.round(this.injuryTimer) : 0,
+      lifeStage: this.lifeStage,
+      ageInDays: this.ageInDays,
+      agedDays: this.agedDays,
+      apprenticeship: this.apprenticeship,
+      quirkOrigin: this.quirkOrigin,
+      generation: this.generation,
+      parents: this.parents,
+      familyId: this.familyId,
+      children: this.children,
+      mentees: this.mentees,
     };
   }
 
   static fromJSON(data) {
-    const c = new Character(data);
+    // (25.1) Evresi olmayan eski kayıtlar (v2-v23) ve bozuk evreler: yetişkinler 'adult' başlar (70+ 'elder'); yaş korunur
+    const c = new Character(isLifeStage(data.lifeStage) ? data : { ...data, lifeStage: data.growsUpAt === null || data.growsUpAt === undefined ? 'adult' : null });
     if (data.facing) c.facing = data.facing;
     c.carrying = data.carrying ?? null;
     c.newcomer = Boolean(data.newcomer);

@@ -59,8 +59,46 @@ export const QUIRKS = {
     description: 'Süs ağaçlarının gölgesinde ya da nehir kenarında manzarayı izleyip dinlenir.',
     leisure: { viewpoint: 3 },
   },
+  // (25.3) Yeni nesil huylar: kuruluşta ve göçle dağıtılmaz; Altın Çağ'da yetişen kuşak mizaç gelişimiyle edinir
+  // (data/temperament.js, systems/TemperamentSystem.js). color: kartta rozetin rengi
+  craftsman: {
+    name: 'Zanaatkâr Ruhu',
+    icon: 'quirkCraft',
+    color: 'craft',
+    description: "Atölyede, tezgâhta, kulübede çalışırken şevke gelir (%8 hızlı, daha az yorulur); Pazar'dan malzeme bakar, çırak işlerini çantasında saklar, atölye için dilekçe verir.",
+    leisure: { monument: 1.2, bench: 0.8 },
+    generation: true,
+  },
+  entrepreneur: {
+    name: 'Girişimci Kanı',
+    icon: 'quirkTrade',
+    color: 'trade',
+    description: "Pazar Yeri'ne sık uğrar ama kesesindeki altını biriktirir (pazarlık payıyla her yevmiyeye +1); ihracat sözleşmeleri onu sevindirir, adil vergi ve hafif pazar harcı için dilekçe verir.",
+    leisure: { inn: 0.8, fountain: 1 },
+    generation: true,
+  },
+  philosopher: {
+    name: 'Bilge Düşünür',
+    icon: 'quirkSage',
+    color: 'sage',
+    description: "Boş zamanında Bilgelik Evi'nde, anıtın ve çardağın başında düşünür; Kıdemli Bilgelerin nasihatinden iki kat moral alır, antik kitap ve araştırma için dilekçe verir.",
+    leisure: { readLibrary: 2, gazebo: 1.5, monument: 1.5, readBench: 1 },
+    generation: true,
+  },
+  festive: {
+    name: 'Şenlik Neşesi',
+    icon: 'quirkFestive',
+    color: 'festive',
+    description: 'Akşamları hana koşar, çantasında Şerbet Testisi eksik olmaz, meydanda dans eder; yanındakilerin neşesini yükseltir, şenlik ve fazladan şerbet fıçısı için dilekçe verir.',
+    leisure: { inn: 3, fountain: 2, campfire: 1.5 },
+    generation: true,
+  },
 };
-export const QUIRK_KEYS = Object.keys(QUIRKS);
+// Kuruluşta, göçte ve doğumda dağıtılan huylar: 19. aşamanın dördü (bu liste değişirse dağıtım ve tohumlar değişir)
+export const QUIRK_KEYS = Object.keys(QUIRKS).filter((k) => !QUIRKS[k].generation);
+// (25.3) Yeni nesil huylar ve hepsi
+export const GENERATION_QUIRK_KEYS = Object.keys(QUIRKS).filter((k) => QUIRKS[k].generation);
+export const ALL_QUIRK_KEYS = Object.keys(QUIRKS);
 
 // Huyların sayıları
 export const QUIRK_RULES = {

@@ -64,9 +64,31 @@ export function petitionMet(state, p) {
     }
     case 'gathering':
       return Boolean(p.met) || isRallyActive(state) || Boolean(state.events?.festival?.active);
+    // (25.3) yeni nesil huyların dilekçeleri: hemen karşılanır ya da kasabadaki işlerle (yükseltme, vergi, şenlik)
+    case 'craftTools':
+      return Boolean(p.met) || state.buildings.filter((b) => CRAFT_TYPES.includes(b.type) && b.upgraded).length > (base.upgraded ?? 0);
+    case 'marketFees':
+      return Boolean(p.met) || ['low', 'exempt'].includes(state.tax?.rate);
+    case 'sherbetCask':
+      return Boolean(p.met) || Boolean(state.events?.festival?.active);
+    // (25.4) Yeni Konut Talebi: çift aynı çatı altında buluştu ya da kasabaya yeni bir kulübe kuruldu
+    case 'newHome': {
+      const a = state.characters.find((x) => x.id === p.characterId);
+      const b = state.characters.find((x) => x.id === base.partnerId);
+      if (a && b && a.homeId !== null && a.homeId === b.homeId) return true;
+      return state.buildings.filter((x) => x.type === 'cabin' && x.functional).length > (base.cabins ?? Infinity);
+    }
     default:
       return false;
   }
+}
+
+// (25.3) Atölye Malzemesi dilekçesinin "yükseltilmiş zanaat yapısı" sayımı
+export const CRAFT_TYPES = ['workshop', 'lumberHut', 'healerHut', 'mill', 'loom', 'brewery'];
+
+/** (25.3) Hanların toplam fıçısı ve en az biri boşsa ilk han (Fazladan Şerbet için). */
+export function innForCask(state) {
+  return state.buildings.find((b) => b.type === 'inn' && b.functional && (b.sherbet ?? 0) <= 9) ?? null;
 }
 
 /** İlerleme / ne yapılmalı metni (kartta ve panelde). */
@@ -88,6 +110,14 @@ export function petitionProgress(state, p) {
       return "Zanaat Atölyesi'nde Sağlam Alet üret ya da hemen ver";
     case 'gathering':
       return 'Meydanda Toplanma Zili çal ya da bir şenlik düzenle';
+    case 'craftTools':
+      return 'Hemen karşıla (demir ve odun) ya da bir zanaat yapısını Seviye 2\'ye yükselt';
+    case 'marketFees':
+      return 'Hemen karşıla (Kasaba Hazinesi\'nden esnafa destek) ya da iç vergiyi Düşük / Muaf kademesine indir';
+    case 'sherbetCask':
+      return 'Hemen karşıla (depodan hana 3 fıçı) ya da meydanda bir şenlik düzenle';
+    case 'newHome':
+      return 'İnşa menüsünden yeni bir kulübe kur (çift oraya taşınır)';
     default:
       return '';
   }
@@ -104,6 +134,7 @@ export function grantStatus(state, p, toolStock = 0) {
     return { ...out, cost: {}, ok: st.ok, reason: st.reason };
   }
   if (p.kind === 'tool' && toolStock > 0) return { ...out, cost: {}, reason: 'Depodaki Sağlam Alet verilir' };
+  if (p.kind === 'sherbetCask' && !innForCask(state)) return { ...out, ok: false, reason: 'Fıçıya yer olan bir han yok' };
   if ((p.kind === 'sapling' || p.kind === 'street') && !homeOf(state, p)) return { ...out, ok: false, reason: 'Sakinin evi yok' };
   const missing = Object.entries(cost).filter(([r, v]) => (state.resources[r] ?? 0) < v).map(([r]) => RESOURCES[r].name);
   if (missing.length) return { ...out, ok: false, reason: `Yetersiz: ${missing.join(', ')}` };

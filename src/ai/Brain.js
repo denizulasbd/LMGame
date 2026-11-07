@@ -50,6 +50,8 @@ import { partnerOf, canRomance } from '../systems/RelationshipSystem.js';
 import { genitive } from '../utils/turkish.js';
 import { SHOP, SNACK, REVOLT } from '../data/citizens.js';
 import { foodItemOf, countItem, roomFor, isRioter, raidOf } from '../systems/Citizens.js';
+import { ELDER } from '../data/lifeStages.js';
+import { TEMPERAMENT } from '../data/temperament.js';
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
 const PLAYGROUND_TYPES = ['fountain', 'campfire', 'inn', 'monument'];
@@ -87,8 +89,9 @@ export class Brain {
    *   relationships: import('../systems/RelationshipSystem.js').RelationshipSystem,
    *   crafting: import('../systems/CraftingSystem.js').CraftingSystem }} services
    */
-  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null }) {
+  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null, apprenticeship = null }) {
     this.crisis = crisis; // (23. aşama) yangın ve yaralanma kararları
+    this.apprenticeship = apprenticeship; // (25.2) çıraklık (kendi üreteci)
 
     this.citizenRng = citizens?.rng ?? rng; // (21. aşama) vatandaşlık kararları kendi üretecinden
     this.health = health;
@@ -188,7 +191,8 @@ export class Brain {
     let onBreak = false;
     if (isWorkHours(hour) && !c.isChild) {
       if (this.rng.next() >= profile.work.breakChance) {
-        const plan = this.planWork(c);
+        // (25.2) Çırak: ustası tezgâhtaysa onun yanına (mola zarı her zamanki gibi atıldı; çırak planı kendi üretecini kullanır)
+        const plan = (c.apprenticeship && this.apprenticeship?.planFor(c)) || this.planWork(c);
         if (plan) return plan;
       } else {
         onBreak = true;
@@ -323,7 +327,8 @@ export class Brain {
     if (c.lastShopAt !== undefined && c.lastShopAt !== null && now - c.lastShopAt < SHOP.cooldownMinutes) return null;
     const markets = this.world.getCompleted('market');
     if (markets.length === 0 || (roomFor(c, 'fruit') <= 0 && roomFor(c, 'souvenir') <= 0)) return null;
-    if (this.citizenRng.next() >= SHOP.chance) return null;
+    // (25.3) Girişimci ve Zanaatkâr Pazar'a daha sık uğrar (zar her sakinde aynı atılır)
+    if (this.citizenRng.next() >= SHOP.chance * (TEMPERAMENT.shopBoost[c.quirk] ?? 1)) return null;
     const origin = this.originTile(c);
     for (const market of markets) {
       const doors = this.world.getSpots(market);
@@ -821,6 +826,12 @@ export class Brain {
       weights.shade = ((weights.bench ?? 1) + (weights.flowers ?? 1)) * (winter ? 0.15 : 0.5);
     }
     this.addQuirkLeisure(c, hour, weights);
+    // (25.1) Kıdemli Bilge: çardak ve gölge (yukarıda yeniden hesaplanır) ile Bilgelik Evi'nde kitap okumak daha cazip
+    if (c.profile.elder) {
+      if (weights.gazebo) weights.gazebo *= ELDER.leisure.gazebo;
+      if (weights.shade) weights.shade *= ELDER.leisure.shade;
+      if (this.world.getCompleted('academy').length > 0) weights.readLibrary = (weights.readLibrary ?? 0) + ELDER.readLibraryBase * ELDER.leisure.readLibrary;
+    }
 
     const options = Object.entries(weights).filter(([name, w]) => w > 0 && ACTIVITIES[name]);
     while (options.length > 0) {

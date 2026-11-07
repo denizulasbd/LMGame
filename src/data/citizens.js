@@ -36,6 +36,20 @@ export const ITEMS = {
   // (24.2) Pazar Yeri'nin terzisinden Dayanıklı Giysi (kışın soğuğa karşı korur) ve handan Şerbet Testisi (keyif)
   garment: { name: 'Dayanıklı Giysi', icon: 'cloth', stack: 1 },
   sherbetJug: { name: 'Şerbet Testisi', icon: 'sherbet', stack: 2, fun: 15 },
+  // (25.5) Aile yadigârları: satılmaz, feda edilmez, yok edilmez (heirloom, locked); her biri tek ve adlı, hikâyesiyle (data/heirloom.js)
+  heirloomHammer: { name: 'Ata Yadigârı Çekiç', icon: 'heirloomHammer', stack: 1, heirloom: true, locked: true },
+  heirloomShuttle: { name: 'Ata Yadigârı Mekik', icon: 'heirloomShuttle', stack: 1, heirloom: true, locked: true },
+  heirloomCompass: { name: 'Eski Seyyah Pusulası', icon: 'heirloomCompass', stack: 1, heirloom: true, locked: true },
+  heirloomYeast: { name: 'Kadim Maya Kavanozu', icon: 'heirloomYeast', stack: 1, heirloom: true, locked: true },
+  heirloomTrowel: { name: 'Usta Mala', icon: 'heirloomTrowel', stack: 1, heirloom: true, locked: true },
+  heirloomJournal: { name: 'Bilge Günlüğü', icon: 'heirloomJournal', stack: 1, heirloom: true, locked: true },
+  // (25.2) Çırak işi: hammadde tüketmeden çıkan küçük yan ürünler (Pazar Yeri'nde value altına satılır); kurabiye yenir
+  noviceNails: { name: 'Acemi Çivisi', icon: 'anvil', stack: 6, value: 2, craft: true },
+  woodenSpoon: { name: 'Tahta Kaşık', icon: 'wood', stack: 4, value: 2, craft: true },
+  herbSachet: { name: 'Ot Kesesi', icon: 'herb', stack: 4, value: 3, craft: true },
+  crispCookie: { name: 'Kıtır Kurabiye', icon: 'bread', stack: 6, hunger: 8, value: 2, craft: true, food: true },
+  plainCloth: { name: 'Basit Bez', icon: 'cloth', stack: 4, value: 3, craft: true },
+  syrupVial: { name: 'Acemi Şerbeti', icon: 'sherbet', stack: 3, value: 3, craft: true },
 };
 export const ITEM_KEYS = Object.keys(ITEMS);
 // Pazarda satılan küçük hatıralar (çantada adıyla görünür)
@@ -102,6 +116,12 @@ export const PETITION_KINDS = {
   stock: { name: 'Kışlık Stok', icon: 'wood', text: 'Kış yaklaşırken odun ve yiyecek stokunun güvenli seviyeye çıkarılmasını istiyorum.' },
   tool: { name: 'Sağlam Alet', icon: 'sturdyTool', text: 'Bana sağlam bir alet verilmesini istiyorum.', grant: { iron: 4, wood: 3 }, grantLabel: 'Aleti Ver' },
   gathering: { name: 'Meydanda Buluşma', icon: 'bell', text: 'Meydanda hep birlikte toplanacağımız bir şenlik ya da buluşma istiyorum.', grantLabel: 'Zili Çal' },
+  // (25.3) Yeni nesil huyların dilekçeleri
+  craftTools: { name: 'Atölye Malzemesi', icon: 'quirkCraft', text: 'Atölyelerimize yeni el aletleri ve tezgâh malzemesi alınsın; elimiz işe daha iyi yatsın.', grant: { iron: 6, wood: 6 }, grantLabel: 'Malzemeyi Ver' },
+  marketFees: { name: 'Pazar Harçları', icon: 'quirkTrade', text: 'Pazar harçları hafifletilsin; adil bir vergiyle esnaf da kasaba da kazansın.', grant: { gold: 25 }, grantLabel: 'Harçları Hafiflet' },
+  // (25.4) Altın Çağ'da evlenip aynı çatı altında yer bulamayan 2. kuşak çift (LineageSystem açar)
+  newHome: { name: 'Yeni Konut Talebi', icon: 'heart', text: 'Yeni evlendik; Belediye Konağı\'ndan kendi yuvamızı kuracağımız bir kulübe istiyoruz.' },
+  sherbetCask: { name: 'Fazladan Şerbet', icon: 'quirkFestive', text: 'Hana fazladan bir şerbet fıçısı açılsın; bu akşam herkes neşelensin!', grant: { sherbet: 3 }, grantLabel: 'Fıçıyı Aç' },
 };
 
 // ---------------------------------------------------------------------------
@@ -122,7 +142,7 @@ export const TRUST = {
   starvingMaxPerHour: -0.6,
   coldPerHour: -0.3, // kışın odun bitip evler soğuyunca
   // Kasabadaki olayların tek seferlik etkisi
-  events: { festival: 4, seasonFestival: 6, grandFeast: 8, goldBonus: 6, rally: 2, rallyRevolt: 4, cold: -3 },
+  events: { feast: 5, feastRich: 10, festival: 4, seasonFestival: 6, grandFeast: 8, goldBonus: 6, rally: 2, rallyRevolt: 4, cold: -3 },
   levels: [
     { min: 70, key: 'good', name: 'Güvenli' },
     { min: 45, key: 'ok', name: 'Huzursuz' },

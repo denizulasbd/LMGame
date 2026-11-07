@@ -27,6 +27,13 @@
     import { WeddingConfetti } from '../src/rendering/WeddingConfetti.js';
     import { ChimeWaves } from '../src/rendering/ChimeWaves.js';
     import { QUIRKS } from '../src/data/social.js';
+    import { getStoolSprite } from '../src/art/ui/index.js';
+    import { PROFESSIONS } from '../src/data/apprenticeship.js';
+    import { HEIRLOOMS } from '../src/data/heirloom.js';
+    import { FairDecor } from '../src/rendering/FairDecor.js';
+    import { GuestEffects } from '../src/rendering/GuestEffects.js';
+    import { GUEST_TYPES } from '../src/data/guest.js';
+    import { FAIRS, FAIR_TYPES } from '../src/data/fair.js';
 
     const root = document.getElementById('root');
     const SCALE = 5;
@@ -54,6 +61,297 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 26.3: Gezgin konuklar — Seyyar Ozan (kep, lir, müzik notaları), Nadir Takasçı (geniş şapka, halı, çanta), Yaşlı Seyyah (kapüşonlu pelerin, kitap) ---
+    {
+      const fx = new GuestEffects();
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      const W = 150;
+      const H = 90;
+      const fountain = getStructureSprite('fountain', {});
+      const market = getStructureSprite('market', { open: true, frame: 0 });
+      const inn = getStructureSprite('inn', { lit: true, frame: 0 });
+      const gazebo = getStructureSprite('gazebo', {});
+      const draw = (ctx) => ({ fillRect: (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }, drawImage: (img, x, y) => ctx.drawImage(img, x, y) });
+      const guestScene = (type, facing, base, bx, by, gx, gy, { time = 1.0, playing = false, night = false, stage = null, backpack = false } = {}) => scene(W, H, [[base, bx, by + base.height]], (ctx) => {
+        const r = draw(ctx);
+        const sprite = getCharacterSprite(GUEST_TYPES[type].appearances[0], facing, 'idle0', look({ stage }));
+        ctx.drawImage(sprite, Math.round(gx - 6), Math.round(gy - sprite.height + 1));
+        if (backpack) ctx.drawImage(getBackpackSprite(facing === 'left' ? 'left' : 'front'), gx - 5, gy - 21);
+        fx.drawAccessory(r, gx, gy, sprite.height, facing, type, time, playing);
+        if (playing) fx.drawNotes(r, { visible: true, playing: true, x: gx, y: gy }, time);
+        if (night) { ctx.fillStyle = 'rgba(20, 16, 50, 0.3)'; ctx.fillRect(0, 0, W, H); fx.drawAccessory(r, gx, gy, sprite.height, facing, type, time, playing); if (playing) fx.drawNotes(r, { visible: true, playing: true, x: gx, y: gy }, time); }
+      });
+      const f1 = [
+        [`Seyyar Ozan · meydan havuzu kenarında çalıyor (akşam)`, guestScene('bard', 'down', fountain, 40, 28, 112, 70, { playing: true, night: true })],
+        [`Seyyar Ozan · hanın önünde dinleniyor`, guestScene('bard', 'left', inn, 30, 14, 108, 78)],
+        [`Nadir Takasçı · pazar tezgâhında`, guestScene('collector', 'down', market, 30, 18, 112, 76, { backpack: true })],
+        [`Nadir Takasçı · yürürken (sol)`, guestScene('collector', 'left', market, 30, 18, 60, 80, { backpack: true })],
+        [`Yaşlı Seyyah · çardakta masal anlatıyor`, guestScene('storyteller', 'down', gazebo, 34, 16, 108, 76, { stage: 'elder' })],
+        [`Yaşlı Seyyah · yürürken (sağ)`, guestScene('storyteller', 'right', gazebo, 34, 16, 40, 80, { stage: 'elder' })],
+      ];
+      show('Gezgin konuklar (26.3): her türün kendine has pelerin / şapka / enstrüman detayı; ozan çalarken havaya yükselen müzik notaları', f1, 4);
+    }
+
+    // --- 26.2: Büyük Ziyafet Sofrası — meydan havuzunun yanında; hazırlıkta yalnızca örtü, şenlikte dolu ve boş hâlleri, üç seviye ---
+    {
+      const decor = new FairDecor();
+      const fountain = getStructureSprite('fountain', {});
+      const W = 170;
+      const H = 100;
+      const fx = Math.round((W - fountain.width) / 2) - 12;
+      const fy = Math.round((H - fountain.height) / 2) + 2;
+      const venue = { x: fx, y: fy, width: fountain.width, height: fountain.height, type: 'fountain' };
+      const TIER_NAMES = { symbolic: 'Sembolik İkram', modest: 'Mütevazı Sofra', rich: 'Zengin Şölen Sofrası' };
+      const cases = [];
+      for (const tier of ['symbolic', 'modest', 'rich']) {
+        cases.push([tier, 'prep', 8, 'hazırlık 06:00 (yalnızca örtü)']);
+        cases.push([tier, 'party', 8, 'şenlik: dolu']);
+        cases.push([tier, 'party', 3, 'şenlik: yarısı yenmiş']);
+        cases.push([tier, 'party', 0, 'şenlik: boş']);
+      }
+      const frames = cases.map(([tier, phase, left, label]) => [`${TIER_NAMES[tier]} · ${label}`, scene(W, H, [[fountain, fx, fy + fountain.height]], (ctx) => {
+        const r = { fillRect: (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); } };
+        decor.draw(r, venue, 1.0, 'summer', phase, { tier, left, total: 8 });
+        if (phase === 'party') { ctx.fillStyle = 'rgba(20, 16, 50, 0.22)'; ctx.fillRect(0, 0, W, H); decor.draw(r, venue, 1.0, 'summer', phase, { tier, left, total: 8 }); }
+      })]);
+      show('Büyük Ziyafet Sofrası (26.2): hazırlıkta yalnızca örtü, şenlik saatinde (18:00 - 22:00) tabaklar, testiler, mumlar; zengin sofrada şerbet fıçıları. Ziyafet bitince tabaklar boşalır, 22:00\'de sofra toplanır', frames, 3);
+    }
+
+    // --- 26.1: Mevsimlik Panayır — meydan havuzunun çevresinde geçici tentler, flamalar ve mevsim süsleri (hazırlık / şenlik saati) ---
+    {
+      const decor = new FairDecor();
+      const fountain = getStructureSprite('fountain', {});
+      const W = 170;
+      const H = 120;
+      const fx = Math.round((W - fountain.width) / 2);
+      const fy = Math.round((H - fountain.height) / 2) + 6;
+      const venue = { x: fx, y: fy, width: fountain.width, height: fountain.height, type: 'fountain' };
+      const looks = [
+        { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'rose', pants: 'navy' },
+        { hair: 'long', hairColor: 'black', skin: 'tan', shirt: 'sky', pants: 'brown' },
+        { hair: 'bun', hairColor: 'gray', skin: 'light', shirt: 'lavender', pants: 'plum' },
+      ];
+      const frames = [];
+      for (const phase of ['prep', 'party']) {
+        for (const type of FAIR_TYPES) {
+          const people = phase === 'party'
+            ? [[getCharacterSprite(looks[0], 'down', 'idle0'), fx - 8, fy + fountain.height + 8], [getCharacterSprite(looks[1], 'down', 'idle1'), fx + fountain.width + 4, fy + fountain.height + 4], [getCharacterSprite(looks[2], 'down', 'idle0', { child: false, coat: false, bag: false, outfit: null, stage: 'elder' }), fx + fountain.width / 2, fy + fountain.height + 12]]
+            : [];
+          frames.push([`${FAIRS[type].name} · ${phase === 'prep' ? 'hazırlık 06:00 - 18:00' : 'şenlik 18:00 - 22:00'}`, scene(W, H, [[fountain, fx, fy + fountain.height], ...people], (ctx) => {
+            const r = { fillRect: (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); } };
+            decor.draw(r, venue, 1.0, type, phase);
+            if (phase === 'party') { ctx.fillStyle = 'rgba(20, 16, 50, 0.22)'; ctx.fillRect(0, 0, W, H); decor.draw(r, venue, 1.0, type, phase); }
+          })]);
+        }
+      }
+      show('Mevsimlik Panayır (26.1): meydan havuzu çevresinde tentler ve flamalar (üstte hazırlık), şenlik saatinde ilkbaharda çiçek çelenkleri, yazın güneş fenerleri, sonbaharda hasat sepetleri, kışın meşale ve ateş (altta). Harita matrisine hiçbir şey yazılmaz', frames, 3);
+    }
+
+    // --- 25.5: aile yadigârları ve törensel devir teslim ---
+    {
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      const kinds = ['heirloomHammer', 'heirloomShuttle', 'heirloomCompass', 'heirloomYeast', 'heirloomTrowel', 'heirloomJournal'];
+      const framed = (name) => {
+        const icon = getIconSprite(name);
+        const c = document.createElement('canvas');
+        c.width = 15;
+        c.height = 15;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#e0a030';
+        ctx.fillRect(0, 0, 15, 15);
+        ctx.fillStyle = '#fff3b0';
+        ctx.fillRect(1, 1, 13, 13);
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(2, 2, 11, 11);
+        ctx.drawImage(icon, 3, 3);
+        return c;
+      };
+      show('Aile yadigârları (25.5): satılmaz, feda edilmez, yok edilmez — çantada parıldayan altın çerçeve', kinds.map((k) => [HEIRLOOMS[k].name, framed(k)]), 8);
+      const elderP = { hair: 'short', hairColor: 'gray', skin: 'tan', shirt: 'forest', pants: 'brown' };
+      const heirP = { hair: 'spiky', hairColor: 'ginger', skin: 'light', shirt: 'sky', pants: 'denim' };
+      const say = (ctx, text, cx, top) => {
+        ctx.font = "7px 'Pixelify Sans', monospace";
+        const w = Math.ceil(ctx.measureText(text).width) + 6;
+        cx = Math.max(w / 2 + 2, Math.min(ctx.canvas.width - w / 2 - 2, cx));
+        ctx.fillStyle = '#1b1423';
+        ctx.fillRect(cx - w / 2 - 1, top - 1, w + 2, 11);
+        ctx.fillStyle = '#fff8e7';
+        ctx.fillRect(cx - w / 2, top, w, 9);
+        ctx.fillStyle = '#3a2a1f';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, cx - w / 2 + 3, top + 5);
+      };
+      const frames = [0, 1, 2].map((i) => {
+        const item = getIconSprite('heirloomHammer');
+        const ix = 58 + i * 10;
+        return [`devir ${i}`, scene(210, 64, [
+          [getCharacterSprite(elderP, 'right', 'idle0', look({ stage: 'elder' })), 50, 58],
+          [getCharacterSprite(heirP, 'left', i === 2 ? 'idle1' : 'idle0', look({ stage: 'youth' })), 88, 58],
+          [item, ix, 46],
+        ], (ctx) => {
+          if (i < 2) say(ctx, 'Bu çekiç artık senin evlat, hakkını ver!', 60, 4);
+          else say(ctx, 'Söz veriyorum, layık olacağım!', 94, 4);
+          if (i === 2) for (let k = 0; k < 6; k++) { ctx.fillStyle = ['#ffd23f', '#f06b8a', '#8a6cf0'][k % 3]; ctx.fillRect(84 + k * 4, 20 + (k % 2) * 3, 1, 1); }
+        })];
+      });
+      show('Törensel devir teslim: Kıdemli Bilge yadigârını evladına uzatır; veda ve söz (metin baloncuğu), ilk devirde Kuşak Şöleni', frames, 4);
+    }
+
+    // --- 25.4: Aile Kütüğü — üç kuşaklık soy ağacı, Yeni Yuva ve Ocak Devri ---
+    {
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      const A = { hair: 'bun', hairColor: 'gray', skin: 'light', shirt: 'lavender', pants: 'plum' };
+      const B = { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'forest', pants: 'brown' };
+      const C1 = { hair: 'long', hairColor: 'brown', skin: 'light', shirt: 'rose', pants: 'navy' };
+      const C2 = { hair: 'spiky', hairColor: 'ginger', skin: 'tan', shirt: 'sky', pants: 'denim' };
+      const K = { hair: 'short', hairColor: 'ginger', skin: 'light', shirt: 'mustard', pants: 'navy' };
+      const tree = scene(200, 112, [
+        [getCharacterSprite(A, 'down', 'idle0', look({ stage: 'elder' })), 54, 30],
+        [getCharacterSprite(B, 'down', 'idle0', look({})), 84, 30],
+        [getBubbleSprite('heart'), 69, 14],
+        [getCharacterSprite(C1, 'down', 'idle0', look({ stage: 'youth' })), 54, 70],
+        [getCharacterSprite(C2, 'down', 'idle0', look({})), 84, 70],
+        [getBubbleSprite('ring'), 69, 54],
+        [getCharacterSprite(K, 'down', 'idle0', look({ child: true })), 69, 106],
+      ], (ctx) => {
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(66, 31, 18, 1); // eşler
+        ctx.fillRect(75, 31, 1, 12);
+        ctx.fillRect(60, 42, 16, 1); // çocuğuna
+        ctx.fillRect(60, 42, 1, 8);
+        ctx.fillRect(66, 71, 18, 1);
+        ctx.fillRect(75, 71, 1, 18);
+        ctx.font = "7px 'Pixelify Sans', monospace";
+        ctx.fillStyle = '#1b1423';
+        ctx.fillText('1. Kuşak Kurucu', 98, 22);
+        ctx.fillText('2. Kuşak Kasabalı', 98, 62);
+        ctx.fillText('3. Kuşak Torun', 98, 100);
+      });
+      const cabin = getStructureSprite('cabin', { tone: 1 });
+      const home = scene(cabin.width + 64, cabin.height + 22, [
+        [cabin, 4, cabin.height + 4],
+        [getCharacterSprite(C1, 'right', 'walk0', look({ stage: 'youth' })), cabin.width + 14, cabin.height + 18],
+        [getCharacterSprite(C2, 'left', 'walk1', look({})), cabin.width + 30, cabin.height + 18],
+        [getBubbleSprite('love'), cabin.width + 22, cabin.height + 1],
+      ]);
+      show('Aile Kütüğü (25.4): üç kuşaklık soy ağacı; evlenen 2. kuşak çift boş kulübeye "Yeni Yuva" kurar', [['soy ağacı', tree], ['Yeni Yuva', home]], 4);
+    }
+
+    // --- 25.3: yeni nesil huylar — rozetler, karakter portreleri ve mizaç sahneleri ---
+    {
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      const keys = ['craftsman', 'entrepreneur', 'philosopher', 'festive'];
+      show('Yeni nesil huylar (25.3): Zanaatkâr Ruhu, Girişimci Kanı, Bilge Düşünür, Şenlik Neşesi — rozet simgeleri', keys.map((k) => [QUIRKS[k].name, getIconSprite(QUIRKS[k].icon)]), 10);
+      const folks = {
+        craftsman: [{ hair: 'short', hairColor: 'brown', skin: 'tan', shirt: 'forest', pants: 'brown' }, { outfit: 'lumberjack:2' }, 'Elimin emeği, gönlümün işi.'],
+        entrepreneur: [{ hair: 'bun', hairColor: 'black', skin: 'light', shirt: 'mustard', pants: 'navy' }, { bag: true }, 'Ucuza al, değerinde sat!'],
+        philosopher: [{ hair: 'long', hairColor: 'auburn', skin: 'medium', shirt: 'lavender', pants: 'plum' }, {}, 'Bilmek, iki kere yaşamaktır.'],
+        festive: [{ hair: 'spiky', hairColor: 'ginger', skin: 'light', shirt: 'rose', pants: 'denim' }, { stage: 'youth' }, 'Haydi bir şerbet içelim!'],
+      };
+      const portrait = (k) => {
+        const [app, extra, line] = folks[k];
+        return scene(150, 52, [[getCharacterSprite(app, 'down', 'idle0', look(extra)), 69, 48], [getIconSprite(QUIRKS[k].icon), 84, 34]], (ctx) => {
+          ctx.font = "7px 'Pixelify Sans', monospace";
+          const w = Math.ceil(ctx.measureText(line).width) + 6;
+          const x = Math.round(75 - w / 2);
+          ctx.fillStyle = '#1b1423';
+          ctx.fillRect(x - 1, 3, w + 2, 11);
+          ctx.fillStyle = '#fff8e7';
+          ctx.fillRect(x, 4, w, 9);
+          ctx.fillRect(74, 13, 2, 2);
+          ctx.fillStyle = '#3a2a1f';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(line, x + 3, 9);
+        });
+      };
+      show('Mizaç portreleri ve sözleri (metin baloncuğu): her yeni huy kendi sözünü söyler', keys.map((k) => [QUIRKS[k].name, portrait(k)]), 4);
+      const fountain = getStructureSprite('fountain', {});
+      const dance = [0, 1, 2].map((i) => {
+        const [app] = folks.festive;
+        return [`dans ${i}`, scene(96, 64, [[fountain, 48 - fountain.width / 2, 40], [getCharacterSprite(app, i % 2 ? 'left' : 'right', 'idle' + (i % 2), look({ stage: 'youth' })), 40, 60], [getCharacterSprite(folks.philosopher[0], 'left', 'idle0', look({})), 64, 60], [getBubbleSprite(i === 1 ? 'note' : 'heart'), 66, 44]])];
+      });
+      show('Şenlik Neşesi meydan havuzunda dans eder (sağa sola döner), yanındakilerin neşesi yükselir', dance, 4);
+    }
+
+    // --- 25.2: Usta-Çırak — usta tezgâhta çalışırken çırak yanındaki taburede izler; ikisi konuşur (metin baloncuğu) ---
+    {
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      const masterP = { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'forest', pants: 'brown' };
+      const pupilP = { hair: 'spiky', hairColor: 'ginger', skin: 'light', shirt: 'sky', pants: 'denim' };
+      const bubble = (ctx, text, cx, top) => {
+        ctx.font = "7px 'Pixelify Sans', monospace";
+        const w = Math.ceil(ctx.measureText(text).width) + 6;
+        cx = Math.max(w / 2 + 2, Math.min(ctx.canvas.width - w / 2 - 2, cx));
+        ctx.fillStyle = '#1b1423';
+        ctx.fillRect(cx - w / 2 - 1, top - 1, w + 2, 11);
+        ctx.fillStyle = '#fff8e7';
+        ctx.fillRect(cx - w / 2, top, w, 9);
+        ctx.fillRect(cx - 1, top + 9, 2, 2);
+        ctx.fillStyle = '#3a2a1f';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, cx - w / 2 + 3, top + 5);
+      };
+      const shop = (type, tool, frame, lines) => {
+        const b = getStructureSprite(type, {});
+        const w = Math.max(150, b.width + 70);
+        const h = b.height + 34;
+        const kit = frame ? 'idle1' : 'idle0';
+        return scene(w, h, [
+          [b, 4, b.height + 8],
+          [getCharacterSprite(masterP, 'right', kit, look({ outfit: 'lumberjack:3' })), b.width + 8, h - 4],
+          [getHeldToolSprite(tool, false), b.width + 14, h - 10 + (frame ? 4 : 0)],
+          [getStoolSprite(), b.width + 31, h - 2],
+          [getCharacterSprite(pupilP, 'down', frame ? 'sit1' : 'sit0', look({ stage: 'youth' })), b.width + 29, h - 5],
+        ], (ctx) => {
+          if (lines[0]) bubble(ctx, lines[0], b.width + 14, 2);
+          if (lines[1]) bubble(ctx, lines[1], b.width + 34, 14);
+        });
+      };
+      show('Usta-Çırak (25.2): usta tezgâhta çalışırken çırak yanındaki taburede izler ve getir-götür işlerine bakar; ikisi konuşur', [
+        ['oduncu kulübesi, kare 0', shop('lumberHut', 'axe', 0, [PROFESSIONS.lumberHut.lines.master[1], null])],
+        ['kare 1 (balta iner)', shop('lumberHut', 'axe', 1, [null, PROFESSIONS.lumberHut.lines.apprentice[0]])],
+        ['dokuma tezgâhı', shop('loom', 'shuttle', 0, [null, PROFESSIONS.loom.lines.apprentice[1]])],
+        ['fırın', shop('mill', 'peel', 1, [PROFESSIONS.mill.lines.master[1], null])],
+      ], 4);
+      show('Çırak taburesi (8x4) ve çırak işleri', [
+        ['tabure', getStoolSprite()],
+        ...['anvil', 'wood', 'herb', 'bread', 'cloth', 'sherbet'].map((n) => [n, getIconSprite(n)]),
+      ], 8);
+    }
+
+    // --- 25.1: yaşam evreleri — Çocuk (küçük silüet), Genç (turuncu fular), Yetişkin (standart), Kıdemli Bilge (kır saç + baston) ---
+    {
+      const people = [
+        { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'sky', pants: 'navy' },
+        { hair: 'long', hairColor: 'auburn', skin: 'tan', shirt: 'rose', pants: 'denim' },
+        { hair: 'bun', hairColor: 'black', skin: 'dark', shirt: 'mint', pants: 'plum' },
+        { hair: 'hat', hairColor: 'ginger', skin: 'light', shirt: 'red', pants: 'denim' },
+      ];
+      const STAGES = [['Çocuk', { child: true }], ['Genç', { stage: 'youth' }], ['Yetişkin', {}], ['Kıdemli Bilge', { stage: 'elder' }]];
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      show('Yaşam evreleri (25.1): aynı sakinin dört evresi, önden', people.slice(0, 2).flatMap((p, i) => STAGES.map(([name, l]) => [`${i + 1}. ${name}`, getCharacterSprite(p, 'down', 'idle0', look(l))])), 6);
+      show('Kıdemli Bilge: kırlaşmış saç ve şakaklar, ahşap yürüyüş bastonu (otururken bırakır); her saç stili ve yön', [
+        ...people.map((p) => [`${p.hair} önden`, getCharacterSprite(p, 'down', 'idle0', look({ stage: 'elder' }))]),
+        ['yandan yürüyüş 0', getCharacterSprite(people[0], 'right', 'walk0', look({ stage: 'elder' }))],
+        ['yandan yürüyüş 1', getCharacterSprite(people[0], 'left', 'walk1', look({ stage: 'elder' }))],
+        ['arkadan', getCharacterSprite(people[1], 'up', 'idle0', look({ stage: 'elder' }))],
+        ['bankta oturuyor', getCharacterSprite(people[2], 'down', 'sit0', look({ stage: 'elder' }))],
+        ['paltolu (kış)', getCharacterSprite(people[3], 'down', 'idle1', look({ stage: 'elder', coat: true }))],
+      ], 6);
+      show('Genç: boynunda turuncu fular (çevik duruş); yönler ve çanta', [
+        ['önden', getCharacterSprite(people[2], 'down', 'idle0', look({ stage: 'youth' }))],
+        ['yandan koşuyor', getCharacterSprite(people[2], 'right', 'walk0', look({ stage: 'youth' }))],
+        ['arkadan', getCharacterSprite(people[2], 'up', 'idle0', look({ stage: 'youth' }))],
+        ['sırt çantalı', getCharacterSprite(people[0], 'down', 'idle0', look({ stage: 'youth', bag: true }))],
+      ], 6);
+      const gazebo = getStructureSprite('gazebo', {});
+      const bench = getStructureSprite('bench', {});
+      show('Bilge Nasihati: emekli bilge çardakta / bankta oturur, yanındaki gençlerin ve yetişkinlerin morali dolar', [
+        ['çardakta nasihat', scene(Math.max(120, gazebo.width + 70), gazebo.height + 20, [[gazebo, 4, gazebo.height + 10], [getCharacterSprite(people[0], 'down', 'sit0', look({ stage: 'elder' })), gazebo.width / 2 - 2, gazebo.height + 4], [getBubbleSprite('book'), gazebo.width / 2 - 1, gazebo.height - 14], [getCharacterSprite(people[1], 'left', 'idle0', look({ stage: 'youth' })), gazebo.width + 22, gazebo.height + 14], [getBubbleSprite('sparkle'), gazebo.width + 23, gazebo.height - 4], [getCharacterSprite(people[2], 'left', 'idle1', look({})), gazebo.width + 42, gazebo.height + 14]])],
+        ['bankta', scene(Math.max(80, bench.width + 50), 48, [[bench, 10, 40], [getCharacterSprite(people[3], 'down', 'sit1', look({ stage: 'elder' })), 12, 38], [getCharacterSprite(people[1], 'left', 'idle0', look({ child: true })), bench.width + 24, 42]])],
+      ], 4);
+    }
 
     // --- 24.3: dış ticaret — Ticaret İskelesi / Kervan Konağı, Ticaret Gemisi, Kervan ve ihracat sözleşmesi kartı ---
     {

@@ -14,6 +14,7 @@ import { INN_SHERBET, SHERBET_JUG } from '../data/refinery.js';
 import { addItem, takeItem, countItem, roomFor, payCoins } from './Citizens.js';
 import { palateUntil } from './Refinery.js';
 import { clamp } from '../utils/math.js';
+import { TEMPERAMENT } from '../data/temperament.js';
 
 export class RefinerySystem {
   /**
@@ -68,7 +69,9 @@ export class RefinerySystem {
     if (c.visible) c.showBubble('sherbet', 2);
     this.events.emit('citizen:sherbet', { character: c, building: inn });
     // Kesesi yetiyorsa çantasına bir testi alır
-    if (!c.isChild && countItem(c, 'sherbetJug') === 0 && inn.sherbet >= SHERBET_JUG.minCasks && (c.coins ?? 0) >= SHERBET_JUG.price && roomFor(c, 'sherbetJug') > 0) {
+    // (25.3) Şenlik Neşesi'nin çantasında testi eksik olmaz: fıçı azken de alır, iki testi taşır
+    const festive = c.quirk === 'festive';
+    if (!c.isChild && countItem(c, 'sherbetJug') < (festive ? TEMPERAMENT.festiveJugs : 1) && inn.sherbet >= (festive ? TEMPERAMENT.festiveJugMin : SHERBET_JUG.minCasks) && (c.coins ?? 0) >= SHERBET_JUG.price && roomFor(c, 'sherbetJug') > 0) {
       if (addItem(c, 'sherbetJug', 1) === 1) {
         inn.sherbet -= 1;
         payCoins(c, SHERBET_JUG.price);
@@ -84,7 +87,7 @@ export class RefinerySystem {
   drinkJugs() {
     let n = 0;
     for (const c of this.world.characters) {
-      if (c.away || c.isSleeping || c.needs.fun >= SHERBET_JUG.drinkBelowFun || countItem(c, 'sherbetJug') <= 0) continue;
+      if (c.away || c.isSleeping || c.needs.fun >= (c.quirk === 'festive' ? TEMPERAMENT.festiveDrinkBelow : SHERBET_JUG.drinkBelowFun) || countItem(c, 'sherbetJug') <= 0) continue;
       if (takeItem(c, 'sherbetJug', 1) !== 1) continue;
       c.needs.fun = clamp(c.needs.fun + SHERBET_JUG.fun, 0, 100);
       this.state.stats.jugsDrunk = (this.state.stats.jugsDrunk ?? 0) + 1;

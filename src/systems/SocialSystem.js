@@ -119,7 +119,8 @@ export class SocialSystem {
 
   leastCommonQuirk(except) {
     const counts = Object.fromEntries(QUIRK_KEYS.map((k) => [k, 0]));
-    for (const c of this.state.characters) if (c !== except && QUIRKS[c.quirk]) counts[c.quirk] += 1;
+    // (25.3) yeni nesil huylar sayılmaz (dağıtım 19. aşamanın dört huyuyla kalır)
+    for (const c of this.state.characters) if (c !== except && counts[c.quirk] !== undefined) counts[c.quirk] += 1;
     const min = Math.min(...Object.values(counts));
     return this.rng.pick(QUIRK_KEYS.filter((k) => counts[k] === min));
   }

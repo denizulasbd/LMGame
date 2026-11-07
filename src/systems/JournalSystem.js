@@ -16,7 +16,11 @@
 //              decreeDelivered / decreeFailed (Kraliyet Fermanları), exodus:started / ended, exodus:leaving, population:left
 //   23. aşama: crisis:fireStarted / fireOut / burnedDown (yangın), crisis:raidWarning / raidResolved (haydut baskını), crisis:injured /
 //              healed (hafif yaralanma), crisis:repaired, building:mended (nedene göre)
+//   25.1: lifeStage:changed (Genç -> Yetişkin, Yetişkin -> Kıdemli Bilge; kutlama cümlesi LifeStageSystem'in kendi üretecinden),
+//         lifeStage:retired (çekirdek sakin kuralıyla gönüllü çalışmaya dönen / yeniden emekli olan bilge)
+//   25.2: apprentice:enrolled / proud / crafted (ilk çırak işi) / graduated (Yetkin Usta / Kıdemli Kalfa)
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
+import { TIERS } from '../data/feast.js';
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
 import { EQUIPMENT } from '../data/equipment.js';
@@ -27,7 +31,11 @@ import { formatTownTitle } from './TownStatus.js';
 import { cargoValue } from './HarborSystem.js';
 import { PETITION_KINDS } from '../data/citizens.js';
 import { TAX_RATES, DECREE_ITEMS } from '../data/crown.js';
-import { genitive } from '../utils/turkish.js';
+import { genitive, ablative } from '../utils/turkish.js';
+import { QUIRKS } from '../data/social.js';
+import { ITEMS } from '../data/citizens.js';
+import { PROFESSIONS } from '../data/apprenticeship.js';
+import { HEIRLOOMS } from '../data/heirloom.js';
 
 // İşlenmiş malların ilk üretimi
 const FIRST_GOODS_TEXT = {
@@ -132,10 +140,73 @@ export class JournalSystem {
       on('family:madeRoom', ({ character, to }) => this.log(`${character.name}, ailenin büyümesi için başka bir eve (${to.name}) taşındı`, 'heart')),
       on('family:childBorn', ({ child, parents }) => this.log(`${parents[0].name} ve ${parents[1].name} ailesine küçük ${child.name} katıldı`, 'love')),
       on('family:grownUp', ({ character }) => this.log(`${character.name} büyüdü ve kasabanın genç bir sakini oldu`, 'star')),
+      // (25.1) Yaşam evreleri
+      on('lifeStage:changed', ({ character, from, to }) => {
+        if (to === 'elder') this.log(this.state.lifeStages?.lastElderLine ?? `${character.name} artık kasabanın kıdemli bir bilgesi oldu, gençlere yol gösterecek!`, 'book');
+        else if (to === 'adult' && from === 'youth') this.log(`${character.name} ${character.age} yaşına bastı: gençliğini geride bırakıp tam bir yetişkin oldu`, 'star');
+      }),
+      // (25.2) Usta-Çırak
+      on('apprentice:enrolled', ({ character, master, building }) =>
+        this.log(`${character.name}, ${master ? `${master.name} ustanın yanında ` : ''}${PROFESSIONS[building.type].name} çıraklığına başladı (${building.name})`, 'hammer')
+      ),
+      on('apprentice:proud', ({ master, apprentice }) => this.log(`${master.name} çırağı ${apprentice.name} ile gurur duyuyor: tezgâhta artık iki kişiler`, 'star')),
+      on('apprentice:crafted', ({ character, item }) => {
+        if (character.apprenticeship?.crafted === 1) this.log(`Çırak ${character.name} ilk çırak işini çıkardı: ${ITEMS[item].name}`, 'sparkle');
+      }),
+      on('apprentice:graduated', ({ character, profession, title, progress }) =>
+        this.log(
+          title
+            ? `${character.name} çıraklığını tamamladı: ${title} ${PROFESSIONS[profession].master} olarak yetişkinliğe adım attı`
+            : `${character.name} yetişkin oldu; ${PROFESSIONS[profession].name} çıraklığı %${Math.floor(progress)}'de kaldı (deneyimi ona kaldı)`,
+          'star'
+        )
+      ),
+      // (25.5) Aile yadigârları
+      on('heirloom:created', ({ character, kind }) => this.log(`${character.name} çantasında bir aile yadigârı taşıyor: ${HEIRLOOMS[kind].name}`, HEIRLOOMS[kind].icon)),
+      on('heirloom:passed', ({ from, to, kind, first }) =>
+        this.log(first ? `İlk Kuşak Mirası Devredildi: ${from.name} yadigârını (${HEIRLOOMS[kind].name}) ${to.name} adlı mirasçısına teslim etti! Meydanda Kuşak Şöleni` : `${from.name}, ${HEIRLOOMS[kind].name} yadigârını ${to.name} adlı mirasçısına teslim etti`, HEIRLOOMS[kind].icon)
+      ),
+      on('heirloom:archived', ({ character, kind }) => this.log(`${character.name} köyden ayrılırken ${HEIRLOOMS[kind].name} kasabanın arşivine emanet edildi`, HEIRLOOMS[kind].icon)),
+      // (25.4) Aile Kütüğü
+      on('lineage:gen2Wedding', ({ a, b, first }) => first && this.log(`Kasabanın 2. Kuşak İlk Düğünü: ${a.name} & ${b.name}! Kasabada doğan kuşak yuva kuruyor`, 'ring')),
+      on('lineage:newHome', ({ a, b, home }) => this.log(`${a.name} ve ${b.name} kendi yuvalarını kurdu: boş bir eve (${home.name}) taşınıyorlar`, 'heart')),
+      on('lineage:extendedFamily', ({ a, b }) => this.log(`${a.name} ve ${b.name} şimdilik ailenin evinde Geniş Aile olarak yaşıyor`, 'heart')),
+      on('lineage:housingPetition', ({ a, b }) => this.log(`${a.name} ve ${b.name} aynı çatı altında yer bulamadı: Belediye Konağı'na Yeni Konut Talebi verdiler`, 'scroll')),
+      on('lineage:handover', ({ elder, heir }) => this.log(`Ocak Devri: Kıdemli Bilge ${elder.name} ocağın reisliğini ${heir.name} adlı evladına devretti`, 'heart')),
+      // (25.3) Mizaç gelişimi
+      on('temperament:developed', ({ character, quirk, origin }) => {
+        const name = QUIRKS[quirk].name;
+        const text =
+          origin.kind === 'family'
+            ? `${character.name}, ${genitive(origin.fromName)} izinden gidip ${name} bir mizaçla gençliğe adım attı`
+            : origin.kind === 'mentor'
+              ? `${character.name}, ustası ${ablative(origin.fromName)} ${name} mizacını kaptı`
+              : origin.kind === 'craft'
+                ? `${character.name}: ${origin.fromName} çıraklığı ona ${name} mizacı kazandırdı`
+                : `${character.name} kendine özgü bir mizaçla büyüdü: ${name}`;
+        this.log(text, QUIRKS[quirk].icon);
+      }),
+      on('lifeStage:retired', ({ character, retired }) =>
+        this.log(
+          retired
+            ? `Kıdemli Bilge ${character.name} yeniden emekliliğin tadını çıkarıyor: kasabada yeterince çalışan el var`
+            : `Kıdemli Bilge ${character.name} kasabada çalışan el azalınca gönüllü usta olarak işe döndü`,
+          'book'
+        )
+      ),
       on('equipment:equipped', ({ character, item }) => this.log(`${character.name} ${EQUIPMENT[item].name} kuşandı`, EQUIPMENT[item].icon)),
       on('worker:dismissed', ({ building, character }) => this.log(`${character.name} ${building.name} işinden çıkarıldı`, 'sulk')),
       on('weather:changed', ({ type }) => this.log(WEATHER_TEXT[type] ?? WEATHER_TYPES[type].name, WEATHER_TYPES[type].icon)),
-      on('festival:started', ({ venue, festival }) => this.log(festival ? `${festival.name} başladı (${venue.name})` : `Kasaba Şenliği başladı (${venue.name})`, festival?.icon ?? 'note')),
+      on('festival:started', ({ venue, festival, fair }) => this.log(fair ? `Şenlik saati: ${festival.name} ${venue.name} başında coşkuyla sürüyor` : festival ? `${festival.name} başladı (${venue.name})` : `Kasaba Şenliği başladı (${venue.name})`, festival?.icon ?? 'note')),
+      // 26.1: mevsimlik panayır
+      on('fair:prep', ({ fair }) => this.log(fair.start, fair.icon)),
+      // 26.3: gezgin konuklar
+      on('guest:arrived', ({ guest, def }) => this.log(def.arrive.replace('{name}', guest.name), def.icon)),
+      on('guest:left', ({ guest, def, thanks }) => thanks && this.log(def.thanks.replace('{name}', guest.name), def.icon)),
+      on('guest:barter', ({ offer }) => this.log(`Nadir takas: ${offer.name} (${offer.text})`, offer.icon)),
+      on('feast:set', ({ tier }) => this.log(TIERS[tier].set, TIERS[tier].icon)),
+      on('feast:ended', ({ tier, served, total }) => this.log(`${TIERS[tier].name} toplandı: ${served} sakin sofradan pay aldı (${total} ikramın)`, TIERS[tier].icon)),
+      on('fair:ended', ({ fair, attendees }) => this.log(`${fair.name} 22:00'de sona erdi; ${attendees.length} sakin kutladı`, fair.icon)),
       on('festival:ended', ({ theme } = {}) => !theme && this.log('Şenlik bitti; herkes yarına neşeyle başlayacak', 'sparkle')),
       // 14. aşama: mevsim festivalleri, toplanma zili
       on('seasonFestival:announced', ({ festival }) => this.log(`Duyuru: bugün 15:00'te ${festival.name}`, festival.icon)),

@@ -409,6 +409,13 @@ export const ACTIVITIES = {
     effect: 'dust',
     bubbles: ['sweat', 'note'],
   },
+  // (25.2) Çırak: ustası tezgâhta çalışırken yanındaki taburede oturup izler, getir-götür işlerine bakar (üretim yok)
+  apprentice: {
+    kind: 'work',
+    travelLabel: 'Ustasının atölyesine koşuyor',
+    label: 'Ustasının yanında çıraklık yapıyor',
+    pose: 'sit',
+  },
   // --- 11. aşama: şifacılık, tedavi ve keşif seferi ---
   brew: {
     kind: 'work',

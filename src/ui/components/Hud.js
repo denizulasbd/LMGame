@@ -18,6 +18,8 @@ import { BUILDINGS } from '../../data/buildings.js';
 import { TOWN_TIERS } from '../../data/town.js';
 import { describeWeather } from '../../data/weather.js';
 import { currentSeasonFestival } from '../../systems/SeasonFestivalSystem.js';
+import { currentFair } from '../../systems/Fair.js';
+import { currentGuest } from '../../systems/Guest.js';
 import { isRallyActive } from '../../systems/RallySystem.js';
 import { IMMIGRATION, TOWN_NAME_MAX_LENGTH } from '../../data/town.js';
 import { getSeason } from '../../data/seasons.js';
@@ -161,11 +163,13 @@ export class Hud {
     const injured = state.characters.filter((c) => c.isInjured).map((c) => c.name);
     // 14. aşama: duyurulan / süren mevsim festivali ve toplanma zili
     const festival = currentSeasonFestival(state);
+    const fairNow = currentFair(state);
+    const guestNow = currentGuest(state);
     const rally = isRallyActive(state) ? Math.ceil((state.rally.until - state.totalMinutes) / 10) : 0;
     // (21. aşama) açık dilekçeler ve isyan
     const petitions = state.petitions?.list ?? [];
     const revoltNow = state.trust?.revolt ?? null;
-    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}`;
+    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${fairNow?.type}:${fairNow?.phase}|${guestNow?.type}:${guestNow?.guest.name}:${guestNow?.guest.leaving}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}`;
     if (buffKey !== this.lastBuffs) {
       this.lastBuffs = buffKey;
       const chips = buffs.map((b) =>
@@ -186,6 +190,8 @@ export class Hud {
       const chip = (icon, text, title, cls = '') =>
         el('span', { className: `buff-chip${cls}`, title }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
       if (festival?.stage === 'announced') chips.unshift(chip(festival.festival.icon, `${festival.festival.name} · 15:00`, festival.festival.announce, ' is-festival'));
+      if (fairNow?.phase === 'prep') chips.unshift(chip(fairNow.fair.icon, `${fairNow.fair.name} · 18:00`, fairNow.fair.start, ' is-festival'));
+      if (guestNow) chips.push(chip(guestNow.def.icon, `${guestNow.def.name} · ${guestNow.guest.name}`, `${guestNow.def.name} ${guestNow.guest.name} kasabaya uğradı (${guestNow.guest.departureDay}. günün 09:00'una kadar). Geçici misafir: nüfusa ve konuta sayılmaz.`, ' is-festival'));
       if (rally) chips.push(chip('bell', 'Meydanda toplanma', 'Toplanma Zili çaldı: sakinler bir saatliğine meydanda'));
       if (sick.length) chips.push(chip('sneeze', `${sick.length} hasta`, `Üşütenler: ${sick.join(', ')}. Şifacı Kulübesi'nde iksirle hemen iyileşirler.`, ' is-freezing'));
       if (away.length) chips.push(chip('map', `Seferde: ${away.length}`, `Keşif seferindekiler: ${away.join(', ')}`));

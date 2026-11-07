@@ -81,6 +81,19 @@ import { AudioSystem } from '../systems/AudioSystem.js';
 import { FestivalEffects } from '../rendering/FestivalEffects.js';
 import { Random } from '../utils/random.js';
 import { getSelectionRing, getTargetMarker } from '../art/ui/index.js';
+import { LifeStageSystem } from '../systems/LifeStageSystem.js';
+import { ApprenticeshipSystem } from '../systems/ApprenticeshipSystem.js';
+import { drawSpeechBubbles } from '../rendering/SpeechBubbles.js';
+import { TemperamentSystem } from '../systems/TemperamentSystem.js';
+import { LineageSystem } from '../systems/LineageSystem.js';
+import { HeirloomSystem } from '../systems/HeirloomSystem.js';
+import { FairSystem } from '../systems/FairSystem.js';
+import { FeastSystem } from '../systems/FeastSystem.js';
+import { GuestSystem } from '../systems/GuestSystem.js';
+import { GuestEffects } from '../rendering/GuestEffects.js';
+import { currentFeastOf } from '../systems/Feast.js';
+import { FairDecor } from '../rendering/FairDecor.js';
+import { currentFair, fairVenue } from '../systems/Fair.js';
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -177,6 +190,20 @@ export class TownScene extends Scene {
     this.refinery = new RefinerySystem(this.game, this.world, { economy: this.economy });
     // (24.3) Dış ticaret: Ticaret İskelesi / Kervan Konağı, ihracat sözleşmeleri, pazar doygunluğu, ithalat (rastgelelik yok)
     this.tradePost = new TradePostSystem(this.game, this.world, { economy: this.economy });
+    // (25.2) Usta-Çırak sistemi: çıraklık, Gururlu Usta, çırak işi, mezuniyet (kendi üreteci; çırak yokken hiçbir şeyi değiştirmez)
+    this.apprenticeship = new ApprenticeshipSystem(this.game, this.world, new Random(state.seed + 28));
+    // (25.4) Aile Kütüğü, 2. kuşak düğünleri, Yeni Yuva ve Ocak Devri (kendi üreteci; ev değişiklikleri Altın Çağ'da)
+    this.lineageSystem = new LineageSystem(this.game, this.world, new Random(state.seed + 30), { petitions: this.petitions });
+    // (25.5) Aile yadigârları, miras intikali ve Kuşak Şöleni (kendi üreteci; Altın Çağ'da)
+    this.heirloomSystem = new HeirloomSystem(this.game, this.world, new Random(state.seed + 31), { economy: this.economy });
+    // (26.1) Mevsimlik panayırlar (kendi üreteci seed + 32; Altın Çağ'dan sonra, mevsimin son günü)
+    this.fairSystem = new FairSystem(this.game, this.world, new Random(state.seed + 32), { attract: this.attract });
+    // (26.2) Büyük Ziyafet Sofrası (kendi üreteci seed + 33; panayır günlerinde)
+    this.feastSystem = new FeastSystem(this.game, this.world, new Random(state.seed + 33), { crisis: this.crisis, attract: this.attract });
+    // (25.3) Mizaç kalıtımı ve yeni nesil huylar (kendi üreteci; Altın Çağ'da açılır)
+    this.temperament = new TemperamentSystem(this.game, this.world, new Random(state.seed + 29));
+    // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
+    this.lifeStages = new LifeStageSystem(this.game, this.world, new Random(state.seed + 27));
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       crisis: this.crisis,
@@ -186,6 +213,7 @@ export class TownScene extends Scene {
       crafting: this.crafting,
       health: this.health,
       research: this.research,
+      apprenticeship: this.apprenticeship,
     });
     this.saves = new SaveSystem(this.game, {
       captureTerrain: () => diffTerrain(this.baseTerrain, this.map),
@@ -196,6 +224,8 @@ export class TownScene extends Scene {
     this.townLevel = new TownLevelSystem(this.game, this.world, this.economy, { attract: this.attract });
     this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population }, { attract: this.attract });
     this.expeditions = new ExpeditionSystem(this.game, this.world, { economy: this.economy, health: this.health, dilemmas: this.dilemmas }, new Random(state.seed + 17));
+    // (26.3) Gezgin Konuklar: Seyyar Ozan, Nadir Takasçı, Yaşlı Seyyah (kendi üreteci seed + 34; Altın Çağ'dan sonra)
+    this.guestSystem = new GuestSystem(this.game, this.world, new Random(state.seed + 34), { expeditions: this.expeditions, attract: this.attract });
 
     // Sıra önemlidir: hava, yapı durumu ve kapasite, Bilgelik Evi ve liman durumu, iş temizliği, atölye durumu, ihtiyaç azalması,
     // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar, kasaba seviyesi ve doğa
@@ -234,6 +264,11 @@ export class TownScene extends Scene {
       this.expeditions,
       this.nature,
       this.tradePost,
+      this.lifeStages,
+      this.temperament,
+      this.fairSystem,
+      this.feastSystem,
+      this.guestSystem,
     ];
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
@@ -280,6 +315,11 @@ export class TownScene extends Scene {
       this.granary,
       this.refinery,
       this.tradePost,
+      this.lifeStages,
+      this.apprenticeship,
+      this.temperament,
+      this.lineageSystem,
+      this.heirloomSystem,
     ];
 
     this.camera = new Camera();
@@ -294,6 +334,9 @@ export class TownScene extends Scene {
     this.festivalFx = new FestivalEffects();
     this.confetti = new WeddingConfetti(); // (19. aşama) meydandaki düğün kutlaması
     this.ageConfetti = new WeddingConfetti(); // (20. aşama) Çağ Kutlaması
+    this.heirloomConfetti = new WeddingConfetti(); // (25.5) Kuşak Şöleni
+    this.guestFx = new GuestEffects(); // (26.3) gezgin konuk aksesuarı ve ozan notaları
+    this.fairDecor = new FairDecor(); // (26.1) panayır tentleri, flamalar ve mevsim süsleri (yalnızca çizim)
     this.chimeWaves = new ChimeWaves(); // (20. aşama) kule çanının ses dalgaları
     this.leaves = new LeafFall();
     this.animationTime = 0; // görsel animasyonlar için gerçek zaman (oyun duraklasa da akar)
@@ -713,6 +756,10 @@ export class TownScene extends Scene {
     }
     for (const character of this.world.characters) character.queueDraw(this.queue);
     for (const visitor of this.world.visitors) visitor.queueDraw(this.queue);
+    for (const guest of this.world.guests) {
+      guest.queueDraw(this.queue);
+      this.guestFx.queue(this.queue, guest, this.game.state.activeGuest?.type, env.time);
+    }
     for (const animal of this.game.state.animals) animal.queueDraw(this.queue, env);
     for (const boat of this.world.boats ?? []) boat.queueDraw(this.queue, env);
     this.queueFestivalDecor(env);
@@ -730,16 +777,23 @@ export class TownScene extends Scene {
     for (const building of this.world.buildings) building.collectLights(lights, env);
     const festivalVenue = this.festivalVenue();
     if (festivalVenue) this.festivalFx.collectLights(lights, festivalVenue, env.festivalTheme, this.game.state.seasonFestival);
+    const fair = currentFair(this.game.state);
+    const fairSite = fair ? fairVenue(this.world) : null;
+    if (fair && fairSite) this.fairDecor.collectLights(lights, fairSite, fair.type, fair.phase, currentFeastOf(this.game.state));
     this.dayNight.render(renderer, this.camera, hour, lights, weather, season.tint);
 
     // Atmosferin üstü: ateşböcekleri, yağmur, balonlar, iş işaretleri, araç önizlemesi ve imleç gece de net görünsün
     renderer.applyCamera(this.camera);
     this.fireflies.draw(renderer, view, fireflyIntensity(weather, hour), this.animationTime, season.fireflies);
     if (festivalVenue) this.festivalFx.draw(renderer, festivalVenue, this.animationTime, env.festivalTheme, this.game.state.seasonFestival);
+    if (fair && fairSite) this.fairDecor.draw(renderer, fairSite, this.animationTime, fair.type, fair.phase, currentFeastOf(this.game.state));
     const party = this.game.state.social.party;
     if (party && this.game.state.totalMinutes < party.until) this.confetti.draw(renderer, party, this.animationTime, view);
     const ageParty = this.game.state.goldenAge?.celebration;
     if (ageParty && this.game.state.totalMinutes < ageParty.until) this.ageConfetti.draw(renderer, ageParty, this.animationTime, view);
+    const feast = this.game.state.heirloom?.feast;
+    if (feast && this.game.state.totalMinutes < feast.until) this.heirloomConfetti.draw(renderer, feast, this.animationTime, view);
+    for (const guest of this.world.guests) this.guestFx.drawNotes(renderer, guest, this.animationTime);
     this.chimeWaves.draw(renderer, towerOf(this.game.state), this.animationTime);
     renderer.resetCamera();
     const daylight = 1 - Math.min(1, getAmbientColor(hour).a / 0.55);
@@ -750,7 +804,13 @@ export class TownScene extends Scene {
     if (!this.cinematic) drawJobMarkers(renderer, this.jobs.jobs, this.animationTime);
     for (const character of this.world.characters) character.drawOverlay(renderer);
     for (const visitor of this.world.visitors) visitor.drawOverlay(renderer);
+    for (const guest of this.world.guests) guest.drawOverlay(renderer);
     for (const animal of this.game.state.animals) animal.drawOverlay(renderer);
+    // (25.2) Usta / çırak / bilge konuşma baloncukları (ekran koordinatında, net yazı)
+    renderer.resetCamera();
+    drawSpeechBubbles(renderer, this.camera, this.world.characters, this.animationTime);
+    drawSpeechBubbles(renderer, this.camera, this.world.guests, this.animationTime); // (26.3) ozanın şarkıları, seyyahın masalları
+    renderer.applyCamera(this.camera);
     if (this.cinematic) {
       renderer.resetCamera();
       return; // fotoğraf modunda imleç, seçim ve araç önizlemesi çizilmez

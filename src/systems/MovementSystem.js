@@ -17,6 +17,7 @@ export class MovementSystem {
     // İki liste ayrı gezilir: her adımda (saniyede 60 kez) birleşik dizi kurmak çöp üretirdi
     this.step(this.world.characters, tick, now);
     this.step(this.world.visitors, tick, now);
+    this.step(this.world.guests, tick, now);
   }
 
   step(list, tick, now) {

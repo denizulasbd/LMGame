@@ -62,6 +62,8 @@ import { ITEMS } from '../data/citizens.js';
 import { productionOf, cropOf } from './Granary.js';
 import { CROPS, DEFAULT_CROP } from '../data/crops.js';
 import { INN_SHERBET } from '../data/refinery.js';
+import { PROFESSIONS } from '../data/apprenticeship.js';
+import { TEMPERAMENT } from '../data/temperament.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
 const TOWER_BUBBLES = ['hammer', 'hammer', 'sweat', 'sparkle']; // (20. aşama) Ulu Saat Kulesi şantiyesinde
@@ -86,6 +88,7 @@ export class BehaviorSystem {
     this.health = services.health;
     this.research = services.research;
     this.crisis = services.crisis ?? null; // (23. aşama)
+    this.apprenticeship = services.apprenticeship ?? null; // (25.2)
     this.state = game.state;
     this.brain = new Brain(world, rng, services);
     this.unsubscribers = [
@@ -531,7 +534,7 @@ export class BehaviorSystem {
     if (task.activity === 'build' && this.towerFor(task)) bubbles = TOWER_BUBBLES; // (20. aşama) kule şantiyesinde çekiç balonları
     if (activity.kind === 'social' || activity.kind === 'festival') bubbles = this.performSocial(c, task, activity, minutes);
     // Şenlikte ritimle sağa sola dönerek dans eder
-    if (activity.dance) c.facing = Math.floor((c.animTime + c.id * 0.3) / 0.6) % 2 === 0 ? 'left' : 'right';
+    if (activity.dance || (c.quirk === 'festive' && task.activity === 'fountain')) c.facing = Math.floor((c.animTime + c.id * 0.3) / 0.6) % 2 === 0 ? 'left' : 'right';
     if (activity.kind === 'work' && !this.performWork(c, task, minutes)) {
       this.endTask(c);
       return;
@@ -623,9 +626,13 @@ export class BehaviorSystem {
    * İş bittiyse ya da hedef kalmadıysa false döner (görev biter).
    */
   performWork(c, task, minutes) {
+    // (25.2) Çırak ustasını izler: yorgunluğu ve öğrenmesi ApprenticeshipSystem'dedir (üretim yok, deneyim yok)
+    if (task.activity === 'apprentice') return this.apprenticeship ? this.apprenticeship.learn(c, task, minutes) : false;
     const work = c.profile.work;
+    // (25.3) Zanaatkâr Ruhu zanaat yapılarında şevkle çalışır: daha az sıkılır, biraz hızlı çalışır (öteki sakinlere dokunulmaz)
+    const crafty = c.quirk === 'craftsman' && task.workBuildingId && PROFESSIONS[this.world.getBuilding(task.workBuildingId)?.type];
     c.needs.energy = clamp(c.needs.energy - DEFAULT_WORK.energyCost * work.fatigue * minutes, 0, 100);
-    c.needs.fun = clamp(c.needs.fun - DEFAULT_WORK.funCost * minutes, 0, 100);
+    c.needs.fun = clamp(c.needs.fun - DEFAULT_WORK.funCost * (crafty ? TEMPERAMENT.craftFunCost : 1) * minutes, 0, 100);
     // Kasaba bonusları (Alet Paketi, Şenlik Coşkusu, Lonca Ustaları) ve Belediye Konağı herkesi, meslek
     // ustalığı ustayı, kişisel ekipman (Sağlam Alet, Sırt Çantası) da kuşananı hızlandırır
     // Üşüten sakin %35 yavaş, şifacıdan Dinçlik alan %15 hızlı çalışır
@@ -639,6 +646,9 @@ export class BehaviorSystem {
       spiceWorkMultiplier(c, this.state.totalMinutes);
     // Zanaat Loncası fermanı üretim yapılarında (inşaat ve toplama emirleri hariç) verimi artırır
     if (task.workBuildingId) amount *= civicProductionMultiplier(this.state);
+    if (crafty) amount *= TEMPERAMENT.craftWorkSpeed;
+    // (25.2) Gururlu Usta: %50'yi geçen çırağın getir-götür işi tezgâha +%5 verim (çırak yoksa çarpılmaz)
+    if (task.workBuildingId && this.apprenticeship && c.buffs.proudMaster !== undefined) amount *= this.apprenticeship.masterBoost(c, task);
     // (12. aşama) Mimarlık Loncası inşaatı, yükseltmeyi ve onarımı hızlandırır
     // (13. aşama) Kraliyet Mimarları fermanı inşaatları 3 kat hızlandırır
     if (task.jobId && task.activity === 'build') amount *= researchBuildMultiplier(this.state) * buffMultiplier(this.state, 'buildSpeed');

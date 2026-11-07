@@ -43,6 +43,11 @@ export async function installMonitor(page) {
     window.__granaryMod = await import('/src/systems/Granary.js').catch(() => null);
     window.__refineryMod = await import('/src/systems/Refinery.js').catch(() => null); // (24.2)
     window.__tradeMod = await import('/src/systems/TradePost.js').catch(() => null); // (24.3)
+    window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
+    window.__apprMod = await import('/src/systems/Apprenticeship.js').catch(() => null); // (25.2)
+    window.__socialData = await import('/src/data/social.js').catch(() => null); // (25.3)
+    window.__lineageMod = await import('/src/systems/Lineage.js').catch(() => null); // (25.4)
+    window.__heirData = await import('/src/data/heirloom.js').catch(() => null); // (25.5)
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -202,7 +207,7 @@ export async function installMonitor(page) {
         m.homelessMax = Math.max(m.homelessMax, s.characters.filter((c) => c.homeId === null && !c.role).length);
         const freeBed = s.buildings.some((b) => b.functional && b.capacity && (homeCount.get(b.id) ?? 0) <= b.capacity - 2);
         for (const c of s.characters) {
-          if (!['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(c.quirk)) broke(`${c.name}: huyu yok (${c.quirk})`);
+          if (!(window.__socialData ? window.__socialData.QUIRKS[c.quirk] : ['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(c.quirk))) broke(`${c.name}: huyu yok (${c.quirk})`);
           if (c.relocating && !c.away) {
             if (!m.relocateSince.has(c.id)) m.relocateSince.set(c.id, now);
             else if (now - m.relocateSince.get(c.id) > RELOCATE_HOURS * 60) {
@@ -320,6 +325,93 @@ export async function installMonitor(page) {
           }
           for (const [r, v] of Object.entries(tp.market)) if (!(v >= 0.55 && v < 1)) broke(`geçersiz pazar çarpanı ${r}: ${v}`);
           m.tradeMinMarket = Math.min(m.tradeMinMarket ?? 1, ...Object.values(tp.market), 1);
+        }
+
+        // ---- (25.1) Yaşam evreleri: evre yaşla tutarlı, yaş sayacı geçerli, emekli bilge çalışmıyor, çekirdek sakin güvencesi ----
+        if (window.__lifeMod) {
+          const L = window.__lifeMod;
+          for (const c of s.characters) {
+            if (c.role) continue;
+            if (!L.isLifeStage(c.lifeStage)) broke(`${c.name}: geçersiz yaşam evresi (${c.lifeStage})`);
+            else if ((c.lifeStage === 'child') !== c.isChild) broke(`${c.name}: çocukluk ile evre uyuşmuyor (${c.lifeStage})`);
+            if (!Number.isInteger(c.ageInDays) || c.ageInDays < 0 || c.age !== L.ageFromDays(c.ageInDays)) broke(`${c.name}: geçersiz yaş sayacı (${c.age} / ${c.ageInDays})`);
+            if (c.retired && c.lifeStage !== 'elder') broke(`${c.name}: bilge olmadığı hâlde emekli`);
+            if (c.retired && (c.task?.jobId || c.task?.workBuildingId)) m.retiredWorking = (m.retiredWorking ?? 0) + 1;
+          }
+          const plan = L.retirementPlan(s);
+          if (s.characters.some((c) => c.lifeStage === 'elder' && !c.role && c.retired !== plan.retired.has(c.id))) m.retireLag = (m.retireLag ?? 0) + 1;
+          const counts = L.stageCounts(s);
+          m.maxElders = Math.max(m.maxElders ?? 0, counts.elder);
+          m.maxYouth = Math.max(m.maxYouth ?? 0, counts.youth);
+          if (counts.elder > 0 && L.coreWorkers(s).length + plan.volunteers.size < Math.min(3, counts.youth + counts.adult + counts.elder)) broke('çekirdek sakin güvencesi bozuldu');
+        }
+
+        // ---- (25.2) Çıraklık: çırak Genç, yapısı var ve zanaat yapısı, ilerleme 0-100, kontenjan aşılmaz, tabure ustanın yanında ----
+        if (window.__apprMod && s.apprenticeship) {
+          const A = window.__apprMod;
+          let active = 0;
+          for (const c of s.characters) {
+            const a = c.apprenticeship;
+            if (!a) {
+              if (c.task?.activity === 'apprentice') broke(`${c.name}: çırak değilken çıraklık yapıyor`);
+              continue;
+            }
+            active++;
+            if (c.lifeStage !== 'youth') m.adultApprentices = (m.adultApprentices ?? 0) + 1;
+            const b = s.buildings.find((x) => x.id === a.buildingId);
+            if (!b || !A.professionFor(b.type)) broke(`${c.name}: çıraklık yapısı yok`);
+            if (!(a.progress >= 0 && a.progress <= 100)) broke(`${c.name}: geçersiz çıraklık ilerlemesi (${a.progress})`);
+            if (a.masterId !== null && !s.characters.some((x) => x.id === a.masterId)) broke(`${c.name}: kayıp usta (${a.masterId})`);
+            if (a.masterId === null) m.orphanSamples = (m.orphanSamples ?? 0) + 1;
+          }
+          for (const b of s.buildings) if (A.professionFor(b.type) && A.apprenticesAt(s, b).length > A.apprenticeSlots(b)) broke(`${b.name}: çırak kontenjanı aşıldı`);
+          m.maxApprentices = Math.max(m.maxApprentices ?? 0, active);
+        }
+
+        // ---- (25.5) Yadigârlar: her sakinde en çok bir yadigâr, kasabada yadigâr kaybolmaz ----
+        if (s.heirloom && window.__heirData) {
+          let n = 0;
+          for (const c of s.characters) {
+            const h = (c.inventory ?? []).filter((x) => window.__heirData.HEIRLOOMS[x.kind]);
+            if (h.length > 1) broke(`${c.name}: birden fazla yadigâr`);
+            n += h.length;
+          }
+          const total = n + s.heirloom.archive.length;
+          if (total < (m.heirloomMax ?? 0)) broke(`yadigâr kayboldu (${total} < ${m.heirloomMax})`);
+          m.heirloomMax = Math.max(m.heirloomMax ?? 0, total);
+        }
+
+        // ---- (25.4) Aile Kütüğü: kuşak, ocak, çocuk listesi tutarlı; birinci derece akraba çift (ensest) yok ----
+        if (s.lineage && window.__lineageMod) {
+          const L = window.__lineageMod;
+          const ids = new Map(s.characters.map((c) => [c.id, c]));
+          for (const c of s.characters) {
+            if (c.role) continue;
+            if (!Number.isInteger(c.generation) || c.generation < 1) broke(`${c.name}: geçersiz kuşak (${c.generation})`);
+            if (!s.lineage.families[c.familyId]) broke(`${c.name}: ocağı yok (${c.familyId})`);
+            for (const pid of c.parents ?? []) {
+              const p = ids.get(pid);
+              if (p && c.generation !== Math.max(...c.parents.map((x) => ids.get(x)?.generation ?? 0)) + 1) broke(`${c.name}: kuşağı ebeveyniyle uyuşmuyor`);
+              if (p && !p.children.includes(c.id)) broke(`${p.name}: çocuk listesinde ${c.name} yok`);
+            }
+            if (c.partnerId !== null) {
+              const o = ids.get(c.partnerId);
+              if (o && L.closeKin(c, o)) broke(`${c.name} ve ${o.name}: birinci derece akraba çift`);
+            }
+          }
+          m.maxGeneration2 = Math.max(m.maxGeneration2 ?? 0, ...s.characters.map((c) => c.generation ?? 1));
+        }
+
+        // ---- (25.3) Mizaç: huy tanımlı mı, kaynak geçerli mi ----
+        if (s.temperament && window.__socialData) {
+          const Q = window.__socialData.QUIRKS;
+          for (const c of s.characters) {
+            if (c.role) continue;
+            if (c.quirk && !Q[c.quirk]) broke(`${c.name}: bilinmeyen huy (${c.quirk})`);
+            if (c.quirkOrigin && !['family', 'mentor', 'craft', 'self'].includes(c.quirkOrigin.kind)) broke(`${c.name}: geçersiz huy kaynağı`);
+          }
+          const gen = s.characters.filter((c) => Q[c.quirk]?.generation).length;
+          m.maxGeneration = Math.max(m.maxGeneration ?? 0, gen);
         }
 
         // ---- (23. aşama) Krizler: yangın, hasar, haydut baskını, yaralanma ----
@@ -477,6 +569,59 @@ export async function installMonitor(page) {
                 spoiled: { ...(s.granary?.spoiled ?? {}) },
                 switches: s.granary?.switches ?? 0,
                 granaryCapacity: s.granaryCapacity ?? 0,
+              }
+            : null,
+          // (25.5)
+          heirloom: s.heirloom && window.__heirData
+            ? {
+                carried: s.characters.flatMap((c) => (c.inventory ?? []).filter((x) => window.__heirData.HEIRLOOMS[x.kind]).map((x) => `${c.name}:${x.name}:${x.heirloom?.chain?.join('>')}`)),
+                state: { created: s.heirloom.created, transfers: s.heirloom.transfers, archive: s.heirloom.archive.length },
+                first: s.chronicle?.firstHeirloom ?? null,
+              }
+            : null,
+          // (25.4)
+          lineage: s.lineage
+            ? {
+                generations: s.characters.filter((c) => !c.role).reduce((m2, c) => ({ ...m2, [c.generation]: (m2[c.generation] ?? 0) + 1 }), {}),
+                families: Object.keys(s.lineage.families).length,
+                maxGeneration: m.maxGeneration2 ?? 1,
+                gen2Married: s.characters.filter((c) => c.married && (c.generation ?? 1) >= 2).length,
+                firstGen2Couple: s.chronicle?.firstGen2Couple ?? null,
+                state: { ...s.lineage, families: undefined, heads: Object.keys(s.lineage.heads).length },
+              }
+            : null,
+          // (25.3)
+          temperament: s.temperament && window.__socialData
+            ? {
+                counts: Object.fromEntries(Object.keys(window.__socialData.QUIRKS).map((k) => [k, s.characters.filter((c) => c.quirk === k).length])),
+                maxGeneration: m.maxGeneration ?? 0,
+                state: { ...s.temperament },
+                petitions: { ...(s.temperament.petitions ?? {}) },
+              }
+            : null,
+          // (25.2)
+          apprentice: window.__apprMod && s.apprenticeship
+            ? {
+                open: s.apprenticeship.open.length,
+                active: s.characters.filter((c) => c.apprenticeship).length,
+                maxActive: m.maxApprentices ?? 0,
+                list: s.characters.filter((c) => c.apprenticeship).map((c) => `${c.name}:${c.apprenticeship.profession}:%${Math.floor(c.apprenticeship.progress)}`),
+                orphanSamples: m.orphanSamples ?? 0,
+                adultApprentices: m.adultApprentices ?? 0,
+                state: { ...s.apprenticeship, open: undefined },
+              }
+            : null,
+          // (25.1)
+          life: window.__lifeMod
+            ? {
+                counts: window.__lifeMod.stageCounts(s),
+                maxElders: m.maxElders ?? 0,
+                maxYouth: m.maxYouth ?? 0,
+                retired: s.characters.filter((c) => c.retired).length,
+                retiredWorking: m.retiredWorking ?? 0,
+                retireLag: m.retireLag ?? 0,
+                ages: s.characters.filter((c) => !c.role).map((c) => c.age),
+                state: { ...(s.lifeStages ?? {}) },
               }
             : null,
           // (24.3)

@@ -57,6 +57,13 @@ export const TOWN_BUFFS = {
   blossomFestival: { name: 'Çiçek Şenliği', icon: 'blossom', hours: 9, friendship: 1.8, romance: 2.5, funDecay: 0.5 },
   sunFair: { name: 'Güneş ve Nehir Panayırı', icon: 'sunfair', hours: 9, friendship: 1.4, funDecay: 0.4, happiness: 4 },
   harvestFeast: { name: 'Büyük Hasat Bayramı', icon: 'harvest', hours: 9, friendship: 1.4, funDecay: 0.5, happiness: 5 },
+  // 26.1: panayırın şenlik saati (data/fair.js) — Panayır Coşkusu
+  fairSpirit: { name: 'Panayır Coşkusu', icon: 'sparkle', hours: 4, friendship: 1.4, funDecay: 0.5 },
+  // 26.2: Büyük Ziyafet Sofrası (data/feast.js): şenlik saatinden ertesi sabaha
+  tradition: { name: 'Gelenek Bağı', icon: 'heart', hours: 12, friendship: 1.3, funDecay: 0.6, happiness: 3 },
+  bounty: { name: 'Bolluk Ziyafeti', icon: 'bread', hours: 12, happiness: 5 },
+  // 26.3: Seyyar Ozan akşamları çalarken (data/guest.js)
+  bardSong: { name: 'Ozan Ezgisi', icon: 'note', hours: 4, friendship: 1.25, funDecay: 0.6 },
   lightsNight: { name: 'Işıklar Gecesi', icon: 'snowman', hours: 9, friendship: 1.5, funDecay: 0.4, happiness: 6 },
   seasonCheer: { name: 'Mevsim Coşkusu', icon: 'sparkle', hours: 24, workSpeed: 1.15, funDecay: 0.8, happiness: 6 },
   // 21. aşama: bir vatandaş dilekçesi karşılanınca (PetitionSystem) kasaba bir gün "sesimiz duyuldu" der
