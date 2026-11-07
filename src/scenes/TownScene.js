@@ -89,6 +89,8 @@ import { LineageSystem } from '../systems/LineageSystem.js';
 import { HeirloomSystem } from '../systems/HeirloomSystem.js';
 import { FairSystem } from '../systems/FairSystem.js';
 import { FeastSystem } from '../systems/FeastSystem.js';
+import { GuestSystem } from '../systems/GuestSystem.js';
+import { GuestEffects } from '../rendering/GuestEffects.js';
 import { currentFeastOf } from '../systems/Feast.js';
 import { FairDecor } from '../rendering/FairDecor.js';
 import { currentFair, fairVenue } from '../systems/Fair.js';
@@ -222,6 +224,8 @@ export class TownScene extends Scene {
     this.townLevel = new TownLevelSystem(this.game, this.world, this.economy, { attract: this.attract });
     this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population }, { attract: this.attract });
     this.expeditions = new ExpeditionSystem(this.game, this.world, { economy: this.economy, health: this.health, dilemmas: this.dilemmas }, new Random(state.seed + 17));
+    // (26.3) Gezgin Konuklar: Seyyar Ozan, Nadir Takasçı, Yaşlı Seyyah (kendi üreteci seed + 34; Altın Çağ'dan sonra)
+    this.guestSystem = new GuestSystem(this.game, this.world, new Random(state.seed + 34), { expeditions: this.expeditions, attract: this.attract });
 
     // Sıra önemlidir: hava, yapı durumu ve kapasite, Bilgelik Evi ve liman durumu, iş temizliği, atölye durumu, ihtiyaç azalması,
     // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar, kasaba seviyesi ve doğa
@@ -264,6 +268,7 @@ export class TownScene extends Scene {
       this.temperament,
       this.fairSystem,
       this.feastSystem,
+      this.guestSystem,
     ];
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
@@ -330,6 +335,7 @@ export class TownScene extends Scene {
     this.confetti = new WeddingConfetti(); // (19. aşama) meydandaki düğün kutlaması
     this.ageConfetti = new WeddingConfetti(); // (20. aşama) Çağ Kutlaması
     this.heirloomConfetti = new WeddingConfetti(); // (25.5) Kuşak Şöleni
+    this.guestFx = new GuestEffects(); // (26.3) gezgin konuk aksesuarı ve ozan notaları
     this.fairDecor = new FairDecor(); // (26.1) panayır tentleri, flamalar ve mevsim süsleri (yalnızca çizim)
     this.chimeWaves = new ChimeWaves(); // (20. aşama) kule çanının ses dalgaları
     this.leaves = new LeafFall();
@@ -750,6 +756,10 @@ export class TownScene extends Scene {
     }
     for (const character of this.world.characters) character.queueDraw(this.queue);
     for (const visitor of this.world.visitors) visitor.queueDraw(this.queue);
+    for (const guest of this.world.guests) {
+      guest.queueDraw(this.queue);
+      this.guestFx.queue(this.queue, guest, this.game.state.activeGuest?.type, env.time);
+    }
     for (const animal of this.game.state.animals) animal.queueDraw(this.queue, env);
     for (const boat of this.world.boats ?? []) boat.queueDraw(this.queue, env);
     this.queueFestivalDecor(env);
@@ -783,6 +793,7 @@ export class TownScene extends Scene {
     if (ageParty && this.game.state.totalMinutes < ageParty.until) this.ageConfetti.draw(renderer, ageParty, this.animationTime, view);
     const feast = this.game.state.heirloom?.feast;
     if (feast && this.game.state.totalMinutes < feast.until) this.heirloomConfetti.draw(renderer, feast, this.animationTime, view);
+    for (const guest of this.world.guests) this.guestFx.drawNotes(renderer, guest, this.animationTime);
     this.chimeWaves.draw(renderer, towerOf(this.game.state), this.animationTime);
     renderer.resetCamera();
     const daylight = 1 - Math.min(1, getAmbientColor(hour).a / 0.55);
@@ -793,10 +804,12 @@ export class TownScene extends Scene {
     if (!this.cinematic) drawJobMarkers(renderer, this.jobs.jobs, this.animationTime);
     for (const character of this.world.characters) character.drawOverlay(renderer);
     for (const visitor of this.world.visitors) visitor.drawOverlay(renderer);
+    for (const guest of this.world.guests) guest.drawOverlay(renderer);
     for (const animal of this.game.state.animals) animal.drawOverlay(renderer);
     // (25.2) Usta / çırak / bilge konuşma baloncukları (ekran koordinatında, net yazı)
     renderer.resetCamera();
     drawSpeechBubbles(renderer, this.camera, this.world.characters, this.animationTime);
+    drawSpeechBubbles(renderer, this.camera, this.world.guests, this.animationTime); // (26.3) ozanın şarkıları, seyyahın masalları
     renderer.applyCamera(this.camera);
     if (this.cinematic) {
       renderer.resetCamera();

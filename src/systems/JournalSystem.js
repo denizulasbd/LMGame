@@ -200,6 +200,10 @@ export class JournalSystem {
       on('festival:started', ({ venue, festival, fair }) => this.log(fair ? `Şenlik saati: ${festival.name} ${venue.name} başında coşkuyla sürüyor` : festival ? `${festival.name} başladı (${venue.name})` : `Kasaba Şenliği başladı (${venue.name})`, festival?.icon ?? 'note')),
       // 26.1: mevsimlik panayır
       on('fair:prep', ({ fair }) => this.log(fair.start, fair.icon)),
+      // 26.3: gezgin konuklar
+      on('guest:arrived', ({ guest, def }) => this.log(def.arrive.replace('{name}', guest.name), def.icon)),
+      on('guest:left', ({ guest, def, thanks }) => thanks && this.log(def.thanks.replace('{name}', guest.name), def.icon)),
+      on('guest:barter', ({ offer }) => this.log(`Nadir takas: ${offer.name} (${offer.text})`, offer.icon)),
       on('feast:set', ({ tier }) => this.log(TIERS[tier].set, TIERS[tier].icon)),
       on('feast:ended', ({ tier, served, total }) => this.log(`${TIERS[tier].name} toplandı: ${served} sakin sofradan pay aldı (${total} ikramın)`, TIERS[tier].icon)),
       on('fair:ended', ({ fair, attendees }) => this.log(`${fair.name} 22:00'de sona erdi; ${attendees.length} sakin kutladı`, fair.icon)),

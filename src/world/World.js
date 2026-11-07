@@ -27,6 +27,7 @@ export class World {
     this.landmarks = landmarks;
     this.reservations = new Map(); // "x,y" -> karakter kimliği
     this.visitors = []; // kasabalı olmayan, haritada yürüyen karakterler (tüccar)
+    this.guests = []; // (26.3) geçici gezgin konuk (Seyyar Ozan / Nadir Takasçı / Yaşlı Seyyah; GuestSystem): nüfusa, konuta, iş gücüne sayılmaz
     this.boats = []; // nehirdeki ticaret teknesi (HarborSystem, 12. aşama; yalnızca çizim)
 
     this.pathGrid = {

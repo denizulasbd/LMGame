@@ -601,6 +601,29 @@ const PAGE_HELPERS = () => {
       s.stats.feastServings = keepStat[1];
     }
 
+    // --- 2u. (26.3) Gezgin konuk haritadayken (masal anlatırken, dinlenirken) ---
+    {
+      const t = s.time;
+      const keepGA = s.goldenAge.since;
+      const keepBook = JSON.stringify(s.guestBook);
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      s.activeGuest = null;
+      sim.scene().world.guests = [];
+      s.guestBook.nextDay = t.day + 1;
+      Object.assign(t, { day: t.day + 1, hour: 8, minute: 58 });
+      sim.step(10);
+      while (t.hour < 11) sim.step(30);
+      A.roundtrip();
+      const live = JSON.stringify(s.activeGuest);
+      const pop = s.characters.length;
+      const diff = A.roundtrip();
+      check('gezgin konuk haritadayken kayıt -> yükleme durum kayması yok (activeGuest, konuk defteri); konuk nüfusa sayılmaz', s.activeGuest !== null && JSON.stringify(s.activeGuest) === live && sim.scene().world.guests.length === 1 && s.characters.length === pop && !s.characters.some((c) => c.isGuest) && diff.length === 0, `${live} ${diff.join(' | ')}`);
+      hours(60);
+      check('yüklemeden sonra konuk süresini doldurup ayrılır (activeGuest null, world.guests boş), sakin listesine hiç karışmaz', s.activeGuest === null && sim.scene().world.guests.length === 0 && !s.characters.some((c) => c.isGuest), JSON.stringify(s.activeGuest));
+      s.goldenAge.since = keepGA;
+      s.guestBook = JSON.parse(keepBook);
+    }
+
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();

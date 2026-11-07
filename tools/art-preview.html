@@ -31,6 +31,8 @@
     import { PROFESSIONS } from '../src/data/apprenticeship.js';
     import { HEIRLOOMS } from '../src/data/heirloom.js';
     import { FairDecor } from '../src/rendering/FairDecor.js';
+    import { GuestEffects } from '../src/rendering/GuestEffects.js';
+    import { GUEST_TYPES } from '../src/data/guest.js';
     import { FAIRS, FAIR_TYPES } from '../src/data/fair.js';
 
     const root = document.getElementById('root');
@@ -59,6 +61,37 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 26.3: Gezgin konuklar — Seyyar Ozan (kep, lir, müzik notaları), Nadir Takasçı (geniş şapka, halı, çanta), Yaşlı Seyyah (kapüşonlu pelerin, kitap) ---
+    {
+      const fx = new GuestEffects();
+      const look = (extra) => ({ child: false, coat: false, bag: false, outfit: null, stage: null, ...extra });
+      const W = 150;
+      const H = 90;
+      const fountain = getStructureSprite('fountain', {});
+      const market = getStructureSprite('market', { open: true, frame: 0 });
+      const inn = getStructureSprite('inn', { lit: true, frame: 0 });
+      const gazebo = getStructureSprite('gazebo', {});
+      const draw = (ctx) => ({ fillRect: (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }, drawImage: (img, x, y) => ctx.drawImage(img, x, y) });
+      const guestScene = (type, facing, base, bx, by, gx, gy, { time = 1.0, playing = false, night = false, stage = null, backpack = false } = {}) => scene(W, H, [[base, bx, by + base.height]], (ctx) => {
+        const r = draw(ctx);
+        const sprite = getCharacterSprite(GUEST_TYPES[type].appearances[0], facing, 'idle0', look({ stage }));
+        ctx.drawImage(sprite, Math.round(gx - 6), Math.round(gy - sprite.height + 1));
+        if (backpack) ctx.drawImage(getBackpackSprite(facing === 'left' ? 'left' : 'front'), gx - 5, gy - 21);
+        fx.drawAccessory(r, gx, gy, sprite.height, facing, type, time, playing);
+        if (playing) fx.drawNotes(r, { visible: true, playing: true, x: gx, y: gy }, time);
+        if (night) { ctx.fillStyle = 'rgba(20, 16, 50, 0.3)'; ctx.fillRect(0, 0, W, H); fx.drawAccessory(r, gx, gy, sprite.height, facing, type, time, playing); if (playing) fx.drawNotes(r, { visible: true, playing: true, x: gx, y: gy }, time); }
+      });
+      const f1 = [
+        [`Seyyar Ozan · meydan havuzu kenarında çalıyor (akşam)`, guestScene('bard', 'down', fountain, 40, 28, 112, 70, { playing: true, night: true })],
+        [`Seyyar Ozan · hanın önünde dinleniyor`, guestScene('bard', 'left', inn, 30, 14, 108, 78)],
+        [`Nadir Takasçı · pazar tezgâhında`, guestScene('collector', 'down', market, 30, 18, 112, 76, { backpack: true })],
+        [`Nadir Takasçı · yürürken (sol)`, guestScene('collector', 'left', market, 30, 18, 60, 80, { backpack: true })],
+        [`Yaşlı Seyyah · çardakta masal anlatıyor`, guestScene('storyteller', 'down', gazebo, 34, 16, 108, 76, { stage: 'elder' })],
+        [`Yaşlı Seyyah · yürürken (sağ)`, guestScene('storyteller', 'right', gazebo, 34, 16, 40, 80, { stage: 'elder' })],
+      ];
+      show('Gezgin konuklar (26.3): her türün kendine has pelerin / şapka / enstrüman detayı; ozan çalarken havaya yükselen müzik notaları', f1, 4);
+    }
 
     // --- 26.2: Büyük Ziyafet Sofrası — meydan havuzunun yanında; hazırlıkta yalnızca örtü, şenlikte dolu ve boş hâlleri, üç seviye ---
     {

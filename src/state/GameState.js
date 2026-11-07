@@ -36,6 +36,7 @@ import { emptyLineage, restoreLineage } from '../systems/Lineage.js';
 import { emptyHeirloomState, restoreHeirloomState } from '../systems/Heirloom.js';
 import { sanitizeCurrentFestival } from '../systems/Fair.js';
 import { sanitizeCurrentFeast } from '../systems/Feast.js';
+import { emptyGuestBook, restoreGuestBook, sanitizeActiveGuest } from '../systems/Guest.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
 
@@ -196,6 +197,8 @@ export class GameState {
     this.temperament = emptyTemperament(); // (25.3) mizaç gelişimi sayaçları
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
     this.heirloom = emptyHeirloomState(); // (25.5) aile yadigârları: sayaçlar, arşiv, Kuşak Şöleni
+    this.activeGuest = null; // (26.3) geçici gezgin konuk (GuestSystem): null | { type, name, look, arrivalDay, departureDay, x, y, leaving, resting, barters, lastBarterDay }
+    this.guestBook = emptyGuestBook(); // (26.3) konuk defteri: sonraki geliş günü, ziyaret / takas sayaçları, Kasaba Bilgeliği
     this.currentFeast = null; // (26.2) Büyük Ziyafet Sofrası (FeastSystem): null | { tier, day, contributions, servings, served }
     this.currentFestival = null; // (26.1) mevsimlik panayır (FairSystem): null | { type, day, phase: 'prep' | 'party' }
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
@@ -280,6 +283,8 @@ export class GameState {
       heirloom: this.heirloom,
       currentFestival: this.currentFestival,
       currentFeast: this.currentFeast,
+      activeGuest: this.activeGuest,
+      guestBook: this.guestBook,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -390,6 +395,8 @@ export class GameState {
     next.lifeStages = restoreLifeStages(data.lifeStages);
     next.temperament = restoreTemperament(data.temperament); // (25.3)
     next.lineage = restoreLineage(data.lineage);
+    next.activeGuest = sanitizeActiveGuest(data.activeGuest); // (26.3) v2-v30 kayıtlarında alan yoktur: null
+    next.guestBook = restoreGuestBook(data.guestBook);
     next.currentFeast = sanitizeCurrentFeast(data.currentFeast); // (26.2) v2-v29 kayıtlarında alan yoktur: null
     next.currentFestival = sanitizeCurrentFestival(data.currentFestival); // (26.1) v2-v28 kayıtlarında alan yoktur: null
     next.heirloom = restoreHeirloomState(data.heirloom); // (25.5) // (25.4) sakinlerin soy verisi LineageSystem'de tamamlanır

@@ -3365,6 +3365,97 @@ panayırı olmayan ya da başka güne ait sofra açılışta kaldırılır. Fiks
 - **Tohum 42 determinizmi.** `autopilot.mjs 42 24` (kule G25'ten önce): 26.1 ile bu adımın kayıt anlık görüntülerinde tek fark `version` ve yeni boş `currentFeast`;
   `--json` raporu bayt bayt aynı. Uzun koşuda kule G25 / G27 / G28, Altın Çağ G28.
 
+## Gezgin Konuklar, Seyyar Ozanlar ve Nadir Takaslar (26. aşama, 26.3 mikro adımı)
+
+26. aşamanın son adımında kasabaya **geçici gezgin konuklar** uğruyor: bir ozan, bir nadir takasçı ya da bir masalcı. Veriler `data/guest.js`'te, saf
+hesaplar `systems/Guest.js`'te, mantık `systems/GuestSystem.js`'te, çizim `rendering/GuestEffects.js`'tedir.
+
+| Konuk | Gündüz | Akşam | Etkisi |
+|---|---|---|---|
+| **Seyyar Ozan** | handa | 18:00 - 22:00 meydan havuzu kenarında lir çalar | **Ozan Ezgisi** bonusu (arkadaşlık, keyfin yavaş azalması); 150 piksel içindeki boştaki sakinlerin keyfi hızla dolar; şarkı sözleri |
+| **Nadir Takasçı** | 09:00 - 18:00 pazar tezgâhında (yoksa Ticaret İskelesi / meydan) | handa | öğlen fazla lüks mallarla **nadir takas**: Antik Şema, Mermer Heykel Parçası, Egzotik Tohum |
+| **Yaşlı Seyyah (Masalcı)** | 10:00 - 17:00 çardakta (yoksa Bilgelik Evi / meydan) masal anlatır | handa | dinleyen çocuk ve gençlere **Bilgelik** (scholarship) deneyimi, **Kasaba Bilgeliği** sayacı; Kıdemli Bilgelerle nostaljik sohbet |
+
+### Geliş, kalış ve ayrılış
+
+- **Altın Çağ kapısı.** Konuk Altın Çağ'dan **önce hiç gelmez**: erken oyun ve Ulu Saat Kulesi'ne kadarki her olay kaydı bayt bayt aynı kalır. Altın Çağ'dan 2 gün
+  sonra ilk konuk, ardından her ayrılıştan **6-8 gün** sonra bir yenisi gelir; sıradaki gün bir **panayır gününe 2 gün kadar yakınsa** konuk panayırla birlikte gelir.
+  Konuk türü bir öncekinden farklı seçilir.
+- **Akış.** 09:00'da harita kenarından girer, **24-48 saat** kalır (ayrılış gününün 09:00'unda yola çıkar), gece handa (yoksa çardakta / meydanda) dinlenir
+  (haritada görünmez, `resting`), 07:00'de uyanır. Ayrılırken Kasaba Günlüğü ve üst bildirimde teşekkür mesajı: "Seyyar Ozan Aydın kasabanın misafirperverliğine
+  teşekkür ederek yeni diyarlara doğru yola çıktı."
+- **Geçici misafir (`isGuest: true`).** Konuk `state.characters`'ta ve `world.characters`'ta **değildir** (`world.guests`): konut kapasitesini, iş gücü kotalarını,
+  nüfusu, göç koşullarını ve sakin sayacını etkilemez. Brain yönetmez; sahne akışını `GuestSystem` yürütür, sakinlerin kararlarına, mesaiye ve otopilota dokunulmaz.
+- **İzole üreteç.** `GuestSystem` kendi tohumlanmış üretecini kullanır (`TownScene` -> **seed + 34**): geliş zamanı, tür, kimlik, takas ve söz seçimi. Ana
+  üretece ve `Math.random`'a dokunmaz (konuk karakterinin kurucusundaki görsel `Math.random` çağrıları da engellenir ve değerler kendi üretecimizden verilir).
+
+### Nadir takas
+
+Takasçı günde bir kez (öğlen, konaklama başına en çok 2) **rezervin üstündeki** lüks malları takas eder. Rezerv Kumaş 2 ve Fıçı Şerbeti 2'dir: Zengin Şölen Sofrası'na
+yetecek stok her zaman kalır. Kilerdeki temel erzağa ve altına dokunulmaz.
+
+| Takas | Bedel | Karşılığı (mevcut keşif sistemi, `ExpeditionSystem.grantFind`) |
+|---|---|---|
+| Antik Şema | 5 Kumaş + 3 Fıçı Şerbeti | bir kadim yazıt (Bilgelik Evi'nde çözülünce kalıcı imar şeması; hepsi bulunduysa yadigâr parçası) |
+| Mermer Heykel Parçası | 3 Kumaş + 2 Fıçı Şerbeti | Kadim Yadigâr Parçası (3 parça birleşince +2 refah) |
+| Egzotik Tohum | 3 Fıçı Şerbeti | Egzotik Üzüm Fidesi (asma) |
+
+Takas otomatiktir (pazarlık penceresi yok): oyuncu fazla lüks malı biriktirir, takasçı geldiğinde karşılığı kasabaya geçer. Elde yeterli fazla yoksa "Fazla lüks malınız
+yok" der ve takas yapılmaz.
+
+### Görünüm
+
+`GuestEffects`: ozanın tüylü yeşil kepi ve lir (çalarken sallanır) ile havaya yükselen **müzik notaları**; takasçının geniş kenarlı şapkası, kırmızı atkısı, halı rulosu ve
+sırt çantası; masalcının kapüşonlu mor pelerini ve kitabı (yaşlı evre + baston). Sözler 25.2'deki **ayrı metin katmanında** (`c.speech`, `SpeechBubbles`); ikon baloncuğuna
+dokunulmaz. Üst çubukta konuk çipi. `tools/art-preview.html`: üç konuk, han / pazar / çardak / meydan sahneleri.
+
+### Kayıt (sürüm 31)
+
+`SAVE_VERSION = 31`. Kayda `activeGuest: null | { type, name, look, arrivalDay, departureDay, x, y, leaving, resting, barters, lastBarterDay }` ve `guestBook` (sonraki geliş günü,
+ziyaret / takas sayaçları, takas türleri, Kasaba Bilgeliği) eklendi. **Sürüm 2-30 kayıtlarında** alanlar yoktur: `null` / boş defterle açılır. Bozuk değerler temizlenir
+(eksik / saçma alanlar düzeltilir); süresi dolmuş konuk açılışta sessizce uğurlanır. Fikstür: `tools/sim/fixtures/save-v31.json`.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1125; 34'ü bu adımın): veri; Altın Çağ kapısı (öncesinde konuk yok); doğal akışla 09:00 giriş, geçici misafir
+  (`isGuest`, sakin listelerinde yok, nüfus / konut / göç aynı, günlerce kalış boyunca hiç sızmaz), 24-48 saatlik kalış ve teşekkürle ayrılış, sonraki geliş 6-8 gün sonra;
+  panayır yakınlığı (2 gün erken gelebilir, 3 gün fazla ise gelmez); Ozan (Ozan Ezgisi, yakın dinleyen + / uzak yok, şarkılar ayrı metin katmanı, ikon baloncuğu
+  değişmez); Takasçı (bedel düşer, ganimet geçer, rezervde takas yok, günde 1 / kalışta en çok 2, erzağa ve altına dokunmaz); Masalcı (genç / çocuk deneyimi,
+  yetişkin değil, Kıdemli Bilge sohbeti); gece dinlenme, uyanma, ayrılış; izole üreteç (seed + 34, `Math.random` 0 çağrı); çizim; kayıt sürümü 31 (gidiş-dönüş,
+  bozuk değerler, saçma alanlar, süresi dolmuş konuk, v30 kaydı).
+- **Test dünyası.** Gezgin konuklar da 26. aşamadan önceki bölümleri etkilemesin diye (26.1 / 26.2'deki panayır izolasyonuyla aynı gerekçe) 26.3 bölümüne kadar kapalı tutulur;
+  eski bölümlerdeki hiçbir doğrulama değişmedi (yalnızca "güncel sürüm" 30 -> 31).
+- **Denetim** (`audit.mjs`): 124/124. Yeni senaryo: konuk haritadayken (masal anlatırken) kayıt -> yükleme durum kayması yok, konuk nüfusa sayılmaz; yüklemeden sonra süresini
+  doldurup ayrılır.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-31, 1137): `save-v31.json` otopilotla 69 günlük oyundur (`--crisis-state`): 68. gün (Bahar Çiçek Panayırı günü) öğleden sonra
+  haritada Seyyar Ozan Aydın, konuk defterinde 6 ziyaret; çıraklar ve diğer önceki sistemler de içinde. v2-v30 kayıtlarının hepsi `activeGuest: null` ve boş konuk defteriyle açılır.
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0.
+  **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34** (değişmedi).
+- **Tohum 42 determinizmi.** `autopilot.mjs 42 24` (kule G25'ten önce): 26.2 ile bu adımın kayıt anlık görüntülerinde tek fark `version` ve iki yeni boş alan (`activeGuest`,
+  `guestBook`); `--json` raporu bayt bayt aynı. Uzun koşuda kule G25 / G27 / G28, Altın Çağ G28; ilk konuk Altın Çağ'dan sonra gelir.
+
+
+## 26. Aşama özeti: Panayırlar, Ziyafet ve Gezgin Konuklar (26.1 - 26.3)
+
+26. aşama, Altın Çağ'a ulaşmış kasabaya **tekrar eden bir şenlik takvimi** getirdi. Üç adım birbirine bağlıdır:
+
+| Adım | Ne eklendi | Kayıt | Yeni üreteç | Testler |
+|---|---|---|---|---|
+| **26.1** Mevsimlik Panayır | Dört mevsimin son günü: 06:00 hazırlık (tent, flama), 18:00 - 22:00 şenlik, 22:00 kapanış; Panayır Coşkusu, 2. kuşak Şenlik Neşesi, Kıdemli Bilge nostaljisi; Tarihçe'de ilk panayır | 29 (`currentFestival`) | seed + 32 | 1053 |
+| **26.2** Büyük Ziyafet Sofrası | Panayır günü meydan havuzunun yanında sofra (Zengin / Mütevazı / Sembolik); kiler güvencesi (kişi başı besin >= 3); Gelenek Bağı, Bolluk Ziyafeti, güven +5 / +10, 2 kat şifa, huy sözleri | 30 (`currentFeast`) | seed + 33 | 1091 |
+| **26.3** Gezgin Konuklar | Seyyar Ozan, Nadir Takasçı, Yaşlı Seyyah; geçici misafir (`isGuest`), nadir takaslar, ozan ezgisi, masal ve bilgelik | 31 (`activeGuest`, `guestBook`) | seed + 34 | 1125 |
+
+**Ortak ilkeler.**
+
+- **Altın Çağ kapısı:** üç sistem de Altın Çağ'dan **önce hiç çalışmaz**. Tohum 42'nin kule öncesi olay kayıtları bayt bayt aynıdır; Ulu Saat Kulesi G25 / G27 / G28 ve Altın Çağ
+  G28 hiç değişmedi (stres matrisinde Altın Çağ G31, G33, G31, G28, G34, G34).
+- **Mesai korunur:** 08:00 - 17:00 mesaisine dokunulmaz; şenlik ve sofra 18:00 - 22:00'de; konuklar sakinlerin kararlarına karışmaz.
+- **İzole üreteçler:** seed + 32 / 33 / 34, her biri yalnızca söz, kimlik ve zamanlama seçer; ana üreteç ve `Math.random` testlerle doğrulanır (ilerlemez).
+- **Metin katmanı:** şarkılar, masallar, kadeh sözleri ve nostalji 25.2'deki ayrı `c.speech` katmanındadır; ikon baloncuğunun zar sırası değişmez.
+- **Harita bozulmaz:** panayır süsleri, sofra ve konuk aksesuarları yalnızca çizilir (`FairDecor`, `GuestEffects`).
+- **Geriye uyumluluk:** v2-v31 kayıtları sıfır hatayla açılır (`compat.mjs` 1137 doğrulama).
+- **Eski testler:** 26. aşamadan önceki bölümler panayırsız ve konuksuz dünyada koşar (`tests.mjs`); hiçbir eski doğrulama gevşetilmedi.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.

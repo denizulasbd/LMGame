@@ -59,11 +59,14 @@
 //   save-v30.json: 26.2'nin oyunu (kayıt sürümü 30, bugünkü): otopilotla 73 gün (--crisis-state); 72. gün (Yaz Güneşi Şenliği panayırı) hazırlık evresinde kurulmuş Zengin Şölen Sofrası
 //                  (currentFeast: 5 fıçı şerbet, 9 ekmek, 22 yiyecek, 1 kumaş bağışı, 32 ikram), daha önce 10 sofra ve 171 ikram. Eski kayıtlarda
 //                  (sürüm 2-29) currentFeast yoktur: null ile açılır
+//   save-v31.json: 26.3'ün oyunu (kayıt sürümü 31, bugünkü): otopilotla 69 gün (--crisis-state); 68. gün 12:xx'de haritadaki Seyyar Ozan
+//                  (68. gün geldi, ayrılış 69. gün 09:00), konuk defterinde 6 ziyaret; çıraklar ve Çırak Kapıları da hâlâ açık. Eski kayıtlarda
+//                  (sürüm 2-30) activeGuest ve konuk defteri yoktur: null / boş defterle açılır
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -196,6 +199,8 @@ for (const { name, raw } of fixtures) {
       first: s.chronicle.firstHeirloom,
       mentees: s.characters.reduce((n, c) => n + (c.mentees?.length ?? 0), 0),
     };
+    // (26.3) gezgin konuk (yüklendiği an)
+    loaded.guest = { active: JSON.parse(JSON.stringify(s.activeGuest)), book: JSON.parse(JSON.stringify(s.guestBook)), onMap: scene.world.guests.length, isolated: !s.characters.some((c) => c.isGuest) && !scene.world.characters.some((c) => c.isGuest), time: { day: s.time.day, hour: s.time.hour } };
     // (26.2) Büyük Ziyafet Sofrası (yüklendiği an)
     loaded.feast = { cf: JSON.parse(JSON.stringify(s.currentFeast)), fair: JSON.parse(JSON.stringify(s.currentFestival)), day: s.time.day, hour: s.time.hour };
     // (26.1) mevsimlik panayır (yüklendiği an)
@@ -500,6 +505,22 @@ for (const { name, raw } of fixtures) {
       ok: grew.every((x) => (x.days === before.get(x.id).days + 1 || (before.get(x.id).child && !x.child && x.days >= 18 * 16)) && (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage))) && grew.length >= L.filter((x) => !x.role).length - 2,
       detail: `${grew.length} sakin`,
     });
+  }
+  // (26.3) gezgin konuklar
+  {
+    const G = r.loaded.guest;
+    if (data.version < 31) {
+      results.push({ name: `${tag}: activeGuest yok -> null, boş konuk defteri, haritada konuk yok`, ok: G.active === null && G.onMap === 0 && G.book.visits === 0 && G.book.nextDay === null && G.book.barters === 0, detail: JSON.stringify(G.book) });
+    } else {
+      const saved = data.activeGuest;
+      const g = G.active;
+      const gone = saved && (saved.departureDay < data.time.day || (saved.departureDay === data.time.day && data.time.hour >= 9 && !saved.leaving));
+      results.push({
+        name: `${tag}: gezgin konuk (activeGuest) ve konuk defteri korundu; konuk nüfus ve konuta sayılmaz`,
+        ok: G.isolated && JSON.stringify(G.book.rare) === JSON.stringify(data.guestBook.rare) && G.book.visits === data.guestBook.visits && (gone || !saved ? g === null || !saved : g !== null && g.type === saved.type && g.departureDay === saved.departureDay && g.name === saved.name && G.onMap === 1),
+        detail: `${g?.type ?? 'yok'} · ziyaret ${G.book.visits} · takas ${G.book.barters}`,
+      });
+    }
   }
   // (26.2) Büyük Ziyafet Sofrası
   {
