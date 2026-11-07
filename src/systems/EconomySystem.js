@@ -1,5 +1,7 @@
 // Kasabanın ortak kaynak bankası: Odun, Taş, Yiyecek ve (10. aşama) işlenmiş mallar Yün, Demir, Ekmek.
 //   - Depo kapasitesi = temel kapasite + tamamlanmış Kiler'lerin katkısı (her kaynak için ayrı ayrı)
+//   - (24. aşama) Ürün Silosu yalnızca tarımsal kaynakların (yiyecek, ekmek, keten, şerbetçiotu) sınırına ekler:
+//     state.granaryCapacity; bir kaynağın sınırı Granary.storageLimit(state, kaynak)
 //   - Harcama / ekleme tek yerden yapılır ve 'resources:changed' olayı yayınlanır
 //     (HUD +5 / -10 vurgularını bu olaydan çizer)
 //   - Depo dolunca ya da kasabanın yiyeceği (ekmek dahil) bitince bir kez bildirim gösterilir
@@ -12,6 +14,7 @@ import { RESOURCES, BASE_STORAGE_CAPACITY } from '../data/resources.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { foodSupply } from './TownStatus.js';
 import { civicStorageBonus } from './CivicSystem.js';
+import { storageLimit, isAgricultural } from './Granary.js';
 
 const FULL_RESET_RATIO = 0.9; // doluluk bu oranın altına inince "depo doldu" uyarısı yeniden verilebilir
 const EPSILON = 1e-9;
@@ -39,10 +42,20 @@ export class EconomySystem {
   recalculateCapacity() {
     // (11. aşama) Belediyenin Altyapı ve Depo Genişletmesi fermanı her kademede kalıcı +150 ekler
     let capacity = BASE_STORAGE_CAPACITY + civicStorageBonus(this.state);
+    let granary = 0;
     for (const b of this.world.buildings) {
-      if (b.functional) capacity += BUILDINGS[b.type].storageBonus ?? 0;
+      if (!b.functional) continue;
+      const def = BUILDINGS[b.type];
+      capacity += def.storageBonus ?? 0;
+      granary += def.granary?.capacity ?? 0; // (24. aşama) Ürün Silosu
     }
     this.state.storageCapacity = capacity;
+    this.state.granaryCapacity = granary;
+  }
+
+  /** (24. aşama) Bu kaynağın depo sınırı (tarımsal kaynaklarda silo katkısı dahil; hazine sınırsız). */
+  limit(resource) {
+    return storageLimit(this.state, resource);
   }
 
   get capacity() {
@@ -56,7 +69,7 @@ export class EconomySystem {
   /** Bu kaynak için depoda kalan boş yer. */
   room(resource) {
     if (RESOURCES[resource].treasury) return Infinity;
-    return Math.max(0, this.capacity - this.amount(resource));
+    return Math.max(0, this.limit(resource) - this.amount(resource));
   }
 
   canAfford(cost = {}) {
@@ -91,7 +104,7 @@ export class EconomySystem {
   /** Kaynak ekler (depo kapasitesine kadar). Gerçekten eklenen miktarı döndürür. */
   add(resource, amount) {
     const current = this.amount(resource);
-    const limit = RESOURCES[resource].treasury ? Infinity : this.capacity; // hazinenin (altın) sınırı yok
+    const limit = this.limit(resource); // hazinenin (altın) sınırı yok; tarımsal kaynaklara silo eklenir
     const added = Math.max(0, Math.min(Math.floor(amount), limit - current));
     if (added > 0) {
       this.state.resources[resource] = current + added;
@@ -101,11 +114,11 @@ export class EconomySystem {
     if (now >= limit && !this.fullWarned.has(resource)) {
       this.fullWarned.add(resource);
       this.events.emit('toast', {
-        text: `${RESOURCES[resource].name} deposu doldu! Kiler kurarak kapasiteyi artırabilirsin.`,
+        text: `${RESOURCES[resource].name} deposu doldu! ${isAgricultural(resource) ? 'Kiler ya da Ürün Silosu' : 'Kiler'} kurarak kapasiteyi artırabilirsin.`,
         tone: 'warn',
         icon: RESOURCES[resource].icon,
       });
-    } else if (now < this.capacity * FULL_RESET_RATIO) {
+    } else if (now < limit * FULL_RESET_RATIO) {
       this.fullWarned.delete(resource);
     }
     if (added > 0 && RESOURCES[resource].foodValue) this.checkHunger();

@@ -38,6 +38,9 @@ export async function installMonitor(page) {
     window.__citizenData = await import('/src/data/citizens.js');
     window.__crownData = await import('/src/data/crown.js');
     window.__crisisData = await import('/src/data/crisis.js');
+    window.__foodSupplyOf = (await import('/src/systems/TownStatus.js')).foodSupply;
+    // (24. aşama) eski sürümlerde (karşılaştırma koşuları) bu modül yoktur: tarım denetimi atlanır, gıda güvencesi yine ölçülür
+    window.__granaryMod = await import('/src/systems/Granary.js').catch(() => null);
   });
   await page.evaluate(
     ({ STUCK_MINUTES, BLOCKED_MINUTES, JOB_STALE_DAYS, RELOCATE_HOURS, MAX_APART_HOURS }) => {
@@ -272,6 +275,27 @@ export async function installMonitor(page) {
           if (s.exodus?.active) m.exodusSamples = (m.exodusSamples ?? 0) + 1;
         }
 
+        // ---- (24. aşama) Gıda güvencesi ve tarım: kişi başı besin, kritik saatler, geçerli mahsul ----
+        // (stok sınırı denetlenmez: kiler yıkılınca ya da testler kaynak verince stok sınırın üstünde kalabilir, oyun bunu kırpmaz)
+        {
+          const pop = Math.max(1, s.characters.length);
+          const perCap = window.__foodSupplyOf(s) / pop;
+          if (s.time.day >= 3) {
+            m.foodMinPerCap = Math.min(m.foodMinPerCap ?? Infinity, perCap);
+            if (perCap < 3) m.foodCriticalSamples = (m.foodCriticalSamples ?? 0) + 1; // bir öğünlük bile besin yok
+            m.foodPerCapSum = (m.foodPerCapSum ?? 0) + perCap;
+            m.foodPerCapN = (m.foodPerCapN ?? 0) + 1;
+          }
+          const GR = window.__granaryMod;
+          if (GR) {
+            for (const b of s.buildings) {
+              if (b.type === 'garden' && !['grain', 'flax', 'hops'].includes(b.crop)) broke(`${b.name}: geçersiz mahsul (${b.crop})`);
+              if (b.type !== 'garden' && b.crop !== null) broke(`${b.name}: bahçe olmayan yapıda mahsul (${b.crop})`);
+              if (b.type === 'garden' && b.functional) m.cropHours = { ...(m.cropHours ?? {}), [b.crop]: ((m.cropHours ?? {})[b.crop] ?? 0) + 1 };
+            }
+          }
+        }
+
         // ---- (23. aşama) Krizler: yangın, hasar, haydut baskını, yaralanma ----
         {
           const KD = window.__crisisData;
@@ -410,6 +434,25 @@ export async function installMonitor(page) {
             news: s.social?.gossip.length ?? 0,
             quirks: Object.fromEntries(['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].map((q) => [q, s.characters.filter((c) => c.quirk === q).length])),
           },
+          // (24. aşama) gıda güvencesi (her sürümde) ve tarımsal çeşitlilik
+          food: {
+            minPerCap: Number.isFinite(m.foodMinPerCap) ? Math.round(m.foodMinPerCap * 10) / 10 : null,
+            avgPerCap: m.foodPerCapN ? Math.round((m.foodPerCapSum / m.foodPerCapN) * 10) / 10 : null,
+            criticalHours: m.foodCriticalSamples ?? 0,
+            end: Math.round(window.__foodSupplyOf(s)),
+          },
+          agri: window.__granaryMod
+            ? {
+                silos: s.buildings.filter((b) => b.type === 'silo' && b.functional).length,
+                gardens: s.buildings.filter((b) => b.type === 'garden' && b.functional).map((b) => b.crop).join(','),
+                cropHours: m.cropHours ?? {},
+                flax: s.stats.goods?.flax ?? 0,
+                hops: s.stats.goods?.hops ?? 0,
+                spoiled: { ...(s.granary?.spoiled ?? {}) },
+                switches: s.granary?.switches ?? 0,
+                granaryCapacity: s.granaryCapacity ?? 0,
+              }
+            : null,
           // (23. aşama)
           crisis: {
             difficulty: s.crisis?.difficulty,

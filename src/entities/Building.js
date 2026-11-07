@@ -22,6 +22,7 @@ import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { BUILDINGS, PROJECT_WORDS } from '../data/buildings.js';
 import { DAMAGE_KINDS } from '../data/crisis.js';
+import { normalizeCrop } from '../systems/Granary.js';
 import { EQUIPMENT } from '../data/equipment.js';
 import {
   getStructureSprite,
@@ -105,6 +106,8 @@ const BASELINE_INSET = {
   // 23. aşama
   well: 3,
   guardTower: 2,
+  // 24. aşama
+  silo: 2,
 };
 // Çardağın çatısı kışın karla örtülür (arka katman çatı altında kalır, karlanmaz)
 const GAZEBO_WINTER_ROOF = { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 };
@@ -155,6 +158,7 @@ export class Building extends Entity {
     crate = null,
     label = null,
     plantedAt = null,
+    crop = undefined,
   }) {
     super({ id, x: tileX * T, y: tileY * T });
     this.type = type;
@@ -213,6 +217,8 @@ export class Building extends Entity {
     this.label = typeof label === 'string' && label.trim() ? label.trim() : null;
     this.plantedAt = Number.isFinite(plantedAt) ? plantedAt : null;
     this.growth = 1; // süs fidanı: 0-1 büyüme (LandscapeSystem her adımda yazar)
+    // 24. aşama: bahçenin ekim tercihi (data/crops.js); eski kayıtlarda (sürüm 2-20) ve geçersiz değerde Buğday / Sebze
+    this.crop = normalizeCrop(type, crop);
   }
 
   /** (18. aşama) Süs fidanının büyüme kademesi: 0 fidan, 1 genç ağaç, 2 ulu ağaç. */
@@ -490,6 +496,7 @@ export class Building extends Entity {
       growthStage: this.growthStage,
       scaffold: this.project?.kind === 'stage',
       step: Math.min(3, Math.floor(this.projectRatio * 4)),
+      crop: this.crop,
     });
   }
 
@@ -972,6 +979,7 @@ export class Building extends Entity {
       crate: this.crate,
       label: this.label,
       plantedAt: this.plantedAt,
+      crop: this.crop,
     };
   }
 }

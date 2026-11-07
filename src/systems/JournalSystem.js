@@ -34,6 +34,9 @@ const FIRST_GOODS_TEXT = {
   wool: 'Koyun Ağılı\'nda ilk yün kırkıldı: artık paltolar ve çantalar yünden dokunacak',
   iron: 'Demir Madeni\'nden ilk demir cevheri çıktı: zanaatkâr çelik başlı aletler dövebilir',
   bread: 'Fırından ilk sıcak ekmekler çıktı: kasabanın sofrası bereketlendi',
+  // (24. aşama) bahçenin ekim tercihi
+  flax: 'Bahçeden ilk keten demetleri toplandı: mavi çiçekli liflerden ileride kumaş dokunacak',
+  hops: 'Bahçeden ilk şerbetçiotu salkımları ve tatlı meyveler toplandı: hanın şerbeti için kokulu bir hasat',
 };
 
 // (15. aşama) barışılan yer; 'chat' sohbet edilen herhangi bir yer

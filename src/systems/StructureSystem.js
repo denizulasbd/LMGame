@@ -20,6 +20,7 @@ import { clamp } from '../utils/math.js';
 import { VINE } from '../data/exploration.js';
 import { schemeGardenMultiplier } from './Exploration.js';
 import { wellGardenMultiplier } from './Crisis.js';
+import { storageLimit } from './Granary.js';
 
 const MIN_TREE_EFFICIENCY = 0.25; // oduncunun çevresinde hiç ağaç yokken bile biraz üretir
 
@@ -150,9 +151,8 @@ export class StructureSystem {
    */
   updateProcessing(building, processing) {
     const resources = this.state.resources;
-    const capacity = this.state.storageCapacity;
     const missing = Object.entries(processing.input).filter(([r, v]) => (resources[r] ?? 0) < v);
-    const full = Object.keys(processing.output).filter((r) => (resources[r] ?? 0) >= capacity);
+    const full = Object.keys(processing.output).filter((r) => (resources[r] ?? 0) >= storageLimit(this.state, r)); // (24. aşama) ekmeğe silo da yer açar
     if (!building.functional) {
       building.idle = true;
       building.processStatus = null;
@@ -161,7 +161,7 @@ export class StructureSystem {
       building.processStatus = `${missing.map(([r]) => RESOURCES[r].name).join(', ')} bekleniyor: kilerde un yapılacak bir şey yok`;
     } else if (full.length) {
       building.idle = true;
-      building.processStatus = `${full.map((r) => RESOURCES[r].name).join(', ')} deposu dolu: kiler kurarak yer aç`;
+      building.processStatus = `${full.map((r) => RESOURCES[r].name).join(', ')} deposu dolu: kiler ya da ürün silosu kurarak yer aç`;
     } else {
       building.idle = false;
       building.processStatus = null;

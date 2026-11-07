@@ -54,6 +54,39 @@
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
 
+    // --- 24. aşama (24.1): tarımsal çeşitlilik — üç mahsulün tarla pikselleri, Ürün Silosu, Keten ve Şerbetçiotu simgeleri ---
+    {
+      const CROPS = { grain: 'Buğday / Sebze', flax: 'Keten', hops: 'Meyve / Şerbetçiotu' };
+      const DESC = {
+        grain: 'altın sarısı başaklar arasında lahana, havuç, domates; ilkbaharda yeşil başak, sonbaharda biçilmiş demet ve kabak',
+        flax: 'açık mavi çiçekli ince yeşil saplar; ilkbaharda filiz, sonbaharda kuruyan saman sarısı demetler',
+        hops: 'tel gerili ahşap sırıklara sarılmış koyu yeşil yapraklar ve mor salkımlar; sonbaharda kehribar meyveler, kışın çıplak sırık',
+      };
+      for (const [crop, name] of Object.entries(CROPS)) {
+        show(`Sebze Bahçesi — ${name} (3x3): ${DESC[crop]}`, SEASONS.map((season) => [NAMES[season], getStructureSprite('garden', { season, crop })]), 4);
+      }
+      show('Yan yana üç ekim tercihi (yaz)', Object.entries(CROPS).map(([crop, name]) => [name, getStructureSprite('garden', { season: 'summer', crop })]), 5);
+      show('Ürün Silosu (2x2): taş temel, demir çemberli ahşap gövde, konik kiremit çatı, yükleme kapağı, buğday çuvalı ve keten demeti', [
+        ['yaz', getStructureSprite('silo', {})],
+        ['kış', getStructureSprite('silo', { season: 'winter' })],
+        ['şantiye', getConstructionSiteSprite(2, 2, 1, 'silo')],
+      ], 6);
+      show('Yeni mal simgeleri ve sırtta taşıma demetleri: Keten, Şerbetçiotu (yanında Yiyecek ve Ekmek)', [
+        ['keten', getIconSprite('flax')],
+        ['şerbetçiotu', getIconSprite('hops')],
+        ['yiyecek', getIconSprite('food')],
+        ['ekmek', getIconSprite('bread')],
+        ['keten demeti', getCarrySprite('flax')],
+        ['şerbetçiotu sepeti', getCarrySprite('hops')],
+      ], 8);
+      const farmer = { hair: 'hat', hairColor: 'ginger', skin: 'light', shirt: 'forest', pants: 'brown' };
+      const silo = getStructureSprite('silo', {});
+      const fields = ['grain', 'flax', 'hops'].map((crop) => getStructureSprite('garden', { season: 'summer', crop }));
+      show('Tarım sahnesi: üç tarla, bahçıvan ve Ürün Silosu', [
+        ['çiftlik', scene(200, 72, [[fields[0], 4, 68], [fields[1], 56, 68], [fields[2], 108, 68], [silo, 162, 68], [getCharacterSprite(farmer, 'down', 'idle0'), 72, 70], [getHeldToolSprite('hoe', false), 80, 62]])],
+      ], 4);
+    }
+
     // --- 23. aşama: yönetilebilir krizler — Su Kuyusu, Gözcü Kulesi, alev / duman, kova, kalkan, haydut, bandaj ve tamir ---
     {
       const looks = [

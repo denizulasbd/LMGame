@@ -21,6 +21,7 @@ import { PETITION_KINDS, TRUST } from '../data/citizens.js';
 import { emptyTax, emptyCrown, emptyExodus } from '../systems/Crown.js';
 import { TAX_RATES, DECREES, REPUTATION } from '../data/crown.js';
 import { emptyCrisis } from '../systems/Crisis.js';
+import { emptyGranary, restoreGranary } from '../systems/Granary.js';
 import { CRISIS_DIFFICULTY, CRISIS } from '../data/crisis.js';
 import { SEASON_FESTIVALS } from '../data/festivals.js';
 import { WEATHER_TYPES } from '../data/weather.js';
@@ -58,6 +59,7 @@ export class GameState {
     // Dilimlenmiş ekmekten artan yiyecek değeri (EconomySystem.consumeFood; ekmek 2,5 yiyecek sayılır)
     this.pantry = { credit: 0 };
     this.storageCapacity = BASE_STORAGE_CAPACITY; // EconomySystem yapılara göre günceller
+    this.granaryCapacity = 0; // (24. aşama) Ürün Silosu'nun tarımsal kaynaklara eklediği kapasite (EconomySystem günceller)
     this.characters = [];
     this.buildings = [];
     this.jobs = []; // oyuncunun verdiği iş emirleri (JobSystem)
@@ -177,6 +179,8 @@ export class GameState {
     this.exodus = emptyExodus();
     // (23. aşama) Krizler (CrisisSystem): tehlike sıklığı ayarı, sıradaki haydut izi ve bekleyen baskın, sayaçlar
     this.crisis = emptyCrisis();
+    // (24. aşama) silosuz kasabada bozulan mahsul sayaçları, bozulma küsuratı ve ekim tercihi değişiklikleri (GranarySystem)
+    this.granary = emptyGranary();
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an
@@ -250,6 +254,7 @@ export class GameState {
       crown: this.crown,
       exodus: this.exodus,
       crisis: this.crisis,
+      granary: this.granary,
       animals: this.animals.map((a) => a.toJSON()),
       animalMeta: this.animalMeta,
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
@@ -353,6 +358,8 @@ export class GameState {
     // 23. aşamadan eski kayıtlarda kriz yoktur: Dengeli, hiçbir yapı hasarlı / yanıyor değil, kimse yaralı değil; yüklemeden
     // sonraki ilk 24 saatte (aktif kriz kaydedilmediyse) doğal kriz çıkmaz
     next.crisis = restoreCrisis(data.crisis);
+    // (24. aşama) eski kayıtlarda (sürüm 2-20) silo / bozulma durumu yok: boş başlar; bahçeler Buğday ekili açılır (Building)
+    next.granary = restoreGranary(data.granary);
     if (!WEATHER_TYPES[next.weather.type]) next.weather.type = 'sunny';
     // Kasaba seviyesi: eski (sürüm 7 ve öncesi) kayıtlarda yoktur; ilk değerlendirme sessizce yapılır
     // (büyümüş bir kasaba yüklenince art arda kutlama çıkmasın)

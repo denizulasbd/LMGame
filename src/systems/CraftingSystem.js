@@ -17,12 +17,12 @@
 import { gearsNeeded } from './GoldenAge.js';
 import { CLOCK_GEAR } from '../data/goldenAge.js';
 import { EQUIPMENT, EQUIPMENT_KEYS, CRAFTING, CRAFT_MODES } from '../data/equipment.js';
-import { BUILDINGS } from '../data/buildings.js';
 import { lacking } from './Equipment.js';
 import { RESOURCES, formatCost } from '../data/resources.js';
 import { getSeason } from '../data/seasons.js';
 import { isShivering } from './HeatingSystem.js';
 import { schemeIronSaving } from './Exploration.js';
+import { productionOf } from './Granary.js';
 
 const GEAR_ITEM = 'clockGear'; // (20. aşama) tezgâhtaki Kadim Dişli (ekipman değil; bitince stoğa 'gears' olarak girer)
 const itemName = (item) => (item === GEAR_ITEM ? CLOCK_GEAR.name : EQUIPMENT[item].name);
@@ -126,7 +126,7 @@ export class CraftingSystem {
   /** Kasabada bu malzemeyi (yün, demir) üreten tamamlanmış bir yapı var mı? */
   hasProducer(material) {
     return this.world.getCompleted().some((b) => {
-      const production = BUILDINGS[b.type].production;
+      const production = productionOf(b); // (24. aşama) bahçenin ürünü seçili mahsule bağlıdır
       return production && (production.resource === material || production.extra?.[material] !== undefined);
     });
   }

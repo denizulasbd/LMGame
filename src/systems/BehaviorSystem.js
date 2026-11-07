@@ -59,6 +59,8 @@ import { clamp } from '../utils/math.js';
 import { schemeBakeMultiplier } from './Exploration.js';
 import { VINE } from '../data/exploration.js';
 import { ITEMS } from '../data/citizens.js';
+import { productionOf, cropOf } from './Granary.js';
+import { CROPS, DEFAULT_CROP } from '../data/crops.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
 const TOWER_BUBBLES = ['hammer', 'hammer', 'sweat', 'sparkle']; // (20. aşama) Ulu Saat Kulesi şantiyesinde
@@ -400,6 +402,8 @@ export class BehaviorSystem {
     if (task.activity === 'meal' && building?.type === 'storage') label = task.bread ? activity.breadStorageLabel : activity.storageLabel;
     else if (task.activity === 'meal' && task.bread) label = activity.breadLabel;
     if (task.activity === 'bake' && building?.idle) label = activity.idleLabel;
+    // (24. aşama) bahçıvan seçili mahsulde çalışır (Buğday'da eski metin kalır)
+    if (task.activity === 'farm' && building && cropOf(building) && cropOf(building) !== DEFAULT_CROP) label = CROPS[cropOf(building)].label;
     if (task.activity === 'build' && building?.project) label = `${PROJECT_WORDS[building.project.kind].doing}: {target}`;
     if (task.activity === 'craft') label = building?.craft ? label.replace('{item}', this.crafting.currentItemName(building)) : activity.idleLabel;
     if (task.activity === 'teach' && !this.state.research?.active) label = activity.teachLabel;
@@ -666,7 +670,7 @@ export class BehaviorSystem {
     }
     // (13. aşama) Güneş Saati Küresi üretim ve işleme yapılarında verimi artırır
     if (building.definition.processing) return this.process(building, amount * relicProductionMultiplier(this.state) * (building.type === 'mill' ? schemeBakeMultiplier(this.state) : 1));
-    const production = building?.definition.production;
+    const production = productionOf(building); // (24. aşama) bahçede seçili mahsulün ürünü ve verimi
     if (!production) return false;
     // Verim (oduncu için çevredeki ağaç sayısı) StructureSystem'de hesaplanır; Bereket Boynuzu yiyeceği artırır
     building.productionBuffer += (production.perHour / 60) * amount * building.efficiency * relicProductionMultiplier(this.state, production.resource);

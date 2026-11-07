@@ -7,6 +7,7 @@
 //   foodValue        : 1 birimin yiyecek değeri. Ekmek 2,5'tir: öğünler ve göç koşulu ekmeği bu değerle sayar
 //                      (bkz. EconomySystem.consumeFood, TownStatus.foodSupply)
 //   longName / hint  : HUD ipucu ve panellerdeki uzun ad / ne işe yaradığı
+//   Keten, Şerbetçiotu : (24. aşama) bahçenin ekim tercihiyle yetişen tarımsal hammaddeler (data/crops.js)
 //   treasury         : (12. aşama) Kasaba Hazinesi: depo sınırı yoktur, ihracattan gelir, harikada harcanır
 export const RESOURCES = {
   wood: { name: 'Odun', icon: 'wood', hint: 'İnşaat, ısınma ve zanaat malzemesi' },
@@ -34,6 +35,21 @@ export const RESOURCES = {
     foodValue: 2.5,
     hint: 'Yel Değirmeni ve Fırın 1 yiyecekten 1 sıcak ekmek yapar: her ekmek 2,5 yiyecek değerindedir',
   },
+  // (24. aşama) Sebze Bahçesi'nin ekim tercihiyle yetişen tarımsal hammaddeler (gıda değildir; Ürün Silosu'nda saklanır)
+  flax: {
+    name: 'Keten',
+    longName: 'Keten Lifi',
+    icon: 'flax',
+    processed: true,
+    hint: "Sebze Bahçesi'nde 'Keten' ekilince yetişir. Lifli sanayi hammaddesi (gıda değildir): ileride dokumada kullanılacak",
+  },
+  hops: {
+    name: 'Şerbetçiotu',
+    longName: 'Meyve ve Şerbetçiotu',
+    icon: 'hops',
+    processed: true,
+    hint: "Sebze Bahçesi'nde 'Meyve / Şerbetçiotu' ekilince yetişir. Tatlı meyve ve aromatik bitki (gıda değildir): ileride han ve şerbet için",
+  },
   // (20. aşama) Ulu Saat Kulesi'nin Mekanizma & Çan aşaması için Zanaat Atölyesi'nde dökülür (data/goldenAge.js)
   gears: {
     name: 'Kadim Dişli',
@@ -58,7 +74,7 @@ export const GOODS_KEYS = RESOURCE_KEYS.filter((k) => RESOURCES[k].processed);
 // Yiyecek yerine sayılan kaynaklar (yiyecek, ekmek)
 export const FOOD_KEYS = RESOURCE_KEYS.filter((k) => RESOURCES[k].foodValue);
 
-export const STARTING_RESOURCES = { wood: 30, stone: 20, food: 25, wool: 0, iron: 0, bread: 0, gears: 0, gold: 0 };
+export const STARTING_RESOURCES = { wood: 30, stone: 20, food: 25, wool: 0, iron: 0, bread: 0, flax: 0, hops: 0, gears: 0, gold: 0 };
 
 // Depo binası olmadan her kaynaktan saklanabilecek miktar (her Kiler buna eklenir)
 export const BASE_STORAGE_CAPACITY = 100;

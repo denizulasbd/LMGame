@@ -58,6 +58,8 @@ import { estimateTax, levyAmount, levyPlan, decreeStatus, reputationLevel } from
 import { mendSpecFor, repairCost, wellNear, defenseStatus } from '../../systems/Crisis.js';
 import { FIRE, WELL, GUARD, REPAIR } from '../../data/crisis.js';
 import { raidCard } from './crisisCards.js';
+import { productionOf, storageLimit, cropOf, hasGranary } from '../../systems/Granary.js';
+import { CROPS, AGRI_KEYS, SPOILAGE } from '../../data/crops.js';
 
 const thumbnailCache = new Map();
 
@@ -90,6 +92,7 @@ export class BuildingPanel {
     this.progress = el('div', { className: 'need-bar building-progress' }, [el('span', { className: 'need-fill need-fun' })]);
     this.people = el('div', { className: 'building-people' });
     this.crafting = el('div', { className: 'building-crafting' });
+    this.cropBox = el('div', { className: 'building-crafting building-crops' }); // (24. aşama) bahçenin ekim tercihi
     this.decrees = el('div', { className: 'building-decrees' });
     this.research = el('div', { className: 'building-decrees building-research' });
     this.harbor = el('div', { className: 'building-decrees building-harbor' });
@@ -135,6 +138,7 @@ export class BuildingPanel {
       this.description,
       this.progress,
       this.people,
+      this.cropBox,
       this.crafting,
       this.decrees,
       this.research,
@@ -227,7 +231,10 @@ export class BuildingPanel {
         : '';
     // (23. aşama) kriz: yangın ilerlemesi, tamir bedeli, bekleyen baskın, kule ve bekçiler
     const crisisKey = this.crisisKeyOf(building, state);
+    // (24. aşama) ekim tercihi ve silo / bozulma durumu
+    const cropKey = cropOf(building) || building.definition.granary ? [building.crop, hasGranary(state), JSON.stringify(state.granary?.spoiled ?? {})].join(':') : '';
     const key = [
+      cropKey,
       crisisKey,
       exploreKey,
       bellKey,
@@ -273,6 +280,7 @@ export class BuildingPanel {
     this.progress.firstElementChild.style.width = `${Math.floor(ratio * 100)}%`;
 
     this.renderPeople(building, people);
+    this.renderCrops(building, state);
     this.renderCrafting(building, state);
     this.renderDecrees(building, state);
     this.renderResearch(building, state);
@@ -425,6 +433,37 @@ export class BuildingPanel {
       );
     }
     this.people.replaceChildren(...children);
+  }
+
+  /**
+   * (24. aşama) Sebze Bahçesi'nin ekim tercihi: Buğday / Sebze, Keten, Meyve / Şerbetçiotu. Seçilen mahsul bahçenin ürününü
+   * ve saatlik verimini belirler; seçim hemen geçerlidir (bahçıvan yeni mahsulle çalışır, tarla yeni dokuyla çizilir).
+   */
+  renderCrops(building, state) {
+    const crop = cropOf(building);
+    const show = Boolean(crop) && !building.underConstruction && !building.ruined;
+    this.cropBox.hidden = !show;
+    if (!show) return;
+    const buttons = building.definition.crops.map((key) => {
+      const def = CROPS[key];
+      const b = this.button(def.shortName, `${def.name}: ${def.description}\nSaatte ${def.perHour} ${RESOURCES[def.resource].name.toLocaleLowerCase('tr')} (kişi başı, tam verimde)`, () =>
+        this.events.emit('ui:setCrop', { buildingId: building.id, crop: key })
+      );
+      b.classList.add('craft-mode', 'crop-mode');
+      b.dataset.crop = key;
+      b.classList.toggle('is-active', crop === key);
+      return b;
+    });
+    const def = CROPS[crop];
+    const note = hasGranary(state)
+      ? 'Ürün Silosu var: hasat yağmurda ve kışın bozulmaz'
+      : `Silo yok: yağmurda ve kışın kilerdeki ${SPOILAGE.safeStock}'i aşan ham mahsulün bir kısmı bozulur`;
+    this.cropBox.replaceChildren(
+      el('div', { className: 'building-section-title', text: 'Ekim Tercihi' }),
+      el('div', { className: 'craft-modes crop-modes' }, buttons),
+      el('div', { className: 'upgrade-text is-active', text: `Ekili: ${def.name} → ${RESOURCES[def.resource].name} (saatte ${def.perHour})` }),
+      el('div', { className: 'upgrade-text', text: note })
+    );
   }
 
   /** Zanaat atölyesi: üretim seçimi, tezgâhtaki iş ve depodaki ekipman (eksik sayısıyla). */
@@ -1175,6 +1214,15 @@ export class BuildingPanel {
         lines.push(`Stok: ${RESOURCE_KEYS.filter((r) => !RESOURCES[r].treasury).map((r) => `${RESOURCES[r].name} ${state.resources[r]}`).join(' · ')} / ${state.storageCapacity}`);
         if (building.type === 'supplyCamp') lines.push('Uzak yollarda yorulanlar burada soluklanır');
         break;
+      case 'silo': {
+        // (24. aşama) Ürün Silosu: tarımsal kaynakların depo sınırı ve bozulmaya karşı koruma
+        lines.push(`Tarımsal depo katkısı: +${def.granary.capacity} (${AGRI_KEYS.map((r) => RESOURCES[r].name).join(', ')})`);
+        lines.push(`Tarımsal stok: ${AGRI_KEYS.map((r) => `${RESOURCES[r].name} ${state.resources[r] ?? 0}/${storageLimit(state, r)}`).join(' · ')}`);
+        lines.push('Kuru ve havadar ambar: yağmurda ve kışın mahsul çürümez');
+        const spoiled = Object.entries(state.granary?.spoiled ?? {}).filter(([, v]) => v > 0);
+        if (spoiled.length) lines.push(`Silodan önce bozulan mahsul: ${spoiled.map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`).join(', ')}`);
+        break;
+      }
       case 'berryBush':
         if (getSeason(state.time.day).berries === 0) lines.push('Kış: çalı dondu, ilkbaharda yeniden meyve verir');
         lines.push(`Stok · porsiyon: ${building.berries}/${def.maxBerries}`);
@@ -1238,7 +1286,7 @@ export class BuildingPanel {
 
   /** Saatlik üretim ve onu oluşturan çarpanlar (StructureSystem her karede building.factors'a yazar). */
   productionLines(building, state) {
-    const production = BUILDINGS[building.type].production;
+    const production = productionOf(building); // (24. aşama) bahçede seçili mahsul
     const season = getSeason(state.time.day);
     const f = building.factors;
     const resource = RESOURCES[production.resource].name;

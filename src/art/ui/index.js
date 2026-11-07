@@ -441,6 +441,30 @@ Object.assign(ICONS, {
     '..KKKKK..',
     '.........',
   ],
+  // (24. aşama) Keten: mavi çiçekli, iple bağlanmış lif demeti
+  flax: [
+    '.c.a.c...',
+    'cacvcac..',
+    '.vVvVv...',
+    '..vVv....',
+    '..KXK....',
+    '..vVv....',
+    '.vVvVv...',
+    '.v.v.v...',
+    '.........',
+  ],
+  // (24. aşama) Şerbetçiotu: yapraklı dalda koyu yeşil-mor salkım ve tatlı meyve
+  hops: [
+    '....xx...',
+    '...Kx.K..',
+    '..KfFKVK.',
+    '.KFlfFvK.',
+    '.KfmlFK..',
+    '.KFlmFK..',
+    '..KFfK...',
+    '...KK....',
+    '.........',
+  ],
   // Mezra: çadır
   tierHamlet: [
     '....K....',
@@ -1253,6 +1277,8 @@ const CARRY_BUNDLES = {
   wool: ['.KKKKKK.', 'Kuu6uuuK', 'Ku6uu6uK', 'K6uuuu6K', '.KKKKKK.'],
   iron: ['..KKKK..', '.KCUrCK.', 'KUCRCUCK', 'KRRRRRRK', '.KKKKKK.'],
   bread: ['.K....K.', '.KKKKKK.', 'KYOYOYOK', 'KXwXwXwK', '.KKKKKK.'],
+  flax: ['.c.a.c..', 'KvKvKvK.', 'KvXXXvK.', 'KvKvKvK.', '.KKKKK..'],
+  hops: ['..KKKK..', '.KlFmFK.', 'KFmlFlFK', 'KfFlfFfK', '.KKKKKK.'],
 };
 
 export function getCarrySprite(resource) {

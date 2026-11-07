@@ -33,6 +33,7 @@ import { getCherryTreeSprite, getGazeboLayer, getMarbleArchSprite, getFlowerFenc
 import { getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.js';
 import { getMarbleFountainSprite, getGoldenLanternSprite, getRoyalStatueSprite } from './structuresGoldenAge.js';
 import { getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
+import { getSiloSprite } from './structuresGranary.js';
 import {
   getWoodFenceSprite,
   getFenceGateSprite,
@@ -410,7 +411,10 @@ export function getLumberHutSprite() {
 }
 
 // ---------------------------------------------------------------------------
-// Sebze bahçesi (3x3, 48x48): çitli tarla, lahana / havuç / domates sıraları
+// Sebze bahçesi (3x3, 48x48): çitli tarla, ekim tercihine göre ekin sıraları (24. aşama)
+//   grain (Buğday / Sebze, varsayılan): altın sarısı buğday başakları arasında lahana, havuç, domates
+//   flax  (Keten)                     : açık mavi çiçekli ince yeşil saplar; sonbaharda kuruyup demetlenir
+//   hops  (Meyve / Şerbetçiotu)       : ahşap sırıklara sarılmış koyu yeşil yapraklar ve mor salkımlar
 // ---------------------------------------------------------------------------
 const CABBAGE = ['.vVv.', 'vVfVv', 'fvVvf', '.fff.'];
 const CARROT = ['v.v', '.v.', '.O.', '.O.'];
@@ -418,25 +422,56 @@ const TOMATO = ['.xo.', 'vxvo', 'ovxv', '.xv.', '.x..'];
 const SPROUT = ['.....', '.v.v.', '..V..', '.fvf.'];
 const PUMPKIN = ['..x..', '.OOO.', 'OOYOO', '.OOO.'];
 const SNOW_MOUND = ['.....', '.787.', '67776', '56665'];
-// Mevsime göre ekin sıraları: ilkbaharda filiz, yazın olgun ekin, sonbaharda kabak hasadı, kışın kar
+// Buğday: altın başaklar (yazın), yeşil başaklar (ilkbaharda), biçilmiş demet (sonbaharda)
+const WHEAT = ['9.9.9', 'P9P9P', 'YPYPY', '.Y.Y.', '.Y.Y.'];
+const WHEAT_GREEN = ['V.V.V', 'vVvVv', '.v.v.', '.f.f.'];
+const SHEAF = ['.9P9.', '9PYP9', '.4Y4.', '.Y4Y.', 'Y4.4Y'];
+// Keten: mavi çiçekli yeşil saplar (yazın), filiz (ilkbaharda), kuruyan saman sarısı demetler (sonbaharda)
+const FLAX = ['c.a.c', 'vcvav', '.v.v.', '.f.f.', '.f.f.'];
+const FLAX_SPROUT = ['.....', '.v.V.', 'v.v.v', '.f.f.'];
+const FLAX_DRY = ['.s.s.', 'szszs', '.z.z.', '.zXz.', 'z.X.z'];
+// Şerbetçiotu: sırığa sarılmış koyu yeşil yapraklar ve mor salkımlar; sonbaharda kehribar meyveler; kışın çıplak sırık
+const HOPS = ['...x.', '.fFx.', 'flmxF', 'Fmlxf', '.Ffx.', '...x.'];
+const HOPS_SPROUT = ['...x.', '...x.', '..vx.', '.v.x.', '..vx.', '...x.'];
+const HOPS_RIPE = ['...x.', '.4Fx.', 'flmx4', 'F4lxf', '.Flx.', '...x.'];
+const HOPS_BARE = ['...x.', '...x.', '...x.', '.787.', '67776', '56665'];
+// Mahsule ve mevsime göre ekin sıraları
 const CROP_ROWS = {
-  spring: [SPROUT, SPROUT, CABBAGE, SPROUT, SPROUT],
-  summer: [CABBAGE, CARROT, TOMATO, CABBAGE, CARROT],
-  autumn: [PUMPKIN, CABBAGE, PUMPKIN, TOMATO, PUMPKIN],
-  winter: [SNOW_MOUND, SNOW_MOUND, SNOW_MOUND, SNOW_MOUND, SNOW_MOUND],
+  grain: {
+    spring: [SPROUT, WHEAT_GREEN, CABBAGE, WHEAT_GREEN, SPROUT],
+    summer: [WHEAT, CABBAGE, WHEAT, TOMATO, WHEAT],
+    autumn: [SHEAF, PUMPKIN, WHEAT, PUMPKIN, SHEAF],
+    winter: [SNOW_MOUND, SNOW_MOUND, SNOW_MOUND, SNOW_MOUND, SNOW_MOUND],
+  },
+  flax: {
+    spring: [FLAX_SPROUT, FLAX_SPROUT, FLAX_SPROUT, FLAX_SPROUT, FLAX_SPROUT],
+    summer: [FLAX, FLAX, FLAX, FLAX, FLAX],
+    autumn: [FLAX_DRY, FLAX, FLAX_DRY, FLAX, FLAX_DRY],
+    winter: [SNOW_MOUND, SNOW_MOUND, SNOW_MOUND, SNOW_MOUND, SNOW_MOUND],
+  },
+  hops: {
+    spring: [HOPS_SPROUT, HOPS_SPROUT, HOPS_SPROUT, HOPS_SPROUT, HOPS_SPROUT],
+    summer: [HOPS, HOPS, HOPS, HOPS, HOPS],
+    autumn: [HOPS_RIPE, HOPS, HOPS_RIPE, HOPS, HOPS_RIPE],
+    winter: [HOPS_BARE, HOPS_BARE, HOPS_BARE, HOPS_BARE, HOPS_BARE],
+  },
 };
+export const GARDEN_CROPS = Object.keys(CROP_ROWS);
 
-function buildGardenRows(season = 'summer') {
+function buildGardenRows(season = 'summer', crop = 'grain') {
   const g = new CharGrid(48, 48);
   const frozen = season === 'winter';
   g.rect(1, 3, 46, 43, frozen ? '5' : 'D');
   g.rect(3, 6, 42, 37, frozen ? '6' : 'd');
 
   // Sıralar: koyu karık + ekinler (kışın donmuş, karla örtülü)
-  (CROP_ROWS[season] ?? CROP_ROWS.summer).forEach((crop, i) => {
+  const rows = (CROP_ROWS[crop] ?? CROP_ROWS.grain)[season] ?? CROP_ROWS.grain.summer;
+  rows.forEach((plant, i) => {
     const y = 8 + i * 7;
     g.hline(4, 43, y + 4, frozen ? '5' : 'D');
-    for (let x = 5; x < 42; x += 7) g.stamp(crop, x, y);
+    // Şerbetçiotu sırıklarını birbirine bağlayan tel
+    if (crop === 'hops') g.hline(5, 41, y, 'x');
+    for (let x = 5; x < 42; x += 7) g.stamp(plant, x, y);
   });
 
   // Çit: direkler + iki sıra kuşak, alt ortada kapı aralığı
@@ -466,8 +501,10 @@ function buildGardenRows(season = 'summer') {
   return g.toRows();
 }
 
-export function getGardenSprite(season = 'summer') {
-  return getSprite(`building:garden:${season}`, () => buildGardenRows(season));
+/** @param {string} crop (24. aşama) ekim tercihi: 'grain' | 'flax' | 'hops' */
+export function getGardenSprite(season = 'summer', crop = 'grain') {
+  const key = CROP_ROWS[crop] ? crop : 'grain';
+  return getSprite(`building:garden:${season}:${key}`, () => buildGardenRows(season, key));
 }
 
 // ---------------------------------------------------------------------------
@@ -624,6 +661,7 @@ const WINTER_ROOFS = {
   watchtower: { light: ['X'], main: ['w'], maxRow: 9 },
   well: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 4 },
   guardTower: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 9 },
+  silo: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 15 },
   supplyCamp: { light: ['S'], main: ['s'], maxRow: 17 },
   workshop: { light: ['c'], main: ['B'], dark: ['n'], maxRow: 17 },
   townHall: { light: ['Z', 'c'], main: ['C', 'B'], dark: ['U', 'n'], maxRow: 36 },
@@ -677,9 +715,12 @@ function getBaseStructureSprite(type, state) {
     case 'lumberHut':
       return getLumberHutSprite();
     case 'garden':
-      return getGardenSprite(state.season);
+      return getGardenSprite(state.season, state.crop ?? 'grain');
     case 'storage':
       return getStorageSprite();
+    // 24. aşama: tarımsal depolama
+    case 'silo':
+      return getSiloSprite();
     case 'quarry':
       return getQuarrySprite(state.active ? (state.frame ?? 0) % 2 : 0);
     case 'fishingPier':

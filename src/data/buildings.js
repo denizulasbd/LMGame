@@ -21,6 +21,10 @@ import { GROUND_TILES } from './tiles.js';
 //   allowedTiles (varsayılan GROUND_TILES: çimen ve biyom zeminleri), demolishable
 //   workers / production / workActivity : üretim binası
 //   storageBonus : depo kapasitesine eklenen miktar
+//   granary      : (24. aşama) { capacity } yalnızca tarımsal kaynakların (data/crops.js -> AGRI_KEYS) depo kapasitesine
+//                  eklenen miktar; kasabada işleyen bir silo varsa mahsuller yağmurda / kışın bozulmaz (Ürün Silosu)
+//   crops        : (24. aşama) yapının ekebileceği mahsuller (data/crops.js; ilki varsayılan). Seçilen mahsul production'ın
+//                  ana ürününü ve saatlik verimini belirler (systems/Granary.js -> productionOf)
 //   funAura      : { radius, perMinute } yanından geçenin / dinlenenin keyfi (litHours varsa yalnızca yanarken)
 //   production.rainBonus : yağmurda üretime eklenen oran (bahçe)
 //   production.seasonal  : verimi mevsimin bu alanıyla çarpılır (bahçe: 'farm'; kışın 0 = donar)
@@ -156,12 +160,14 @@ export const BUILDINGS = {
     buildable: true,
     demolishable: true,
     category: 'Üretim',
-    description: 'Lahana, havuç ve domates yetişen bahçe. Çalışan sakin düzenli yiyecek üretir.',
+    description: 'Buğday, lahana, havuç ve domates yetişen bahçe. Çalışan sakin düzenli yiyecek üretir; panelden ekim tercihi (Buğday / Keten / Şerbetçiotu) seçilir.',
     cost: { wood: 15, stone: 5 },
     buildWork: 120,
     workers: 1,
     workActivity: 'farm',
     production: { resource: 'food', perHour: 5, rainBonus: 0.25, seasonal: 'farm' },
+    // (24. aşama) Ekim tercihi: ana ürün ve saatlik verim seçilen mahsulden gelir (data/crops.js; ilki varsayılan)
+    crops: ['grain', 'flax', 'hops'],
     upgrade: {
       name: 'Cam Sera',
       description: 'Cam çatılı sera: kışın donmaz, kar yağarken bile %60 verimle taze yiyecek üretir.',
@@ -485,6 +491,21 @@ export const BUILDINGS = {
     cost: { wood: 30, stone: 20 },
     buildWork: 200,
     storageBonus: 100,
+  },
+  // --- 24. aşama: tarımsal çeşitlilik ---
+  silo: {
+    name: 'Ürün Silosu',
+    size: { w: 2, h: 2 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Depolama',
+    description:
+      'Taş temelli, ahşap gövdeli tahıl ambarı. Buğday / yiyecek, un / ekmek, keten ve şerbetçiotunun depo kapasitesini +150 artırır; yağmurda ve kışın kilerdeki mahsulün çürümesini önler.',
+    cost: { wood: 40, stone: 25 },
+    buildWork: 180,
+    granary: { capacity: 150 },
+    requiresTier: 2,
   },
   bench: {
     name: 'Ahşap Bank',
@@ -978,6 +999,7 @@ export const BUILD_MENU = [
   'mill',
   'fishingPier',
   'storage',
+  'silo',
   'inn',
   'workshop',
   'healerHut',
