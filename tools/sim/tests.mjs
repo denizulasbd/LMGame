@@ -72,6 +72,9 @@
 //              Altın Çağ kapısı, oluşma ve çantada yer açma, mirasçı önceliği (aynı meslekten evlat, en yaşlı evlat, çırak, manevi
 //              evlat), çırak geçmişi, akşam töreni, veda sözleri, Tarihçe ve Kuşak Şöleni, Ata Mirası Gururu, kart çerçevesi, köyden
 //              ayrılan taşıyıcı ve arşiv, ocak devri, izole üreteç, kayıt sürümü 28 (gidiş-dönüş, bozuk değerler, v27 kaydı)
+//   27. aşama (27.3): sıfır tahsisatlı çizim (GuestEffects sabit işlev + RenderQueue.addCall, balon genişliği önbelleği, FairDecor yeniden
+//              kullanılan dikdörtgenler), tıklanabilir gezgin konuk ve misafir kartı (süre, ayrılış, takas özeti), havuz panelinde Büyük
+//              Ziyafet Sofrası bloğu (kademe, bağışlar, ikram, bonuslar), çıraklık bekleme nedeni, yadigâr devir zinciri satırı
 //   27. aşama (27.2): tıkanan mekanikler (boştaki atölyede / dolu raflı şifacıda Tezgâh Pratiği, ot toplayan şifacı ustası, hasarlı / yanan
 //              yapıya çırak yazılmaması ve ders ortası güvenlik, sonradan evlenen evlada ve ev halkına Ocak Devri, kütükteki reislik, Altın Çağ
 //              başlarken bekleyen çiftlerin yuvası, sınırlı ve gerçek buluşmayla karşılanan Yeni Konut Talebi, yadigârı olan mirasçının
@@ -6945,7 +6948,9 @@ const pageResults = await page.evaluate(async () => {
       talker.speech = { text: 'Deneme', at: -1, duration: 2, remaining: 0.5 };
       const snap = JSON.stringify(talker.speech);
       for (let i = 0; i < 300; i++) drawSpeechBubbles({ ctx }, { x: 0, y: 0, zoom: 2 }, [talker]);
-      check('27.1: drawSpeechBubbles salt okunurdur (300 kare çizimde söz ve süresi aynı)', JSON.stringify(talker.speech) === snap && ops.length > 0);
+      // (27.3) çizim yalnızca genişlik önbelleğini (width / widthText) yazar; metin ve süre aynı kalır
+      const { width: _w, widthText: _wt, ...rest } = talker.speech;
+      check('27.1: drawSpeechBubbles salt okunurdur (300 kare çizimde söz ve süresi aynı)', JSON.stringify(rest) === snap && _wt === talker.speech.text && ops.length > 0);
       const a = { speech: { text: 'a', at: -1, duration: 1 } };
       const b = { speech: { text: 'b', at: -1, duration: 3 } };
       updateSpeechBubbles([a], [b], 1.5);
@@ -7349,6 +7354,244 @@ const pageResults = await page.evaluate(async () => {
     restore(snap0);
     s0.lineage.heads = { ...keepHeads };
     Object.assign(s0.lineage, keepLineage);
+    s0.goldenAge.since = keepGA;
+  }
+
+  // ===== 27. aşama (27.3): sıfır tahsisatlı çizim ve arayüz görünürlüğü (konuk kartı, ziyafet bloğu, çıraklık notu, yadigâr zinciri) =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const GD = await import('/src/data/guest.js');
+    const FD = await import('/src/data/feast.js');
+    const FA = await import('/src/systems/Fair.js');
+    const AP = await import('/src/systems/Apprenticeship.js');
+    const AD = await import('/src/data/apprenticeship.js');
+    const CZ = await import('/src/data/citizens.js');
+    const CI = await import('/src/systems/Citizens.js');
+    const { RenderQueue } = await import('/src/rendering/RenderQueue.js');
+    const { GuestEffects } = await import('/src/rendering/GuestEffects.js');
+    const { FairDecor } = await import('/src/rendering/FairDecor.js');
+    const SB = await import('/src/rendering/SpeechBubbles.js');
+    const GP = await import('/src/ui/components/GuestPanel.js');
+    const BP = await import('/src/ui/components/BuildingPanel.js');
+    const { Random } = await import('/src/utils/random.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    s0.crisis.difficulty = 'huzurlu';
+    s0.crisis.raid = null;
+    s0.crisis.nextRaidWarnAt = null;
+    s0.petitions.list = [];
+    s0.petitions.nextAt = s0.totalMinutes + 1e6;
+    const keepGA = s0.goldenAge.since;
+    s0.goldenAge.since = s0.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+    const keepTime = { ...s0.time };
+    const people = () => st().characters.filter((c) => !c.role && !c.away && !c.emigrating && !c.isChild).sort((a, b) => a.id - b.id);
+
+    // --- 1.1 GuestEffects: kuyruğa her karede yeni kapanış yerine sabit işlev ---
+    {
+      const ge = new GuestEffects();
+      const q = new RenderQueue();
+      const fnSeen = new Set();
+      const viaQueue = [];
+      const direct = [];
+      const rq = { fillRect: (...a) => viaQueue.push(a), drawImage: () => {} };
+      const rd = { fillRect: (...a) => direct.push(a), drawImage: () => {} };
+      const guest = { visible: true, x: 100.4, y: 200.6, sortY: 200, spriteHeight: 18, facing: 'left', playing: true };
+      for (let f = 0; f < 30; f++) {
+        for (const type of GD.GUEST_KEYS) {
+          ge.queue(q, guest, type, f * 0.1);
+          fnSeen.add(q.items[q.count - 1].fn);
+          q.flush(rq);
+          ge.drawAccessory(rd, guest.x, guest.y, guest.spriteHeight, guest.facing, type, f * 0.1, guest.playing);
+        }
+      }
+      check('27.3: GuestEffects kuyruğa 90 karede tek ve aynı çizim işlevini verir (kapanış üretmez), çıktı doğrudan çizimle birebir', fnSeen.size === 1 && fnSeen.has(ge.drawQueued) && JSON.stringify(viaQueue) === JSON.stringify(direct) && viaQueue.length > 500 && q.items.length === 1 && q.items[0].a === null, `${fnSeen.size} ${viaQueue.length}`);
+      // RenderQueue: addCall sırayı bozmaz (addImage / addCustom ile birlikte derinlik sıralı)
+      const order = [];
+      const q2 = new RenderQueue();
+      q2.addImage(5, 'img5', 0, 0);
+      q2.addCall(3, (r, a) => order.push(a), 'call3');
+      q2.addCustom(4, () => order.push('custom4'));
+      q2.flush({ drawImage: (img) => order.push(img) });
+      check('27.3: RenderQueue.addCall derinlik sırasına uyar ve kare sonunda argümanları bırakır', order.join() === 'call3,custom4,img5' && q2.items.every((it) => it.fn === null && it.a === null && it.draw === null));
+    }
+
+    // --- 1.2 SpeechBubbles: genişlik bir kez ölçülür ---
+    {
+      let measures = 0;
+      const ops = [];
+      const ctx = { save() {}, restore() {}, measureText: (t) => { measures++; return { width: t.length * 5 }; }, fillRect: (...a) => ops.push(a), fillText: (...a) => ops.push(a), set font(v) {}, set textBaseline(v) {}, set globalAlpha(v) {}, set fillStyle(v) {} };
+      const c = { visible: true, x: 120, y: 220, spriteHeight: 18, bubble: null, speech: { text: 'Öğreniyorum ustam!', at: -1, duration: 3, remaining: 2 } };
+      for (let i = 0; i < 50; i++) SB.drawSpeechBubbles({ ctx }, { x: 0, y: 0, zoom: 2 }, [c]);
+      const firstW = c.speech.width;
+      const frame = ops.slice(0, ops.length / 50);
+      const same = Array.from({ length: 50 }, (_, i) => JSON.stringify(ops.slice(i * frame.length, (i + 1) * frame.length))).every((x) => x === JSON.stringify(frame));
+      c.speech.text = 'Bak ustam, çivi!';
+      SB.drawSpeechBubbles({ ctx }, { x: 0, y: 0, zoom: 2 }, [c]);
+      check('27.3: konuşma balonu genişliği ilk çizimde bir kez ölçülür (50 karede 1 measureText), her kare aynı çizilir; metin değişince yeniden ölçülür', measures === 2 && firstW === 'Öğreniyorum ustam!'.length * 5 + 10 && same && c.speech.width === 'Bak ustam, çivi!'.length * 5 + 10, `${measures} ${firstW}`);
+      check('27.3: balon önbelleği sözün süresine dokunmaz (remaining aynı)', c.speech.remaining === 2 && c.speech.duration === 3);
+    }
+
+    // --- 1.3 FairDecor: yeniden kullanılan dikdörtgenler, kararlı çıktı ---
+    {
+      const fd = new FairDecor();
+      const venue = { x: 400, y: 300, width: 32, height: 32 };
+      const b1 = fd.bounds(venue);
+      const b2 = fd.bounds({ x: 10, y: 10, width: 16, height: 16 });
+      const left2 = b2.left; // aynı nesne sonraki çağrıda yeniden yazılır
+      const t1 = fd.tableRect(venue);
+      let invalid = 0;
+      const run = () => {
+        const calls = [];
+        const r = { fillRect: (...a) => { if (a.slice(0, 4).some((v) => !Number.isFinite(v)) || typeof a[4] !== 'string') invalid++; calls.push(a); } };
+        for (const type of ['spring', 'summer', 'autumn', 'winter']) for (const tier of [null, 'symbolic', 'modest', 'rich']) fd.draw(r, venue, 2.7, type, 'party', tier ? { tier, left: 3, total: 7 } : null);
+        const lights = [];
+        for (const type of ['spring', 'summer', 'autumn', 'winter']) fd.collectLights(lights, venue, type, 'party', { tier: 'rich', left: 1, total: 2 });
+        return JSON.stringify([calls, lights]);
+      };
+      const r1 = run();
+      const r2 = run();
+      check('27.3: FairDecor bounds / tableRect aynı nesneyi yeniden kullanır; dört mevsim ve üç sofra çizimi kararlı ve geçerli', b1 === b2 && t1 === fd.tableRect(venue) && left2 === 10 - 28 && r1 === r2 && r1.length > 10000 && invalid === 0, `${r1.length} ${invalid}`);
+    }
+
+    // --- 2.1 Gezgin konuk tıklanır, misafir kartı açılır ---
+    const gs = () => S().guestSystem;
+    const makeGuest = (type, extra = {}) => {
+      if (st().activeGuest) { gs().character = null; S().world.guests = []; st().activeGuest = null; }
+      const entry = S().world.findEntryTile(new Random(11));
+      const p = S().world.standPoint(entry.x, entry.y);
+      st().activeGuest = { type, name: GD.GUEST_TYPES[type].names[0], look: 0, arrivalDay: st().time.day, departureDay: st().time.day + 1, x: p.x, y: p.y, leaving: false, resting: false, barters: 0, lastBarterDay: null, exit: null, ...extra };
+      gs().spawn();
+      return gs().character;
+    };
+    st().time.hour = 13;
+    const guest = makeGuest('collector', { arrivalDay: st().time.day - 1, barters: 1, lastBarterDay: st().time.day - 1 });
+    guest.visible = true;
+    guest.clearPath();
+    const card = () => document.querySelector('.guest-panel');
+    const hitX = guest.x;
+    const hitY = guest.y - 6;
+    const hit = S().world.findCharacterAt(hitX, hitY);
+    const cam = S().camera;
+    game.input.pendingClick = { x: (hitX - cam.x) * cam.zoom, y: (hitY - cam.y) * cam.zoom };
+    S().handleSelectionInput(true);
+    game.render(0);
+    check('27.3: World.findCharacterAt gezgin konuğu da bulur (isGuest)', hit === guest && hit.isGuest === true && S().world.findCharacterAt(hitX, hitY, { guests: false }) !== guest);
+    check('27.3: haritada konuğa tıklamak misafir kartını açar (sakin / yapı seçimi kalkar)', S().guestSelected === true && card() && !card().hidden && S().selectedId === null && S().selectedBuildingId === null && card().textContent.includes(st().activeGuest.name) && card().textContent.includes('Nadir Takasçı'), card()?.textContent.slice(0, 120));
+    const sum = GP.guestSummary(st(), guest);
+    check('27.3: misafir kartı: ne kadar süredir kasabada (saat), ayrılış ve şu anki işi', sum.rows.some(([l, v]) => l === 'Kasabada' && v.startsWith(`${24 + 13 - 9} saattir`)) && sum.rows.some(([l, v]) => l === 'Ayrılış' && v === `G${st().activeGuest.departureDay} 09:00`) && card().textContent.includes('saattir'), JSON.stringify(sum.rows));
+    check('27.3: Nadir Takasçı kartında takas özeti: bu kalıştaki takas sayısı, rezerv ve teklifler (bedel -> karşılık)', card().textContent.includes('1/2 takas') && card().querySelectorAll('.guest-offer').length === GD.BARTER_KEYS.length && card().textContent.includes('Antik Şema') && card().textContent.includes('Kumaş 5 · Fıçı Şerbeti 3 ->'));
+    game.events.emit('guest:barter', { key: 'seed', offer: GD.BARTER_OFFERS.seed, text: GD.BARTER_OFFERS.seed.text });
+    game.render(0);
+    check('27.3: takas olunca kartta son takas: ne verildi, ne alındı', card().textContent.includes('Fıçı Şerbeti 3 verildi -> Egzotik Tohum alındı'));
+    const res0 = { cloth: st().resources.cloth, sherbet: st().resources.sherbet };
+    Object.assign(st().resources, { cloth: 20, sherbet: 20 });
+    game.render(0);
+    const okCount = card().querySelectorAll('.guest-offer.is-ok').length;
+    Object.assign(st().resources, { cloth: 0, sherbet: 0 });
+    game.render(0);
+    const noneOk = card().querySelectorAll('.guest-offer.is-ok').length;
+    Object.assign(st().resources, res0);
+    check('27.3: teklifler stok rezervin üstündeyse "Uygun", değilse "Stok yetmez"', okCount === GD.BARTER_KEYS.length && noneOk === 0);
+    game.events.emit('ui:selectCharacter', people()[0].id);
+    game.render(0);
+    check('27.3: bir sakin seçilince misafir kartı kapanır', S().guestSelected === false && card().hidden && S().selectedId === people()[0].id);
+    game.events.emit('ui:selectGuest', true);
+    game.render(0);
+    const reopened = !card().hidden;
+    card().querySelector('.character-close').click();
+    game.render(0);
+    check('27.3: kart ✕ ile kapanır', reopened && card().hidden && S().guestSelected === false);
+    const bard = makeGuest('bard');
+    game.events.emit('ui:selectGuest', true);
+    game.render(0);
+    const bardText = card().textContent;
+    gs().finish(false);
+    game.render(0);
+    check('27.3: ozan kartında akşam çalma saatleri; konuk ayrılınca kart kendiliğinden kapanır', bard && bardText.includes('18:00 - 22:00') && bardText.includes('Ozan Ezgisi') && card().hidden && S().guestSelected === false);
+    const sc = { activeGuest: { type: 'storyteller', name: 'X', arrivalDay: 3, departureDay: 4, barters: 0, leaving: false, resting: false }, time: { day: 3, hour: 12 }, guestBook: { wisdom: 12.7 }, resources: {} };
+    const ss = GP.guestSummary(sc, { activityLabel: 'Masal anlatıyor' });
+    check('27.3: masalcı kartında masal saatleri ve Kasaba Bilgeliği', ss.rows.some(([l, v]) => l === 'Masal saati' && v.startsWith('10:00 - 17:00')) && ss.rows.some(([l, v]) => l === 'Kasaba Bilgeliği' && v === '12 puan') && ss.rows.some(([l, v]) => l === 'Kasabada' && v.startsWith('3 saattir')));
+
+    // --- 2.2 Büyük Ziyafet Sofrası havuz panelinde ---
+    {
+      const fountain = S().world.getCompleted('fountain')[0] ?? sim.place('fountain', { instant: true });
+      let fairDay = st().time.day;
+      while (!FA.isFairDay(fairDay)) fairDay++;
+      Object.assign(st().time, { day: fairDay, hour: 19, minute: 0 });
+      st().currentFestival = { type: 'summer', day: fairDay, phase: 'party', participants: [] };
+      st().currentFeast = { tier: 'rich', day: fairDay, contributions: { food: 22, bread: 9, sherbet: 5, cloth: 1 }, servings: 32, served: 7, eatenIds: [] };
+      const now = st().totalMinutes;
+      const keepBuffs = { tradition: st().buffs.tradition, bounty: st().buffs.bounty };
+      st().buffs.tradition = now + 11 * 60;
+      st().buffs.bounty = now + 11 * 60;
+      game.events.emit('ui:selectBuilding', fountain.id);
+      game.render(0);
+      const box = document.querySelector('.building-feast');
+      const text = box?.textContent ?? '';
+      check('27.3: havuz paneli süren Büyük Ziyafet Sofrası\'nı gösterir: kademe, evre, kilerden ayrılanlar, ikram sayacı', box && !box.hidden && text.includes('Zengin Şölen Sofrası') && text.includes('Şenlik saati') && text.includes('Yiyecek 22 · Ekmek 9 · Fıçı Şerbeti 5 · Kumaş 1') && text.includes('7/32 verildi · 25 kaldı'), text.slice(0, 200));
+      check('27.3: sofranın bonusları: Gelenek Bağı ve Bolluk Ziyafeti (kalan saatiyle)', text.includes('Gelenek Bağı · 11 sa') && text.includes('Bolluk Ziyafeti · 11 sa') && box.querySelectorAll('.feast-buff:not(.is-off)').length === 2);
+      st().currentFeast = { tier: 'symbolic', day: fairDay, contributions: { food: 0, bread: 0, sherbet: 0, cloth: 0 }, servings: 30, served: 0, eatenIds: [] };
+      st().currentFestival.phase = 'prep';
+      const info = BP.feastInfo(st());
+      game.render(0);
+      check('27.3: Sembolik İkramda kilerden bir şey ayrılmadığı ve bonus olmadığı yazar; hazırlık evresi', info.name === 'Sembolik İkram' && info.contributions.includes('Hiçbir şey') && info.buffs.length === 0 && info.phase.startsWith('Hazırlık') && document.querySelector('.building-feast').textContent.includes('Bonus yok'));
+      st().currentFeast = null;
+      st().currentFestival = null;
+      game.render(0);
+      check('27.3: sofra yokken blok gizlenir', document.querySelector('.building-feast').hidden && BP.feastInfo(st()) === null);
+      Object.assign(st().buffs, keepBuffs);
+      game.events.emit('ui:selectBuilding', null);
+    }
+
+    // --- 3.1 Çıraklık bekleme nedeni ve yadigâr zinciri karakter kartında ---
+    {
+      const ws = S().world.getCompleted('workshop').find((b) => !b.damaged) ?? sim.place('workshop');
+      const pool = people().filter((c) => c.lifeStage !== 'elder');
+      const master = pool[0];
+      const youth = pool[pool.length - 1];
+      const keep = { y: { lifeStage: youth.lifeStage, ageInDays: youth.ageInDays, age: youth.age, apprenticeship: youth.apprenticeship, workplaceId: youth.workplaceId, inventory: youth.inventory }, m: { task: master.task, workplaceId: master.workplaceId, away: master.away } };
+      sim.give({ food: 500, bread: 60 });
+      youth.apprenticeship = { masterId: master.id, profession: 'workshop', buildingId: ws.id, progress: 42, since: 0, crafted: 0 };
+      youth.lifeStage = 'youth';
+      master.away = false;
+      const idle0 = ws.idle;
+      ws.idle = true;
+      master.task = null;
+      const sIdle = AP.apprenticeStatus(st(), youth);
+      game.events.emit('ui:selectCharacter', youth.id);
+      game.render(0);
+      const note = document.querySelector('.character-panel:not(.guest-panel) .apprentice-note')?.textContent ?? '';
+      ws.idle = false;
+      master.task = { activity: 'craft', workBuildingId: ws.id, buildingId: ws.id };
+      const sWork = AP.apprenticeStatus(st(), youth);
+      master.task = null;
+      const sAway = AP.apprenticeStatus(st(), youth);
+      const hh = { id: -77, type: 'healerHut' };
+      const herbState = { ...st(), buildings: [...st().buildings, hh] };
+      const y2 = { apprenticeship: { masterId: master.id, profession: 'healerHut', buildingId: -77 } };
+      master.task = { activity: 'gatherHerbs', workBuildingId: -77 };
+      const sHerb = AP.apprenticeStatus(herbState, y2);
+      ws.damaged = true;
+      const sDamaged = AP.apprenticeStatus(st(), youth);
+      ws.damaged = false;
+      ws.idle = idle0;
+      check('27.3: kartta çıraklık nedeni: boştaki atölyede "Sipariş bekleniyor: Tezgâh Pratiği", usta tezgâhta / ot topluyor / tezgâhta değil / atölye hasarlı', sIdle.text.startsWith('Sipariş bekleniyor: Tezgâh Pratiği') && sIdle.ok && note === sIdle.text && sWork.text === 'Ustasının yanında öğreniyor' && sHerb.text.startsWith('Usta ot topluyor') && !sAway.ok && sDamaged.text.includes('hasarlı'), `${note} | ${sAway.text}`);
+      // Yadigâr zinciri okunur satır
+      const slot = { kind: 'heirloomHammer', qty: 1, name: 'Ata Yadigârı Çekiç', heirloom: CI.sanitizeHeirloomMeta({ ownerId: master.id, ownerName: 'Mehmet', story: "Mehmet Usta'nın 30 yıllık emektar çekici.", since: 1, chain: ['Mehmet', 'Ayşe', youth.name] }) };
+      youth.inventory = [slot];
+      game.render(0);
+      const chainEl = document.querySelector('.character-panel:not(.guest-panel) .heirloom-chain');
+      check('27.3: yadigârın devir zinciri karakter kartında okunur satır olarak listelenir (Mehmet → Ayşe → ...)', chainEl && chainEl.querySelectorAll('.chain-link').length === 3 && chainEl.textContent === `Mehmet→Ayşe→${youth.name}` && chainEl.closest('.purse-box').textContent.includes('Aile yadigârıAta Yadigârı Çekiç'), `${chainEl?.textContent} ${chainEl?.querySelectorAll('.chain-link').length}`);
+      Object.assign(youth, keep.y);
+      Object.assign(master, keep.m);
+      game.events.emit('ui:selectCharacter', null);
+    }
+
+    check('27.3: kayıt sürümü 31 korunur', CONFIG.SAVE_VERSION === 31);
+    if (st().activeGuest) gs().finish(false);
+    S().world.guests = [];
+    Object.assign(st().time, keepTime);
     s0.goldenAge.since = keepGA;
   }
 

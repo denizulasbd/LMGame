@@ -56,7 +56,7 @@ export class MapTooltip {
     let tone = 'is-info';
     if (info.character) {
       name = info.character.name;
-      status = info.character.visitor ? 'Gezgin tüccar · tıkla ve takas et' : 'Kasaba sakini · tıkla ve incele';
+      status = info.character.visitor ? 'Gezgin tüccar · tıkla ve takas et' : info.character.guest ? `Gezgin konuk · ${info.character.label ?? 'kasabada misafir'} · tıkla ve tanış` : 'Kasaba sakini · tıkla ve incele';
     } else if (info.building) {
       name = info.building.name;
       const job = info.job && info.job !== 'build' ? ` · Emir: ${JOBS[info.job].name}` : '';

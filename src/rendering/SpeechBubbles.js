@@ -3,6 +3,8 @@
 // (27.1) Süre simülasyonda düşer: updateSpeechBubbles() TownScene.update'te her adımda (tick.dtSeconds) çağrılır ve biten
 // sözü siler; drawSpeechBubbles() SALT OKUNUR çizimdir. Böylece çizim açık da olsa kapalı da (başsız simülasyon) sözler aynı
 // adımda biter ve sözün bitişine bakan üreteçlerin (seed + 32 / 33 / 34 ...) sırası çizime bağlı kaymaz.
+// (27.3) Balon genişliği her karede ctx.measureText ile ölçülmez: sözün ilk çiziminde bir kez ölçülüp s.width'e yazılır
+// (metin değişirse yeniden). Söz kayda girmez; başsız simülasyonda hiç ölçülmez.
 const FONT = "11px 'Pixelify Sans', ui-monospace, monospace";
 const PAD_X = 5;
 const HEIGHT = 16;
@@ -30,7 +32,7 @@ export function updateSpeechBubbles(characters, guests, dtSeconds) {
   }
 }
 
-/** Salt okunur çizim: sözlere ve sürelerine dokunmaz. */
+/** Salt okunur çizim: sözlerin metnine ve süresine dokunmaz (yalnızca genişlik önbelleği s.width / s.widthText yazılır). */
 export function drawSpeechBubbles(renderer, camera, characters) {
   const ctx = renderer.ctx;
   ctx.save();
@@ -45,7 +47,11 @@ export function drawSpeechBubbles(renderer, camera, characters) {
     const z = camera.zoom;
     const sx = Math.round((c.x - camera.x) * z);
     const sy = Math.round((c.y - c.spriteHeight - (c.bubble ? 12 : 2) - camera.y) * z);
-    const w = Math.ceil(ctx.measureText(s.text).width) + PAD_X * 2;
+    if (s.widthText !== s.text || !(s.width > 0)) {
+      s.width = Math.ceil(ctx.measureText(s.text).width) + PAD_X * 2;
+      s.widthText = s.text;
+    }
+    const w = s.width;
     const x = sx - Math.round(w / 2);
     const y = sy - HEIGHT - 4 - Math.round(Math.min(1, t / 0.15) * 2);
     const alpha = left < 0.4 ? Math.max(0, left / 0.4) : 1;

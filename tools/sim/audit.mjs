@@ -1490,5 +1490,112 @@ const PAGE_HELPERS = () => {
   await browser.close();
 }
 
+// =====================================================================================================================
+// 9. (27.3) Gerçek fareyle gezgin konuk kartı ve havuzdaki Büyük Ziyafet Sofrası bloğu; canlı çizimde balon ölçümü ve
+//    konuk aksesuarının kuyruğa sabit işlevle girmesi (oyun döngüsü çalışırken, gerçek kareler)
+// =====================================================================================================================
+{
+  const W = 1366;
+  const H = 768;
+  const { browser, page, errors } = await openGame({ seed: 8, stopLoop: false, viewport: { width: W, height: H } });
+  const pass = (name, ok, detail = '') => results.push({ name, ok: Boolean(ok), detail });
+  await page.evaluate(async () => {
+    const game = window.game;
+    const s = game.state;
+    s.time.paused = true;
+    s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+    const scene = game.scenes.current;
+    const { GUEST_TYPES } = await import('/src/data/guest.js');
+    const { Random } = await import('/src/utils/random.js');
+    const entry = scene.world.findEntryTile(new Random(3));
+    const p = scene.world.standPoint(entry.x, entry.y);
+    s.activeGuest = { type: 'collector', name: GUEST_TYPES.collector.names[0], look: 0, arrivalDay: s.time.day, departureDay: s.time.day + 1, x: p.x, y: p.y, leaving: false, resting: false, barters: 0, lastBarterDay: null, exit: null };
+    scene.guestSystem.spawn();
+    const g = scene.guestSystem.character;
+    g.visible = true;
+    g.clearPath();
+    // Konuğu meydanın yakınında, üstünde sakin olmayan bir karoya koy ve ekranın ortasına al (kamera doğrudan)
+    const plaza = scene.world.landmarks.plaza;
+    for (let r = 2; r < 12; r++) {
+      const q = scene.world.standPoint(plaza.centerX + r, plaza.centerY + 1);
+      g.x = q.x;
+      g.y = q.y;
+      if (scene.world.findCharacterAt(g.x, g.y - 6) === g) break;
+    }
+    const cam = scene.camera;
+    cam.x = g.x - 683 / cam.zoom;
+    cam.y = g.y - 6 - 384 / cam.zoom;
+    // Canlı çizimde ölçüm sayacı ve kuyruğa giren işlevler
+    window.__measures = 0;
+    const real = CanvasRenderingContext2D.prototype.measureText;
+    CanvasRenderingContext2D.prototype.measureText = function (t) { if (t === 'Takas zamanı, dostlar!') window.__measures++; return real.call(this, t); };
+    g.speech = { text: 'Takas zamanı, dostlar!', at: -1, duration: 600 };
+    window.__fns = new Set();
+    const q = scene.queue;
+    const realCall = q.addCall.bind(q);
+    q.addCall = (sortY, fn, ...rest) => { window.__fns.add(fn); return realCall(sortY, fn, ...rest); };
+  });
+  await page.waitForTimeout(600); // ~30+ gerçek kare
+  const live = await page.evaluate(() => ({ measures: window.__measures, fns: window.__fns.size, frames: performance.now() }));
+  pass('27.3: canlı çizimde konuşma balonu metni bir kez ölçülür (karelerce measureText yok)', live.measures === 1, `${live.measures}`);
+  pass('27.3: canlı çizimde konuk aksesuarı kuyruğa her karede aynı sabit işlevle girer (kapanış yok)', live.fns === 1, `${live.fns}`);
+  // Bir kare sonra (kamera sınırlara oturduktan sonra) ekran konumu
+  const pt = await page.evaluate(() => {
+    const scene = window.game.scenes.current;
+    const g = scene.world.guests[0];
+    const cam = scene.camera;
+    return { x: (g.x - cam.x) * cam.zoom, y: (g.y - 6 - cam.y) * cam.zoom };
+  });
+  await page.mouse.click(pt.x, pt.y);
+  await page.waitForTimeout(250);
+  const g1 = await page.evaluate(() => {
+    const c = document.querySelector('.guest-panel');
+    const b = c && !c.hidden ? c.getBoundingClientRect().toJSON() : null;
+    const col = document.querySelector('.ui-cards').getBoundingClientRect().toJSON(); // kart sütunu kendi içinde kaydırılır
+    return { open: Boolean(b), box: b, col, text: c?.textContent ?? '', selected: window.game.scenes.current.guestSelected, offers: c?.querySelectorAll('.guest-offer').length ?? 0 };
+  });
+  pass('27.3: gerçek fareyle Nadir Takasçı\'ya tıklamak misafir kartını sağ altta açar (ad, tür, takas teklifleri)', g1.open && g1.selected && g1.text.includes('Nadir Takasçı') && g1.offers === 3 && g1.box.right <= W && g1.box.left > W / 2 && g1.col.bottom <= H && g1.col.top >= 0, `${JSON.stringify(g1.box)} sütun ${JSON.stringify(g1.col)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+  pass('27.3: Esc misafir kartını kapatır', await page.evaluate(() => document.querySelector('.guest-panel').hidden && !window.game.scenes.current.guestSelected));
+  // Havuz: süren sofra
+  const fp = await page.evaluate(async () => {
+    const game = window.game;
+    const s = game.state;
+    const scene = game.scenes.current;
+    const FA = await import('/src/systems/Fair.js');
+    let f = scene.world.getCompleted('fountain')[0];
+    if (!f) {
+      const { x, y } = window.sim?.findSpot?.('fountain') ?? {};
+      if (x !== undefined) {
+        const r = scene.construction.placeSite('fountain', x, y);
+        scene.construction.complete(r.building);
+        f = r.building;
+      }
+    }
+    let day = s.time.day;
+    while (!FA.isFairDay(day)) day++;
+    Object.assign(s.time, { day, hour: 19, minute: 0 });
+    s.currentFestival = { type: 'summer', day, phase: 'party', participants: [] };
+    s.currentFeast = { tier: 'modest', day, contributions: { food: 30, bread: 6, sherbet: 0, cloth: 0 }, servings: 20, served: 4, eatenIds: [] };
+    s.buffs.tradition = s.totalMinutes + 600;
+    const cam = scene.camera;
+    cam.x = f.center.x - 683 / cam.zoom;
+    cam.y = f.center.y - 384 / cam.zoom;
+    return { x: 683, y: 384, ok: Boolean(f) };
+  });
+  await page.waitForTimeout(150);
+  await page.mouse.click(fp.x, fp.y);
+  await page.waitForTimeout(250);
+  const feast = await page.evaluate(() => {
+    const box = document.querySelector('.building-feast');
+    return { shown: Boolean(box) && !box.hidden, text: box?.textContent ?? '' };
+  });
+  pass('27.3: gerçek fareyle meydan havuzuna tıklayınca panelde Mütevazı Sofra, kilerden ayrılanlar, ikram ve Gelenek Bağı görünür', fp.ok && feast.shown && feast.text.includes('Mütevazı Sofra') && feast.text.includes('Yiyecek 30 · Ekmek 6') && feast.text.includes('4/20 verildi') && feast.text.includes('Gelenek Bağı'), feast.text.slice(0, 160));
+  pass('27.3: etkileşim boyunca sayfa hatası yok', errors.length === 0, errors.slice(0, 2).join(' | '));
+  allErrors.push(...errors);
+  await browser.close();
+}
+
 const ok = report(allErrors);
 process.exit(ok ? 0 : 1);

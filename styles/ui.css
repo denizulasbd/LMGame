@@ -4470,3 +4470,129 @@ kbd {
   0%, 100% { box-shadow: 0 0 0 1px #e0a030, 0 0 4px 0 rgba(255, 210, 63, 0.6); }
   50% { box-shadow: 0 0 0 1px #ffd23f, 0 0 9px 2px rgba(255, 243, 176, 0.95); }
 }
+
+/* ---------------------------------------------------------------------------
+   (27.3) Gezgin konuk kartı, Büyük Ziyafet Sofrası bloğu, çıraklık bekleme notu, yadigâr zinciri
+   --------------------------------------------------------------------------- */
+.guest-panel .guest-badge {
+  background: var(--ui-card-info);
+}
+
+.guest-body .relations {
+  margin-top: 8px;
+}
+
+.guest-offer {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  grid-template-areas: 'icon name state' 'deal deal deal';
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 3px 6px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-card);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.guest-offer img {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+}
+
+.guest-offer.is-ok {
+  background: var(--ui-card-ok);
+}
+
+.guest-offer img {
+  grid-area: icon;
+}
+
+.guest-offer-name {
+  grid-area: name;
+  color: var(--ui-highlight);
+}
+
+.guest-offer-deal {
+  grid-area: deal;
+  color: var(--ui-ink-soft);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.guest-offer-state {
+  grid-area: state;
+  font-size: 10px;
+  color: var(--ui-ink-soft);
+}
+
+.guest-offer.is-ok .guest-offer-state {
+  color: var(--ui-ok);
+}
+
+.feast-scroll {
+  border-color: rgba(255, 210, 63, 0.45);
+  background: linear-gradient(180deg, rgba(255, 232, 190, 0.12), rgba(255, 214, 160, 0.05));
+}
+
+.feast-scroll .feast-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.feast-scroll .feast-row span:first-child {
+  color: var(--ui-ink-soft);
+}
+
+.feast-buffs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.feast-buff {
+  padding: 1px 6px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-card-hi);
+  font-size: 11px;
+}
+
+.feast-buff.is-off {
+  background: var(--ui-card);
+  color: var(--ui-ink-soft);
+}
+
+.apprentice-note {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ui-warn);
+}
+
+.apprentice-note.is-ok {
+  color: var(--ui-ok);
+}
+
+.heirloom-chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+}
+
+.heirloom-chain .chain-link {
+  padding: 1px 5px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-card-hi);
+}
+
+.heirloom-chain .chain-arrow {
+  color: var(--ui-ink-soft);
+}

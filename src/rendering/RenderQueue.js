@@ -20,7 +20,15 @@ export class RenderQueue {
     this.push(sortY, null, 0, 0, draw);
   }
 
-  push(sortY, image, x, y, draw) {
+  /**
+   * (27.3) Sıfır tahsisatlı özel çizim: sabit (bir kez tanımlanmış) fn(renderer, a, b, c) argümanlarıyla çağrılır. Her karede
+   * yeni bir kapanış (closure) üretmeden havuzdaki öğeye yazılır.
+   */
+  addCall(sortY, fn, a = null, b = null, c = null) {
+    this.push(sortY, null, 0, 0, null, fn, a, b, c);
+  }
+
+  push(sortY, image, x, y, draw, fn = null, a = null, b = null, c = null) {
     // Öğe nesneleri kareler arasında yeniden kullanılır (çöp üretmemek için)
     let item = this.items[this.count];
     if (!item) {
@@ -33,6 +41,10 @@ export class RenderQueue {
     item.x = x;
     item.y = y;
     item.draw = draw;
+    item.fn = fn;
+    item.a = a;
+    item.b = b;
+    item.c = c;
     this.count++;
   }
 
@@ -42,10 +54,13 @@ export class RenderQueue {
     for (let i = 0; i < this.count; i++) active[i] = this.items[i];
     active.sort(byDepth);
     for (const item of active) {
-      if (item.draw) item.draw(renderer);
+      if (item.fn) item.fn(renderer, item.a, item.b, item.c);
+      else if (item.draw) item.draw(renderer);
       else renderer.drawImage(item.image, item.x, item.y);
       item.image = null;
       item.draw = null;
+      item.fn = null;
+      item.a = item.b = item.c = null; // kare bitince nesnelere tutunma
     }
     active.length = 0;
     this.count = 0;

@@ -42,7 +42,7 @@ import { petitionProgress, grantStatus, formatRemaining } from '../../systems/Pe
 import { INJURY } from '../../data/crisis.js';
 import { LIFE_STAGES, AGING } from '../../data/lifeStages.js';
 import { PROFESSIONS, PROUD_MASTER } from '../../data/apprenticeship.js';
-import { apprenticesOf, graduationFor, acceptsApprentice } from '../../systems/Apprenticeship.js';
+import { apprenticesOf, graduationFor, acceptsApprentice, apprenticeStatus } from '../../systems/Apprenticeship.js';
 import { ORIGIN_NAMES } from '../../data/temperament.js';
 import { generationName } from '../../systems/Lineage.js';
 import { heirloomSlot } from '../../systems/Citizens.js';
@@ -320,8 +320,9 @@ export class CharacterPanel {
     const youth = character.lifeStage === 'youth' && !character.role;
     const proud = (character.buffs.proudMaster ?? -1) > state.totalMinutes;
     const canEnroll = youth && !a && state.buildings.some((b) => acceptsApprentice(state, b));
+    const status = apprenticeStatus(state, character); // (27.3) bekleme / pratik nedeni
     const key = a
-      ? `a:${a.masterId}:${a.buildingId}:${Math.floor(a.progress)}:${a.crafted}`
+      ? `a:${a.masterId}:${a.buildingId}:${Math.floor(a.progress)}:${a.crafted}:${status?.text}`
       : `${youth}:${canEnroll}:${pupils.map((p) => `${p.id}-${Math.floor(p.apprenticeship.progress)}`).join(',')}:${proud}`;
     if (key === this.lastApprentice) return;
     this.lastApprentice = key;
@@ -342,6 +343,7 @@ export class CharacterPanel {
           el('span', { className: 'apprentice-pct', text: `%${pct} Çıraklık` }),
         ])
       );
+      if (status) rows.push(el('div', { className: `apprentice-note${status.ok ? ' is-ok' : ''}`, text: status.text }));
       rows.push(row('Yetişkinlikte', [el('span', { text: grad.title ? `${grad.title} ${prof.master}` : `${prof.master} deneyimiyle (%${pct})` })]));
       if (a.crafted) rows.push(row('Çırak işi', [el('span', { text: `${a.crafted} parça` })]));
       const leave = this.button('Çıraklıktan Ayır', 'Genç her zamanki işlerine döner (ilerlemesi silinir)', () => this.events.emit('ui:releaseApprentice', { characterId: character.id }));
@@ -395,7 +397,15 @@ export class CharacterPanel {
       );
     }
     const summary = inv.length ? inv.map((s) => `${s.name ?? ITEMS[s.kind].name}${s.qty > 1 ? ` ×${s.qty}` : ''}`).join(', ') : 'Çantası boş';
-    this.purseBox.replaceChildren(coins, el('div', { className: 'bag-slots' }, slots), el('div', { className: 'bag-summary', text: summary }));
+    // (27.3) Aile yadigârının devir zinciri: ipucunun yanı sıra kartta da okunur bir satır
+    const relic = inv.find((s) => s.heirloom);
+    const chain = relic
+      ? [
+          el('div', { className: 'social-row' }, [el('span', { className: 'social-label', text: 'Aile yadigârı' }), el('span', { className: 'social-value', text: relic.name ?? ITEMS[relic.kind].name })]),
+          el('div', { className: 'heirloom-chain', title: relic.heirloom.story }, relic.heirloom.chain.flatMap((name, i) => [...(i ? [el('span', { className: 'chain-arrow', text: '→' })] : []), el('span', { className: 'chain-link', text: name })])),
+        ]
+      : [];
+    this.purseBox.replaceChildren(coins, el('div', { className: 'bag-slots' }, slots), el('div', { className: 'bag-summary', text: summary }), ...chain);
   }
 
   /** (21. aşama) Açık dilekçe: isteği, ne yapılmalı, kalan süre ve yanıt düğmeleri. */
