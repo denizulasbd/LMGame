@@ -3456,6 +3456,216 @@ ziyaret / takas sayaçları, takas türleri, Kasaba Bilgeliği) eklendi. **Sür�
 - **Geriye uyumluluk:** v2-v31 kayıtları sıfır hatayla açılır (`compat.mjs` 1137 doğrulama).
 - **Eski testler:** 26. aşamadan önceki bölümler panayırsız ve konuksuz dünyada koşar (`tests.mjs`); hiçbir eski doğrulama gevşetilmedi.
 
+## Kalite Kontrol ve Mimari Cilalama: Kayıt Bütünlüğü, Ziyafet Kileri ve Determinizm Onarımları (27. aşama, 27.1 mikro adımı)
+
+27. aşama yeni oynanış eklemez; bağımsız statik kod denetiminde bulunan açıkları kapatır. 27.1 üç paket onarımdır. **Kayıt sürümü 31 olarak kaldı**
+(yeni fikstür yok): eklenen alanların hepsi isteğe bağlıdır ve v2-v31 kayıtlarında yoksa boş varsayılanla (`[]` / `null`) başlar.
+
+### 1. Ziyafet sofrası ve panayır kayıt bütünlüğü (`FeastSystem`, `Feast`, `FairSystem`, `Fair`)
+
+- **Çift ikram:** sofradan ikram alanlar artık `currentFeast.eatenIds` dizisinde kayda girer (önceden yalnızca bellekteki `c.feasted` vardı). Şenlik saatinde
+  kayıt -> yükleme yapılınca `FeastSystem.reconcile` bu listeden `c.feasted` işaretini yeniden kurar; `serve()` hem `served >= servings` hem de
+  `eatenIds.includes(c.id)` kontrolü yapar. Aynı sakin ikinci kez yiyemez, sayaç kapasiteyi aşamaz. `sanitizeCurrentFeast` diziyi doğrular (sayı olmayan /
+  tekrarlanan kimlikler atılır, `served` en az liste uzunluğu kadardır).
+- **Negatif kiler iadesi:** 22:00'de yenmeyen pay `frac = clamp((servings - served) / servings, 0, 1)` ile hesaplanır; bozuk ya da eski bir kayıttan taşmış sayaç
+  kilerden erzak silemez.
+- **Depo sınırı:** kilere dönen her şey `Granary.storageLimit` ile sınırlıdır (`FeastSystem.credit`).
+- **Panayır iptali:** 18:00'de meydan havuzu / mekân yıkılmış ya da hasarlıysa `FairSystem` panayırı iptal eder ve `'fair:cancelled'` yayınlar; sofra kaldırılır ve
+  sabah ayrılan **tüm** bağış (besin, ekmek, Fıçı Şerbeti, Kumaş) depo sınırları içinde kilere döner (`'feast:cancelled' { tier, refund }`). Şenlik saatine
+  ulaşamadan (hazırlık evresinde) kapanan panayırın sofrası da saat başı aynı biçimde iade edilir. Önceden bu erzak sessizce kayboluyordu.
+- **Katılımcılar:** `currentFestival.participants` dans eden sakinlerin kimliklerini tutar; yüklemede `FairSystem.attendees` buradan kurulur. Şenlik ortasında
+  kayıt -> yükleme yapılsa da kapanış sayımı ve panayır anıları önceden dans edenleri içerir.
+
+### 2. Konuk sistemi, kimlik izolasyonu ve balon determinizmi (`GuestSystem`, `Entity`, `SpeechBubbles`)
+
+- **Konuşma balonları simülasyonda biter:** `c.speech` süresi artık çizimde değil, `TownScene.update` içinde her simülasyon adımında
+  `updateSpeechBubbles(world.characters, world.guests, tick.dtSeconds)` ile düşer (`s.remaining`). `drawSpeechBubbles()` **salt okunur** çizimdir.
+  `tick.dtSeconds` duraklatılmamış gerçek saniyedir (oyun duraklatılınca söz süresi de durur). Böylece çizimli oyunla başsız simülasyonda sözler aynı adımda
+  biter ve sözün bitişine bakan üreteçlerin (`seed + 32 / 33 / 34`, ayrıca mizaç ve bilge sözleri) sırası ekran çizimine bağlı kaymaz.
+- **Kimlik sayacı:** gezgin konuğun `Character`'ı sabit negatif kimlikle (`GUEST_ID = -1`) kurulur; ortak `Entity` sayacı ilerlemez, sonradan doğan çocukların
+  kimliği ve doğum günü ofseti (`LifeStages.birthdayOffset`) konuktan etkilenmez.
+- **Ayrılırken kayıt:** konuk çıkış karosunu `activeGuest.exit` alanına yazar. Ayrılırken (`leaving: true`) kayıt -> yükleme yapılırsa `restore()` çıkışa giden
+  rotayı yeniden kurar (`exit` yoksa, eski biçimde, üreteç kullanmadan en yakın kenar karosu seçilir); yol yoksa ya da zaten çıkıştaysa sessizce uğurlanır.
+  Önceden konuk ilk adımda haritanın ortasında buharlaşıyordu.
+- **Tıkanan yollar:** `GuestSystem` `'world:blocked'` ve `'building:removed'` olaylarını dinler (`destroy()` temizler): ayrılan konuk çıkış rotasını, kalan konuk
+  hedef anahtarını sıfırlayıp güncel durağının rotasını yeniden hesaplar (dinlenirken uyanınca).
+
+### 3. Çekirdek iş gücü ve emekli bilge iş yuvası (`LifeStages`, `JobSystem`)
+
+- `LifeStages.coreWorkers` keşif seferindeki (`c.away`) ve köyü terk etmekte olan (`c.emigrating`) sakinleri çalışabilir kadrodan düşer. 3 yetişkinden biri sefere
+  çıkınca kadro 2'ye iner ve en dinç emekli bilge gönüllü ustaya döner; sakin dönünce saat başı yeniden emekli olur (`LifeStageSystem.refreshRetirement`).
+- `JobSystem.reservedForPinned` emekli bilgeyi (`c.retired`) sayılmaz kabul eder: iş yerine sabitlenmiş sakin 70 yaşında emekli olunca o yuvayı kilitlemez
+  (gönüllü ustaya dönünce yeniden sayılır).
+- Bilgeler ~57. günden sonra ortaya çıktığı için bu iki düzeltme kule öncesi erken oyunu etkilemez (aşağıdaki determinizm doğrulaması).
+
+### Kayıt (sürüm 31, değişmedi)
+
+`currentFeast.eatenIds: number[]`, `currentFestival.participants: number[]` ve `activeGuest.exit: null | { x, y }` eklendi. Üçü de isteğe bağlıdır; v2-v31 kayıtlarında
+yoksa `[]` / `null` ile açılır, bozuk değerler temizlenir. `SAVE_VERSION = 31`, fikstürler aynı.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1157; 32'si bu adımın): kayıt -> yüklemede çift ikram yok, sofra dolunca ikram durur, `served > servings` iken negatif iade yok,
+  iade depo sınırında; meydan hasarlıyken iptal ve hazırlıkta kapanışta bağışın tamamı geri; katılımcılar kayda girer ve kapanış sayımına / anılara yansır;
+  `c.speech` hiç çizilmeden adımlarla biter, duraklatınca durur, `drawSpeechBubbles` 300 karede salt okunur; konuk `Entity` sayacını kaydırmaz; ayrılırken kayıt
+  -> yüklemede çıkışa yürür ve teşekkürle ayrılır (`exit`'siz eski biçimde de); yeni şantiye / yıkım rotayı yeniden kurar; `destroy` dinleyicileri temizler; seferdeki /
+  göç eden sakin çekirdek kadrodan düşer ve bilge gönüllü olur (saf hesap ve gerçek `LifeStageSystem`); emekli bilge sabit yuvayı tutmaz.
+  Eski testlerde yalnızca biçim karşılaştırmaları yeni alanları (`participants: []`, `exit: null`) içerecek biçimde güncellendi. 26.2'deki "güven +10" testi, 26.1
+  bölümünün aynı günlü panayırı artık erzağını geri verdiği için (o sofra da Zengin olabildiğinden) günlük güven işaretini önceden temizler.
+- **Denetim** (`audit.mjs`): 129/129. Yeni senaryolar: şenlik ortasında kayıt -> yükleme (eatenIds / participants korunur, durum kayması yok; yüklemeden sonra kimse
+  iki kez yemez, iade negatif değil, kapanış dans edenleri içerir) ve konuk çıkışa yürürken kayıt -> yükleme (haritada kalır, durum kayması yok, teşekkürle ayrılır).
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-31): 1137/1137 (süren sofra / panayır karşılaştırması yeni alanların `[]` varsayılanıyla yapılır).
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0.
+  **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34** (değişmedi).
+- **Tohum 42 determinizmi.** `autopilot.mjs 42 24` (kule öncesi): `--json` raporu, kayıt anlık görüntüsü ve günlük çıktısı 26.3 ile **bayt bayt aynı**. 45 günlük koşuda
+  Ulu Saat Kulesi G25 / G27 / G28, Altın Çağ G28 (değişmedi); 45 günün raporunda yalnızca Altın Çağ sonrasına ait tek bir sayaç (güzel sokak anısı 114 -> 115) farklı.
+
+## Kalite Kontrol: Tıkanan Mekaniklerin Açılması (27. aşama, 27.2 mikro adımı)
+
+Uzun koşularda (64-72 gün) hiç ilerlemeyen ya da hiç görünmeyen dört mekanik açıldı. Hepsi Ulu Saat Kulesi / Altın Çağ sonrasına aittir; kule öncesi oyun
+**bayt bayt aynıdır**. Her sistem kendi üretecini kullanmaya devam eder (dilekçe `seed + 23`, çıraklık `seed + 28`, soy `seed + 30`, yadigâr `seed + 31`); ana üreteç ve
+`Math.random` tüketilmez. **Kayıt sürümü 31** (yeni alan yok).
+
+### 1. Çıraklık darboğazları (`ApprenticeshipSystem`, `Apprenticeship`)
+
+- **Ot toplayan Şifacı:** usta kulübenin otlarını topluyorsa (`gatherHerbs`, `workBuildingId` = kulübe) fiilen mesaidedir; çırak kulübedeki taburesinde tam hızla öğrenir.
+- **Tezgâh Pratiği:** zanaat yapısı boşta beklerken (`building.idle`: herkes ekipmanlı, sipariş yok; iksir rafları dolu) çırağın kayıtlı ustası kasabadaysa (seferde,
+  köyü terk ediyor ya da emekli değil) çırak mesai saatinde taburesine oturup **normalin %60'ı** (`APPRENTICE.practiceRate`) hızla pratik yapar. Usta tezgâhta olmadığı
+  için Gururlu Usta ve verim katkısı yoktur; söz yalnızca çıraktan gelir. Boşta olmayan yapıda 25.2 kuralı aynen geçerlidir (usta tezgâhta değilse plan yok, usta kalkınca
+  çırak da kalkar).
+- **Güvenlik:** hasarlı (`damaged`) ya da yanan (`isBurning`) yapıya çırak yazılmaz, ders planlanmaz (`safeForApprentice`). Ders sürerken yapı hasar alır / yanarsa ya da
+  kasaba eşiğin altına düşerse (kişi başı besin < 6 ya da çalışabilir çekirdek iş gücü < 3) çırak dersi bırakıp temel işine döner.
+
+### 2. Ocak Devri, Yeni Yuva ve Yeni Konut Talebi (`LineageSystem`, `Lineage`, `Petitions`)
+
+- **"Tek şans" bitti:** bir düğünde (`relationship:married`) evlenenlerin Kıdemli Bilge ebeveynleri ve yaşadıkları evlerin bilge reisleri için devir yeniden denenir. Bilgenin
+  evladı 70 yaşındayken bekârsa, evlendiği gün ocak ona geçer.
+- **Evladı olmayan bilge:** `Lineage.chooseHearthHeir`, evli biyolojik evlat yoksa aynı evde yaşayan evli sakini seçer (kuşağı büyük olan önce; bilgenin eşi olmaz).
+  `Lineage.hearthsOf` bilgenin kendi evine ek olarak kütükte (`lineage.heads`) reis göründüğü evleri de verir.
+- **Altın Çağ'dan hemen önce evlenenler:** `LineageSystem` `goldenAge:began` olayını dinler; ayrı evlerde ya da ebeveyn evinde kalan evli 2. kuşak çiftler o anda
+  `settle` ile yuvalarına kavuşur.
+- **Yeni Konut Talebi:** artık dilekçe sınırlarına uyar (çiftin ikisinde de açık dilekçe yoksa ve kasabada `PETITIONS.maxOpen`'dan az açık dilekçe varsa açılır).
+  Yeni kulübe bitince dilekçeli ve hâlâ ayrı yaşayan çift oraya taşınır; dilekçe **yalnızca çift gerçekten aynı çatı altında buluşunca** karşılanır (kulübe sayısının
+  artması tek başına yetmez).
+
+### 3. Yadigâr mirasçısı ve çırak geçmişi (`Heirloom`, `HeirloomSystem`)
+
+- `Heirloom.pickHeir`, çantasında zaten yadigâr taşıyan adayı havuzdan düşürür: ilk sıradaki evlatta yadigâr varsa tören iptal olmaz, sıradaki uygun evlada / çırağa / manevi
+  evlada geçer.
+- `master.mentees` çalışma zamanında da kayıttaki kuralla (`sanitizeMentees`, son `MAX_MENTEES = 12`) sınırlıdır. Kesintisiz oturum ile kayıt / yükleme aynı mirasçıyı seçer.
+
+### 4. Yeni nesil mizaç dilekçeleri (`PetitionSystem`)
+
+Yalnızca Altın Çağ'da (öncesinde hiçbir ağırlık ya da zar değişmez):
+
+- `optionsFor`: Zanaatkâr Ruhu (`craftTools`), Girişimci Kanı (`marketFees`), Bilge Düşünür (`academy` / `research` / `books`) ve Şenlik Neşesi (`sherbetCask`) kendi
+  dilekçelerini `NEW_GEN_PRIORITY.weight = 3` kat ağırlıkla ister. Bilge Düşünür'ün araştırma ve kitapları bittiyse meydanda bilgelik sohbeti (Toplanma) onun dilekçesi sayılır.
+- `create`: kendi dilekçesini açabilen yeni nesil huylu sakinler adaylar arasında öne geçer: Altın Çağ'da henüz hiç açılmadıysa her zaman (ve yalnızca kendi dilekçesiyle),
+  sonra %50 olasılıkla (kendi üreteci). Öteki sakinlerin seçenekleri değişmez.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1185; 28'i bu adımın): boştaki atölyede Tezgâh Pratiği (%60 hız, gurur yok, usta seferdeyse yok), 25.2 kuralının korunması, ot toplayan
+  Şifacı ustasıyla tam hızda öğrenme, dolu raflı kulübede pratik; hasarlı / yanan yapıya yazılmama, ders ortası hasar / yangın / kıtlık / iş gücü kaybında dersi bırakma;
+  sonradan evlenen evlada Ocak Devri, evli ev halkına devir, kütükteki reislik; Altın Çağ başlarken bekleyen çiftin yuvası, sınırlı ve gerçek buluşmayla karşılanan Yeni
+  Konut Talebi, yeni kulübede taşınma; yadigârı olan mirasçının atlanması, çalışma zamanında 12 çırak sınırı; Altın Çağ'da yeni nesil dilekçe ağırlığı ve önceliği;
+  bu adımın sistem çağrılarında ana üreteçlerin ve `Math.random`'un hiç ilerlemediği. Eski testlerde tek değişiklik: 25.3'teki dilekçe ağırlığı denetimi Altın Çağ'da
+  `5 x NEW_GEN_PRIORITY.weight` bekler.
+- **Denetim** (`audit.mjs`): 130/130. Yeni senaryo: rafları dolu Şifacı Kulübesi'nde gerçek mesaide Tezgâh Pratiği, kayıt -> yüklemede durum kayması yok, yüklemeden sonra da
+  ilerleme.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-31): 1137/1137.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0.
+  **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34** (değişmedi). Çırak mesaisi 665 -> 949 saat, Geniş Aile 3 -> 5.
+- **Tohum 42 determinizmi.** `autopilot.mjs 42 24` (kule öncesi): `--json` raporu, günlük çıktısı ve kayıt dosyası `main` ile **bayt bayt aynı**. Kule G25 / G27 / G28,
+  Altın Çağ G28.
+- **Tohum 42, 72 gün (`main` -> 27.2):** Zanaat Atölyesi çırağı %0 -> **%100**, Şifacı çırağı %0 -> **%100**; mezun 2 -> 3; çırak mesaisi 346 -> 793 saat; çırak işi
+  43 -> 156; yeni nesil dilekçe `{}` -> `{ sherbetCask: 1 }`; Geniş Aile 1 -> 2. Ocak Devri 0 kaldı: 72. güne kadar tek Kıdemli Bilge (Deniz) var, çocuğu yok ve evinde yalnızca
+  eşi yaşıyor (eş mirasçı olamaz), yani devredecek kimse yok.
+
+## Kalite Kontrol: Sıfır Tahsisatlı Çizim ve Arayüz Görünürlüğü (27. aşama, 27.3 mikro adımı)
+
+Bu adım yalnızca çizimi ve arayüzü değiştirir: simülasyon kurallarına, üreteçlere ve kayda dokunmaz. **Kayıt sürümü 31**, kule öncesi oyun **bayt bayt aynı**.
+
+### 1. Sıfır tahsisatlı çizim
+
+- **`RenderQueue.addCall(sortY, fn, a, b, c)`:** havuzdaki öğeye sabit bir işlev ve argümanları yazılır; kare bitince argümanlar bırakılır. `GuestEffects`
+  artık her karede yeni bir kapanış (closure) üretmez, bir kez tanımlanan `drawQueued`'u verir.
+- **`SpeechBubbles`:** balon genişliği her karede `ctx.measureText` ile ölçülmez; sözün ilk çiziminde bir kez ölçülür ve `s.width`'e yazılır (metin değişirse yeniden
+  ölçülür). Söz kayda girmez; başsız simülasyonda hiç ölçülmez.
+- **`FairDecor`:** `bounds()` / `tableRect()` aynı nesneyi yeniden kullanır. `for ... of [a, b]` dizileri, `forEach` kapanışları, iç `rope` kapanışı ve her karede
+  yeniden kurulan renk / ışık dizileri modül sabitlerine ve sayaçlı döngülere dönüştü.
+- **Görüntü aynı:** `main` ile 27.3, aynı girdilerle (dört mevsim × iki evre × dört sofra × beş zaman, üç konuk türü, balonlar) **31.942 çizim çağrısında birebir aynı**
+  çıktıyı verir.
+
+### 2. Gezgin konuk kartı ve ziyafet bloğu
+
+- **Tıklanabilir konuk:** `World.findCharacterAt` gezgin konukları (`world.guests`) da bulur. Konuğa tıklamak sağ altta **misafir kartını** açar
+  (`GuestPanel`, `'guest:selected'`, `'ui:selectGuest'`):
+  - portre, ad ve tür;
+  - kaç saattir kasabada olduğu ve ne zaman ayrılacağı;
+  - şu anki işi;
+  - ozanda akşam çalma saatleri ve Ozan Ezgisi, masalcıda masal saatleri ve Kasaba Bilgeliği;
+  - Nadir Takasçı'da takas özeti: bu kalıştaki takas sayısı, son takasta ne verilip ne alındığı, rezerv ve teklifler (bedel -> karşılık, "Uygun" / "Stok yetmez").
+
+  Sakin ya da yapı seçilince, ✕ / Esc ile ya da konuk ayrılınca kart kapanır. Harita ipucu "Gezgin konuk · ... · tıkla ve tanış" der; seçili konuğun ayağının altında
+  seçim halkası ve yolu görünür.
+- **Büyük Ziyafet Sofrası bloğu:** meydan havuzunun ve Belediye Konağı'nın panelinde, süren sofranın kademesi (Sembolik / Mütevazı / Zengin Şölen), evresi, kilerden
+  ayrılan erzak / şerbet / kumaş, ikram sayacı (verilen / kalan) ve Gelenek Bağı / Bolluk Ziyafeti bonusları (kalan saatiyle) parşömen kartta gösterilir.
+  Sembolik sofrada "Bonus yok" yazar. Sofra yokken blok gizlidir.
+
+### 3. Çıraklık ve yadigâr
+
+- **Çıraklık bekleme nedeni** (`Apprenticeship.apprenticeStatus`): ilerleme çubuğunun altında yeşil ya da sarı bir not çıraklığın durumunu söyler:
+  - "Ustasının yanında öğreniyor";
+  - "Usta ot topluyor: çırak kulübede otları ayıklıyor";
+  - "Sipariş bekleniyor: Tezgâh Pratiği yapılıyor (%60 hız)" ya da "Raflar dolu: ...";
+  - "Usta tezgâhta değil / seferde";
+  - "Atölye hasarlı / yanıyor";
+  - "Kasabada gıda ya da iş gücü kıt".
+- **Yadigâr zinciri:** "Kişisel Kese & Çanta" bölümünde aile yadigârının adı ve devir zinciri (`Mehmet → Ayşe → Ozan`) okunur bir satırdır; hikâyesi ipucundadır.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1207; 22'si bu adımın):
+  - sabit işlevle kuyruğa giriş (90 karede tek işlev, doğrudan çizimle birebir) ve `addCall`'ın derinlik sırası;
+  - 50 karede tek `measureText`;
+  - `FairDecor`'un kararlı, geçerli çıktısı;
+  - `findCharacterAt` ile konuk, tıklamayla kart, süre / ayrılış / takas özeti / son takas / teklif durumu, ozan ve masalcı satırları, kartın kapanması;
+  - havuz panelinde sofra (zengin ve sembolik), bonuslar, sofra yokken gizlenmesi;
+  - çıraklık notları ve kartta yadigâr zinciri.
+
+  27.1'deki "salt okunur balon" testi yalnızca genişlik önbelleğini (`width`, `widthText`) hariç tutar.
+- **Denetim** (`audit.mjs`): 136/136. Yeni bölüm (oyun döngüsü canlı, gerçek fare):
+  - canlı çizimde balon metni bir kez ölçülür;
+  - konuk aksesuarı kuyruğa tek işlevle girer;
+  - Nadir Takasçı'ya gerçek tıklama misafir kartını sağ sütunda açar, Esc kapatır;
+  - meydan havuzuna gerçek tıklama sofra bloğunu gösterir;
+  - sayfa hatası yok.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-31): 1137/1137.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0.
+  **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34** (değişmedi).
+- **Tohum 42 determinizmi.** `autopilot.mjs 42 24`: `--json` raporu, günlük çıktısı ve kayıt dosyası `main` ile **bayt bayt aynı**; kule G25 / G27 / G28, Altın Çağ G28.
+
+## 27. Aşama özeti: Kalite Kontrol, Darboğaz Açma ve Mimari Cilalama (27.1 - 27.3)
+
+27. aşama yeni bir oynanış katmanı eklemedi. Statik kod denetiminde bulunan açıkları kapattı, uzun koşularda tıkanan mekanikleri açtı ve 26. aşamanın görünmeyen
+sistemlerini arayüze taşıdı.
+
+| Adım | Ne düzeldi | Kayıt | Testler |
+|---|---|---|---|
+| **27.1** Kayıt bütünlüğü | Ziyafette çift ikram ve negatif / depo sınırını aşan iade, panayır iptalinde kaybolan erzak, kayda girmeyen katılımcılar; konuşma balonlarının çizime bağlı bitişi (başsız simülasyonda üreteç kayması); konuğun `Entity` kimlik sayacını ilerletmesi, ayrılırken yüklemede buharlaşması, tıkanan yolu fark etmemesi; seferdeki sakinin çekirdek kadro sayılması, emekli bilgenin sabit yuvayı kilitlemesi | 31 (isteğe bağlı `eatenIds`, `participants`, `exit`) | 1157 |
+| **27.2** Darboğazlar | Zanaat / Şifacı çırakları %0'da kalıyordu (Tezgâh Pratiği, ot toplayan usta) -> 72 günde %100; hasarlı / yanan yapı ve ders ortası güvenlik; Ocak Devri'nin "tek şans" tuzağı, ev halkına devir, Altın Çağ öncesi evlenenlerin yuvası, sınırlı ve gerçek buluşmayla karşılanan konut dilekçesi; yadigârı olan mirasçının atlanması, 12 çırak sınırı; Altın Çağ'da yeni nesil huy dilekçelerinin önceliği | 31 | 1185 |
+| **27.3** Performans ve arayüz | Kapanışsız konuk çizimi, bir kez ölçülen balon genişliği, tahsisatsız panayır süsleri (çıktı birebir aynı); tıklanabilir gezgin konuk ve misafir kartı; havuz panelinde ziyafet bloğu; çıraklık bekleme nedeni ve yadigâr zinciri | 31 | 1207 |
+
+**Ortak ilkeler.**
+
+- **Kule öncesi bayt bayt aynı:** üç adımda da `autopilot.mjs 42 24` raporu, günlüğü ve kayıt dosyası 26.3 / `main` ile aynıdır. Ulu Saat Kulesi G25 / G27 / G28 ve
+  Altın Çağ G28 hiç değişmedi; stres matrisinde Altın Çağ G31, G33, G31, G28, G34, G34.
+- **İzole üreteçler:** dilekçe `seed + 23`, çıraklık `seed + 28`, soy `seed + 30`, yadigâr `seed + 31`, panayır / sofra / konuk `seed + 32 / 33 / 34`. Ana üreteç ve
+  `Math.random` (eski sistemlerin tohumlu çağrıları dahil) değişmedi.
+- **Kayıt sürümü 31:** yeni alanların hepsi isteğe bağlıdır; v2-v31 kayıtları sıfır hatayla açılır (`compat.mjs` 1137).
+- **Simülasyon araçları:** `tests.mjs` 1125 -> 1207, `audit.mjs` 124 -> 136 doğrulama.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.

@@ -89,6 +89,7 @@ export class TimeSystem {
     const simDt = paused ? 0 : dt * speed;
     return {
       realDt: dt,
+      dtSeconds: paused ? 0 : dt, // (27.1) duraklatılmamış gerçek saniye (konuşma balonlarının süresi)
       simDt,
       gameMinutes: simDt / CONFIG.REAL_SECONDS_PER_GAME_MINUTE,
       hour: this.getHourFloat(),

@@ -16,6 +16,7 @@ import { ModalHost } from './ModalHost.js';
 import { Hud } from './components/Hud.js';
 import { ResidentList } from './components/ResidentList.js';
 import { CharacterPanel } from './components/CharacterPanel.js';
+import { GuestPanel } from './components/GuestPanel.js';
 import { BuildingPanel } from './components/BuildingPanel.js';
 import { BuildMenu } from './components/BuildMenu.js';
 import { Toasts } from './components/Toasts.js';
@@ -54,6 +55,7 @@ export class UIManager {
       new TradePanel(game),
       new ResidentList(game),
       new CharacterPanel(game),
+      new GuestPanel(game), // (27.3) gezgin konuk kartı
       new BuildingPanel(game),
       this.dock,
       new Toasts(game),

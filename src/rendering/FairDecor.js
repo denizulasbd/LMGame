@@ -7,11 +7,30 @@ import { FAIRS } from '../data/fair.js';
 
 const POLE = '#6b4a2a';
 const OUTLINE = '#1b1423';
+// (27.3) Sık çizilen döngülerde her karede dizi / nesne üretilmesin: renkler ve ışık renkleri modül sabitleri
+const WREATH_COLORS = ['#f06b8a', '#ffffff', '#f9b4c6', '#ffd23f'];
+const FLAMES = ['#ff9a3c', '#ffd23f', '#e8463c', '#fff3b0'];
+const LIGHT_TABLE = [255, 214, 140];
+const LIGHT_SUN = [255, 214, 100];
+const LIGHT_TORCH = [255, 160, 70];
+const LIGHT_WREATH = [255, 190, 210];
+const LIGHT_BASKET = [255, 190, 110];
 
 export class FairDecor {
-  /** Panayır alanı: yapının çevresindeki dikdörtgen (piksel). */
+  constructor() {
+    // (27.3) Yeniden kullanılan dikdörtgenler: bounds() / tableRect() her karede yeni nesne üretmez
+    this._b = { left: 0, right: 0, top: 0, bottom: 0 };
+    this._t = { x: 0, y: 0, w: 26, h: 9 };
+  }
+
+  /** Panayır alanı: yapının çevresindeki dikdörtgen (piksel). Dönen nesne yeniden kullanılır (bir sonraki çağrıya kadar geçerli). */
   bounds(venue) {
-    return { left: venue.x - 28, right: venue.x + venue.width + 28, top: venue.y - 26, bottom: venue.y + venue.height + 20 };
+    const b = this._b;
+    b.left = venue.x - 28;
+    b.right = venue.x + venue.width + 28;
+    b.top = venue.y - 26;
+    b.bottom = venue.y + venue.height + 20;
+    return b;
   }
 
   /** Dünya katmanında: tentler, flamalar, Büyük Ziyafet Sofrası ve (şenlik saatinde) mevsim süsleri. feast: Feast.currentFeastOf sonucu ya da null. */
@@ -29,9 +48,14 @@ export class FairDecor {
     else if (fair.prop === 'torch') this.drawTorches(renderer, b, venue, time);
   }
 
-  /** Sofranın konumu: meydan havuzunun sağında, yanında. */
+  /** Sofranın konumu: meydan havuzunun sağında, yanında. Dönen nesne yeniden kullanılır. */
   tableRect(venue) {
-    return { x: venue.x + venue.width + 3, y: venue.y + venue.height - 6, w: 26, h: 9 };
+    const t = this._t;
+    t.x = venue.x + venue.width + 3;
+    t.y = venue.y + venue.height - 6;
+    t.w = 26;
+    t.h = 9;
+    return t;
   }
 
   /**
@@ -76,7 +100,8 @@ export class FairDecor {
     }
     // Zengin sofra: uçlarda şerbet fıçıları
     if (feast.tier === 'rich') {
-      for (const x of [t.x - 4, t.x + t.w + 1]) {
+      for (let k = 0; k < 2; k++) {
+        const x = k === 0 ? t.x - 4 : t.x + t.w + 1;
         renderer.fillRect(x, t.y + 1, 4, 6, OUTLINE);
         renderer.fillRect(x + 1, t.y + 2, 2, 4, '#8a5524');
         renderer.fillRect(x + 1, t.y + 3, 2, 1, '#c0c0c0'); // çember
@@ -84,14 +109,16 @@ export class FairDecor {
       }
     }
     // Mumlar
-    for (const x of [t.x + 5, t.x + t.w - 7]) {
+    for (let k = 0; k < 2; k++) {
+      const x = k === 0 ? t.x + 5 : t.x + t.w - 7;
       renderer.fillRect(x, t.y + 1, 1, 2, '#f4f0e0');
       renderer.fillRect(x, t.y - 1 + (Math.floor(time * 6 + x) % 2), 1, 2, '#ffd23f');
     }
   }
 
   drawPoles(renderer, b) {
-    for (const x of [b.left, b.right]) {
+    for (let k = 0; k < 2; k++) {
+      const x = k === 0 ? b.left : b.right;
       renderer.fillRect(x, b.top, 1, 14, POLE);
       renderer.fillRect(x - 1, b.top - 1, 3, 1, OUTLINE);
       renderer.fillRect(x, b.bottom - 8, 1, 8, POLE);
@@ -109,48 +136,51 @@ export class FairDecor {
     }
     renderer.fillRect(b.left, b.top - 1, w, 1, OUTLINE);
     // Yan tentler: iki yanda kısa şeritli saçaklar
-    for (const x of [b.left, b.right - 3]) {
+    for (let k = 0; k < 2; k++) {
+      const x = k === 0 ? b.left : b.right - 3;
       for (let y = 0, i = 0; y < 24; y += 4, i++) renderer.fillRect(x, b.top + 4 + y, 3, 3, colors[(i + 1) % colors.length]);
     }
   }
 
   /** İki yan ve alt kenarda küçük üçgen flamalar. */
   drawBunting(renderer, b, colors, time) {
-    const rope = (x0, y0, len, horizontal, offset) => {
-      for (let k = 0, i = 0; k < len; k += 6, i++) {
-        const sag = Math.round(Math.sin((k / len) * Math.PI) * 3);
-        const sway = Math.floor(time * 2 + i + offset) % 2;
-        const c = colors[(i + offset) % colors.length];
-        const x = horizontal ? x0 + k : x0 + sag;
-        const y = horizontal ? y0 + sag : y0 + k;
-        renderer.fillRect(x, y, horizontal ? 6 : 1, horizontal ? 1 : 6, POLE);
-        if (horizontal) {
-          renderer.fillRect(x + 1, y + 1, 4, 1, c);
-          renderer.fillRect(x + 2, y + 2, 2 + sway, 1, c);
-        } else {
-          renderer.fillRect(x + 1, y + 1, 1, 4, c);
-          renderer.fillRect(x + 2, y + 2, 1, 2 + sway, c);
-        }
+    this.rope(renderer, colors, time, b.left, b.bottom - 8, b.right - b.left, true, 1);
+    this.rope(renderer, colors, time, b.left, b.top + 14, b.bottom - b.top - 22, false, 2);
+    this.rope(renderer, colors, time, b.right, b.top + 14, b.bottom - b.top - 22, false, 3);
+  }
+
+  /** (27.3) Tek flama ipi (önceden her karede üretilen iç kapanışın yerine yöntem). */
+  rope(renderer, colors, time, x0, y0, len, horizontal, offset) {
+    for (let k = 0, i = 0; k < len; k += 6, i++) {
+      const sag = Math.round(Math.sin((k / len) * Math.PI) * 3);
+      const sway = Math.floor(time * 2 + i + offset) % 2;
+      const c = colors[(i + offset) % colors.length];
+      const x = horizontal ? x0 + k : x0 + sag;
+      const y = horizontal ? y0 + sag : y0 + k;
+      renderer.fillRect(x, y, horizontal ? 6 : 1, horizontal ? 1 : 6, POLE);
+      if (horizontal) {
+        renderer.fillRect(x + 1, y + 1, 4, 1, c);
+        renderer.fillRect(x + 2, y + 2, 2 + sway, 1, c);
+      } else {
+        renderer.fillRect(x + 1, y + 1, 1, 4, c);
+        renderer.fillRect(x + 2, y + 2, 1, 2 + sway, c);
       }
-    };
-    rope(b.left, b.bottom - 8, b.right - b.left, true, 1);
-    rope(b.left, b.top + 14, b.bottom - b.top - 22, false, 2);
-    rope(b.right, b.top + 14, b.bottom - b.top - 22, false, 3);
+    }
   }
 
   /** İlkbahar: çiçek çelenkleri (halka, pembe-beyaz çiçek noktaları). */
   drawWreaths(renderer, b, time) {
-    const spots = [b.left + 6, (b.left + b.right) / 2 - 6, b.right - 18];
-    spots.forEach((x, i) => {
+    for (let i = 0; i < 3; i++) {
+      const x = i === 0 ? b.left + 6 : i === 1 ? (b.left + b.right) / 2 - 6 : b.right - 18;
       const y = b.top + 5;
-      const colors = ['#f06b8a', '#ffffff', '#f9b4c6', '#ffd23f'];
+      const colors = WREATH_COLORS;
       for (let k = 0; k < 12; k++) {
         const a = (k / 12) * Math.PI * 2;
         const px = Math.round(x + 6 + Math.cos(a) * 5);
         const py = Math.round(y + 6 + Math.sin(a) * 4);
         renderer.fillRect(px, py, 2, 2, k % 3 === 0 ? '#5fa34a' : colors[(k + i + Math.floor(time * 2)) % colors.length]);
       }
-    });
+    }
   }
 
   /** Yaz: güneş fenerleri (sarı-turuncu yuvarlak fenerler, ışıkları collectLights'ta). */
@@ -170,8 +200,9 @@ export class FairDecor {
 
   /** Sonbahar: köşelere hasat sepetleri (kahverengi sepet, balkabağı, elma, buğday başağı). */
   drawBaskets(renderer, b, time) {
-    const spots = [[b.left + 3, b.bottom - 15], [b.right - 15, b.bottom - 15], [b.left + 3, b.top + 22], [b.right - 15, b.top + 22]];
-    spots.forEach(([x, y], i) => {
+    for (let i = 0; i < 4; i++) {
+      const x = i % 2 === 0 ? b.left + 3 : b.right - 15;
+      const y = i < 2 ? b.bottom - 15 : b.top + 22;
       renderer.fillRect(x, y + 4, 12, 7, OUTLINE);
       renderer.fillRect(x + 1, y + 5, 10, 5, i % 2 ? '#a0662f' : '#8a5524');
       renderer.fillRect(x + 1, y + 7, 10, 1, '#6b4a2a');
@@ -179,14 +210,15 @@ export class FairDecor {
       renderer.fillRect(x + 4, y + 1, 1, 1, '#5fa34a');
       renderer.fillRect(x + 7, y + 3, 3, 3, '#c0392b'); // elma
       renderer.fillRect(x + 9, y + (Math.floor(time * 2 + i) % 2), 1, 4, '#f0c850'); // başak
-    });
+    }
   }
 
   /** Kış: köşelerde meydan meşaleleri; kıvılcımlar ve alevler. */
   drawTorches(renderer, b, venue, time) {
-    const flames = ['#ff9a3c', '#ffd23f', '#e8463c', '#fff3b0'];
-    const spots = [[b.left + 2, b.top + 16], [b.right - 2, b.top + 16], [b.left + 2, b.bottom - 14], [b.right - 2, b.bottom - 14]];
-    spots.forEach(([x, y], s) => {
+    const flames = FLAMES;
+    for (let s = 0; s < 4; s++) {
+      const x = s % 2 === 0 ? b.left + 2 : b.right - 2;
+      const y = s < 2 ? b.top + 16 : b.bottom - 14;
       renderer.fillRect(x, y, 1, 14, POLE);
       renderer.fillRect(x - 2, y - 1, 5, 2, OUTLINE);
       for (let i = 0; i < 8; i++) {
@@ -195,7 +227,7 @@ export class FairDecor {
         const fy = Math.round(y - 2 - phase * 9);
         renderer.fillRect(fx, fy, phase < 0.5 ? 2 : 1, 2, flames[(i + s) % flames.length]);
       }
-    });
+    }
     // Meydanın ortasında küçük şenlik ateşi
     const cx = Math.round(venue.x + venue.width / 2);
     const cy = venue.y + venue.height + 8;
@@ -212,18 +244,18 @@ export class FairDecor {
     const b = this.bounds(venue);
     if (feast) {
       const t = this.tableRect(venue);
-      out.push({ x: t.x + t.w / 2, y: t.y, radius: 34, color: [255, 214, 140], intensity: 0.6, glow: 0.3 });
+      out.push({ x: t.x + t.w / 2, y: t.y, radius: 34, color: LIGHT_TABLE, intensity: 0.6, glow: 0.3 });
     }
     const prop = FAIRS[type].prop;
     if (prop === 'sunLantern') {
-      for (let i = 0; i < 5; i++) out.push({ x: b.left + 12 + (i * (b.right - b.left - 20)) / 4, y: b.top + 12 + (i % 2) * 3, radius: 22, color: [255, 214, 100], intensity: 0.6, glow: 0.3 });
+      for (let i = 0; i < 5; i++) out.push({ x: b.left + 12 + (i * (b.right - b.left - 20)) / 4, y: b.top + 12 + (i % 2) * 3, radius: 22, color: LIGHT_SUN, intensity: 0.6, glow: 0.3 });
     } else if (prop === 'torch') {
-      for (const [x, y] of [[b.left, b.top + 10], [b.right, b.top + 10], [b.left, b.bottom - 20], [b.right, b.bottom - 20]]) out.push({ x, y, radius: 40, color: [255, 160, 70], intensity: 0.8, glow: 0.35 });
-      out.push({ x: venue.x + venue.width / 2, y: venue.y + venue.height + 2, radius: 70, color: [255, 160, 70], intensity: 0.9, glow: 0.4 });
+      for (let s = 0; s < 4; s++) out.push({ x: s % 2 === 0 ? b.left : b.right, y: s < 2 ? b.top + 10 : b.bottom - 20, radius: 40, color: LIGHT_TORCH, intensity: 0.8, glow: 0.35 });
+      out.push({ x: venue.x + venue.width / 2, y: venue.y + venue.height + 2, radius: 70, color: LIGHT_TORCH, intensity: 0.9, glow: 0.4 });
     } else if (prop === 'wreath') {
-      out.push({ x: (b.left + b.right) / 2, y: b.top + 10, radius: 40, color: [255, 190, 210], intensity: 0.5, glow: 0.2 });
+      out.push({ x: (b.left + b.right) / 2, y: b.top + 10, radius: 40, color: LIGHT_WREATH, intensity: 0.5, glow: 0.2 });
     } else {
-      for (const [x, y] of [[b.left + 8, b.bottom - 10], [b.right - 8, b.bottom - 10]]) out.push({ x, y, radius: 26, color: [255, 190, 110], intensity: 0.5, glow: 0.25 });
+      for (let s = 0; s < 2; s++) out.push({ x: s === 0 ? b.left + 8 : b.right - 8, y: b.bottom - 10, radius: 26, color: LIGHT_BASKET, intensity: 0.5, glow: 0.25 });
     }
   }
 }

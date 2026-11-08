@@ -83,7 +83,7 @@ import { Random } from '../utils/random.js';
 import { getSelectionRing, getTargetMarker } from '../art/ui/index.js';
 import { LifeStageSystem } from '../systems/LifeStageSystem.js';
 import { ApprenticeshipSystem } from '../systems/ApprenticeshipSystem.js';
-import { drawSpeechBubbles } from '../rendering/SpeechBubbles.js';
+import { drawSpeechBubbles, updateSpeechBubbles } from '../rendering/SpeechBubbles.js';
 import { TemperamentSystem } from '../systems/TemperamentSystem.js';
 import { LineageSystem } from '../systems/LineageSystem.js';
 import { HeirloomSystem } from '../systems/HeirloomSystem.js';
@@ -347,6 +347,7 @@ export class TownScene extends Scene {
     this.hoveredCharacterId = null;
     this.selectedId = null;
     this.selectedBuildingId = null;
+    this.guestSelected = false; // (27.3) gezgin konuk kartı açık mı (konuğun kimliği sabittir: GUEST_ID)
     this.followId = null;
     this.focusId = null;
     this.cinematic = false; // (13. aşama) fotoğraf modu: arayüz gizli, haritada imleç ve seçim çizilmez
@@ -363,6 +364,8 @@ export class TownScene extends Scene {
       }),
       events.on('ui:followCharacter', (id) => this.setFollow(id)),
       events.on('ui:selectBuilding', (id) => this.selectBuilding(id)),
+      events.on('ui:selectGuest', (on) => this.selectGuest(on)), // (27.3)
+      events.on('guest:left', () => this.selectGuest(false)),
       events.on('ui:demolishBuilding', (id) => {
         const building = this.world.getBuilding(id);
         const result = building ? this.construction.demolishAt(building.tileX, building.tileY) : null;
@@ -412,6 +415,7 @@ export class TownScene extends Scene {
     events.emit('map:hover', null);
     events.emit('character:selected', null);
     events.emit('building:selected', null);
+    events.emit('guest:selected', false); // (27.3)
     events.emit('camera:followChanged', null);
     events.emit('tool:changed', { tool: 'select', buildType: null });
     events.emit(this.attract ? 'title:show' : 'title:hide', {});
@@ -462,7 +466,10 @@ export class TownScene extends Scene {
 
   select(id) {
     const valid = id !== null && this.world.getCharacter(id) ? id : null;
-    if (valid !== null) this.selectBuilding(null);
+    if (valid !== null) {
+      this.selectBuilding(null);
+      this.selectGuest(false);
+    }
     if (valid === this.selectedId) return;
     this.selectedId = valid;
     // Başka biri seçilince (ya da seçim kalkınca) eski takip biter
@@ -471,9 +478,24 @@ export class TownScene extends Scene {
     this.game.events.emit('character:selected', valid);
   }
 
+  /** (27.3) Gezgin konuğu seç / bırak: sağ altta misafir kartı ('guest:selected' true / false). */
+  selectGuest(on) {
+    const next = Boolean(on) && Boolean(this.game.state.activeGuest) && this.world.guests.length > 0;
+    if (next) {
+      this.select(null);
+      this.selectBuilding(null);
+    }
+    if (next === this.guestSelected) return;
+    this.guestSelected = next;
+    this.game.events.emit('guest:selected', next);
+  }
+
   selectBuilding(id) {
     const valid = id !== null && this.world.getBuilding(id) ? id : null;
-    if (valid !== null) this.select(null);
+    if (valid !== null) {
+      this.select(null);
+      this.selectGuest(false);
+    }
     if (valid === this.selectedBuildingId) return;
     this.selectedBuildingId = valid;
     this.game.events.emit('building:selected', valid);
@@ -503,6 +525,8 @@ export class TownScene extends Scene {
     this.timeSystem.update(dt);
     const tick = this.timeSystem.getTick(dt);
     for (const system of this.systems) system.update(tick);
+    // (27.1) Konuşma balonlarının süresi çizimde değil simülasyonda düşer (başsız ve çizimli koşu aynı adımda biter)
+    updateSpeechBubbles(this.world.characters, this.world.guests, tick.dtSeconds);
 
     const { renderer } = this.game;
     const season = getSeason(this.game.state.time.day);
@@ -624,6 +648,7 @@ export class TownScene extends Scene {
     if (input.wasPressed('cancel') && !escapeUsed) {
       this.select(null);
       this.selectBuilding(null);
+      this.selectGuest(false);
     }
 
     const click = input.consumeClick();
@@ -641,6 +666,10 @@ export class TownScene extends Scene {
       return;
     }
     const character = this.world.findCharacterAt(point.x, point.y);
+    if (character?.isGuest) {
+      this.selectGuest(true); // (27.3) gezgin konuk: misafir kartı
+      return;
+    }
     if (character) {
       this.select(character.id);
       return;
@@ -663,10 +692,12 @@ export class TownScene extends Scene {
       }
       this.select(null);
       this.selectBuilding(null);
+      this.selectGuest(false);
       return;
     }
     this.select(null);
     this.selectBuilding(null);
+    this.selectGuest(false);
   }
 
   /** Takip edilen (ya da listeden seçilip odaklanılan) karaktere kamerayı yumuşakça kaydırır. */
@@ -711,7 +742,7 @@ export class TownScene extends Scene {
     this.hoverRefresh = HOVER_REFRESH_SECONDS;
 
     let info = hovered ? this.world.getTileInfo(hovered.tileX, hovered.tileY) : null;
-    if (info && character) info = { ...info, character: { id: character.id, name: character.name, visitor: Boolean(visitor) } };
+    if (info && character) info = { ...info, character: { id: character.id, name: character.name, visitor: Boolean(visitor), guest: Boolean(character.isGuest), label: character.isGuest ? character.activityLabel : null } };
     if (info) info.job = this.jobs.jobAt(hovered.tileX, hovered.tileY)?.type ?? null;
     this.game.events.emit('map:hover', info);
   }
@@ -808,8 +839,8 @@ export class TownScene extends Scene {
     for (const animal of this.game.state.animals) animal.drawOverlay(renderer);
     // (25.2) Usta / çırak / bilge konuşma baloncukları (ekran koordinatında, net yazı)
     renderer.resetCamera();
-    drawSpeechBubbles(renderer, this.camera, this.world.characters, this.animationTime);
-    drawSpeechBubbles(renderer, this.camera, this.world.guests, this.animationTime); // (26.3) ozanın şarkıları, seyyahın masalları
+    drawSpeechBubbles(renderer, this.camera, this.world.characters);
+    drawSpeechBubbles(renderer, this.camera, this.world.guests); // (26.3) ozanın şarkıları, seyyahın masalları
     renderer.applyCamera(this.camera);
     if (this.cinematic) {
       renderer.resetCamera();
@@ -852,9 +883,9 @@ export class TownScene extends Scene {
     drawAreaCursor(renderer, building.tileX, building.tileY, w, h, this.animationTime, true, false);
   }
 
-  /** Seçili karakterin ayak altı halkası ve gideceği yolun noktalı çizgisi. */
+  /** Seçili karakterin (ya da 27.3: seçili gezgin konuğun) ayak altı halkası ve gideceği yolun noktalı çizgisi. */
   drawSelectionGround(renderer) {
-    const character = this.selectedId !== null ? this.world.getCharacter(this.selectedId) : null;
+    const character = this.selectedId !== null ? this.world.getCharacter(this.selectedId) : this.guestSelected ? this.world.guests[0] ?? null : null;
     if (!character) return;
 
     const points = character.remainingWaypoints();

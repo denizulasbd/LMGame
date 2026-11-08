@@ -40,6 +40,8 @@ export function sanitizeActiveGuest(raw) {
     resting: Boolean(raw.resting),
     barters: Number.isFinite(raw.barters) && raw.barters > 0 ? Math.floor(raw.barters) : 0,
     lastBarterDay: Number.isFinite(raw.lastBarterDay) ? Math.floor(raw.lastBarterDay) : null,
+    // (27.1) Ayrılırken yürüdüğü çıkış karosu (kayıt / yüklemede aynı çıkışa döner); v2-v31 kayıtlarında yoksa null
+    exit: raw.exit && Number.isInteger(raw.exit.x) && Number.isInteger(raw.exit.y) ? { x: raw.exit.x, y: raw.exit.y } : null,
   };
 }
 

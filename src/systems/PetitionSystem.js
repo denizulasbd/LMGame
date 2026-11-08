@@ -27,6 +27,11 @@ import { genitive } from '../utils/turkish.js';
 import { storageLimit } from './Granary.js';
 import { CRAFT_TYPES, innForCask } from './Petitions.js';
 
+// (27.2) Yeni nesil huyların (25.3) kendi dilekçeleri. Altın Çağ'da bu huylu sakinlerin kendi dilekçeleri ağırlıkça öne çıkar ve
+// adaylar arasında önceliklidir (kendi üreteciyle, seed + 23); Altın Çağ'dan önce hiçbir ağırlık ya da zar değişmez.
+export const NEW_GEN_PETITIONS = { craftsman: ['craftTools'], entrepreneur: ['marketFees'], philosopher: ['academy', 'research', 'books'], festive: ['sherbetCask'] };
+export const NEW_GEN_PRIORITY = { weight: 3, chance: 0.5 }; // ağırlık çarpanı; Altın Çağ'da ilki açıldıktan sonra adaya öncelik olasılığı
+
 const OUTDOOR_TRADES = ['woodcutting', 'masonry', 'mining'];
 const HEARD_BUFF = 'heard';
 
@@ -152,7 +157,37 @@ export class PetitionSystem {
     if (quirk === 'craftsman' && s.buildings.some((b) => CRAFT_TYPES.includes(b.type) && b.functional)) out.push(['craftTools', 5]);
     if (quirk === 'entrepreneur' && !['low', 'exempt'].includes(s.tax?.rate)) out.push(['marketFees', 5]);
     if (quirk === 'festive' && innForCask(s)) out.push(['sherbetCask', 5]);
+    // (27.2) Altın Çağ'da yeni nesil huyların kendi dilekçeleri belirgin biçimde öne çıkar (öncesinde hiçbir ağırlık değişmez)
+    const own = isGoldenAge(s) ? NEW_GEN_PETITIONS[quirk] : null;
+    if (own) {
+      let found = false;
+      for (const o of out) if (own.includes(o[0])) { o[1] *= NEW_GEN_PRIORITY.weight; found = true; }
+      // Bilge Düşünür: araştırmalar ve kitaplar bitmişse meydanda bilgelik sohbeti (Toplanma) kendi dilekçesi gibi öne çıkar
+      if (!found && quirk === 'philosopher') for (const o of out) if (o[0] === 'gathering') o[1] = 5 * NEW_GEN_PRIORITY.weight;
+    }
     return out;
+  }
+
+  /** (27.2) Sakinin bu seçeneklerinden yeni nesil huyuna özgü olanlar (Bilge Düşünür'de yedek: bilgelik sohbeti). */
+  newGenKinds(c, options) {
+    const own = NEW_GEN_PETITIONS[c.quirk];
+    if (!own) return [];
+    const mine = options.filter(([k]) => own.includes(k));
+    if (mine.length || c.quirk !== 'philosopher') return mine;
+    return options.filter(([k]) => k === 'gathering');
+  }
+
+  /** (27.2) Altın Çağ başladığından beri yeni nesil huylu bir sakinin kendi dilekçesi açıldı mı (açık listede ya da defterde)? */
+  newGenOpenedInGoldenAge() {
+    const s = this.state;
+    const since = s.goldenAge?.since?.day ?? Infinity;
+    const isNew = (p) => {
+      if (!(p.day >= since)) return false;
+      const quirk = s.characters.find((x) => x.id === p.characterId)?.quirk;
+      const own = NEW_GEN_PETITIONS[quirk];
+      return Boolean(own) && (own.includes(p.kind) || (quirk === 'philosopher' && p.kind === 'gathering'));
+    };
+    return (s.petitions.list ?? []).some(isNew) || (s.petitions.log ?? []).some(isNew);
   }
 
   /** Kışlık stok hedefi (zaten güvenli seviyedeyse null). */
@@ -172,9 +207,24 @@ export class PetitionSystem {
   create(forceKind = null, forceId = null) {
     const s = this.state;
     const pool = s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.newcomer && !petitionOf(s, c) && (forceId === null || c.id === forceId));
-    for (const c of this.rng.shuffle([...pool])) {
+    let order = this.rng.shuffle([...pool]);
+    // (27.2) Altın Çağ'da kendi dilekçesi açılabilen yeni nesil huylu sakinler adaylar arasında öne geçer: Altın Çağ'da henüz hiç
+    // açılmadıysa her zaman (ve yalnızca kendi dilekçesi), sonra NEW_GEN_PRIORITY.chance olasılıkla (kendi üreteci)
+    let firstOnly = false;
+    if (isGoldenAge(s) && !forceKind && forceId === null) {
+      const special = new Set(order.filter((c) => this.newGenKinds(c, this.optionsFor(c)).length > 0));
+      if (special.size) {
+        firstOnly = !this.newGenOpenedInGoldenAge();
+        if (firstOnly || this.rng.next() < NEW_GEN_PRIORITY.chance) order = [...order.filter((c) => special.has(c)), ...order.filter((c) => !special.has(c))];
+      }
+    }
+    for (const c of order) {
       let options = this.optionsFor(c);
       if (forceKind) options = options.filter(([k]) => k === forceKind);
+      if (firstOnly) {
+        const mine = this.newGenKinds(c, options);
+        if (mine.length) options = mine;
+      }
       if (options.length === 0) continue;
       return this.open(c, this.rng.weighted(options));
     }

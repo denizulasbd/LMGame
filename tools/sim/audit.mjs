@@ -624,6 +624,137 @@ const PAGE_HELPERS = () => {
       s.guestBook = JSON.parse(keepBook);
     }
 
+    // --- 2v. (27.1) Şenlik ortasında ikramlar verilmişken: çift ikram yok, negatif iade yok, katılımcılar korunur ---
+    {
+      const t = s.time;
+      const keepGA = s.goldenAge.since;
+      const keepStat = [s.stats.feasts, s.stats.feastServings, s.stats.fairs];
+      const keepFair = s.chronicle.firstFair;
+      if (!s.buildings.some((b) => b.type === 'fountain' && b.functional)) sim.place('fountain', { instant: true });
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      s.events.festival.active = false;
+      s.seasonFestival.stage = null;
+      s.currentFeast = null;
+      s.currentFestival = null;
+      s.pantry.credit = 0;
+      Object.assign(s.resources, { food: 400, bread: 30, sherbet: 4, cloth: 2 });
+      Object.assign(t, { day: 4 * Math.ceil((t.day + 1) / 4), hour: 5, minute: 58 });
+      sim.step(10);
+      while (t.hour < 19) sim.step(30);
+      A.roundtrip();
+      const eaten = [...(s.currentFeast?.eatenIds ?? [])];
+      const dancers = [...(s.currentFestival?.participants ?? [])];
+      const diff = A.roundtrip();
+      const after = sim.scene().fairSystem.attendees;
+      check('27.1: şenlikte kayıt -> yükleme: ikram alanlar (eatenIds) ve dans edenler (participants) korunur, durum kayması yok', eaten.length > 0 && eaten.length === s.currentFeast.served && JSON.stringify(s.currentFeast.eatenIds) === JSON.stringify(eaten) && dancers.length > 0 && dancers.every((id) => after.has(id)) && diff.length === 0, `${eaten.length} ${dancers.length} ${diff.join(' | ')}`);
+      // Yüklemeden sonra 22:00'ye kadar: hiçbir sakin iki kez yemez, sayaç kapasiteyi aşmaz, kiler eksilmez
+      let peak = 0;
+      let dup = false;
+      let feastEnd = null;
+      let fairEnd = null;
+      const off1 = game.events.on('feast:ended', (p) => (feastEnd = p));
+      const off2 = game.events.on('fair:ended', (p) => (fairEnd = p));
+      const food0 = s.resources.food;
+      while (s.currentFeast && t.hour < 23) {
+        sim.step(30);
+        const f = s.currentFeast;
+        if (f) { peak = Math.max(peak, f.served - f.servings); if (new Set(f.eatenIds).size !== f.eatenIds.length || f.eatenIds.length !== f.served) dup = true; }
+      }
+      off1(); off2();
+      check('27.1: yüklemeden sonra kimse ikinci kez ikram almaz (served <= servings); 22:00 iadesi negatif değil', !dup && peak <= 0 && feastEnd && feastEnd.refund.food >= 0 && feastEnd.refund.bread >= 0 && s.resources.food >= food0, `${peak} ${JSON.stringify(feastEnd?.refund)}`);
+      check('27.1: kapanış sayımı yüklemeden önce dans edenleri de içerir', fairEnd && dancers.every((id) => fairEnd.attendees.includes(id)), `${fairEnd?.attendees.length}`);
+      s.goldenAge.since = keepGA;
+      [s.stats.feasts, s.stats.feastServings, s.stats.fairs] = keepStat;
+      s.chronicle.firstFair = keepFair;
+    }
+
+    // --- 2w. (27.1) Gezgin konuk ayrılış günü çıkışa yürürken ---
+    {
+      const t = s.time;
+      const keepGA = s.goldenAge.since;
+      const keepBook = JSON.stringify(s.guestBook);
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      s.activeGuest = null;
+      sim.scene().world.guests = [];
+      s.guestBook.nextDay = t.day + 1;
+      Object.assign(t, { day: t.day + 1, hour: 8, minute: 58 });
+      sim.step(10);
+      while (t.hour < 14) sim.step(30); // konuk meydana / pazara yürüsün
+      const g0 = s.activeGuest;
+      if (g0) g0.departureDay = t.day + 1;
+      Object.assign(t, { day: t.day + 1, hour: 8, minute: 59 });
+      let moving = false;
+      for (let i = 0; i < 40 && !(s.activeGuest?.leaving && sim.scene().world.guests[0]?.isMoving); i++) sim.step(5);
+      moving = Boolean(s.activeGuest?.leaving && sim.scene().world.guests[0]?.isMoving);
+      sim.step(20);
+      A.roundtrip(); // gün atlamasının sabah özeti (StatsSystem) yükleme anında bir kez oluşur; ölçüm bundan sonra (bu da ayrılırken bir yüklemedir)
+      const live = JSON.stringify(s.activeGuest);
+      const diff = A.roundtrip();
+      const back = sim.scene().world.guests[0];
+      sim.step(2);
+      check('27.1: konuk çıkışa yürürken kayıt -> yükleme: haritada kalır ve çıkış rotası yeniden kurulur (buharlaşmaz), durum kayması yok', g0 && moving && JSON.stringify(s.activeGuest) !== 'null' && s.activeGuest?.leaving && back?.isMoving && sim.scene().world.guests.length === 1 && diff.length === 0, `${live} ${diff.join(' | ')}`);
+      let thanks = null;
+      const off = game.events.on('guest:left', (p) => (thanks = p.thanks));
+      hours(4);
+      off();
+      check('27.1: yüklemeden sonra çıkışa varıp teşekkürle ayrılır', s.activeGuest === null && sim.scene().world.guests.length === 0 && thanks === true, `${thanks}`);
+      s.goldenAge.since = keepGA;
+      s.guestBook = JSON.parse(keepBook);
+    }
+
+    // --- 2x. (27.2) Rafları dolu (boşta) Şifacı Kulübesi'nde Tezgâh Pratiği: gerçek akış ve kayıt -> yükleme ---
+    {
+      const t = s.time;
+      const keepGA = s.goldenAge.since;
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      rich();
+      const hut = sim.scene().world.getCompleted('healerHut').find((b) => !b.damaged) ?? sim.place('healerHut');
+      const spec = hut.definition.apothecary;
+      const fill = () => { const h = sim.scene().world.getBuilding(hut.id); if (h) { h.remedies = spec.maxRemedies; h.herbs = spec.maxHerbs; } }; // yüklemeden sonra yapı yeni nesnedir
+      fill();
+      const pool = s.characters.filter((c) => !c.role && !c.isChild && !c.away && !c.emigrating && c.lifeStage !== 'elder' && !c.apprenticeship).sort((a, b) => a.id - b.id);
+      const master = pool[0];
+      const youth = pool[pool.length - 1];
+      const keep = { m: { workplaceId: master.workplaceId, herb: master.skills.herbalism }, y: { lifeStage: youth.lifeStage, ageInDays: youth.ageInDays, age: youth.age, workplaceId: youth.workplaceId } };
+      master.workplaceId = hut.id;
+      master.skills.herbalism = Math.max(master.skills.herbalism ?? 0, 1600);
+      for (const c of s.characters) if (c.apprenticeship?.buildingId === hut.id) c.apprenticeship = null;
+      Object.assign(youth, { lifeStage: 'youth', ageInDays: 19 * 16, age: 19, workplaceId: null });
+      youth.profile = youth.buildProfile();
+      const enrolled = sim.scene().apprenticeship.enroll(youth, hut);
+      Object.assign(t, { day: t.day + 1, hour: 6, minute: 55 });
+      sim.step(10);
+      const p0 = youth.apprenticeship?.progress ?? 0;
+      let practiced = 0;
+      // Karar penceresi zamanı durdurabilir: varsayılan seçenekle kapatılır, adım sayısı sınırlıdır
+      const run = (until, each = () => {}) => {
+        for (let i = 0; i < 600 && s.time.hour < until; i++) { // yüklemeden sonra s.time yeni nesnedir
+          if (s.dilemma.active) game.events.emit('ui:chooseDilemma', { optionId: s.dilemma.active.defaultId });
+          s.time.paused = false;
+          fill();
+          sim.step(30);
+          each();
+        }
+      };
+      run(12, () => { if (youth.task?.activity === 'apprentice' && hut.idle) practiced++; });
+      A.roundtrip(); // gün atlamasının sabah özeti (StatsSystem) yükleme anında bir kez oluşur; ölçüm bundan sonra
+      const p1 = s.characters.find((c) => c.id === youth.id).apprenticeship?.progress ?? 0;
+      const diff = A.roundtrip();
+      const y2 = s.characters.find((c) => c.id === youth.id);
+      run(16);
+      const p2 = y2.apprenticeship?.progress ?? 0;
+      const hut2 = sim.scene().world.getBuilding(hut.id);
+      const maxGain = (4 * 60 + 30) * 100 / 3600; // 12:00 -> 16:00 arası tam hızdan bile fazla olamaz
+      check('27.2: rafları dolu (idle) Şifacı Kulübesi\'nde çırak gerçek mesaide Tezgâh Pratiği ile ilerler; kayıt -> yüklemede durum kayması yok, yüklemeden sonra da ilerler', enrolled && hut2.idle && practiced > 0 && p1 > p0 && p2 > p1 && p2 - p1 <= maxGain && diff.length === 0, `${p0.toFixed(2)} -> ${p1.toFixed(2)} -> ${p2.toFixed(2)} pratik ${practiced} ${diff.join(' | ')}`);
+      y2.apprenticeship = null;
+      Object.assign(y2, keep.y);
+      y2.profile = y2.buildProfile();
+      const m2 = s.characters.find((c) => c.id === master.id);
+      m2.workplaceId = keep.m.workplaceId;
+      m2.skills.herbalism = keep.m.herb;
+      s.goldenAge.since = keepGA;
+    }
+
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();
@@ -1355,6 +1486,113 @@ const PAGE_HELPERS = () => {
   });
   pass('listeden seçilen sakinin kartı sağ altta, listeyle aynı hizada açılır', card && Math.abs(card.right - card.listRight) <= 1 && card.top >= card.listBottom && card.left > W / 2, JSON.stringify(card));
   pass('etkileşim boyunca sayfa hatası yok', errors.length === 0, errors.slice(0, 2).join(' | '));
+  allErrors.push(...errors);
+  await browser.close();
+}
+
+// =====================================================================================================================
+// 9. (27.3) Gerçek fareyle gezgin konuk kartı ve havuzdaki Büyük Ziyafet Sofrası bloğu; canlı çizimde balon ölçümü ve
+//    konuk aksesuarının kuyruğa sabit işlevle girmesi (oyun döngüsü çalışırken, gerçek kareler)
+// =====================================================================================================================
+{
+  const W = 1366;
+  const H = 768;
+  const { browser, page, errors } = await openGame({ seed: 8, stopLoop: false, viewport: { width: W, height: H } });
+  const pass = (name, ok, detail = '') => results.push({ name, ok: Boolean(ok), detail });
+  await page.evaluate(async () => {
+    const game = window.game;
+    const s = game.state;
+    s.time.paused = true;
+    s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+    const scene = game.scenes.current;
+    const { GUEST_TYPES } = await import('/src/data/guest.js');
+    const { Random } = await import('/src/utils/random.js');
+    const entry = scene.world.findEntryTile(new Random(3));
+    const p = scene.world.standPoint(entry.x, entry.y);
+    s.activeGuest = { type: 'collector', name: GUEST_TYPES.collector.names[0], look: 0, arrivalDay: s.time.day, departureDay: s.time.day + 1, x: p.x, y: p.y, leaving: false, resting: false, barters: 0, lastBarterDay: null, exit: null };
+    scene.guestSystem.spawn();
+    const g = scene.guestSystem.character;
+    g.visible = true;
+    g.clearPath();
+    // Konuğu meydanın yakınında, üstünde sakin olmayan bir karoya koy ve ekranın ortasına al (kamera doğrudan)
+    const plaza = scene.world.landmarks.plaza;
+    for (let r = 2; r < 12; r++) {
+      const q = scene.world.standPoint(plaza.centerX + r, plaza.centerY + 1);
+      g.x = q.x;
+      g.y = q.y;
+      if (scene.world.findCharacterAt(g.x, g.y - 6) === g) break;
+    }
+    const cam = scene.camera;
+    cam.x = g.x - 683 / cam.zoom;
+    cam.y = g.y - 6 - 384 / cam.zoom;
+    // Canlı çizimde ölçüm sayacı ve kuyruğa giren işlevler
+    window.__measures = 0;
+    const real = CanvasRenderingContext2D.prototype.measureText;
+    CanvasRenderingContext2D.prototype.measureText = function (t) { if (t === 'Takas zamanı, dostlar!') window.__measures++; return real.call(this, t); };
+    g.speech = { text: 'Takas zamanı, dostlar!', at: -1, duration: 600 };
+    window.__fns = new Set();
+    const q = scene.queue;
+    const realCall = q.addCall.bind(q);
+    q.addCall = (sortY, fn, ...rest) => { window.__fns.add(fn); return realCall(sortY, fn, ...rest); };
+  });
+  await page.waitForTimeout(600); // ~30+ gerçek kare
+  const live = await page.evaluate(() => ({ measures: window.__measures, fns: window.__fns.size, frames: performance.now() }));
+  pass('27.3: canlı çizimde konuşma balonu metni bir kez ölçülür (karelerce measureText yok)', live.measures === 1, `${live.measures}`);
+  pass('27.3: canlı çizimde konuk aksesuarı kuyruğa her karede aynı sabit işlevle girer (kapanış yok)', live.fns === 1, `${live.fns}`);
+  // Bir kare sonra (kamera sınırlara oturduktan sonra) ekran konumu
+  const pt = await page.evaluate(() => {
+    const scene = window.game.scenes.current;
+    const g = scene.world.guests[0];
+    const cam = scene.camera;
+    return { x: (g.x - cam.x) * cam.zoom, y: (g.y - 6 - cam.y) * cam.zoom };
+  });
+  await page.mouse.click(pt.x, pt.y);
+  await page.waitForTimeout(250);
+  const g1 = await page.evaluate(() => {
+    const c = document.querySelector('.guest-panel');
+    const b = c && !c.hidden ? c.getBoundingClientRect().toJSON() : null;
+    const col = document.querySelector('.ui-cards').getBoundingClientRect().toJSON(); // kart sütunu kendi içinde kaydırılır
+    return { open: Boolean(b), box: b, col, text: c?.textContent ?? '', selected: window.game.scenes.current.guestSelected, offers: c?.querySelectorAll('.guest-offer').length ?? 0 };
+  });
+  pass('27.3: gerçek fareyle Nadir Takasçı\'ya tıklamak misafir kartını sağ altta açar (ad, tür, takas teklifleri)', g1.open && g1.selected && g1.text.includes('Nadir Takasçı') && g1.offers === 3 && g1.box.right <= W && g1.box.left > W / 2 && g1.col.bottom <= H && g1.col.top >= 0, `${JSON.stringify(g1.box)} sütun ${JSON.stringify(g1.col)}`);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+  pass('27.3: Esc misafir kartını kapatır', await page.evaluate(() => document.querySelector('.guest-panel').hidden && !window.game.scenes.current.guestSelected));
+  // Havuz: süren sofra
+  const fp = await page.evaluate(async () => {
+    const game = window.game;
+    const s = game.state;
+    const scene = game.scenes.current;
+    const FA = await import('/src/systems/Fair.js');
+    let f = scene.world.getCompleted('fountain')[0];
+    if (!f) {
+      const { x, y } = window.sim?.findSpot?.('fountain') ?? {};
+      if (x !== undefined) {
+        const r = scene.construction.placeSite('fountain', x, y);
+        scene.construction.complete(r.building);
+        f = r.building;
+      }
+    }
+    let day = s.time.day;
+    while (!FA.isFairDay(day)) day++;
+    Object.assign(s.time, { day, hour: 19, minute: 0 });
+    s.currentFestival = { type: 'summer', day, phase: 'party', participants: [] };
+    s.currentFeast = { tier: 'modest', day, contributions: { food: 30, bread: 6, sherbet: 0, cloth: 0 }, servings: 20, served: 4, eatenIds: [] };
+    s.buffs.tradition = s.totalMinutes + 600;
+    const cam = scene.camera;
+    cam.x = f.center.x - 683 / cam.zoom;
+    cam.y = f.center.y - 384 / cam.zoom;
+    return { x: 683, y: 384, ok: Boolean(f) };
+  });
+  await page.waitForTimeout(150);
+  await page.mouse.click(fp.x, fp.y);
+  await page.waitForTimeout(250);
+  const feast = await page.evaluate(() => {
+    const box = document.querySelector('.building-feast');
+    return { shown: Boolean(box) && !box.hidden, text: box?.textContent ?? '' };
+  });
+  pass('27.3: gerçek fareyle meydan havuzuna tıklayınca panelde Mütevazı Sofra, kilerden ayrılanlar, ikram ve Gelenek Bağı görünür', fp.ok && feast.shown && feast.text.includes('Mütevazı Sofra') && feast.text.includes('Yiyecek 30 · Ekmek 6') && feast.text.includes('4/20 verildi') && feast.text.includes('Gelenek Bağı'), feast.text.slice(0, 160));
+  pass('27.3: etkileşim boyunca sayfa hatası yok', errors.length === 0, errors.slice(0, 2).join(' | '));
   allErrors.push(...errors);
   await browser.close();
 }

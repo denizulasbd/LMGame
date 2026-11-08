@@ -64,9 +64,14 @@ export function apprenticeSlots(building) {
   return APPRENTICE.perBuilding + (building?.upgraded ? 1 : 0);
 }
 
-/** Yapı çırak alabilir mi (zanaat yapısı, tamamlanmış, hasarsız, kontenjanı dolmamış). */
+/** (27.2) Yapı çırağa güvenli mi: tamamlanmış, hasarsız ve yanmıyor. */
+export function safeForApprentice(building) {
+  return Boolean(building) && building.functional && !building.damaged && !building.isDamaged && !building.isBurning;
+}
+
+/** Yapı çırak alabilir mi (zanaat yapısı, tamamlanmış, hasarsız / yanmıyor, kontenjanı dolmamış). */
 export function acceptsApprentice(state, building) {
-  if (!building || !professionFor(building.type) || !building.functional) return false;
+  if (!building || !professionFor(building.type) || !safeForApprentice(building)) return false;
   return apprenticesAt(state, building).length < apprenticeSlots(building);
 }
 
@@ -107,4 +112,29 @@ export function restoreApprenticeshipState(data, buildings = []) {
 /** Zanaat yapısı tanımı (arayüz için). */
 export function isCraftBuilding(type) {
   return Boolean(PROFESSIONS[type]) && Boolean(BUILDINGS[type]);
+}
+
+/**
+ * (27.3) Çırağın şu anki ders durumu (arayüz için; saf): { text, ok } ya da null (çırak değil).
+ * Usta tezgâhta, ot topluyor, yapı boşta (Tezgâh Pratiği: sipariş bekleniyor / raflar dolu), yapı hasarlı / yanıyor, kasaba
+ * çırakları ayıramıyor ya da usta tezgâhta değil.
+ */
+export function apprenticeStatus(state, c) {
+  const a = c?.apprenticeship;
+  if (!a) return null;
+  const building = state.buildings.find((b) => b.id === a.buildingId);
+  if (!building) return { text: 'Atölye yok: çırak her zamanki işinde', ok: false };
+  if (building.isBurning) return { text: 'Atölye yanıyor: ders yok', ok: false };
+  if (building.damaged || building.isDamaged) return { text: 'Atölye hasarlı: tamir edilene kadar ders yok', ok: false };
+  if (!townCanSpare(state)) return { text: 'Kasabada gıda ya da iş gücü kıt: çırak temel işlere koşuyor', ok: false };
+  const master = a.masterId !== null ? state.characters.find((x) => x.id === a.masterId) : null;
+  const task = master?.task;
+  if (master && !master.away && task?.activity === 'gatherHerbs' && task.workBuildingId === building.id) return { text: 'Usta ot topluyor: çırak kulübede otları ayıklıyor', ok: true };
+  if (master && !master.away && task?.workBuildingId === building.id) return { text: 'Ustasının yanında öğreniyor', ok: true };
+  if (building.idle === true) {
+    const why = building.type === 'workshop' ? 'Sipariş bekleniyor' : building.type === 'healerHut' ? 'Raflar dolu' : 'Yapı boşta';
+    if (master && canMaster(master)) return { text: `${why}: Tezgâh Pratiği yapılıyor (%${Math.round(APPRENTICE.practiceRate * 100)} hız)`, ok: true };
+    return { text: `${why}; ustası ${master?.away ? 'seferde' : 'kasabada değil'}: pratik yok`, ok: false };
+  }
+  return { text: master?.away ? 'Usta seferde: çırak her zamanki işinde' : 'Usta tezgâhta değil: çırak her zamanki işinde', ok: false };
 }

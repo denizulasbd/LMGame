@@ -25,7 +25,7 @@ import { CLOCK_GEAR } from '../../data/goldenAge.js';
 import { BUILDINGS, mendSpec, PROJECT_WORDS } from '../../data/buildings.js';
 import { STORM } from '../../data/dilemmas.js';
 import { RESOURCES, RESOURCE_KEYS, formatCost } from '../../data/resources.js';
-import { TOWN_HALL, CIVIC_PROJECTS, CIVIC_PROJECT_KEYS } from '../../data/town.js';
+import { TOWN_HALL, CIVIC_PROJECTS, CIVIC_PROJECT_KEYS, TOWN_BUFFS } from '../../data/town.js';
 import { civicStatus, CivicSystem } from '../../systems/CivicSystem.js';
 import { EQUIPMENT, EQUIPMENT_KEYS, CRAFT_MODES } from '../../data/equipment.js';
 import { getSeason } from '../../data/seasons.js';
@@ -67,6 +67,9 @@ import { clothWelfare } from '../../systems/Refinery.js';
 import { PROFESSIONS } from '../../data/apprenticeship.js';
 import { doorOpen, apprenticesAt, pickMaster, acceptsApprentice, canApprentice, apprenticeSlots } from '../../systems/Apprenticeship.js';
 import { headOf } from '../../systems/Lineage.js';
+import { FEAST, TIERS as FEAST_TIERS } from '../../data/feast.js';
+import { currentFeastOf } from '../../systems/Feast.js';
+import { currentFair } from '../../systems/Fair.js';
 
 const thumbnailCache = new Map();
 
@@ -107,6 +110,7 @@ export class BuildingPanel {
     this.apprenticeBox = el('div', { className: 'building-decrees building-apprentice' }); // (25.2) çıraklık
     this.luxury = el('div', { className: 'building-decrees building-luxury' });
     this.bell = el('div', { className: 'building-decrees building-bell' });
+    this.feastBox = el('div', { className: 'building-decrees building-feast', hidden: true }); // (27.3) Büyük Ziyafet Sofrası
     this.trustBox = el('div', { className: 'building-decrees building-trust' }); // (21. aşama) Yönetim Güveni
     this.crownBox = el('div', { className: 'building-decrees building-crown' }); // (22. aşama) iç vergi ve Krallık
     this.crisisBox = el('div', { className: 'building-decrees building-crisis' }); // (23. aşama) yangın, tamir, kuyu, kule
@@ -155,6 +159,7 @@ export class BuildingPanel {
       this.tradeBox,
       this.apprenticeBox,
       this.luxury,
+      this.feastBox,
       this.crownBox,
       this.trustBox,
       this.crisisBox,
@@ -246,7 +251,10 @@ export class BuildingPanel {
     const cropKey = cropOf(building) || building.definition.granary ? [building.crop, hasGranary(state), JSON.stringify(state.granary?.spoiled ?? {})].join(':') : '';
     // (24.3) dış ticaret: ziyaret, sözleşmeler, pazar, ithalat stoğu ve ilgili stoklar
     const tradeKey = building.type === 'tradingPost' ? JSON.stringify([state.tradePost, state.resources, Math.floor(state.totalMinutes / 60)]) : '';
+    // (27.3) Büyük Ziyafet Sofrası (meydan havuzu, Belediye Konağı): sofra, evre, ikram sayacı ve bonus bitişleri (saat)
+    const feastKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.currentFeast, currentFair(state)?.phase ?? null, ...FEAST.buffs.rich.map((k) => Math.ceil(((state.buffs[k] ?? 0) - state.totalMinutes) / 60))]) : '';
     const key = [
+      feastKey,
       tradeKey,
       cropKey,
       crisisKey,
@@ -306,6 +314,7 @@ export class BuildingPanel {
     this.renderTrust(building, state);
     this.renderCrisis(building, state);
     this.renderBell(building, state);
+    this.renderFeast(building, state);
     this.renderExpedition(building, state);
     this.renderInscriptions(building, state);
     // (18. aşama) Mahalle tabelası: ad kutusu (yazılırken üzerine yazılmaz)
@@ -753,6 +762,28 @@ export class BuildingPanel {
     if (raid) children.push(el('div', { className: 'building-section-title', text: 'Haydut Baskını' }), raid);
     this.crisisBox.hidden = children.length === 0;
     this.crisisBox.replaceChildren(...children);
+  }
+
+  /**
+   * (27.3) Büyük Ziyafet Sofrası bilgi bloğu (meydan havuzu ve Belediye Konağı): sofranın kademesi (Sembolik / Mütevazı / Zengin Şölen),
+   * evresi, kilerden ayrılan erzak / şerbet / kumaş, ikram sayacı ve sakinlere verdiği Gelenek Bağı / Bolluk Ziyafeti bonusları.
+   */
+  renderFeast(building, state) {
+    const show = (building.type === 'fountain' || Boolean(building.definition.civic)) && building.functional;
+    const info = show ? feastInfo(state) : null;
+    this.feastBox.hidden = !info;
+    if (!info) return;
+    const row = (label, value) => el('div', { className: 'feast-row' }, [el('span', { text: label }), el('span', { text: value })]);
+    this.feastBox.replaceChildren(
+      el('div', { className: 'building-section-title', text: 'Büyük Ziyafet Sofrası' }),
+      el('div', { className: 'decree luxury-card feast-scroll' }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL(info.icon), alt: '' }), info.name, el('span', { className: 'decree-state', text: info.phase })]),
+        row('Kilerden ayrılan', info.contributions),
+        row('İkram', info.servings),
+        el('div', { className: 'feast-buffs' }, info.buffs.length ? info.buffs.map((b) => el('span', { className: `feast-buff${b.active ? '' : ' is-off'}`, title: b.hint, text: b.text })) : [el('span', { className: 'feast-buff is-off', text: 'Bonus yok: kiler idareli tutuluyor' })]),
+        el('div', { className: 'upgrade-text', text: info.note }),
+      ])
+    );
   }
 
   /** (14. aşama) Meydan havuzu ve Belediye Konağı: Toplanma Zili. */
@@ -1469,4 +1500,38 @@ export class BuildingPanel {
     if (building.definition.luxury) lines.push('Lüks iş: fırıncı, çiftçi ve yapı ustası yuvaları doluyken çalışılır; kasaba açken durur');
     return lines;
   }
+}
+
+/**
+ * (27.3) Süren Büyük Ziyafet Sofrasının arayüz özeti (saf; test ve panel aynı metni kullanır) ya da null.
+ * { tier, name, icon, phase, contributions, servings, buffs: [{ key, text, active, hint }], note }
+ */
+export function feastInfo(state) {
+  const cur = currentFeastOf(state);
+  if (!cur) return null;
+  const f = cur.feast;
+  const tier = FEAST_TIERS[cur.tier];
+  const fair = currentFair(state);
+  const phase = fair?.phase === 'party' ? 'Şenlik saati (22:00\'ye kadar)' : 'Hazırlık: sofra 18:00\'de açılır';
+  const parts = [];
+  const c = f.contributions;
+  if (c.food) parts.push(`Yiyecek ${c.food}`);
+  if (c.bread) parts.push(`Ekmek ${c.bread}`);
+  if (c.sherbet) parts.push(`Fıçı Şerbeti ${c.sherbet}`);
+  if (c.cloth) parts.push(`Kumaş ${c.cloth}`);
+  const now = state.totalMinutes;
+  const buffs = (FEAST.buffs[cur.tier] ?? []).map((key) => {
+    const def = TOWN_BUFFS[key];
+    const end = state.buffs?.[key] ?? 0;
+    const active = end > now;
+    const left = Math.ceil((end - now) / 60);
+    return { key, active, text: active ? `${def.name} · ${left} sa` : `${def.name} · 18:00'de`, hint: active ? `${def.name} etkin: yaklaşık ${left} saat daha` : `${def.name} şenlik saatinde başlar` };
+  });
+  const note =
+    cur.tier === 'rich'
+      ? 'Zengin sofrada şerbet içenler Keyifli Damak ile güne başlar; yenmeyen erzak 22:00\'de kilere döner.'
+      : cur.tier === 'modest'
+        ? 'Dans eden her sakin sofradan bir ikram alır; yenmeyen erzak 22:00\'de kilere döner.'
+        : 'Kişi başı besin güvencesi için kilerden bir şey ayrılmadı: yalnızca hafif bir ikram.';
+  return { tier: cur.tier, name: tier.name, icon: tier.icon, phase, contributions: parts.length ? parts.join(' · ') : 'Hiçbir şey (kiler korunuyor)', servings: `${f.served}/${f.servings} verildi · ${cur.left} kaldı`, buffs, note };
 }

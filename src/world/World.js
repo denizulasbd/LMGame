@@ -245,12 +245,16 @@ export class World {
     return this.characters.filter((c) => c.homeId === building.id);
   }
 
-  /** Dünya pikselindeki noktanın altındaki en öndeki görünür karakter. */
-  findCharacterAt(worldX, worldY) {
+  /**
+   * Dünya pikselindeki noktanın altındaki en öndeki görünür karakter. (27.3) Gezgin konuklar (world.guests, isGuest: true) da
+   * tıklanabilir; çağıran konuğu sakinden isGuest ile ayırır. Yalnızca arayüz kullanır (simülasyon kararları çağırmaz).
+   */
+  findCharacterAt(worldX, worldY, { guests = true } = {}) {
     let best = null;
     for (const c of this.characters) {
       if (c.hitTest(worldX, worldY) && (!best || c.sortY > best.sortY)) best = c;
     }
+    if (guests) for (const g of this.guests) if (g.visible && g.hitTest(worldX, worldY) && (!best || g.sortY > best.sortY)) best = g;
     return best;
   }
 

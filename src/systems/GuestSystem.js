@@ -13,6 +13,10 @@
 // Konukları Brain yönetmez; sahne akışını bu sistem yürütür (sakinlerin kararlarına, mesaiye, otopilota dokunulmaz).
 // KENDİ tohumlanmış üretecini kullanır (TownScene -> seed + 34). Durum: state.activeGuest, state.guestBook (kayda girer).
 // Olaylar: 'guest:arrived' { guest, def }, 'guest:barter' { offer, key, text }, 'guest:left' { guest, def }.
+// (27.1) Kimlik izolasyonu: konuğun Character'ı sabit negatif kimlikle (GUEST_ID) kurulur; ortak Entity sayacı ilerlemez, sonradan
+//        doğan çocukların kimliği ve doğum günü ofseti konuktan etkilenmez.
+//        Ayrılırken kayıt -> yükleme: çıkış rotası (activeGuest.exit, yoksa en yakın kenar karosu) yeniden kurulur; yol yoksa sessizce uğurlanır.
+//        Yol tıkanırsa ('world:blocked', 'building:removed') rota yeniden hesaplanır.
 import { GUEST, GUEST_TYPES, BARTER_OFFERS } from '../data/guest.js';
 import { ACTIVITIES } from '../data/activities.js';
 import { Character } from '../entities/Character.js';
@@ -21,6 +25,7 @@ import { arrivalDue, pickableTypes, affordableOffers } from './Guest.js';
 import { levelFor } from './SkillSystem.js';
 
 const FREE_KINDS = new Set(['social', 'leisure', 'festival']);
+export const GUEST_ID = -1; // (27.1) geçici konuğun kimliği: Entity sayacını ilerletmez, sakin kimlikleriyle çakışmaz
 
 export class GuestSystem {
   /**
@@ -38,7 +43,12 @@ export class GuestSystem {
     this.attract = attract;
     this.character = null; // haritadaki konuk (yalnızca çalışma anında)
     this.targetKey = null;
-    this.unsubscribers = [game.events.on('time:hour', (hour) => this.onHour(hour))];
+    this.unsubscribers = [
+      game.events.on('time:hour', (hour) => this.onHour(hour)),
+      // (27.1) Yoluna yapı dikilir ya da yapı kalkarsa konuk eski rotayla içinden geçmesin
+      game.events.on('world:blocked', () => this.reroute()),
+      game.events.on('building:removed', () => this.reroute()),
+    ];
     this.restore();
   }
 
@@ -95,6 +105,7 @@ export class GuestSystem {
       resting: false,
       barters: 0,
       lastBarterDay: null,
+      exit: null,
     };
     book.visits += 1;
     book.lastType = type;
@@ -115,8 +126,65 @@ export class GuestSystem {
       return;
     }
     this.spawn();
+    if (g.leaving) {
+      // (27.1) Ayrılırken kaydedildi: çıkışa giden rota yeniden kurulur (yoksa ilk adımda haritanın ortasında buharlaşırdı)
+      g.resting = false;
+      this.character.visible = true;
+      this.character.activityLabel = 'Kasabadan ayrılıyor';
+      if (!this.walkToExit()) this.finish(false);
+      return;
+    }
     if (g.resting && !(hour >= GUEST.restHour || hour < GUEST.wakeHour)) g.resting = false;
     if (this.character) this.character.visible = !g.resting;
+    this.route();
+  }
+
+  /** (27.1) Kayıttaki çıkış karosu; yoksa (eski kayıt) konuğa en yakın erişilebilir kenar karosu (üreteç kullanmaz). */
+  exitTile() {
+    const g = this.guest;
+    if (g?.exit && this.world.isReachable(g.exit.x, g.exit.y)) return g.exit;
+    const c = this.character;
+    const { width, height } = this.world.map;
+    let best = null;
+    let bestD = Infinity;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (x !== 0 && y !== 0 && x !== width - 1 && y !== height - 1) continue;
+        if (!this.world.isReachable(x, y)) continue;
+        const d = c ? (x - c.tileX) ** 2 + (y - c.tileY) ** 2 : 0;
+        if (d < bestD) {
+          bestD = d;
+          best = { x, y };
+        }
+      }
+    }
+    return best;
+  }
+
+  /** (27.1) Çıkışa yürüt: yol bulunursa true; yoksa (ya da zaten çıkıştaysa) false. */
+  walkToExit() {
+    const c = this.character;
+    const exit = this.exitTile();
+    if (!c || !exit) return false;
+    if (c.tileX === exit.x && c.tileY === exit.y) return false;
+    const path = this.world.findPath({ x: c.tileX, y: c.tileY }, exit);
+    if (!path || path.length <= 1) return false;
+    c.setWaypoints(path.slice(1).map((s) => this.world.standPoint(s.x, s.y)));
+    c.pose = 'walk';
+    this.targetKey = 'leave';
+    return true;
+  }
+
+  /** (27.1) Harita değişti: rota yeniden hesaplanır (ayrılıyorsa çıkışa, değilse güncel durağına). */
+  reroute() {
+    const g = this.guest;
+    if (!g || !this.character) return;
+    if (g.leaving) {
+      if (!this.walkToExit()) this.finish(false);
+      return;
+    }
+    if (g.resting) return; // handa / çardakta dinlenirken yürümez; uyanınca yeni rota kurulur
+    this.targetKey = null;
     this.route();
   }
 
@@ -128,7 +196,7 @@ export class GuestSystem {
     Math.random = () => 0;
     let c;
     try {
-      c = new Character({ name: g.name, age: g.type === 'storyteller' ? 68 : 38, traits: [], appearance: def.appearances[g.look], x: g.x, y: g.y, lifeStage: g.type === 'storyteller' ? 'elder' : null });
+      c = new Character({ id: GUEST_ID, name: g.name, age: g.type === 'storyteller' ? 68 : 38, traits: [], appearance: def.appearances[g.look], x: g.x, y: g.y, lifeStage: g.type === 'storyteller' ? 'elder' : null });
     } finally {
       Math.random = realRandom;
     }
@@ -153,6 +221,7 @@ export class GuestSystem {
     this.character.activityLabel = 'Kasabadan ayrılıyor';
     this.character.speech = null;
     const exit = this.world.findEntryTile(this.rng);
+    g.exit = exit ? { x: exit.x, y: exit.y } : null; // (27.1) kayıt / yüklemede aynı çıkışa dönülsün
     this.walkTo(exit);
     this.targetKey = 'leave';
     if (!this.character.isMoving) this.finish(true);

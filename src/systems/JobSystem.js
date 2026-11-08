@@ -208,9 +208,12 @@ export class JobSystem {
    * Bu üretim binasındaki son boş yer için daha deneyimli (en az Kalfa) ve şu an çalışmayan biri
    * varsa acemi beklesin: işi usta alsın. Son yer değilse ya da usta yoksa false.
    */
-  /** Bu yapıya sabitlenmiş ama şu an içinde çalışmayan sakin sayısı (onların yuvası boş bekletilir). */
+  /**
+   * Bu yapıya sabitlenmiş ama şu an içinde çalışmayan sakin sayısı (onların yuvası boş bekletilir). (27.1) Emekli Kıdemli Bilge
+   * (c.retired) işe gitmediği için yuvayı tutmaz; gönüllü ustaya dönünce (retired = false) yeniden sayılır.
+   */
   reservedForPinned(building) {
-    return this.world.characters.filter((o) => o.workplaceId === building.id && !building.workerIds.has(o.id) && !o.away).length;
+    return this.world.characters.filter((o) => o.workplaceId === building.id && !building.workerIds.has(o.id) && !o.away && !o.retired).length;
   }
 
   /** Sabitlenmiş sakinin işi: kendi iş yerinde boş bir çalışma yeri (yapı kullanılamıyorsa null). */

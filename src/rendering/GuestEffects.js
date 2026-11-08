@@ -7,15 +7,20 @@ const OUTLINE = '#1b1423';
 const NOTE_COLORS = ['P', 'p', 'i', 'a', 'O'];
 
 export class GuestEffects {
+  constructor() {
+    // (27.3) Kuyruğa her karede yeni kapanış yerine bu sabit çizim işlevi (renderer, guest, type, time) verilir
+    this.drawQueued = (renderer, guest, type, time) => this.drawAccessory(renderer, guest.x, guest.y, guest.spriteHeight, guest.facing, type, time, guest.playing);
+  }
+
   /**
    * Çizim kuyruğuna aksesuarı ekler (karakterin derinliğiyle sıralanır).
-   * @param {{ addCustom: Function }} queue
+   * @param {{ addCall: Function }} queue
    * @param {import('../entities/Character.js').Character} guest
    * @param {string} type 'bard' | 'collector' | 'storyteller'
    */
   queue(queue, guest, type, time) {
     if (!guest.visible) return;
-    queue.addCustom(guest.sortY + 0.03, (renderer) => this.drawAccessory(renderer, guest.x, guest.y, guest.spriteHeight, guest.facing, type, time, guest.playing));
+    queue.addCall(guest.sortY + 0.03, this.drawQueued, guest, type, time);
   }
 
   /** Karakterin ayak noktası (x, y) ve boyuna göre aksesuar. */

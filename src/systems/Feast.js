@@ -2,7 +2,8 @@
 //   planFeast(state)           : { tier, contributions: { food, bread, sherbet, cloth }, servings } (kilerden neyin ayrılacağı)
 //   currentFeastOf(state)      : bugünkü sofra { feast, tier, left, total } ya da null (çizim ve arayüz için)
 //   sanitizeCurrentFeast(raw)  : kayıttaki sofra durumu; bozuksa null
-//   state.currentFeast         : null | { tier, day, contributions, servings, served }
+//   state.currentFeast         : null | { tier, day, contributions, servings, served, eatenIds }
+//                                (27.1) eatenIds: ikram alan sakinlerin kimlikleri (kayıt / yüklemede çift ikramı önler; v2-v31'de yoksa [])
 // GIDA GÜVENCESİ: planFeast bağışı, kasabanın besin değeri kişi başı FEAST.minPerCapita'nın altına inmeyecek biçimde sınırlar.
 import { FEAST, TIERS } from '../data/feast.js';
 import { RESOURCES } from '../data/resources.js';
@@ -46,5 +47,7 @@ export function sanitizeCurrentFeast(raw) {
   const n = (v) => (Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
   const c = raw.contributions ?? {};
   const servings = Math.max(1, n(raw.servings));
-  return { tier: raw.tier, day: Math.floor(raw.day), contributions: { food: n(c.food), bread: n(c.bread), sherbet: n(c.sherbet), cloth: n(c.cloth) }, servings, served: Math.min(servings, n(raw.served)) };
+  const eatenIds = Array.isArray(raw.eatenIds) ? [...new Set(raw.eatenIds.filter((id) => Number.isFinite(id)).map((id) => Math.floor(id)))].slice(0, servings) : [];
+  const served = Math.min(servings, Math.max(n(raw.served), eatenIds.length));
+  return { tier: raw.tier, day: Math.floor(raw.day), contributions: { food: n(c.food), bread: n(c.bread), sherbet: n(c.sherbet), cloth: n(c.cloth) }, servings, served, eatenIds };
 }

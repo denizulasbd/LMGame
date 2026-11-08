@@ -94,3 +94,41 @@ export function headOf(state, home) {
   const adults = residents.filter((c) => !c.isChild);
   return adults.length ? adults.reduce((best, c) => (c.ageInDays > best.ageInDays || (c.ageInDays === best.ageInDays && c.id < best.id) ? c : best)) : null;
 }
+
+/** (27.2) Ocak Devri için aday: devredebilecek sakin mi (evli, çocuk / bilge değil, köyü terk etmiyor, ziyaretçi değil)? */
+function canInherit(c, elder) {
+  return Boolean(c) && c !== elder && !c.role && c.married && !c.isChild && c.lifeStage !== 'elder' && !c.emigrating;
+}
+
+/**
+ * (27.2) Ocak reisliğinin mirasçısı: önce evli yetişkin / genç biyolojik evlat (aynı evde yaşayan önce, eşitlikte küçük kimlik);
+ * evladı yoksa aynı evde bilgeyle birlikte yaşayan evli sakin (kuşağı büyük olan önce, sonra küçük kimlik; bilgenin eşi olmaz).
+ * Kimse yoksa null. Saf; rastgelelik yok.
+ */
+export function chooseHearthHeir(state, elder, home) {
+  if (!elder || !home) return null;
+  const kids = (elder.children ?? [])
+    .map((id) => state.characters.find((x) => x.id === id))
+    .filter((c) => canInherit(c, elder))
+    .sort((x, y) => (y.homeId === home.id) - (x.homeId === home.id) || x.id - y.id);
+  if (kids.length) return kids[0];
+  const mates = state.characters
+    .filter((c) => c.homeId === home.id && canInherit(c, elder) && c.id !== elder.partnerId)
+    .sort((x, y) => (y.generation ?? 1) - (x.generation ?? 1) || x.id - y.id);
+  return mates[0] ?? null;
+}
+
+/**
+ * (27.2) Bilgenin reisi olduğu evler: kendi evi (reisi oysa) ve kütükte (lineage.heads) reis göründüğü evler; kimlik sırasıyla,
+ * tekrarsız.
+ */
+export function hearthsOf(state, elder) {
+  if (!elder) return [];
+  const ids = new Set();
+  if (elder.homeId !== null && elder.homeId !== undefined) ids.add(elder.homeId);
+  for (const [home, head] of Object.entries(state.lineage?.heads ?? {})) if (head === elder.id) ids.add(Number(home));
+  return [...ids]
+    .map((id) => state.buildings.find((b) => b.id === id))
+    .filter((b) => b && b.capacity && headOf(state, b) === elder)
+    .sort((a, b) => (a.id === elder.homeId ? -1 : b.id === elder.homeId ? 1 : a.id - b.id));
+}

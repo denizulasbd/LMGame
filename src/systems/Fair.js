@@ -1,5 +1,6 @@
 // (26.1) Mevsimlik panayırın saf yardımcıları: takvim, yer seçimi, kayıt temizliği. Durumu FairSystem yazar.
-//   state.currentFestival : null | { type: 'spring' | 'summer' | 'autumn' | 'winter', day, phase: 'prep' | 'party' }
+//   state.currentFestival : null | { type: 'spring' | 'summer' | 'autumn' | 'winter', day, phase: 'prep' | 'party', participants }
+//                           (27.1) participants: şenlikte dans eden sakinlerin kimlikleri (kapanış sayımı ve anılar; v2-v31'de yoksa [])
 import { FAIR, FAIRS, FAIR_PHASES } from '../data/fair.js';
 import { getSeason } from '../data/seasons.js';
 import { isGoldenAge } from './GoldenAge.js';
@@ -40,5 +41,6 @@ export function fairVenue(world) {
 export function sanitizeCurrentFestival(raw) {
   if (!raw || typeof raw !== 'object') return null;
   if (!FAIRS[raw.type] || !FAIR_PHASES.includes(raw.phase) || !Number.isFinite(raw.day)) return null;
-  return { type: raw.type, day: Math.floor(raw.day), phase: raw.phase };
+  const participants = Array.isArray(raw.participants) ? [...new Set(raw.participants.filter((id) => Number.isFinite(id)).map((id) => Math.floor(id)))] : [];
+  return { type: raw.type, day: Math.floor(raw.day), phase: raw.phase, participants };
 }

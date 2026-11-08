@@ -12,7 +12,9 @@
 //
 // Bu sistem KENDİ tohumlanmış üretecini kullanır (TownScene -> seed + 32): yalnızca söz seçimi ve konuşma sıklığı.
 // Ana üretece ve Math.random'a dokunmaz. Durum: state.currentFestival (kayda girer), state.chronicle.firstFair, stats.fairs.
-// Olaylar: 'fair:prep' { fair, type }, 'fair:ended' { fair, type, attendees, first }, ayrıca 'festival:started' { fair: true }.
+// Olaylar: 'fair:prep' { fair, type }, 'fair:ended' { fair, type, attendees, first }, 'fair:cancelled' { fair, type } (27.1: yer
+// yıkıldı / hasarlı, şenlik başlamadı; FeastSystem sofrayı kilere iade eder), ayrıca 'festival:started' { fair: true }.
+// (27.1) Katılımcılar currentFestival.participants'ta da tutulur: şenlik ortasında kayıt -> yükleme kapanış sayımını ve anıları korur.
 import { FAIR, FAIRS, ELDER_LINES, FESTIVE_DANCER_LINES } from '../data/fair.js';
 import { SEASON_FESTIVAL } from '../data/festivals.js';
 import { SEASON_FESTIVALS } from '../data/festivals.js';
@@ -57,6 +59,8 @@ export class FairSystem {
       return;
     }
     cf.phase = hour >= FAIR.partyHour ? 'party' : 'prep';
+    if (!Array.isArray(cf.participants)) cf.participants = [];
+    this.attendees = new Set(cf.participants);
   }
 
   /** Gün atlanmış ya da 22:00 kaçırılmışsa (zaman sıçraması, kayıt) başka güne ait panayır kalıntısı yeni panayırı engellemesin. */
@@ -82,7 +86,7 @@ export class FairSystem {
     if (this.state.characters.length < FAIR.minPopulation || !fairVenue(this.world)) return false;
     const type = getSeason(day).key;
     const fair = FAIRS[type];
-    this.state.currentFestival = { type, day, phase: 'prep' };
+    this.state.currentFestival = { type, day, phase: 'prep', participants: [] };
     this.attendees.clear();
     this.events.emit('fair:prep', { fair, type });
     if (!this.attract) this.events.emit('toast', { text: fair.start, tone: 'success', icon: fair.icon });
@@ -96,7 +100,10 @@ export class FairSystem {
     const fair = FAIRS[cf.type];
     const venue = fairVenue(this.world);
     if (!venue) {
+      // (27.1) Meydan yıkıldı / hasarlı: panayır iptal; sofraya ayrılan erzak 'fair:cancelled' ile kilere döner
       this.state.currentFestival = null;
+      this.attendees.clear();
+      this.events.emit('fair:cancelled', { fair, type: cf.type });
       return false;
     }
     cf.phase = 'party';
@@ -155,7 +162,10 @@ export class FairSystem {
     const dancers = [];
     for (const c of this.world.characters) {
       if (c.task?.activity !== 'festival' || c.task.phase !== 'perform') continue;
-      this.attendees.add(c.id);
+      if (!this.attendees.has(c.id)) {
+        this.attendees.add(c.id);
+        (cf.participants ??= []).push(c.id);
+      }
       c.needs.fun = clamp(c.needs.fun + FAIR.funPerMinute * minutes, 0, 100);
       c.needs.social = clamp(c.needs.social + FAIR.socialPerMinute * minutes, 0, 100);
       if (c.quirk === 'festive' && (c.generation ?? 1) >= FAIR.festiveGeneration) dancers.push(c);
