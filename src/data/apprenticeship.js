@@ -84,6 +84,7 @@ export const APPRENTICE = {
   standOffset: { x: 9, y: 1 }, // taburenin ustanın çalıştığı noktaya göre yeri (piksel)
   speechPerMinute: 0.012, // usta / çırak konuşma olasılığı (kendi üreteciyle)
   speechSeconds: 3.2,
+  practiceRate: 0.6, // (27.1/27.2) Tezgâh Pratiği: yapı boşta (sipariş / raf dolu) beklerken ustasının taburesinde normalin %60'ı hızla
 };
 
 // Gururlu Usta: yanında çırağı çalışan ustanın keyfi %25 yavaş düşer (hours saat sürer, her birlikte mesaide yenilenir);

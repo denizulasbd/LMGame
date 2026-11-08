@@ -14,7 +14,7 @@
 //   'heirloom:archived' { character, kind }.
 import { HEIRLOOMS, HEIRLOOM, HANDOVER_LINES } from '../data/heirloom.js';
 import { ITEMS } from '../data/citizens.js';
-import { heirloomKindFor, heirloomStory, pickHeir } from './Heirloom.js';
+import { heirloomKindFor, heirloomStory, pickHeir, sanitizeMentees, MAX_MENTEES } from './Heirloom.js';
 import { heirloomSlot, sanitizeHeirloomMeta, inventoryCapacity } from './Citizens.js';
 import { developmentOpen } from './Temperament.js';
 import { rallyStatus } from './RallySystem.js';
@@ -55,6 +55,8 @@ export class HeirloomSystem {
     const m = master.mentees.find((x) => x.id === c.id);
     if (m) m.progress = Math.max(m.progress, progress);
     else master.mentees.push({ id: c.id, progress: Math.max(0, Math.min(100, progress)) });
+    // (27.2) Çalışma zamanında da kayıttaki sınır (sanitizeMentees: son 12): kesintisiz oturum ile kayıt / yükleme aynı mirasçıyı seçer
+    if (master.mentees.length > MAX_MENTEES) master.mentees = sanitizeMentees(master.mentees);
   }
 
   /** Yaşlı sakinin çantasında yadigâr belirir (Altın Çağ'da; zaten bir yadigâr taşımıyorsa). */

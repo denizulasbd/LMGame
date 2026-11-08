@@ -71,12 +71,12 @@ export function petitionMet(state, p) {
       return Boolean(p.met) || ['low', 'exempt'].includes(state.tax?.rate);
     case 'sherbetCask':
       return Boolean(p.met) || Boolean(state.events?.festival?.active);
-    // (25.4) Yeni Konut Talebi: çift aynı çatı altında buluştu ya da kasabaya yeni bir kulübe kuruldu
+    // (25.4) Yeni Konut Talebi: (27.2) yalnızca çift gerçekten aynı çatı altında buluşunca karşılanır (yeni kulübe bitince
+    // LineageSystem çifti oraya taşır; kulübe sayısının artması tek başına yetmez)
     case 'newHome': {
       const a = state.characters.find((x) => x.id === p.characterId);
       const b = state.characters.find((x) => x.id === base.partnerId);
-      if (a && b && a.homeId !== null && a.homeId === b.homeId) return true;
-      return state.buildings.filter((x) => x.type === 'cabin' && x.functional).length > (base.cabins ?? Infinity);
+      return Boolean(a && b && a.homeId !== null && a.homeId !== undefined && a.homeId === b.homeId);
     }
     default:
       return false;

@@ -64,9 +64,14 @@ export function apprenticeSlots(building) {
   return APPRENTICE.perBuilding + (building?.upgraded ? 1 : 0);
 }
 
-/** Yapı çırak alabilir mi (zanaat yapısı, tamamlanmış, hasarsız, kontenjanı dolmamış). */
+/** (27.2) Yapı çırağa güvenli mi: tamamlanmış, hasarsız ve yanmıyor. */
+export function safeForApprentice(building) {
+  return Boolean(building) && building.functional && !building.damaged && !building.isDamaged && !building.isBurning;
+}
+
+/** Yapı çırak alabilir mi (zanaat yapısı, tamamlanmış, hasarsız / yanmıyor, kontenjanı dolmamış). */
 export function acceptsApprentice(state, building) {
-  if (!building || !professionFor(building.type) || !building.functional) return false;
+  if (!building || !professionFor(building.type) || !safeForApprentice(building)) return false;
   return apprenticesAt(state, building).length < apprenticeSlots(building);
 }
 

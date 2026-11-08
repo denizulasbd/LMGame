@@ -72,6 +72,10 @@
 //              Altın Çağ kapısı, oluşma ve çantada yer açma, mirasçı önceliği (aynı meslekten evlat, en yaşlı evlat, çırak, manevi
 //              evlat), çırak geçmişi, akşam töreni, veda sözleri, Tarihçe ve Kuşak Şöleni, Ata Mirası Gururu, kart çerçevesi, köyden
 //              ayrılan taşıyıcı ve arşiv, ocak devri, izole üreteç, kayıt sürümü 28 (gidiş-dönüş, bozuk değerler, v27 kaydı)
+//   27. aşama (27.2): tıkanan mekanikler (boştaki atölyede / dolu raflı şifacıda Tezgâh Pratiği, ot toplayan şifacı ustası, hasarlı / yanan
+//              yapıya çırak yazılmaması ve ders ortası güvenlik, sonradan evlenen evlada ve ev halkına Ocak Devri, kütükteki reislik, Altın Çağ
+//              başlarken bekleyen çiftlerin yuvası, sınırlı ve gerçek buluşmayla karşılanan Yeni Konut Talebi, yadigârı olan mirasçının
+//              atlanması, çalışma zamanında 12 çırak sınırı, Altın Çağ'da yeni nesil huy dilekçelerinin önceliği, izole üreteçler)
 //   27. aşama (27.1): kayıt bütünlüğü ve onarımlar (ziyafette eatenIds ile çift ikramın önlenmesi, 0..1'e kilitli ve depo sınırlı iade,
 //              panayır iptalinde / hazırlıkta erzak iadesi, kayda giren panayır katılımcıları, simülasyonda biten konuşma balonları ve salt
 //              okunur çizim, konuğun Entity kimlik sayacını ilerletmemesi, ayrılan konuğun kayıt / yüklemede çıkışa yürümesi, tıkanınca yeniden
@@ -5438,7 +5442,10 @@ const pageResults = await page.evaluate(async () => {
       return Object.fromEntries(P.optionsFor(c));
     };
     st().tax.rate = 'standard';
-    check('yeni dilekçeler: Zanaatkâr "Atölye Malzemesi", Girişimci "Pazar Harçları", Şenlik "Fazladan Şerbet" (ve Buluşma x5), Bilge Düşünür kitap / araştırma', opt('craftsman').craftTools === 5 && opt('entrepreneur').marketFees === 5 && opt('festive').sherbetCask === 5 && opt('festive').gathering === 5 && (opt('philosopher').books || opt('philosopher').academy || opt('philosopher').research) && !opt('musician').craftTools && !opt('animalLover').marketFees);
+    // (27.2) Altın Çağ'da yeni nesil huyların kendi dilekçeleri NEW_GEN_PRIORITY.weight katıdır (öncesinde 25.3'teki 5)
+    const { NEW_GEN_PRIORITY } = await import('/src/systems/PetitionSystem.js');
+    const kq = st().goldenAge?.since ? NEW_GEN_PRIORITY.weight : 1;
+    check('yeni dilekçeler: Zanaatkâr "Atölye Malzemesi", Girişimci "Pazar Harçları", Şenlik "Fazladan Şerbet" (ve Buluşma x5), Bilge Düşünür kitap / araştırma', opt('craftsman').craftTools === 5 * kq && opt('entrepreneur').marketFees === 5 * kq && opt('festive').sherbetCask === 5 * kq && opt('festive').gathering === 5 && (opt('philosopher').books || opt('philosopher').academy || opt('philosopher').research) && !opt('musician').craftTools && !opt('animalLover').marketFees);
     check('dilekçe metinleri Türkçe ve tanımlı', CZ.PETITION_KINDS.marketFees.text.includes('Pazar harçları hafifletilsin') && CZ.PETITION_KINDS.sherbetCask.text.includes('Hana fazladan bir şerbet fıçısı açılsın'));
     const pc = people()[5];
     pc.quirk = 'entrepreneur';
@@ -7075,6 +7082,274 @@ const pageResults = await page.evaluate(async () => {
     st().goldenAge.since = keep.since;
     Object.assign(st().events.festival, keep.festival, { active: false });
     goto(keep.day, keep.hour, keep.minute);
+  }
+
+  // ===== 27. aşama (27.2): tıkanan mekaniklerin açılması (çıraklık, ocak devri, yadigâr, yeni nesil dilekçeler) =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const AD = await import('/src/data/apprenticeship.js');
+    const AP = await import('/src/systems/Apprenticeship.js');
+    const LN = await import('/src/systems/Lineage.js');
+    const HL = await import('/src/systems/Heirloom.js');
+    const HD = await import('/src/data/heirloom.js');
+    const CZ = await import('/src/data/citizens.js');
+    const CI = await import('/src/systems/Citizens.js');
+    const PS = await import('/src/systems/PetitionSystem.js');
+    const PT = await import('/src/systems/Petitions.js');
+    const { CONFIG } = await import('/src/config.js');
+    const Y = 16;
+    const s0 = st();
+    s0.crisis.difficulty = 'huzurlu';
+    s0.crisis.raid = null;
+    s0.crisis.nextRaidWarnAt = null;
+    s0.petitions.list = [];
+    s0.petitions.nextAt = s0.totalMinutes + 1e6;
+    const keepGA = s0.goldenAge.since;
+    s0.goldenAge.since = s0.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+    sim.give({ wood: 600, stone: 400, iron: 120, food: 500, bread: 80 });
+    const people = () => st().characters.filter((c) => !c.role && !c.away && !c.emigrating && !c.isChild).sort((a, b) => a.id - b.id);
+    // Her senaryo değiştirdiği sakin alanlarını kaydedip geri yükler
+    const FIELDS = ['lifeStage', 'ageInDays', 'agedDays', 'age', 'apprenticeship', 'workplaceId', 'task', 'away', 'married', 'partnerId', 'homeId', 'parents', 'children', 'generation', 'inventory', 'mentees', 'quirk', 'retired', 'relocating', 'emigrating'];
+    const snapshot = () => st().characters.map((c) => ({ c, v: Object.fromEntries(FIELDS.map((k) => [k, Array.isArray(c[k]) ? [...c[k]] : c[k] && typeof c[k] === 'object' ? { ...c[k] } : c[k]])) }));
+    const restore = (snap) => { for (const o of snap) Object.assign(o.c, o.v); };
+    const snap0 = snapshot();
+    const keepHeads = { ...s0.lineage.heads };
+    const keepLineage = { handovers: s0.lineage.handovers, newHomes: s0.lineage.newHomes, petitions: s0.lineage.petitions, extended: s0.lineage.extended };
+    const makeYouth = (c, age = 19) => { c.ageInDays = age * Y; c.agedDays = 0; c.age = age; c.lifeStage = 'youth'; c.profile = c.buildProfile(); c.apprenticeship = null; c.workplaceId = null; c.task = null; return c; };
+    const mainRngs = Object.entries(S()).filter(([k, v]) => !['apprenticeship', 'lineageSystem', 'heirloomSystem', 'petitions'].includes(k) && v && v.rng && Number.isFinite(v.rng.state)).map(([, v]) => v.rng);
+    const rngBefore = mainRngs.map((r) => r.state);
+    let randomCalls = 0;
+    const realRandom = Math.random;
+    Math.random = () => { randomCalls++; return realRandom(); };
+    // Yalnızca bu adımın sistem çağrıları ölçülür (sim.place gibi test yardımcıları değil)
+    let rngViolations = 0;
+    let isoCalls = 0;
+    const iso = (fn) => {
+      const b = mainRngs.map((r) => r.state);
+      const rc = randomCalls;
+      const out = fn();
+      isoCalls++;
+      if (randomCalls !== rc || mainRngs.some((r, i) => r.state !== b[i])) rngViolations++;
+      return out;
+    };
+
+    // --- 1.1 Tezgâh Pratiği (boştaki atölye) ve ot toplayan Şifacı ---
+    const sysA = () => S().apprenticeship;
+    const ws = S().world.getCompleted('workshop').find((b) => !b.damaged) ?? sim.place('workshop');
+    const hh = S().world.getCompleted('healerHut').find((b) => !b.damaged) ?? sim.place('healerHut');
+    for (const c of st().characters) if (c.apprenticeship && [ws.id, hh.id].includes(c.apprenticeship.buildingId)) c.apprenticeship = null;
+    const pool = people().filter((c) => c.lifeStage !== 'elder');
+    const smith = pool[0];
+    const healer = pool[1];
+    const y1 = makeYouth(pool[pool.length - 1]);
+    const y2 = makeYouth(pool[pool.length - 2]);
+    const y3 = makeYouth(pool[pool.length - 3]);
+    for (const [m, b, skill] of [[smith, ws, 'crafting'], [healer, hh, 'herbalism']]) { m.workplaceId = b.id; m.lifeStage = 'adult'; m.skills[skill] = 1600; m.task = null; m.away = false; }
+    ws.damaged = false; ws.isBurning = false; hh.damaged = false; hh.isBurning = false;
+    const enrolled1 = sysA().enroll(y1, ws);
+    const enrolled2 = sysA().enroll(y2, hh);
+    check('27.2: gençler Zanaat Atölyesi ve Şifacı Kulübesi\'ne çırak yazılır (ustaları atanır)', enrolled1 && enrolled2 && y1.apprenticeship.masterId === smith.id && y2.apprenticeship.masterId === healer.id, `${y1.apprenticeship?.masterId} ${y2.apprenticeship?.masterId}`);
+    const prevIdle = ws.idle;
+    ws.idle = false;
+    check('27.2: 25.2 kuralı korunur: boşta olmayan atölyede usta tezgâhta değilken plan yok', iso(() => sysA().planFor(y1)) === null);
+    ws.idle = true; // herkes ekipmanlı: sipariş yok, atölye boşta bekliyor
+    const prac = iso(() => sysA().planFor(y1));
+    check('27.2: atölye boştayken (idle) kayıtlı usta kasabadaysa çırak taburesine "Tezgâh Pratiği"ne gider', prac?.activity === 'apprentice' && prac.buildingId === ws.id && !prac.workBuildingId && sysA().masterAtWork(y1) === null && sysA().practiceMaster(y1) === smith, JSON.stringify(prac));
+    delete smith.buffs.proudMaster; delete smith.buffs.proudSince;
+    const t1 = { activity: 'apprentice', buildingId: ws.id, phase: 'perform', elapsed: 0 };
+    y1.task = t1;
+    const p1 = y1.apprenticeship.progress;
+    const okP = iso(() => sysA().learn(y1, t1, 60));
+    check('27.2: Tezgâh Pratiği normalin %60\'ı hızla ilerler; usta gururu / verim katkısı yok', okP && Math.abs(y1.apprenticeship.progress - p1 - 60 * AD.APPRENTICE.perMinute * AD.APPRENTICE.practiceRate) < 1e-9 && !(smith.buffs.proudMaster > st().totalMinutes) && y1.activityLabel.includes('Tezgâh Pratiği'), `${y1.apprenticeship.progress} ${y1.activityLabel}`);
+    smith.away = true;
+    check('27.2: ustası seferdeyken boştaki atölyede de pratik yok (çırak işine döner)', iso(() => sysA().planFor(y1)) === null && iso(() => sysA().learn(y1, t1, 1)) === false);
+    smith.away = false;
+    // Şifacı ustası kulübenin otlarını topluyor
+    hh.idle = false;
+    healer.task = { activity: 'gatherHerbs', buildingId: hh.id, workBuildingId: hh.id, phase: 'perform', elapsed: 0 };
+    const planH = iso(() => sysA().planFor(y2));
+    const t2 = { activity: 'apprentice', buildingId: hh.id, phase: 'perform', elapsed: 0 };
+    y2.task = t2;
+    const p2 = y2.apprenticeship.progress;
+    const okH = iso(() => sysA().learn(y2, t2, 60));
+    check('27.2: Şifacı ustası ot toplarken (gatherHerbs) mesaidedir: çırak kulübede tam hızla öğrenir', planH?.activity === 'apprentice' && sysA().masterAtWork(y2) === healer && okH && Math.abs(y2.apprenticeship.progress - p2 - 60 * AD.APPRENTICE.perMinute) < 1e-9);
+    healer.task = null;
+    hh.idle = true; // raflar dolu
+    check('27.2: raflar dolu (idle) Şifacı Kulübesi\'nde de Tezgâh Pratiği', iso(() => sysA().planFor(y2))?.activity === 'apprentice' && iso(() => sysA().learn(y2, t2, 10)));
+    // --- 1.2 Hasarlı / yanan yapı ve mesai ortası güvenlik ---
+    hh.damaged = true;
+    check('27.2: hasarlı yapıya çırak yazılmaz, ders planlanmaz; ders sürerken hasar alınca çırak kalkar', !AP.acceptsApprentice(st(), hh) && !sysA().enroll(y3, hh) && iso(() => sysA().planFor(y2)) === null && iso(() => sysA().learn(y2, t2, 1)) === false);
+    hh.damaged = false;
+    ws.isBurning = true;
+    check('27.2: yanan yapıya çırak yazılmaz, ders planlanmaz; yanarken ders biter', !AP.acceptsApprentice(st(), ws) && iso(() => sysA().planFor(y1)) === null && iso(() => sysA().learn(y1, t1, 1)) === false);
+    ws.isBurning = false;
+    const res0 = { food: s0.resources.food, bread: s0.resources.bread, credit: s0.pantry.credit };
+    s0.resources.food = 0; s0.resources.bread = 0; s0.pantry.credit = 0;
+    const midFood = iso(() => sysA().learn(y1, t1, 1));
+    Object.assign(s0.resources, { food: res0.food, bread: res0.bread }); s0.pantry.credit = res0.credit;
+    check('27.2: mesai ortasında gıda kişi başı 6\'nın altına düşerse çırak dersi bırakır (temel işe döner)', midFood === false && iso(() => sysA().learn(y1, t1, 1)) === true);
+    const others = st().characters.filter((c) => !c.role && !c.isChild && c.lifeStage !== 'youth' && !c.retired && !c.away && !c.emigrating);
+    const awayKeep = others.map((c) => c.away);
+    others.slice(2).forEach((c) => { c.away = true; });
+    const midCore = iso(() => sysA().learn(y1, t1, 1));
+    others.forEach((c, i) => { c.away = awayKeep[i]; });
+    check('27.2: mesai ortasında çekirdek iş gücü 3\'ün altına düşerse çırak dersi bırakır', midCore === false);
+    ws.idle = prevIdle;
+    y1.apprenticeship = null; y2.apprenticeship = null;
+    restore(snap0);
+
+    // --- 2.1 Ocak Devri: tek şans değil; evli ev halkına devir; kütükteki reislik ---
+    const LS = () => S().lineageSystem;
+    const freeCabin = () => S().world.getCompleted('cabin').find((h) => h.functional && S().world.getResidents(h).length === 0) ?? sim.place('cabin');
+    const [E, K, P, M1, M2, E2, E3, K3] = people().filter((c) => c.lifeStage !== 'elder');
+    const asElder = (c) => { c.lifeStage = 'elder'; c.age = 70; c.ageInDays = 70 * Y; c.retired = true; };
+    const cab1 = freeCabin();
+    for (const c of [E]) c.homeId = cab1.id;
+    asElder(E);
+    E.children = [K.id]; K.parents = [E.id]; K.married = false; K.partnerId = null; P.married = false; P.partnerId = null;
+    E.married = false; E.partnerId = null;
+    st().lineage.heads[cab1.id] = E.id;
+    const h0 = st().lineage.handovers;
+    iso(() => LS().onElder(E));
+    const noHeir = st().lineage.heads[cab1.id] === E.id && st().lineage.handovers === h0;
+    K.married = P.married = true; K.partnerId = P.id; P.partnerId = K.id;
+    const hEv = [];
+    const offH = game.events.on('lineage:handover', (p) => hEv.push(p));
+    iso(() => LS().onMarried(K, P));
+    offH();
+    check('27.2: bilgenin evladı 70 yaşında evli değilse devir bekler; evlat sonradan evlenince Ocak Devri tetiklenir', noHeir && st().lineage.heads[cab1.id] === K.id && st().lineage.handovers === h0 + 1 && hEv[0]?.heir === K && hEv[0]?.elder === E, `${noHeir} ${st().lineage.heads[cab1.id]}`);
+    // Evladı olmayan bilge: aynı evde yaşayan evli (kuşağı büyük) sakine devreder
+    const cab2 = freeCabin() === cab1 ? sim.place('cabin') : freeCabin();
+    E2.homeId = M1.homeId = M2.homeId = cab2.id;
+    asElder(E2); E2.children = []; E2.married = false; E2.partnerId = null;
+    M1.married = M2.married = true; M1.partnerId = M2.id; M2.partnerId = M1.id; M1.generation = 2; M2.generation = 1; M1.parents = []; M2.parents = [];
+    st().lineage.heads[cab2.id] = E2.id;
+    const pick2 = LN.chooseHearthHeir(st(), E2, cab2);
+    iso(() => LS().onElder(E2));
+    check('27.2: evli evladı olmayan bilgenin ocağı aynı evde yaşayan evli 2. kuşak sakine geçer', pick2 === M1 && st().lineage.heads[cab2.id] === M1.id && M1.memories.some((m) => m.kind === 'home' && m.text.includes(E2.name)), `${pick2?.name}`);
+    // Kütükte reis göründüğü ev: bilge başka evde yaşasa da o evin reisliğini evladına devreder
+    const cab3 = sim.place('cabin');
+    asElder(E3); E3.homeId = cab2.id; E3.children = [K3.id]; K3.parents = [E3.id]; K3.homeId = cab3.id; K3.married = true; K3.partnerId = null;
+    st().lineage.heads[cab3.id] = E3.id;
+    check('27.2: hearthsOf: bilgenin kütükte (lineage.heads) reis göründüğü evler de sayılır', LN.hearthsOf(st(), E3).some((h) => h.id === cab3.id));
+    iso(() => LS().onElder(E3));
+    check('27.2: kütükteki ocağın reisliği evli evlada devredilir', st().lineage.heads[cab3.id] === K3.id);
+    restore(snap0);
+    s0.lineage.heads = { ...keepHeads };
+    Object.assign(s0.lineage, keepLineage);
+
+    // --- 2.2 Altın Çağ başlarken bekleyen çiftler; Yeni Konut Talebi ---
+    {
+      const [A, B, C, D] = people().filter((c) => c.lifeStage !== 'elder');
+      const homeA = A.homeId;
+      const homeB = B.homeId !== homeA ? B.homeId : C.homeId;
+      A.married = B.married = true; A.partnerId = B.id; B.partnerId = A.id; A.generation = 2; B.generation = 2; A.parents = []; B.parents = [];
+      B.homeId = homeB;
+      freeCabin();
+      const emptyIds = S().world.getCompleted('cabin').filter((h) => h.functional && S().world.getResidents(h).length === 0).map((h) => h.id);
+      const nh = st().lineage.newHomes;
+      iso(() => LS().settleWaiting());
+      check('27.2: Altın Çağ başlarken (goldenAge:began) ayrı evlerde kalan evli 2. kuşak çift boş kulübede yuva kurar', A.homeId === B.homeId && emptyIds.includes(A.homeId) && st().lineage.newHomes === nh + 1, `${A.homeId} ${B.homeId} ${emptyIds}`);
+      const listening = [...(game.events.listeners.get('goldenAge:began') ?? [])].length > 0;
+      check('27.2: LineageSystem goldenAge:began olayını dinler', listening);
+      // Boş kulübe yokken: dilekçe; kulübe sayısı artsa da çift ayrıysa karşılanmaz
+      A.homeId = homeA; B.homeId = homeB;
+      const empties = S().world.getCompleted('cabin').filter((h) => S().world.getResidents(h).length === 0);
+      // boş kulübeler geçici olarak kullanılamaz (harabe) gösterilir: kasabada boş kulübe yok
+      const conds = empties.map((h) => h.condition);
+      const hide = (on) => empties.forEach((h, i) => { h.condition = on ? 'ruined' : conds[i]; });
+      hide(true);
+      s0.petitions.list = [];
+      const dbg = `${A.homeId}/${B.homeId} boş: ${S().world.getCompleted('cabin').filter((h) => h.functional && S().world.getResidents(h).length === 0).map((h) => h.id)} gizli: ${empties.map((h) => h.id)}`;
+      const r1 = iso(() => LS().settle(A, B));
+      hide(false);
+      const pet = st().petitions.list.find((p) => p.kind === 'newHome');
+      const fakeMore = pet ? { ...pet, baseline: { ...pet.baseline, cabins: 0 } } : null;
+      check('27.2: boş kulübe yokken Yeni Konut Talebi açılır; kulübe sayısı artsa da çift ayrı yaşarken karşılanmaz', r1 === 'petition' && pet && pet.characterId === A.id && !PT.petitionMet(st(), fakeMore), `${r1} ${JSON.stringify(pet)} ${dbg}`);
+      // Sınırlar: çiftte zaten açık dilekçe varken ya da liste doluyken yenisi açılmaz
+      const n0 = st().petitions.list.length;
+      hide(true);
+      const r2 = iso(() => LS().settle(A, B));
+      st().petitions.list.push({ id: 9901, kind: 'gathering', characterId: C.id, baseline: {}, deadline: 1e12, status: 'open' });
+      const n1 = st().petitions.list.length;
+      const cand = people().filter((o) => ![A, B, C].includes(o) && !CI.petitionOf(st(), o));
+      const X1 = cand[0];
+      const X2 = cand.find((o) => o.homeId !== X1.homeId);
+      const r3 = iso(() => LS().settle(X1, X2));
+      hide(false);
+      check('27.2: Yeni Konut Talebi dilekçe sınırlarına uyar (sakin başına bir, en çok ' + CZ.PETITIONS.maxOpen + ')', r2 === 'petition' && r3 === 'petition' && n0 === 1 && st().petitions.list.length === n1 && n1 === CZ.PETITIONS.maxOpen);
+      st().petitions.list = st().petitions.list.filter((p) => p.id !== 9901);
+      // Yeni kulübe tamamlanınca çift oraya taşınır, dilekçe çift aynı çatı altında buluşunca karşılanır
+      const done0 = st().petitions.fulfilled;
+      const nc = sim.place('cabin');
+      S().petitions.checkAll();
+      check('27.2: yeni kulübe bitince ayrı yaşayan dilekçeli çift taşınır; dilekçe aynı eve kavuşunca karşılanır', A.homeId !== null && A.homeId === B.homeId && !st().petitions.list.some((p) => p.kind === 'newHome') && st().petitions.fulfilled === done0 + 1, `${A.homeId} ${B.homeId} yeni ${nc?.id}`);
+      restore(snap0);
+      s0.petitions.list = [];
+      s0.lineage.heads = { ...keepHeads };
+      Object.assign(s0.lineage, keepLineage);
+    }
+
+    // --- 3.1 Yadigâr: ilk mirasçıda yadigâr varsa sıradaki uygun mirasçıya geçer ---
+    {
+      const strip = () => { for (const c of st().characters) c.inventory = (c.inventory ?? []).filter((x) => !CZ.ITEMS[x.kind]?.heirloom); };
+      strip();
+      const [H, K1, K2] = people().filter((c) => c.lifeStage !== 'elder');
+      asElder(H);
+      H.children = [K1.id, K2.id];
+      K1.ageInDays = 40 * Y; K2.ageInDays = 30 * Y; K1.lifeStage = K2.lifeStage = 'adult';
+      const slot = (c, kind) => ({ kind, qty: 1, name: HD.HEIRLOOMS[kind].name, heirloom: CI.sanitizeHeirloomMeta({ ownerId: c.id, ownerName: c.name, story: 'x', since: 1, chain: [c.name] }) });
+      H.inventory = [slot(H, 'heirloomHammer')];
+      const first = HL.pickHeir(st(), H, 'heirloomHammer');
+      K1.inventory = [...(K1.inventory ?? []), slot(K1, 'heirloomTrowel')]; // ilk sıradaki zaten bir yadigâr taşıyor
+      const second = HL.pickHeir(st(), H, 'heirloomHammer');
+      const passed = iso(() => S().heirloomSystem.pass(H, second, H.inventory[0]));
+      check('27.2: ilk sıradaki mirasçıda zaten yadigâr varsa sıradaki uygun evlat seçilir ve tören iptal olmaz', first === K1 && second === K2 && passed && CI.heirloomSlot(K2)?.kind === 'heirloomHammer' && CI.heirloomSlot(K1)?.kind === 'heirloomTrowel', `${first?.name} ${second?.name}`);
+      // 3.2 Çırak geçmişi çalışma zamanında da 12 ile sınırlı (kayıttaki kuralla birebir)
+      H.mentees = [];
+      const ids = people().map((c) => c.id).filter((id) => id !== H.id);
+      for (let i = 0; i < 15; i++) S().heirloomSystem.recordMentee(H.id, { id: ids[i % ids.length] + (i >= ids.length ? 100000 : 0) }, 10 + i);
+      const live = JSON.stringify(H.mentees);
+      check('27.2: master.mentees çalışma zamanında son ' + HL.MAX_MENTEES + ' kayıtla sınırlı ve sanitizeMentees ile birebir aynı', H.mentees.length === HL.MAX_MENTEES && live === JSON.stringify(HL.sanitizeMentees(H.mentees)) && H.mentees[H.mentees.length - 1].progress === 24, `${H.mentees.length}`);
+      strip();
+      restore(snap0);
+    }
+
+    // --- 4.1 Yeni nesil mizaç dilekçeleri Altın Çağ'da öncelikli ---
+    {
+      const P = S().petitions;
+      const c = people()[3];
+      const keepQ = c.quirk;
+      c.quirk = 'craftsman';
+      st().tax.rate = 'standard';
+      const wGA = Object.fromEntries(P.optionsFor(c)).craftTools;
+      const since = s0.goldenAge.since;
+      s0.goldenAge.since = null;
+      const wPre = Object.fromEntries(P.optionsFor(c)).craftTools;
+      s0.goldenAge.since = since;
+      check('27.2: Altın Çağ\'da Zanaatkâr\'ın kendi dilekçesinin ağırlığı ' + PS.NEW_GEN_PRIORITY.weight + ' katı (öncesinde 25.3\'teki gibi 5)', wGA === 5 * PS.NEW_GEN_PRIORITY.weight && wPre === 5, `${wGA} ${wPre}`);
+      s0.petitions.list = [];
+      const keepLog = s0.petitions.log;
+      s0.petitions.log = [];
+      const p = iso(() => P.create());
+      const owner = st().characters.find((x) => x.id === p?.characterId);
+      check('27.2: Altın Çağ\'da henüz yeni nesil dilekçe açılmamışken yeni nesil huylu uygun aday öncelik alır, kendi dilekçesini açar', p && owner && PS.NEW_GEN_PETITIONS[owner.quirk] && P.newGenKinds(owner, [[p.kind, 1]]).length === 1, `${p?.kind} ${owner?.quirk}`);
+      check('27.2: açılan dilekçe "Altın Çağ\'da açıldı" sayılır (bir sonraki seçimde zorunlu öncelik kalkar)', P.newGenOpenedInGoldenAge());
+      check('27.2: Bilge Düşünür\'ün araştırma ve kitapları bittiyse bilgelik sohbeti (Toplanma) kendi dilekçesi sayılır', P.newGenKinds({ quirk: 'philosopher' }, [['sapling', 1], ['gathering', 15]]).map(([k]) => k).join() === 'gathering' && P.newGenKinds({ quirk: 'philosopher' }, [['books', 5], ['gathering', 1]]).map(([k]) => k).join() === 'books');
+      s0.petitions.list = [];
+      s0.petitions.log = keepLog;
+      c.quirk = keepQ;
+    }
+
+    Math.random = realRandom;
+    check('27.2: bu adımın sistemleri ana üreteçleri ve Math.random\'u tüketmez (dilekçe seed + 23, çıraklık + 28, soy + 30, yadigâr + 31)', mainRngs.length > 5 && isoCalls > 15 && rngViolations === 0, `${rngViolations}/${isoCalls}`);
+    void rngBefore;
+    check('27.2: kayıt sürümü 31 korunur', CONFIG.SAVE_VERSION === 31);
+    restore(snap0);
+    s0.lineage.heads = { ...keepHeads };
+    Object.assign(s0.lineage, keepLineage);
+    s0.goldenAge.since = keepGA;
   }
 
   return out;

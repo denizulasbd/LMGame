@@ -10,6 +10,10 @@
 //                tezgâhına +%5 verim.
 //   Çırak İşi  : %50'den sonra mesai sonunda olasılıkla hammadde tüketmeden çantaya küçük bir yan ürün; birikince Pazar'da satılır.
 //   Mezuniyet  : Genç 21 yaşında Yetişkin olunca %100'de Yetkin Usta, %60'ta Kıdemli Kalfa olarak başlar (meslek deneyimi).
+//   (27.2) Darboğazlar: Şifacı ustası ot toplarken (gatherHerbs, o kulübenin işi) fiilen mesaidedir, çırak kulübede otları ayıklar.
+//                Zanaat yapısı boşta beklerken (building.idle: sipariş bitti / raflar dolu) kayıtlı usta kasabadaysa çırak taburesinde
+//                "Tezgâh Pratiği" yapar (APPRENTICE.practiceRate hızla; usta gururu ve verim katkısı yok). Hasarlı / yanan yapıya çırak
+//                yazılmaz; ders sürerken yapı hasar alır / yanarsa ya da kasaba gıda / iş gücü eşiğinin altına düşerse çırak işine döner.
 //   Sözler     : usta ve çırak ara sıra konuşur ("Öğreniyorum ustam!"); metin baloncuğu ayrı bir katmandır (c.speech): ikon
 //                balonuna (c.bubble) dokunmaz, böylece davranış sisteminin balon zarı ve ana üreteç hiç etkilenmez.
 //
@@ -25,6 +29,7 @@ import {
   canMaster,
   pickMaster,
   acceptsApprentice,
+  safeForApprentice,
   doorOpen,
   townCanSpare,
   graduationFor,
@@ -161,6 +166,8 @@ export class ApprenticeshipSystem {
     if (!a) return null;
     const own = a.masterId !== null ? this.world.getCharacter(a.masterId) : null;
     if (own && own.task?.workBuildingId === a.buildingId && !own.away) return own;
+    // (27.2) Şifacı ustası kulübenin otlarını topluyorsa (gatherHerbs, workBuildingId = kulübe) fiilen şifacılık mesaisindedir
+    if (own && own.task?.activity === 'gatherHerbs' && own.task.workBuildingId === a.buildingId && !own.away) return own;
     const skill = PROFESSIONS[a.profession].skill;
     let best = null;
     for (const o of this.world.characters) {
@@ -170,24 +177,39 @@ export class ApprenticeshipSystem {
     return best;
   }
 
+  /**
+   * (27.2) Tezgâh Pratiği: yapı boşta bekliyorsa (building.idle) ve çırağın kayıtlı ustası kasabadaysa (seferde / köyü terk etmiyor,
+   * emekli değil) o usta "yanındaymış gibi" sayılır. Yoksa null. Normal (boşta olmayan) yapıda hiçbir şeyi değiştirmez.
+   */
+  practiceMaster(c) {
+    const a = c.apprenticeship;
+    if (!a || a.masterId === null) return null;
+    const building = this.world.getBuilding(a.buildingId);
+    if (!building || building.idle !== true || !safeForApprentice(building)) return null;
+    const own = this.world.getCharacter(a.masterId);
+    return own && canMaster(own) ? own : null;
+  }
+
   /** Brain çağırır (mesai saatinde, mola zarı atıldıktan sonra): çırağın planı ya da null (o zaman her zamanki işine gider). */
   planFor(c) {
     const a = c.apprenticeship;
     if (!a || !townCanSpare(this.state)) return null;
     const building = this.world.getBuilding(a.buildingId);
-    const master = this.masterAtWork(c);
-    if (!building || !building.functional || !master) return null;
+    if (!building || !safeForApprentice(building)) return null; // (27.2) hasarlı / yanan yapıda ders yok
+    const atWork = this.masterAtWork(c);
+    const master = atWork ?? this.practiceMaster(c);
+    if (!master) return null;
     const spots = this.world.getSpots(building);
     if (spots.length === 0) return null;
     const origin = { x: c.tileX, y: c.tileY };
     const spot = spots.reduce((best, s) => (Math.hypot(s.x - origin.x, s.y - origin.y) < Math.hypot(best.x - origin.x, best.y - origin.y) ? s : best));
-    const fp = master.task.finalPoint;
+    const fp = atWork ? master.task?.finalPoint : null;
     return {
       activity: 'apprentice',
       buildingId: building.id,
       spot,
       finalPoint: fp ? { x: fp.x + APPRENTICE.standOffset.x, y: fp.y + APPRENTICE.standOffset.y } : undefined,
-      faceTarget: master.task.finalPoint ?? building.center,
+      faceTarget: (atWork && master.task?.finalPoint) || building.center,
       duration: this.rng.int(WORK_SESSION[0], WORK_SESSION[1]),
     };
   }
@@ -197,15 +219,25 @@ export class ApprenticeshipSystem {
     const a = c.apprenticeship;
     if (!a) return false;
     const building = this.world.getBuilding(a.buildingId);
-    if (!building || !building.functional || building.isBurning) return false;
+    if (!building || !safeForApprentice(building)) return false; // (27.2) yapı hasar aldı / yanıyor: çırak kalkar
+    if (!townCanSpare(this.state)) return false; // (27.2) mesai ortasında gıda / iş gücü kritik: çırak temel işine döner
     c.needs.energy = clamp(c.needs.energy - 0.02 * APPRENTICE.fatigue * minutes, 0, 100);
-    const master = this.masterAtWork(c);
+    const atWork = this.masterAtWork(c);
+    const master = atWork ?? this.practiceMaster(c);
     if (!master) return false; // ustası tezgâhtan kalktı: çırak da kalkar (bir sonraki planda işine döner)
     if (task.phase !== 'perform') return true;
-    a.progress = Math.min(100, a.progress + APPRENTICE.perMinute * minutes);
+    const rate = atWork ? 1 : APPRENTICE.practiceRate;
+    a.progress = Math.min(100, a.progress + APPRENTICE.perMinute * rate * minutes);
     this.state.apprenticeship.minutes += minutes;
-    c.faceToward(master.x, master.y);
     const prof = PROFESSIONS[a.profession];
+    if (!atWork) {
+      // (27.2) Tezgâh Pratiği: usta tezgâhta değil; gurur / verim yok, sözler yalnızca çıraktan
+      c.faceToward(building.center.x, building.center.y);
+      c.activityLabel = `Tezgâh Pratiği: ${prof.name.toLocaleLowerCase('tr')} (%${Math.floor(a.progress)})`;
+      if (c.visible && this.rng.next() < APPRENTICE.speechPerMinute * minutes) this.say(c, this.rng.pick(prof.lines.apprentice));
+      return true;
+    }
+    c.faceToward(master.x, master.y);
     c.activityLabel = `${master.name} ustanın yanında ${prof.name.toLocaleLowerCase('tr')} öğreniyor (%${Math.floor(a.progress)})`;
     // Gururlu Usta
     const now = this.state.totalMinutes;

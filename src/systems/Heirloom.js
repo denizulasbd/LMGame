@@ -3,6 +3,7 @@
 import { HEIRLOOMS, HEIRLOOM_KINDS, HEIRLOOM } from '../data/heirloom.js';
 import { getFriendship } from './RelationshipSystem.js';
 import { primarySkill } from './SkillSystem.js';
+import { heirloomSlot } from './Citizens.js';
 
 /** Sakinin yadigârı: seferlere çıkmışsa pusula; değilse ana mesleği (tezgâh yeri), kişiliği; hiçbiri yoksa Usta Mala. */
 export function heirloomKindFor(state, c) {
@@ -30,10 +31,11 @@ function sameTrade(kind, c) {
 /**
  * Mirasçı: önce kasabadaki Genç / yetişkin evlatları (aynı mesleği yapan ya da onun çırağı olan önce, sonra en yaşlısı), evladı yoksa
  * en çok emek verdiği (en yüksek ilerlemeyle yetiştirdiği) çırağı, o da yoksa kasabada doğan kuşaktan en yakın dostu (manevi evlat);
- * hiçbiri yoksa null. Kıdemli Bilge, çocuk, köyü terk eden olmaz.
+ * hiçbiri yoksa null. Kıdemli Bilge, çocuk, köyü terk eden olmaz. (27.2) Çantasında zaten yadigâr taşıyan aday havuzdan düşer: ilk sıradaki
+ * mirasçıda yadigâr varsa tören iptal olmaz, sıradaki uygun evlada / çırağa / manevi evlada geçer.
  */
 export function pickHeir(state, elder, kind) {
-  const ok = (c) => c && c !== elder && !c.role && !c.isChild && c.lifeStage !== 'elder' && !c.emigrating && !c.away;
+  const ok = (c) => c && c !== elder && !c.role && !c.isChild && c.lifeStage !== 'elder' && !c.emigrating && !c.away && !heirloomSlot(c);
   const byId = (id) => state.characters.find((x) => x.id === id);
   const mentees = new Map((elder.mentees ?? []).map((m) => [m.id, m.progress]));
   for (const a of state.characters) if (a.apprenticeship?.masterId === elder.id) mentees.set(a.id, Math.max(mentees.get(a.id) ?? 0, a.apprenticeship.progress));
@@ -66,7 +68,10 @@ export function restoreHeirloomState(data) {
   return out;
 }
 
-/** Kayıttan gelen çırak geçmişi: [{ id, progress }]. */
+/** Ustanın sakladığı en çok çırak kaydı (kayıtta ve çalışma zamanında aynı sınır). */
+export const MAX_MENTEES = 12;
+
+/** Kayıttan gelen (ve 27.2'den beri çalışma zamanında eklenen) çırak geçmişi: [{ id, progress }], son MAX_MENTEES kayıt. */
 export function sanitizeMentees(list) {
-  return (Array.isArray(list) ? list : []).filter((m) => m && Number.isFinite(m.id) && Number.isFinite(m.progress)).slice(-12).map((m) => ({ id: m.id, progress: Math.max(0, Math.min(100, m.progress)) }));
+  return (Array.isArray(list) ? list : []).filter((m) => m && Number.isFinite(m.id) && Number.isFinite(m.progress)).slice(-MAX_MENTEES).map((m) => ({ id: m.id, progress: Math.max(0, Math.min(100, m.progress)) }));
 }

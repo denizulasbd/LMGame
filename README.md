@@ -3520,6 +3520,68 @@ yoksa `[]` / `null` ile açılır, bozuk değerler temizlenir. `SAVE_VERSION = 3
 - **Tohum 42 determinizmi.** `autopilot.mjs 42 24` (kule öncesi): `--json` raporu, kayıt anlık görüntüsü ve günlük çıktısı 26.3 ile **bayt bayt aynı**. 45 günlük koşuda
   Ulu Saat Kulesi G25 / G27 / G28, Altın Çağ G28 (değişmedi); 45 günün raporunda yalnızca Altın Çağ sonrasına ait tek bir sayaç (güzel sokak anısı 114 -> 115) farklı.
 
+## Kalite Kontrol: Tıkanan Mekaniklerin Açılması (27. aşama, 27.2 mikro adımı)
+
+Uzun koşularda (64-72 gün) hiç ilerlemeyen ya da hiç görünmeyen dört mekanik açıldı. Hepsi Ulu Saat Kulesi / Altın Çağ sonrasına aittir; kule öncesi oyun
+**bayt bayt aynıdır**. Her sistem kendi üretecini kullanmaya devam eder (dilekçe `seed + 23`, çıraklık `seed + 28`, soy `seed + 30`, yadigâr `seed + 31`); ana üreteç ve
+`Math.random` tüketilmez. **Kayıt sürümü 31** (yeni alan yok).
+
+### 1. Çıraklık darboğazları (`ApprenticeshipSystem`, `Apprenticeship`)
+
+- **Ot toplayan Şifacı:** usta kulübenin otlarını topluyorsa (`gatherHerbs`, `workBuildingId` = kulübe) fiilen mesaidedir; çırak kulübedeki taburesinde tam hızla öğrenir.
+- **Tezgâh Pratiği:** zanaat yapısı boşta beklerken (`building.idle`: herkes ekipmanlı, sipariş yok; iksir rafları dolu) çırağın kayıtlı ustası kasabadaysa (seferde,
+  köyü terk ediyor ya da emekli değil) çırak mesai saatinde taburesine oturup **normalin %60'ı** (`APPRENTICE.practiceRate`) hızla pratik yapar. Usta tezgâhta olmadığı
+  için Gururlu Usta ve verim katkısı yoktur; söz yalnızca çıraktan gelir. Boşta olmayan yapıda 25.2 kuralı aynen geçerlidir (usta tezgâhta değilse plan yok, usta kalkınca
+  çırak da kalkar).
+- **Güvenlik:** hasarlı (`damaged`) ya da yanan (`isBurning`) yapıya çırak yazılmaz, ders planlanmaz (`safeForApprentice`). Ders sürerken yapı hasar alır / yanarsa ya da
+  kasaba eşiğin altına düşerse (kişi başı besin < 6 ya da çalışabilir çekirdek iş gücü < 3) çırak dersi bırakıp temel işine döner.
+
+### 2. Ocak Devri, Yeni Yuva ve Yeni Konut Talebi (`LineageSystem`, `Lineage`, `Petitions`)
+
+- **"Tek şans" bitti:** bir düğünde (`relationship:married`) evlenenlerin Kıdemli Bilge ebeveynleri ve yaşadıkları evlerin bilge reisleri için devir yeniden denenir. Bilgenin
+  evladı 70 yaşındayken bekârsa, evlendiği gün ocak ona geçer.
+- **Evladı olmayan bilge:** `Lineage.chooseHearthHeir`, evli biyolojik evlat yoksa aynı evde yaşayan evli sakini seçer (kuşağı büyük olan önce; bilgenin eşi olmaz).
+  `Lineage.hearthsOf` bilgenin kendi evine ek olarak kütükte (`lineage.heads`) reis göründüğü evleri de verir.
+- **Altın Çağ'dan hemen önce evlenenler:** `LineageSystem` `goldenAge:began` olayını dinler; ayrı evlerde ya da ebeveyn evinde kalan evli 2. kuşak çiftler o anda
+  `settle` ile yuvalarına kavuşur.
+- **Yeni Konut Talebi:** artık dilekçe sınırlarına uyar (çiftin ikisinde de açık dilekçe yoksa ve kasabada `PETITIONS.maxOpen`'dan az açık dilekçe varsa açılır).
+  Yeni kulübe bitince dilekçeli ve hâlâ ayrı yaşayan çift oraya taşınır; dilekçe **yalnızca çift gerçekten aynı çatı altında buluşunca** karşılanır (kulübe sayısının
+  artması tek başına yetmez).
+
+### 3. Yadigâr mirasçısı ve çırak geçmişi (`Heirloom`, `HeirloomSystem`)
+
+- `Heirloom.pickHeir`, çantasında zaten yadigâr taşıyan adayı havuzdan düşürür: ilk sıradaki evlatta yadigâr varsa tören iptal olmaz, sıradaki uygun evlada / çırağa / manevi
+  evlada geçer.
+- `master.mentees` çalışma zamanında da kayıttaki kuralla (`sanitizeMentees`, son `MAX_MENTEES = 12`) sınırlıdır. Kesintisiz oturum ile kayıt / yükleme aynı mirasçıyı seçer.
+
+### 4. Yeni nesil mizaç dilekçeleri (`PetitionSystem`)
+
+Yalnızca Altın Çağ'da (öncesinde hiçbir ağırlık ya da zar değişmez):
+
+- `optionsFor`: Zanaatkâr Ruhu (`craftTools`), Girişimci Kanı (`marketFees`), Bilge Düşünür (`academy` / `research` / `books`) ve Şenlik Neşesi (`sherbetCask`) kendi
+  dilekçelerini `NEW_GEN_PRIORITY.weight = 3` kat ağırlıkla ister. Bilge Düşünür'ün araştırma ve kitapları bittiyse meydanda bilgelik sohbeti (Toplanma) onun dilekçesi sayılır.
+- `create`: kendi dilekçesini açabilen yeni nesil huylu sakinler adaylar arasında öne geçer: Altın Çağ'da henüz hiç açılmadıysa her zaman (ve yalnızca kendi dilekçesiyle),
+  sonra %50 olasılıkla (kendi üreteci). Öteki sakinlerin seçenekleri değişmez.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1185; 28'i bu adımın): boştaki atölyede Tezgâh Pratiği (%60 hız, gurur yok, usta seferdeyse yok), 25.2 kuralının korunması, ot toplayan
+  Şifacı ustasıyla tam hızda öğrenme, dolu raflı kulübede pratik; hasarlı / yanan yapıya yazılmama, ders ortası hasar / yangın / kıtlık / iş gücü kaybında dersi bırakma;
+  sonradan evlenen evlada Ocak Devri, evli ev halkına devir, kütükteki reislik; Altın Çağ başlarken bekleyen çiftin yuvası, sınırlı ve gerçek buluşmayla karşılanan Yeni
+  Konut Talebi, yeni kulübede taşınma; yadigârı olan mirasçının atlanması, çalışma zamanında 12 çırak sınırı; Altın Çağ'da yeni nesil dilekçe ağırlığı ve önceliği;
+  bu adımın sistem çağrılarında ana üreteçlerin ve `Math.random`'un hiç ilerlemediği. Eski testlerde tek değişiklik: 25.3'teki dilekçe ağırlığı denetimi Altın Çağ'da
+  `5 x NEW_GEN_PRIORITY.weight` bekler.
+- **Denetim** (`audit.mjs`): 130/130. Yeni senaryo: rafları dolu Şifacı Kulübesi'nde gerçek mesaide Tezgâh Pratiği, kayıt -> yüklemede durum kayması yok, yüklemeden sonra da
+  ilerleme.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-31): 1137/1137.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0.
+  **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34** (değişmedi). Çırak mesaisi 665 -> 949 saat, Geniş Aile 3 -> 5.
+- **Tohum 42 determinizmi.** `autopilot.mjs 42 24` (kule öncesi): `--json` raporu, günlük çıktısı ve kayıt dosyası `main` ile **bayt bayt aynı**. Kule G25 / G27 / G28,
+  Altın Çağ G28.
+- **Tohum 42, 72 gün (`main` -> 27.2):** Zanaat Atölyesi çırağı %0 -> **%100**, Şifacı çırağı %0 -> **%100**; mezun 2 -> 3; çırak mesaisi 346 -> 793 saat; çırak işi
+  43 -> 156; yeni nesil dilekçe `{}` -> `{ sherbetCask: 1 }`; Geniş Aile 1 -> 2. Ocak Devri 0 kaldı: 72. güne kadar tek Kıdemli Bilge (Deniz) var, çocuğu yok ve evinde yalnızca
+  eşi yaşıyor (eş mirasçı olamaz), yani devredecek kimse yok.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.

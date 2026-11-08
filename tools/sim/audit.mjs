@@ -702,6 +702,59 @@ const PAGE_HELPERS = () => {
       s.guestBook = JSON.parse(keepBook);
     }
 
+    // --- 2x. (27.2) Rafları dolu (boşta) Şifacı Kulübesi'nde Tezgâh Pratiği: gerçek akış ve kayıt -> yükleme ---
+    {
+      const t = s.time;
+      const keepGA = s.goldenAge.since;
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      rich();
+      const hut = sim.scene().world.getCompleted('healerHut').find((b) => !b.damaged) ?? sim.place('healerHut');
+      const spec = hut.definition.apothecary;
+      const fill = () => { const h = sim.scene().world.getBuilding(hut.id); if (h) { h.remedies = spec.maxRemedies; h.herbs = spec.maxHerbs; } }; // yüklemeden sonra yapı yeni nesnedir
+      fill();
+      const pool = s.characters.filter((c) => !c.role && !c.isChild && !c.away && !c.emigrating && c.lifeStage !== 'elder' && !c.apprenticeship).sort((a, b) => a.id - b.id);
+      const master = pool[0];
+      const youth = pool[pool.length - 1];
+      const keep = { m: { workplaceId: master.workplaceId, herb: master.skills.herbalism }, y: { lifeStage: youth.lifeStage, ageInDays: youth.ageInDays, age: youth.age, workplaceId: youth.workplaceId } };
+      master.workplaceId = hut.id;
+      master.skills.herbalism = Math.max(master.skills.herbalism ?? 0, 1600);
+      for (const c of s.characters) if (c.apprenticeship?.buildingId === hut.id) c.apprenticeship = null;
+      Object.assign(youth, { lifeStage: 'youth', ageInDays: 19 * 16, age: 19, workplaceId: null });
+      youth.profile = youth.buildProfile();
+      const enrolled = sim.scene().apprenticeship.enroll(youth, hut);
+      Object.assign(t, { day: t.day + 1, hour: 6, minute: 55 });
+      sim.step(10);
+      const p0 = youth.apprenticeship?.progress ?? 0;
+      let practiced = 0;
+      // Karar penceresi zamanı durdurabilir: varsayılan seçenekle kapatılır, adım sayısı sınırlıdır
+      const run = (until, each = () => {}) => {
+        for (let i = 0; i < 600 && s.time.hour < until; i++) { // yüklemeden sonra s.time yeni nesnedir
+          if (s.dilemma.active) game.events.emit('ui:chooseDilemma', { optionId: s.dilemma.active.defaultId });
+          s.time.paused = false;
+          fill();
+          sim.step(30);
+          each();
+        }
+      };
+      run(12, () => { if (youth.task?.activity === 'apprentice' && hut.idle) practiced++; });
+      A.roundtrip(); // gün atlamasının sabah özeti (StatsSystem) yükleme anında bir kez oluşur; ölçüm bundan sonra
+      const p1 = s.characters.find((c) => c.id === youth.id).apprenticeship?.progress ?? 0;
+      const diff = A.roundtrip();
+      const y2 = s.characters.find((c) => c.id === youth.id);
+      run(16);
+      const p2 = y2.apprenticeship?.progress ?? 0;
+      const hut2 = sim.scene().world.getBuilding(hut.id);
+      const maxGain = (4 * 60 + 30) * 100 / 3600; // 12:00 -> 16:00 arası tam hızdan bile fazla olamaz
+      check('27.2: rafları dolu (idle) Şifacı Kulübesi\'nde çırak gerçek mesaide Tezgâh Pratiği ile ilerler; kayıt -> yüklemede durum kayması yok, yüklemeden sonra da ilerler', enrolled && hut2.idle && practiced > 0 && p1 > p0 && p2 > p1 && p2 - p1 <= maxGain && diff.length === 0, `${p0.toFixed(2)} -> ${p1.toFixed(2)} -> ${p2.toFixed(2)} pratik ${practiced} ${diff.join(' | ')}`);
+      y2.apprenticeship = null;
+      Object.assign(y2, keep.y);
+      y2.profile = y2.buildProfile();
+      const m2 = s.characters.find((c) => c.id === master.id);
+      m2.workplaceId = keep.m.workplaceId;
+      m2.skills.herbalism = keep.m.herb;
+      s.goldenAge.since = keepGA;
+    }
+
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();
