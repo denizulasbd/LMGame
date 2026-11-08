@@ -72,6 +72,10 @@
 //              Altın Çağ kapısı, oluşma ve çantada yer açma, mirasçı önceliği (aynı meslekten evlat, en yaşlı evlat, çırak, manevi
 //              evlat), çırak geçmişi, akşam töreni, veda sözleri, Tarihçe ve Kuşak Şöleni, Ata Mirası Gururu, kart çerçevesi, köyden
 //              ayrılan taşıyıcı ve arşiv, ocak devri, izole üreteç, kayıt sürümü 28 (gidiş-dönüş, bozuk değerler, v27 kaydı)
+//   27. aşama (27.1): kayıt bütünlüğü ve onarımlar (ziyafette eatenIds ile çift ikramın önlenmesi, 0..1'e kilitli ve depo sınırlı iade,
+//              panayır iptalinde / hazırlıkta erzak iadesi, kayda giren panayır katılımcıları, simülasyonda biten konuşma balonları ve salt
+//              okunur çizim, konuğun Entity kimlik sayacını ilerletmemesi, ayrılan konuğun kayıt / yüklemede çıkışa yürümesi, tıkanınca yeniden
+//              rota, seferdeki / göç eden sakinin çekirdek kadrodan düşmesi, emekli bilgenin sabit iş yuvasını kilitlememesi)
 //   26. aşama (26.3): Gezgin Konuklar (Seyyar Ozan, Nadir Takasçı, Yaşlı Seyyah: Altın Çağ kapısı, 09:00 giriş, 24-48 saat kalış, panayıra yakınlık,
 //              geçici misafir: nüfus / konut / iş gücü etkilenmez, ozan ezgisi, nadir takaslar ve rezerv, masal ve bilgelik, gece dinlenme, ayrılış), çizim,
 //              izole üreteç (seed + 34), kayıt sürümü 31 (gidiş-dönüş, bozuk değerler, süresi dolmuş konuk, v30 kaydı)
@@ -6022,7 +6026,7 @@ const pageResults = await page.evaluate(async () => {
     evs.length = 0;
     sim.step(5);
     const fair = FD.FAIRS.summer;
-    check('06:00: Yaz Güneşi Şenliği hazırlığı başlar (currentFestival { type, day, phase: prep }), şenlik kuralları henüz yok', JSON.stringify(st().currentFestival) === JSON.stringify({ type: 'summer', day: 8, phase: 'prep' }) && !st().events.festival.active && evs.some((e) => e.n === 'fair:prep'));
+    check('06:00: Yaz Güneşi Şenliği hazırlığı başlar (currentFestival { type, day, phase: prep }), şenlik kuralları henüz yok', JSON.stringify(st().currentFestival) === JSON.stringify({ type: 'summer', day: 8, phase: 'prep', participants: [] }) && !st().events.festival.active && evs.some((e) => e.n === 'fair:prep'));
     check('başlangıçta kutlama mesajı üst bildirime ve Kasaba Günlüğü\'ne düşer', evs.some((e) => e.n === 'toast' && e.p.text === 'Meydanda Yaz Güneşi Şenliği başladı! Bu akşam herkes meydanda toplanıyor.') && st().journal.some((e) => e.text === fair.start && e.day === 8));
     goto(8, 7, 59);
     sim.step(5);
@@ -6163,10 +6167,10 @@ const pageResults = await page.evaluate(async () => {
     goto(12, 18); fs().onHour(18);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 31: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && JSON.stringify(raw.currentFestival) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && raw.chronicle.firstFair?.type === 'summer');
+    check('kayıt sürümü 31: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
     st().currentFestival = null;
     game.events.emit('ui:load');
-    check('kayıttan süren panayır birebir döner (şenlik kuralları ve Tarihçe\'deki ilk kayıt ile)', JSON.stringify(st().currentFestival) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && st().events.festival.active && st().chronicle.firstFair?.name === fair.name && st().stats.fairs >= 5);
+    check('kayıttan süren panayır birebir döner (şenlik kuralları ve Tarihçe\'deki ilk kayıt ile)', JSON.stringify(st().currentFestival) === JSON.stringify(raw.currentFestival) && st().currentFestival.phase === 'party' && st().events.festival.active && st().chronicle.firstFair?.name === fair.name && st().stats.fairs >= 5);
     game.events.emit('ui:save');
     const bad = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     bad.currentFestival = { type: 'uydurma', day: 'x', phase: 'party' };
@@ -6300,11 +6304,14 @@ const pageResults = await page.evaluate(async () => {
     }
     check('gündüz mesaisinde (06:00 - 17:00) kimse sofraya gitmez, ikram verilmez, bonuslar kapalıdır', early === 0 && !('tradition' in st().buffs && st().buffs.tradition > st().totalMinutes), `${early}`);
     check('hazırlıkta sofra yalnızca çizimdir: harita matrisi aynı', mapHash() === hash0);
+    // (27.1) 26.1 bölümünün aynı günlü (G12) panayırı artık iptal / hazırlıkta erzağını kilere geri verdiği için o sofra da Zengin olabilir
+    // ve günlük güven anahtarını önceden işaretleyebilir: bu sofranın kendi +10'unu ölçmek için önceki işaret temizlenir
+    if (st().trust.eventDays.feastRich === 12) st().trust.eventDays.feastRich = null;
     const trustBefore = st().trust.eventDays.feastRich;
     while (st().time.hour < 18) sim.step(60);
     sim.step(30);
     const t = st();
-    check('18:00: Gelenek Bağı ve Bolluk Ziyafeti etkin (22:00 + 8 saat), güven +10 (feastRich)', t.buffs.tradition > t.totalMinutes + 4 * 60 && t.buffs.bounty > t.totalMinutes + 4 * 60 && t.trust.eventDays.feastRich === 12 && trustBefore !== 12 && evs.some((e) => e.n === 'feast:started' && e.p.tier === 'rich'));
+    check('18:00: Gelenek Bağı ve Bolluk Ziyafeti etkin (22:00 + 8 saat), güven +10 (feastRich)', t.buffs.tradition > t.totalMinutes + 4 * 60 && t.buffs.bounty > t.totalMinutes + 4 * 60 && t.trust.eventDays.feastRich === 12 && trustBefore !== 12 && evs.some((e) => e.n === 'feast:started' && e.p.tier === 'rich'), `${t.buffs.tradition} ${t.buffs.bounty} ${t.totalMinutes} ${t.trust.eventDays.feastRich} ${trustBefore} ${JSON.stringify(t.currentFestival)} ${JSON.stringify(t.currentFeast)} ${evs.map((e) => e.n).join(',')}`);
     sim.step(450);
     const served = st().currentFeast?.served ?? 0;
     check('şenlik saatinde sakinler sofradan ikram alır (en çok ikram sayısı kadar); zengin sofrada Keyifli Damak', served >= 3 && served <= st().currentFeast.servings && st().characters.filter((c) => c.feasted === 12).length === served && st().characters.some((c) => c.feasted === 12 && (c.buffs.merryPalate ?? 0) > st().totalMinutes), `${served}/${st().currentFeast.servings}`);
@@ -6517,7 +6524,7 @@ const pageResults = await page.evaluate(async () => {
       clearGuest();
       const entry = S().world.findEntryTile(new Random(7));
       const p = S().world.standPoint(entry.x, entry.y);
-      st().activeGuest = { type, name: GD.GUEST_TYPES[type].names[0], look: 0, arrivalDay: st().time.day, departureDay: st().time.day + 1, x: p.x, y: p.y, leaving: false, resting: false, barters: 0, lastBarterDay: null, ...extra };
+      st().activeGuest = { type, name: GD.GUEST_TYPES[type].names[0], look: 0, arrivalDay: st().time.day, departureDay: st().time.day + 1, x: p.x, y: p.y, leaving: false, resting: false, barters: 0, lastBarterDay: null, exit: null, ...extra };
       gs().spawn();
       gs().route();
       return gs().character;
@@ -6766,6 +6773,308 @@ const pageResults = await page.evaluate(async () => {
     Object.assign(st().events.festival, keep.festival, { active: false });
     goto(keep.day, keep.hour, keep.minute);
     offs.forEach((off) => off());
+  }
+
+  // ===== 27. aşama (27.1): kayıt bütünlüğü, ziyafet kileri ve determinizm onarımları =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const FA = await import('/src/systems/Fair.js');
+    const FT = await import('/src/systems/Feast.js');
+    const FDATA = await import('/src/data/fair.js');
+    const GD = await import('/src/data/guest.js');
+    const GU = await import('/src/systems/Guest.js');
+    const LS = await import('/src/systems/LifeStages.js');
+    const { storageLimit } = await import('/src/systems/Granary.js');
+    const { updateSpeechBubbles, drawSpeechBubbles } = await import('/src/rendering/SpeechBubbles.js');
+    const { GUEST_ID } = await import('/src/systems/GuestSystem.js');
+    const { Random } = await import('/src/utils/random.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    const keep = { since: s0.goldenAge.since, day: s0.time.day, hour: s0.time.hour, minute: s0.time.minute, festival: { ...s0.events.festival }, res: { ...s0.resources } };
+    s0.crisis.difficulty = 'huzurlu';
+    s0.crisis.raid = null;
+    s0.crisis.nextRaidWarnAt = null;
+    s0.petitions.list = [];
+    s0.petitions.nextAt = s0.totalMinutes + 1e6;
+    rich();
+    if (!S().world.getCompleted('fountain').length) sim.place('fountain', { instant: true });
+    s0.goldenAge.since = { day: 1, hour: 8, minute: 0 };
+    const goto = (day, hour, minute = 0) => { const t = st().time; t.day = day; t.hour = hour; t.minute = minute; };
+    const clearGuest = () => { const g = S().guestSystem; if (st().activeGuest) { g.character = null; S().world.guests = []; st().activeGuest = null; } g.targetKey = null; };
+    const reset = () => { clearGuest(); st().currentFestival = null; st().currentFeast = null; Object.assign(st().events.festival, { active: false, theme: null, endsAt: 0 }); st().seasonFestival.stage = null; S().fairSystem.attendees.clear(); for (const k of ['tradition', 'bounty']) delete st().buffs[k]; };
+    const fairDay = (() => { let d = 40; while (!FA.isFairDay(d)) d++; return d; })();
+    const residents = () => st().characters.filter((c) => !c.role && !c.isChild && !c.away);
+    const dance = (list) => { for (const c of list) { c.task = { activity: 'festival', phase: 'perform' }; c.visible = true; c.speech = null; } };
+    const save = () => { game.events.emit('ui:save'); return JSON.parse(localStorage.getItem('lmgame.save.v2')); };
+    const load = (data) => { if (data) localStorage.setItem('lmgame.save.v2', JSON.stringify(data)); game.events.emit('ui:load'); };
+
+    // --- 1.1 Ziyafet: çift ikram ve negatif kiler iadesi ---
+    reset();
+    goto(fairDay, 19);
+    st().currentFestival = { type: 'summer', day: fairDay, phase: 'party', participants: [] };
+    Object.assign(st().events.festival, { active: true, theme: FDATA.FAIR.theme, endsAt: st().totalMinutes + 180 });
+    st().currentFeast = { tier: 'modest', day: fairDay, contributions: { food: 30, bread: 0, sherbet: 0, cloth: 0 }, servings: 3, served: 0, eatenIds: [] };
+    const eaters = residents().slice(0, 3);
+    dance(eaters);
+    S().feastSystem.update({ gameMinutes: 1 });
+    const eatenBefore = [...st().currentFeast.eatenIds];
+    check('27.1: ikram alanlar sofrada kayda girer (currentFeast.eatenIds)', st().currentFeast.served === 3 && eatenBefore.length === 3 && eaters.every((c) => eatenBefore.includes(c.id)), JSON.stringify(st().currentFeast));
+    const raw1 = save();
+    check('27.1: kayıt sürümü 31 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw1.version === 31 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
+    load();
+    const reloaded = st().characters.filter((c) => eatenBefore.includes(c.id));
+    check('27.1: yüklemede eatenIds\'teki sakinlerin c.feasted işareti yeniden kurulur', reloaded.length === 3 && reloaded.every((c) => c.feasted === fairDay), reloaded.map((c) => c.feasted).join());
+    st().currentFeast.servings = 10; // sofrada yer olsa bile aynı sakin ikinci kez yemez
+    for (const c of reloaded) c.feasted = undefined; // bellek işareti silinse de kayıttaki liste korur
+    dance(reloaded);
+    const hunger = reloaded.map((c) => c.needs.hunger);
+    S().feastSystem.update({ gameMinutes: 1 });
+    check('27.1: kayıt -> yükleme sonrası aynı sakin ikinci kez ikram almaz (served ve tokluk aynı)', st().currentFeast.served === 3 && st().currentFeast.eatenIds.length === 3 && reloaded.every((c, i) => c.needs.hunger === hunger[i]), `${st().currentFeast.served}`);
+    const fresh = residents().find((c) => !eatenBefore.includes(c.id));
+    dance([fresh]);
+    S().feastSystem.update({ gameMinutes: 1 });
+    check('27.1: henüz yemeyen sakin ikramını alır', st().currentFeast.served === 4 && st().currentFeast.eatenIds.includes(fresh.id));
+    st().currentFeast.servings = 4;
+    const more = residents().filter((c) => !st().currentFeast.eatenIds.includes(c.id)).slice(0, 3);
+    dance(more);
+    S().feastSystem.update({ gameMinutes: 1 });
+    check('27.1: sofra dolunca (served >= servings) ikram durur', st().currentFeast.served === 4 && st().currentFeast.eatenIds.length === 4 && S().feastSystem.serve(more[0], st().currentFeast, { hunger: 1, fun: 1, social: 1 }, st().totalMinutes) === false);
+    // Bozuk / eski kayıttan taşmış sayaç: oran 0'ın altına inmez
+    st().currentFeast.served = 9;
+    st().resources.food = 100;
+    const endEv = [];
+    const offEnd = game.events.on('feast:ended', (p) => endEv.push(p));
+    S().feastSystem.clearTable();
+    offEnd();
+    check('27.1: served > servings olsa bile 22:00 iadesi negatif olmaz, kilerden erzak silinmez', st().resources.food === 100 && endEv[0]?.refund.food === 0 && endEv[0].refund.bread === 0, JSON.stringify(endEv[0]?.refund));
+    check('27.1: sanitizeCurrentFeast: eatenIds yoksa [] (v2-v31), bozuksa temizlenir, served en az eatenIds kadar', JSON.stringify(FT.sanitizeCurrentFeast({ tier: 'modest', day: 3, contributions: {}, servings: 4, served: 1 }).eatenIds) === '[]' && JSON.stringify(FT.sanitizeCurrentFeast({ tier: 'modest', day: 3, contributions: {}, servings: 4, served: 0, eatenIds: [5, 'x', 5, 7.2, null] }).eatenIds) === '[5,7]' && FT.sanitizeCurrentFeast({ tier: 'modest', day: 3, contributions: {}, servings: 4, served: 0, eatenIds: [1, 2] }).served === 2 && JSON.stringify(FT.sanitizeCurrentFeast({ tier: 'modest', day: 3, servings: 2, eatenIds: 'bozuk' }).eatenIds) === '[]');
+    // 1.2 Depo sınırı
+    const limit = storageLimit(st(), 'food');
+    st().currentFeast = { tier: 'modest', day: fairDay, contributions: { food: 40, bread: 0, sherbet: 0, cloth: 0 }, servings: 4, served: 0, eatenIds: [] };
+    st().resources.food = limit - 5;
+    S().feastSystem.clearTable();
+    check('27.1: 22:00 iadesi depo sınırını aşmaz (Granary.storageLimit)', st().resources.food === limit, `${st().resources.food}/${limit}`);
+
+    // --- 1.2 Panayır iptali: sabah ayrılan erzak kilere döner ---
+    reset();
+    st().resources.food = 120; st().resources.bread = 30; st().resources.sherbet = 8; st().resources.cloth = 6;
+    const before = { food: 120, bread: 30, sherbet: 8, cloth: 6 };
+    goto(fairDay, 6);
+    S().fairSystem.onHour(6);
+    const set = st().currentFeast;
+    const taken = set ? set.contributions.food + set.contributions.bread + set.contributions.sherbet + set.contributions.cloth : 0;
+    const venues = FDATA.FAIR.venues.flatMap((t) => S().world.getCompleted(t)).filter((b) => !b.damaged);
+    for (const b of venues) b.damaged = true;
+    const cancelEv = [];
+    const offC = ['fair:cancelled', 'feast:cancelled'].map((n) => game.events.on(n, (p) => cancelEv.push(n)));
+    goto(fairDay, 18);
+    S().fairSystem.onHour(18);
+    for (const b of venues) b.damaged = false;
+    offC.forEach((off) => off());
+    check('27.1: şenlikten önce meydan hasarlıysa panayır iptal edilir, sabah ayrılan erzağın tamamı kilere döner', set && taken > 0 && st().currentFestival === null && st().currentFeast === null && cancelEv.includes('fair:cancelled') && cancelEv.includes('feast:cancelled') && ['food', 'bread', 'sherbet', 'cloth'].every((k) => st().resources[k] === before[k]), `${JSON.stringify(set?.contributions)} ${JSON.stringify(st().resources)}`);
+    // Hazırlık evresinde kapanan panayır (şenlik saatine ulaşılamadı): saat başı sofra kaldırılır, erzak döner
+    reset();
+    Object.assign(st().resources, before);
+    goto(fairDay, 6);
+    S().fairSystem.onHour(6);
+    const set2 = st().currentFeast;
+    goto(fairDay, 22);
+    S().fairSystem.onHour(22);
+    S().feastSystem.dropStale();
+    check('27.1: hazırlık evresinde kaldırılan sofranın erzağı da kilere döner', set2 && st().currentFeast === null && ['food', 'bread', 'sherbet', 'cloth'].every((k) => st().resources[k] === before[k]), JSON.stringify(st().resources));
+    // İade de depo sınırına uyar
+    reset();
+    Object.assign(st().resources, before);
+    goto(fairDay, 6);
+    S().fairSystem.onHour(6);
+    const set3 = st().currentFeast;
+    st().resources.food = storageLimit(st(), 'food') - 1;
+    S().feastSystem.returnTable();
+    check('27.1: iptal iadesi depo sınırını aşmaz', set3 && st().resources.food === storageLimit(st(), 'food'));
+
+    // --- 1.3 Panayır katılımcıları kayda girer ---
+    reset();
+    goto(fairDay, 6);
+    S().fairSystem.onHour(6);
+    goto(fairDay, 18);
+    S().fairSystem.onHour(18);
+    const dancers = residents().slice(0, 4);
+    dance(dancers);
+    S().fairSystem.update({ gameMinutes: 1 });
+    const ids = dancers.map((c) => c.id);
+    check('27.1: dans eden sakinler currentFestival.participants\'a yazılır', st().currentFestival?.phase === 'party' && ids.every((id) => st().currentFestival.participants.includes(id)), JSON.stringify(st().currentFestival));
+    const raw2 = save();
+    load();
+    check('27.1: şenlik ortasında kayıt -> yükleme katılımcıları korur (FairSystem.attendees participants\'tan kurulur)', JSON.stringify(raw2.currentFestival.participants) === JSON.stringify(st().currentFestival.participants) && ids.every((id) => S().fairSystem.attendees.has(id)));
+    for (const c of st().characters) if (c.task?.activity === 'festival') c.task = null; // yüklemeden sonra kimse dans etmese bile
+    const endF = [];
+    const offF = game.events.on('fair:ended', (p) => endF.push(p));
+    goto(fairDay, 22);
+    S().fairSystem.onHour(22);
+    offF();
+    const fm = FDATA.FAIRS[raw2.currentFestival.type].memory;
+    check('27.1: kapanış sayımı ve anılar yüklemeden önce dans edenleri de içerir', endF[0] && ids.every((id) => endF[0].attendees.includes(id)) && ids.every((id) => S().world.getCharacter(id)?.memories.some((m) => m.text === fm)), `${endF[0]?.attendees.length}`);
+    check('27.1: sanitizeCurrentFestival: participants yoksa [] (v2-v31), bozuk girdiler temizlenir', JSON.stringify(FA.sanitizeCurrentFestival({ type: 'summer', day: 4, phase: 'party' }).participants) === '[]' && JSON.stringify(FA.sanitizeCurrentFestival({ type: 'summer', day: 4, phase: 'party', participants: [3, 3, 'x', 9] }).participants) === '[3,9]');
+    reset();
+
+    // --- 2.1 Konuşma balonu süresi simülasyonda düşer (çizim salt okunur) ---
+    {
+      const talker = residents()[0];
+      talker.speech = { text: 'Deneme', at: -1, duration: 2 };
+      sim.step(60); // 1 sn (başsız: hiç çizim yok)
+      const midLeft = talker.speech?.remaining;
+      sim.step(70);
+      check('27.1: c.speech hiç çizilmeden update adımlarıyla biter (başsız simülasyon = çizimli oyun)', Math.abs(midLeft - 1) < 1e-6 && talker.speech === null, `${midLeft} ${JSON.stringify(talker.speech)}`);
+      talker.speech = { text: 'Deneme', at: -1, duration: 2 };
+      st().time.paused = true;
+      sim.step(200);
+      const kept = talker.speech;
+      st().time.paused = false;
+      check('27.1: oyun duraklatılmışken söz süresi işlemez', kept && (kept.remaining ?? kept.duration) === 2, JSON.stringify(kept));
+      const ops = [];
+      const ctx = { save() {}, restore() {}, measureText: () => ({ width: 30 }), fillRect: (...a) => ops.push(a), fillText: (...a) => ops.push(a), set font(v) {}, set textBaseline(v) {}, set globalAlpha(v) {}, set fillStyle(v) {} };
+      talker.visible = true;
+      talker.speech = { text: 'Deneme', at: -1, duration: 2, remaining: 0.5 };
+      const snap = JSON.stringify(talker.speech);
+      for (let i = 0; i < 300; i++) drawSpeechBubbles({ ctx }, { x: 0, y: 0, zoom: 2 }, [talker]);
+      check('27.1: drawSpeechBubbles salt okunurdur (300 kare çizimde söz ve süresi aynı)', JSON.stringify(talker.speech) === snap && ops.length > 0);
+      const a = { speech: { text: 'a', at: -1, duration: 1 } };
+      const b = { speech: { text: 'b', at: -1, duration: 3 } };
+      updateSpeechBubbles([a], [b], 1.5);
+      check('27.1: updateSpeechBubbles sakinlerin ve konukların sözlerini birlikte eskitir', a.speech === null && Math.abs(b.speech.remaining - 1.5) < 1e-9);
+      talker.speech = null;
+    }
+
+    // --- 2.2 Konuk ortak Entity kimlik sayacını ilerletmez ---
+    const Ch = st().characters[0].constructor;
+    const app = st().characters[0].appearance;
+    const makeGuest = (type, extra = {}) => {
+      clearGuest();
+      const entry = S().world.findEntryTile(new Random(7));
+      const p = S().world.standPoint(entry.x, entry.y);
+      st().activeGuest = { type, name: GD.GUEST_TYPES[type].names[0], look: 0, arrivalDay: st().time.day, departureDay: st().time.day + 1, x: p.x, y: p.y, leaving: false, resting: false, barters: 0, lastBarterDay: null, exit: null, ...extra };
+      S().guestSystem.spawn();
+      S().guestSystem.route();
+      return S().guestSystem.character;
+    };
+    goto(fairDay + 3, 10);
+    const id1 = new Ch({ name: 'Sayaç', traits: [], appearance: app }).id;
+    const gch = makeGuest('storyteller');
+    const id2 = new Ch({ name: 'Sayaç', traits: [], appearance: app }).id;
+    check('27.1: konuk sabit negatif kimlikle kurulur; Entity kimlik sayacı kaymaz (sonraki çocuğun kimliği aynı)', gch.id === GUEST_ID && GUEST_ID < 0 && id2 === id1 + 1 && !st().characters.some((c) => c.id === gch.id), `${id1} -> ${id2}, konuk ${gch.id}`);
+
+    // --- 2.3 Ayrılan konuk kayıt / yüklemede buharlaşmaz ---
+    clearGuest();
+    goto(fairDay + 4, 9, 30);
+    const leaver = makeGuest('bard', { departureDay: fairDay + 4, arrivalDay: fairDay + 3 });
+    const plaza = S().world.landmarks.plaza;
+    const mid = S().world.standPoint(plaza.centerX, plaza.centerY + 2);
+    leaver.x = mid.x; leaver.y = mid.y; leaver.clearPath();
+    S().guestSystem.sendAway();
+    const exitSaved = st().activeGuest?.exit;
+    check('27.1: ayrılan konuk çıkış karosunu kayda yazar (activeGuest.exit)', st().activeGuest?.leaving === true && exitSaved && Number.isInteger(exitSaved.x) && S().guestSystem.character.isMoving);
+    const raw3 = save();
+    load();
+    const back = S().world.guests[0];
+    const lastWp = back?.waypoints?.[back.waypoints.length - 1];
+    const exitPt = S().world.standPoint(exitSaved.x, exitSaved.y);
+    sim.step(2);
+    check('27.1: ayrılırken kayıt -> yükleme: konuk haritada kalır ve kayıttaki çıkışa yürür (anında buharlaşmaz)', st().activeGuest?.leaving === true && S().world.guests.length === 1 && back.isMoving && lastWp && lastWp.x === exitPt.x && lastWp.y === exitPt.y, `${JSON.stringify(st().activeGuest)}`);
+    const left = [];
+    const offL = game.events.on('guest:left', (p) => left.push(p));
+    for (let i = 0; i < 400 && st().activeGuest; i++) sim.step(30);
+    offL();
+    check('27.1: yüklemeden sonra çıkışa vararak teşekkürle ayrılır', st().activeGuest === null && left.length === 1 && left[0].thanks === true && S().world.guests.length === 0);
+    // Eski kayıt (exit alanı yok): en yakın kenar karosuna yürür
+    delete raw3.activeGuest.exit;
+    Object.assign(raw3.activeGuest, { x: mid.x, y: mid.y }); // meydanın ortasında yürürken kaydedilmiş gibi
+    load(raw3);
+    const old = S().world.guests[0];
+    check('27.1: exit alanı olmayan (v31 öncesi biçim) ayrılan konuk en yakın kenara giden rotayla döner', st().activeGuest?.leaving === true && st().activeGuest.exit === null && old?.isMoving, `${JSON.stringify(st().activeGuest)} ${JSON.stringify(raw3.activeGuest)} ${raw3.time.day} ${raw3.time.hour} ${old?.tileX},${old?.tileY}`);
+    // Yol tıkanınca rota yeniden kurulur
+    const gsys = S().guestSystem;
+    let rerouted = 0;
+    const realWalk = gsys.walkToExit.bind(gsys);
+    gsys.walkToExit = () => { rerouted++; return realWalk(); };
+    const bench = S().construction.placeSite('parkBench', ...Object.values(sim.findSpot('parkBench'))).building; // gerçek şantiye: 'world:blocked'
+    const afterPlace = rerouted;
+    S().construction.demolish(bench, { quiet: true }); // gerçek yıkım: 'building:removed'
+    gsys.walkToExit = realWalk;
+    check('27.1: world:blocked (yeni şantiye) ve building:removed (yıkım) ayrılan konuğun çıkış rotasını yeniden hesaplatır', afterPlace === 1 && rerouted === 2 && st().activeGuest?.leaving === true, `${afterPlace} ${rerouted}`);
+    clearGuest();
+    goto(fairDay + 5, 11);
+    const teller = makeGuest('storyteller', { departureDay: fairDay + 6 });
+    gsys.targetKey = 'eski-hedef';
+    const bench2 = S().construction.placeSite('parkBench', ...Object.values(sim.findSpot('parkBench'))).building;
+    const walkable = (teller.waypoints ?? []).every((w) => S().world.map.isWalkable(Math.floor(w.x / 16), Math.floor(w.y / 16)));
+    check('27.1: kalan konukta tıkanma sonrası hedef anahtarı sıfırlanır, yeni rota yürünebilir karolardan geçer', gsys.targetKey !== 'eski-hedef' && gsys.targetKey?.startsWith('tell') && walkable, gsys.targetKey);
+    S().construction.demolish(bench2, { quiet: true });
+    clearGuest();
+    // destroy() dinleyicileri temizler
+    const before3 = game.events.listeners?.get?.('world:blocked')?.size;
+    const probe = new (S().guestSystem.constructor)(game, S().world, new Random(1), { attract: true });
+    probe.destroy();
+    const after3 = game.events.listeners?.get?.('world:blocked')?.size;
+    check('27.1: GuestSystem.destroy world:blocked / building:removed dinleyicilerini kaldırır', before3 === after3, `${before3} ${after3}`);
+    S().world.guests = [];
+
+    // --- 3.1 Seferdeki / göç eden sakinler çekirdek iş gücü sayılmaz ---
+    {
+      const mk = (id, extra = {}) => ({ id, role: null, isChild: false, lifeStage: 'adult', emigrating: false, away: false, ...extra });
+      const fake = (list) => ({ characters: list });
+      const base = [mk(1), mk(2), mk(3), mk(9, { lifeStage: 'elder' })];
+      const p0 = LS.retirementPlan(fake(base));
+      const awayList = [mk(1), mk(2, { away: true }), mk(3), mk(9, { lifeStage: 'elder' })];
+      const p1 = LS.retirementPlan(fake(awayList));
+      const emList = [mk(1), mk(2), mk(3, { emigrating: true }), mk(9, { lifeStage: 'elder' })];
+      const p2 = LS.retirementPlan(fake(emList));
+      check('27.1: 3 yetişkinden 1\'i seferdeyse çekirdek kadro 2\'ye düşer, emekli bilge gönüllü usta olur', p0.retired.has(9) && LS.coreWorkers(fake(awayList)).length === 2 && p1.volunteers.has(9) && !p1.retired.has(9));
+      check('27.1: köyü terk etmekte olan sakin de çekirdek kadrodan düşer', LS.coreWorkers(fake(emList)).length === 2 && p2.volunteers.has(9));
+      // Gerçek sistemde: kasabada yalnızca 3 çalışabilir sakin varmış gibi (geri kalanı geçici çocuk) ve biri sefere çıkınca
+      const ls = S().lifeStages;
+      const pool = st().characters.filter((c) => !c.role && !c.isChild && c.lifeStage !== 'elder' && !c.emigrating);
+      const elder = st().characters.find((c) => !c.role && !c.isChild && !c.away && !c.emigrating);
+      const saved = st().characters.map((c) => ({ c, emigrating: c.emigrating, lifeStage: c.lifeStage, away: c.away, retired: c.retired }));
+      const workers = pool.filter((c) => c !== elder).slice(0, 3);
+      for (const c of st().characters) if (c !== elder && !workers.includes(c) && !c.role) c.emigrating = true; // geri kalanlar geçici olarak kadro dışı
+      elder.lifeStage = 'elder';
+      elder.retired = true;
+      ls.refreshRetirement({ silent: true });
+      const wasRetired = elder.retired;
+      workers[0].away = true;
+      ls.refreshRetirement({ silent: true });
+      const volunteer = elder.retired === false;
+      workers[0].away = saved.find((o) => o.c === workers[0]).away;
+      ls.refreshRetirement({ silent: true });
+      const backRetired = elder.retired;
+      for (const o of saved) Object.assign(o.c, { emigrating: o.emigrating, lifeStage: o.lifeStage, away: o.away, retired: o.retired });
+      ls.refreshRetirement({ silent: true });
+      check('27.1: LifeStageSystem: sefere çıkan sakin yüzünden kadro 2\'ye düşünce bilge gönüllü usta olur, dönünce yeniden emekli', wasRetired === true && volunteer && backRetired === true);
+    }
+
+    // --- 3.2 Emekli bilge sabit iş yuvasını kilitlemez ---
+    {
+      const shop = S().world.buildings.find((b) => b.functional && b.workerSlots > 0 && !b.underConstruction);
+      const sage = st().characters.find((c) => !c.role && !c.isChild && !shop.workerIds.has(c.id) && !c.away);
+      const savedS = { workplaceId: sage.workplaceId, retired: sage.retired, lifeStage: sage.lifeStage };
+      const others = S().world.characters.filter((o) => o !== sage && o.workplaceId === shop.id && !shop.workerIds.has(o.id) && !o.away && !o.retired).length;
+      sage.workplaceId = shop.id;
+      sage.lifeStage = 'elder';
+      sage.retired = true;
+      const r1 = S().jobs.reservedForPinned(shop);
+      sage.retired = false;
+      const r2 = S().jobs.reservedForPinned(shop);
+      Object.assign(sage, savedS);
+      check('27.1: emekli bilge (retired) sabit iş yuvasını tutmaz; gönüllü ustaya dönünce yine sayılır', r1 === others && r2 === others + 1, `${shop.type} ${r1}/${r2}`);
+    }
+
+    // Eski durum geri
+    reset();
+    Object.assign(st().resources, keep.res);
+    st().goldenAge.since = keep.since;
+    Object.assign(st().events.festival, keep.festival, { active: false });
+    goto(keep.day, keep.hour, keep.minute);
   }
 
   return out;

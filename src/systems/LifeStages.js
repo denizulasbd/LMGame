@@ -43,9 +43,12 @@ export function isResident(c) {
   return Boolean(c) && !c.role;
 }
 
-/** Çalışabilir çekirdek sakinler: çocuk, bilge ve ziyaretçi olmayan (gönüllü bilgeler sayılmaz). */
+/**
+ * Çalışabilir çekirdek sakinler: çocuk, bilge ve ziyaretçi olmayan (gönüllü bilgeler sayılmaz). (27.1) Keşif seferindeki
+ * (c.away) ve köyü terk etmekte olan (c.emigrating) sakinler fiilen kasabada çalışmadığı için sayılmaz.
+ */
 export function coreWorkers(state) {
-  return state.characters.filter((c) => isResident(c) && !c.isChild && c.lifeStage !== 'elder' && !c.emigrating);
+  return state.characters.filter((c) => isResident(c) && !c.isChild && c.lifeStage !== 'elder' && !c.emigrating && !c.away);
 }
 
 /**

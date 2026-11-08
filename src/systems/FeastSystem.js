@@ -8,9 +8,12 @@
 //                            sosyallik); zengin sofrada şerbet içenler Keyifli Damak'la güne başlar.
 //   Süresince              : hafif yaralılar 2 kat hızlı iyileşir; sofrada neşeli kadeh / lokma sözleri (c.speech: AYRI metin katmanı),
 //                            Şenlik Neşesi şarkı tutturur, Zanaatkâr Ruhu işçiliği över, Girişimci Kanı bolluğu ticaret itibarına yorar.
-//   22:00 'fair:ended'     : sofra toplanır, yenmeyen erzak kilere döner.
+//   22:00 'fair:ended'     : sofra toplanır, yenmeyen erzak kilere döner (27.1: oran 0..1'e kilitli, depo sınırı aşılmaz).
+//   İptal                  : (27.1) panayır şenlikten önce iptal edilirse ('fair:cancelled') ya da hazırlık evresinde kalkarsa sabah
+//                            ayrılan erzağın tamamı (food, bread, sherbet, cloth) depo sınırları içinde kilere döner.
+//   Kayıt                  : (27.1) ikram alanlar feast.eatenIds'te tutulur: şenlikte kayıt -> yükleme çift ikram vermez.
 // KENDİ tohumlanmış üretecini kullanır (TownScene -> seed + 33): yalnızca söz seçimi. Durum: state.currentFeast (kayda girer), stats.feasts.
-// Olaylar: 'feast:set' { feast, tier }, 'feast:started' { tier }, 'feast:ended' { tier, served, total, refund }.
+// Olaylar: 'feast:set' { feast, tier }, 'feast:started' { tier }, 'feast:ended' { tier, served, total, refund }, 'feast:cancelled' { tier, refund }.
 import { FEAST, TIERS, TOAST_LINES, QUIRK_LINES } from '../data/feast.js';
 import { INJURY } from '../data/crisis.js';
 import { TOWN_BUFFS } from '../data/town.js';
@@ -18,6 +21,7 @@ import { clamp } from '../utils/math.js';
 import { planFeast } from './Feast.js';
 import { palateUntil } from './Refinery.js';
 import { currentFair } from './Fair.js';
+import { storageLimit } from './Granary.js';
 
 export class FeastSystem {
   /**
@@ -37,6 +41,7 @@ export class FeastSystem {
       game.events.on('fair:prep', () => this.setTable()),
       game.events.on('festival:started', ({ fair } = {}) => fair && this.beginParty()),
       game.events.on('fair:ended', () => this.clearTable()),
+      game.events.on('fair:cancelled', () => this.returnTable()),
       game.events.on('time:hour', () => this.dropStale()),
     ];
     this.reconcile();
@@ -50,14 +55,50 @@ export class FeastSystem {
     return this.state.currentFeast;
   }
 
-  /** Kayıttan: panayırsız ya da başka güne ait sofra temizlenir (artık erzak kilere dönmez: kayıt anında zaten ayrılmıştı). */
+  /**
+   * Kayıttan: panayırsız ya da başka güne ait sofra temizlenir (artık erzak kilere dönmez: kayıt anında zaten ayrılmıştı).
+   * (27.1) Süren sofrada ikram alanların c.feasted işareti eatenIds'ten yeniden kurulur.
+   */
   reconcile() {
     if (this.feast && !currentFair(this.state)) this.state.currentFeast = null;
     else if (this.feast && this.feast.day !== this.state.time.day) this.state.currentFeast = null;
+    const feast = this.feast;
+    if (!feast) return;
+    if (!Array.isArray(feast.eatenIds)) feast.eatenIds = [];
+    const eaten = new Set(feast.eatenIds);
+    for (const c of this.state.characters) if (eaten.has(c.id)) c.feasted = feast.day;
   }
 
+  /**
+   * Saat başı: başka güne ait sofra kalıntısı sessizce silinir. (27.1) Bugünün sofrası panayırı kaybetmişse (şenlikten önce iptal,
+   * hazırlık evresinde kapanış) sabah ayrılan erzak kilere döner.
+   */
   dropStale() {
-    if (this.feast && (this.feast.day !== this.state.time.day || !currentFair(this.state))) this.state.currentFeast = null;
+    const feast = this.feast;
+    if (!feast) return;
+    if (feast.day !== this.state.time.day) this.state.currentFeast = null;
+    else if (!currentFair(this.state)) this.returnTable();
+  }
+
+  /** Bir kaynağı depo sınırı içinde kilere ekler; eklenen miktarı döndürür. */
+  credit(key, amount) {
+    const res = this.state.resources;
+    const have = res[key] ?? 0;
+    const room = Math.max(0, storageLimit(this.state, key) - have);
+    const added = Math.max(0, Math.min(Math.floor(amount) || 0, room));
+    res[key] = have + added;
+    return added;
+  }
+
+  /** (27.1) Şenliğe ulaşamayan sofra: sabah ayrılan her şey (depo sınırları içinde) kilere döner. */
+  returnTable() {
+    const feast = this.feast;
+    if (!feast) return false;
+    const refund = {};
+    for (const key of ['food', 'bread', 'sherbet', 'cloth']) refund[key] = this.credit(key, feast.contributions[key] ?? 0);
+    this.state.currentFeast = null;
+    this.events.emit('feast:cancelled', { tier: feast.tier, refund });
+    return true;
   }
 
   /** 06:00: sofrayı kur, kilerden ayır. */
@@ -66,7 +107,7 @@ export class FeastSystem {
     const plan = planFeast(this.state);
     const res = this.state.resources;
     for (const key of ['food', 'bread', 'sherbet', 'cloth']) res[key] = Math.max(0, (res[key] ?? 0) - plan.contributions[key]);
-    this.state.currentFeast = { tier: plan.tier, day: this.state.time.day, contributions: { ...plan.contributions }, servings: plan.servings, served: 0 };
+    this.state.currentFeast = { tier: plan.tier, day: this.state.time.day, contributions: { ...plan.contributions }, servings: plan.servings, served: 0, eatenIds: [] };
     this.events.emit('feast:set', { feast: this.feast, tier: plan.tier });
     return true;
   }
@@ -86,10 +127,12 @@ export class FeastSystem {
   clearTable() {
     const feast = this.feast;
     if (!feast) return false;
-    const frac = feast.servings > 0 ? (feast.servings - feast.served) / feast.servings : 0;
-    const refund = { food: Math.floor(feast.contributions.food * frac), bread: Math.floor(feast.contributions.bread * frac) };
-    this.state.resources.food = (this.state.resources.food ?? 0) + refund.food;
-    this.state.resources.bread = (this.state.resources.bread ?? 0) + refund.bread;
+    // (27.1) Oran 0..1'e kilitli: fazla ikram (served > servings) kilerden erzak silemez; iade depo sınırını aşmaz
+    const frac = feast.servings > 0 ? Math.max(0, Math.min(1, (feast.servings - feast.served) / feast.servings)) : 0;
+    const refund = {
+      food: this.credit('food', Math.floor(feast.contributions.food * frac)),
+      bread: this.credit('bread', Math.floor(feast.contributions.bread * frac)),
+    };
     this.state.stats.feasts = (this.state.stats.feasts ?? 0) + 1;
     this.state.stats.feastServings = (this.state.stats.feastServings ?? 0) + feast.served;
     this.state.currentFeast = null;
@@ -113,19 +156,24 @@ export class FeastSystem {
         if (c.injuryTimer <= 0 && this.crisis) this.crisis.heal(c, 'natural');
       }
       if (c.task?.activity !== 'festival' || c.task.phase !== 'perform') continue;
-      if (c.feasted !== feast.day && feast.served < feast.servings) this.serve(c, feast, fill, now);
+      if (c.feasted !== feast.day && feast.served < feast.servings && !feast.eatenIds.includes(c.id)) this.serve(c, feast, fill, now);
+      else if (c.feasted !== feast.day && feast.eatenIds.includes(c.id)) c.feasted = feast.day;
       if (c.feasted === feast.day) this.maybeSpeak(c, feast, minutes);
     }
   }
 
   /** Sofraya gelen sakin tek ikram alır (sofra boşalınca ikram biter). */
   serve(c, feast, fill, now) {
-    c.feasted = feast.day; // yalnızca bellekte (kayda girmez)
+    if (!Array.isArray(feast.eatenIds)) feast.eatenIds = [];
+    if (feast.served >= feast.servings || feast.eatenIds.includes(c.id)) return false; // (27.1) sofra boş ya da zaten ikram aldı
+    c.feasted = feast.day; // bellekte; kayıtta feast.eatenIds'ten yeniden kurulur
+    feast.eatenIds.push(c.id);
     feast.served += 1;
     c.needs.hunger = clamp(c.needs.hunger + fill.hunger, 0, 100);
     c.needs.fun = clamp(c.needs.fun + fill.fun, 0, 100);
     c.needs.social = clamp(c.needs.social + fill.social, 0, 100);
     if (feast.tier === 'rich' && feast.contributions.sherbet > 0) c.buffs.merryPalate = Math.max(c.buffs.merryPalate ?? 0, palateUntil(now)); // Keyifli Damak
+    return true;
   }
 
   maybeSpeak(c, feast, minutes) {

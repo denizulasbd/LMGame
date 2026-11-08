@@ -83,7 +83,7 @@ import { Random } from '../utils/random.js';
 import { getSelectionRing, getTargetMarker } from '../art/ui/index.js';
 import { LifeStageSystem } from '../systems/LifeStageSystem.js';
 import { ApprenticeshipSystem } from '../systems/ApprenticeshipSystem.js';
-import { drawSpeechBubbles } from '../rendering/SpeechBubbles.js';
+import { drawSpeechBubbles, updateSpeechBubbles } from '../rendering/SpeechBubbles.js';
 import { TemperamentSystem } from '../systems/TemperamentSystem.js';
 import { LineageSystem } from '../systems/LineageSystem.js';
 import { HeirloomSystem } from '../systems/HeirloomSystem.js';
@@ -503,6 +503,8 @@ export class TownScene extends Scene {
     this.timeSystem.update(dt);
     const tick = this.timeSystem.getTick(dt);
     for (const system of this.systems) system.update(tick);
+    // (27.1) Konuşma balonlarının süresi çizimde değil simülasyonda düşer (başsız ve çizimli koşu aynı adımda biter)
+    updateSpeechBubbles(this.world.characters, this.world.guests, tick.dtSeconds);
 
     const { renderer } = this.game;
     const season = getSeason(this.game.state.time.day);
@@ -808,8 +810,8 @@ export class TownScene extends Scene {
     for (const animal of this.game.state.animals) animal.drawOverlay(renderer);
     // (25.2) Usta / çırak / bilge konuşma baloncukları (ekran koordinatında, net yazı)
     renderer.resetCamera();
-    drawSpeechBubbles(renderer, this.camera, this.world.characters, this.animationTime);
-    drawSpeechBubbles(renderer, this.camera, this.world.guests, this.animationTime); // (26.3) ozanın şarkıları, seyyahın masalları
+    drawSpeechBubbles(renderer, this.camera, this.world.characters);
+    drawSpeechBubbles(renderer, this.camera, this.world.guests); // (26.3) ozanın şarkıları, seyyahın masalları
     renderer.applyCamera(this.camera);
     if (this.cinematic) {
       renderer.resetCamera();

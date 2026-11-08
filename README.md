@@ -3456,6 +3456,70 @@ ziyaret / takas sayaçları, takas türleri, Kasaba Bilgeliği) eklendi. **Sür�
 - **Geriye uyumluluk:** v2-v31 kayıtları sıfır hatayla açılır (`compat.mjs` 1137 doğrulama).
 - **Eski testler:** 26. aşamadan önceki bölümler panayırsız ve konuksuz dünyada koşar (`tests.mjs`); hiçbir eski doğrulama gevşetilmedi.
 
+## Kalite Kontrol ve Mimari Cilalama: Kayıt Bütünlüğü, Ziyafet Kileri ve Determinizm Onarımları (27. aşama, 27.1 mikro adımı)
+
+27. aşama yeni oynanış eklemez; bağımsız statik kod denetiminde bulunan açıkları kapatır. 27.1 üç paket onarımdır. **Kayıt sürümü 31 olarak kaldı**
+(yeni fikstür yok): eklenen alanların hepsi isteğe bağlıdır ve v2-v31 kayıtlarında yoksa boş varsayılanla (`[]` / `null`) başlar.
+
+### 1. Ziyafet sofrası ve panayır kayıt bütünlüğü (`FeastSystem`, `Feast`, `FairSystem`, `Fair`)
+
+- **Çift ikram:** sofradan ikram alanlar artık `currentFeast.eatenIds` dizisinde kayda girer (önceden yalnızca bellekteki `c.feasted` vardı). Şenlik saatinde
+  kayıt -> yükleme yapılınca `FeastSystem.reconcile` bu listeden `c.feasted` işaretini yeniden kurar; `serve()` hem `served >= servings` hem de
+  `eatenIds.includes(c.id)` kontrolü yapar. Aynı sakin ikinci kez yiyemez, sayaç kapasiteyi aşamaz. `sanitizeCurrentFeast` diziyi doğrular (sayı olmayan /
+  tekrarlanan kimlikler atılır, `served` en az liste uzunluğu kadardır).
+- **Negatif kiler iadesi:** 22:00'de yenmeyen pay `frac = clamp((servings - served) / servings, 0, 1)` ile hesaplanır; bozuk ya da eski bir kayıttan taşmış sayaç
+  kilerden erzak silemez.
+- **Depo sınırı:** kilere dönen her şey `Granary.storageLimit` ile sınırlıdır (`FeastSystem.credit`).
+- **Panayır iptali:** 18:00'de meydan havuzu / mekân yıkılmış ya da hasarlıysa `FairSystem` panayırı iptal eder ve `'fair:cancelled'` yayınlar; sofra kaldırılır ve
+  sabah ayrılan **tüm** bağış (besin, ekmek, Fıçı Şerbeti, Kumaş) depo sınırları içinde kilere döner (`'feast:cancelled' { tier, refund }`). Şenlik saatine
+  ulaşamadan (hazırlık evresinde) kapanan panayırın sofrası da saat başı aynı biçimde iade edilir. Önceden bu erzak sessizce kayboluyordu.
+- **Katılımcılar:** `currentFestival.participants` dans eden sakinlerin kimliklerini tutar; yüklemede `FairSystem.attendees` buradan kurulur. Şenlik ortasında
+  kayıt -> yükleme yapılsa da kapanış sayımı ve panayır anıları önceden dans edenleri içerir.
+
+### 2. Konuk sistemi, kimlik izolasyonu ve balon determinizmi (`GuestSystem`, `Entity`, `SpeechBubbles`)
+
+- **Konuşma balonları simülasyonda biter:** `c.speech` süresi artık çizimde değil, `TownScene.update` içinde her simülasyon adımında
+  `updateSpeechBubbles(world.characters, world.guests, tick.dtSeconds)` ile düşer (`s.remaining`). `drawSpeechBubbles()` **salt okunur** çizimdir.
+  `tick.dtSeconds` duraklatılmamış gerçek saniyedir (oyun duraklatılınca söz süresi de durur). Böylece çizimli oyunla başsız simülasyonda sözler aynı adımda
+  biter ve sözün bitişine bakan üreteçlerin (`seed + 32 / 33 / 34`, ayrıca mizaç ve bilge sözleri) sırası ekran çizimine bağlı kaymaz.
+- **Kimlik sayacı:** gezgin konuğun `Character`'ı sabit negatif kimlikle (`GUEST_ID = -1`) kurulur; ortak `Entity` sayacı ilerlemez, sonradan doğan çocukların
+  kimliği ve doğum günü ofseti (`LifeStages.birthdayOffset`) konuktan etkilenmez.
+- **Ayrılırken kayıt:** konuk çıkış karosunu `activeGuest.exit` alanına yazar. Ayrılırken (`leaving: true`) kayıt -> yükleme yapılırsa `restore()` çıkışa giden
+  rotayı yeniden kurar (`exit` yoksa, eski biçimde, üreteç kullanmadan en yakın kenar karosu seçilir); yol yoksa ya da zaten çıkıştaysa sessizce uğurlanır.
+  Önceden konuk ilk adımda haritanın ortasında buharlaşıyordu.
+- **Tıkanan yollar:** `GuestSystem` `'world:blocked'` ve `'building:removed'` olaylarını dinler (`destroy()` temizler): ayrılan konuk çıkış rotasını, kalan konuk
+  hedef anahtarını sıfırlayıp güncel durağının rotasını yeniden hesaplar (dinlenirken uyanınca).
+
+### 3. Çekirdek iş gücü ve emekli bilge iş yuvası (`LifeStages`, `JobSystem`)
+
+- `LifeStages.coreWorkers` keşif seferindeki (`c.away`) ve köyü terk etmekte olan (`c.emigrating`) sakinleri çalışabilir kadrodan düşer. 3 yetişkinden biri sefere
+  çıkınca kadro 2'ye iner ve en dinç emekli bilge gönüllü ustaya döner; sakin dönünce saat başı yeniden emekli olur (`LifeStageSystem.refreshRetirement`).
+- `JobSystem.reservedForPinned` emekli bilgeyi (`c.retired`) sayılmaz kabul eder: iş yerine sabitlenmiş sakin 70 yaşında emekli olunca o yuvayı kilitlemez
+  (gönüllü ustaya dönünce yeniden sayılır).
+- Bilgeler ~57. günden sonra ortaya çıktığı için bu iki düzeltme kule öncesi erken oyunu etkilemez (aşağıdaki determinizm doğrulaması).
+
+### Kayıt (sürüm 31, değişmedi)
+
+`currentFeast.eatenIds: number[]`, `currentFestival.participants: number[]` ve `activeGuest.exit: null | { x, y }` eklendi. Üçü de isteğe bağlıdır; v2-v31 kayıtlarında
+yoksa `[]` / `null` ile açılır, bozuk değerler temizlenir. `SAVE_VERSION = 31`, fikstürler aynı.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1157; 32'si bu adımın): kayıt -> yüklemede çift ikram yok, sofra dolunca ikram durur, `served > servings` iken negatif iade yok,
+  iade depo sınırında; meydan hasarlıyken iptal ve hazırlıkta kapanışta bağışın tamamı geri; katılımcılar kayda girer ve kapanış sayımına / anılara yansır;
+  `c.speech` hiç çizilmeden adımlarla biter, duraklatınca durur, `drawSpeechBubbles` 300 karede salt okunur; konuk `Entity` sayacını kaydırmaz; ayrılırken kayıt
+  -> yüklemede çıkışa yürür ve teşekkürle ayrılır (`exit`'siz eski biçimde de); yeni şantiye / yıkım rotayı yeniden kurar; `destroy` dinleyicileri temizler; seferdeki /
+  göç eden sakin çekirdek kadrodan düşer ve bilge gönüllü olur (saf hesap ve gerçek `LifeStageSystem`); emekli bilge sabit yuvayı tutmaz.
+  Eski testlerde yalnızca biçim karşılaştırmaları yeni alanları (`participants: []`, `exit: null`) içerecek biçimde güncellendi. 26.2'deki "güven +10" testi, 26.1
+  bölümünün aynı günlü panayırı artık erzağını geri verdiği için (o sofra da Zengin olabildiğinden) günlük güven işaretini önceden temizler.
+- **Denetim** (`audit.mjs`): 129/129. Yeni senaryolar: şenlik ortasında kayıt -> yükleme (eatenIds / participants korunur, durum kayması yok; yüklemeden sonra kimse
+  iki kez yemez, iade negatif değil, kapanış dans edenleri içerir) ve konuk çıkışa yürürken kayıt -> yükleme (haritada kalır, durum kayması yok, teşekkürle ayrılır).
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-31): 1137/1137 (süren sofra / panayır karşılaştırması yeni alanların `[]` varsayılanıyla yapılır).
+- **Stres matrisi** (`stress.mjs --seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0.
+  **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G28, G34, G34** (değişmedi).
+- **Tohum 42 determinizmi.** `autopilot.mjs 42 24` (kule öncesi): `--json` raporu, kayıt anlık görüntüsü ve günlük çıktısı 26.3 ile **bayt bayt aynı**. 45 günlük koşuda
+  Ulu Saat Kulesi G25 / G27 / G28, Altın Çağ G28 (değişmedi); 45 günün raporunda yalnızca Altın Çağ sonrasına ait tek bir sayaç (güzel sokak anısı 114 -> 115) farklı.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.

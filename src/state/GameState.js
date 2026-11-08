@@ -197,10 +197,10 @@ export class GameState {
     this.temperament = emptyTemperament(); // (25.3) mizaç gelişimi sayaçları
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
     this.heirloom = emptyHeirloomState(); // (25.5) aile yadigârları: sayaçlar, arşiv, Kuşak Şöleni
-    this.activeGuest = null; // (26.3) geçici gezgin konuk (GuestSystem): null | { type, name, look, arrivalDay, departureDay, x, y, leaving, resting, barters, lastBarterDay }
+    this.activeGuest = null; // (26.3) geçici gezgin konuk (GuestSystem): null | { type, name, look, arrivalDay, departureDay, x, y, leaving, resting, barters, lastBarterDay, exit } (27.1: exit isteğe bağlı)
     this.guestBook = emptyGuestBook(); // (26.3) konuk defteri: sonraki geliş günü, ziyaret / takas sayaçları, Kasaba Bilgeliği
-    this.currentFeast = null; // (26.2) Büyük Ziyafet Sofrası (FeastSystem): null | { tier, day, contributions, servings, served }
-    this.currentFestival = null; // (26.1) mevsimlik panayır (FairSystem): null | { type, day, phase: 'prep' | 'party' }
+    this.currentFeast = null; // (26.2) Büyük Ziyafet Sofrası (FeastSystem): null | { tier, day, contributions, servings, served, eatenIds } (27.1: eatenIds isteğe bağlı)
+    this.currentFestival = null; // (26.1) mevsimlik panayır (FairSystem): null | { type, day, phase: 'prep' | 'party', participants } (27.1: participants isteğe bağlı)
     // Kasaba seviyesi / prestij (TownLevelSystem, 10. aşama):
     //   tier        : 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir (hiç düşmez)
     //   reached     : { seviye: { day, hour, minute } } her seviyeye ulaşılan an

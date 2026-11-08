@@ -532,7 +532,8 @@ for (const { name, raw } of fixtures) {
       const live = saved && saved.day === data.time.day && data.currentFestival && data.time.hour >= 6 && data.time.hour < 22;
       results.push({
         name: `${tag}: süren Büyük Ziyafet Sofrası (currentFeast: seviye, bağışlar, ikram sayacı) korundu`,
-        ok: JSON.stringify(E.cf) === JSON.stringify(live ? saved : null),
+        // (27.1) eatenIds v2-v31 kayıtlarında yoktur: yüklemede [] ile başlar
+        ok: JSON.stringify(E.cf) === JSON.stringify(live ? { ...saved, eatenIds: saved.eatenIds ?? [] } : null),
         detail: JSON.stringify(E.cf),
       });
     }
@@ -547,7 +548,8 @@ for (const { name, raw } of fixtures) {
       const live = saved && saved.day === data.time.day && data.time.hour >= 6 && data.time.hour < 22;
       results.push({
         name: `${tag}: süren panayır (currentFestival) ve Tarihçe'deki ilk panayır korundu`,
-        ok: JSON.stringify(F.cf) === JSON.stringify(live ? saved : null) && JSON.stringify(F.first) === JSON.stringify(data.chronicle.firstFair),
+        // (27.1) participants v2-v31 kayıtlarında yoktur: yüklemede [] ile başlar
+        ok: JSON.stringify(F.cf) === JSON.stringify(live ? { ...saved, participants: saved.participants ?? [] } : null) && JSON.stringify(F.first) === JSON.stringify(data.chronicle.firstFair),
         detail: `${JSON.stringify(F.cf)} · ilk: ${F.first?.name ?? 'yok'}`,
       });
     }

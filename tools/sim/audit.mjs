@@ -624,6 +624,84 @@ const PAGE_HELPERS = () => {
       s.guestBook = JSON.parse(keepBook);
     }
 
+    // --- 2v. (27.1) Şenlik ortasında ikramlar verilmişken: çift ikram yok, negatif iade yok, katılımcılar korunur ---
+    {
+      const t = s.time;
+      const keepGA = s.goldenAge.since;
+      const keepStat = [s.stats.feasts, s.stats.feastServings, s.stats.fairs];
+      const keepFair = s.chronicle.firstFair;
+      if (!s.buildings.some((b) => b.type === 'fountain' && b.functional)) sim.place('fountain', { instant: true });
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      s.events.festival.active = false;
+      s.seasonFestival.stage = null;
+      s.currentFeast = null;
+      s.currentFestival = null;
+      s.pantry.credit = 0;
+      Object.assign(s.resources, { food: 400, bread: 30, sherbet: 4, cloth: 2 });
+      Object.assign(t, { day: 4 * Math.ceil((t.day + 1) / 4), hour: 5, minute: 58 });
+      sim.step(10);
+      while (t.hour < 19) sim.step(30);
+      A.roundtrip();
+      const eaten = [...(s.currentFeast?.eatenIds ?? [])];
+      const dancers = [...(s.currentFestival?.participants ?? [])];
+      const diff = A.roundtrip();
+      const after = sim.scene().fairSystem.attendees;
+      check('27.1: şenlikte kayıt -> yükleme: ikram alanlar (eatenIds) ve dans edenler (participants) korunur, durum kayması yok', eaten.length > 0 && eaten.length === s.currentFeast.served && JSON.stringify(s.currentFeast.eatenIds) === JSON.stringify(eaten) && dancers.length > 0 && dancers.every((id) => after.has(id)) && diff.length === 0, `${eaten.length} ${dancers.length} ${diff.join(' | ')}`);
+      // Yüklemeden sonra 22:00'ye kadar: hiçbir sakin iki kez yemez, sayaç kapasiteyi aşmaz, kiler eksilmez
+      let peak = 0;
+      let dup = false;
+      let feastEnd = null;
+      let fairEnd = null;
+      const off1 = game.events.on('feast:ended', (p) => (feastEnd = p));
+      const off2 = game.events.on('fair:ended', (p) => (fairEnd = p));
+      const food0 = s.resources.food;
+      while (s.currentFeast && t.hour < 23) {
+        sim.step(30);
+        const f = s.currentFeast;
+        if (f) { peak = Math.max(peak, f.served - f.servings); if (new Set(f.eatenIds).size !== f.eatenIds.length || f.eatenIds.length !== f.served) dup = true; }
+      }
+      off1(); off2();
+      check('27.1: yüklemeden sonra kimse ikinci kez ikram almaz (served <= servings); 22:00 iadesi negatif değil', !dup && peak <= 0 && feastEnd && feastEnd.refund.food >= 0 && feastEnd.refund.bread >= 0 && s.resources.food >= food0, `${peak} ${JSON.stringify(feastEnd?.refund)}`);
+      check('27.1: kapanış sayımı yüklemeden önce dans edenleri de içerir', fairEnd && dancers.every((id) => fairEnd.attendees.includes(id)), `${fairEnd?.attendees.length}`);
+      s.goldenAge.since = keepGA;
+      [s.stats.feasts, s.stats.feastServings, s.stats.fairs] = keepStat;
+      s.chronicle.firstFair = keepFair;
+    }
+
+    // --- 2w. (27.1) Gezgin konuk ayrılış günü çıkışa yürürken ---
+    {
+      const t = s.time;
+      const keepGA = s.goldenAge.since;
+      const keepBook = JSON.stringify(s.guestBook);
+      s.goldenAge.since = s.goldenAge.since ?? { day: 1, hour: 8, minute: 0 };
+      s.activeGuest = null;
+      sim.scene().world.guests = [];
+      s.guestBook.nextDay = t.day + 1;
+      Object.assign(t, { day: t.day + 1, hour: 8, minute: 58 });
+      sim.step(10);
+      while (t.hour < 14) sim.step(30); // konuk meydana / pazara yürüsün
+      const g0 = s.activeGuest;
+      if (g0) g0.departureDay = t.day + 1;
+      Object.assign(t, { day: t.day + 1, hour: 8, minute: 59 });
+      let moving = false;
+      for (let i = 0; i < 40 && !(s.activeGuest?.leaving && sim.scene().world.guests[0]?.isMoving); i++) sim.step(5);
+      moving = Boolean(s.activeGuest?.leaving && sim.scene().world.guests[0]?.isMoving);
+      sim.step(20);
+      A.roundtrip(); // gün atlamasının sabah özeti (StatsSystem) yükleme anında bir kez oluşur; ölçüm bundan sonra (bu da ayrılırken bir yüklemedir)
+      const live = JSON.stringify(s.activeGuest);
+      const diff = A.roundtrip();
+      const back = sim.scene().world.guests[0];
+      sim.step(2);
+      check('27.1: konuk çıkışa yürürken kayıt -> yükleme: haritada kalır ve çıkış rotası yeniden kurulur (buharlaşmaz), durum kayması yok', g0 && moving && JSON.stringify(s.activeGuest) !== 'null' && s.activeGuest?.leaving && back?.isMoving && sim.scene().world.guests.length === 1 && diff.length === 0, `${live} ${diff.join(' | ')}`);
+      let thanks = null;
+      const off = game.events.on('guest:left', (p) => (thanks = p.thanks));
+      hours(4);
+      off();
+      check('27.1: yüklemeden sonra çıkışa varıp teşekkürle ayrılır', s.activeGuest === null && sim.scene().world.guests.length === 0 && thanks === true, `${thanks}`);
+      s.goldenAge.since = keepGA;
+      s.guestBook = JSON.parse(keepBook);
+    }
+
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();
