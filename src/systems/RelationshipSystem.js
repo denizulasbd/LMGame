@@ -11,6 +11,9 @@
 //   - Evlilik: bir süredir partner olan çift akşam bir toplanma yerinde ya da şenlikte evlenir (bir süre
 //     daha geçerse 18:00'de meydanda küçük bir törenle): 'relationship:married' { a, b, venue, festival }
 //     Evliliğin sonuçlarını (aynı eve taşınma, Mutlu Yuva, çocuk) FamilySystem uygular.
+//   - (29.1) Sosyal Kimya: sohbette puan ve keyif kazancı çiftin kimyasına göre çarpılır (+2 / +3: 1,5 kat; eksi: gergin).
+//     Aşk zarı kimyaya bakar: kimyası 0 ya da eksi olanlar aşık olamaz; +2 / +3 daha düşük puanla ve çok daha hızlı aşık olur.
+//     Kırgın / kıskanç sakinin sohbeti puan kazandırmaz (systems/Chemistry.js, data/chemistry.js).
 //
 // Puanlar GameState.relationships içinde "küçükId-büyükId" anahtarıyla saklanır; kaydedilen
 // çift yoksa aynı evde yaşayanlar HOUSEMATE_START, aile (ebeveyn-çocuk, kardeş) FAMILY_START ile başlar.
@@ -32,6 +35,8 @@ import { clamp } from '../utils/math.js';
 import { buffMultiplier } from './TownStatus.js';
 import { ageGap } from './LifeStages.js';
 import { closeKin } from './Lineage.js';
+import { chemistryOf, chemistryLevel, hasTag } from './Chemistry.js';
+import { EMOTION_RULES } from '../data/chemistry.js';
 
 const FESTIVAL_NEAR_PIXELS = 34; // şenlikte iki karodan yakın olanlar
 
@@ -184,6 +189,7 @@ export class RelationshipSystem {
     this.world = world;
     this.rng = rng;
     this.groups = []; // bu karenin sohbet / çalışma grupları (ConflictSystem ve FamilySystem de okur)
+    this.bond = { socialBonus: 1, funBonus: 0 }; // bondFor'un yeniden kullandığı nesne (her adımda tahsisat yok)
     this.unsubscribers = [game.events.on('time:hour', (hour) => this.onHour(hour))];
   }
 
@@ -197,7 +203,27 @@ export class RelationshipSystem {
 
   /** Sohbetin kazanç çarpanları: { socialBonus, funBonus } (bu iki kişinin seviyesine göre). */
   bondFor(a, b) {
-    return levelForScore(this.get(a, b));
+    const level = levelForScore(this.get(a, b));
+    // (29.1) kimya: güçlü çekimde keyif 1,5 kat ve ek keyif; eksi kimyada sohbet gergin geçer (keyif kaçar)
+    const chem = chemistryLevel(chemistryOf(this.state, a, b));
+    const bond = this.bond;
+    bond.socialBonus = level.socialBonus;
+    bond.funBonus = (level.funBonus > 0 ? level.funBonus * chem.fun : level.funBonus) + chem.funFlat;
+    const tags = a.relationships[b.id].tags;
+    if (tags.length > 0) {
+      if (tags.includes('resentful')) bond.funBonus += EMOTION_RULES.resentFun;
+      if (tags.includes('jealous')) bond.funBonus += EMOTION_RULES.jealousFun;
+      if (tags.includes('grateful') || tags.includes('admiration')) bond.funBonus += EMOTION_RULES.admireFun;
+    }
+    return bond;
+  }
+
+  /** (29.1) Sohbette ilişki puanı kazanç çarpanı: kimya ve (iki yönde) kırgınlık / kıskançlık. */
+  chatMultiplier(a, b) {
+    let m = chemistryLevel(chemistryOf(this.state, a, b)).chat;
+    if (hasTag(a, b.id, 'resentful') || hasTag(b, a.id, 'resentful')) m *= EMOTION_RULES.resentChat;
+    else if (hasTag(a, b.id, 'jealous') || hasTag(b, a.id, 'jealous')) m *= EMOTION_RULES.jealousChat;
+    return m;
   }
 
   /** Çifte puan ekler (eksi olabilir); zıt kişilikliler yarı puan kazanır. Seviye değişirse olayı yayınlar. */
@@ -243,8 +269,11 @@ export class RelationshipSystem {
           const b = members[j];
           // Kalabalık şenlikte yalnızca yan yana dans edenler yakınlaşır
           if (near && Math.hypot(a.x - b.x, a.y - b.y) > near) continue;
-          this.add(a, b, rate * tick.gameMinutes);
-          if (group.kind === 'work') continue;
+          if (group.kind === 'work') {
+            this.add(a, b, rate * tick.gameMinutes);
+            continue;
+          }
+          this.add(a, b, rate * this.chatMultiplier(a, b) * tick.gameMinutes);
           this.tryRomance(a, b, group, tick.gameMinutes);
           if (evening) this.tryMarriage(a, b, group, tick.gameMinutes);
         }
@@ -254,8 +283,11 @@ export class RelationshipSystem {
 
   /** Yakın iki bekâr sohbet ederken / dans ederken aşık olabilir. */
   tryRomance(a, b, group, minutes) {
-    if (!canRomance(a, b) || this.get(a, b) < ROMANCE.minScore) return;
-    if (this.rng.next() >= ROMANCE.chancePerMinute * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance')) return;
+    if (!canRomance(a, b)) return;
+    // (29.1) Aşk zarı kimyaya bakar: kimya 0 ya da eksiyse aşk yok; güçlü çekim daha düşük puanla ve daha hızlı aşık eder
+    const chem = chemistryLevel(chemistryOf(this.state, a, b));
+    if (chem.romance <= 0 || this.get(a, b) < chem.romanceScore) return;
+    if (this.rng.next() >= ROMANCE.chancePerMinute * chem.romance * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance')) return;
     const now = this.state.totalMinutes;
     a.partnerId = b.id;
     b.partnerId = a.id;

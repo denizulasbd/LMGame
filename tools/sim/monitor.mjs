@@ -136,6 +136,18 @@ export async function installMonitor(page) {
         const byId = new Map(s.characters.map((c) => [c.id, c]));
         const buildings = new Map(s.buildings.map((b) => [b.id, b]));
 
+        // ---- (29.1) Sosyal kimya: kayıp sakine işaret eden ilişki kaydı, sınır dışı kimya, bilinmeyen etiket, tek yönlü kimya ----
+        for (const c of s.characters) {
+          for (const [key, rel] of Object.entries(c.relationships ?? {})) {
+            const id = Number(key);
+            if (id !== 0 && !ids.has(id)) broke(`${c.name}: kimya kaydı kayıp sakine (#${id}) işaret ediyor`);
+            if (!Number.isInteger(rel.chemistry) || rel.chemistry < -2 || rel.chemistry > 3) broke(`${c.name}: sınır dışı kimya ${rel.chemistry}`);
+            if (rel.tags.some((t) => !['grateful', 'admiration', 'resentful', 'jealous', 'kindred'].includes(t))) broke(`${c.name}: bilinmeyen duygusal etiket ${rel.tags}`);
+            const back = id !== 0 ? byId.get(id)?.relationships?.[c.id] : null;
+            if (id !== 0 && ids.has(id) && (!back || back.chemistry !== rel.chemistry)) broke(`${c.name}: #${id} ile kimya tek yönlü / uyumsuz`);
+          }
+        }
+
         // ---- Takılma ----
         for (const c of s.characters) {
           for (const k of Object.keys(m.minNeeds)) if (c.needs[k] !== undefined) m.minNeeds[k] = Math.min(m.minNeeds[k], c.needs[k]);
@@ -637,6 +649,15 @@ export async function installMonitor(page) {
                 // (28.3) Saygın Büyükler, nüfus (toplam / kotaya sayılan), en yaşlı sakin ve vefatın kopuk referans bırakmadığı (yukarıdaki referans denetimi) örnekleri
                 venerable: s.characters.filter((c) => c.isVenerable).map((c) => `${c.name}:${c.age}/${c.lifespan}`),
                 births: s.stats?.births ?? 0,
+                // (29.1) sosyal kimya ve duygusal etiketler
+                chemistry: (() => {
+                  const dist = {}; const tags = {}; let records = 0; let ruler = 0;
+                  for (const c of s.characters) for (const [k, r] of Object.entries(c.relationships ?? {})) {
+                    if (k === '0') ruler += r.tags.length; else if (Number(k) > c.id) { dist[r.chemistry] = (dist[r.chemistry] ?? 0) + 1; records++; }
+                    for (const t of r.tags) tags[t] = (tags[t] ?? 0) + 1;
+                  }
+                  return { records, dist, tags, ruler, given: s.stats.emotionTags ?? 0, kindred: s.stats.kindredBonds ?? 0, sparks: s.stats.sparks ?? 0, treats: s.stats.treats ?? 0, greetings: s.stats.tagGreetings ?? 0 };
+                })(),
                 valley: s.valley,
                 doctrine: s.doctrine?.chosen ?? null,
                 late: m.late ?? null, // (28.4)

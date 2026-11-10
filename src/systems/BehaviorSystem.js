@@ -66,6 +66,7 @@ import { valleyProductionMultiplier } from './Valley.js';
 import { doctrineProductionMultiplier } from './Doctrine.js';
 import { INN_SHERBET } from '../data/refinery.js';
 import { PROFESSIONS } from '../data/apprenticeship.js';
+import { hasTag } from './Chemistry.js';
 import { TEMPERAMENT } from '../data/temperament.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
@@ -874,7 +875,9 @@ export class BehaviorSystem {
     for (const other of this.world.characters) {
       if (other === c || other.task?.buildingId !== task.buildingId) continue;
       if (other.task.activity !== task.activity || other.task.phase !== 'perform') continue;
-      const rank = Math.hypot(other.x - c.x, other.y - c.y) - this.relationships.get(c, other) * 0.8;
+      // (29.1) kırgın olduğu kişiye ancak başka kimse yoksa döner; minnettar olduğuna öncelik verir
+      const feeling = hasTag(c, other.id, 'resentful') ? 500 : hasTag(c, other.id, 'grateful') ? -40 : 0;
+      const rank = Math.hypot(other.x - c.x, other.y - c.y) - this.relationships.get(c, other) * 0.8 + feeling;
       if (!best || rank < best.rank) best = { other, rank };
     }
     return best?.other ?? null;

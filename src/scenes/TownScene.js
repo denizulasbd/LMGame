@@ -32,6 +32,7 @@ import { NatureSystem } from '../systems/NatureSystem.js';
 import { PopulationSystem } from '../systems/PopulationSystem.js';
 import { WeatherSystem } from '../systems/WeatherSystem.js';
 import { RelationshipSystem } from '../systems/RelationshipSystem.js';
+import { ChemistrySystem } from '../systems/ChemistrySystem.js';
 import { ConflictSystem } from '../systems/ConflictSystem.js';
 import { FamilySystem } from '../systems/FamilySystem.js';
 import { CraftingSystem } from '../systems/CraftingSystem.js';
@@ -159,6 +160,8 @@ export class TownScene extends Scene {
     this.relationships = new RelationshipSystem(this.game, this.world, new Random(state.seed + 5));
     this.conflicts = new ConflictSystem(this.game, this.world, this.relationships, new Random(state.seed + 6));
     this.family = new FamilySystem(this.game, this.world, new Random(state.seed + 7));
+    // (29.1) Sosyal kimya ve duygusal etiketler (üreteci yok: kıvılcım kimlik çiftinden ve tohumdan türer, seed + 37 izole)
+    this.chemistry = new ChemistrySystem(this.game, this.world, { relationships: this.relationships });
     this.social = new SocialSystem(this.game, this.world, new Random(state.seed + 19), { relationships: this.relationships });
     this.crafting = new CraftingSystem(this.game, this.world, this.economy);
     this.health = new HealthSystem(this.game, this.world, new Random(state.seed + 8));
@@ -252,6 +255,7 @@ export class TownScene extends Scene {
       this.animals,
       this.relationships,
       this.conflicts,
+      this.chemistry,
       this.family,
       this.social,
       this.townEvents,
@@ -290,6 +294,7 @@ export class TownScene extends Scene {
       this.heating,
       this.milestones,
       this.relationships,
+      this.chemistry,
       this.family,
       this.social,
       this.crafting,

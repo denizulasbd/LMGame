@@ -53,6 +53,8 @@ import { genitive } from '../utils/turkish.js';
 import { SHOP, SNACK, REVOLT } from '../data/citizens.js';
 import { foodItemOf, countItem, roomFor, isRioter, raidOf } from '../systems/Citizens.js';
 import { ELDER } from '../data/lifeStages.js';
+import { hasTag } from '../systems/Chemistry.js';
+import { EMOTION_RULES } from '../data/chemistry.js';
 import { TEMPERAMENT } from '../data/temperament.js';
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
@@ -731,23 +733,29 @@ export class Brain {
     // Önce zaten insanların toplandığı yere katıl
     let best = null;
     for (const building of gatherings) {
-      const count = this.participants(building, c).length;
+      const people = this.participants(building, c);
+      const count = people.length;
       if (count === 0 || this.world.freeGatherSpots(building, c.id).length === 0) continue;
-      const rank = count + (building.type === 'inn' ? 1.5 : building.type === 'campfire' ? 0.5 : building.type === 'gazebo' ? 1 : 0);
+      // (29.1) kırgın olduğu biri oturuyorsa o masaya gitmez; minnettar olduğu kişinin yanına gitmeye can atar
+      const mood = this.companyMood(c, people);
+      if (mood < 0) continue;
+      const rank = count + mood * 3 + (building.type === 'inn' ? 1.5 : building.type === 'campfire' ? 0.5 : building.type === 'gazebo' ? 1 : 0);
       const better = !best || rank > best.count;
       if (better) best = { building, count: rank };
     }
     if (best) return this.planGathering(c, best.building);
 
     // Kimse yoksa uygun birini davet et
-    const campfire = gatherings.find((b) => b.type === 'campfire');
-    const fountain = gatherings.find((b) => b.type === 'fountain');
-    const inn = gatherings.find((b) => b.type === 'inn');
+    // (29.1) kırgın olduğu birinin oturduğu yerde kendi sohbetini de başlatmaz
+    const calm = gatherings.filter((b) => this.companyMood(c, this.participants(b, c)) >= 0);
+    const campfire = calm.find((b) => b.type === 'campfire');
+    const fountain = calm.find((b) => b.type === 'fountain');
+    const inn = calm.find((b) => b.type === 'inn');
     const evening = hour >= EVENING_START || hour < EVENING_END;
     // Akşamları han kamp ateşinden de çok sevilir
     let place = evening ? inn ?? campfire ?? fountain : fountain ?? campfire ?? inn;
     // (13. aşama) Çiftler çardakta baş başa oturmayı, dostlar da arada bir orada sohbeti sever
-    const gazebo = gatherings.find((b) => b.type === 'gazebo' && this.world.freeGatherSpots(b, c.id).length >= 2);
+    const gazebo = calm.find((b) => b.type === 'gazebo' && this.world.freeGatherSpots(b, c.id).length >= 2);
     const lover = c.partnerId !== null && c.partnerId !== undefined ? this.world.getCharacter(c.partnerId) : null;
     if (gazebo && ((lover && this.isAvailableForChat(lover, hour)) || this.rng.next() < GAZEBO_INVITE_CHANCE)) place = gazebo;
     if (!place) return null;
@@ -833,7 +841,11 @@ export class Brain {
     // (13. aşama) Çardak: meydandaki havuz kadar sevilir; sevgilisi / eşi olan için iki kat
     if (this.availableGatherings().some((b) => b.type === 'gazebo')) weights.gazebo = (weights.fountain ?? 1) * (c.partnerId !== null && c.partnerId !== undefined ? 1.8 : 0.9);
     for (const building of this.availableGatherings()) {
-      if (this.participants(building, c).length > 0) weights[building.type] = (weights[building.type] ?? 0) * 1.6;
+      const people = this.participants(building, c);
+      if (people.length === 0) continue;
+      // (29.1) kırgın olduğu kişinin oturduğu yerden kaçınır, minnettar olduğu kişinin olduğu yere meyleder
+      const mood = this.companyMood(c, people);
+      weights[building.type] = (weights[building.type] ?? 0) * 1.6 * (mood < 0 ? EMOTION_RULES.resentVenue : mood > 0 ? EMOTION_RULES.gratefulVenue : 1);
     }
     // (18. aşama) Ulu süs ağaçlarının gölgesinde dinlenmek: bankı ve çiçekleri sevenler daha çok sever (kışın az)
     if (this.shadeTrees().length > 0) {
@@ -1259,12 +1271,23 @@ export class Brain {
     );
   }
 
+  /** (29.1) Toplanma yerindekilere karşı his: kırgın olduğu biri varsa -1, minnettar olduğu biri varsa +1, yoksa 0. */
+  companyMood(c, people) {
+    let mood = 0;
+    for (const o of people) {
+      if (hasTag(c, o.id, 'resentful')) return -1;
+      if (hasTag(c, o.id, 'grateful')) mood = 1;
+    }
+    return mood;
+  }
+
   /** Sohbete çağrılacak uygun kişi: yakın olan, ama dost olduğu kişiler öne geçer. */
   findPartner(c, hour) {
     let best = null;
     for (const other of this.world.characters) {
       if (other === c || !this.isAvailableForChat(other, hour)) continue;
-      const rank = Math.sqrt(distanceSq(other, c)) - this.relationships.get(c, other) * 0.8;
+      if (hasTag(c, other.id, 'resentful')) continue; // (29.1) kırgın olduğu kişiyi sohbete çağırmaz
+      const rank = Math.sqrt(distanceSq(other, c)) - this.relationships.get(c, other) * 0.8 - (hasTag(c, other.id, 'grateful') ? 40 : 0);
       if (!best || rank < best.rank) best = { other, rank };
     }
     return best?.other ?? null;

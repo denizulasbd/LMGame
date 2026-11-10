@@ -15,6 +15,8 @@ import { ACTIVITY_SKILLS, SKILL_PREFERENCE_TILES } from '../data/skills.js';
 import { getSeason } from '../data/seasons.js';
 import { skillLevel } from './SkillSystem.js';
 import { LUXURY_WORK } from '../data/refinery.js';
+import { hasTag, hasAnyTag } from './Chemistry.js';
+import { EMOTION_RULES } from '../data/chemistry.js';
 
 const PRODUCTION_PRIORITY = 2; // üretim binalarında çalışmak, emirli işlerden sonra gelir
 const PATH_CHECKS = 5; // en yakın birkaç aday için gerçek yol aranır
@@ -267,12 +269,15 @@ export class JobSystem {
       return skill ? (skillLevel(c, skill).level - 1) * SKILL_PREFERENCE_TILES + (c.profile.skillPreference[skill] ?? 0) : 0;
     };
 
+    const grateful = hasAnyTag(c, 'grateful');
     for (const job of this.jobs) {
       const full = job.assignees.length >= JOBS[job.type].maxWorkers && !job.assignees.includes(c.id);
       if (full || !this.isValid(job)) continue;
       const spot = freeSpot(this.spotsFor(job));
       // Öncelikli işaretlenen hedef her işten önce gelir
-      if (spot) candidates.push({ priority: job.urgent ? -1 : JOBS[job.type].priority, d: dist(spot, origin) - preference(job.type), job, spot });
+      // (29.1) minnettar olduğu biri o işte çalışıyorsa yardıma koşar (iş daha yakınmış gibi görünür)
+      const helping = grateful && job.assignees.some((id) => hasTag(c, id, 'grateful')) ? EMOTION_RULES.helpTiles : 0;
+      if (spot) candidates.push({ priority: job.urgent ? -1 : JOBS[job.type].priority, d: dist(spot, origin) - preference(job.type) - helping, job, spot });
     }
     for (const building of this.world.getCompleted()) {
       const def = BUILDINGS[building.type];

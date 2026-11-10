@@ -110,6 +110,9 @@ const pageResults = await page.evaluate(async () => {
   const check = (name, ok, detail = '') => out.push({ name, ok: Boolean(ok), detail: String(detail) });
   const near = (a, b) => Math.abs(a - b) < 1e-6;
   const rich = () => sim.give({ wood: 250, stone: 250, food: 200, iron: 60, wool: 60, bread: 60 });
+  // (29.1) aşk zarı kimyaya bakar: aşk / evlilik testleri çiftin kimyasını açıkça kurar (saat başı yeniden hesaplanana dek geçerli)
+  const CHX = await import('/src/systems/Chemistry.js');
+  const setChem = (a, b, n) => { CHX.refreshChemistry(s, a, b); a.relationships[b.id].chemistry = n; b.relationships[a.id].chemistry = n; };
   const hours = (h) => sim.step(Math.round(h * 225));
   const plaza = scene.world.landmarks.plaza;
   // 26. aşama öncesi bölümler panayırsız bir dünyada yazıldı: Altın Çağ'dan sonra panayır (ve Büyük Ziyafet Sofrası) kurulursa o bölümlerin
@@ -742,6 +745,7 @@ const pageResults = await page.evaluate(async () => {
     check('çardak kurulur, iki oturaklı', gazebo && seats.length === 2 && seats.every((t) => t.seat));
     const [a, b] = s.characters.filter((c) => !c.isChild && !c.away && !c.illness && c.visible).slice(-2);
     const brain = scene.behavior.brain;
+    if (s.goldenAge.celebration) { s.goldenAge.celebration.until = s.totalMinutes; sim.step(5); } // (29.1) süren Çağ Kutlaması sakinleri meydana çekmesin
     for (const c of [a, b]) scene.behavior.endTask(c);
     const planA = brain.planGathering(a, gazebo);
     scene.behavior.startPlan(a, planA, s.time.hour);
@@ -752,6 +756,13 @@ const pageResults = await page.evaluate(async () => {
     for (let i = 0; i < 12 && !both; i++) {
       hours(0.25);
       both = [a, b].every((c) => c.task?.activity === 'gazebo' && c.task.phase === 'perform');
+      // (29.1) araya başka bir etkinlik girdiyse sakin yeniden çardağa yollanır
+      for (const c of [a, b]) {
+        if (c.task?.activity === 'gazebo') continue;
+        scene.behavior.endTask(c);
+        const again = brain.planGathering(c, gazebo, c === b ? a.task?.spot ?? planA.spot : null);
+        if (again) scene.behavior.startPlan(c, again, s.time.hour);
+      }
     }
     hours(0.25);
     const sat = [a, b].every((c) => c.task?.activity === 'gazebo' && c.pose === 'sit');
@@ -1948,6 +1959,7 @@ const pageResults = await page.evaluate(async () => {
     check('ilk randevu Yaşam Günlüğü\'ne yazılır', A.memories.some((m) => m.kind === 'date' && m.text.includes(B.name)) && B.memories.some((m) => m.kind === 'date' && m.text.includes(A.name)));
     check('durum metni: "… ile bankta yan yana oturuyor"', A.activityLabel === `${B.name} ile bankta yan yana oturuyor`, A.activityLabel);
     // Bankta yan yana oturan çift aşık olabilir
+    setChem(A, B, 2);
     S.relationships.set(A, B, 90);
     forced(S.relationships.rng, 0, () => social.update({ gameMinutes: 1, hour: 12 }));
     check('bankta yan yana oturan çift aşık olur (sevgili)', RS.arePartners(A, B) && !A.married);
@@ -2323,7 +2335,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 35', raw.version === 35);
+  check('kayıt sürümü 36', raw.version === 36);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2768,7 +2780,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 35: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 35 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 36: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 36 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -3033,10 +3045,11 @@ const pageResults = await page.evaluate(async () => {
     check('araştırma tamamlanınca teslim edilir: Antik Kitap (ya da kitaplık doluysa altın)', st.crown.decreeLog.at(-1).outcome === 'delivered' && (st.goldenAge.books === books0 + 1 || st.crown.decreeLog.at(-1).item === null));
     // Usta işi eser
     st.masterworks.items.push({ id: 9999, type: 'ironStatue', maker: 'Usta', makerId: -1, status: 'stored', day: 1, hour: 1 });
+    const sold0 = st.masterworks.items.filter((i) => i.status === 'sold').length; // (29.1) depoda başka eser de olabilir: herhangi bir depo eseri gider
     const seeds0 = st.exploration.items.vineSeed;
     S.crown.openDecree('treasure');
     game.events.emit('ui:deliverDecree');
-    check('saray hazinesi fermanı: depodaki usta işi eser Krallığa gider, Nadir Tohum ödülü', st.masterworks.items.find((i) => i.id === 9999).status === 'sold' && st.exploration.items.vineSeed === seeds0 + 1);
+    check('saray hazinesi fermanı: depodaki usta işi eser Krallığa gider, Nadir Tohum ödülü', st.masterworks.items.filter((i) => i.status === 'sold').length === sold0 + 1 && st.exploration.items.vineSeed === seeds0 + 1);
     st.masterworks.items = st.masterworks.items.filter((i) => i.id !== 9999);
     // Süresi dolan ve reddedilen ferman: ceza
     S.crown.openDecree('feast');
@@ -3143,7 +3156,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 35: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 35 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 36: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 36 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3375,7 +3388,7 @@ const pageResults = await page.evaluate(async () => {
     // Bekçi nöbeti
     let patrolling = null;
     // Nöbet üretimden sonra gelir (boştaki yetişkinlerin işi); testte bir sakini kuleye sabitleyip nöbeti doğrularız
-    const guardCandidate = adults().find((c) => !c.away && !c.illness && c.workplaceId === null);
+    const guardCandidate = adults().find((c) => !c.away && !c.illness && c.workplaceId === null && !c.retired && !c.isInjured && !c.emigrating && c.lifeStage === 'adult'); // (29.1) emekli / yaralı aday nöbete gitmez
     game.events.emit('ui:pinWorker', { buildingId: tower.id, characterId: guardCandidate.id });
     for (let i = 0; i < 30 && !patrolling; i++) {
       hours(1);
@@ -3561,7 +3574,7 @@ const pageResults = await page.evaluate(async () => {
         for (const c of st.characters) if (c.task && ['fetchWater', 'fightFire'].includes(c.task.activity)) seen.add(c.task.activity);
       }
       offB();
-      check('sakinler işi bırakıp kova taşır: su alır (fetchWater), yangına boşaltır (fightFire) ve yangını söndürür', !fightTarget.isBurning && seen.has('fetchWater') && seen.has('fightFire') && buckets >= 3 && !fightTarget.damaged, `${[...seen]} ${buckets} kova`);
+      check('sakinler işi bırakıp kova taşır: su alır (fetchWater), yangına boşaltır (fightFire) ve yangını söndürür', !fightTarget.isBurning && seen.has('fetchWater') && seen.has('fightFire') && buckets >= 3 && !fightTarget.damaged, `${[...seen]} ${buckets} kova · saat ${st.time.hour} · yanıyor ${fightTarget.isBurning} hasar ${fightTarget.damaged} · uyanık yetişkin ${st.characters.filter((c) => !c.isChild && !c.isSleeping && !c.away).length} · gerek ${CRI.bucketsNeeded(st, fightTarget)} · kutlama ${Boolean(st.goldenAge.celebration)} · şenlik ${st.events.festival.active}`);
       check('yangını söndüren kova taşıyıcıların başında su kovası balonu çıkar', (() => { try { return UI.getBubbleSprite('bucket') && UI.getBubbleSprite('shield') && UI.getBubbleSprite('bandit') && UI.getBubbleSprite('bandage'); } catch (e) { return false; } })());
     }
     // Kuyu yokken nehirden su taşıma: kovayı dolduranlar yangına koşar (sorumlu sakinler kova doluyken sıralamadan düşmez)
@@ -3811,7 +3824,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 35: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 35 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 36: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 36 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -4092,7 +4105,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { g: garden.id, o: other.id, switches: st.granary.switches };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 35: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    check('kayıt sürümü 36: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
     game.events.emit('ui:load');
     const s2 = game.state;
     const g2 = s2.buildings.find((b) => b.id === T.g);
@@ -4424,7 +4437,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 35: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    check('kayıt sürümü 36: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
     game.events.emit('ui:load');
     const s2 = st();
     const inn2 = s2.buildings.find((b) => b.id === T.inn);
@@ -4701,7 +4714,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 35: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    check('kayıt sürümü 36: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
     game.events.emit('ui:load');
     const t2 = st().tradePost;
     check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
@@ -4987,7 +5000,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 35: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
+    check('kayıt sürümü 36: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
     game.events.emit('ui:load');
     const back = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     const sage2 = st().characters.find((c) => c.id === sage.id);
@@ -5019,6 +5032,8 @@ const pageResults = await page.evaluate(async () => {
       delete c.agedDays;
       if (!c.growsUpAt && c.age >= 70) c.age = 66; // v23'te bilge yoktu
     }
+    // (29.1) dünya kaysa da kayıtta 21 yaşından küçük bir yetişkin bulunsun (v23'te büyüyen çocuklar 18 yaşında yetişkin olurdu)
+    if (!old.characters.some((c) => !c.growsUpAt && c.age < 21)) old.characters.find((c) => !c.growsUpAt && !c.married && c.age < 60).age = 19;
     const ages = new Map(old.characters.map((c) => [c.id, c.age]));
     localStorage.setItem('lmgame.save.v2', JSON.stringify(old));
     game.events.emit('ui:load');
@@ -5252,7 +5267,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const snap = JSON.stringify(youth.apprenticeship);
-    check('kayıt sürümü 35: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
+    check('kayıt sürümü 36: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
     game.events.emit('ui:load');
     const y2 = st().characters.find((c) => c.id === youth.id);
     check('kayıttan çıraklık, kapı ve sayaçlar birebir döner', JSON.stringify(y2.apprenticeship) === snap && AP.doorOpen(st(), st().buildings.find((b) => b.id === hut.id)) && st().apprenticeship.crafted >= 1);
@@ -5639,7 +5654,7 @@ const pageResults = await page.evaluate(async () => {
     // --- Kayıt (sürüm 26) ---
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 35: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
+    check('kayıt sürümü 36: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
     const snapT = JSON.stringify(st().temperament);
     game.events.emit('ui:load');
     const sh2 = st().characters.find((c) => c.id === shown.id);
@@ -5763,7 +5778,7 @@ const pageResults = await page.evaluate(async () => {
     const blockers = [];
     for (const h of st().buildings.filter((b) => b.type === 'cabin' && b.functional)) {
       if (S().world.getResidents(h).length === 0) {
-        const filler = people().find((c) => c !== g2a && c !== g2b && c !== ma && c !== pa && c.homeId !== h.id && !blockers.some(([x]) => x === c));
+        const filler = people().find((c) => c !== g2a && c !== g2b && c !== ma && c !== pa && c.homeId !== h.id && !blockers.some(([x]) => x === c) && (c.homeId === null || people().filter((x) => x.homeId === c.homeId).length > 1)); // (29.1) tek başına oturanı taşımak kendi evini boşaltır
         blockers.push([filler, filler.homeId]);
         filler.homeId = h.id;
       }
@@ -5834,7 +5849,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rc = raw.characters.find((c) => c.id === g2a.id);
-    check('kayıt sürümü 35: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
+    check('kayıt sürümü 36: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
     const snap = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
     game.events.emit('ui:load');
     const back = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
@@ -6083,7 +6098,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rk = raw.characters.find((c) => c.id === k1.id);
-    check('kayıt sürümü 35: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
+    check('kayıt sürümü 36: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
     const snap = JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null));
     game.events.emit('ui:load');
     check('kayıttan yadigârlar, zincirleri, sayaçlar ve arşiv birebir döner', JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null)) === snap && st().heirloom.archive.length >= 1 && st().chronicle.firstHeirloom?.elder === e1.name);
@@ -6316,7 +6331,7 @@ const pageResults = await page.evaluate(async () => {
     goto(12, 18); fs().onHour(18);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 35: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
+    check('kayıt sürümü 36: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
     st().currentFestival = null;
     game.events.emit('ui:load');
     check('kayıttan süren panayır birebir döner (şenlik kuralları ve Tarihçe\'deki ilk kayıt ile)', JSON.stringify(st().currentFestival) === JSON.stringify(raw.currentFestival) && st().currentFestival.phase === 'party' && st().events.festival.active && st().chronicle.firstFair?.name === fair.name && st().stats.fairs >= 5);
@@ -6601,7 +6616,7 @@ const pageResults = await page.evaluate(async () => {
     const liveFeast = JSON.stringify(st().currentFeast);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 35: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
+    check('kayıt sürümü 36: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
     st().currentFeast = null;
     game.events.emit('ui:load');
     check('kayıttan süren sofra birebir döner (ikram sayacı dahil)', JSON.stringify(st().currentFeast) === liveFeast && st().currentFestival?.phase === 'party');
@@ -6824,7 +6839,7 @@ const pageResults = await page.evaluate(async () => {
     goto(21, 9, 0);
     evs.length = 0;
     gs().onHour(9);
-    check('ayrılış gününün 09:00\'unda yola çıkar (leaving), kenara varınca ayrılır', st().activeGuest.leaving === true || st().activeGuest === null);
+    check('ayrılış gününün 09:00\'unda yola çıkar (leaving), kenara varınca ayrılır', st().activeGuest === null || st().activeGuest.leaving === true);
     let steps = 0;
     while (st().activeGuest && steps++ < 400) sim.step(30);
     check('ayrılınca teşekkür mesajı, world.guests boşalır, nextDay 6-8 gün sonra', st().activeGuest === null && S().world.guests.length === 0 && evs.some((e) => e.n === 'guest:left') && st().guestBook.nextDay >= 21 + 6);
@@ -6882,7 +6897,7 @@ const pageResults = await page.evaluate(async () => {
     const liveB = JSON.stringify(st().guestBook);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 35: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw.version === 35 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
+    check('kayıt sürümü 36: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw.version === 36 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
     st().activeGuest = null;
     game.events.emit('ui:load');
     check('kayıttan konuk kaldığı yerde döner (haritada yeniden oluşur), defter birebir', JSON.stringify(st().activeGuest) === liveG && JSON.stringify(st().guestBook) === liveB && S().world.guests.length === 1 && S().world.guests[0].isGuest === true);
@@ -6971,7 +6986,7 @@ const pageResults = await page.evaluate(async () => {
     const eatenBefore = [...st().currentFeast.eatenIds];
     check('27.1: ikram alanlar sofrada kayda girer (currentFeast.eatenIds)', st().currentFeast.served === 3 && eatenBefore.length === 3 && eaters.every((c) => eatenBefore.includes(c.id)), JSON.stringify(st().currentFeast));
     const raw1 = save();
-    check('27.1: kayıt sürümü 35 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 35 && raw1.version === 35 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
+    check('27.1: kayıt sürümü 36 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 36 && raw1.version === 36 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
     load();
     const reloaded = st().characters.filter((c) => eatenBefore.includes(c.id));
     check('27.1: yüklemede eatenIds\'teki sakinlerin c.feasted işareti yeniden kurulur', reloaded.length === 3 && reloaded.every((c) => c.feasted === fairDay), reloaded.map((c) => c.feasted).join());
@@ -7365,7 +7380,8 @@ const pageResults = await page.evaluate(async () => {
     const offH = game.events.on('lineage:handover', (p) => hEv.push(p));
     iso(() => LS().onMarried(K, P));
     offH();
-    check('27.2: bilgenin evladı 70 yaşında evli değilse devir bekler; evlat sonradan evlenince Ocak Devri tetiklenir', noHeir && st().lineage.heads[cab1.id] === K.id && st().lineage.handovers === h0 + 1 && hEv[0]?.heir === K && hEv[0]?.elder === E, `${noHeir} ${st().lineage.heads[cab1.id]} E${E.id} K${K.id} P${P.id} hEv${hEv.length} Ehome${E.homeId} cab1 ${cab1.id} Khome${K.homeId} Phome${P.homeId} elder ${E.lifeStage} Kstage ${K.lifeStage} Kaway ${K.away}`);
+    check('27.2: bilgenin evladı 70 yaşında evli değilse devir bekler; evlat sonradan evlenince Ocak Devri tetiklenir', noHeir && st().lineage.heads[cab1.id] === K.id && st().lineage.handovers >= h0 + 1 && hEv.filter((p) => p.elder === E).length === 1 && hEv.find((p) => p.elder === E).heir === K, // (29.1) dünya kaydığında aynı düğün başka bir bilgenin devrini de tetikleyebilir
+       `${noHeir} ${st().lineage.heads[cab1.id]} E${E.id} K${K.id} P${P.id} hEv${hEv.length} Ehome${E.homeId} cab1 ${cab1.id} Khome${K.homeId} Phome${P.homeId} elder ${E.lifeStage} Kstage ${K.lifeStage} Kaway ${K.away}`);
     // Evladı olmayan bilge: aynı evde yaşayan evli (kuşağı büyük) sakine devreder
     const cab2 = freeCabin() === cab1 ? sim.place('cabin') : freeCabin();
     E2.homeId = M1.homeId = M2.homeId = cab2.id;
@@ -7496,7 +7512,7 @@ const pageResults = await page.evaluate(async () => {
     Math.random = realRandom;
     check('27.2: bu adımın sistemleri ana üreteçleri ve Math.random\'u tüketmez (dilekçe seed + 23, çıraklık + 28, soy + 30, yadigâr + 31)', mainRngs.length > 5 && isoCalls > 15 && rngViolations === 0, `${rngViolations}/${isoCalls}`);
     void rngBefore;
-    check('27.2: kayıt sürümü 35 korunur', CONFIG.SAVE_VERSION === 35);
+    check('27.2: kayıt sürümü 36 korunur', CONFIG.SAVE_VERSION === 36);
     restore(snap0);
     s0.lineage.heads = { ...keepHeads };
     Object.assign(s0.lineage, keepLineage);
@@ -7734,7 +7750,7 @@ const pageResults = await page.evaluate(async () => {
       game.events.emit('ui:selectCharacter', null);
     }
 
-    check('27.3: kayıt sürümü 35 korunur', CONFIG.SAVE_VERSION === 35);
+    check('27.3: kayıt sürümü 36 korunur', CONFIG.SAVE_VERSION === 36);
     if (st().activeGuest) gs().finish(false);
     S().world.guests = [];
     Object.assign(st().time, keepTime);
@@ -8435,7 +8451,7 @@ const pageResults = await page.evaluate(async () => {
     localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
     const migrated = SMX.SaveManager.read('session');
     if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
-    check('28.4: v34 kaydı v35\'e göç eder: tohumdan deterministik vadi, boş doktrin', CONFIG.SAVE_VERSION === 35 && migrated && migrated.valley === VY.valleyFor(legacy.seed) && migrated.doctrine.chosen === null && migrated.doctrine.day === null);
+    check('28.4: v34 kaydı v35\'e göç eder: tohumdan deterministik vadi, boş doktrin', CONFIG.SAVE_VERSION === 36 && migrated && migrated.valley === VY.valleyFor(legacy.seed) && migrated.doctrine.chosen === null && migrated.doctrine.day === null);
 
     // Temizlik
     for (const o of offs) o();
@@ -8446,6 +8462,462 @@ const pageResults = await page.evaluate(async () => {
     s0.time.day = keepDay;
     s0.civic.tradeCharter = false;
     s0.research.active = null;
+  }
+
+  // ===== 29. aşama (29.1): Sosyal Kimya, Karşılıklı Çekim / İtme ve Duygusal Etiketler =====
+  {
+    const S = () => game.scenes.current;
+    const s0 = game.state;
+    const CD = await import('/src/data/chemistry.js');
+    const CH = await import('/src/systems/Chemistry.js');
+    const RSX = await import('/src/systems/RelationshipSystem.js');
+    const RD = await import('/src/data/relationships.js');
+    const TSX = await import('/src/systems/TownStatus.js');
+    const UIX = await import('/src/art/ui/index.js');
+    const SMX = await import('/src/state/SaveManager.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const { ACTIVITIES } = await import('/src/data/activities.js');
+    const { CONFIG } = await import('/src/config.js');
+    const rel = S().relationships;
+    const chem = S().chemistry;
+    const forced = (rng, value, fn) => { rng.next = () => value; try { return fn(); } finally { delete rng.next; } };
+    const mk = (id, extra = {}) => ({ id, traits: [], quirk: null, skills: {}, relationships: {}, ...extra });
+    // Belirli bir kıvılcımı veren kimlik çifti (tohum 5): saf arama, üreteç tüketmez
+    const idsWithSpark = (want) => { for (let a = 9000; a < 9400; a++) for (let b = a + 1; b < a + 40; b++) if (CH.sparkFor(s0.seed, a, b) === want) return [a, b]; return null; };
+    const [z1, z2] = idsWithSpark(0);
+    const [p1, p2] = idsWithSpark(1);
+    const [n1, n2] = idsWithSpark(-1);
+    const total = (a, b) => CH.chemistryFor(s0.seed, a, b);
+
+    // --- Veri ve kıvılcım ---
+    check('29.1: kimya -2 (Doğal Zıtlık) .. +3 (Kozmik Çekim) arası altı seviyedir', CD.CHEMISTRY_MIN === -2 && CD.CHEMISTRY_MAX === 3 && [-2, -1, 0, 1, 2, 3].every((n) => CD.CHEMISTRY_LEVELS[n]?.name) && CD.CHEMISTRY_LEVELS[-2].name === 'Doğal Zıtlık' && CD.CHEMISTRY_LEVELS[3].name === 'Kozmik Çekim');
+    check('29.1: beş duygusal etiket tanımlı (Minnettar, Hayran, Kırgın, Kıskanç, Ruh İkizi)', CD.EMOTION_TAG_KEYS.join() === 'grateful,admiration,resentful,jealous,kindred' && CD.EMOTION_TAG_KEYS.map((k) => CD.EMOTION_TAGS[k].name).join() === 'Minnettar,Hayran,Kırgın,Kıskanç,Ruh İkizi');
+    const sparks = [];
+    for (let a = 1; a < 40; a++) for (let b = a + 1; b < 40; b++) sparks.push(CH.sparkFor(s0.seed, a, b));
+    check('29.1: kıvılcım -1 / 0 / +1; üçü de görülür, simetrik (A-B = B-A) ve aynı tohumda hep aynı', sparks.every((v) => v === -1 || v === 0 || v === 1) && new Set(sparks).size === 3 && CH.sparkFor(s0.seed, 3, 17) === CH.sparkFor(s0.seed, 17, 3) && CH.sparkFor(s0.seed, 3, 17) === CH.sparkFor(s0.seed, 3, 17), JSON.stringify([-1, 0, 1].map((v) => sparks.filter((x) => x === v).length)));
+    const otherSeed = [];
+    for (let a = 1; a < 40; a++) for (let b = a + 1; b < 40; b++) otherSeed.push(CH.sparkFor(s0.seed + 1, a, b));
+    check('29.1: kıvılcım dünya tohumuna bağlıdır (başka tohumda dağılım değişir), izole üreteç tohum + 37', CD.CHEMISTRY_SEED_OFFSET === 37 && otherSeed.some((v, i) => v !== sparks[i]));
+
+    // --- Kişilik, huy ve zanaat kombinasyonları ---
+    check('29.1: zıt özellikler (Çalışkan / Uykucu, Neşeli / Huysuz) taban kimyayı -1 düşürür', total(mk(z1, { traits: ['hardworking'] }), mk(z2, { traits: ['sleepyhead'] })) === -1 && total(mk(z1, { traits: ['cheerful'] }), mk(z2, { traits: ['grumpy'] })) === -1 && CH.traitHarmony(mk(1, { traits: ['hardworking', 'cheerful'] }), mk(2, { traits: ['sleepyhead', 'cheerful'] })) === -1);
+    check('29.1: ortak özellik ve tamamlayan özellikler (Hırslı + Çalışkan) +1', total(mk(z1, { traits: ['glutton'] }), mk(z2, { traits: ['glutton', 'nightOwl'] })) === 1 && total(mk(z1, { traits: ['ambitious'] }), mk(z2, { traits: ['hardworking'] })) === 1 && total(mk(z1, { traits: ['nightOwl'] }), mk(z2, { traits: ['glutton'] })) === 0);
+    check('29.1: Doğa Sever + Çiftçi (Kalfa ve üstü) +1; Çırak çiftçiyle nötr', total(mk(z1, { traits: ['natureLover'] }), mk(z2, { skills: { farming: 480 } })) === 1 && total(mk(z1, { traits: ['natureLover'] }), mk(z2, { skills: { farming: 100 } })) === 0 && total(mk(z1, { skills: { husbandry: 2000 } }), mk(z2, { traits: ['natureLover'] })) === 1);
+    check('29.1: huy rezonansı: Müzisyen + Şenlik Neşesi +1, Kitap Kurdu + Bilge Düşünür +1, aynı huy +1', total(mk(z1, { quirk: 'musician' }), mk(z2, { quirk: 'festive' })) === 1 && total(mk(z1, { quirk: 'philosopher' }), mk(z2, { quirk: 'bookworm' })) === 1 && total(mk(z1, { quirk: 'animalLover' }), mk(z2, { quirk: 'animalLover' })) === 1);
+    check('29.1: Zanaatkâr Ruhu + Hayvansever nötr; sekiz huyun hepsi tanınır', total(mk(z1, { quirk: 'craftsman' }), mk(z2, { quirk: 'animalLover' })) === 0 && CD.QUIRK_RESONANCE.flat().every((q) => ['animalLover', 'bookworm', 'musician', 'natureEnthusiast', 'craftsman', 'entrepreneur', 'philosopher', 'festive'].includes(q)));
+    check('29.1: zanaat bağı +1: usta-çırak, ikisi de Başusta, aynı sabit iş yeri, birlikte çalışılmış atölye', total(mk(z1, { apprenticeship: { masterId: z2 } }), mk(z2)) === 1 && total(mk(z1, { mentees: [{ id: z2, progress: 80 }] }), mk(z2)) === 1 && total(mk(z1, { isGrandmaster: true }), mk(z2, { isGrandmaster: true })) === 1 && total(mk(z1, { isGrandmaster: true }), mk(z2)) === 0 && total(mk(z1, { workplaceId: 7 }), mk(z2, { workplaceId: 7 })) === 1 && total(mk(z1, { workplaceId: 7 }), mk(z2, { workplaceId: 8 })) === 0 && total(mk(z1, { relationships: { [z2]: { craft: true } } }), mk(z2)) === 1);
+    const best = CH.chemistryBreakdown(s0.seed, mk(p1, { traits: ['cheerful'], quirk: 'musician', isGrandmaster: true }), mk(p2, { traits: ['cheerful'], quirk: 'festive', isGrandmaster: true }));
+    const worst = CH.chemistryBreakdown(s0.seed, mk(n1, { traits: ['cheerful'], quirk: 'musician' }), mk(n2, { traits: ['grumpy'], quirk: 'bookworm' }));
+    check('29.1: kıvılcım +1 + kişilik + huy + zanaat = 4 -> +3 ile sınırlanır (Kozmik Çekim); kıvılcım -1 + zıtlık = -2 (Doğal Zıtlık)', best.spark === 1 && best.traits === 1 && best.quirks === 1 && best.craft === 1 && best.total === 3 && worst.spark === -1 && worst.traits === -1 && worst.total === -2, JSON.stringify([best, worst]));
+    check('29.1: ara skorlar: +2 (kıvılcım +1, ortak özellik), 0 (kıvılcım -1, rezonans)', total(mk(p1, { traits: ['glutton'] }), mk(p2, { traits: ['glutton'] })) === 2 && total(mk(n1, { quirk: 'musician' }), mk(n2, { quirk: 'festive' })) === 0);
+
+    // --- Determinizm: ana üreteç, sistem üreteçleri ve Math.random sıfır çağrı ---
+    const adults = s0.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.visible !== undefined).sort((a, b) => a.id - b.id);
+    const keepRel = new Map(s0.characters.map((c) => [c, JSON.stringify(c.relationships)]));
+    const keepScores = JSON.stringify(s0.relationships);
+    const keepStats = { ...s0.stats };
+    const rngs = [S().behavior.rng, rel.rng, S().conflicts.rng, S().social.rng, S().family.rng];
+    let calls = 0;
+    const realRandom = Math.random;
+    Math.random = () => { calls++; return realRandom(); };
+    for (const r of rngs) { const proto = Object.getPrototypeOf(r).next; r.next = function () { calls++; return proto.call(this); }; }
+    const first = [];
+    for (const a of adults) for (const b of adults) if (a.id < b.id) first.push(CH.chemistryFor(s0.seed, a, b));
+    const second = [];
+    for (const a of adults) for (const b of adults) if (a.id < b.id) second.push(CH.chemistryOf(s0, a, b));
+    chem.onHour();
+    chem.update({ gameMinutes: 1, hour: 12 });
+    chem.meet(adults[0], adults[1]);
+    chem.treat(adults[0], adults[1]);
+    chem.tag(adults[0], adults[1].id, 'grateful');
+    Math.random = realRandom;
+    for (const r of rngs) delete r.next;
+    check('29.1: kimya hesabı, saat başı güncelleme, karşılaşma, ikram ve etiketleme ana üreteci / sistem üreteçlerini / Math.random\'ı HİÇ tüketmez (0 çağrı)', calls === 0 && first.length > 10, `${calls} çağrı, ${first.length} çift`);
+    check('29.1: aynı çift art arda hep aynı kimyayı alır; kayıt iki yönde aynıdır', first.join() === second.join() && adults.every((a) => adults.every((b) => a === b || a.relationships[b.id]?.chemistry === b.relationships[a.id]?.chemistry)) && first.every((v) => Number.isInteger(v) && v >= -2 && v <= 3));
+    for (const [c, json] of keepRel) c.relationships = JSON.parse(json);
+
+    // --- Sohbet hızı ve keyif ---
+    const A = adults[0];
+    const B = adults.find((c) => c !== A && !RSX.isFamily(A, c) && A.partnerId !== c.id);
+    // Gerçek oyundan kalan etiketler testleri etkilemesin: kayıtlar geri yüklenir, sonra test sakinlerinin kayıtları boşaltılır
+    const cast = [A, B];
+    const fresh = () => { for (const [c, json] of keepRel) c.relationships = JSON.parse(json); for (const c of cast) c.relationships = {}; for (const c of s0.characters) for (const x of cast) delete c.relationships[x.id]; };
+    fresh();
+    const key = RSX.pairKey(A.id, B.id);
+    const fountain = S().world.getCompleted('fountain')[0];
+    const keepTasks = [A, B].map((c) => [c, c.task, c.visible, c.x, c.y, c.pose, c.insideBuildingId, { ...c.needs }, c.speech, c.bubble]);
+    const sit = (c, dx = 0) => { c.task = { activity: 'fountain', phase: 'perform', buildingId: fountain.id, elapsed: 0, duration: 999 }; c.visible = true; c.insideBuildingId = null; c.x = fountain.center.x + dx; c.y = fountain.center.y + 20; };
+    const others = s0.characters.filter((c) => c !== A && c !== B).map((c) => [c, c.task]);
+    for (const [c] of others) if (c.task?.buildingId === fountain.id) c.task = null;
+    sit(A); sit(B, 14);
+    const gainAt = (n) => { setChem(A, B, n); s0.relationships[key] = 0; forced(rel.rng, 0.999, () => rel.update({ gameMinutes: 10, hour: 12 })); return s0.relationships[key]; };
+    const g0 = gainAt(0);
+    const g2 = gainAt(2);
+    const g3 = gainAt(3);
+    const gm = gainAt(-1);
+    const gm2 = gainAt(-2);
+    check('29.1: kimyası +2 / +3 olanların sohbeti 1,5 kat hızlı ilişki puanı kazandırır (gerçek RelationshipSystem.update)', g0 > 0 && Math.abs(g2 / g0 - 1.5) < 1e-9 && Math.abs(g3 / g0 - 1.5) < 1e-9, `${g0} -> ${g2} / ${g3}`);
+    check('29.1: eksi kimyada sohbet yavaş ilerler (-1: x0,75; -2: x0,5); +1 hafif hızlı (x1,2)', Math.abs(gm / g0 - 0.75) < 1e-9 && Math.abs(gm2 / g0 - 0.5) < 1e-9 && Math.abs(gainAt(1) / g0 - 1.2) < 1e-9, `${gm} ${gm2}`);
+    const bondAt = (n, score) => { setChem(A, B, n); s0.relationships[key] = score; const b = rel.bondFor(A, B); return { f: b.funBonus, s: b.socialBonus }; };
+    const friend = RD.RELATIONSHIP_LEVELS.find((l) => l.key === 'friend');
+    check('29.1: güçlü çekimde sohbet keyfi 1,5 kat (+ek keyif); sosyallik çarpanı ilişki seviyesinden gelir', Math.abs(bondAt(0, 50).f - friend.funBonus) < 1e-9 && Math.abs(bondAt(2, 50).f - (friend.funBonus * 1.5 + CD.CHEMISTRY_LEVELS[2].funFlat)) < 1e-9 && bondAt(3, 50).f > bondAt(2, 50).f && bondAt(2, 50).s === friend.socialBonus);
+    check('29.1: eksi kimyada sohbet gergin geçer: keyif düşer (dakikada -0,06 / -0,12)', Math.abs(bondAt(-1, 0).f + 0.06) < 1e-9 && Math.abs(bondAt(-2, 0).f + 0.12) < 1e-9 && bondAt(0, 0).f === 0);
+    setChem(A, B, 2);
+    s0.relationships[key] = 50;
+    A.needs.fun = 40; A.needs.social = 40;
+    const fun0 = A.needs.fun;
+    S().behavior.performSocial(A, A.task, ACTIVITIES.fountain, 10);
+    check('29.1: gerçek sohbette (performSocial) güçlü çekim keyfi doldurur', Math.abs(A.needs.fun - fun0 - (friend.funBonus * 1.5 + CD.CHEMISTRY_LEVELS[2].funFlat) * 10) < 1e-6, `${fun0} -> ${A.needs.fun}`);
+
+    // --- Atışma riski ---
+    const conflicts = S().conflicts;
+    const keepTraits = [A.traits, B.traits, A.profile, B.profile];
+    A.traits = ['glutton']; B.traits = ['nightOwl'];
+    const quarrelEvents = [];
+    const offQ = game.events.on('relationship:quarrel', (p) => quarrelEvents.push(p));
+    const tryQ = (n) => { setChem(A, B, n); conflicts.cooldowns.delete(key); const q = s0.stats.quarrels ?? 0; forced(conflicts.rng, 0, () => conflicts.tryQuarrel(A, B, 'chat', 1, null)); return (s0.stats.quarrels ?? 0) - q; };
+    const q0 = tryQ(0);
+    const q2 = tryQ(2);
+    const qm = tryQ(-1);
+    check('29.1: zıt özelliği olmayan çift nötr / olumlu kimyada atışmaz; eksi kimyada atışabilir (traits: null)', q0 === 0 && q2 === 0 && qm === 1 && quarrelEvents.at(-1)?.traits === null, `${q0} ${q2} ${qm}`);
+    check('29.1: eksi kimya atışma olasılığını artırır (x1,5 / x2), güçlü çekim azaltır', CD.CHEMISTRY_LEVELS[-1].quarrel === 1.5 && CD.CHEMISTRY_LEVELS[-2].quarrel === 2 && CD.CHEMISTRY_LEVELS[2].quarrel < 1 && CD.CHEMISTRY_LEVELS[0].quarrel === 1);
+    A.traits = ['cheerful']; B.traits = ['grumpy'];
+    const baseRate = (await import('/src/data/family.js')).CONFLICT.chatChancePerMinute * Math.max(A.profile.quarrelChance, B.profile.quarrelChance) * (s0.relationships[key] < 0 ? (await import('/src/data/family.js')).CONFLICT.feudQuarrelMultiplier : 1);
+    const tryAt = (n, roll) => { setChem(A, B, n); conflicts.cooldowns.delete(key); s0.relationships[key] = 20; const q = s0.stats.quarrels ?? 0; forced(conflicts.rng, roll, () => conflicts.tryQuarrel(A, B, 'chat', 1, null)); return (s0.stats.quarrels ?? 0) - q; };
+    s0.relationships[key] = 20;
+    const rate20 = (await import('/src/data/family.js')).CONFLICT.chatChancePerMinute * Math.max(A.profile.quarrelChance, B.profile.quarrelChance);
+    check('29.1: aynı zarda zıt özellikli çift nötr kimyada atışmaz, -2 kimyada atışır (gerçek ConflictSystem)', tryAt(0, rate20 * 1.5) === 0 && tryAt(-2, rate20 * 1.5) === 1 && baseRate > 0);
+    offQ();
+    [A.traits, B.traits, A.profile, B.profile] = keepTraits;
+    CH.removeTag(A, B.id, 'resentful'); CH.removeTag(B, A.id, 'resentful');
+
+    // --- Aşk zarı kimyaya bakar ---
+    const keepLove = s0.characters.map((c) => [c, c.partnerId, c.married, c.partnerSince]);
+    for (const c of s0.characters) { c.partnerId = null; c.married = false; }
+    let L1 = null; let L2 = null;
+    for (const a of adults) { for (const b of adults) if (a.id < b.id && RSX.canRomance(a, b)) { L1 = a; L2 = b; break; } if (L1) break; }
+    const loveKey = RSX.pairKey(L1.id, L2.id);
+    cast.push(L1, L2);
+    const group = { activity: 'fountain', buildingId: fountain.id, kind: 'chat' };
+    const love = (n, score, roll = 0) => { L1.partnerId = L2.partnerId = null; setChem(L1, L2, n); s0.relationships[loveKey] = score; forced(rel.rng, roll, () => rel.tryRomance(L1, L2, group, 1)); return RSX.arePartners(L1, L2); };
+    check('29.1: kimyası 0 ya da eksi olanlar ilişki puanı 100 olsa da aşık olamaz', !love(0, 100) && !love(-1, 100) && !love(-2, 100));
+    check('29.1: kimya +1: aşk 85 puandan başlar (84\'te olmaz)', !love(1, 84) && love(1, 85));
+    check('29.1: kimya +2: 75 puanda, +3: 65 puanda aşık olur (tutkulu); +2 64 / 74\'te olmaz', !love(2, 74) && love(2, 75) && !love(3, 64) && love(3, 65));
+    const chance1 = RD.ROMANCE.chancePerMinute * (ACTIVITIES.fountain.romanceMultiplier ?? 1) * TSX.buffMultiplier(s0, 'romance');
+    check('29.1: aşk olasılığı kimyayla çarpılır (+1: x1, +2: x2, +3: x3,5): aynı zarda +1 aşık olmaz, +2 ve +3 olur', !love(1, 100, chance1 * 1.5) && love(2, 100, chance1 * 1.5) && !love(2, 100, chance1 * 2.5) && love(3, 100, chance1 * 2.5) && CD.CHEMISTRY_LEVELS[3].romance === 3.5);
+    for (const [c, pid, m, since] of keepLove) { c.partnerId = pid; c.married = m; c.partnerSince = since; }
+
+    // --- Duygusal etiketlerin oluşması ---
+    fresh();
+    const tagEvents = [];
+    const offT = game.events.on('chemistry:tag', (p) => tagEvents.push(p));
+    const home = { id: -77, workerIds: new Set() };
+    const keepHome = A.homeId;
+    A.homeId = home.id;
+    chem.onFireOut(home, [B.id, A.id]); // (olay dinleyicisinin çağırdığı işleyici; sahte olay öteki sistemleri tetiklemesin)
+    check('29.1: yangını söndürene evin sakini MİNNETTAR olur (kendine değil); etiket yönlüdür', CH.hasTag(A, B.id, 'grateful') && !CH.hasTag(B, A.id, 'grateful') && !A.relationships[A.id] && tagEvents.some((e) => e.from === A && e.toId === B.id && e.tag === 'grateful'));
+    A.homeId = keepHome;
+    const C = adults.find((c) => c !== A && c !== B);
+    cast.push(C);
+    game.events.emit('crisis:treatedAt', { character: C, building: { id: -5, workerIds: new Set([B.id]) } });
+    const D = adults.find((c) => ![A, B, C].includes(c));
+    cast.push(D);
+    chem.thankHealers(D, { id: -5, workerIds: new Set([B.id]) });
+    check('29.1: sistem olayları dinler (yangın, şifa, dilekçe, şaheser, mezuniyet, yadigâr, Başusta, kademe, atışma, barışma, aşk, ayrılış, saat)', chem.unsubscribers.length === 14 && CH.hasTag(C, B.id, 'grateful'));
+    check('29.1: yarası sarılan / iyileşen sakin kulübedeki şifacıya minnettar olur', CH.hasTag(C, B.id, 'grateful') && CH.hasTag(D, B.id, 'grateful') && Number.isFinite(C.relationships[B.id].until.grateful));
+    chem.onPetition(C, 'rejected');
+    const afterReject = [...CH.tagsOf(C, CD.RULER_ID)];
+    chem.onPetition(C, 'fulfilled');
+    check('29.1: dilekçesi reddedilen Yönetime KIRGIN olur; dileği karşılanınca kırgınlık minnete döner', afterReject.join() === 'resentful' && CH.tagsOf(C, CD.RULER_ID).join() === 'grateful' && CD.RULER_ID === 0);
+    s0.relationships[RSX.pairKey(C.id, B.id)] = 80;
+    chem.onMasterwork(B, { workerIds: new Set([D.id]) });
+    check('29.1: şaheser çıkaran ustaya en iyi arkadaşları ve iş arkadaşları HAYRAN kalır', CH.hasTag(C, B.id, 'admiration') && CH.hasTag(D, B.id, 'admiration') && !CH.hasTag(B, B.id, 'admiration'));
+    // Hayranlık sınırı: A sırayla B, C, D'ye hayran olur; üçüncüde en eskisi (aynı dakikada: küçük kimlik) silinir
+    const mkAdmirer = () => {
+      const keep = JSON.stringify(A.relationships);
+      for (const o of [B, C, D]) CH.removeTag(A, o.id, 'admiration');
+      for (const o of [B, C, D]) chem.tag(A, o.id, 'admiration');
+      const left = [B, C, D].filter((o) => CH.hasTag(A, o.id, 'admiration')).map((o) => o.id);
+      A.relationships = JSON.parse(keep);
+      return left;
+    };
+    const keepGM = [B.isGrandmaster, B.grandmasterProfession];
+    const keepStages = [A.lifeStage, B.lifeStage];
+    A.lifeStage = B.lifeStage = 'adult';
+    B.isGrandmaster = true;
+    s0.relationships[key] = 30;
+    CH.removeTag(A, B.id, 'admiration');
+    chem.admire(A, B, false);
+    const notAtChat = !CH.hasTag(A, B.id, 'admiration');
+    chem.admire(A, B, true);
+    const admiredGM = CH.hasTag(A, B.id, 'admiration');
+    chem.admire(B, A, true);
+    check('29.1: atölyede yanında çalıştığı Başustaya hayran olur (Başusta ona değil; sohbette değil)', notAtChat && admiredGM && !CH.hasTag(B, A.id, 'admiration'));
+    B.isGrandmaster = keepGM[0];
+    B.lifeStage = 'elder';
+    CH.removeTag(A, B.id, 'admiration');
+    s0.relationships[key] = 30;
+    chem.admire(A, B, false);
+    const strangerSage = CH.hasTag(A, B.id, 'admiration');
+    s0.relationships[key] = 45;
+    chem.admire(A, B, false);
+    check('29.1: sohbet ettiği dostu Kıdemli Bilgeye hayran olur (tanıdık yetmez)', !strangerSage && CH.hasTag(A, B.id, 'admiration'));
+    const adm = mkAdmirer();
+    check('29.1: hayranlık sınırlıdır: üçüncü hayranlık en eskisini (eşitlikte küçük kimliği) siler (en çok 2)', adm.length === 2 && adm.includes(D.id) && !adm.includes(Math.min(B.id, C.id)) && CD.EMOTION_RULES.admireLimit === 2, adm.join());
+    chem.onGraduated(D, B.id);
+    chem.thankHealers(A, { id: -9 });
+    const healer = s0.characters.filter((c) => c !== A && !c.role && !c.isChild && (c.skills?.herbalism ?? 0) >= 480).sort((x, y) => (y.skills.herbalism ?? 0) - (x.skills.herbalism ?? 0))[0];
+    check('29.1: mezun olan çırak ustasına minnettar olur; kulübe boşsa minnet kasabanın en usta şifacısına gider', CH.hasTag(D, B.id, 'grateful') && (!healer || CH.hasTag(A, healer.id, 'grateful')), healer?.name ?? 'usta şifacı yok');
+    [B.isGrandmaster, B.grandmasterProfession] = keepGM;
+    [A.lifeStage, B.lifeStage] = keepStages;
+    CH.removeTag(A, B.id, 'admiration');
+    const shop = S().world.buildings.find((b) => b.workerIds);
+    const keepWorkers = new Set(shop.workerIds);
+    const keepSkills = [{ ...A.skills }, { ...D.skills }];
+    shop.workerIds.clear(); shop.workerIds.add(A.id); shop.workerIds.add(D.id);
+    const keepTaskD = D.task;
+    A.task = { ...A.task, workBuildingId: shop.id };
+    A.skills.crafting = 600; D.skills.crafting = 10;
+    s0.relationships[RSX.pairKey(A.id, D.id)] = 5;
+    chem.onSkillUp(A, 'crafting', { level: 2, name: 'Kalfa' });
+    check('29.1: aynı atölyede kendisinden önce kademe atlayan iş arkadaşını KISKANIR (dostuysa kıskanmaz)', CH.hasTag(D, A.id, 'jealous') && !CH.hasTag(A, D.id, 'jealous'));
+    CH.removeTag(D, A.id, 'jealous');
+    s0.relationships[RSX.pairKey(A.id, D.id)] = 60;
+    chem.onSkillUp(A, 'crafting', { level: 2, name: 'Kalfa' });
+    check('29.1: dostunun terfisini kıskanmaz', !CH.hasTag(D, A.id, 'jealous'));
+    shop.workerIds.clear(); for (const id of keepWorkers) shop.workerIds.add(id);
+    [A.skills, D.skills] = keepSkills;
+    sit(A);
+    // Atışma kırgınlığı ve barışma
+    for (const c of [C, D]) { CH.removeTag(c, D.id, 'resentful'); CH.removeTag(c, C.id, 'resentful'); }
+    const keepProfiles = [C.profile.quarrelChance, D.profile.quarrelChance];
+    C.profile.quarrelChance = 1; D.profile.quarrelChance = 1.5;
+    chem.onQuarrel(C, D);
+    const resentUntil = C.relationships[D.id]?.until.resentful;
+    check('29.1: atışmada haksızlığa uğrayan (sakin mizaçlı) kısa süre KIRGIN kalır (2 gün)', CH.hasTag(C, D.id, 'resentful') && !CH.hasTag(D, C.id, 'resentful') && resentUntil === Math.round(s0.totalMinutes + 2 * 1440), `${resentUntil} ${s0.totalMinutes}`);
+    chem.onReconciled(C, D);
+    check('29.1: barışınca kırgınlık silinir', !CH.hasTag(C, D.id, 'resentful'));
+    [C.profile.quarrelChance, D.profile.quarrelChance] = keepProfiles;
+    // Karşılıksız aşk
+    for (const c of s0.characters) { c.partnerId = null; c.married = false; }
+    const X = adults.find((c) => c !== L1 && c !== L2 && RSX.canRomance(c, L1));
+    if (X) {
+      setChem(X, L1, 2);
+      s0.relationships[RSX.pairKey(X.id, L1.id)] = 70;
+      L1.partnerId = L2.id; L2.partnerId = L1.id;
+      chem.onPartnered(L1, L2);
+    }
+    check('29.1: hoşlandığı kişi başkasına aşık olunca ona KIRGIN, sevdiğini kapana KISKANÇ olur', X && CH.hasTag(X, L1.id, 'resentful') && CH.hasTag(X, L2.id, 'jealous') && !CH.hasTag(L2, X.id, 'jealous'), X?.name);
+    // Eşe ilgi
+    const LNX = await import('/src/systems/Lineage.js');
+    const Y = adults.find((c) => ![L1, L2, X].includes(c) && !RSX.isFamily(c, L1) && !RSX.isFamily(c, L2) && !LNX.closeKin(c, L1)) ?? null;
+    if (Y) {
+      L1.partnerId = L2.id; L2.partnerId = L1.id; Y.partnerId = null;
+      CH.removeTag(L2, Y.id, 'jealous');
+      setChem(Y, L1, 2);
+      chem.attention(Y, L1);
+    }
+    check('29.1: eşiyle / sevgilisiyle güçlü kimyası olan bekârın ilgisini KISKANIR', Y && CH.hasTag(L2, Y.id, 'jealous'), `${Y?.name} kimya ${Y ? chem.get(Y, L1) : '-'}`);
+    for (const [c, pid, m, since] of keepLove) { c.partnerId = pid; c.married = m; c.partnerSince = since; }
+    // Ruh İkizi (gerçek saat başı güncellemesi: kimya yeniden hesaplanır)
+    const keepQuirks = [A.quirk, B.quirk, A.traits, B.traits];
+    A.quirk = B.quirk = 'musician'; A.traits = ['glutton']; B.traits = ['glutton'];
+    for (const x of [A, B]) for (const y of [C, D, L1, L2]) if (x !== y) s0.relationships[RSX.pairKey(x.id, y.id)] = 10; // başka bir ruh ikizi adayı araya girmesin (kişi başı tek bağ)
+    CH.chemistryOf(s0, A, B);
+    A.relationships[B.id].craft = B.relationships[A.id].craft = true;
+    CH.removeTag(A, B.id, 'kindred'); CH.removeTag(B, A.id, 'kindred');
+    s0.relationships[key] = 30;
+    const bonds0 = s0.stats.kindredBonds ?? 0;
+    chem.onHour();
+    const tooEarly = CH.hasTag(A, B.id, 'kindred');
+    s0.relationships[key] = 80;
+    chem.onHour();
+    const realChem = A.relationships[B.id].chemistry;
+    check('29.1: kimyası +2 / +3 olan çift en iyi arkadaş olunca aralarında RUH İKİZİ bağı filizlenir (karşılıklı; günlük ve anı)', realChem >= 2 && !tooEarly && CH.hasTag(A, B.id, 'kindred') && CH.hasTag(B, A.id, 'kindred') && s0.stats.kindredBonds >= bonds0 + 1 && chem.kindredCount(A) === 1 && s0.journal.slice(-12).some((e) => e.text.includes('ruh ikizi') && e.text.includes(A.name) && e.text.includes(B.name)) && A.memories.some((m) => m.text.includes('ruh ikizi')), `kimya ${realChem} erken ${tooEarly} ${JSON.stringify(A.relationships[B.id])} sayaç ${bonds0}->${s0.stats.kindredBonds}`);
+    check('29.1: Ruh İkizi kalıcıdır (süresi yok), öteki etiketlerin bitiş dakikası vardır', A.relationships[B.id].until.kindred === undefined && CD.EMOTION_TAGS.kindred.days === null && Number.isFinite(A.relationships[B.id].until.grateful));
+    A.relationships[B.id].until.grateful = s0.totalMinutes - 1;
+    chem.onHour();
+    check('29.1: süresi dolan etiket saat başı silinir', !CH.hasTag(A, B.id, 'grateful') && A.relationships[B.id].until.grateful === undefined && CH.hasTag(A, B.id, 'kindred'));
+    A.traits = ['cheerful']; B.traits = ['grumpy']; A.quirk = 'craftsman'; B.quirk = 'animalLover';
+    A.relationships[B.id].craft = B.relationships[A.id].craft = false;
+    chem.onHour();
+    check('29.1: kimya değişince (zıt özellik) kayıt saat başı güncellenir ve Ruh İkizi bağı çözülür', A.relationships[B.id].chemistry < 2 && !CH.hasTag(A, B.id, 'kindred') && !CH.hasTag(B, A.id, 'kindred'), A.relationships[B.id].chemistry);
+    [A.quirk, B.quirk, A.traits, B.traits] = keepQuirks;
+    // Zanaat bağı (aynı atölyede birlikte çalışanlar)
+    const saveGroups = rel.groups;
+    const { PROFESSIONS: PRF } = await import('/src/data/apprenticeship.js');
+    const craftShop = S().world.buildings.find((b) => PRF[b.type]) ?? sim.place(Object.keys(PRF)[0]);
+    const keepWp = [C.workplaceId, D.workplaceId, C.isGrandmaster, D.isGrandmaster, C.apprenticeship, D.apprenticeship, C.mentees, D.mentees];
+    C.workplaceId = D.workplaceId = null; C.isGrandmaster = D.isGrandmaster = false; C.apprenticeship = D.apprenticeship = null; C.mentees = []; D.mentees = [];
+    C.relationships = {}; D.relationships = {};
+    const plain = CH.refreshChemistry(s0, C, D);
+    rel.groups = [{ id: 'work:job:1', kind: 'work', buildingId: craftShop.id, members: [C, D] }];
+    for (let i = 0; i < 30; i++) chem.onHour();
+    const siteBond = C.relationships[D.id].craft;
+    rel.groups = [{ id: `work:building:${craftShop.id}`, kind: 'work', buildingId: craftShop.id, members: [C, D] }];
+    for (let i = 0; i < 23; i++) chem.onHour();
+    const early = C.relationships[D.id].craft;
+    chem.onHour();
+    check('29.1: aynı atölyede 24 saat birlikte çalışanlar kalıcı zanaat bağı kurar (+1 kimya; şantiyede ve 23 saatte kurulmaz)', !siteBond && !early && C.relationships[D.id].craft && D.relationships[C.id].craft && C.relationships[D.id].together === 24 && C.relationships[D.id].chemistry === Math.min(3, plain + 1), `${plain} -> ${C.relationships[D.id].chemistry} (${craftShop.type})`);
+    [C.workplaceId, D.workplaceId, C.isGrandmaster, D.isGrandmaster, C.apprenticeship, D.apprenticeship, C.mentees, D.mentees] = keepWp;
+    rel.groups = saveGroups;
+
+    // --- Etiketlerin davranışa yansıması ---
+    fresh();
+    sit(A); sit(B, 14);
+    setChem(A, B, 0);
+    CH.addTag(A, B.id, 'grateful', s0.totalMinutes);
+    forced(rel.rng, 0.999, () => rel.update({ gameMinutes: 1, hour: 12 }));
+    B.needs.fun = 40; B.needs.hunger = 40; A.needs.fun = 40; A.speech = null;
+    const treats0 = s0.stats.treats ?? 0;
+    chem.treatDays.clear();
+    chem.update({ gameMinutes: 1, hour: 12 });
+    const afterTreat = { fun: B.needs.fun, hunger: B.needs.hunger, giver: A.needs.fun, speech: A.speech?.text, n: (s0.stats.treats ?? 0) - treats0 };
+    chem.update({ gameMinutes: 1, hour: 12 });
+    check('29.1: minnettar sakin aynı sohbette karşısındakine İKRAMDA bulunur (keyif +5, tokluk +4, söz; günde bir kez)', afterTreat.fun === 45 && afterTreat.hunger === 44 && afterTreat.giver === 42 && afterTreat.n === 1 && CD.TREAT_LINES.some((l) => l.replace('{name}', B.name) === afterTreat.speech) && (s0.stats.treats ?? 0) - treats0 === 1 && B.needs.fun === 45, JSON.stringify(afterTreat));
+    const brain = S().behavior.brain;
+    check('29.1: minnettar olduğu kişinin oturduğu yere meyleder (companyMood +1), sohbette onu öne alır', brain.companyMood(A, [B, C]) === 1 && brain.companyMood(B, [A, C]) === 0 && CD.EMOTION_RULES.gratefulVenue > 1);
+    CH.addTag(A, B.id, 'resentful', s0.totalMinutes);
+    check('29.1: kırgınlık minneti siler; kırgın sakin o kişinin oturduğu masadan kaçınır (companyMood -1, ağırlık x0,1)', !CH.hasTag(A, B.id, 'grateful') && brain.companyMood(A, [C, B]) === -1 && CD.EMOTION_RULES.resentVenue === 0.1);
+    for (const [c] of others) if (c.task?.buildingId === fountain.id) c.task = null;
+    A.task = null; A.needs.social = 10;
+    const joinPlan = forced(brain.rng, 0.5, () => brain.planSocial(A, 12));
+    CH.removeTag(A, B.id, 'resentful');
+    const joinPlan2 = forced(brain.rng, 0.5, () => brain.planSocial(A, 12));
+    check('29.1: kırgın olduğu kişinin oturduğu toplanma yerine katılmaz; kırgınlık geçince katılır (gerçek Brain.planSocial)', joinPlan?.buildingId !== fountain.id && joinPlan2?.buildingId === fountain.id, `${joinPlan?.buildingId} / ${joinPlan2?.buildingId} (${fountain.id})`);
+    CH.addTag(A, B.id, 'resentful', s0.totalMinutes);
+    sit(A);
+    check('29.1: kırgın olduğu kişiyi sohbete çağırmaz; kırgınla sohbet puan kazandırmaz, keyif kaçırır', rel.chatMultiplier(A, B) === 0 && rel.chatMultiplier(B, A) === 0 && bondAt(0, 0).f === CD.EMOTION_RULES.resentFun && (() => { const o = B.task; B.task = null; const p = forced(brain.rng, 0.5, () => brain.findPartner(A, 12)); B.task = o; return p !== B; })());
+    sit(C, -14);
+    setChem(A, C, 0);
+    s0.relationships[RSX.pairKey(A.id, C.id)] = 0; s0.relationships[key] = 80;
+    check('29.1: aynı yerde kırgın olduğu yakın dostu yerine başkasına döner (nearestPartner)', S().behavior.nearestPartner(A, A.task) === C);
+    CH.removeTag(A, B.id, 'resentful');
+    CH.addTag(A, C.id, 'jealous', s0.totalMinutes);
+    check('29.1: kıskandığı kişiyle sohbet yarı hızda ilerler', rel.chatMultiplier(A, C) === 0.5);
+    // Şantiyeye yardıma gitme
+    sim.give({ wood: 400, stone: 300 });
+    const site1 = sim.place('cabin', { instant: false });
+    const site2 = sim.place('cabin', { instant: false });
+    const jobs = S().jobs;
+    const j1 = jobs.jobs.find((j) => j.buildingId === site1?.id);
+    const j2 = jobs.jobs.find((j) => j.buildingId === site2?.id);
+    let helpDetail = 'şantiye kurulamadı';
+    let helpOk = false;
+    if (j1 && j2) {
+      const keepW = [A.workplaceId, A.retired, { ...A.relationships }];
+      A.workplaceId = null; A.retired = false;
+      for (const j of jobs.jobs) j.assignees = j.assignees.filter((id) => id !== A.id && id !== B.id);
+      const origin = { x: Math.round((site1.tileX + site2.tileX) / 2), y: Math.round((site1.tileY + site2.tileY) / 2) + 1 };
+      CH.removeTag(A, B.id, 'grateful');
+      const plain = jobs.findWorkFor(A, origin);
+      const far = plain?.job === j1 ? j2 : j1;
+      far.assignees.push(B.id);
+      const still = jobs.findWorkFor(A, origin);
+      CH.addTag(A, B.id, 'grateful', s0.totalMinutes);
+      const helped = jobs.findWorkFor(A, origin);
+      helpOk = (plain?.job === j1 || plain?.job === j2) && still?.job === plain.job && helped?.job === far;
+      helpDetail = `${plain?.job?.id} -> ${still?.job?.id} -> ${helped?.job?.id} (uzak ${far.id})`;
+      far.assignees = far.assignees.filter((id) => id !== B.id);
+      A.workplaceId = keepW[0]; A.retired = keepW[1];
+    }
+    check('29.1: minnettar olduğu kişinin çalıştığı şantiyeye yardıma gider (gerçek JobSystem.findWorkFor)', helpOk && CD.EMOTION_RULES.helpTiles === 10, helpDetail);
+
+    // --- Yolda karşılaşma: şimşek ve etiketli selam ---
+    fresh();
+    const liveGroups = rel.groups;
+    rel.groups = []; // sohbet grubu kalmasın: ikram sözü selamın önüne geçmesin
+    const walk = (c, dx) => { c.task = { activity: 'stroll', phase: 'travel' }; c.visible = true; c.away = null; c.x = fountain.center.x + dx; c.y = fountain.center.y + 40; c.bubble = null; c.speech = null; };
+    for (const [c] of others) if (c.task?.phase === 'travel') c.task = null;
+    walk(A, 0); walk(B, 8);
+    setChem(A, B, 2);
+    chem.encounterCooldowns.clear();
+    const sparks0 = s0.stats.sparks ?? 0;
+    const sparkEvents = [];
+    const offS = game.events.on('chemistry:spark', (p) => sparkEvents.push(p));
+    chem.update({ gameMinutes: 1, hour: 12 });
+    const sparked = A.bubble?.icon === 'spark' && B.bubble?.icon === 'spark' && (s0.stats.sparks ?? 0) === sparks0 + 1 && sparkEvents.length === 1 && sparkEvents[0].chemistry === 2;
+    const sparkLine = (A.id < B.id ? A : B).speech?.text;
+    chem.update({ gameMinutes: 1, hour: 12 });
+    check('29.1: kimyası +2 / +3 olan iki sakin yolda karşılaşınca başlarında mavi şimşek çakar (aynı çift günde bir kez)', sparked && (s0.stats.sparks ?? 0) === sparks0 + 1 && CD.SPARK_GREETINGS.includes(sparkLine) && CD.EMOTION_RULES.encounterCooldown === 1440, `${A.bubble?.icon} ${sparkLine}`);
+    check('29.1: şimşek balonunun görseli tanımlı (çizilebilir sprite)', Boolean(UIX.getBubbleSprite('spark')) && UIX.getAnyIconURL('spark').startsWith('data:image'));
+    walk(A, 0); walk(B, 8);
+    setChem(A, B, 0);
+    chem.encounterCooldowns.clear();
+    chem.update({ gameMinutes: 1, hour: 12 });
+    const quiet = !A.bubble && !A.speech && !B.speech;
+    CH.addTag(A, B.id, 'resentful', s0.totalMinutes);
+    CH.addTag(B, A.id, 'grateful', s0.totalMinutes);
+    chem.encounterCooldowns.clear();
+    chem.update({ gameMinutes: 1, hour: 12 });
+    check('29.1: nötr çift sessizce geçer; etiketi olan sakinin selamı değişir ("Yine mi sen...", "… minnettarım!")', quiet && CD.TAG_GREETINGS.resentful.some((l) => l.replace('{name}', B.name) === A.speech?.text) && CD.TAG_GREETINGS.grateful.some((l) => l.replace('{name}', A.name) === B.speech?.text) && A.bubble?.icon === 'sulk' && B.bubble?.icon === 'heart' && CD.TAG_GREETINGS.resentful.includes('Yine mi sen...') && CD.TAG_GREETINGS.grateful.includes('Ustam, sana minnettarım!'), `${A.speech?.text} / ${B.speech?.text}`);
+    A.speech = { text: 'Deneme', at: -1, duration: 2 };
+    chem.encounterCooldowns.clear();
+    chem.update({ gameMinutes: 1, hour: 12 });
+    check('29.1: süren bir sözün üstüne yazılmaz', A.speech.text === 'Deneme');
+    rel.groups = liveGroups;
+    offS();
+
+    // --- Arayüz: kimya rozeti ve etiket çipleri ---
+    fresh();
+    A.speech = null; B.speech = null;
+    s0.relationships[key] = 60;
+    setChem(A, B, 2);
+    CH.addTag(A, B.id, 'grateful', s0.totalMinutes);
+    CH.addTag(A, B.id, 'admiration', s0.totalMinutes);
+    CH.addTag(A, CD.RULER_ID, 'resentful', s0.totalMinutes);
+    setChem(A, C, -1);
+    s0.relationships[RSX.pairKey(A.id, C.id)] = -30;
+    game.events.emit('ui:selectCharacter', A.id);
+    game.render(0);
+    const rows = [...document.querySelectorAll('.relation-row')];
+    const rowB = rows.find((r) => r.querySelector('.relation-name')?.textContent.includes(B.name));
+    const rowC = rows.find((r) => r.querySelector('.relation-name')?.textContent.includes(C.name));
+    check('29.1: Karakter Kartı ilişki satırında kimya rozeti: güçlü çekimde çift şimşek, antipatide kırık çizgi', rowB?.querySelector('.chemistry-badge')?.textContent === '⚡⚡' && rowB.querySelector('.chemistry-badge').title.includes('Kimya +2') && rowC?.querySelector('.chemistry-badge')?.textContent === '⌁' && rowC.querySelector('.chemistry-badge').classList.contains('is-antipathy'), `${rowB?.querySelector('.chemistry-badge')?.textContent} ${rowC?.querySelector('.chemistry-badge')?.textContent}`);
+    const chips = [...(rowB?.querySelectorAll('.emotion-chip') ?? [])].map((x) => x.textContent);
+    check('29.1: ilişki çubuğunun altında etiket çipleri ([Minnettar] [Hayran]); Yönetime karşı his ayrı satırda', chips.join() === 'Minnettar,Hayran' && rowB.querySelector('.emotion-chip.is-grateful') && document.querySelector('.relation-ruler .emotion-chip.is-resentful')?.textContent === 'Kırgın' && rowB.querySelector('.emotion-chips').previousElementSibling.classList.contains('relation-bar'), chips.join());
+    CH.removeTag(A, B.id, 'admiration');
+    game.render(0);
+    check('29.1: etiket değişince kart yenilenir', [...document.querySelectorAll('.relation-row')].find((r) => r.querySelector('.relation-name')?.textContent.includes(B.name))?.querySelectorAll('.emotion-chip').length === 1);
+    game.events.emit('ui:selectCharacter', null);
+
+    // --- Kayıt (sürüm 36) ---
+    const rawSave = JSON.parse(JSON.stringify(S().saves.snapshot()));
+    const rawA = rawSave.characters.find((c) => c.id === A.id);
+    check('29.1: kimya ve etiketler kayda yazılır (characters[].relationships { chemistry, craft, together, tags, until })', rawA.relationships[B.id].chemistry === 2 && rawA.relationships[B.id].tags.join() === 'grateful' && Number.isFinite(rawA.relationships[B.id].until.grateful) && rawA.relationships[0].tags.join() === 'resentful' && rawA.relationships[B.id].craft === false);
+    const back = Character.fromJSON(rawA);
+    check('29.1: kayıttan yükleme birebir (gidiş-dönüş)', JSON.stringify(back.toJSON().relationships) === JSON.stringify(rawA.relationships));
+    const dirty = CH.sanitizeRelations({ 7: { chemistry: 99, tags: ['grateful', 'dragon', 'grateful'], until: { grateful: 'x' } }, 8: { chemistry: 'bozuk', tags: 'x' }, [A.id]: { chemistry: 1, tags: [] }, abc: { chemistry: 1 }, 9: null, '-3': { chemistry: 1 } }, A.id);
+    check('29.1: bozuk kayıt temizlenir (sınır dışı kimya, bilinmeyen etiket, kendine / geçersiz kimliğe işaret eden kayıt)', JSON.stringify(dirty) === JSON.stringify({ 7: { chemistry: 3, craft: false, together: 0, tags: ['grateful'], until: { grateful: 0 } }, 8: { chemistry: 0, craft: false, together: 0, tags: [], until: {} } }) && JSON.stringify(CH.sanitizeRelations(null)) === '{}' && JSON.stringify(CH.sanitizeRelations([1, 2])) === '{}', JSON.stringify(dirty));
+    const ghost = { relationships: { 424242: { chemistry: 1, craft: false, tags: [], until: {} }, 0: { chemistry: 0, craft: false, tags: ['grateful'], until: { grateful: 5 } } }, id: A.id };
+    const pruned = CH.pruneRelations([ghost]);
+    check('29.1: kasabadan ayrılan / vefat eden sakine işaret eden kayıt silinir (Yönetim kaydı kalır)', pruned === 1 && !ghost.relationships[424242] && ghost.relationships[0]);
+    const legacy = JSON.parse(JSON.stringify(rawSave));
+    legacy.version = 35;
+    for (const c of legacy.characters) delete c.relationships;
+    const keepSlot = localStorage.getItem(CONFIG.SESSION_KEY);
+    localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
+    const migrated = SMX.SaveManager.read('session');
+    if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
+    const mById = new Map((migrated?.characters ?? []).map((c) => [c.id, c]));
+    const pairs = Object.keys(legacy.relationships).map((k) => k.split('-').map(Number)).filter(([a, b]) => mById.has(a) && mById.has(b));
+    const boundOk = pairs.length > 0 && pairs.every(([a, b]) => { const ra = mById.get(a).relationships[b]; const rb = mById.get(b).relationships[a]; return ra && rb && ra.chemistry === rb.chemistry && ra.chemistry === CH.chemistryFor(legacy.seed, mById.get(a), mById.get(b)) && ra.tags.length === 0 && ra.craft === false; });
+    check('29.1: v35 kaydı v36\'ya göç eder: her mevcut ilişkiye deterministik kimya ve boş etiket yapısı bağlanır', CONFIG.SAVE_VERSION === 36 && migrated && boundOk && migrated.characters.every((c) => c.relationships && typeof c.relationships === 'object'), `${pairs.length} çift`);
+    const again = (() => { localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy)); const m = SMX.SaveManager.read('session'); if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot); return m; })();
+    check('29.1: göç deterministiktir (iki kez göç birebir aynı kayıt)', JSON.stringify(again.characters.map((c) => c.relationships)) === JSON.stringify(migrated.characters.map((c) => c.relationships)));
+
+    // Temizlik
+    offT();
+    for (const [c, json] of keepRel) c.relationships = JSON.parse(json);
+    for (const k of Object.keys(s0.relationships)) delete s0.relationships[k];
+    Object.assign(s0.relationships, JSON.parse(keepScores));
+    for (const [c, task, visible, x, y, pose, inside, needs, speech, bubble] of keepTasks) Object.assign(c, { task, visible, x, y, pose, insideBuildingId: inside, speech, bubble }, { needs });
+    for (const [c, task] of others) c.task = task;
+    D.task = keepTaskD;
+    C.task = others.find(([c]) => c === C)?.[1] ?? null;
+    for (const k of ['sparks', 'treats', 'emotionTags', 'kindredBonds', 'tagGreetings', 'quarrels']) { if (keepStats[k] === undefined) delete s0.stats[k]; else s0.stats[k] = keepStats[k]; }
+    chem.encounterCooldowns.clear();
+    chem.treatDays.clear();
   }
 
   return out;

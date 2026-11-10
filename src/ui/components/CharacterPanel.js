@@ -21,7 +21,9 @@ import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
 import { EQUIPMENT, EQUIPMENT_SLOTS, SLOT_KEYS } from '../../data/equipment.js';
-import { topFriends, worstRelation, partnerOf, childrenOf, getFriendship } from '../../systems/RelationshipSystem.js';
+import { topFriends, worstRelation, partnerOf, childrenOf, getFriendship, levelForScore } from '../../systems/RelationshipSystem.js';
+import { chemistryFor, chemistryLevel, tagsOf } from '../../systems/Chemistry.js';
+import { EMOTION_TAGS, RULER_ID } from '../../data/chemistry.js';
 import { topSkills, progressToNext, primarySkill } from '../../systems/SkillSystem.js';
 import { isShivering } from '../../systems/HeatingSystem.js';
 import { coldProtection } from '../../systems/Equipment.js';
@@ -557,18 +559,48 @@ export class CharacterPanel {
       ...friends.map((f) => ({ ...f, kind: 'friend' })),
       ...(rival ? [{ ...rival, kind: 'rival' }] : []),
     ];
-    const key = entries.map((e) => `${e.kind}:${e.character.id}:${Math.floor(e.score)}`).join('|');
+    // (29.1) Etiketi olan ama listeye girmeyen sakinler de (minnettar olduğu şifacı, kırgın olduğu komşu...) gösterilir
+    const listed = new Set(entries.map((e) => e.character.id));
+    for (const other of state.characters) {
+      if (other === character || listed.has(other.id) || tagsOf(character, other.id).length === 0) continue;
+      const score = getFriendship(state, character, other);
+      entries.push({ character: other, score, level: levelForScore(score), kind: score < 0 ? 'rival' : 'friend' });
+    }
+    for (const e of entries) {
+      e.chemistry = character.relationships?.[e.character.id]?.chemistry ?? chemistryFor(state.seed, character, e.character);
+      e.tags = tagsOf(character, e.character.id);
+    }
+    const rulerTags = tagsOf(character, RULER_ID);
+    const key = `${entries.map((e) => `${e.kind}:${e.character.id}:${Math.floor(e.score)}:${e.chemistry}:${e.tags.join(',')}`).join('|')}#${rulerTags.join(',')}`;
     if (key === this.lastRelations) return;
     this.lastRelations = key;
 
+    // Yönetime (oyuncuya) karşı hisler: dilekçesi reddedildiyse kırgın, dileği karşılandıysa minnettar
+    const rulerRow = rulerTags.length ? [el('div', { className: 'relation-ruler' }, [el('span', { className: 'family-label', text: 'Yönetime karşı' }), this.tagChips(rulerTags)])] : [];
+    if (entries.length === 0 && rulerRow.length) {
+      this.relationsList.replaceChildren(...rulerRow);
+      return;
+    }
     if (entries.length === 0) {
       this.relationsList.replaceChildren(el('div', { className: 'relations-empty', text: 'Henüz yakın bir bağı yok. Sohbet ettikçe ve birlikte çalıştıkça arkadaş olurlar.' }));
       return;
     }
-    this.relationsList.replaceChildren(...entries.map((entry) => this.relationRow(character, entry)));
+    this.relationsList.replaceChildren(...entries.map((entry) => this.relationRow(character, entry)), ...rulerRow);
   }
 
-  relationRow(character, { character: other, score, level, kind }) {
+  /** (29.1) Duygusal etiket çipleri: [Minnettar] [Hayran] [Kırgın]... */
+  tagChips(tags) {
+    return el('span', { className: 'emotion-chips' }, tags.map((t) => el('span', { className: `emotion-chip is-${EMOTION_TAGS[t].color}`, text: EMOTION_TAGS[t].name, title: EMOTION_TAGS[t].description })));
+  }
+
+  /** (29.1) Kimya rozeti: ⚡⚡ güçlü çekim, ⚡ uyum, kırık çizgi antipati (nötrde rozet yok). */
+  chemistryBadge(chemistry) {
+    if (!chemistry) return null;
+    const level = chemistryLevel(chemistry);
+    return el('span', { className: `chemistry-badge is-${level.key}`, text: level.icon, title: `Kimya ${chemistry > 0 ? '+' : ''}${chemistry}: ${level.name}` });
+  }
+
+  relationRow(character, { character: other, score, level, kind, chemistry = 0, tags = [] }) {
     const isRival = kind === 'rival';
     const isPartner = kind === 'partner';
     const label = isPartner ? (character.married ? 'Eşi' : 'Sevgilisi') : level.name;
@@ -578,11 +610,13 @@ export class CharacterPanel {
     const name = el('span', { className: 'relation-name' }, [
       other.name,
       ...(isPartner ? [el('img', { className: 'relation-heart', src: getAnyIconURL(character.married ? 'ring' : 'love'), alt: '' })] : []),
+      ...(chemistry ? [this.chemistryBadge(chemistry)] : []),
     ]);
     const row = el('button', { className: `relation-row${isRival ? ' is-rival' : ''}${isPartner ? ' is-partner' : ''}`, type: 'button', tabIndex: -1, title: `${other.name}: ${Math.floor(score)} puan · tıkla ve seç` }, [
       el('img', { className: 'relation-portrait', src: getCharacterPortraitURL(other.appearance, other.look), alt: '' }),
       el('div', { className: 'relation-info' }, [name, el('span', { className: `relation-level ${levelClass}`, text: isRival ? `${label} · anlaşamıyorlar` : label })]),
       el('span', { className: 'need-bar relation-bar' }, [el('span', { className: `need-fill relation-fill ${levelClass}`, style: `width: ${width}%` })]),
+      ...(tags.length ? [this.tagChips(tags)] : []),
     ]);
     row.addEventListener('mousedown', (e) => e.preventDefault());
     row.addEventListener('click', () => this.events.emit('ui:selectCharacter', other.id));

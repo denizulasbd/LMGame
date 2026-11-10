@@ -59,7 +59,10 @@
 //   save-v30.json: 26.2'nin oyunu (kayıt sürümü 30, bugünkü): otopilotla 73 gün (--crisis-state); 72. gün (Yaz Güneşi Şenliği panayırı) hazırlık evresinde kurulmuş Zengin Şölen Sofrası
 //                  (currentFeast: 5 fıçı şerbet, 9 ekmek, 22 yiyecek, 1 kumaş bağışı, 32 ikram), daha önce 10 sofra ve 171 ikram. Eski kayıtlarda
 //                  (sürüm 2-29) currentFeast yoktur: null ile açılır
-//   save-v35.json: 28.4'ün oyunu (kayıt sürümü 35, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42: Bereketli Delta, Tarım Doktrini, seviye 4 G30, Altın Çağ G51).
+//   save-v36.json: 29.1'in oyunu (kayıt sürümü 36, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin kimya kayıtları, zanaat bağları ve
+//                  duygusal etiketleri (Minnettar, Hayran, Kırgın, Kıskanç, Ruh İkizi; Yönetime karşı hisler). Eski kayıtlarda (sürüm 2-35)
+//                  characters[].relationships yoktur: her mevcut ilişkiye deterministik kimya ve boş etiket yapısı bağlanır
+//   save-v35.json: 28.4'ün oyunu (kayıt sürümü 35): otopilotla 72 gün (--crisis-state; tohum 42: Bereketli Delta, Tarım Doktrini, seviye 4 G30, Altın Çağ G51).
 //   save-v34.json: 28.3'ün oyunu (kayıt sürümü 34, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42; 64. gün ilk Saygın Büyük Deniz, kotaya sayılan 30 / toplam 31).
 //   save-v33.json: 28.2'nin oyunu (kayıt sürümü 33, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42, 28.2 kurallarıyla yeni referans; 3 Başusta).
 //   save-v32.json: 28.1'in oyunu (kayıt sürümü 32): otopilotla 72 gün (--crisis-state; tohum 42, 28.1 kurallarıyla yeni referans).
@@ -70,7 +73,7 @@
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -211,6 +214,17 @@ for (const { name, raw } of fixtures) {
     loaded.fair = { cf: JSON.parse(JSON.stringify(s.currentFestival)), first: JSON.parse(JSON.stringify(s.chronicle.firstFair)), fairs: s.stats.fairs ?? 0, time: { day: s.time.day, hour: s.time.hour } };
     // (28.4) Vadi Karakteri ve Kasaba Doktrini (yüklendiği an)
     loaded.valley = { key: s.valley, expected: (await import('/src/systems/Valley.js')).valleyFor(s.seed), doctrine: JSON.stringify(s.doctrine), tradeCharter: s.civic.tradeCharter };
+    // (29.1) Sosyal kimya ve duygusal etiketler (yüklendiği an)
+    const chemSnap = () => (() => {
+      const byId = new Map(s.characters.map((c) => [c.id, c]));
+      const pairs = Object.keys(s.relationships).map((k) => k.split('-').map(Number)).filter(([a, b]) => byId.has(a) && byId.has(b));
+      let bound = 0; let symmetric = 0; let dangling = 0; let range = true; let tags = 0; let records = 0;
+      for (const [a, b] of pairs) { const ra = byId.get(a).relationships[b]; const rb = byId.get(b).relationships[a]; if (ra && rb) bound++; if (ra && rb && ra.chemistry === rb.chemistry) symmetric++; }
+      for (const c of s.characters) for (const [k, r] of Object.entries(c.relationships ?? {})) { records++; if (k !== '0' && !byId.has(Number(k))) dangling++; if (!Number.isInteger(r.chemistry) || r.chemistry < -2 || r.chemistry > 3) range = false; tags += r.tags.length; }
+      return { pairs: pairs.length, bound, symmetric, dangling, range, tags, records, json: JSON.stringify(s.characters.map((c) => [c.id, c.relationships])) };
+    })();
+    loaded.chemistry = chemSnap();
+    loaded.chemistryFor = await (async () => { const CH = await import('/src/systems/Chemistry.js'); const byId = new Map(s.characters.map((c) => [c.id, c])); return Object.keys(s.relationships).map((k) => k.split('-').map(Number)).filter(([a, b]) => byId.has(a) && byId.has(b)).every(([a, b]) => { const x = byId.get(a).relationships[b]?.chemistry; return x >= -2 && x <= 3 && Math.abs(x - CH.chemistryFor(s.seed, byId.get(a), byId.get(b))) <= 1; }); })();
     // (25.4) Aile Kütüğü (yüklendiği an)
     loaded.lineage = {
       people: s.characters.filter((c) => !c.role).map((c) => ({ id: c.id, g: c.generation, f: c.familyId, p: [...(c.parents ?? [])], pi: [...c.parentIds], k: [...(c.children ?? [])], fam: Boolean(s.lineage.families[c.familyId]) })),
@@ -279,6 +293,7 @@ for (const { name, raw } of fixtures) {
       crownAfter: { pop: s.characters.length, left: s.exodus.left, active: Boolean(s.exodus.active), rate: s.tax.rate },
       apprAfter: { ok: s.characters.every((c) => !c.apprenticeship || (c.lifeStage === 'youth' && s.buildings.some((b) => b.id === c.apprenticeship.buildingId) && c.apprenticeship.progress >= 0 && c.apprenticeship.progress <= 100)), n: s.characters.filter((c) => c.apprenticeship).length },
       lifeAfter: s.characters.map((c) => ({ id: c.id, days: c.ageInDays, stage: c.lifeStage, child: c.isChild })),
+      chemistryAfter: (() => { const c = chemSnap(); delete c.json; return c; })(),
       tradeAfter: { visits: s.tradePost.visits, scheduled: s.tradePost.nextShipAt !== null || Boolean(s.tradePost.ship) },
       agriAfter: { crops: s.buildings.filter((b) => b.type === 'garden').map((b) => b.crop), capacity: s.granaryCapacity },
       crisisAfter: { fires: s.crisis.fires, raids: s.crisis.raids, raidPending: s.crisis.raid !== null, nextWarn: s.crisis.nextRaidWarnAt, burning: s.buildings.filter((b) => b.isBurning).length, injured: s.characters.filter((c) => c.isInjured).length, day: s.time.day },
@@ -480,6 +495,18 @@ for (const { name, raw } of fixtures) {
       results.push({ name: `${tag}: iskele, gemi takvimi, sözleşmeler, pazar çarpanları ve sayaçlar korundu`, ok: D.json === want && D.posts === data.buildings.filter((b) => b.type === 'tradingPost').length, detail: `${t.visits} ziyaret · ${t.completed} sözleşme · +${t.goldEarned} altın` });
       results.push({ name: `${tag}: bir gün sonra takvim sürüyor`, ok: r.tradeAfter.scheduled && r.tradeAfter.visits >= t.visits });
     }
+  }
+  // (29.1) Sosyal kimya ve duygusal etiketler
+  {
+    const C = r.loaded.chemistry;
+    const after = r.chemistryAfter;
+    if (data.version < 36) {
+      results.push({ name: `${tag}: mevcut her ilişkiye deterministik kimya bağlandı (iki yönlü, -2..+3), etiket yok`, ok: C.pairs === C.bound && C.bound === C.symmetric && C.range && C.tags === 0 && C.dangling === 0 && r.loaded.chemistryFor, detail: `${C.bound}/${C.pairs} çift` });
+    } else {
+      const want = JSON.stringify(data.characters.map((c) => [c.id, c.relationships]));
+      results.push({ name: `${tag}: kimya, zanaat bağı ve duygusal etiketler korundu`, ok: C.json === want && C.range && C.dangling === 0 && C.records > 0, detail: `${C.records} kayıt · ${C.tags} etiket` });
+    }
+    results.push({ name: `${tag}: bir gün sonra kimya kayıtları tutarlı (kopuk kayıt yok, iki yönlü, sınır içinde)`, ok: after.dangling === 0 && after.range && after.bound === after.symmetric, detail: `${after.records} kayıt · ${after.tags} etiket` });
   }
   // (28.4) Vadi Karakteri ve Kasaba Doktrini
   {

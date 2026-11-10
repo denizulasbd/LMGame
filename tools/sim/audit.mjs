@@ -831,6 +831,37 @@ const PAGE_HELPERS = () => {
       s.goldenAge.since = keepGA;
     }
 
+    // --- 2y. (29.1) Sosyal kimya ve duygusal etiketler: kayıt -> yükleme durum kayması yok; kopuk kayıt yüklemede temizlenir ---
+    {
+      const CH = await import('/src/systems/Chemistry.js');
+      const pick = () => s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((x, y) => x.id - y.id).slice(0, 3);
+      const [a, b, c3] = pick();
+      const ids = [a.id, b.id, c3.id];
+      const before = new Map([a, b, c3].map((c) => [c.id, JSON.stringify(c.relationships)]));
+      CH.chemistryOf(s, a, b);
+      CH.chemistryOf(s, a, c3);
+      CH.addTag(a, b.id, 'grateful', s.totalMinutes);
+      CH.addTag(b, a.id, 'jealous', s.totalMinutes);
+      CH.addTag(a, 0, 'resentful', s.totalMinutes);
+      CH.addTag(a, c3.id, 'kindred', s.totalMinutes);
+      CH.addTag(c3, a.id, 'kindred', s.totalMinutes);
+      a.relationships[b.id].together = b.relationships[a.id].together = 24;
+      a.relationships[b.id].craft = b.relationships[a.id].craft = true;
+      CH.refreshChemistry(s, a, b);
+      const want = JSON.stringify(s.characters.map((c) => [c.id, c.relationships]));
+      const diff = A.roundtrip();
+      check('(29.1) kimya, zanaat bağı ve duygusal etiketler kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const [a2, b2, c2] = ids.map((id) => s.characters.find((c) => c.id === id));
+      check('(29.1) yüklenen kayıtlar birebir aynı (yönlü etiketler, Yönetime kırgınlık, ruh ikizi, zanaat bağı)', JSON.stringify(s.characters.map((c) => [c.id, c.relationships])) === want && CH.hasTag(a2, b2.id, 'grateful') && !CH.hasTag(b2, a2.id, 'grateful') && CH.hasTag(b2, a2.id, 'jealous') && CH.hasTag(a2, 0, 'resentful') && CH.hasTag(c2, a2.id, 'kindred') && a2.relationships[b2.id].craft === true);
+      check('(29.1) yüklemeden sonra kimya aynı hesaplanır (kimlik çifti + tohum: deterministik)', a2.relationships[b2.id].chemistry === CH.chemistryFor(s.seed, a2, b2) && a2.relationships[c2.id].chemistry === CH.chemistryFor(s.seed, a2, c2));
+      a2.relationships[987654] = { chemistry: 2, craft: false, together: 0, tags: ['grateful'], until: { grateful: s.totalMinutes + 999 } };
+      A.roundtrip();
+      const a3 = s.characters.find((c) => c.id === ids[0]);
+      check('(29.1) kayıp sakine işaret eden kimya kaydı yüklemede temizlenir (Yönetim kaydı kalır)', !a3.relationships[987654] && CH.hasTag(a3, 0, 'resentful') && CH.hasTag(a3, ids[1], 'grateful'));
+      for (const id of ids) { const c = s.characters.find((x) => x.id === id); c.relationships = JSON.parse(before.get(id)); }
+      for (const c of s.characters) for (const id of ids) { const r = c.relationships[id]; const back = s.characters.find((x) => x.id === id).relationships[c.id]; if (r && !back) delete c.relationships[id]; }
+    }
+
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();

@@ -260,6 +260,8 @@ LMGame/
     │   ├── SkillSystem.js  Meslek deneyimi, kademe atlama, ustalık iş hızı bonusu
     │   ├── MilestoneSystem.js Kasaba hedefleri: ilerleme, tamamlanma, kış sınavı takibi, anıt kutlaması
     │   ├── TownLevelSystem.js Kasaba seviyesi: ortalama refah, seviye atlama ve kutlama, belediyenin erzak dengesi
+    │   ├── Chemistry.js    (29.1) Sosyal kimyanın saf hesapları: kıvılcım (izole üreteç), kişilik / huy / zanaat uyumu, yönlü etiketler, kayıt göçü
+    │   ├── ChemistrySystem.js (29.1) Duygusal etiketlerin doğması (olaylar), saat başı kimya, ikram, yolda şimşek ve etiketli selam
     │   ├── HealthSystem.js Maruziyet, üşütme, kendiliğinden iyileşme, şifacıda tedavi ve Dinçlik
     │   ├── AnimalSystem.js Yaban hayatı (dolaşma, ürküp kaçma, gece yuva) ve kedi / köpek (gelme, dolaşma, uyku, sevilme)
     │   ├── DilemmaSystem.js Karar olayları: zamanlama, seçenek koşulları, zaman aşımı, fırtına, kurtlar, keşif seferi
@@ -3954,6 +3956,112 @@ Kasaba **Gelişmiş Şehir (seviye 4)** olunca ya da **Altın Çağ**'a girince:
   **1,10 / 3**. Stres matrisinin geç oyun örneklerinde de ortalamalar %88-%95, en düşükler %76-%88'dir (tohum 7 ve 42'de örneklerin %100'ü %100'ün altında). Önceki adımlarda aynı evrede refah %100'e yapışıyordu.
 - **Not (denge):** ceza yalnızca lüks kalemleri eksikse düşer; üç kalemi sürekli akıtan oyuncu refahı yine yükseltebilir (kasıtlı: "ekonomiyi sürekli optimize et"). Doktrin ve vadi sayıları `data/valley.js`, `data/doctrines.js`, `data/lateGame.js` içindedir.
 
+## Yaşayan Ruh: Sosyal Kimya, Karşılıklı Çekim / İtme ve Duygusal Etiketler (29. aşama, 29.1 mikro adımı)
+
+**Kayıt sürümü 36.** 29. aşama ("Yaşayan Ruh") karakter psikolojisini on mikro adımda (29.1 – 29.10) derinleştirir. İlk adımda ilişki artık tek bir sayı değildir: her sakin çifti arasında doğal bir
+**Kimya** (-2 … +3) ve yönlü **Duygusal Etiketler** vardır. İlişki puanı (-50 … 100, `state.relationships`) olduğu gibi durur; kimya o puanın ne kadar hızlı aktığını, aşkın mümkün olup olmadığını ve sohbetin tadını belirler.
+Determinizm kuralı değişmedi: aynı tohum art arda koşturulunca birebir aynı sonucu verir.
+
+### 1. Sosyal Kimya Matrisi (`data/chemistry.js`, `systems/Chemistry.js`)
+
+`kimya = sınırla( kıvılcım + kişilik uyumu + huy rezonansı + zanaat bağı , -2, +3 )`
+
+| Belirleyici | Değer | Kural |
+|---|---|---|
+| **Kıvılcım** | -1 / 0 / +1 (ağırlık 30 / 45 / 25) | Kimlik çiftinden ve dünya tohumundan türer: `sparkFor(seed, idA, idB)` her çağrıda **izole** bir üreteç kurar (tohum + 37; kimlikler karıştırılır), simetriktir ve çağrı sırasına bağlı değildir |
+| **Kişilik uyumu** | -1 / 0 / +1 | Zıt özellikler (`OPPOSING_TRAITS`: Çalışkan / Uykucu, Neşeli / Huysuz…) **-1** (baskın). Ortak özellik ya da tamamlayan çift (`COMPLEMENTARY_TRAITS`: Hırslı + Çalışkan, Neşeli + Sosyal Kelebek, Doğa Sever + İçine Kapanık…) **+1**. Özellik + meslek de tamamlar (`TRAIT_SKILL_COMPLEMENTS`: Doğa Sever + Kalfa / Usta **Çiftçi** ya da Çoban, Hırslı + Taşçı / Madenci, Obur + Aşçı / Fırıncı) |
+| **Huy rezonansı** | 0 / +1 | Aynı huy ya da rezonanslı çift (`QUIRK_RESONANCE`: Müzisyen + Şenlik Neşesi, Kitap Kurdu + Bilge Düşünür, Hayvansever + Doğa Tutkunu, Zanaatkâr Ruhu + Girişimci Kanı, Doğa Tutkunu + Bilge Düşünür). Listede olmayan çiftler nötrdür (Zanaatkâr Ruhu + Hayvansever = 0) |
+| **Zanaat bağı** | 0 / +1 | Usta-çırak (`apprenticeship.masterId` / `mentees`), ikisinin de Başusta olması, aynı yapıya sabitlenmiş olmak ya da aynı atölyede (çıraklık yapıları) **24 saat başı** birlikte çalışmış olmak (kayıtta kalıcı `craft`) |
+
+| Kimya | Ad | Sohbette puan | Sohbet keyfi | Atışma | Aşk zarı | Aşk için puan | Rozet |
+|---|---|---|---|---|---|---|---|
+| -2 | Doğal Zıtlık | x0,5 | dakikada -0,12 | x2 | **yok** | - | `⌁⌁` |
+| -1 | Antipati | x0,75 | dakikada -0,06 | x1,5 | **yok** | - | `⌁` |
+| 0 | Nötr | x1 | - | x1 | **yok** | - | (yok) |
+| +1 | Uyum | x1,2 | x1,2 | x1 | x1 | 85 | `⚡` |
+| +2 | Güçlü Çekim | **x1,5** | **x1,5** + 0,05 | x0,5 | **x2** | 75 | `⚡⚡` |
+| +3 | Kozmik Çekim | **x1,5** | **x1,5** + 0,08 | x0,25 | **x3,5** | 65 | `✨⚡⚡` |
+
+Kimya her çift için `c.relationships[karşıKimlik].chemistry` alanında (iki yönde aynı) saklanır; kayıt ilk sohbette açılır (`chemistryOf`) ve **saat başı** yeniden hesaplanır (meslek kademesi, huy, zanaat bağı değişmiş olabilir).
+Yolda karşılaşan her çift için kayıt açılmaz (`ChemistrySystem.peek` kayıtsız hesaplar), böylece kayıt dosyası şişmez.
+
+### 2. Duygusal Etiketler (`systems/ChemistrySystem.js`)
+
+`c.relationships[karşıKimlik] = { chemistry, craft, together, tags: [...], until: { etiket: bitiş dakikası } }`. Etiketler **yönlüdür** (A, B'ye minnettar olabilir; B, A'ya olmayabilir). `0` kimliği sakin olmayan **Yönetim**dir (oyuncu).
+
+| Etiket | Nasıl oluşur | Süre |
+|---|---|---|
+| **Minnettar** (`grateful`) | Yangını söndürenlere (yanan yapının sakinleri ve çalışanları), yarasını saran / hastalığını iyileştiren şifacıya (kulübe boşsa oraya sabitlenmiş ya da kasabanın en usta şifacısına), mezun eden ustasına, yadigârını devreden büyüğüne; dileği karşılanınca **Yönetime** | 20 gün |
+| **Hayran** (`admiration`) | Atölyede yanında çalıştığı Başustaya, sohbet ettiği dostu Kıdemli Bilgeye, şaheser çıkaran ustaya (iş arkadaşları ve en iyi arkadaşları), yeni Başustaya. Bir sakin en çok **2** kişiye hayran olur (yenisi en eskisini siler) | 15 gün |
+| **Kırgın** (`resentful`) | Dilekçesi reddedilince **Yönetime**; atışmada haksızlığa uğrayınca (daha sakin mizaçlı olan; 2 gün, barışınca hemen silinir); hoşlandığı kişi (puan ≥ 40, kimya ≥ +1) başkasına aşık olunca ona | 5 gün |
+| **Kıskanç** (`jealous`) | Aynı yapıda kendisinden önce kademe atlayan (dostu olmayan) iş arkadaşına; eşiyle / sevgilisiyle güçlü kimyası (≥ +2) olan bekârın ilgisine; sevdiğini kapan rakibe | 6 gün |
+| **Ruh İkizi** (`kindred`) | Kimyası +2 / +3 olan çift **En İyi Arkadaş** (75 puan) olunca karşılıklı filizlenir; her sakinin **tek** ruh ikizi olur. Kimya +2'nin altına düşerse bağ çözülür. Günlüğe ve anılara yazılır | kalıcı |
+
+Minnet kırgınlığı, kırgınlık minneti siler. Kasabadan ayrılan / vefat eden sakine işaret eden kayıtlar silinir (`pruneRelations`; yüklemede de).
+
+### 3. Davranışa yansıma
+
+- **Sohbet** (`RelationshipSystem.update`, `bondFor`, `chatMultiplier`): kimyası +2 / +3 olanların sohbetinde ilişki puanı ve keyif **1,5 kat** akar; eksi kimyada sohbet gergindir (keyif düşer). Kırgın olunan kişiyle sohbet puan kazandırmaz ve keyif kaçırır; kıskanılanla yarı hızda ilerler; hayran / minnettar olunanla hafif keyif verir.
+- **Atışma** (`ConflictSystem.tryQuarrel`): olasılık kimyayla çarpılır. Zıt özelliği olmayan ama kimyası eksi (kayıtlı) çift de yarı olasılıkla atışabilir (`relationship:quarrel` olayında `traits: null`; günlük "Kimyası tutmayan …" diye yazar).
+- **Flört ve aşk** (`RelationshipSystem.tryRomance`): aşk zarı **doğrudan kimyaya** bakar. Kimyası 0 ya da eksi olanlar ilişki puanı 100 olsa da aşık olamaz; +2 / +3 daha düşük puanla (75 / 65) ve 2 / 3,5 kat hızlı aşık olur.
+- **Minnettar** sakin: aynı sohbette karşısındakine günde bir kez **ikramda** bulunur (keyif +5, tokluk +4; "Buyur, ikramım olsun!"), onun oturduğu toplanma yerine meyleder (boş zaman ağırlığı x2,5), sohbete önce onu çağırır ve onun çalıştığı **şantiyeye yardıma** gider (`JobSystem.findWorkFor`: iş 10 karo yakınmış gibi seçilir).
+- **Kırgın** sakin: o kişinin oturduğu **masaya oturmaz** (`Brain.companyMood`: katılmaz, orada sohbet de başlatmaz; boş zaman ağırlığı x0,1), onu sohbete çağırmaz, aynı yerdeyse başkasına döner.
+
+### 4. Görselleştirme
+
+- **Karakter Detay Kartı → İlişkiler:** adın yanında kimya rozeti (`⚡⚡` güçlü çekim, `⚡` uyum, `⌁` antipati; ipucunda "Kimya +2: Güçlü Çekim"), ilişki çubuğunun **altında** renkli etiket çipleri (`[Minnettar]` yeşil, `[Hayran]` altın, `[Kırgın]` mor, `[Kıskanç]` kiremit, `[Ruh İkizi]` pembe). Etiketi olan ama ilk üçe girmeyen sakinler de listelenir; Yönetime karşı hisler ayrı satırdadır.
+- **Dünya üstü balonlar:** kimyası +2 / +3 olan iki yetişkin yolda karşılaşınca (16 piksel; aynı çift günde bir kez) başlarında çift mavi şimşek (`spark` balonu) çakar. Etiketi olan sakin selamını etiketine göre söyler (metin baloncuğu, `SpeechBubbles.js`): "Ustam, sana minnettarım!", "Elinize sağlık ustam!", "Yine mi sen...", "Seni görmek ne güzel …!". Süren bir sözün üstüne yazılmaz.
+
+### Mimari
+
+- `data/chemistry.js`: bütün sayılar, etiket tanımları, rezonans / tamamlayıcılık tabloları ve sözler.
+- `systems/Chemistry.js`: **saf** hesaplar (kıvılcım, üç belirleyici, döküm, kayıt okuma / yazma, etiket ekleme / silme / süre, temizlik, göç). Düz kayıt nesneleriyle de çalışır.
+- `systems/ChemistrySystem.js`: olay dinleyicileri (yangın, şifa, dilekçe, şaheser, mezuniyet, yadigâr, Başusta, kademe, atışma, barışma, aşk, ayrılış), saat başı güncelleme, ikram ve yolda karşılaşma. **Üreteci yoktur**: söz seçimi kimliklerden ve oyun saatinden hesaplanır.
+  Olaylar: `chemistry:tag`, `chemistry:kindred`, `chemistry:spark`, `chemistry:treat`, `chemistry:craftBond`. Sistem sırası: ilişkiler → atışma → **kimya** → aile → sosyal.
+- Kancalar: `RelationshipSystem` (sohbet hızı, keyif, aşk zarı), `ConflictSystem` (atışma riski), `Brain` (masa seçimi, davet), `BehaviorSystem.nearestPartner`, `JobSystem.findWorkFor` (yardım), `CharacterPanel` (rozet, çipler), `art/ui` (`spark` balonu).
+- **Determinizm:** kimya hesabı, saat başı güncelleme, karşılaşma, ikram ve etiketleme ana üreteci, öteki sistemlerin üreteçlerini ve `Math.random`'ı **hiç** tüketmez (testte sayılır: 0 çağrı).
+
+### Kayıt (sürüm 36)
+
+`characters[].relationships` eklendi. `SaveManager.migrate` v35 → v36'da `migrateChemistry` ile kayıttaki **her mevcut ilişkiye** (puanı olan çiftler, sevgililer / eşler) kimlik çiftinden ve tohumdan türeyen deterministik kimyayı ve boş etiket yapısını bağlar (rastgelelik yok; iki kez göç birebir aynı kayıt).
+`sanitizeRelations` sınır dışı kimyayı, bilinmeyen etiketi, kendine / geçersiz kimliğe işaret eden kaydı temizler. `SAVE_VERSION = 36`. Yeni fikstür `save-v36.json` (otopilot, 72 gün, `--crisis-state`).
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1330 → **1397**; 67'si yeni): kıvılcımın dağılımı / simetrisi / tohuma bağlılığı, kişilik - huy - zanaat kombinasyonlarının skoru (-2 … +3; sınır değerler dahil), **0 üreteç çağrısı**, gerçek `RelationshipSystem.update` ile sohbet hızı (x1,5 / x0,75 / x0,5),
+  `performSocial` ile keyif, gerçek `ConflictSystem` ile atışma riski, aşk zarı (kimya ≤ 0 aşk yok; 85 / 75 / 65 eşikleri; x1 / x2 / x3,5), beş etiketin her oluşma yolu, süre ve barışma, Ruh İkizi (kişi başı tek, kimya düşünce çözülür), 24 saatlik zanaat bağı, ikram,
+  gerçek `Brain.planSocial` ile masadan kaçınma, gerçek `JobSystem.findWorkFor` ile şantiyeye yardım, şimşek balonu ve etiketli selamlar, kart rozeti ve çipleri, kayıt gidiş-dönüşü, bozuk veri, v35 → v36 göçü.
+  Aşk zarına bakan eski testler çiftin kimyasını açıkça kurar (`setChem`); dünya akışına duyarlı yedi eski test (çardak sohbeti, bekçi adayı, Geniş Aile, saray hazinesi, v23 genç yetişkin, konuk ayrılışı, Ocak Devri) akış kaysa da geçerli olacak şekilde sağlamlaştırıldı.
+- **Denetim** (`audit.mjs`): 150 → **154**. Kimya, zanaat bağı ve etiketlerle kayıt → yükleme durum kayması yok; kayıtlar birebir döner; yüklemeden sonra kimya aynı hesaplanır; kayıp sakine işaret eden kayıt yüklemede temizlenir.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-36): 1327 → **1437** (her fikstürde "mevcut her ilişkiye deterministik kimya bağlandı" ve "bir gün sonra kimya kayıtları tutarlı" denetimleri).
+- **Bekçi** (`monitor.mjs`): kayıp sakine işaret eden kimya kaydı, sınır dışı kimya, bilinmeyen etiket ve tek yönlü kimya artık **kopuk referans** sayılır; otopilot raporuna `(29.1)` satırı eklendi.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 50`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0.
+
+  | Tohum | Evli çift | Atışma / barışma | Kimya dağılımı (-2 / -1 / 0 / +1 / +2 / +3) | Ruh ikizi bağı | Şimşek | İkram | Yaşayan etiket (Minnettar / Hayran / Kırgın / Kıskanç) |
+  |---|---|---|---|---|---|---|---|
+  | 7 | 14 | 205 / 48 | 18 / 75 / 117 / 123 / 76 / 25 | 13 | 1765 | 32 | 12 / 53 / 18 / 12 |
+  | 13 | 13 | 202 / 30 | 15 / 61 / 126 / 112 / 104 / 16 | 13 | 1662 | 7 | 4 / 60 / 8 / 21 |
+  | 21 | 11 | 196 / 50 | 23 / 73 / 120 / 128 / 73 / 17 | 13 | 1354 | 6 | 7 / 52 / 15 / 23 |
+  | **42** | 10 | 165 / 48 | 23 / 80 / 110 / 120 / 73 / 22 | 13 | 1457 | 2 | 7 / 54 / 7 / 24 |
+  | 77 | 13 | 213 / 50 | 33 / 64 / 117 / 107 / 92 / 18 | 13 | 1749 | 2 | 2 / 58 / 7 / 22 |
+  | 101 | 10 | 231 / 51 | 29 / 72 / 115 / 122 / 71 / 26 | 12 | 1460 | 2 | 5 / 59 / 12 / 33 |
+
+  Altı koşuda toplam 72 düğün, 39 doğum, 1212 atışma, 277 barışma (%23); isyan 0, terk eden 0. Güçlü çekim (+2 / +3) çiftlerin yaklaşık dörtte biridir; Doğal Zıtlık (-2) %4-8'de kalır.
+- **Tohum 42** (`autopilot.mjs 42 72 --crisis-state`, iki kez art arda): `--json` raporu ve kayıt dosyası **bayt bayt aynı**, günlükte yalnızca kayıt dosyasının yolu farklı. 28.4 ile karşılaştırma:
+
+  | | 28.4 | 29.1 |
+  |---|---|---|
+  | Evli çift / düğün kutlaması | 14 / 14 | 13 / 14 |
+  | Doğum | 8 | 9 |
+  | Randevu | 26 | 70 |
+  | Atışma / barışma (oran) | 197 / 24 (%12) | 289 / 56 (%19) |
+  | Altın Çağ | G51 | G53 |
+  | Nüfus (72. gün) | 31 | 31 |
+
+  Kimya kayıtlı 435 çiftte dağılım: **-2: 23 · -1: 81 · 0: 115 · +1: 114 · +2: 78 · +3: 24**. 72 günde 888 etiket verildi; son gün yaşayan etiketler: Hayran 60, Ruh İkizi 26 (15 bağ), Minnettar 10, Kıskanç 10, Kırgın 10 (6'sı Yönetime). Şimşek 2181 kez çaktı (günde ~30), etiketli selam 2427, ikram 9.
+- **Not (denge):** aşkın yarı çiftlere kapanması evlilik sayısını düşürmedi (güçlü çekim daha erken ve hızlı aşık eder; randevular arttı). Atışmalar ~%45 arttı (eksi kimya), barışma oranı da yükseldi. Minnet doğal olarak seyrektir (yangın, şifa, mezuniyet, yadigâr), bu yüzden ikram nadir görülür;
+  sonraki adımlarda (hafıza, arzular) yeni minnet kaynakları eklenebilir. Sayılar `data/chemistry.js` içindedir.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -3996,8 +4104,8 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (1007; 25.5: aile yadigârları ve kilidi, mirasçı seçimi, akşam töreni, Kuşak Şöleni, Ata Mirası Gururu, kayıt sürümü 28; 25.4: Aile Kütüğü, akrabalık engeli, 2. kuşak ilk düğünü, Yeni Yuva / Geniş Aile / Yeni Konut Talebi, Ocak Devri, kayıt sürümü 27; 25.3: yeni nesil huylar, mizaç kalıtımı ve usta etkisi, yeni dilekçeler, kayıt sürümü 26; 25.2: Usta-Çırak, Çırak Kapısı, Gururlu Usta, çırak işi, mezuniyet, metin baloncukları, kayıt sürümü 25; 25.1: yaşam evreleri, yaşlanma, Kıdemli Bilge emekliliği ve çekirdek sakin kuralı, Bilge Nasihati, kuşak yaşı, evre rozeti, kayıt sürümü 24; 23. aşama: tehlike sıklığı ayarı ve doğal kriz kapıları, Su Kuyusu (yangın ihtimali ×0,2, bahçe sulaması), Gözcü Kulesi ve bekçiler, haydut baskınının üç çözümü (püskürt, haraç, hazırlıksız) ve penceresi, yangın (çıkış, kova zinciri, Acil Söndür, hasarlı ama silinmeyen yapı), Tamir Et ve ustaların onarımı, hafif yaralanma ve Şifacı, ana rastgele sayı üretecinin tüketilmemesi, kayıt sürümü 20; 22. aşama: iç vergi kademeleri ve öşür, Krallık Vergisi (uyarı, ödeme, malla ödeme, ceza), Kraliyet Fermanları ve ödülleri, Kraliyet Beratı ve Aslanlı Heykel, kötü şöhret ve göç, köyü terk etme ve çekirdek sakinler; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 28'e; 25.5: yadigârlar; 25.4: Aile Kütüğü; 25.3: mizaç; 25.2: çıraklık; 25.1: yaşam evreleri ve gün cinsinden yaşlar) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (1397; 29.1: sosyal kimya skorları, sohbet hızı ve aşk zarı, duygusal etiketler ve davranışa yansıması, 0 üreteç çağrısı, kayıt sürümü 36; 25.5: aile yadigârları ve kilidi, mirasçı seçimi, akşam töreni, Kuşak Şöleni, Ata Mirası Gururu, kayıt sürümü 28; 25.4: Aile Kütüğü, akrabalık engeli, 2. kuşak ilk düğünü, Yeni Yuva / Geniş Aile / Yeni Konut Talebi, Ocak Devri, kayıt sürümü 27; 25.3: yeni nesil huylar, mizaç kalıtımı ve usta etkisi, yeni dilekçeler, kayıt sürümü 26; 25.2: Usta-Çırak, Çırak Kapısı, Gururlu Usta, çırak işi, mezuniyet, metin baloncukları, kayıt sürümü 25; 25.1: yaşam evreleri, yaşlanma, Kıdemli Bilge emekliliği ve çekirdek sakin kuralı, Bilge Nasihati, kuşak yaşı, evre rozeti, kayıt sürümü 24; 23. aşama: tehlike sıklığı ayarı ve doğal kriz kapıları, Su Kuyusu (yangın ihtimali ×0,2, bahçe sulaması), Gözcü Kulesi ve bekçiler, haydut baskınının üç çözümü (püskürt, haraç, hazırlıksız) ve penceresi, yangın (çıkış, kova zinciri, Acil Söndür, hasarlı ama silinmeyen yapı), Tamir Et ve ustaların onarımı, hafif yaralanma ve Şifacı, ana rastgele sayı üretecinin tüketilmemesi, kayıt sürümü 20; 22. aşama: iç vergi kademeleri ve öşür, Krallık Vergisi (uyarı, ödeme, malla ödeme, ceza), Kraliyet Fermanları ve ödülleri, Kraliyet Beratı ve Aslanlı Heykel, kötü şöhret ve göç, köyü terk etme ve çekirdek sakinler; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 36'ya; 29.1: kimya ve duygusal etiketler; 25.5: yadigârlar; 25.4: Aile Kütüğü; 25.3: mizaç; 25.2: çıraklık; 25.1: yaşam evreleri ve gün cinsinden yaşlar) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
 | `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması / Çağ Kutlaması / isyan ve yağma / tahsildar, ferman ve köyü terk eden sakin sırasında, yangın ve haydut izi sürerken kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |
@@ -4119,6 +4227,7 @@ düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 | Oyunun adı, başlangıç ekranı | `config.js` → `GAME_TITLE`, `ui/components/TitleMenu.js` |
 | Takas teklifleri, tüccar takvimi | `data/trade.js` |
 | (28.1) Acil Seferberlik, anında / usta onarımı bedelleri | `data/crisis.js` → `FIRE.muster`, `REPAIR` |
+| (29.1) Kimya seviyeleri, rezonans / tamamlayıcılık tabloları, etiket süreleri ve sözleri | `data/chemistry.js` (+ `systems/Chemistry.js`, `ChemistrySystem.js`) |
 | (28.4) Vadi Karakterleri (bonus / ceza çarpanları) | `data/valley.js` (+ `systems/Valley.js`) |
 | (28.4) Kasaba Doktrinleri, kapı araştırma / ferman etiketleri | `data/doctrines.js`, `data/research.js` / `data/town.js` → `doctrine` alanı (+ `systems/Doctrine.js`) |
 | (28.4) Geç oyun beklentisi (azalma çarpanı, lüks cezası) | `data/lateGame.js` (+ `systems/LateGame.js`) |

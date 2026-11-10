@@ -1045,6 +1045,59 @@ button.relation-row:hover {
 .relation-fill.is-dislike { background: #d98a5a; }
 .relation-fill.is-rival { background: var(--ui-bad); }
 
+/* ---------- Sosyal kimya ve duygusal etiketler (29.1) ---------- */
+.chemistry-badge {
+  margin-left: 4px;
+  /* şimşek / kırık çizgi simgeleri piksel yazı tipinde yoktur: sistem simge yazı tipiyle çizilir */
+  font-family: 'Segoe UI Symbol', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Noto Sans Symbols 2', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  white-space: nowrap;
+}
+
+.chemistry-badge.is-harmony { color: #4aa3df; }
+.chemistry-badge.is-attraction,
+.chemistry-badge.is-cosmic { color: #2f6fb5; text-shadow: 0 0 3px rgba(155, 227, 242, 0.9); }
+.chemistry-badge.is-antipathy,
+.chemistry-badge.is-clash { color: #9e2e2a; }
+
+.emotion-chips {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding-bottom: 2px;
+}
+
+.emotion-chip {
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  color: #fff8e7;
+  border: 1px solid rgba(27, 20, 35, 0.55);
+}
+
+.emotion-chip.is-grateful { background: #3f8f4d; }
+.emotion-chip.is-admiration { background: #b8862b; }
+.emotion-chip.is-resentful { background: #8a4b8f; }
+.emotion-chip.is-jealous { background: #b5482f; }
+.emotion-chip.is-kindred { background: #d9507a; }
+
+.relation-ruler {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  background: var(--ui-card);
+  border: 2px dashed var(--ui-wood);
+}
+
+.relation-ruler .emotion-chips {
+  padding-bottom: 0;
+}
+
 /* ---------- Aile ve ekipman (karakter paneli, 9. aşama) ---------- */
 .family-list {
   display: flex;

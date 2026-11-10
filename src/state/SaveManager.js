@@ -8,6 +8,7 @@ import { defaultTownName } from './GameState.js';
 import { LEGACY_BUILDING_TYPES } from '../data/buildings.js';
 import { lifespanFor } from '../systems/Venerable.js';
 import { valleyFor } from '../systems/Valley.js';
+import { migrateChemistry } from '../systems/Chemistry.js';
 
 const SLOT_KEYS = {
   main: CONFIG.SAVE_KEY,
@@ -19,6 +20,10 @@ const SLOT_KEYS = {
  * türe çevrilir; kurulmuş ya da yarım kalmış lambalar yüklenince Sokak Feneri olarak çalışır.
  */
 function migrate(data) {
+  // (29.1) v35 -> v36: mevcut her ilişkiye (puanı olan çiftler, sevgililer / eşler) kimlik çiftinden ve tohumdan türeyen deterministik
+  // kimya ve boş duygusal etiket yapısı bağlanır (rastgelelik tüketmez). Daha eski sürümlerin aşağıdaki göçleri sakin alanlarını
+  // değiştirmediği için (kimya yalnızca özellik, huy, çıraklık ve Başusta bilgisine bakar) sıra önemli değildir.
+  const bindChemistry = data.version < 36;
   // (28.4) v34 -> v35: tohumdan deterministik Vadi Karakteri, boş Kasaba Doktrini
   if (data.version < 35) {
     data.valley = valleyFor(data.seed);
@@ -61,6 +66,7 @@ function migrate(data) {
     }
     if (data.tax && typeof data.tax === 'object') data.tax.lockedUntil = 0;
   }
+  if (bindChemistry) migrateChemistry(data);
   if (Array.isArray(data.buildings)) {
     for (const b of data.buildings) {
       if (b && LEGACY_BUILDING_TYPES[b.type]) b.type = LEGACY_BUILDING_TYPES[b.type];

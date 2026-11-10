@@ -107,9 +107,11 @@ export class JournalSystem {
       on('relationship:quarrel', ({ a, b, traits, kind, place, firstToday }) => {
         // Yolda karşılaşınca çıkan atışmalar yalnızca balonla görünür; günlüğe iş yeri ve sohbet atışmaları
         if (!firstToday || kind === 'encounter') return;
-        const why = `${TRAITS[traits[0]].name} ${a.name}, ${TRAITS[traits[1]].name.toLocaleLowerCase('tr')} ${b.name} ile`;
+        // (29.1) zıt özelliği olmayan ama kimyası tutmayan çiftin atışması
+        const why = traits ? `${TRAITS[traits[0]].name} ${a.name}, ${TRAITS[traits[1]].name.toLocaleLowerCase('tr')} ${b.name} ile` : `Kimyası tutmayan ${a.name}, ${b.name} ile`;
         this.log(`${why} atıştı${place ? ` (${place})` : ''}`, 'angry');
       }),
+      on('chemistry:kindred', ({ a, b }) => this.log(`${a.name} ile ${b.name} arasında ruh ikizi bağı filizlendi`, 'love')),
       on('relationship:reconciled', ({ a, b, place }) => this.log(`${a.name} ile ${b.name} ${RECONCILE_PLACES[place] ?? ''}barıştı`, 'handshake')),
       // (15. aşama) usta işi eserler
       on('masterwork:created', ({ piece, character }) => this.log(`Usta ${character.name} usta işi bir eser ortaya koydu: ${piece.name}`, piece.icon)),
