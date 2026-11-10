@@ -445,6 +445,7 @@ function restoreTax(data) {
   if (!data || typeof data !== 'object') return out;
   if (TAX_RATES[data.rate]) out.rate = data.rate;
   out.nextAt = NUM(data.nextAt);
+  out.lockedUntil = Math.max(0, NUM(data.lockedUntil) ?? 0); // (28.1) v2-v31 kayıtlarında alan yoktur: kilit yok
   out.collections = COUNT(data.collections);
   out.totalGold = COUNT(data.totalGold);
   out.totalGoods = COUNT(data.totalGoods);

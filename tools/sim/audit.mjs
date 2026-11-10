@@ -341,7 +341,13 @@ const PAGE_HELPERS = () => {
       check('yüklenen Krallık Vergisi vakti gelince bir kez ödenir', paid.n === 1 && !s.crown.notice, `${paid.n}`);
       paid.off();
       game.events.emit('ui:deliverDecree');
+      // (28.1) Vergi Fermanı: Ağır Vergi seçileli 26 saat geçti; kayıttan dönen kilit hâlâ sürer, kademe değişmez
+      const lockLeft = s.tax.lockedUntil - s.totalMinutes;
+      game.events.emit('ui:setTaxRate', { rate: 'exempt' });
+      check('(28.1) kilitliyken (yüklemeden sonra da) vergi kademesi değişmez', lockLeft > 0 && s.tax.rate === 'heavy', `kilit ${Math.round(lockLeft)} dk kaldı, kademe ${s.tax.rate}`);
+      s.tax.lockedUntil = 0;
       game.events.emit('ui:setTaxRate', { rate: 'standard' });
+      check('(28.1) kilit dolunca vergi kademesi yeniden değişir ve 3 gün kilitlenir', s.tax.rate === 'standard' && s.tax.lockedUntil - s.totalMinutes === 3 * 1440);
       check('yüklenen ferman teslim edilir', !s.crown.decree && s.crown.delivered >= 1);
     }
 

@@ -158,6 +158,7 @@ export class Building extends Entity {
     isBurning = false,
     fireProgress = 0,
     fireWater = 0,
+    emergencyMuster = false,
     damageKind = null,
     damagedAt = null,
     treatedToday = 0,
@@ -214,6 +215,7 @@ export class Building extends Entity {
     this.isBurning = Boolean(isBurning);
     this.fireProgress = Number.isFinite(fireProgress) ? Math.min(100, Math.max(0, fireProgress)) : 0;
     this.fireWater = Math.max(0, Math.floor(Number(fireWater) || 0));
+    this.emergencyMuster = Boolean(emergencyMuster) && this.isBurning; // (28.1) Acil Seferberlik ilan edilmiş yangın
     this.damageKind = (this.damaged || this.isBurning) && DAMAGE_KINDS[damageKind] ? damageKind : null; // null = fırtına (eski kayıtlar)
     this.damagedAt = Number.isFinite(damagedAt) ? damagedAt : null;
     this.guardSlots = 1; // Gözcü Kulesi: nöbet tutabilecek bekçi sayısı (CrisisSystem yetişkin sayısına göre günceller)
@@ -1002,6 +1004,7 @@ export class Building extends Entity {
       isBurning: this.isBurning,
       fireProgress: this.fireProgress,
       fireWater: this.fireWater,
+      emergencyMuster: this.emergencyMuster,
       damageKind: this.damageKind,
       damagedAt: this.damagedAt,
       wonderStage: this.wonderStage,

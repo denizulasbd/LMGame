@@ -42,6 +42,7 @@ import { WORK_SESSION } from '../data/jobs.js';
 import { isBedtime, isWorkHours } from './TraitProfile.js';
 import { getSeason } from '../data/seasons.js';
 import { ILLNESS } from '../data/health.js';
+import { FIRE } from '../data/crisis.js';
 import { SCHOOL } from '../data/research.js';
 import { isRallyActive } from '../systems/RallySystem.js';
 import { healSpeedMultiplier } from '../systems/ResearchSystem.js';
@@ -230,10 +231,12 @@ export class Brain {
   // ---------------------------------------------------------------------------
 
   /** Krizin kendi üretecinden süre (sabit aralıklar üretece dokunmaz). */
-  crisisDuration(activity) {
+  crisisDuration(activity, fire = null) {
     const range = ACTIVITIES[activity].duration;
     if (!range) return 0;
-    return range[0] === range[1] ? range[0] : (this.crisis?.rng ?? this.rng).int(range[0], range[1]);
+    const base = range[0] === range[1] ? range[0] : (this.crisis?.rng ?? this.rng).int(range[0], range[1]);
+    // (28.1) Acil Seferberlik: kova taşıma işleri 2 kat hızlıdır (süre yarıya iner)
+    return fire?.emergencyMuster ? base / FIRE.muster.speed : base;
   }
 
   /**
@@ -253,7 +256,7 @@ export class Brain {
       if (doors.length === 0) return null;
       const spot = this.nearest(doors, c);
       if (!this.world.findPath(origin, spot)) return null;
-      return { activity: 'fightFire', buildingId: fire.id, fireId: fire.id, spot, faceTarget: fire.center, duration: this.crisisDuration('fightFire') };
+      return { activity: 'fightFire', buildingId: fire.id, fireId: fire.id, spot, faceTarget: fire.center, duration: this.crisisDuration('fightFire', fire) };
     }
     const source = this.crisis.waterSource(fire, c);
     if (!source) return null;
@@ -264,7 +267,7 @@ export class Brain {
       spot: source.spot,
       facing: source.spot.facing,
       faceTarget: source.building?.center,
-      duration: this.crisisDuration('fetchWater'),
+      duration: this.crisisDuration('fetchWater', fire),
     };
   }
 

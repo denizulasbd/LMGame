@@ -17,6 +17,13 @@ const SLOT_KEYS = {
  * türe çevrilir; kurulmuş ya da yarım kalmış lambalar yüklenince Sokak Feneri olarak çalışır.
  */
 function migrate(data) {
+  // (28.1) v31 -> v32: yangınlara Acil Seferberlik bayrağı, vergiye Vergi Fermanı kilidi (alanlar eksikse güvenle eklenir)
+  if (data.version < 32) {
+    if (Array.isArray(data.buildings)) {
+      for (const b of data.buildings) if (b && typeof b === 'object') b.emergencyMuster = false;
+    }
+    if (data.tax && typeof data.tax === 'object') data.tax.lockedUntil = 0;
+  }
   if (Array.isArray(data.buildings)) {
     for (const b of data.buildings) {
       if (b && LEGACY_BUILDING_TYPES[b.type]) b.type = LEGACY_BUILDING_TYPES[b.type];

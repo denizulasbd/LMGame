@@ -323,7 +323,10 @@ export class JournalSystem {
       on('building:mended', ({ building, kind }) => this.log(`${building.name} ${kind === 'fire' ? 'yangın' : kind === 'raid' ? 'baskın' : 'fırtına'} hasarından onarıldı`, 'hammer')),
       // 23. aşama: yangın, haydut baskını, yaralanma
       on('crisis:fireStarted', ({ building, natural }) => this.log(`ALARM · ${building.name} yangın çıktı${natural ? '' : ' (yangın çıkarıldı)'}! Sakinler kovalarla koşuyor`, 'fire')),
-      on('crisis:fireOut', ({ building, byPlayer }) => this.log(byPlayer ? `${building.name} yangını acil kova zinciriyle söndürüldü` : `${building.name} yangını el birliğiyle söndürüldü; yapı hasar görmedi`, 'bucket')),
+      on('crisis:fireOut', ({ building }) => this.log(`${building.name} yangını el birliğiyle söndürüldü; yapı hasar görmedi`, 'bucket')),
+      on('crisis:musterCalled', ({ building, responders }) => this.log(`Acil Seferberlik: ${building.name} yangınına ${responders.length} kişi koşturuldu`, 'bucket')),
+      on('crisis:musterFatigue', ({ building, helpers }) => this.log(`${building.name} seferberliği bitti: ${helpers.length} kova taşıyıcı aşırı yorgun düştü`, 'sweat')),
+      on('tax:rateLocked', ({ minutesLeft }) => this.log(`Vergi Fermanı kilitli: kademe ${Math.ceil(minutesLeft / 60)} saat değişmez`, 'coin')),
       on('crisis:burnedDown', ({ building }) => this.log(`${building.name} söndürülemedi, yanıp hasar gördü (haritadan silinmedi; onarılana kadar çalışmaz)`, 'repair')),
       on('crisis:raidWarning', ({ raid, early }) => this.log(`Ormanda haydut izleri görüldü${early ? ' (Gözcü Kulesi 2 gün önceden haber verdi)' : ''}: baskın bekleniyor`, 'bandit')),
       on('crisis:raidResolved', ({ choice, auto, text }) => this.log(`${choice === 'defend' ? 'Haydutlar püskürtüldü' : choice === 'tribute' ? 'Haydutlara haraç verildi' : 'Haydutlar hazırlıksız yakaladı'}${auto ? ' (karar verilmedi, kendiliğinden)' : ''}: ${text}`, choice === 'defend' ? 'shield' : 'bandit')),

@@ -7,7 +7,7 @@ import { trustValue } from './Citizens.js';
 import { isGoldenAge } from './GoldenAge.js';
 
 export function emptyTax() {
-  return { rate: TAX.defaultRate, nextAt: null, collections: 0, totalGold: 0, totalGoods: 0, last: null, log: [] };
+  return { rate: TAX.defaultRate, nextAt: null, lockedUntil: 0, collections: 0, totalGold: 0, totalGoods: 0, last: null, log: [] };
 }
 
 export function emptyCrown() {
@@ -48,6 +48,11 @@ export function taxRateOf(state) {
 /** Ağır Vergi seçili kaldıkça kasabanın çalışma hızı çarpanı (öteki kademelerde 1). */
 export function taxWorkMultiplier(state) {
   return taxRateOf(state).workSpeed ?? 1;
+}
+
+/** (28.1) Vergi Fermanı kilidine kalan oyun dakikası (0 = kilit yok). */
+export function taxLockLeft(state) {
+  return Math.max(0, (state.tax?.lockedUntil ?? 0) - state.totalMinutes);
 }
 
 /** Bir sakinden bu oranla kesilecek altın (kesesi azsa 0). */

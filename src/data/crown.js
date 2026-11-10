@@ -19,6 +19,7 @@ export const TAX_RATE_KEYS = Object.keys(TAX_RATES);
 
 export const TAX = {
   defaultRate: 'standard',
+  lockDays: 3, // (28.1) Vergi Fermanı: kademe değişince bu kadar oyun günü kilitlenir (bir tam tahsilat döngüsü)
   everyDays: 3, // her 3 günde bir ...
   hour: 12, // ... öğlen 12:00'de
   minCoins: 2, // kesesinde bundan azı olandan kesinti yapılmaz

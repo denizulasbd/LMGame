@@ -150,7 +150,7 @@ export function raidHoursLeft(state) {
   return raid ? Math.max(0, Math.ceil((raid.arriveAt - state.totalMinutes) / 60)) : null;
 }
 
-/** Tamirin bedeli: inşa maliyetinin %25'i (yalnızca odun ve taş, en az 1). */
+/** Ustaların onarım projesinin (mend) bedeli: inşa maliyetinin %20'si (yalnızca odun ve taş, en az 1). */
 export function repairCost(type) {
   const def = BUILDINGS[type];
   return Object.fromEntries(
@@ -158,6 +158,23 @@ export function repairCost(type) {
       .filter(([r]) => r === 'wood' || r === 'stone')
       .map(([r, v]) => [r, Math.max(1, Math.ceil(v * REPAIR.costRatio))])
   );
+}
+
+/** (28.1) Panelden anında "Tamir Et"in bedeli: inşa maliyetinin %50'si (odun ve taş, en az 1) + 25 altın. */
+export function instantRepairCost(type) {
+  const def = BUILDINGS[type];
+  const cost = Object.fromEntries(
+    Object.entries(def?.cost ?? {})
+      .filter(([r]) => r === 'wood' || r === 'stone')
+      .map(([r, v]) => [r, Math.max(1, Math.ceil(v * REPAIR.instant.ratio))])
+  );
+  cost.gold = REPAIR.instant.gold;
+  return cost;
+}
+
+/** (28.1) Bu yangına aynı anda koşabilecek en çok sakin: normalde 4, Acil Seferberlik ilan edilmişse 8. */
+export function fightersFor(building) {
+  return building?.emergencyMuster ? FIRE.muster.fighters : FIRE.maxFighters;
 }
 
 /** Yangın ya da baskınla hasar gören yapının onarım projesi (ustalar yapar; fırtına hasarı eski kuralı korur). */
@@ -171,7 +188,7 @@ export function crisisMendSpec(type) {
   };
 }
 
-/** Hasarlı yapının onarım projesi: yangın / baskın hasarı %25 + kısa iş, fırtına hasarı eski kural (%30). */
+/** Hasarlı yapının onarım projesi: yangın / baskın hasarı %20 + kısa iş, fırtına hasarı da %20 (28.1). */
 export function mendSpecFor(building) {
   return building.damageKind === 'fire' || building.damageKind === 'raid' ? crisisMendSpec(building.type) : mendSpec(building.type, STORM.mend);
 }

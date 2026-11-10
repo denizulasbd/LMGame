@@ -6,12 +6,14 @@
 //   Tahsilat : her 3 günde bir 12:00'de yetişkinlerin kesesinden orana göre altın kesilip Kasaba Hazinesi'ne, çantalarındaki
 //              fazla erzak / ekmek / odundan öşür kilere aktarılır (kilerde yer kadar; hiçbir şey kaybolmaz). Her tahsilatta
 //              kademenin güven ve keyif etkisi uygulanır (Muaf +6 / +5, Düşük +2, Standart 0, Ağır -8 / -10): 'tax:collected'.
+//   Ferman   : (28.1) kademe değiştirilince state.tax.lockedUntil = şimdi + 3 oyun günü; kilit sürerken kademe değişmez ('tax:rateLocked').
 // Durum: state.tax (kayda girer).
 import { TAX, TAX_RATES } from '../data/crown.js';
 import { ITEMS } from '../data/citizens.js';
-import { emptyTax, nextOnSchedule, taxRateOf, coinTax, titheOf } from './Crown.js';
+import { emptyTax, nextOnSchedule, taxRateOf, coinTax, titheOf, taxLockLeft } from './Crown.js';
 import { takeItem } from './Citizens.js';
 import { clamp } from '../utils/math.js';
+import { formatRemaining } from './Petitions.js';
 
 export class TaxSystem {
   /**
@@ -41,8 +43,16 @@ export class TaxSystem {
 
   setRate(rate) {
     if (!TAX_RATES[rate] || this.state.tax.rate === rate) return false;
+    // (28.1) Vergi Fermanı kilidi: kademe değiştirilince 3 oyun günü sabit kalır (tahsilat öncesi geçiş istismarını kapatır)
+    const left = taxLockLeft(this.state);
+    if (left > 0) {
+      this.events.emit('tax:rateLocked', { rate, minutesLeft: left });
+      this.events.emit('toast', { text: `Vergi Fermanı kilitli: kademe ${formatRemaining(left)} sonra değiştirilebilir`, tone: 'warn', icon: 'coin' });
+      return false;
+    }
     const from = this.state.tax.rate;
     this.state.tax.rate = rate;
+    this.state.tax.lockedUntil = this.state.totalMinutes + TAX.lockDays * 1440;
     this.events.emit('tax:rateChanged', { rate, from, def: TAX_RATES[rate] });
     this.events.emit('toast', { text: `İç vergi: ${TAX_RATES[rate].name} (${TAX_RATES[rate].description})`, tone: rate === 'heavy' ? 'warn' : 'info', icon: TAX_RATES[rate].icon });
     return true;

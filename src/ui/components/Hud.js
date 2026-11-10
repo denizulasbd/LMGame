@@ -201,7 +201,7 @@ export class Hud {
       }
       if (damaged.length) {
         const crisisDamage = state.buildings.some((b) => b.damaged && !b.isBurning && (b.damageKind === 'fire' || b.damageKind === 'raid'));
-        chips.push(chip(crisisDamage ? 'repair' : 'storm', `${damaged.length} hasarlı yapı`, `Onarılmalı (panelden "Tamir Et" ya da ustalar kendiliğinden): ${damaged.join(', ')}`, ' is-freezing'));
+        chips.push(chip(crisisDamage ? 'repair' : 'storm', `${damaged.length} hasarlı yapı`, `Onarılmalı (ustalar kendiliğinden ya da panelden pahalı "Tamir Et"): ${damaged.join(', ')}`, ' is-freezing'));
       }
       if (injured.length) chips.push(chip('bandage', `${injured.length} hafif yaralı`, `Yürüme ve çalışma %20 yavaş: ${injured.join(', ')}. Şifacı Kulübesi'nde sarılırlar; yoksa 1,5 günde kendiliğinden geçer.`));
       // (21. aşama) İsyan alarmı ve açık dilekçeler (tıklanabilir)
@@ -219,7 +219,7 @@ export class Hud {
       }
       // (23. aşama) Yangın alarmı (her yanan yapı için, tıklayınca yapı seçilir) ve haydut izi (tıklayınca karar penceresi)
       for (const b of burning) {
-        chips.unshift(action('fire', `${b.name} yanıyor · %${Math.round(b.fireProgress)}`, 'Sakinler kovalarla koşuyor. Tıkla: yapıyı seç, panelden "Acil Söndür (Kova Zinciri)" de. %100\'e varırsa yapı hasar alır (silinmez).', ' is-revolt', () => this.game.events.emit('ui:selectBuilding', b.id)));
+        chips.unshift(action('fire', `${b.name} yanıyor · %${Math.round(b.fireProgress)}`, 'Sakinler kovalarla koşuyor. Tıkla: yapıyı seç, panelden 30 altına "Acil Seferberlik" ilan et (8 kişi, 2 kat hız; sonra yorgunluk). %100\'e varırsa yapı hasar alır (silinmez).', ' is-revolt', () => this.game.events.emit('ui:selectBuilding', b.id)));
       }
       if (raidLeft !== null) {
         const ok = defenseStatus(state).ok;

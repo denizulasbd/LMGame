@@ -5,9 +5,12 @@
 //                olur ('crisis:burnedDown'; haritadan silinmez, onarılana kadar çalışmaz). Yakındaki sağlam yetişkinler (ve
 //                Kasaba Bekçileri) işi bırakıp en yakın Su Kuyusu'na (yoksa nehir kıyısına) koşar, kovayı doldurup yangına
 //                boşaltır (Brain -> planFirefight; 'crisis:bucketFilled' / 'crisis:bucketThrown'). Yeterli kova (3-4) atılırsa
-//                ya da oyuncu "Acil Söndür" derse yangın hasarsız söner ('crisis:fireOut'; Güven +2, "el birliğiyle" anısı).
-//   Tamir      : hasarlı yapıyı oyuncu "Tamir Et" ile inşa maliyetinin %25'i karşılığında anında onarır ('ui:repairBuilding');
-//                yoksa boştaki ustalar, hasardan 2 saat sonra kaynak yetiyorsa onarım projesini kendiliğinden başlatır.
+//                yangın hasarsız söner ('crisis:fireOut'; Güven +2, "el birliğiyle" anısı).
+//   Seferberlik: (28.1) oyuncu 30 altına "Acil Seferberlik" ilan edebilir ('ui:emergencyMuster'): yangın SÖNMEZ, ama o yangına
+//                4 yerine 8 kişi koşar ve kovayı 2 kat hızlı taşır; kova atan herkes yangın bitince Enerji -40 / Keyif -20
+//                (Aşırı Yorgunluk) kaybeder ('crisis:musterFatigue').
+//   Tamir      : (28.1) panelden anında "Tamir Et" pahalı bir lükstür: maliyetin %50'si + 25 altın ('ui:repairBuilding');
+//                ustalar hasardan 2 saat sonra kaynak yetiyorsa maliyetin %20'sine onarım projesini kendiliğinden başlatır.
 //   Gözcü Kulesi: saatlik Güven katkısı, 1-2 Kasaba Bekçisi (nöbet = work 'patrol'), baskın 2 gün önceden haber verilir.
 //   Haydutlar  : 10. günden sonra 8-10 günde bir "haydut izi" uyarısı ('crisis:raidWarning'); süre dolunca ya da oyuncu karar
 //                verince üç yol: A) bekçilerle püskürt (kayıp yok, Güven +6, ganimet, ufak yaralanma olasılığı), B) haraç öde
@@ -31,7 +34,8 @@ import {
   defenseStatus,
   tributeStatus,
   stolenAmount,
-  repairCost,
+  instantRepairCost,
+  fightersFor,
   damageableNow,
   ablePeople,
   usable,
@@ -67,7 +71,7 @@ export class CrisisSystem {
     const on = (name, handler) => game.events.on(name, handler);
     this.unsubscribers = [
       on('time:hour', () => this.hourly()),
-      on('ui:extinguish', ({ buildingId }) => this.extinguish(this.world.getBuilding(buildingId), { byPlayer: true })),
+      on('ui:emergencyMuster', ({ buildingId }) => this.muster(this.world.getBuilding(buildingId))),
       on('ui:repairBuilding', ({ buildingId }) => this.repairNow(this.world.getBuilding(buildingId))),
       on('ui:raidChoice', ({ choice }) => this.resolveRaid(choice)),
       on('ui:setCrisisDifficulty', ({ difficulty }) => this.setDifficulty(difficulty)),
@@ -183,6 +187,7 @@ export class CrisisSystem {
     building.isBurning = true;
     building.fireProgress = 0;
     building.fireWater = 0;
+    building.emergencyMuster = false;
     building.damageKind = 'fire';
     this.helpers.set(building.id, new Set());
     this.crisis.fires += 1;
@@ -192,7 +197,7 @@ export class CrisisSystem {
     const responders = this.responders(building);
     this.note('fire', `${building.name} tutuştu`);
     this.events.emit('crisis:fireStarted', { building, natural, responders: responders.map((c) => c.id) });
-    this.events.emit('toast', { text: `🔥 ${building.name} yangın çıktı! Sakinler kovalarla koşuyor; panelden "Acil Söndür" diyebilirsin.`, tone: 'warn', icon: 'fire' });
+    this.events.emit('toast', { text: `🔥 ${building.name} yangın çıktı! Sakinler kovalarla koşuyor; panelden 30 altına "Acil Seferberlik" ilan edebilirsin.`, tone: 'warn', icon: 'fire' });
     return building;
   }
 
@@ -209,7 +214,7 @@ export class CrisisSystem {
       .filter((c) => !c.isSleeping && !exclude.has(c.id))
       .map((c) => ({ c, d: Math.hypot(c.x - cx, c.y - cy) - (guards.has(c.id) ? 160 : 0) }))
       .sort((a, b) => a.d - b.d || a.c.id - b.c.id)
-      .slice(0, FIRE.maxFighters)
+      .slice(0, fightersFor(building))
       .map((x) => x.c);
   }
 
@@ -218,7 +223,7 @@ export class CrisisSystem {
     const burning = this.state.buildings.filter((b) => b.isBurning).sort((a, b) => b.fireProgress - a.fireProgress || a.id - b.id);
     if (burning.length === 0) return null;
     const at = Math.floor(this.state.totalMinutes);
-    const key = burning.map((b) => b.id).join(',');
+    const key = burning.map((b) => `${b.id}${b.emergencyMuster ? 'm' : ''}`).join(',');
     const cache = this.assignCache;
     if (cache.at !== at || cache.key !== key) {
       cache.at = at;
@@ -234,7 +239,7 @@ export class CrisisSystem {
           taken.add(p.id);
           cache.map.set(p.id, b.id);
         }
-        const slots = Math.max(0, FIRE.maxFighters - committed.length);
+        const slots = Math.max(0, fightersFor(b) - committed.length);
         for (const r of this.responders(b, taken).slice(0, slots)) {
           taken.add(r.id);
           cache.map.set(r.id, b.id);
@@ -289,13 +294,58 @@ export class CrisisSystem {
     if (building.fireProgress > FIRE.injuryAfter && this.rng.next() < FIRE.injuryChance) this.injure(c, 'fire');
   }
 
-  /** Yangını hasarsız söndürür (sakinler kovalarla ya da oyuncu "Acil Söndür" ile). Dönüş: true. */
+  /** Acil Seferberlik bedeli ve yapılabilirliği: { ok, reason, cost }. */
+  musterStatus(building) {
+    const cost = { gold: FIRE.muster.gold };
+    if (!building?.isBurning) return { ok: false, reason: 'Yapı yanmıyor', cost };
+    if (building.emergencyMuster) return { ok: false, reason: 'Seferberlik zaten ilan edildi', cost };
+    if (!this.economy.canAfford(cost)) return { ok: false, reason: `Yetersiz kaynak: ${this.economy.missing(cost).join(', ')}`, cost };
+    return { ok: true, reason: null, cost };
+  }
+
+  /**
+   * (28.1) "Acil Seferberlik": 30 altına yangına 8 kişi (en yakın uyanık, sağlam yetişkinler) çağrılır ve kova 2 kat hızlı taşınır.
+   * Yangın SÖNMEZ; söndürmek yine kovalara (sönmeden çabuk) bağlıdır. Dönüş: { ok, reason, cost }.
+   */
+  muster(building) {
+    const st = this.musterStatus(building);
+    if (!st.ok) {
+      if (building) this.events.emit('toast', { text: `Seferberlik ilan edilemedi: ${st.reason}`, tone: 'warn', icon: 'fire' });
+      return st;
+    }
+    this.economy.spend(st.cost);
+    building.emergencyMuster = true;
+    const responders = this.responders(building);
+    this.note('muster', `${building.name} için acil seferberlik ilan edildi`);
+    this.events.emit('crisis:musterCalled', { building, responders: responders.map((c) => c.id) });
+    this.events.emit('toast', { text: `📯 ${building.name} için Acil Seferberlik! ${responders.length} kişi koşuyor (-${FIRE.muster.gold} altın); kova atanlar yangın sonrası bitkin düşecek`, tone: 'warn', icon: 'bucket' });
+    return st;
+  }
+
+  /** (28.1) Seferberlik yangını bitince kova atan herkes Aşırı Yorgunluk yaşar: Enerji -40, Keyif -20. */
+  musterFatigue(building, helperIds) {
+    if (!building?.emergencyMuster) return [];
+    const tired = [];
+    for (const id of helperIds) {
+      const c = this.world.getCharacter(id);
+      if (!c) continue;
+      c.needs.energy = Math.max(0, c.needs.energy - FIRE.muster.energy);
+      c.needs.fun = Math.max(0, c.needs.fun - FIRE.muster.fun);
+      if (c.visible) c.showBubble('sweat', 2.2);
+      tired.push(c.id);
+    }
+    this.events.emit('crisis:musterFatigue', { building, helpers: tired });
+    return tired;
+  }
+
+  /** Yangını hasarsız söndürür (sakinler kovalarla). Dönüş: true. */
   extinguish(building, { byPlayer = false } = {}) {
     if (!building?.isBurning) return false;
     const s = this.state;
     const helperIds = [...(this.helpers.get(building.id) ?? [])];
     this.helpers.delete(building.id);
     const progress = building.fireProgress;
+    const mustered = building.emergencyMuster;
     building.isBurning = false;
     building.fireProgress = 0;
     building.fireWater = 0;
@@ -309,6 +359,8 @@ export class CrisisSystem {
       c.needs.fun = Math.min(100, c.needs.fun + 4);
       if (c.visible) c.showBubble('sparkle', 2.2);
     }
+    if (mustered) this.musterFatigue({ emergencyMuster: true, name: building.name }, helperIds);
+    building.emergencyMuster = false;
     this.note('fireOut', `${building.name} yangını söndürüldü`);
     this.events.emit('crisis:fireOut', { building, byPlayer, helpers: helpers.map((c) => c.id), progress });
     this.events.emit('toast', { text: `${building.name} yangını söndürüldü${byPlayer ? '' : ': yangını el birliğiyle söndürdük'} (Güven +${FIRE.trustOut})`, tone: 'success', icon: 'bucket' });
@@ -324,6 +376,8 @@ export class CrisisSystem {
     building.isBurning = false;
     building.fireProgress = 0;
     building.fireWater = 0;
+    this.musterFatigue(building, helperIds);
+    building.emergencyMuster = false;
     this.damage(building, 'fire');
     this.crisis.burned += 1;
     this.trust.adjust(FIRE.trustBurned, 'fireBurned');
@@ -331,7 +385,7 @@ export class CrisisSystem {
     if (pool.length && this.rng.next() < FIRE.burnedInjuryChance) this.injure(pool[0], 'fire');
     this.note('burned', `${building.name} yanıp hasar gördü`);
     this.events.emit('crisis:burnedDown', { building });
-    this.events.emit('toast', { text: `${building.name} yangında hasar gördü! Onarılana kadar çalışmaz: panelden "Tamir Et" de.`, tone: 'warn', icon: 'repair' });
+    this.events.emit('toast', { text: `${building.name} yangında hasar gördü! Onarılana kadar çalışmaz: panelden "Tamir Et" de ya da ustaların onarmasını bekle.`, tone: 'warn', icon: 'repair' });
     return true;
   }
 
@@ -351,12 +405,12 @@ export class CrisisSystem {
   repairStatus(building) {
     if (!building || !building.damaged) return { ok: false, reason: 'Yapı hasarlı değil', cost: {} };
     if (building.isBurning) return { ok: false, reason: 'Önce yangın söndürülmeli', cost: {} };
-    const cost = repairCost(building.type);
+    const cost = instantRepairCost(building.type);
     if (!this.economy.canAfford(cost)) return { ok: false, reason: `Yetersiz kaynak: ${this.economy.missing(cost).join(', ')}`, cost };
     return { ok: true, reason: null, cost };
   }
 
-  /** "Tamir Et": inşa maliyetinin %25'iyle yapıyı anında onarır. Dönüş: { ok, reason }. */
+  /** "Tamir Et": inşa maliyetinin %50'si + 25 altınla yapıyı anında onarır (28.1: pahalı acil durum lüksü). Dönüş: { ok, reason }. */
   repairNow(building) {
     const st = this.repairStatus(building);
     if (!st.ok) {

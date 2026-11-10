@@ -35,6 +35,9 @@ export const FIRE = {
   bucketsNearWell: 3, // yakında kuyu varsa (kova zinciri) daha az
   bucketSetback: 12, // her kova yangın ilerlemesini bu kadar geriletir
   maxFighters: 4, // aynı anda koşan en çok sakin
+  // (28.1) Acil Seferberlik: yangını bedavaya silen eski "Acil Söndür" yerine. Yangın sönmez; seferberlik ilan edilen yangına
+  // 8 kişi koşar ve kovayı 2 kat hızlı taşır; kova atan herkes söndükten sonra aşırı yorulur.
+  muster: { gold: 30, fighters: 8, speed: 2, energy: 40, fun: 20 },
   injuryChance: 0.06, // yangın %40'ı geçtikten sonra atılan her kovada çarpanıyla yaralanma olasılığı
   injuryAfter: 40,
   trustOut: 2, // el birliğiyle söndürülünce Yönetim Güveni
@@ -90,9 +93,13 @@ export const INJURY = {
   bubbles: ['bandage', 'sweat'],
 };
 
-/** Tamir: inşa maliyetinin %25'i (odun ve taş); boştaki ustalar da otomatik onarır. */
+/**
+ * Tamir. (28.1) Ustaların onarım projesi (mend) inşa maliyetinin %20'si (odun ve taş) + kısa iş; panelden "Tamir Et" (anında) ise
+ * pahalı bir acil durum lüksüdür: maliyetin %50'si + 25 altın. Boştaki ustalar da otomatik onarır.
+ */
 export const REPAIR = {
-  costRatio: 0.25,
+  costRatio: 0.2,
+  instant: { ratio: 0.5, gold: 25 },
   buildWork: 60, // kısa onarım işi
   autoDelayHours: 2, // hasardan bu kadar sonra kaynak yetiyorsa usta onarımı otomatik başlar
 };

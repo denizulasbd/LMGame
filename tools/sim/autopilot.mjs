@@ -372,7 +372,7 @@ await page.evaluate((passive) => {
         const CR = window.__crown;
         const t = s.trust.value;
         const want = t < 40 ? 'exempt' : t < 62 ? 'low' : 'standard';
-        if (s.tax.rate !== want) game.events.emit('ui:setTaxRate', { rate: want });
+        if (s.tax.rate !== want && !((s.tax.lockedUntil ?? 0) > s.totalMinutes)) game.events.emit('ui:setTaxRate', { rate: want });
         const d = s.crown.decree;
         if (d && CR.decreeStatus(s, d).ok) {
           const margin = Object.entries(d.need ?? {}).every(([r, v]) => res[r] >= v + 25);
@@ -386,9 +386,17 @@ await page.evaluate((passive) => {
       // (23. aşama) Krizler: yangını söndür, hasarlıyı tamir et, haydut izine karşı püskürt / uzlaş
       if (!window.__noSafety) {
         const CRI = window.__crisis;
-        // Sakinler kovalarla uğraşır; yangın yarıyı aşarsa oyuncu "Acil Söndür" der
-        for (const b of s.buildings) if (b.isBurning && b.fireProgress >= 45) game.events.emit('ui:extinguish', { buildingId: b.id });
-        for (const b of s.buildings) if (b.damaged && !b.isBurning && !b.project) game.events.emit('ui:repairBuilding', { buildingId: b.id });
+        // Sakinler kovalarla uğraşır; yangın yarıyı aşarsa oyuncu 30 altına "Acil Seferberlik" ilan eder (28.1)
+        for (const b of s.buildings) if (b.isBurning && b.fireProgress >= 45 && !b.emergencyMuster && res.gold >= 30) game.events.emit('ui:emergencyMuster', { buildingId: b.id });
+        // (28.1) Anında "Tamir Et" pahalıdır: önce ustalara bırak (fırtına hasarı için projeyi başlat); 24 saatten uzun beklerse acil tamir
+        for (const b of s.buildings) {
+          if (!b.damaged || b.isBurning || b.project) continue;
+          if (b.damageKind === 'storm' || !b.damageKind) {
+            const check = scene.construction.checkProject(b);
+            if (check.ok) scene.construction.startProject(b);
+          }
+          if (Number.isFinite(b.damagedAt) && s.totalMinutes - b.damagedAt > 24 * 60) game.events.emit('ui:repairBuilding', { buildingId: b.id });
+        }
         const raid = s.crisis.raid;
         if (raid) {
           const choice = CRI.defenseStatus(s).ok ? 'defend' : CRI.tributeStatus(s, raid.tribute).ok ? 'tribute' : 'caught';

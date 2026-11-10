@@ -196,7 +196,7 @@ export const STORM = {
   delayHours: [20, 30],
   damage: [1, 3], // güçlendirilmemiş kasabada hasar alan üretim yapısı sayısı
   wolfFun: -6,
-  mend: { costRatio: 0.3, buildWork: 90 }, // hasarlı yapının onarımı: yapının maliyetinin %30'u
+  mend: { costRatio: 0.2, buildWork: 90 }, // hasarlı yapının onarımı: yapının maliyetinin %20'si (28.1: %30'dan indirildi)
 };
 
 // Keşif seferi: süre ve ganimet tabloları (rastgele biri; büyük seferde tılsım şansı)

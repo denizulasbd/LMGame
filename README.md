@@ -45,10 +45,10 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 | Karar penceresindeki seçenekler | Sürpriz olayda kararını ver (oyun durur; 30 sn içinde seçmezsen varsayılan güvenli seçenek) |
 | Belediye Konağı panelinde **Fermanı İlan Et** | Büyük Ziyafet, Depo Genişletmesi ya da Zanaat Loncası fermanını ilan et |
 | Hasarlı yapının panelinde **Onarımı Başlat** | Fırtınada / kurt saldırısında hasar gören yapıyı onar |
-| Hasarlı yapının panelinde **Tamir Et** | (23. aşama) İnşa maliyetinin %25'iyle (odun + taş) yapıyı anında onar; yoksa boştaki ustalar yangın / baskın hasarını 2 saat sonra kaynak yetiyorsa kendiliğinden onarır |
-| Yanan yapının panelinde **Acil Söndür (Kova Zinciri)** | (23. aşama) Yangını anında, hasarsız söndür (Güven +2); sakinler zaten kovalarla koşar |
+| Hasarlı yapının panelinde **Tamir Et** | (23. aşama; **28.1'de pahalandı**) Anında onarım artık acil durum lüksüdür: inşa maliyetinin **%50'si (odun + taş) + 25 altın**. Acelen yoksa boştaki ustalar yangın / baskın / fırtına hasarını maliyetin yalnızca **%20'siyle** onarır (yangın / baskında 2 saat sonra kendiliğinden başlar) |
+| Yanan yapının panelinde **Acil Seferberlik** | (28.1; eski bedava "Acil Söndür"ün yerine) **30 altın**: yangın sönmez ama o yangına 4 yerine **8 kişi** koşar ve kova **2 kat hızlı** taşınır; kova atan herkes yangın bitince **Enerji -40, Keyif -20** kaybeder |
 | Üst çubuğun altındaki **Haydut izleri · N sa** çipi (ya da Gözcü Kulesi / Belediye / meydan paneli) | (23. aşama) Haydut Baskını penceresi: A bekçilerle püskürt, B haraç öde, C hazırlıksız yakalan |
-| Üst çubuğun altındaki **… yanıyor · %N** çipi | (23. aşama) Yanan yapıyı seç, panelinden söndür |
+| Üst çubuğun altındaki **… yanıyor · %N** çipi | (23. aşama) Yanan yapıyı seç; panelinden Acil Seferberlik ilan et |
 | Ayarlar > **Tehlike Sıklığı** (Huzurlu / Dengeli / Çetin) | (23. aşama) Doğal yangın ve haydut baskını sıklığı (kayda girer) |
 | Bilgelik Evi panelinde **Araştır** | Kasaba araştırmasını başlat (maliyet peşin; Bilge çalıştıkça ilerler) |
 | Liman panelinde **Kapalı / 250+ / 400+ / 550+** ve **İhracat Sandığı Hazırla** | Otomatik fazlalık ihracatının stok sınırını seç; rıhtıma bir ihracat sandığı koy |
@@ -3659,12 +3659,100 @@ sistemlerini arayüze taşıdı.
 
 **Ortak ilkeler.**
 
-- **Kule öncesi bayt bayt aynı:** üç adımda da `autopilot.mjs 42 24` raporu, günlüğü ve kayıt dosyası 26.3 / `main` ile aynıdır. Ulu Saat Kulesi G25 / G27 / G28 ve
-  Altın Çağ G28 hiç değişmedi; stres matrisinde Altın Çağ G31, G33, G31, G28, G34, G34.
+- **Kule öncesi bayt bayt aynı (yalnızca 27. aşamaya özgü tarihî not):** üç adımda da `autopilot.mjs 42 24` raporu, günlüğü ve kayıt dosyası 26.3 / `main` ile aynıdır. Ulu Saat
+  Kulesi G25 / G27 / G28 ve Altın Çağ G28 hiç değişmedi; stres matrisinde Altın Çağ G31, G33, G31, G28, G34, G34. **28. aşamada bu kural kaldırıldı** (bkz. 28.1).
 - **İzole üreteçler:** dilekçe `seed + 23`, çıraklık `seed + 28`, soy `seed + 30`, yadigâr `seed + 31`, panayır / sofra / konuk `seed + 32 / 33 / 34`. Ana üreteç ve
   `Math.random` (eski sistemlerin tohumlu çağrıları dahil) değişmedi.
 - **Kayıt sürümü 31:** yeni alanların hepsi isteğe bağlıdır; v2-v31 kayıtları sıfır hatayla açılır (`compat.mjs` 1137).
 - **Simülasyon araçları:** `tests.mjs` 1125 -> 1207, `audit.mjs` 124 -> 136 doğrulama.
+
+## Sistemik Derinlik ve Çekirdek Revizyon: Kriz, Onarım, Vergi ve Takas İstismarlarının Çözümü (28. aşama, 28.1 mikro adımı)
+
+28. aşamayla birlikte **mimari paradigma değişti**: bugüne dek uygulanan "Tohum 42'nin kule öncesi olayları ve G28 Altın Çağ takvimi bayt bayt aynı kalmalıdır" kuralı
+**resmen kaldırıldı**. Oyunun mekaniklerini kökten iyileştirmek serbesttir. Değişmeyenler:
+
+- **Eski kayıtlar açılır:** v2-v31 kayıtları göç koduyla (`SaveManager.migrate`) sorunsuz yüklenir.
+- **Oyunun kendi içindeki determinizmi korunur:** aynı tohum art arda iki kez koşturulunca birebir aynı sonucu verir; krizler, dilekçeler, çıraklık, soy, yadigâr, panayır /
+  sofra / konuk sistemlerinin izole üreteçleri (`seed + 23 ... + 34`) ve `Math.random` tohumlaması aynen sürer.
+- **Yeni referans noktası:** Tohum 42, yeni kurallarla yeni ve farklı bir dengeye oturdu (aşağıda). Bundan sonraki adımlar `main` ile değil **28.1'in sonuçlarıyla** karşılaştırılır.
+
+Bu adım dört mekanik açığı kapatır.
+
+### 1. "Acil Söndür" sihri kalktı -> "Acil Seferberlik" (`CrisisSystem`, `Crisis`, `Brain`, `Building`)
+
+Eskiden panelden "Acil Söndür" bedavaya, anında ve üstüne +2 Güven vererek yangını siliyordu: kova zincirini ve Su Kuyusu'nu anlamsızlaştırıyordu. Düğme artık
+**Acil Seferberlik** (`ui:emergencyMuster`):
+
+- **Bedel 30 altın** (`FIRE.muster.gold`; altın yoksa düğme devre dışı, `musterStatus` nedeni yazar). Yangın **sönmez**; yanan yapı `emergencyMuster = true` bayrağı alır (kayda girer).
+- **8 kişi koşar** (`FIRE.muster.fighters`; normalde `FIRE.maxFighters` = 4, bekçiler dahil): en yakın uyanık, sağlam yetişkinler; `fightersFor(building)` hem `responders` hem
+  `fireAssignment` için tek kaynaktır.
+- **2 kat hızlı kova** (`FIRE.muster.speed`): `fetchWater` ve `fightFire` süreleri yarıya iner (`Brain.crisisDuration(activity, fire)`; süre sabit olduğu için üreteç tüketilmez).
+- **Aşırı Yorgunluk:** yangın söndüğünde ya da yapı hasar aldığında **kova atan her sakin Enerji -40, Keyif -20** kaybeder (`crisis:musterFatigue`, Kasaba Günlüğü satırı).
+  Kova atmayan sakin etkilenmez. Seferberlik bayrağı yangın bitince sıfırlanır.
+- Kovayla söndürme (3-4 kova, Güven +2, "el birliğiyle" anısı) aynen sürer; yani seferberlik bir **hızlandırıcıdır**, büyü değil. `ui:extinguish` olayı kaldırıldı.
+
+### 2. "Tamir Et" lüksü ve normal onarım dengesi (`Crisis`, `CrisisSystem`, `dilemmas`)
+
+- **Anında Tamir Et** (`ui:repairBuilding`): inşa maliyetinin **%50'si (odun + taş) + 25 altın** (`REPAIR.instant`, `instantRepairCost`). Altın ya da malzeme yoksa reddedilir.
+- **Ustaların onarım projesi (`mend`)** maliyetin **%20'sine** indi (`REPAIR.costRatio` 0,25 -> 0,2; fırtına hasarının `STORM.mend.costRatio`'su da 0,3 -> 0,2): acelesi
+  olmayan oyuncu ustaları bekler. Yangın / baskın hasarında usta onarımı yine 2 saat sonra kendiliğinden başlar.
+- Panelde iki yol açıkça yazılır: anında yol pahalı, usta yolu ucuz.
+
+### 3. Vergi Fermanı kilidi (`TaxSystem`, `Crown`, `BuildingPanel`)
+
+Eskiden vergi 11:59'da Ağır'a, 12:01'de Muaf'a çekilerek tahsilat parası toplanıp Ağır Vergi'nin çalışma hızı cezasından ve moral bozukluğundan kaçılıyordu.
+
+- Kademe değişince `state.tax.lockedUntil = şimdi + 3 oyun günü` (`TAX.lockDays`, bir tam tahsilat döngüsü) yazılır; kilit sürerken `setRate` reddedilir (`tax:rateLocked`, uyarı toast'ı, günlük).
+- Aynı kademeyi yeniden seçmek kilit koymaz. İlk değişiklik (kilit 0) serbesttir.
+- **Panel:** kilitliyken seçili olmayan kademe düğmeleri devre dışıdır (tooltip ve kartta "Ferman kilitli: N gün N saat").
+- Kilit kayda girer ve yüklemeden sonra da sürer.
+
+### 4. Dış ticaret sözleşmeleri limanın önüne geçti (`data/tradePost.js`)
+
+Büyük Ticaret Limanı fazlalığı `EXPORT.values` fiyatından otomatik satar (Kumaş 6, Şerbet 7, Ekmek 3, Yün 3, Erzak 1). Sözleşme tabanları artık bunun **en az %40 üstündedir**
+(`CONTRACT_MIN_PREMIUM = 1.4`; testler ve denetim bunu doğrular):
+
+| Sözleşme | Eski | Yeni | Liman karşılığı | Prim |
+|---|---|---|---|---|
+| Kumaş (10) | 40 | **85** | 60 | x1,42 |
+| Fıçı Şerbeti (8) | 35 | **80** | 56 | x1,43 |
+| Ekmek (25) | 20 | **105** | 75 | x1,40 |
+| Erzak (40) | 18 | **75** | 40 | x1,88 |
+| Yün (15) | 30 | **65** | 45 | x1,44 |
+
+> Not: görev metni Ekmek için 90 altın öngörmüştü; ancak 25 ekmeğin liman karşılığı 75'tir ve 90 yalnızca %20 prim eder. "En az %40" ilkesini sağlamak için **105** seçildi.
+> Pazar doygunluğu (peş peşe satışta -%12, taban %55) ve kayıt biçimi değişmedi; kayıttaki sözleşmeler kendi `gold` değerini taşır.
+
+### Kayıt (sürüm 32)
+
+`buildings[].emergencyMuster: boolean` ve `tax.lockedUntil: number` eklendi. `SaveManager.migrate` v31 -> v32 için yangınlara `emergencyMuster: false`, vergiye `lockedUntil: 0`
+yazar; `GameState.restore` eksik / bozuk değerleri de aynı varsayılana çeker. `SAVE_VERSION = 32`. Fikstür `save-v32.json` (otopilot, 72 gün, `--crisis-state`) eklendi.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1207 -> **1232**; 25'i bu adımın, birkaçı yeni kurala göre güncellendi):
+  - Acil Seferberlik: düğmenin varlığı ("Acil Söndür" yok), altın yetmezse devre dışı / reddedilir, 30 altın düşer, yangın **sönmez**, bayrak açılır, atanan sayısı 4 -> 8,
+    kova süreleri yarıya iner, ikinci ilan reddedilir, kova atanlar söndükten sonra Enerji -40 / Keyif -20 (atmayan etkilenmez), söndürülemeyen yangında da yorgunluk,
+    bayrak kayda yazılır ve sıfırlanır;
+  - Tamir: anında bedel %50 + 25 altın, altın yoksa ret, usta onarımı %20 (yangın ve fırtına), altın istemez;
+  - Vergi Fermanı: kilitsiz serbest geçiş, `lockedUntil` = +3 gün, tahsilattan hemen sonra Muaf'a kaçışın reddi ("tax:rateLocked"), Ağır Vergi hız cezasının kilit boyunca sürmesi,
+    kilit bitmeden 1 dakika önce hâlâ kilitli, 3 gün dolunca açılıp yeniden kilitlenme, aynı kademede kilit yok, panel düğmeleri devre dışı + "Ferman kilitli", kayıt,
+    v31 -> v32 göçü;
+  - sözleşmeler: yeni taban altınlar (85 / 80 / 105 / 75 / 65) ve her birinin liman fiyatına göre **en az %40 prim**; pazar doygunluğu testleri yeni sayılara uyarlandı.
+  - **Tohum kayması nedeniyle sağlamlaştırılan eski testler:** dokumacının yevmiyesi (kesedeki net değişim yerine `wagesPaid`), Kıdemli Bilge anısı (40'lık bellek sınırı), Ocak Devri
+    (önceki ocak reisliklerinin ve kulübeye sonradan yerleşenlerin sayacı bozmaması), Altın Çağ'da yuva kuran çift (başka bekleyen çiftlerin boş kulübeleri kapması), Sofra
+    öncesi kalan şenlik görevleri. Hiçbiri kuralı gevşetmez; yalnızca dünyanın önceki testlerden artakalan durumuna bağımlılığı kaldırır.
+- **Denetim** (`audit.mjs`): 136 -> **138**. Vergi kilidi, tahsildar yoldayken / ferman sürerken kayıt -> yükleme sonrasında da sürer; kilit dolunca kademe değişir ve yeniden 3 gün kilitlenir.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-32): 1137 -> **1176**. Yeni `save-v32.json` fikstürü (otopilot, 72 gün, `--crisis-state`).
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0;
+  refah / nüfus 30 / seviye 4 her tohumda. **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G30, G38, G34** (28.1 öncesi: G31, G33, G31, **G28**, **G34**, G34).
+  Yangın 25 (hepsi söndürüldü, hasar bırakan 0), haydut baskını 24, tamir 3, vergi tahsilatı 78 (+8725 altın, hep Standart kademe), Krallık Vergisi 36/36.
+- **Tohum 42, yeni referans noktası.** `autopilot.mjs 42 72 --crisis-state` iki kez art arda koşturuldu: `--json` raporu, kayıt dosyası ve günlük çıktısı **bayt bayt aynı**
+  (tek fark günlükteki kayıt dosyası adı). Ulu Saat Kulesi aşamaları **G25 / G27 / G28 -> G27 / G29 / G30**, Altın Çağ **G28 -> G30**. Koşu: yangın 11 (söndürülen 10), haydut
+  baskını 7 (püskürtülen 5, haraç 2), vergi 23 tahsilat (+3391 altın), Krallık Vergisi 11/11, ferman teslim 9, takılma 0, kopuk referans 0, sayfa hatası yok.
+  Bundan sonraki adımlar bu değerlere göre kıyaslanır.
+- **Otopilot:** yangın yarıyı aşınca (altın >= 30) Acil Seferberlik ilan eder; hasarı önce ustalara bırakır (fırtına hasarı için onarım projesini kendisi başlatır),
+  24 saati aşarsa pahalı anında tamire başvurur; vergi kilidini gözetir.
 
 ## Kod denetimi (15. aşama öncesi)
 
@@ -3830,6 +3918,9 @@ düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 | Yeni harabe | `data/buildings.js` (`ruin` alanı, `RUIN_TYPES`) + `art/sprites/structuresTier2.js` |
 | Oyunun adı, başlangıç ekranı | `config.js` → `GAME_TITLE`, `ui/components/TitleMenu.js` |
 | Takas teklifleri, tüccar takvimi | `data/trade.js` |
+| (28.1) Acil Seferberlik, anında / usta onarımı bedelleri | `data/crisis.js` → `FIRE.muster`, `REPAIR` |
+| (28.1) Vergi Fermanı kilit süresi | `data/crown.js` → `TAX.lockDays` |
+| (28.1) İhracat sözleşmesi altınları (limana göre en az %40 prim) | `data/tradePost.js` → `CONTRACTS`, `CONTRACT_MIN_PREMIUM` |
 | Yeni ses ya da ambiyans | `systems/AudioSystem.js` (sentez araçları `core/SoundEngine.js`) |
 | Yeni dinamik olay | `systems/EventSystem.js` (+ günlük metni `JournalSystem.js`) |
 | Yeni simülasyon kuralı | `systems/` altında yeni sistem, `TownScene` içinde listeye ekle |
