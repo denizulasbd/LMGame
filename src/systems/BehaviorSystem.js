@@ -404,6 +404,7 @@ export class BehaviorSystem {
     const building = task.buildingId ? this.world.getBuilding(task.buildingId) : null;
     let label = activity.label;
     if (task.activity === 'sleep' && task.nap) label = activity.napLabel;
+    if (task.activity === 'sleep' && c.isVenerable) label = building ? `${building.name}'nde sabahlıyor (Saygın Büyük)` : 'Sabahlıyor'; // (28.3)
     if (task.activity === 'meal' && building?.type === 'storage') label = task.bread ? activity.breadStorageLabel : activity.storageLabel;
     else if (task.activity === 'meal' && task.bread) label = activity.breadLabel;
     if ((task.activity === 'bake' || task.activity === 'weave' || task.activity === 'brewSherbet') && building?.idle) label = activity.idleLabel;

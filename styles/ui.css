@@ -383,6 +383,17 @@
   box-shadow: inset -2px -2px 0 #e0a030, inset 2px 2px 0 var(--ui-card-hi), 0 0 0 1px var(--ui-card-hi);
 }
 
+/* (28.3) Saygın Büyük etiketi */
+.life-stage-venerable {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ui-ink-dark);
+  background: linear-gradient(135deg, #ffe9a8 0%, #d9c2f5 100%);
+  border: 2px solid var(--ui-line);
+  padding: 0 6px;
+  margin-left: 4px;
+}
+
 /* (28.2) Başusta rozeti: altın-mor */
 .craft-badge.is-grandmaster {
   background: linear-gradient(135deg, #ffd23f 0%, #b58cf0 100%);

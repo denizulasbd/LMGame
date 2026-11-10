@@ -241,10 +241,11 @@ export class SocialSystem {
       day,
       hour,
       at: this.state.totalMinutes,
-      heardBy: [...new Set(knowers.filter(Boolean).map((c) => c.id))],
+      heardBy: [...new Set(knowers.filter((c) => c && this.state.characters.includes(c)).map((c) => c.id))], // (28.3) vefat edenler / ayrılanlar haberi duymaz
       selfStories,
       spread: false,
     };
+    for (const id of Object.keys(news.selfStories)) if (!this.state.characters.some((c) => c.id === Number(id))) delete news.selfStories[id];
     social.gossip.push(news);
     if (social.gossip.length > GOSSIP.maxItems) social.gossip.splice(0, social.gossip.length - GOSSIP.maxItems);
     this.events.emit('gossip:created', { news });

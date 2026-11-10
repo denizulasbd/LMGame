@@ -712,7 +712,7 @@ function sanitizeReferences(next) {
   const residents = new Map();
   for (const c of next.characters) if (c.homeId !== null) residents.set(c.homeId, (residents.get(c.homeId) ?? 0) + 1);
   for (const c of next.characters) {
-    if (c.homeId !== null) continue;
+    if (c.homeId !== null || c.isVenerable) continue; // (28.3) Saygın Büyük yataksızdır
     const home = next.buildings.find((b) => b.functional && b.capacity > (residents.get(b.id) ?? 0));
     if (!home) continue;
     c.homeId = home.id;

@@ -105,9 +105,9 @@ await page.evaluate((passive) => {
     window.__stats.gold.decrees += price;
     window.__stats.gold.items.push(decree.name);
   });
-  for (const name of ['research:completed', 'school:graduated', 'harbor:shipped', 'wonder:stageCompleted', 'wonder:completed', 'goldenAge:began', 'goldenAge:celebrationEnded']) {
+  for (const name of ['research:completed', 'school:graduated', 'harbor:shipped', 'wonder:stageCompleted', 'wonder:completed', 'goldenAge:began', 'goldenAge:celebrationEnded', 'population:died', 'venerable:became', 'family:childBorn', 'population:joined']) {
     game.events.on(name, (p) => {
-      const what = p?.research?.name ?? (p?.skill ? `${p.character.name} -> ${p.skill}` : '') ?? '';
+      const what = name === 'population:died' ? p.text : name === 'venerable:became' ? `${p.character.name} (${p.character.age})` : name === 'family:childBorn' || name === 'population:joined' ? `${p.child?.name ?? p.character?.name} (nüfus ${game.state.characters.length}, kotaya sayılan ${game.state.characters.filter((c) => !c.isVenerable).length})` : (p?.research?.name ?? (p?.skill ? `${p.character.name} -> ${p.skill}` : '') ?? '');
       const extra = name === 'harbor:shipped' ? `+${p.gold} altın (${Object.entries(p.cargo).map(([r, v]) => `${r}${v}`).join(' ')})` : p?.stage ? `${p.stage.name} (${p.index})` : '';
       sim.log.push(`${sim.stamp()} ${name} ${what} ${extra}`.trim());
     });
@@ -967,6 +967,11 @@ if (mon.life) {
     `(25.1) yaşam evreleri: çocuk ${L.counts.child}, genç ${L.counts.youth}, yetişkin ${L.counts.adult}, Kıdemli Bilge ${L.counts.elder} (emekli ${L.retired}) · ` +
       `en çok bilge ${L.maxElders}, en çok genç ${L.maxYouth} · yaş aralığı ${ages} · unvanı alan bilge ${L.state.elders ?? 0}, yetişkinliğe geçen genç ${L.state.adults ?? 0} · ` +
       `nasihat ${Math.round(L.state.adviceMinutes ?? 0)} dk · işteki emekli ${L.retiredWorking} · emeklilik gecikmesi ${L.retireLag}`
+  );
+  // (28.3) Sürdürülebilir kuşak döngüsü
+  console.log(
+    `(28.3) nüfus ${L.population} (kotaya sayılan ${L.active}) · Saygın Büyük ${L.venerable.length} (${L.venerable.join(', ') || '-'}; toplam olan ${L.state.venerables ?? 0}) · vefat ${L.state.deaths ?? 0} (kaza ${L.state.accidents ?? 0}; son: ${L.state.lastDeath ? `${L.state.lastDeath.name} ${L.state.lastDeath.age} yaşında G${L.state.lastDeath.day} ${L.state.lastDeath.cause}` : '-'}) · ` +
+      `doğum ${L.births} · ömrü atanmamış ${L.lifespanMissing} · yataklı Saygın Büyük ${L.venerableWithHome}`
   );
 }
 console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);

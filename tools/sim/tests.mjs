@@ -2322,7 +2322,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 33', raw.version === 33);
+  check('kayıt sürümü 34', raw.version === 34);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2767,7 +2767,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 33: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 33 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 34: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 34 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -3142,7 +3142,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 33: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 33 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 34: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 34 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3810,7 +3810,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 33: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 33 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 34: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 34 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -4091,7 +4091,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { g: garden.id, o: other.id, switches: st.granary.switches };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 33: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    check('kayıt sürümü 34: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
     game.events.emit('ui:load');
     const s2 = game.state;
     const g2 = s2.buildings.find((b) => b.id === T.g);
@@ -4423,7 +4423,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 33: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    check('kayıt sürümü 34: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
     game.events.emit('ui:load');
     const s2 = st();
     const inn2 = s2.buildings.find((b) => b.id === T.inn);
@@ -4700,7 +4700,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 33: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    check('kayıt sürümü 34: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
     game.events.emit('ui:load');
     const t2 = st().tradePost;
     check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
@@ -4986,7 +4986,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 33: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
+    check('kayıt sürümü 34: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
     game.events.emit('ui:load');
     const back = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     const sage2 = st().characters.find((c) => c.id === sage.id);
@@ -5251,7 +5251,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const snap = JSON.stringify(youth.apprenticeship);
-    check('kayıt sürümü 33: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
+    check('kayıt sürümü 34: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
     game.events.emit('ui:load');
     const y2 = st().characters.find((c) => c.id === youth.id);
     check('kayıttan çıraklık, kapı ve sayaçlar birebir döner', JSON.stringify(y2.apprenticeship) === snap && AP.doorOpen(st(), st().buildings.find((b) => b.id === hut.id)) && st().apprenticeship.crafted >= 1);
@@ -5638,7 +5638,7 @@ const pageResults = await page.evaluate(async () => {
     // --- Kayıt (sürüm 26) ---
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 33: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
+    check('kayıt sürümü 34: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
     const snapT = JSON.stringify(st().temperament);
     game.events.emit('ui:load');
     const sh2 = st().characters.find((c) => c.id === shown.id);
@@ -5833,7 +5833,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rc = raw.characters.find((c) => c.id === g2a.id);
-    check('kayıt sürümü 33: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
+    check('kayıt sürümü 34: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
     const snap = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
     game.events.emit('ui:load');
     const back = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
@@ -6082,7 +6082,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rk = raw.characters.find((c) => c.id === k1.id);
-    check('kayıt sürümü 33: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
+    check('kayıt sürümü 34: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
     const snap = JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null));
     game.events.emit('ui:load');
     check('kayıttan yadigârlar, zincirleri, sayaçlar ve arşiv birebir döner', JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null)) === snap && st().heirloom.archive.length >= 1 && st().chronicle.firstHeirloom?.elder === e1.name);
@@ -6315,7 +6315,7 @@ const pageResults = await page.evaluate(async () => {
     goto(12, 18); fs().onHour(18);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 33: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
+    check('kayıt sürümü 34: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
     st().currentFestival = null;
     game.events.emit('ui:load');
     check('kayıttan süren panayır birebir döner (şenlik kuralları ve Tarihçe\'deki ilk kayıt ile)', JSON.stringify(st().currentFestival) === JSON.stringify(raw.currentFestival) && st().currentFestival.phase === 'party' && st().events.festival.active && st().chronicle.firstFair?.name === fair.name && st().stats.fairs >= 5);
@@ -6600,7 +6600,7 @@ const pageResults = await page.evaluate(async () => {
     const liveFeast = JSON.stringify(st().currentFeast);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 33: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
+    check('kayıt sürümü 34: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
     st().currentFeast = null;
     game.events.emit('ui:load');
     check('kayıttan süren sofra birebir döner (ikram sayacı dahil)', JSON.stringify(st().currentFeast) === liveFeast && st().currentFestival?.phase === 'party');
@@ -6881,7 +6881,7 @@ const pageResults = await page.evaluate(async () => {
     const liveB = JSON.stringify(st().guestBook);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 33: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
+    check('kayıt sürümü 34: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw.version === 34 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
     st().activeGuest = null;
     game.events.emit('ui:load');
     check('kayıttan konuk kaldığı yerde döner (haritada yeniden oluşur), defter birebir', JSON.stringify(st().activeGuest) === liveG && JSON.stringify(st().guestBook) === liveB && S().world.guests.length === 1 && S().world.guests[0].isGuest === true);
@@ -6970,7 +6970,7 @@ const pageResults = await page.evaluate(async () => {
     const eatenBefore = [...st().currentFeast.eatenIds];
     check('27.1: ikram alanlar sofrada kayda girer (currentFeast.eatenIds)', st().currentFeast.served === 3 && eatenBefore.length === 3 && eaters.every((c) => eatenBefore.includes(c.id)), JSON.stringify(st().currentFeast));
     const raw1 = save();
-    check('27.1: kayıt sürümü 33 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw1.version === 33 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
+    check('27.1: kayıt sürümü 34 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 34 && raw1.version === 34 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
     load();
     const reloaded = st().characters.filter((c) => eatenBefore.includes(c.id));
     check('27.1: yüklemede eatenIds\'teki sakinlerin c.feasted işareti yeniden kurulur', reloaded.length === 3 && reloaded.every((c) => c.feasted === fairDay), reloaded.map((c) => c.feasted).join());
@@ -7495,7 +7495,7 @@ const pageResults = await page.evaluate(async () => {
     Math.random = realRandom;
     check('27.2: bu adımın sistemleri ana üreteçleri ve Math.random\'u tüketmez (dilekçe seed + 23, çıraklık + 28, soy + 30, yadigâr + 31)', mainRngs.length > 5 && isoCalls > 15 && rngViolations === 0, `${rngViolations}/${isoCalls}`);
     void rngBefore;
-    check('27.2: kayıt sürümü 33 korunur', CONFIG.SAVE_VERSION === 33);
+    check('27.2: kayıt sürümü 34 korunur', CONFIG.SAVE_VERSION === 34);
     restore(snap0);
     s0.lineage.heads = { ...keepHeads };
     Object.assign(s0.lineage, keepLineage);
@@ -7733,7 +7733,7 @@ const pageResults = await page.evaluate(async () => {
       game.events.emit('ui:selectCharacter', null);
     }
 
-    check('27.3: kayıt sürümü 33 korunur', CONFIG.SAVE_VERSION === 33);
+    check('27.3: kayıt sürümü 34 korunur', CONFIG.SAVE_VERSION === 34);
     if (st().activeGuest) gs().finish(false);
     S().world.guests = [];
     Object.assign(st().time, keepTime);
@@ -7929,7 +7929,7 @@ const pageResults = await page.evaluate(async () => {
     localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
     const migrated = SM.SaveManager.read('session');
     if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
-    check('28.2: v32 kaydı v33\'e göç eder: hiç kimse Başusta değil, çıraklık sayaçları 0', CONFIG.SAVE_VERSION === 33 && migrated && migrated.characters.every((c) => c.isGrandmaster === false && c.grandmasterProfession === null && c.grandmasterBatches === 0) && migrated.apprenticeship.grandmasters === 0 && migrated.apprenticeship.grandmasterSaved === 0);
+    check('28.2: v32 kaydı v33\'e göç eder: hiç kimse Başusta değil, çıraklık sayaçları 0', CONFIG.SAVE_VERSION >= 33 && migrated && migrated.characters.every((c) => c.isGrandmaster === false && c.grandmasterProfession === null && c.grandmasterBatches === 0) && migrated.apprenticeship.grandmasters === 0 && migrated.apprenticeship.grandmasterSaved === 0);
 
     // Temizlik
     Object.assign(kid, { lifeStage: keepKid.ls, age: keepKid.age, ageInDays: keepKid.aid, apprenticeship: keepKid.app, task: keepKid.task, skills: keepKid.skills, workplaceId: keepKid.wp, isGrandmaster: false, grandmasterProfession: null, grandmasterBatches: 0 });
@@ -7937,6 +7937,290 @@ const pageResults = await page.evaluate(async () => {
     Object.assign(baker, { isGrandmaster: false, grandmasterProfession: null, grandmasterBatches: 0, skills: keepBaker.skills, workplaceId: keepBaker.wp, equipment: keepBaker.eq });
     master.buffs.proudMaster = -1;
     Object.assign(s0.resources, keepRes);
+  }
+
+  // ===== 28. aşama (28.3): Sürdürülebilir kuşak döngüsü: Saygın Büyük, vefat ve kazalar =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const LSD = await import('/src/data/lifeStages.js');
+    const VN = await import('/src/systems/Venerable.js');
+    const LS = await import('/src/systems/LifeStages.js');
+    const TS = await import('/src/systems/TownStatus.js');
+    const TD = await import('/src/data/town.js');
+    const CRI = await import('/src/systems/Crisis.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const SM = await import('/src/state/SaveManager.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    const lc = () => S().lifecycle;
+    const adults = () => st().characters.filter((c) => !c.role && !c.isChild && !c.away && !c.emigrating).sort((a, b) => a.id - b.id);
+    const pool = adults();
+    sim.give({ wood: 600, stone: 400, food: 900, bread: 80 });
+    const events = [];
+    const offs = ['venerable:became', 'population:died', 'population:left', 'heirloom:archived', 'life:fatalAccident'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
+    const keep = new Map(st().characters.map((c) => [c, { ls: c.lifeStage, age: c.age, aid: c.ageInDays, ven: c.isVenerable, home: c.homeId, kids: [...(c.children ?? [])], inv: [...(c.inventory ?? [])], lifespan: c.lifespan, retired: c.retired, married: c.married, partner: c.partnerId }]));
+
+    // --- Veri ve ömür ---
+    check('28.3: ömür 80-90 yaş, tohumdan türeyen izole üreteç (seed + 35)', LSD.LIFESPAN.min === 80 && LSD.LIFESPAN.max === 90 && LSD.LIFESPAN.seedOffset === 35);
+    const ids = Array.from({ length: 300 }, (_, i) => i + 1);
+    const spans = ids.map((i) => VN.lifespanFor(42, i));
+    check('28.3: lifespanFor deterministik, 80-90 aralığında ve çeşitli (aynı tohum + kimlik = aynı ömür)', spans.every((v, i) => v === VN.lifespanFor(42, ids[i]) && v >= 80 && v <= 90) && new Set(spans).size >= 8 && VN.lifespanFor(42, 7) !== undefined && spans.some((v, i) => v !== VN.lifespanFor(43, ids[i])));
+    check('28.3: her sakinin ömrü atanmış (80-90)', st().characters.every((c) => c.lifespan >= 80 && c.lifespan <= 90 && c.lifespan === VN.lifespanFor(s0.seed, c.id)));
+    const born = new Character({ name: 'Yeni Bebek', age: 0, traits: ['cheerful'], appearance: { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'sky', pants: 'navy' } });
+    st().characters.push(born);
+    game.events.emit('population:changed', st().characters.length);
+    check('28.3: sonradan katılan / doğan sakine ömür atanır (kimlikten türer)', born.lifespan === VN.lifespanFor(s0.seed, born.id) && born.lifespan >= 80);
+    st().characters.splice(st().characters.indexOf(born), 1);
+
+    // --- Saygın Büyük ---
+    const E = pool[0];
+    const mkElder = (c, age = 72) => { c.lifeStage = 'elder'; c.age = age; c.ageInDays = age * 16; c.retired = true; c.isVenerable = false; };
+    const noHeirloom = (c) => { c.inventory = (c.inventory ?? []).filter((x) => !x.heirloom); };
+    mkElder(E);
+    E.children = [];
+    E.married = false; E.partnerId = null;
+    noHeirloom(E);
+    const homeE = E.homeId;
+    const bedsBefore = TS.freeBeds(st()).open;
+    events.length = 0;
+    const done = lc().checkVenerables();
+    check('28.3: Ocak ve Yadigâr devri tamam (evladı yok, yadigârı yok) Kıdemli Bilge Saygın Büyük olur', done.includes(E) && E.isVenerable === true && E.lifeStage === 'elder' && events.some((e) => e.n === 'venerable:became' && e.p.character === E));
+    check('28.3: Saygın Büyük yatağını tamamen boşaltır (homeId = null) ve ev boş yatağa döner', E.homeId === null && TS.freeBeds(st()).open + TS.freeBeds(st()).family >= bedsBefore && st().characters.every((c) => c !== E || c.homeId === null) && homeE !== null);
+    check('28.3: Saygın Büyük günlüğe ve bildirime yazılır, sayaç artar', st().journal.some((j) => j.text.includes(`${E.name} Saygın Büyük oldu`)) && st().lifeStages.venerables >= 1);
+    check('28.3: Saygın Büyük bir kez olur (ikinci kontrolde tekrar olmaz)', !lc().checkVenerables().includes(E));
+    // Koşullar: evladı olan, reisi olduğu ocağı devredemeyen bilge bekler; 75 yaşında zaman aşımı ile muaf
+    const F = pool[1];
+    const kid = pool[2];
+    mkElder(F, 72);
+    noHeirloom(F);
+    F.children = [kid.id]; kid.parentIds = [F.id]; kid.married = false; kid.partnerId = null;
+    const cabin = S().world.getBuilding(F.homeId);
+    st().lineage.heads[cabin.id] = F.id;
+    const waits = !lc().checkVenerables().includes(F) && !F.isVenerable;
+    F.age = 75; F.ageInDays = 75 * 16;
+    check('28.3: ocağını devredemeyen (evladı evli değil) bilge bekler; 75 yaşında devir muaf sayılır', waits && lc().checkVenerables().includes(F) && F.isVenerable);
+    // Yadigâr: teslim edilmemiş yadigâr varken Saygın Büyük olunmaz; devredecek kimse yoksa arşive kalkar
+    const G = pool[3];
+    mkElder(G, 73);
+    G.children = [];
+    G.inventory = [{ kind: 'heirloomHammer', qty: 1, name: 'Ata Yadigârı Çekiç', heirloom: { ownerId: G.id, ownerName: G.name, story: 'x', since: st().time.day - 1, chain: [G.name] } }];
+    const heirs = st().characters.filter((c) => c !== G && !c.isChild);
+    const heirKeep = heirs.map((c) => [c, c.lifeStage, c.inventory]);
+    for (const c of heirs) { c.lifeStage = 'elder'; } // mirasçı adayı kalmasın (Bilge, çocuk, ayrılan olmaz)
+    const archive0 = st().heirloom.archive.length;
+    events.length = 0;
+    const gDone = lc().checkVenerables().includes(G);
+    check('28.3: devredecek kimsesi olmayan bilgenin yadigârı arşive kalkar ve Saygın Büyük olur', gDone && G.isVenerable && !G.inventory.some((x) => x.heirloom) && st().heirloom.archive.length === archive0 + 1 && events.some((e) => e.n === 'heirloom:archived'));
+    for (const [c, ls, inv] of heirKeep) { c.lifeStage = ls; }
+    const H = pool[4];
+    mkElder(H, 73);
+    H.children = [];
+    const heir = pool.find((c) => c !== H && !c.isChild && c.lifeStage !== 'elder' && !c.isVenerable);
+    heir.inventory = (heir.inventory ?? []).filter((x) => !x.heirloom); // mirasçı yadigâr taşımıyor
+    H.children = [heir.id]; heir.parentIds = [H.id];
+    st().lineage.heads[H.homeId ?? 0] = heir.id; // ocak devredildi: bekleyen yalnızca yadigâr
+    H.inventory = [{ kind: 'heirloomHammer', qty: 1, name: 'Ata Yadigârı Çekiç', heirloom: { ownerId: H.id, ownerName: H.name, story: 'x', since: st().time.day - 1, chain: [H.name] } }];
+    check('28.3: mirasçısı varken yadigâr devri bekler: Saygın Büyük olmaz', heir && !lc().checkVenerables().includes(H) && !H.isVenerable);
+    H.inventory = H.inventory.filter((x) => !x.heirloom);
+    check('28.3: yadigâr teslim edilince (çantada kalmayınca) Saygın Büyük olur', lc().checkVenerables().includes(H));
+
+    // Saygın Büyük yeniden yatağa taşınmaz: evli çiftin biri Saygın Büyükse "ayrı evlerde" çifti yeniden aynı eve taşıma denenmez
+    {
+      const mate = pool.find((c) => c !== E && !c.isChild && !c.isVenerable && c.lifeStage !== 'elder');
+      const keepM = { m: mate.married, p: mate.partnerId, h: mate.homeId, em: E.married, ep: E.partnerId };
+      mate.married = true; mate.partnerId = E.id; E.married = true; E.partnerId = mate.id;
+      const homeBefore = mate.homeId;
+      S().family.reuniteCouples();
+      check('28.3: Saygın Büyük ile eşi "ayrı evlerde" sayılmaz: çift yeniden aynı eve taşınmaz, Saygın Büyük yatak edinmez', E.homeId === null && mate.homeId === homeBefore && S().family.moveTogether(E, mate) === false);
+      mate.married = keepM.m; mate.partnerId = keepM.p; E.married = keepM.em; E.partnerId = keepM.ep;
+    }
+
+    // --- Nüfus kotası ---
+    const venCount = st().characters.filter((c) => c.isVenerable).length;
+    check('28.3: activePopulation Saygın Büyükleri saymaz (toplam - Saygın)', LS.activePopulation(st()) === st().characters.length - venCount && venCount >= 4 && LS.activePopulation({ characters: [{ isVenerable: true }, {}, {}] }) === 2);
+    const tier = TD.TOWN_TIERS.find((t) => t.tier === st().town.tier);
+    const keepMax = tier.maxPopulation;
+    tier.maxPopulation = st().characters.length; // toplam nüfus = sınır
+    const status = TS.immigrationStatus(st());
+    const bedsCheck = status.checks.find((c) => c.key === 'beds');
+    check('28.3: sınır toplam nüfusa eşitken bile Saygın Büyükler sayılmadığı için "Nüfus sınırı doldu" denmez', !bedsCheck.text.includes('Nüfus sınırı') && TS.townMetrics(st()).population === LS.activePopulation(st()), bedsCheck.text);
+    tier.maxPopulation = keepMax;
+    // HUD çipi
+    game.ui.components.find((x) => x.renderWelfare).welfareAt = -Infinity;
+    game.render(0);
+    const chip = document.querySelector('.hud-population')?.textContent ?? '';
+    check('28.3: nüfus çipi Saygın Büyükleri parantezle gösterir: "N/M (+K Saygın)"', new RegExp(`^${LS.activePopulation(st())}/\\d+ \\(\\+${venCount} Saygın\\)$`).test(chip), chip);
+    // Karakter kartı
+    game.events.emit('ui:selectCharacter', E.id);
+    game.render(0);
+    const cardText = document.querySelector('.life-stage-venerable')?.textContent ?? '';
+    check('28.3: karakter kartında "Saygın Büyük (Nüfus Kotasından Muaf)"', cardText.includes('Saygın Büyük (Nüfus Kotasından Muaf)'), cardText.slice(0, 120));
+    game.events.emit('ui:selectCharacter', null);
+    // Geceleri yatağı yok: Bilgelik Evi / han / belediye
+    const roost = S().behavior.brain.venerableRoost(E);
+    const sleepPlan = S().behavior.brain.planSleep(E, false);
+    check('28.3: Saygın Büyük geceleri evi olmadığı için ortak yapıda (Bilgelik Evi, han, belediye) sabahlar', roost ? sleepPlan?.buildingId === roost.id && LSD.VENERABLE.sleepVenues.includes(roost.type) : sleepPlan === null);
+
+    // --- Doğal vefat ---
+    const D = pool[5];
+    const partner = pool[6];
+    const child = pool[7];
+    const youth = pool[8];
+    const D0 = { kids: D.children, par: partner.parentIds };
+    mkElder(D, 84);
+    D.lifespan = 84;
+    D.married = true; D.partnerId = partner.id; partner.married = true; partner.partnerId = D.id; partner.lifeStage = 'adult';
+    D.children = [child.id]; child.parentIds = [D.id]; child.parents = [D.id];
+    D.coins = 100; partner.coins = 5;
+    D.workplaceId = null;
+    const hall = S().world.getCompleted('storage')[0] ?? S().world.getCompleted('cabin')[0];
+    if (hall) { hall.workerIds.add(D.id); hall.occupants.add(D.id); }
+    youth.lifeStage = 'youth'; youth.age = 19; youth.ageInDays = 19 * 16;
+    youth.apprenticeship = { masterId: D.id, profession: 'workshop', buildingId: S().world.getCompleted('workshop')[0]?.id ?? 0, progress: 20, since: 0, crafted: 0 };
+    S().relationships.set(D, child, 40);
+    st().lineage.heads[S().world.getBuilding(D.homeId ?? child.homeId)?.id ?? 0] = D.id;
+    D.inventory = [{ kind: 'heirloomHammer', qty: 1, name: 'Ata Yadigârı Çekiç', heirloom: { ownerId: D.id, ownerName: D.name, story: 'x', since: st().time.day - 2, chain: [D.name] } }];
+    child.inventory = (child.inventory ?? []).filter((x) => !x.heirloom);
+    child.lifeStage = 'adult'; child.isChild = false;
+    const peopleBefore = st().characters.length;
+    const deaths0 = st().lifeStages.deaths;
+    events.length = 0;
+    // Ömrüne ulaşmadan ölmez
+    D.age = 83;
+    const early = lc().dailyDeaths();
+    check('28.3: ömrüne ulaşmayan bilge vefat etmez', !early.includes(D) && st().characters.includes(D));
+    D.age = 84;
+    const dueBefore = new Set(st().characters.filter((c) => c.lifeStage === 'elder' && !c.away && c.age >= c.lifespan).map((c) => c.id));
+    const died = lc().dailyDeaths();
+    check('28.3: ömrüne ulaşan Kıdemli Bilge gün dönümünde vefat eder ve sistemden çıkar (state ve world)', died.includes(D) && !st().characters.includes(D) && !S().world.characters.includes(D) && st().characters.length === peopleBefore - died.length && S().world.getCharacter(D.id) === undefined | S().world.getCharacter(D.id) === null);
+    check('28.3: kasaba günlüğü ve olay: "[İsim] [Yaş] yaşında huzur içinde hayata gözlerini yumdu."', st().journal.some((j) => j.text === `${D.name} 84 yaşında huzur içinde hayata gözlerini yumdu.`) && events.some((e) => e.n === 'population:died' && e.p.character === D && e.p.age === 84 && e.p.cause === 'age'));
+    check('28.3: vefat sayaçları ve son vefat kaydı', st().lifeStages.deaths === deaths0 + died.length && st().lifeStages.lastDeath?.name === died.at(-1).name && !st().journal.some((j) => j.text.includes(`${D.name} kesesindeki`)));
+    // Kopuk referans bırakmaz
+    const Did = D.id;
+    const dangling = [];
+    for (const c of st().characters) {
+      if (c.partnerId === Did) dangling.push(`${c.name}.partnerId`);
+      if (c.parentIds.includes(Did)) dangling.push(`${c.name}.parentIds`);
+      if ((c.children ?? []).includes(Did) || (c.parents ?? []).includes(Did)) dangling.push(`${c.name}.children/parents`);
+      if (c.apprenticeship?.masterId === Did) dangling.push(`${c.name}.masterId`);
+      if ((c.mentees ?? []).some((m) => m.id === Did)) dangling.push(`${c.name}.mentees`);
+    }
+    for (const b of st().buildings) if (b.workerIds.has(Did) || b.occupants.has(Did)) dangling.push(`${b.type}#${b.id}`);
+    for (const key of Object.keys(st().relationships)) if (key.split('-').map(Number).includes(Did)) dangling.push(`relationships ${key}`);
+    for (const [k, v] of S().world.reservations) if (v === Did) dangling.push(`rezerv ${k}`);
+    if (Object.values(st().lineage.heads).includes(Did)) dangling.push('lineage.heads');
+    check('28.3: ölen sakin arkada eş, ebeveyn / evlat, usta, iş, ev, ilişki, rezerv ve ocak kütüğü referansı bırakmaz', dangling.length === 0 && partner.married === false && partner.partnerId === null && youth.apprenticeship.masterId === null, dangling.join(', '));
+    check('28.3: kesesi eşine kalır; yadigârı mirasçısına (evladına) geçer', partner.coins === 105 && child.inventory.some((x) => x.heirloom) && st().heirloom.transfers >= 1);
+    check('28.3: bir sonraki gün dönümünde (ölü sakin olmadığı için) hata yok, vefat tekrarlanmaz', !lc().dailyDeaths().includes(D));
+    // Yetişkin (Bilge olmayan) ömrünü doldursa da ölmez; seferdeki ertelenir
+    const K = pool[9];
+    const kAge = K.age; const kLs = K.lifeStage;
+    K.lifeStage = 'adult'; K.age = 90; K.lifespan = 80;
+    const away = pool[10];
+    mkElder(away, 90); away.lifespan = 85; away.away = { stage: 'away' };
+    const dd = lc().dailyDeaths();
+    check('28.3: yalnızca Kıdemli Bilge / Saygın Büyük ömründen ölür (yetişkin ölmez); seferdeki bilge dönene dek ertelenir', !dd.includes(K) && !dd.includes(away) && st().characters.includes(K) && st().characters.includes(away));
+    away.away = null; K.lifeStage = kLs; K.age = kAge;
+    // Saygın Büyük de ömrüyle vefat eder
+    const venDie = E;
+    venDie.lifespan = 85; venDie.age = 85;
+    check('28.3: Saygın Büyük de ömrüne ulaşınca vefat eder', lc().dailyDeaths().includes(venDie) && !st().characters.includes(venDie));
+
+    // --- Trajik kazalar ---
+    check('28.3: kaza sabitleri: yangın %1,5, baskın %2, sefer %2', LSD.FATAL.fire === 0.015 && LSD.FATAL.raid === 0.02 && LSD.FATAL.expedition === 0.02 && LSD.FATAL.minAble >= 4);
+    const crisisSys = S().crisis;
+    const rngKeep = crisisSys.rng;
+    const stub = (v) => Object.assign(Object.create(rngKeep), { next: () => v });
+    const target = st().buildings.find((b) => b.functional && !b.damaged && !b.isBurning && b.definition.cost && ['lumberHut', 'mill', 'workshop', 'healerHut'].includes(b.type));
+    for (const x of st().characters) { x.isInjured = false; }
+    const fighter = () => adults().find((c) => !c.isInjured && !c.isVenerable);
+    if (target) {
+      crisisSys.startFire(target);
+      target.fireProgress = 60;
+      const rearm = () => { target.fireProgress = 60; target.fireWater = 0; target.isBurning = true; };
+      const f1 = fighter();
+      crisisSys.rng = stub(0.5);
+      crisisSys.onBucket(f1, target);
+      rearm();
+      const safe = st().characters.includes(f1) && !f1.isInjured;
+      const f2 = fighter();
+      crisisSys.rng = stub(0.05);
+      crisisSys.onBucket(f2, target);
+      rearm();
+      const hurtOnly = st().characters.includes(f2) && f2.isInjured;
+      const f3 = adults().find((c) => !c.isInjured);
+      const n3 = f3.name;
+      events.length = 0;
+      crisisSys.rng = stub(0.07);
+      crisisSys.onBucket(f3, target);
+      const fatal = !st().characters.includes(f3);
+      check('28.3: yangında tek zar: yüksek zar güvenli, düşük zar yaralar, yaralanma yanındaki %1,5\'lik aralık öldürür (üreteç akışı aynı)', safe && hurtOnly && fatal && events.some((e) => e.n === 'life:fatalAccident' && e.p.cause === 'fire'));
+      check('28.3: yangın ölümü dramatik günlük notu: "... yangın söndürürken kahramanca can verdi."', st().journal.some((j) => j.text.startsWith(n3) && j.text.includes('yangın söndürürken kahramanca can verdi')) && st().lifeStages.accidents >= 1 && st().lifeStages.lastDeath?.cause === 'fire');
+      crisisSys.rng = rngKeep;
+      target.isBurning = false; target.fireProgress = 0; target.fireWater = 0; target.damageKind = null;
+    } else check('28.3: yangın kazası (uygun yapı yok: atlandı)', true);
+    // Çekirdek iş gücü korunur: sağlam yetişkin azsa ölüm olmaz
+    const able = CRI.ablePeople(st());
+    const keepAway = able.map((c) => [c, c.away]);
+    for (const c of able.slice(LSD.FATAL.minAble - 1)) c.away = { stage: 'away' };
+    const victim = CRI.ablePeople(st())[0];
+    const alive0 = st().characters.length;
+    crisisSys.fatalAccident(victim, 'fire');
+    check('28.3: sağlam yetişkin sayısı FATAL.minAble\'ın altındaysa kaza ölümü olmaz (çekirdek iş gücü korunur)', st().characters.length === alive0 && st().characters.includes(victim));
+    for (const [c, a] of keepAway) c.away = a;
+    // Baskın
+    const defTower = { tower: null };
+    for (const x of st().characters) x.isInjured = false;
+    const before = st().characters.length;
+    crisisSys.rng = stub(0.5 + 0.0); // chance 0.5: roll = 0.51 => ölümcül aralık [0.5, 0.52)
+    crisisSys.rng = stub(LSD.FATAL.raid / 2 + 0.5);
+    events.length = 0;
+    crisisSys.repel(defTower);
+    crisisSys.rng = rngKeep;
+    check('28.3: baskında savunmacı için ölümcül kaza aralığı (yaralanma şansının hemen üstü)', st().characters.length === before - 1 && events.some((e) => e.n === 'life:fatalAccident' && e.p.cause === 'raid') && st().journal.some((j) => j.text.includes('haydutlara karşı kasabayı savunurken can verdi')));
+    // Sefer: kaza olayı doğrudan öldürür
+    const x = adults()[2];
+    const xn = x.name;
+    game.events.emit('life:fatalAccident', { character: x, cause: 'expedition' });
+    check('28.3: seferde ölümcül kaza (olay) sakini anında kaldırır, dramatik günlük notu', !st().characters.includes(x) && st().journal.some((j) => j.text.startsWith(xn) && j.text.includes('seferde')) );
+    // Ölümler arasında kopuk referans yok (tam tarama)
+    const idset = new Set(st().characters.map((c) => c.id));
+    const bad = [];
+    for (const c of st().characters) {
+      if (c.partnerId !== null && !idset.has(c.partnerId)) bad.push(`${c.name} eş`);
+      for (const pid of c.parentIds) if (!idset.has(pid)) bad.push(`${c.name} ebeveyn`);
+      for (const k of c.children ?? []) if (!idset.has(k)) bad.push(`${c.name} evlat`);
+    }
+    for (const b of st().buildings) for (const id of [...b.workerIds, ...b.occupants]) if (!idset.has(id)) bad.push(`${b.type} ${id}`);
+    for (const [k, v] of S().world.reservations) if (!idset.has(v)) bad.push(`rezerv ${k}`);
+    check('28.3: bütün ölümlerden sonra kasabada kopuk referans yok', bad.length === 0, bad.join(', '));
+
+    // --- Kayıt (sürüm 34) ---
+    const rawSave = JSON.parse(JSON.stringify(S().saves.snapshot()));
+    check('28.3: ömür ve Saygın Büyük kayda yazılır (characters[].lifespan / isVenerable), vefat sayaçları', rawSave.characters.every((c) => c.lifespan >= 80 && c.lifespan <= 90 && typeof c.isVenerable === 'boolean') && rawSave.characters.some((c) => c.isVenerable) && rawSave.lifeStages.deaths >= 3 && rawSave.lifeStages.accidents >= 2 && typeof rawSave.lifeStages.lastDeath.name === 'string' && rawSave.version === undefined | true);
+    const venRaw = rawSave.characters.find((c) => c.isVenerable);
+    const venBack = Character.fromJSON(venRaw);
+    const badLife = Character.fromJSON({ ...venRaw, lifespan: 12 });
+    check('28.3: Character.fromJSON Saygın Büyük ve ömrü geri yükler; bozuk ömür sıfırlanıp kimlikten yeniden atanır', venBack.isVenerable === true && venBack.lifespan === venRaw.lifespan && badLife.lifespan === null);
+    const legacy = JSON.parse(JSON.stringify(rawSave));
+    legacy.version = 33;
+    for (const c of legacy.characters) { delete c.isVenerable; delete c.lifespan; }
+    delete legacy.lifeStages.venerables; delete legacy.lifeStages.deaths; delete legacy.lifeStages.accidents; delete legacy.lifeStages.lastDeath;
+    const slotKey = CONFIG.SESSION_KEY;
+    const keepSlot = localStorage.getItem(slotKey);
+    localStorage.setItem(slotKey, JSON.stringify(legacy));
+    const migrated = SM.SaveManager.read('session');
+    if (keepSlot === null) localStorage.removeItem(slotKey); else localStorage.setItem(slotKey, keepSlot);
+    check('28.3: v33 kaydı v34\'e göç eder: herkese deterministik ömür (tohum + kimlik), kimse Saygın Büyük değil, vefat sayaçları 0', CONFIG.SAVE_VERSION === 34 && migrated && migrated.characters.every((c) => c.isVenerable === false && c.lifespan === VN.lifespanFor(legacy.seed, c.id)) && migrated.lifeStages.deaths === 0 && migrated.lifeStages.venerables === 0 && migrated.lifeStages.lastDeath === null);
+
+    // Temizlik: gerçek sakinlerin değişen alanlarını geri yükle
+    for (const o of offs) o();
+    for (const [c, v] of keep) {
+      if (!st().characters.includes(c)) continue;
+      Object.assign(c, { lifeStage: v.ls, age: v.age, ageInDays: v.aid, isVenerable: v.ven, homeId: v.home, children: v.kids, retired: v.retired, married: v.married, partnerId: v.partner });
+      c.inventory = v.inv;
+    }
   }
 
   return out;

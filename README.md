@@ -3810,6 +3810,81 @@ art arda koşturulunca her seferinde **kendi içinde %100 aynı** sonucu verir (
 - **Not (denge):** çıraklık hızı iki katına çıktığı için Gençlerin çoğu 21'e gelmeden %100'ü görür; Başusta artık nadir değil, "mezun çırakların çoğu" olur. Eser şansı kasabadaki günlük ve usta başına bekleme sınırlarıyla
   zaten sınırlıdır; gerekirse `GRANDMASTER` sabitlerinden ayarlanır.
 
+## Sürdürülebilir Kuşak Döngüsü, Saygın Büyükler ve Vefat (28. aşama, 28.3 mikro adımı)
+
+**Kayıt sürümü 34.** 25.1'den beri geçerli olan **"Pikselköy'de ölüm yoktur" kuralı kaldırıldı.** Yaşlılar artık yataklarını gençlere bırakıp nüfus kotasından düşer, ömürlerinin sonunda huzur içinde vefat eder;
+yangın, baskın ve seferde çok nadir kazalar da can alabilir. Böylece 30 kişilik sınır kasabayı kilitlemez: doğumlar ve göçmenler yaşlıların boşalttığı yataklarla sürer.
+Determinizm kuralı değişmedi: aynı tohum art arda koşturulunca birebir aynı sonucu verir (aşağıda doğrulandı).
+
+### 1. Saygın Büyük (`isVenerable`; `systems/Venerable.js`, `LifecycleSystem.js`)
+
+- **Geçiş:** her gün **19:00**'da Kıdemli Bilge (70+), **Ocak Devri**'ni ve **Yadigâr Devri**'ni tamamlamışsa `isVenerable = true` olur. (Yadigâr töreni 18:00'dır.)
+  - *Ocak Devri tamam:* reisi olduğu ocak kalmadı (devretti), **ya da** canlı biyolojik evladı yok (muaf), **ya da** 75 yaşına dek devredemedi (evlatları evlenmemiş; kasaba kilitlenmesin diye muaf; `VENERABLE.hearthGraceAge`).
+  - *Yadigâr Devri tamam:* kendi yadigârı çantasında kalmadı. Mirasçısı varsa 18:00 töreni onu devreder; **devredecek kimsesi yoksa** yadigâr kasaba arşivine kalkar ve bilge Saygın Büyük olur.
+- **Yatak boşaltma:** `homeId = null`; evdeyse kapıya çıkar. Boşalan yatak göçmenlere / doğumlara açılır. Kayıt yüklemesi ona yeni yatak aramaz (`sanitizeReferences`).
+- **Gece düzeni:** Bilgelik Evi'nde, handa ya da Belediye'de sabahlar (`Brain.venerableRoost`, `VENERABLE.sleepVenues`); durum metni "… sabahlıyor (Saygın Büyük)".
+- **Nüfus kotası:** `LifeStages.activePopulation` Saygın Büyükleri saymaz. `TownStatus.immigrationStatus` (göç sınırı, boş yatak, yiyecek ihtiyacı), `townMetrics` (seviye ölçütleri), `FamilySystem` (doğum sınırı) ve `DilemmaSystem` (boş yatak
+  kararı) bunu kullanır: kasabada 30 aktif sakin + Saygın Büyükler yaşayabilir, aktif nüfus 30'un altına inince doğumlar ve göçmenler sürer.
+
+### 2. Doğal vefat
+
+- **Ömür (`lifespan`):** 80-90 yaş (1 yaş = 16 oyun günü). `Venerable.lifespanFor(seed, id)` tohum + 35 ve kimlikten türeyen **izole bir üreteçle** hesaplar: sıraya bağlı değildir, ana üretece ve `Math.random`'a dokunmaz.
+  Her sakin doğum / göç / yükleme anında ömrünü alır (`LifecycleSystem.ensureLifespans`).
+- **Vefat:** gün dönümünde (00:00, yaşlanmadan sonra) ömrüne ulaşan **Kıdemli Bilge ya da Saygın Büyük** vefat eder (yetişkinler ömründen ölmez; seferdeki ya da köyden ayrılmakta olan dönene dek ertelenir).
+- **Temizlik:** `removeResident` (köyü terk edenlerle aynı) + ocak kütüğü, `children` / `parents`, `mentees` ve çırağın `masterId`'si. Eşin evliliği çözülür, kese eşine (yoksa evladına) kalır, yadigâr mirasçısına
+  (yoksa arşive) geçer (`population:left { reason: 'death' }`). **Arkada kopuk eş, ebeveyn, iş, ev, ilişki, rezerv ya da ocak referansı kalmaz.**
+- **Haber:** Kasaba Günlüğü ve üst bildirim: *"[İsim] [Yaş] yaşında huzur içinde hayata gözlerini yumdu."* (`population:died`). Cenaze şenliği yok.
+
+### 3. Trajik kazalar (`CrisisSystem`, `ExpeditionSystem`; `FATAL`)
+
+- **Yangın:** kova atışında **tek zar**: eski yaralanma aralığı (%6) aynen durur, hemen yanındaki **%1,5**'lik aralık ölümcüldür ("… yangın söndürürken kahramanca can verdi"). Zar sayısı değişmediği için kriz üretecinin akışı aynıdır.
+- **Baskın:** savunmada yaralanma aralığının yanında **%2**'lik ölümcül aralık ("… haydutlara karşı kasabayı savunurken can verdi").
+- **Sefer:** riskli macera başarısız olunca **%2** ek zar ("… seferde yolunu kaybedip bir daha dönmedi").
+- **Koruma:** kasabada `FATAL.minAble` (6) sağlam yetişkin yoksa ya da kafile tek kişiyse ölüm olmaz (çekirdek iş gücü korunur). Çocuklar kazadan ölmez.
+
+### 4. Arayüz
+
+- **Nüfus çipi:** `28/30 (+2 Saygın)`; ipucu Saygın Büyükleri açıklar.
+- **Karakter kartı:** Saygın Büyük'ün kartında **"Saygın Büyük (Nüfus Kotasından Muaf)"** etiketi (altın-mor).
+
+### Kayıt (sürüm 34)
+
+`characters[].isVenerable`, `characters[].lifespan` ve `lifeStages.venerables / deaths / accidents / lastDeath` eklendi. `SaveManager.migrate` v33 -> v34'te herkese `lifespanFor(seed, id)` ile deterministik ömür atar, kimseyi Saygın Büyük saymaz,
+vefat sayaçlarını sıfırlar; bozuk ömür yüklemede sıfırlanıp kimlikten yeniden atanır. `SAVE_VERSION = 34`. Yeni fikstür `save-v34.json` (otopilot, 72 gün, `--crisis-state`).
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1259 -> **1296**; 37'si yeni): ömür (80-90, deterministik, çeşitli, kimlikten türeyen, sonradan doğana atanan), Saygın Büyük geçişi (evladı yok / yadigârı yok, 75 yaş zaman aşımı, mirasçı varken bekleme,
+  mirasçısız yadigârın arşive kalkması), yatak boşaltma ve boş yatak sayısı, `activePopulation` ve göç sınırı (toplam = sınır iken "Nüfus sınırı doldu" denmemesi), nüfus çipi `N/M (+K Saygın)`, karakter kartı etiketi, geceleri ortak yapıda sabahlama,
+  evli çiftin Saygın Büyük'ü yeniden yatağa taşımaması, vefat (ömründen önce ölmez, gün dönümünde çıkar, günlük metni, sayaçlar, **eş / ebeveyn / evlat / usta / iş / ev / ilişki / rezerv / ocak kütüğü referansı kalmaz**, kese eşe, yadigâr evlada,
+  yetişkin ölmez, seferdeki ertelenir, Saygın Büyük de ölür), kaza zarları (yangında tek zar: yüksek güvenli / düşük yaralar / yanındaki aralık öldürür; baskın; sefer; `FATAL.minAble` koruması), tam tarama ile kopuk referans yok, kayıt alanları, bozuk ömür, v33 -> v34 göçü.
+  - Önceki testlerin artakalan durumundan etkilenen eski sayımlar sağlamlaştırıldı (kural gevşemedi).
+- **Denetim** (`audit.mjs`): 141 -> **146**. Ölenin eş / çırak (usta) / iş / yapı referansı bırakmaması, Saygın Büyük + vefat sonrası kayıt -> yükleme durum kayması yok, yüklenen Saygın Büyük'ün yataksız kalması ve ömrünün korunması,
+  yüklemeden sonra kopuk eş / ebeveyn yok, adım atınca takılma yok.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-34): 1215 -> **1254**. Yeni `save-v34.json` fikstürü (otopilot, 72 gün, `--crisis-state`). Harness'te anlık görüntü artık dizilerin kopyasını tutar (Saygın Büyük kotayı boşaltınca anlık görüntü
+  sırasında doğan bir çocuk canlı diziyi değiştirip kopuk gösteriyordu).
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0; nüfus 30/30, seviye 4, refah %100. **Ulu Saat Kulesi 6/6, Altın Çağ G31, G35, G32, G31, G31, G30**
+  (28.2: G32, G32, G32, G31, G31, G30). 40 günde hiçbir sakin 70'e gelmediği için vefat / Saygın Büyük 0'dır; yeni mekanik uzun koşuda ölçülür.
+- **Tohum 42, 330 gün (`autopilot.mjs 42 330`): nüfus döngüsü kırıldı.** İki koşu **bayt bayt aynı** (`--json`, kayıt, günlük; tek fark dosya adı). Takvim (28.2 ile aynı, kule öncesi değişen bir şey yok): Ulu Saat Kulesi G28 / G30 / G31, Altın Çağ G31.
+  Olay günlüğü:
+
+  | Gün | Olay | Nüfus (toplam / kotaya sayılan) |
+  |---|---|---|
+  | G18 | nüfus 30'a ulaştı, kota doldu | 30 / 30 |
+  | **G64 19:00** | **ilk Saygın Büyük: Deniz (70)** yatağını bıraktı | 31 / 30 |
+  | **G65 07:00** | **ertesi sabah yeni bebek (Elif Naz)**: kota artık dolu değil, doğum sürüyor | 31 / 30 |
+  | G98 | **ilk vefat**: Elif Naz 19 yaşında yangın söndürürken kahramanca can verdi (kaza) | |
+  | G99, G151, G190, G228, G231 | her kayıp / boşalan yatakla yeni bebek (Aras, Poyraz, Ege, Yaz, Elif Naz) | 31-34 / 30 |
+  | G150 | Mert 38 yaşında haydutlara karşı kasabayı savunurken can verdi (kaza) | |
+  | G189 / G227 / G230 | Saygın Büyük: Kemal, Lale, Sude | 32-34 / 30 |
+  | **G255 00:00** | **ilk doğal vefat: Deniz 82 yaşında huzur içinde hayata gözlerini yumdu** (ömrü 82) | 33 / 30 |
+
+  330. günün sonu: nüfus 33 (kotaya sayılan 30), Saygın Büyük 3 (Kemal 78/87, Lale 75/83, Sude 75/88; yatağı olan 0), vefat 3 (kaza 2), toplam doğum 13, ömrü atanmamış 0, takılma 0, **kopuk referans 0**, sayfa hatası yok.
+  Yani kasaba 30 sınırında kilitlenmeden kuşak değiştirir: Saygın Büyükler 30 aktif sakinin yanında yaşar, her boşalan yatakla bebekler doğar.
+- **Tohum 42, 72 gün** (`--crisis-state`, fikstür): iki koşu bayt bayt aynı; G64'te ilk Saygın Büyük Deniz, nüfus 31 (kotaya sayılan 30), takılma 0, kopuk referans 0.
+- **Not (ömür ölçeği):** 1 yaş = 16 oyun günü olduğundan 80-90 yaşlık ömür ilk doğal vefatları ~250. günlerde getirir (Kıdemli Bilge 70 yaşta, ocak ve yadigâr devrinden sonra Saygın Büyük olur); kazalar çok daha erken olabilir.
+  Gerekirse `LIFESPAN` ile ayarlanır. Kıdemli Bilge ocağını 75'e dek devredemezse (evlatları evli değilse) devir muaf sayılır ki kasaba kilitlenmesin.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -3975,6 +4050,7 @@ düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 | Oyunun adı, başlangıç ekranı | `config.js` → `GAME_TITLE`, `ui/components/TitleMenu.js` |
 | Takas teklifleri, tüccar takvimi | `data/trade.js` |
 | (28.1) Acil Seferberlik, anında / usta onarımı bedelleri | `data/crisis.js` → `FIRE.muster`, `REPAIR` |
+| (28.3) Ömür aralığı, Saygın Büyük koşulları, kaza ihtimalleri | `data/lifeStages.js` → `LIFESPAN`, `VENERABLE`, `FATAL` (+ `systems/Venerable.js`, `LifecycleSystem.js`) |
 | (28.2) Çıraklık hızı, Gençlik enerji bonusu, usta verimi | `data/apprenticeship.js` → `APPRENTICE.perMinute`, `PROUD_MASTER.workBoost`; `data/lifeStages.js` → `YOUTH.energyGain` |
 | (28.2) Başusta etkileri (eser şansı çarpanı, tasarruf aralığı) | `data/apprenticeship.js` → `GRANDMASTER` (+ `systems/Grandmaster.js`) |
 | (28.1) Vergi Fermanı kilit süresi | `data/crown.js` → `TAX.lockDays` |

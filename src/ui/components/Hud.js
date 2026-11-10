@@ -10,6 +10,7 @@
 // çiplerinde açık dilekçeler (tıklayınca dilekçe sahibi seçilir) ve isyan alarmı (tıklayınca meydan havuzu / Belediye
 // Konağı paneli açılır: acil erzak ve altın dağıtımı).
 // Kaydet / Yükle / Yeni Harita Ayarlar penceresine, farenin altındaki karonun bilgisi harita ipucuna taşındı.
+import { activePopulation } from '../../systems/LifeStages.js';
 import { CONFIG } from '../../config.js';
 import { getDayPhase } from '../../systems/TimeSystem.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
@@ -118,12 +119,13 @@ export class Hud {
   renderWelfare(state) {
     const happiness = Math.round(townHappiness(state));
     const level = happinessLevel(happiness);
-    const population = state.characters.length;
+    const population = activePopulation(state); // (28.3) Saygın Büyükler nüfus kotasına sayılmaz
+    const venerable = state.characters.length - population;
     const capacity = housingCapacity(state);
     const status = immigrationStatus(state);
     const trust = Math.round(trustValue(state));
     const revolt = state.trust?.revolt ?? null;
-    const key = `${happiness}|${population}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}|${trust}|${Boolean(revolt)}`;
+    const key = `${happiness}|${population}|${venerable}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}|${trust}|${Boolean(revolt)}`;
     if (key !== this.lastWelfare) {
       this.lastWelfare = key;
       this.welfareFill.style.width = `${happiness}%`;
@@ -143,11 +145,11 @@ export class Hud {
         ? `\nYönetim Güveni: %${trust} · İSYAN sürüyor! Güven %${REVOLT.endTrust}'in üstüne çıkınca yatışır (meydan havuzu / Belediye Konağı: erzak ve altın dağıt).`
         : `\nYönetim Güveni: %${trust} (${tl.name}). Dilekçeleri karşılamak ve yüksek refah güveni artırır; reddetmek, açlık, soğuk ve %35 altı refah eritir. %${REVOLT.critical} altında uzun kalırsa isyan çıkar.`;
       this.welfareRow.title = `Refah (ortalama mutluluk): ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.${beauty}${trustLine}`;
-      this.population.textContent = `${population}/${capacity}`;
+      this.population.textContent = `${population}/${capacity}${venerable ? ` (+${venerable} Saygın)` : ''}`; // (28.3) örn. 28/30 (+2 Saygın)
       this.populationWrap.classList.toggle('is-full', population >= capacity);
       this.population.classList.toggle('is-full', population >= capacity);
       const lines = status.checks.map((c) => `${c.ok ? '✓' : '✗'} ${c.text}`);
-      this.populationWrap.title = `${population} sakin / ${capacity} yatak. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
+      this.populationWrap.title = `${population} sakin / ${capacity} yatak${venerable ? ` (+${venerable} Saygın Büyük: yatağı olmayan, nüfus kotasına sayılmayan bilgeler)` : ''}. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
     }
     const buffs = activeBuffs(state);
     const heating = Math.round(heatingPerDay(state) * 10) / 10;

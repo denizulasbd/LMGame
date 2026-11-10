@@ -251,7 +251,9 @@ export class CharacterPanel {
     this.stageBadge.replaceChildren(
       el('span', { className: `life-stage-badge is-${key}`, title }, [el('img', { src: getAnyIconURL(stage.icon), alt: '' }), stage.name]),
       el('span', { className: 'life-stage-age', text: `${character.age} yaşında` }),
-      ...(note ? [el('span', { className: 'life-stage-note', text: note })] : [])
+      ...(note ? [el('span', { className: 'life-stage-note', text: note })] : []),
+      // (28.3) Saygın Büyük: nüfus kotasından muaf, yatağı yok
+      ...(character.isVenerable ? [el('span', { className: 'life-stage-venerable', title: 'Ocağını ve yadigârını devretti; yatağını gençlere bıraktı. Nüfus sınırına sayılmaz; geceleri Bilgelik Evi\'nde, handa ya da belediyede sabahlar.', text: 'Saygın Büyük (Nüfus Kotasından Muaf)' })] : [])
     );
   }
 

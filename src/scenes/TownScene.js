@@ -81,6 +81,7 @@ import { AudioSystem } from '../systems/AudioSystem.js';
 import { FestivalEffects } from '../rendering/FestivalEffects.js';
 import { Random } from '../utils/random.js';
 import { getSelectionRing, getTargetMarker } from '../art/ui/index.js';
+import { LifecycleSystem } from '../systems/LifecycleSystem.js';
 import { LifeStageSystem } from '../systems/LifeStageSystem.js';
 import { ApprenticeshipSystem } from '../systems/ApprenticeshipSystem.js';
 import { drawSpeechBubbles, updateSpeechBubbles } from '../rendering/SpeechBubbles.js';
@@ -204,6 +205,8 @@ export class TownScene extends Scene {
     this.temperament = new TemperamentSystem(this.game, this.world, new Random(state.seed + 29));
     // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
     this.lifeStages = new LifeStageSystem(this.game, this.world, new Random(state.seed + 27));
+    // (28.3) Saygın Büyük, doğal vefat ve kazalar (ömür kimlikten türer: seed + 35 izole üreteci; rastgelelik tüketmez). Yaşlanmadan SONRA kayıt olur.
+    this.lifecycle = new LifecycleSystem(this.game, this.world, { jobs: this.jobs });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       crisis: this.crisis,
@@ -320,6 +323,7 @@ export class TownScene extends Scene {
       this.temperament,
       this.lineageSystem,
       this.heirloomSystem,
+      this.lifecycle,
     ];
 
     this.camera = new Camera();

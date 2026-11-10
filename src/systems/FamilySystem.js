@@ -12,6 +12,7 @@
 //                büyüyüp yetişkin olur.
 // Yayınladığı olaylar: 'family:homeShared' { a, b, home, swapped?, vacated? (boşalan evler) }, 'family:madeRoom' { character, from, to },
 //   'family:childBorn' { child, parents, home }, 'family:grownUp' { character }, 'population:changed'.
+import { activePopulation } from './LifeStages.js';
 import { compoundName } from '../utils/names.js';
 import { Character } from '../entities/Character.js';
 import { HAPPY_HOME, CHILDREN, CHILD_NAMES, CHILD_SHIRTS, CHILD_HAIR_STYLES } from '../data/family.js';
@@ -107,7 +108,7 @@ export class FamilySystem {
   reuniteCouples() {
     for (const a of this.world.characters) {
       const b = partnerOf(this.state, a);
-      if (b && a.married && a.id < b.id && a.homeId !== b.homeId) this.moveTogether(a, b);
+      if (b && a.married && a.id < b.id && a.homeId !== b.homeId && !a.isVenerable && !b.isVenerable) this.moveTogether(a, b);
     }
   }
 
@@ -123,6 +124,7 @@ export class FamilySystem {
    */
   moveTogether(a, b) {
     if (a.homeId !== null && a.homeId === b.homeId) return true;
+    if (a.isVenerable || b.isVenerable) return false; // (28.3) Saygın Büyük yatağını bıraktı: çift yeniden aynı eve taşınmaz
     const homes = this.world.getCompleted('cabin');
     const homeA = this.world.getBuilding(a.homeId);
     const homeB = this.world.getBuilding(b.homeId);
@@ -185,7 +187,7 @@ export class FamilySystem {
    */
   eligibleCouples() {
     const now = this.state.totalMinutes;
-    if (this.state.characters.length >= CHILDREN.maxPopulation) return [];
+    if (activePopulation(this.state) >= CHILDREN.maxPopulation) return [];
     if (townHappiness(this.state) < CHILDREN.minHappiness) return [];
     const couples = [];
     for (const a of this.world.characters) {
@@ -220,7 +222,7 @@ export class FamilySystem {
 
   tryBirths() {
     for (const { a, b, home } of this.eligibleCouples()) {
-      if (this.state.characters.length >= CHILDREN.maxPopulation) return;
+      if (activePopulation(this.state) >= CHILDREN.maxPopulation) return;
       if (this.rng.next() < CHILDREN.chancePerDay) this.welcomeChild(a, b, home);
     }
   }

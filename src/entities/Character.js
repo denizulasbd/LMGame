@@ -15,6 +15,7 @@
 // 25.4: Aile Kütüğü (generation, parents: doğum ebeveynleri, familyId: ocak, children; LineageSystem).
 // 22. aşama: köyü terk etmeye karar verdiyse yola çıktığı an ve çıkış karosu (emigrating: { since, exit }; DesertionSystem).
 import { PROFESSIONS } from '../data/apprenticeship.js';
+import { sanitizeLifespan } from '../data/lifeStages.js';
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { NEED_KEYS } from '../data/characters.js';
@@ -108,6 +109,8 @@ export class Character extends Entity {
     agedDays = 0,
     apprenticeship = null,
     isGrandmaster = false,
+    isVenerable = false,
+    lifespan = null,
     grandmasterProfession = null,
     grandmasterBatches = 0,
     quirkOrigin = null,
@@ -178,6 +181,9 @@ export class Character extends Entity {
     // 25.3: huyun kaynağı (Aile mirası / Usta etkisi / Mesleğin doğası / Özgün gelişim; kayda girer)
     this.quirkOrigin = sanitizeOrigin(quirkOrigin);
     // (28.2) Başusta: çıraklığı %100 bitirenin kalıcı unvanı (grandmasterProfession = çıraklık yapısı türü); batches: hammaddesiz üretim sayacı
+    // (28.3) Saygın Büyük: ocağını ve yadigârını devredip yatağını boşaltan Kıdemli Bilge (nüfus kotasından muaf); lifespan: vefat yaşı (80-90)
+    this.isVenerable = Boolean(isVenerable) && this.lifeStage === 'elder';
+    this.lifespan = sanitizeLifespan(lifespan);
     this.isGrandmaster = Boolean(isGrandmaster) && PROFESSIONS[grandmasterProfession] !== undefined;
     this.grandmasterProfession = this.isGrandmaster ? grandmasterProfession : null;
     this.grandmasterBatches = this.isGrandmaster ? Math.max(0, Math.floor(Number(grandmasterBatches) || 0)) : 0;
@@ -587,6 +593,8 @@ export class Character extends Entity {
       apprenticeship: this.apprenticeship,
       quirkOrigin: this.quirkOrigin,
       isGrandmaster: this.isGrandmaster,
+      isVenerable: this.isVenerable,
+      lifespan: this.lifespan,
       grandmasterProfession: this.grandmasterProfession,
       grandmasterBatches: this.grandmasterBatches,
       generation: this.generation,

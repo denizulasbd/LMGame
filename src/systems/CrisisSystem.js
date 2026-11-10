@@ -24,6 +24,7 @@
 // 8. günden (haydut 10.) önce, Huzurlu ayarda ve kayıt yüklendikten sonraki ilk 24 saatte çıkmaz; testler fonksiyonları
 // doğrudan çağırabilir (startFire, warnRaid, resolveRaid, injure).
 import { CRISIS, FIRE, GUARD, BANDIT, INJURY, REPAIR, CRISIS_DIFFICULTY } from '../data/crisis.js';
+import { FATAL } from '../data/lifeStages.js';
 import {
   emptyCrisis,
   crisisRate,
@@ -291,7 +292,12 @@ export class CrisisSystem {
       this.extinguish(building, { byPlayer: false });
       return;
     }
-    if (building.fireProgress > FIRE.injuryAfter && this.rng.next() < FIRE.injuryChance) this.injure(c, 'fire');
+    if (building.fireProgress > FIRE.injuryAfter) {
+      // (28.3) tek zar: yaralanma aralığının hemen yanında çok küçük bir ölümcül kaza aralığı (üreteç akışı değişmez)
+      const roll = this.rng.next();
+      if (roll < FIRE.injuryChance) this.injure(c, 'fire');
+      else if (roll < FIRE.injuryChance + FATAL.fire) this.fatalAccident(c, 'fire');
+    }
   }
 
   /** Acil Seferberlik bedeli ve yapılabilirliği: { ok, reason, cost }. */
@@ -532,9 +538,12 @@ export class CrisisSystem {
     s.stats.raidsRepelled = (s.stats.raidsRepelled ?? 0) + 1;
     let injured = null;
     const chance = tower ? BANDIT.repelInjuryChanceTower : BANDIT.repelInjuryChance;
-    if (defenders.length && this.rng.next() < chance) {
+    const roll = this.rng.next();
+    if (defenders.length && roll < chance) {
       injured = this.rng.pick(defenders);
       this.injure(injured, 'raid');
+    } else if (defenders.length && roll < chance + FATAL.raid) {
+      this.fatalAccident(this.rng.pick(defenders), 'raid'); // (28.3) nadir ölümcül kaza
     }
     for (const d of defenders) {
       addMemory(s, d, 'Haydutları kasabadan kovduk', 'shield', { kind: 'town' });
@@ -584,6 +593,13 @@ export class CrisisSystem {
   // ---------------------------------------------------------------------------
 
   /** Sakini hafif yaralar (ölüm yoktur). Dönüş: true (yeni yaralandıysa). */
+  /** (28.3) Ölümcül kaza: kasabada yeterli sağlam yetişkin varsa (çekirdek iş gücü korunur) sakin anında ölür ('life:fatalAccident' -> LifecycleSystem). */
+  fatalAccident(c, cause) {
+    if (!c || c.isChild || c.role || ablePeople(this.state).length < FATAL.minAble) return false;
+    this.events.emit('life:fatalAccident', { character: c, cause });
+    return true;
+  }
+
   injure(c, cause = 'fire') {
     if (!c || c.isInjured || c.isChild) return false;
     c.isInjured = true;

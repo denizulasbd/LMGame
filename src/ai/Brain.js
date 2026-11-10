@@ -43,6 +43,7 @@ import { isBedtime, isWorkHours } from './TraitProfile.js';
 import { getSeason } from '../data/seasons.js';
 import { ILLNESS } from '../data/health.js';
 import { FIRE } from '../data/crisis.js';
+import { VENERABLE } from '../data/lifeStages.js';
 import { SCHOOL } from '../data/research.js';
 import { isRallyActive } from '../systems/RallySystem.js';
 import { healSpeedMultiplier } from '../systems/ResearchSystem.js';
@@ -418,7 +419,8 @@ export class Brain {
   }
 
   planSleep(c, nap) {
-    const home = this.world.getBuilding(c.homeId);
+    // (28.3) Saygın Büyük'ün yatağı yoktur: geceleri Bilgelik Evi'nde, handa ya da belediyede sabahlar
+    const home = c.isVenerable ? this.venerableRoost(c) : this.world.getBuilding(c.homeId);
     if (!home) return null;
     if (c.insideBuildingId === home.id) return { activity: 'sleep', buildingId: home.id, nap };
     const doors = this.world.getSpots(home);
@@ -430,6 +432,16 @@ export class Brain {
       spot: this.nearest(doors, c),
       finalPoint: home.entrancePoint,
     };
+  }
+
+  /** (28.3) Saygın Büyük'ün sabahladığı yapı: VENERABLE.sleepVenues sırasıyla ilk sağlam yapı (aynı türde en yakın). */
+  venerableRoost(c) {
+    for (const type of VENERABLE.sleepVenues) {
+      const options = this.world.getCompleted(type).filter((b) => b.functional && !b.damaged && !b.isBurning && this.world.getSpots(b).length > 0);
+      if (options.length === 0) continue;
+      return options.reduce((best, b) => (Math.hypot(b.center.x - c.x, b.center.y - c.y) < Math.hypot(best.center.x - c.x, best.center.y - c.y) ? b : best));
+    }
+    return null;
   }
 
   /** Acıkınca: stokta yiyecek varsa evde / kilerde yemek (daha hızlı), yoksa böğürtlen. */

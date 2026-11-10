@@ -1,8 +1,10 @@
 // (25. aşama, 25.1) Yaşam evreleri ve yaş döngüsü: Çocuk -> Genç -> Yetişkin -> Kıdemli Bilge.
 // Hesaplar src/systems/LifeStages.js (saf) ve LifeStageSystem.js'te (durum değiştirir); burada yalnızca sayılar ve adlar var.
 //
-// İlke: Pikselköy'de ÖLÜM YOKTUR. Yaşlanan sakin oyundan silinmez; "Kıdemli Bilge" unvanı kazanır, ağır işlerden emekli olur
-// ve çardakta, bankta, meydan havuzunda ya da Bilgelik Evi'nde vakit geçirerek kasabaya bilgelik katar.
+// İlke (25.1): yaşlanan sakin "Kıdemli Bilge" unvanı kazanır, ağır işlerden emekli olur ve çardakta, bankta, meydan havuzunda ya da
+// Bilgelik Evi'nde vakit geçirerek kasabaya bilgelik katar. (28.3) "Ölümsüzlük" kuralı KALKTI: Bilge ocağını ve yadigârını devredince
+// "Saygın Büyük" olur (yatağını boşaltır, nüfus kotasından düşer) ve ömrünün sonunda huzur içinde vefat eder; yangın, baskın ve
+// seferde çok nadir kazalar da can alabilir.
 //
 // Yaş döngüsü RASTGELELİK KULLANMAZ: her sakinin doğum günü kimliğinden türetilir, yaşı yalnızca gün dönümlerinde (00:00)
 // ilerler; oyunun hiçbir üretecinin sırası değişmez.
@@ -60,3 +62,21 @@ export const ELDER_LINES = [
 
 // (25.2) Bilge Nasihati sözleri (metin baloncuğu; kendi üreteciyle seçilir)
 export const ELDER_ADVICE = ['Sabır her işin başıdır, evlat.', 'Ağaç yaşken eğilir.', 'Komşu komşunun külüne muhtaç.', 'Bir elin nesi var, iki elin sesi var.', 'Damlaya damlaya göl olur.'];
+
+// (28.3) Sürdürülebilir kuşak döngüsü
+//   LIFESPAN  : her sakinin ömrü (yaş olarak; 1 yaş = AGING.daysPerYear oyun günü) 80-90 arasından kimliğinden ve tohumdan türetilir
+//               (Venerable.lifespanFor: izole üreteç, ana üretece dokunmaz). Kıdemli Bilge / Saygın Büyük bu yaşa ulaştığı gün dönümünde (00:00) vefat eder.
+//   VENERABLE : Kıdemli Bilge, Ocak Devri'ni ve Yadigâr Devri'ni tamamlayınca Saygın Büyük olur (kontrol her gün 19:00'da; Yadigâr töreni 18:00'dır).
+//               hearthGraceAge: ocağını bu yaşa dek devredememiş (evlatları evlenmemiş) bilgenin devri muaf sayılır (kasaba kilitlenmesin).
+//               sleepVenues: yatağı olmayan Saygın Büyük'ün geceleri sabahladığı yapılar (öncelik sırasıyla)
+//   FATAL     : trajik kazalar. chance = yaralanma zarının hemen yanındaki ölümcül aralık (tek zar: üreteç akışı değişmez), minAble: kasabada en az bu kadar
+//               sağlam yetişkin varsa (çekirdek iş gücü korunur) ölüm gerçekleşir. Seferde: yalnızca kafileden kaza geçiren (mishap) biri için ek zar.
+export const LIFESPAN = { min: 80, max: 90, seedOffset: 35 };
+export const VENERABLE = { checkHour: 19, hearthGraceAge: 75, sleepVenues: ['academy', 'inn', 'townHall', 'library'] };
+export const FATAL = { fire: 0.015, raid: 0.02, expedition: 0.02, minAble: 6 };
+
+/** Kayıttan gelen ömür: geçerli değilse null (LifecycleSystem kimlikten atar). */
+export function sanitizeLifespan(value) {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= LIFESPAN.min && n <= LIFESPAN.max ? n : null;
+}

@@ -369,6 +369,37 @@ const PAGE_HELPERS = () => {
       g2.grandmasterBatches = 0;
     }
 
+    // --- 2k3. (28.3) Saygın Büyük ve vefat: kayıt -> yükleme durum kayması yok; ölenin eş / iş / çırak / ev / ilişki referansı kalmaz ---
+    {
+      const lc = scene().lifecycle;
+      const pool = s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
+      const v = pool.find((c) => c.partnerId === null);
+      const d = pool.find((c) => c !== v && c.partnerId !== null);
+      const mate = s.characters.find((c) => c.id === d.partnerId);
+      const ward = pool.find((c) => c !== v && c !== d && c !== mate && !c.apprenticeship);
+      const workshop = s.buildings.find((b) => b.type === 'workshop' && b.functional);
+      for (const c of [v, d]) { c.lifeStage = 'elder'; c.age = 72; c.ageInDays = 72 * 16; c.children = []; c.inventory = (c.inventory ?? []).filter((x) => !x.heirloom); }
+      const homeV = v.homeId;
+      const venerableNow = lc.makeVenerable(v);
+      if (workshop) { ward.lifeStage = 'youth'; ward.apprenticeship = { masterId: d.id, profession: 'workshop', buildingId: workshop.id, progress: 10, since: 0, crafted: 0 }; }
+      const hadWork = d.workplaceId;
+      const diedNow = lc.die(d, { cause: 'age' });
+      const dangling = s.characters.filter((c) => c.partnerId === d.id || c.parentIds.includes(d.id) || c.apprenticeship?.masterId === d.id).length + s.buildings.filter((b) => b.workerIds.has(d.id) || b.occupants.has(d.id)).length;
+      check('(28.3) vefat eden sakin arkada eş, çırak (usta), iş ya da yapı referansı bırakmaz', venerableNow && diedNow && dangling === 0 && !s.characters.includes(d) && mate.married === false && (!workshop || ward.apprenticeship?.masterId === null), `${dangling}`);
+      const diff = A.roundtrip();
+      check('(28.3) Saygın Büyük ve vefat sonrası kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const v2 = s.characters.find((c) => c.id === v.id);
+      check('(28.3) yüklenen Saygın Büyük yataksız kalır (yükleme ona yatak bulmaz), ömrü korunur, ölen geri gelmez', v2?.isVenerable === true && v2.homeId === null && v2.lifespan === v.lifespan && !s.characters.some((c) => c.id === d.id));
+      const ids2 = new Set(s.characters.map((c) => c.id));
+      const refs = s.characters.filter((c) => (c.partnerId !== null && !ids2.has(c.partnerId)) || c.parentIds.some((x) => !ids2.has(x))).length;
+      check('(28.3) yüklemeden sonra kopuk eş / ebeveyn referansı yok', refs === 0, `${refs}`);
+      sim.step(30);
+      check('(28.3) Saygın Büyük adım atınca da yatak aramaz ve evsiz kalsa da takılmaz', s.characters.some((c) => c.id === v.id) && s.characters.find((c) => c.id === v.id).homeId === null);
+      // v2 Saygın Büyük olarak kalır (yataksızlık kayıt -> yüklemede de kararlıdır); ana kasaba akışını bozmaması için emekli sayılır
+      const w2 = s.characters.find((c) => c.id === ward.id);
+      if (w2) { w2.apprenticeship = null; w2.lifeStage = 'adult'; } // geçici çırak: sonraki çıraklık bölümlerine karışmasın
+    }
+
     // --- 2l. (23. aşama) Yangın sürerken, haydut izi beklerken, hasarlı yapı ve yaralı sakin varken ---
     {
       rich();

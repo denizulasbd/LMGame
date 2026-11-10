@@ -204,7 +204,7 @@ export async function installMonitor(page) {
         }
         // ---- (19. aşama) Evlilik akışı: taşınma, ortak ev, kutlama, huylar, dedikodu ----
         m.minPop = Math.min(m.minPop, s.characters.length);
-        m.homelessMax = Math.max(m.homelessMax, s.characters.filter((c) => c.homeId === null && !c.role).length);
+        m.homelessMax = Math.max(m.homelessMax, s.characters.filter((c) => c.homeId === null && !c.role && !c.isVenerable).length); // (28.3) Saygın Büyükler yataksızdır
         const freeBed = s.buildings.some((b) => b.functional && b.capacity && (homeCount.get(b.id) ?? 0) <= b.capacity - 2);
         for (const c of s.characters) {
           if (!(window.__socialData ? window.__socialData.QUIRKS[c.quirk] : ['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(c.quirk))) broke(`${c.name}: huyu yok (${c.quirk})`);
@@ -218,7 +218,7 @@ export async function installMonitor(page) {
           const p = c.married ? byId.get(c.partnerId) : null;
           if (!p || c.id > p.id) continue;
           const key = `${c.id}-${p.id}`;
-          if (c.homeId !== p.homeId && freeBed) {
+          if (c.homeId !== p.homeId && freeBed && !c.isVenerable && !p.isVenerable) { // (28.3) Saygın Büyük yataksızdır
             if (!m.apartSince.has(key)) m.apartSince.set(key, now);
             else if (now - m.apartSince.get(key) > MAX_APART_HOURS * 60) {
               m.socialStuck.push(`G${s.time.day} ${c.name} & ${p.name}: boş yatak varken ${MAX_APART_HOURS} saattir ayrı evlerde`);
@@ -623,6 +623,13 @@ export async function installMonitor(page) {
                 retireLag: m.retireLag ?? 0,
                 ages: s.characters.filter((c) => !c.role).map((c) => c.age),
                 state: { ...(s.lifeStages ?? {}) },
+                // (28.3) Saygın Büyükler, nüfus (toplam / kotaya sayılan), en yaşlı sakin ve vefatın kopuk referans bırakmadığı (yukarıdaki referans denetimi) örnekleri
+                venerable: s.characters.filter((c) => c.isVenerable).map((c) => `${c.name}:${c.age}/${c.lifespan}`),
+                births: s.stats?.births ?? 0,
+                population: s.characters.length,
+                active: s.characters.filter((c) => !c.isVenerable).length,
+                lifespanMissing: s.characters.filter((c) => !c.role && !(c.lifespan >= 80 && c.lifespan <= 90)).length,
+                venerableWithHome: s.characters.filter((c) => c.isVenerable && c.homeId !== null).length,
               }
             : null,
           // (24.3)

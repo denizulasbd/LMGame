@@ -114,6 +114,9 @@ console.log(
     `unvanı alan bilge ${lf((l) => l.state.elders ?? 0)}, yetişkinliğe geçen genç ${lf((l) => l.state.adults ?? 0)} · nasihat ${Math.round(lf((l) => l.state.adviceMinutes ?? 0))} dk · ` +
     `işteki emekli ${lf((l) => l.retiredWorking)} · en yaşlı ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? Math.max(...r.data.monitor.life.ages) : '-'}`).join(' ')}`
 );
+console.log(
+  `(28.3) Saygın Büyük ${lf((l) => l.venerable.length)} (toplam olan ${lf((l) => l.state.venerables ?? 0)}) · vefat ${lf((l) => l.state.deaths ?? 0)} (kaza ${lf((l) => l.state.accidents ?? 0)}) · nüfus (toplam / kotaya sayılan) ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? `${r.data.monitor.life.population}/${r.data.monitor.life.active}` : '-'}`).join(' ')} · ömrü atanmamış ${lf((l) => l.lifespanMissing)} · yataklı Saygın Büyük ${lf((l) => l.venerableWithHome)}`
+);
 const hl = (f) => sum((d) => (d.monitor.heirloom ? f(d.monitor.heirloom) : 0));
 console.log(`(25.5) yadigâr: oluşan ${hl((h) => h.state.created)}, devredilen ${hl((h) => h.state.transfers)}, arşivde ${hl((h) => h.state.archive)} · ilk devir ${results.map((r) => `${r.seed}:${r.data?.monitor.heirloom?.first ? `G${r.data.monitor.heirloom.first.day}` : '-'}`).join(' ')}`);
 const lg = (f) => sum((d) => (d.monitor.lineage ? f(d.monitor.lineage) : 0));

@@ -296,7 +296,9 @@ export class JournalSystem {
       on('exodus:started', () => this.log('ALARM · Umut tükendi: sakinler köyü terk etmeyi konuşuyor, göçmenler artık gelmiyor', 'bundle')),
       on('exodus:ended', () => this.log('Kasabaya umut döndü: terk edişler durdu', 'heart')),
       on('exodus:leaving', ({ names }) => this.log(`${names.join(' ve ')} bohçasını topladı, köyü terk etmek için yola çıktı`, 'bundle')),
-      on('population:left', ({ character, coins, items }) => this.log(`${character.name} kesesindeki ${coins} altın ve çantasındaki ${items} eşyayla köyden temelli ayrıldı. Geride boş bir ev ve hüzün kaldı`, 'bundle')),
+      on('population:died', ({ character, text, cause }) => this.log(text, cause === 'age' ? 'book' : 'heart')),
+      on('venerable:became', ({ character }) => this.log(`${character.name} Saygın Büyük oldu: ocağını ve yadigârını devretti, yatağını gençlere bıraktı`, 'star')),
+      on('population:left', ({ character, coins, items, reason }) => reason === 'death' ? null : this.log(`${character.name} kesesindeki ${coins} altın ve çantasındaki ${items} eşyayla köyden temelli ayrıldı. Geride boş bir ev ve hüzün kaldı`, 'bundle')),
       // 12. aşama: Bilgelik Evi, okul, liman ve harika
       on('research:started', ({ research }) => this.log(`Bilgelik Evi'nde araştırma başladı: ${research.name}`, 'book')),
       on('research:completed', ({ research }) => this.log(`Araştırma tamamlandı: ${research.name}`, research.icon)),

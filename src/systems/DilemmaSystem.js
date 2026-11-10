@@ -17,6 +17,7 @@
 //               aynı pencere, duraklatma ve süre; tanım data/exploration.js -> ADVENTURES. Seçim 'adventure:chosen'
 //               { id, optionId, auto } olarak ExpeditionSystem'e gider (olay takvimini ve geçmişini etkilemez).
 // Durum state.dilemma'dadır (kayda girer: açık pencere, yaklaşan fırtına, süren sefer).
+import { activePopulation } from './LifeStages.js';
 import { DILEMMAS, DILEMMA_KEYS, DILEMMA_SCHEDULE, STORM } from '../data/dilemmas.js';
 import { ADVENTURES } from '../data/exploration.js';
 import { idleAdults as idleAdultsOf } from './Exploration.js';
@@ -184,7 +185,7 @@ export class DilemmaSystem {
     for (const req of (option.requires ?? '').split(',').filter(Boolean)) {
       const [key, n] = req.split(':');
       const count = Number(n ?? 1);
-      if (key === 'freeBed' && (freeBeds(this.state).open <= 0 || this.state.characters.length >= immigrationLimit(this.state))) {
+      if (key === 'freeBed' && (freeBeds(this.state).open <= 0 || activePopulation(this.state) >= immigrationLimit(this.state))) {
         return { ok: false, reason: 'Kasabada boş yatak yok' };
       }
       if (key === 'explorers' && this.idleAdults().length < count) return { ok: false, reason: `${count} sağlıklı yetişkin gerekir` };
