@@ -62,6 +62,8 @@ import { ITEMS } from '../data/citizens.js';
 import { productionOf, cropOf } from './Granary.js';
 import { CROPS, DEFAULT_CROP } from '../data/crops.js';
 import { grandmasterFreeDue, grandmasterCommit } from './Grandmaster.js';
+import { valleyProductionMultiplier } from './Valley.js';
+import { doctrineProductionMultiplier } from './Doctrine.js';
 import { INN_SHERBET } from '../data/refinery.js';
 import { PROFESSIONS } from '../data/apprenticeship.js';
 import { TEMPERAMENT } from '../data/temperament.js';
@@ -679,6 +681,8 @@ export class BehaviorSystem {
     if (building.definition.guard) return true;
     // (12. aşama) Gelişmiş Çarklar: oduncu, taş ocağı, maden ve değirmende verim +%20
     amount *= researchProductionMultiplier(this.state, building.type);
+    // (28.4) Vadi Karakteri ve Kasaba Doktrini: yapı türüne göre asimetrik verim
+    amount *= valleyProductionMultiplier(this.state, building.type) * doctrineProductionMultiplier(this.state, building.type);
     if (building.definition.apothecary) return this.apothecaryWork(building, task, amount * (task.activity === 'brew' ? healSpeedMultiplier(this.state) : 1));
     if (building.definition.kitchen) {
       this.cook(building, amount);

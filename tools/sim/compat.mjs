@@ -59,6 +59,7 @@
 //   save-v30.json: 26.2'nin oyunu (kayıt sürümü 30, bugünkü): otopilotla 73 gün (--crisis-state); 72. gün (Yaz Güneşi Şenliği panayırı) hazırlık evresinde kurulmuş Zengin Şölen Sofrası
 //                  (currentFeast: 5 fıçı şerbet, 9 ekmek, 22 yiyecek, 1 kumaş bağışı, 32 ikram), daha önce 10 sofra ve 171 ikram. Eski kayıtlarda
 //                  (sürüm 2-29) currentFeast yoktur: null ile açılır
+//   save-v35.json: 28.4'ün oyunu (kayıt sürümü 35, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42: Bereketli Delta, Tarım Doktrini, seviye 4 G30, Altın Çağ G51).
 //   save-v34.json: 28.3'ün oyunu (kayıt sürümü 34, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42; 64. gün ilk Saygın Büyük Deniz, kotaya sayılan 30 / toplam 31).
 //   save-v33.json: 28.2'nin oyunu (kayıt sürümü 33, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42, 28.2 kurallarıyla yeni referans; 3 Başusta).
 //   save-v32.json: 28.1'in oyunu (kayıt sürümü 32): otopilotla 72 gün (--crisis-state; tohum 42, 28.1 kurallarıyla yeni referans).
@@ -69,7 +70,7 @@
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -208,6 +209,8 @@ for (const { name, raw } of fixtures) {
     loaded.feast = { cf: JSON.parse(JSON.stringify(s.currentFeast)), fair: JSON.parse(JSON.stringify(s.currentFestival)), day: s.time.day, hour: s.time.hour };
     // (26.1) mevsimlik panayır (yüklendiği an)
     loaded.fair = { cf: JSON.parse(JSON.stringify(s.currentFestival)), first: JSON.parse(JSON.stringify(s.chronicle.firstFair)), fairs: s.stats.fairs ?? 0, time: { day: s.time.day, hour: s.time.hour } };
+    // (28.4) Vadi Karakteri ve Kasaba Doktrini (yüklendiği an)
+    loaded.valley = { key: s.valley, expected: (await import('/src/systems/Valley.js')).valleyFor(s.seed), doctrine: JSON.stringify(s.doctrine), tradeCharter: s.civic.tradeCharter };
     // (25.4) Aile Kütüğü (yüklendiği an)
     loaded.lineage = {
       people: s.characters.filter((c) => !c.role).map((c) => ({ id: c.id, g: c.generation, f: c.familyId, p: [...(c.parents ?? [])], pi: [...c.parentIds], k: [...(c.children ?? [])], fam: Boolean(s.lineage.families[c.familyId]) })),
@@ -476,6 +479,15 @@ for (const { name, raw } of fixtures) {
       const want = JSON.stringify({ ship: t.ship, next: t.nextShipAt, visits: t.visits, market: t.market, completed: t.completed, earned: t.goldEarned });
       results.push({ name: `${tag}: iskele, gemi takvimi, sözleşmeler, pazar çarpanları ve sayaçlar korundu`, ok: D.json === want && D.posts === data.buildings.filter((b) => b.type === 'tradingPost').length, detail: `${t.visits} ziyaret · ${t.completed} sözleşme · +${t.goldEarned} altın` });
       results.push({ name: `${tag}: bir gün sonra takvim sürüyor`, ok: r.tradeAfter.scheduled && r.tradeAfter.visits >= t.visits });
+    }
+  }
+  // (28.4) Vadi Karakteri ve Kasaba Doktrini
+  {
+    const V = r.loaded.valley;
+    if (data.version < 35) {
+      results.push({ name: `${tag}: vadi karakteri tohumdan atandı, doktrin seçilmedi, Ticaret Beratı yok`, ok: V.key === V.expected && V.doctrine === JSON.stringify({ chosen: null, day: null }) && V.tradeCharter === false, detail: V.key });
+    } else {
+      results.push({ name: `${tag}: vadi karakteri ve kasaba doktrini korundu`, ok: V.key === data.valley && V.key === V.expected && V.doctrine === JSON.stringify(data.doctrine), detail: `${V.key} · doktrin ${data.doctrine.chosen ?? '-'}` });
     }
   }
   // (25.1) yaşam evreleri

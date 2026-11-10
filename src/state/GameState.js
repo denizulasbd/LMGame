@@ -2,6 +2,8 @@
 // Sistemler durumu burada değiştirir; çizim ve UI yalnızca okur.
 // Harita kaydedilmez: aynı tohumdan (seed) yeniden üretilir, yalnızca değişen karolar
 // kayda eklenir (bkz. world/TerrainSnapshot.js; kayıt dosyasını SaveManager yazar).
+import { valleyFor, sanitizeValley } from '../systems/Valley.js';
+import { emptyDoctrine, restoreDoctrine } from '../systems/Doctrine.js';
 import { emptyGoldenAge, emptyChronicle } from '../systems/GoldenAge.js';
 import { GOLDEN_AGE } from '../data/goldenAge.js';
 import { CONFIG } from '../config.js';
@@ -134,7 +136,7 @@ export class GameState {
     this.animalMeta = { wildlifeSeeded: false, lastPetDay: 0 };
     // Belediye fermanları (CivicSystem, 11. aşama): depo genişletme kademesi, lonca, son ziyafet günü,
     // keşif seferlerinden gelen kadim tılsımlar (refaha kalıcı katkı)
-    this.civic = { storageLevel: 0, craftGuild: false, feastDay: -99, decrees: 0, relics: 0, expeditionsSinceTalisman: 0 };
+    this.civic = { storageLevel: 0, craftGuild: false, tradeCharter: false, feastDay: -99, decrees: 0, relics: 0, expeditionsSinceTalisman: 0 };
     // İkilem olayları (DilemmaSystem, 11. aşama):
     //   nextDay   : bir sonraki olayın günü, history: { olay: son çıktığı gün }
     //   active    : açık karar penceresi { id, remaining (gerçek saniye), wasPaused }
@@ -144,6 +146,9 @@ export class GameState {
     // Bilgelik Evi (ResearchSystem, 12. aşama): süren araştırma { id, progress } ve biten araştırmalar
     // { id: { day, hour, minute } }
     this.research = { active: null, done: {} };
+    // (28.4) Vadi Karakteri (tohumdan; anahtar) ve Kasaba Doktrini { chosen, day }
+    this.valley = valleyFor(seed);
+    this.doctrine = emptyDoctrine();
     // Nehir ihracatı (HarborSystem, 12. aşama):
     //   boat      : nehirdeki ticaret teknesi { stage: arriving | docked | leaving, progress, cargo, dockUntil } ya da null
     //   nextBoatAt: sıradaki teknenin yola çıkacağı oyun dakikası
@@ -257,6 +262,8 @@ export class GameState {
       civic: this.civic,
       dilemma: this.dilemma,
       research: this.research,
+      valley: this.valley,
+      doctrine: this.doctrine,
       trade: this.trade,
       luxury: this.luxury,
       history: this.history,
@@ -347,6 +354,8 @@ export class GameState {
       active: RESEARCH[data.research?.active?.id] ? { id: data.research.active.id, progress: Math.max(0, Number(data.research.active.progress) || 0) } : null,
       done: Object.fromEntries(Object.entries(data.research?.done ?? {}).filter(([id]) => RESEARCH[id])),
     };
+    next.valley = sanitizeValley(data.valley, next.seed); // (28.4) eski kayıtlarda yok: tohumdan atanır
+    next.doctrine = restoreDoctrine(data.doctrine);
     next.trade = { ...next.trade, ...(data.trade ?? {}), exported: { ...(data.trade?.exported ?? {}) } };
     // 13. aşamadan eski kayıtlarda altın harcaması, yadigâr ve arşiv yoktur: boş başlar
     next.luxury = {

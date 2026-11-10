@@ -10,6 +10,10 @@
 // çiplerinde açık dilekçeler (tıklayınca dilekçe sahibi seçilir) ve isyan alarmı (tıklayınca meydan havuzu / Belediye
 // Konağı paneli açılır: acil erzak ve altın dağıtımı).
 // Kaydet / Yükle / Yeni Harita Ayarlar penceresine, farenin altındaki karonun bilgisi harita ipucuna taşındı.
+import { VALLEYS } from '../../data/valley.js';
+import { DOCTRINES } from '../../data/doctrines.js';
+import { LATE_GAME } from '../../data/lateGame.js';
+import { lateGameActive, missingLuxuries } from '../../systems/LateGame.js';
 import { activePopulation } from '../../systems/LifeStages.js';
 import { CONFIG } from '../../config.js';
 import { getDayPhase } from '../../systems/TimeSystem.js';
@@ -171,7 +175,7 @@ export class Hud {
     // (21. aşama) açık dilekçeler ve isyan
     const petitions = state.petitions?.list ?? [];
     const revoltNow = state.trust?.revolt ?? null;
-    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${fairNow?.type}:${fairNow?.phase}|${guestNow?.type}:${guestNow?.guest.name}:${guestNow?.guest.leaving}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}`;
+    const buffKey = `${state.valley}|${state.doctrine?.chosen}|${lateGameActive(state)}|${missingLuxuries(state).join(',')}|${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${fairNow?.type}:${fairNow?.phase}|${guestNow?.type}:${guestNow?.guest.name}:${guestNow?.guest.leaving}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}`;
     if (buffKey !== this.lastBuffs) {
       this.lastBuffs = buffKey;
       const chips = buffs.map((b) =>
@@ -191,6 +195,20 @@ export class Hud {
       }
       const chip = (icon, text, title, cls = '') =>
         el('span', { className: `buff-chip${cls}`, title }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
+      // (28.4) Vadi Karakteri (oyunun başından beri), Kasaba Doktrini ve geç oyun beklentisi: üst çubuğun altındaki çip satırında
+      {
+        const valley = VALLEYS[state.valley];
+        const doctrine = DOCTRINES[state.doctrine?.chosen];
+        const late = lateGameActive(state);
+        const missing = missingLuxuries(state).map((k) => LATE_GAME.luxuries[k].name);
+        const title = `Vadi Karakteri: ${valley?.name}. ${valley?.description ?? ''}\n${doctrine ? `Kasaba Doktrini: ${doctrine.name}. ${doctrine.description}` : 'Kasaba Doktrini: henüz seçilmedi (Bilgelik Evi araştırması ya da Belediye fermanıyla seçilir).'}${late ? `\nGeç oyun beklentisi: Keyif ve Sosyallik %${Math.round((LATE_GAME.decay - 1) * 100)} çabuk azalır; ${missing.length ? `EKSİK lüks: ${missing.join(', ')} (refah -${missing.length * LATE_GAME.perMissing})` : 'lüks kalemleri tam (şerbet, kumaş, sıcak yemek)'}.` : ''}`;
+        chips.unshift(
+          el('span', { className: `buff-chip hud-valley-chip${late && missing.length ? ' is-freezing' : ''}`, title }, [
+            el('img', { src: getAnyIconURL('map'), alt: '' }),
+            el('span', { className: 'hud-valley', text: `${valley?.name ?? '-'}${doctrine ? ` · ${doctrine.name.replace(' Doktrini', '')}` : ''}${late && missing.length ? ` · eksik lüks ${missing.length}` : ''}` }),
+          ])
+        );
+      }
       if (festival?.stage === 'announced') chips.unshift(chip(festival.festival.icon, `${festival.festival.name} · 15:00`, festival.festival.announce, ' is-festival'));
       if (fairNow?.phase === 'prep') chips.unshift(chip(fairNow.fair.icon, `${fairNow.fair.name} · 18:00`, fairNow.fair.start, ' is-festival'));
       if (guestNow) chips.push(chip(guestNow.def.icon, `${guestNow.def.name} · ${guestNow.guest.name}`, `${guestNow.def.name} ${guestNow.guest.name} kasabaya uğradı (${guestNow.guest.departureDay}. günün 09:00'una kadar). Geçici misafir: nüfusa ve konuta sayılmaz.`, ' is-festival'));

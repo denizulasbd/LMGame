@@ -400,6 +400,27 @@ const PAGE_HELPERS = () => {
       if (w2) { w2.apprenticeship = null; w2.lifeStage = 'adult'; } // geçici çırak: sonraki çıraklık bölümlerine karışmasın
     }
 
+    // --- 2k4. (28.4) Vadi Karakteri, Kasaba Doktrini ve geç oyun beklentisi: kayıt -> yükleme durum kayması yok; kilitli yol yüklemeden sonra da kilitli ---
+    {
+      const valley0 = s.valley;
+      s.doctrine = { chosen: 'commerce', day: s.time.day };
+      s.civic.tradeCharter = true;
+      s.town.tier = 4;
+      const welfare0 = Math.round(scene().townHappiness?.() ?? 0);
+      const diff = A.roundtrip();
+      check('(28.4) vadi, doktrin ve Gelişmiş Şehir (geç oyun) kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      check('(28.4) yüklenen vadi ve doktrin aynen döner (vadi tohumdan, doktrin seçili, Ticaret Beratı)', s.valley === valley0 && s.valley === (await import('/src/systems/Valley.js')).valleyFor(s.seed) && s.doctrine.chosen === 'commerce' && s.civic.tradeCharter === true);
+      const RSX = await import('/src/systems/ResearchSystem.js');
+      const CVX = await import('/src/systems/CivicSystem.js');
+      const lockedAfter = ['gears', 'herbalism', 'cropRotation'].every((id) => !RSX.researchStatus(s, id, true).ok && RSX.researchStatus(s, id, true).locked) && !CVX.civicStatus(s, 'craftGuild', true).ok;
+      check('(28.4) doktrin kilidi yüklemeden sonra da sürer (öteki doktrinlerin araştırma ve fermanları kapalı)', lockedAfter);
+      const LGX = await import('/src/systems/LateGame.js');
+      check('(28.4) yüklemeden sonra geç oyun beklentisi hâlâ açık (seviye 4): azalma x1,3', LGX.lateGameActive(s) && LGX.lateDecayMultiplier(s) === 1.3);
+      s.doctrine = { chosen: null, day: null };
+      s.civic.tradeCharter = false;
+      s.town.tier = Math.min(s.town.tier, 3);
+    }
+
     // --- 2l. (23. aşama) Yangın sürerken, haydut izi beklerken, hasarlı yapı ve yaralı sakin varken ---
     {
       rich();

@@ -4,6 +4,7 @@
 //   storageLimit(state, key)  : bir kaynağın depo sınırı: genel kapasite + (tarımsal kaynaksa) silo katkısı; hazine sınırsız
 //   hasGranary(state)         : kasabada işleyen bir Ürün Silosu var mı (mahsuller bozulmaz)
 //   spoilageAt(state, key, h) : silosuz kasabada h saatte bu kaynaktan bozulacak (küsuratlı) miktar
+import { doctrineGranaryBonus } from './Doctrine.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { RESOURCES } from '../data/resources.js';
 import { CROPS, DEFAULT_CROP, AGRI_KEYS, SPOILAGE } from '../data/crops.js';
@@ -46,7 +47,9 @@ export function isAgricultural(resource) {
 /** Bir kaynağın depo sınırı (Kiler'ler, belediye fermanı ve tarımsal kaynaklarda Ürün Silosu). */
 export function storageLimit(state, resource) {
   if (RESOURCES[resource]?.treasury) return Infinity;
-  return state.storageCapacity + (isAgricultural(resource) ? state.granaryCapacity ?? 0 : 0);
+  // (28.4) Tarım Doktrini: silonun tarımsal kapasite katkısı +%50
+  const silo = isAgricultural(resource) ? Math.round((state.granaryCapacity ?? 0) * (1 + ((state.granaryCapacity ?? 0) > 0 ? doctrineGranaryBonus(state) : 0))) : 0;
+  return state.storageCapacity + silo;
 }
 
 export function hasGranary(state) {

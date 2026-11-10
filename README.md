@@ -3885,6 +3885,75 @@ vefat sayaçlarını sıfırlar; bozuk ömür yüklemede sıfırlanıp kimlikten
 - **Not (ömür ölçeği):** 1 yaş = 16 oyun günü olduğundan 80-90 yaşlık ömür ilk doğal vefatları ~250. günlerde getirir (Kıdemli Bilge 70 yaşta, ocak ve yadigâr devrinden sonra Saygın Büyük olur); kazalar çok daha erken olabilir.
   Gerekirse `LIFESPAN` ile ayarlanır. Kıdemli Bilge ocağını 75'e dek devredemezse (evlatları evli değilse) devir muaf sayılır ki kasaba kilitlenmesin.
 
+## Harita Kimliği, Kasaba Doktrinleri ve Geç Oyun Meydan Okuması (28. aşama, 28.4 mikro adımı)
+
+**Kayıt sürümü 35.** Rastgele haritalar artık yalnızca ağaçların yerini değil, oynanış stratejisini de değiştirir; araştırma ve fermanlar karşılıklı dışlayan üç yola ayrılır; geç oyunda refah kalıcı bonuslarla %100'e yapışmaz.
+Determinizm kuralı değişmedi: aynı tohum art arda koşturulunca birebir aynı sonucu verir.
+
+### 1. Vadi Karakteri (`data/valley.js`, `systems/Valley.js`)
+
+`Valley.valleyFor(seed)` harita tohumundan **izole üreteçle** (seed + 36) deterministik bir karakter seçer; `state.valley` (kayda girer) oyun boyunca değişmez ve üst çubuğun altındaki çip satırında görünür (ipucunda açıklama).
+
+| Vadi | Güçlü | Zayıf |
+|---|---|---|
+| **Bereketli Delta** | Sebze Bahçesi (Keten, Şerbetçiotu dahil) ve Balıkçı İskelesi **+%25** | Taş Ocağı ve Demir Madeni **-%30** |
+| **Rüzgârlı Boğaz** | Yel Değirmeni, Taş Ocağı, Demir Madeni **+%25** | Kışlık ısınma odunu (tüm evler, han, kamp ateşi) **+%40** |
+| **Kadim Orman** | Oduncu ve Kereste Atölyesi **+%30** | Sebze Bahçesi **-%20** |
+
+Verim çarpanı tek noktadan uygulanır (`BehaviorSystem.performWork`: araştırma x vadi x doktrin); ısınma `HeatingSystem.heatingSources` / `heatingPerDay` içindedir.
+
+### 2. Kasaba Doktrinleri (`data/doctrines.js`, `systems/Doctrine.js`)
+
+Üç karşılıklı dışlayan yol. **Bir doktrine bağlı ilk araştırma ya da ferman başlatıldığında doktrin SEÇİLİR** (`state.doctrine = { chosen, day }`); ötekilerin araştırma ve fermanları kalıcı olarak kilitlenir
+("Doktrin kilitli: … seçildi"; düğmeler devre dışı, kartta "(kilitli)"). Nötr araştırma ve fermanlar (Mimarlık, Yalıtım, Büyük Ziyafet, Depo Genişletmesi) herkese açıktır. Etkiler seçildiği anda başlar.
+
+| Doktrin | Kapıları | Radikal bonus | Bedel |
+|---|---|---|---|
+| **Zanaat ve Sanayi** | Gelişmiş Çarklar, Zanaat Loncası Desteği | Taş Ocağı ve Demir Madeni **x2**; Zanaat Atölyesi, Dokuma Tezgâhı, Şerbethane **+%20** | Çevre estetiğinin refah katkısı **-%8** |
+| **Tarım ve Doğa** | Şifalı Bitki, **Münavebe ve Silo Düzeni** (yeni; Bahçe +%10) | Sebze Bahçesi **+%30**, Fırın (Yel Değirmeni) **+%40**, Ürün Silosu'nun tarımsal kapasite katkısı **+%50** | Taş Ocağı ve Demir Madeni **-%20** |
+| **Ticaret ve Diplomasi** | **Ticaret Hukuku** (yeni; liman +%10), **Ticaret Beratı** (yeni ferman; Krallık Vergisi -%10) | İhracat sözleşmesi altını **+%30**, liman satışı **+%25**, Krallık Vergisi **-%30** | Sebze Bahçesi ve Oduncu **-%10** |
+
+Doktrin vadiyi dengeler ya da uçurur: Delta'nın zayıf madenini Sanayi kurtarır, Orman'ın güneşsiz bahçesini Tarım, Boğaz'ın madenlerini yine Sanayi uçurur. Bilgelik Evi ve Belediye panelleri doktrin özetini ve kapı etiketlerini gösterir.
+
+### 3. Geç Oyun Beklentisi (`data/lateGame.js`, `systems/LateGame.js`)
+
+Kasaba **Gelişmiş Şehir (seviye 4)** olunca ya da **Altın Çağ**'a girince:
+
+- **Keyif ve Sosyallik** ihtiyaçlarının doğal azalma hızı **x1,3** (`NeedsSystem`): lükse alışan sakinler çabuk sıkılır.
+- **Lüks akışı:** Fıçı Şerbeti (kilerde ya da handa), Kumaş / Dayanıklı Giysi ve handa sıcak yemek sürekli bulunmalıdır; eksik her kalem refahtan **6 puan** düşürür (en çok 18; `TownStatus.townHappiness`, kalıcı bonuslar ve Altın Çağ çarpanından sonra çıkarılır).
+- Çip ipucu eksik lüksleri ve cezayı listeler; çip "eksik lüks N" diye uyarır.
+
+### Kayıt (sürüm 35)
+
+`valley` (anahtar), `doctrine { chosen, day }` ve `civic.tradeCharter` eklendi. `SaveManager.migrate` v34 -> v35'te tohumdan deterministik vadi atar ve doktrini boş bırakır; `sanitizeValley` / `restoreDoctrine` bozuk değeri temizler.
+`SAVE_VERSION = 35`. Yeni fikstür `save-v35.json` (otopilot, 72 gün, `--crisis-state`).
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1296 -> **1330**; 34'ü yeni): vadi tanımları ve sayıları, tohumdan deterministik seçim (üç vadi de görülür), HUD çipi, **gerçek `performWork` ile** vadi verimleri (bahçe / taş / odun) ve ısınma (+%40), doktrin
+  tanımları, kapılar (araştırma ve ferman), seçim ("Çarklar -> Sanayi", "Ticaret Beratı -> Ticaret"), kilit ("Doktrin kilitli", kilitli başlatma reddi, nötr yollar açık), panel özeti, doktrin etkileri (Sanayi x2 gerçek performWork, estetik,
+  Tarım silosu +%50, Ticaret sözleşme / Krallık Vergisi / liman), geç oyun (seviye 4 ve Altın Çağ'da başlar, **gerçek NeedsSystem** ile Keyif / Sosyallik oranı 1,3), lüks eksikliği ve refah cezası (6 / 18 puan), HUD ipucu, kayıt, bozuk veri, v34 -> v35 göçü.
+  Altın Çağ refah çarpanı testi geç oyun cezasını ayrı sayacak şekilde uyarlandı.
+- **Denetim** (`audit.mjs`): 146 -> **150**. Vadi / doktrin / seviye 4 ile kayıt -> yükleme durum kayması yok, yüklenen vadi tohumdan, kilit yüklemeden sonra da sürer, geç oyun açık kalır.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-35): 1254 -> **1327** (her fikstürde yeni "vadi tohumdan atandı, doktrin boş" denetimi).
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 50`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0. Otopilot doktrini vadiye göre seçer, böylece üç yol da denenir:
+
+  | Tohum | Vadi | Doktrin | Altın Çağ | Geç oyun refahı (ort / en düşük) |
+  |---|---|---|---|---|
+  | 7 | Bereketli Delta | Tarım | 50. güne dek yok | %88 / %82 |
+  | 13 | Rüzgârlı Boğaz | Sanayi | G28 | %95 / %88 |
+  | 21 | Bereketli Delta | Tarım | G41 | %91 / %88 |
+  | **42** | **Bereketli Delta** | **Tarım** | G51 | %88 / %88 |
+  | 77 | Kadim Orman | Ticaret | G34 | %93 / %82 |
+  | 101 | Rüzgârlı Boğaz | Sanayi | G30 | %94 / %76 |
+
+  Ulu Saat Kulesi 4/6 koşuda 50. güne dek bitti: taş ve demirde -%30 (ve Tarım doktrinin -%20'si) Delta'da kuleyi geciktirir; Boğaz'da (madenler +%25, Sanayi x2) ise G28-G30'da biter. Bu asimetri tasarımın amacıdır.
+- **Tohum 42, yeni kimlik: Bereketli Delta.** `autopilot.mjs 42 72 --crisis-state` iki kez art arda koşturuldu: `--json` raporu, kayıt dosyası ve günlük **bayt bayt aynı**. Delta'nın zayıf taş / demiri kuleyi geciktirdi:
+  Ulu Saat Kulesi aşamaları **G28 / G30 / G31 -> G45 / G49 / G51**, Altın Çağ **G31 -> G51**; otopilot Tarım Doktrini'ni seçti (Münavebe + Şifalı Bitki + Yalıtım + Mimarlık: 4/4 araştırma). Seviye 4'e G30'da ulaşıldı.
+- **Geç oyunda refah nasıl tepki veriyor?** Seviye 4 / Altın Çağ boyunca 1024 örnekte (G30'dan) refah **hep %100'de kalmaz**: ortalama **%93,4**, en düşük **%88,0**, en yüksek %100; örneklerin **%56'sı %100'ün altında** (551'i %90'ın altında), ortalama eksik lüks
+  **1,10 / 3**. Stres matrisinin geç oyun örneklerinde de ortalamalar %88-%95, en düşükler %76-%88'dir (tohum 7 ve 42'de örneklerin %100'ü %100'ün altında). Önceki adımlarda aynı evrede refah %100'e yapışıyordu.
+- **Not (denge):** ceza yalnızca lüks kalemleri eksikse düşer; üç kalemi sürekli akıtan oyuncu refahı yine yükseltebilir (kasıtlı: "ekonomiyi sürekli optimize et"). Doktrin ve vadi sayıları `data/valley.js`, `data/doctrines.js`, `data/lateGame.js` içindedir.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -4050,6 +4119,9 @@ düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 | Oyunun adı, başlangıç ekranı | `config.js` → `GAME_TITLE`, `ui/components/TitleMenu.js` |
 | Takas teklifleri, tüccar takvimi | `data/trade.js` |
 | (28.1) Acil Seferberlik, anında / usta onarımı bedelleri | `data/crisis.js` → `FIRE.muster`, `REPAIR` |
+| (28.4) Vadi Karakterleri (bonus / ceza çarpanları) | `data/valley.js` (+ `systems/Valley.js`) |
+| (28.4) Kasaba Doktrinleri, kapı araştırma / ferman etiketleri | `data/doctrines.js`, `data/research.js` / `data/town.js` → `doctrine` alanı (+ `systems/Doctrine.js`) |
+| (28.4) Geç oyun beklentisi (azalma çarpanı, lüks cezası) | `data/lateGame.js` (+ `systems/LateGame.js`) |
 | (28.3) Ömür aralığı, Saygın Büyük koşulları, kaza ihtimalleri | `data/lifeStages.js` → `LIFESPAN`, `VENERABLE`, `FATAL` (+ `systems/Venerable.js`, `LifecycleSystem.js`) |
 | (28.2) Çıraklık hızı, Gençlik enerji bonusu, usta verimi | `data/apprenticeship.js` → `APPRENTICE.perMinute`, `PROUD_MASTER.workBoost`; `data/lifeStages.js` → `YOUTH.energyGain` |
 | (28.2) Başusta etkileri (eser şansı çarpanı, tasarruf aralığı) | `data/apprenticeship.js` → `GRANDMASTER` (+ `systems/Grandmaster.js`) |

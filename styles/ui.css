@@ -4614,3 +4614,17 @@ kbd {
 .heirloom-chain .chain-arrow {
   color: var(--ui-ink-soft);
 }
+
+/* (28.4) Vadi Karakteri / Doktrin çipi ve doktrin kartları */
+.hud-valley-chip {
+  font-size: 12px;
+  font-weight: 700;
+}
+.doctrine-card {
+  border-left: 4px solid #b58cf0;
+}
+.doctrine-tag.is-active {
+  color: #6a3fb5;
+  font-weight: 700;
+}
+

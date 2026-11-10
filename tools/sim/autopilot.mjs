@@ -513,15 +513,20 @@ await page.evaluate((passive) => {
     const cap = s.storageCapacity;
     if (world.getCompleted('townHall').length) {
       if (res.wood > cap * 0.6 && res.stone > cap * 0.6 && res.iron > 60) game.events.emit('ui:civicProject', { id: 'storehouse' });
-      if (res.wool > 70 && res.iron > 70) game.events.emit('ui:civicProject', { id: 'craftGuild' });
+      // (28.4) doktrine bağlı fermanlar yalnızca kendi doktrini seçiliyse / seçilebiliyorsa (vadiye göre) ilan edilir
+      const dc = s.doctrine.chosen;
+      if (res.wool > 70 && res.iron > 70 && (dc === 'industry' || (dc === null && s.valley === 'windyGorge'))) game.events.emit('ui:civicProject', { id: 'craftGuild' });
+      if (res.wool > 90 && res.iron > 60 && res.wood > 100 && (dc === 'commerce' || (dc === null && s.valley === 'ancientWeald'))) game.events.emit('ui:civicProject', { id: 'tradeCharter' });
       if (res.bread + res.food > 200 && res.wood > 100) game.events.emit('ui:civicProject', { id: 'grandFeast' });
     }
 
     // (12. aşama) Bilgelik Evi: kaynak yedekte kalacak kadar varsa sıradaki araştırma
-    const ORDER = ['gears', 'architecture', 'insulation', 'herbalism'];
+    // (28.4) Doktrin vadiye göre seçilir (her vadide farklı yol denensin): Delta -> Tarım, Boğaz -> Sanayi, Orman -> Ticaret; kilitli olanlar atlanır
+    const ORDERS = { fertileDelta: ['cropRotation', 'architecture', 'insulation', 'herbalism'], windyGorge: ['gears', 'architecture', 'insulation'], ancientWeald: ['tradeLaw', 'architecture', 'insulation'] };
+    const ORDER = ORDERS[s.valley] ?? ['gears', 'architecture', 'insulation', 'herbalism'];
     if (scene.research.academies().length && !s.research.active) {
       // Sıradaki karşılanabilir araştırma (yedekte biraz kaynak kalsın)
-      const id = ORDER.find((k) => !s.research.done[k] && Object.entries(window.__research[k].cost).every(([r, v]) => res[r] >= v + 25));
+      const id = ORDER.find((k) => !s.research.done[k] && window.__researchStatus(s, k, true).ok && Object.entries(window.__research[k].cost).every(([r, v]) => res[r] >= v + 25));
       if (id) game.events.emit('ui:startResearch', { id });
     }
     // Liman: fazlalık ihracatı açık. Harika için biriktirirken sınır yüksek (taş, demir ve yün kalsın), önce düşük (250),
@@ -701,6 +706,7 @@ await page.evaluate(async () => {
   const { BUILDINGS } = await import('/src/data/buildings.js');
   window.__dilemmaDefs = DILEMMAS;
   window.__research = RESEARCH;
+  window.__researchStatus = (await import('/src/systems/ResearchSystem.js')).researchStatus;
   window.__wonder = BUILDINGS.wonder;
   window.__luxury = await import('/src/systems/Luxury.js');
   window.__relicKeys = (await import('/src/data/luxury.js')).RELIC_KEYS;
@@ -972,6 +978,11 @@ if (mon.life) {
   console.log(
     `(28.3) nüfus ${L.population} (kotaya sayılan ${L.active}) · Saygın Büyük ${L.venerable.length} (${L.venerable.join(', ') || '-'}; toplam olan ${L.state.venerables ?? 0}) · vefat ${L.state.deaths ?? 0} (kaza ${L.state.accidents ?? 0}; son: ${L.state.lastDeath ? `${L.state.lastDeath.name} ${L.state.lastDeath.age} yaşında G${L.state.lastDeath.day} ${L.state.lastDeath.cause}` : '-'}) · ` +
       `doğum ${L.births} · ömrü atanmamış ${L.lifespanMissing} · yataklı Saygın Büyük ${L.venerableWithHome}`
+  );
+  // (28.4) Vadi Karakteri, Doktrin ve geç oyun refahı
+  const lt = L.late;
+  console.log(
+    `(28.4) vadi ${L.valley} · doktrin ${L.doctrine ?? 'seçilmedi'} · geç oyun (seviye 4 / Altın Çağ) ${lt ? `${lt.n} örnek (G${lt.since}'den): refah ort %${(lt.sum / lt.n).toFixed(1)}, en düşük %${lt.min.toFixed(1)}, en yüksek %${lt.max.toFixed(1)}; %100'ün altında ${lt.below100} örnek (%${((100 * lt.below100) / lt.n).toFixed(0)}), %90'ın altında ${lt.below90}; ortalama eksik lüks ${(lt.missingSum / lt.n).toFixed(2)}/3` : 'hiç girilmedi'}`
   );
 }
 console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);

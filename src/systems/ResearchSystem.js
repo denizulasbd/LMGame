@@ -14,6 +14,7 @@ import { RESEARCH, SCHOOL } from '../data/research.js';
 import { SKILL_LEVELS, SKILL_KEYS } from '../data/skills.js';
 import { isWithinHours } from './StructureSystem.js';
 import { INSCRIPTIONS } from '../data/exploration.js';
+import { doctrineGate, chooseDoctrine } from './Doctrine.js';
 
 // ---------------------------------------------------------------------------
 // Araştırmaların etkileri (saf yardımcılar)
@@ -25,8 +26,18 @@ export function hasResearch(state, id) {
 
 /** Bu yapı türünde üretim / işleme verimi çarpanı (Gelişmiş Çarklar). */
 export function researchProductionMultiplier(state, type) {
-  const p = RESEARCH.gears.effect.production;
-  return hasResearch(state, 'gears') && p.types.includes(type) ? p.multiplier : 1;
+  let m = 1;
+  for (const def of Object.entries(RESEARCH)) {
+    const [id, research] = def;
+    const p = research.effect.production;
+    if (p && hasResearch(state, id) && p.types.includes(type)) m *= p.multiplier; // (28.4) Münavebe de üretimi artırır
+  }
+  return m;
+}
+
+/** (28.4) Liman satış değeri çarpanı (Ticaret Hukuku). */
+export function researchExportMultiplier(state) {
+  return hasResearch(state, 'tradeLaw') ? RESEARCH.tradeLaw.effect.exportValue : 1;
 }
 
 /** İnşaat, yükseltme ve onarım hızı çarpanı (Mimarlık Loncası). */
@@ -62,6 +73,8 @@ export function researchStatus(state, id, hasAcademy = true) {
   if (r.done[id]) return { ok: false, reason: 'Tamamlandı', done: true };
   if (r.active?.id === id) return { ok: false, reason: 'Araştırılıyor', active: true };
   if (!hasAcademy) return { ok: false, reason: 'Önce Bilgelik Evi tamamlanmalı' };
+  const gate = doctrineGate(state, def.doctrine ?? null); // (28.4) Kasaba Doktrinleri: karşılıklı dışlayan yollar
+  if (!gate.ok) return { ok: false, reason: gate.reason, locked: true };
   if (r.active) return { ok: false, reason: 'Bilge başka bir araştırmayla meşgul' };
   const missing = Object.entries(def.cost).filter(([res, v]) => (state.resources[res] ?? 0) < v);
   if (missing.length) return { ok: false, reason: 'Yetersiz kaynak' };
@@ -103,6 +116,7 @@ export class ResearchSystem {
     }
     this.economy.spend(RESEARCH[id].cost);
     this.state.research.active = { id, progress: 0 };
+    if (chooseDoctrine(this.state, RESEARCH[id].doctrine ?? null)) this.events.emit('doctrine:chosen', { doctrine: this.state.doctrine.chosen, source: 'research', id });
     this.events.emit('research:started', { id, research: RESEARCH[id] });
     this.events.emit('toast', { text: `Araştırma başladı: ${RESEARCH[id].name}. Bilge çalıştıkça ilerleyecek.`, tone: 'info', icon: 'book' });
     return { ok: true };

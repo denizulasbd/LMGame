@@ -7,6 +7,7 @@ import { CONFIG } from '../config.js';
 import { defaultTownName } from './GameState.js';
 import { LEGACY_BUILDING_TYPES } from '../data/buildings.js';
 import { lifespanFor } from '../systems/Venerable.js';
+import { valleyFor } from '../systems/Valley.js';
 
 const SLOT_KEYS = {
   main: CONFIG.SAVE_KEY,
@@ -18,6 +19,11 @@ const SLOT_KEYS = {
  * türe çevrilir; kurulmuş ya da yarım kalmış lambalar yüklenince Sokak Feneri olarak çalışır.
  */
 function migrate(data) {
+  // (28.4) v34 -> v35: tohumdan deterministik Vadi Karakteri, boş Kasaba Doktrini
+  if (data.version < 35) {
+    data.valley = valleyFor(data.seed);
+    data.doctrine = { chosen: null, day: null };
+  }
   // (28.3) v33 -> v34: herkese kimliğinden ve tohumdan türeyen deterministik ömür (80-90 yaş), hiç kimse Saygın Büyük değil; yaşam evresi sayaçlarına vefat alanları
   if (data.version < 34) {
     if (Array.isArray(data.characters)) {

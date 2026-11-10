@@ -227,6 +227,16 @@ export const CIVIC_PROJECTS = {
     once: true,
     xpMultiplier: 1.15,
     productionMultiplier: 1.15,
+    doctrine: 'industry', // (28.4) Zanaat ve Sanayi Doktrinini SEÇER
+  },
+  tradeCharter: {
+    name: 'Ticaret Beratı',
+    icon: 'coin',
+    description: 'Krallıktan alınan ticaret beratı: Krallık Vergisi kalıcı -%10 düşer. Ticaret ve Diplomasi Doktrini\'ni SEÇER (öteki doktrinlerin yolları kilitlenir).',
+    cost: { wool: 40, iron: 30, wood: 60 },
+    once: true,
+    doctrine: 'commerce',
+    levyMultiplier: 0.9,
   },
 };
 export const CIVIC_PROJECT_KEYS = Object.keys(CIVIC_PROJECTS);

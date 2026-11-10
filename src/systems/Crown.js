@@ -1,6 +1,8 @@
 // (22. aşama) Krallık katmanının saf hesapları (durum değiştirmez): vergi oranı ve verim çarpanı, takvim, Krallık Vergisi
 // tutarı, itibar seviyesi, ferman ihtiyacı ve durumu, kötü şöhretin göçe etkisi. TownStatus da bunları kullanır; bu yüzden
 // burada TownStatus içe aktarılmaz.
+import { doctrineLevyMultiplier } from './Doctrine.js';
+import { CIVIC_PROJECTS } from '../data/town.js';
 import { TAX, TAX_RATES, LEVY, REPUTATION, DECREES, DECREE, EXODUS } from '../data/crown.js';
 import { RESOURCES } from '../data/resources.js';
 import { trustValue } from './Citizens.js';
@@ -100,7 +102,8 @@ export function levyAmount(state) {
   const pop = state.characters.filter((c) => !c.role).length;
   const golden = isGoldenAge(state) ? LEVY.goldenAge : 1;
   const rep = reputationLevel(state.crown?.reputation ?? REPUTATION.start).levy;
-  return Math.round((LEVY.base + LEVY.perTier * tier + LEVY.perResident * pop) * golden * rep);
+  const trade = doctrineLevyMultiplier(state) * (state.civic?.tradeCharter ? CIVIC_PROJECTS.tradeCharter.levyMultiplier : 1); // (28.4) Ticaret Doktrini ve Beratı
+  return Math.round((LEVY.base + LEVY.perTier * tier + LEVY.perResident * pop) * golden * rep * trade);
 }
 
 /**

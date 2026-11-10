@@ -3,6 +3,7 @@
 // aynı hesabı kullansın diye tek yerde.
 // 10. aşama: kasabanın toplam yiyecek değeri (ekmek 2,5 sayılır), kasaba seviyesi (Mezra -> Gelişmiş
 // Şehir) ölçütleri ve unvanı, belediyenin iş verimi çarpanı.
+import { lateDiscontent } from './LateGame.js';
 import { goldenWelfareMultiplier, goldenWorkMultiplier } from './GoldenAge.js';
 import { silkPrestige } from './Luxury.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -32,7 +33,9 @@ export function townHappiness(state) {
   if (people.length === 0) return 0;
   const average = people.reduce((sum, c) => sum + happinessOf(c), 0) / people.length;
   // (20. aşama) Altın Çağ: kasaba refahına kalıcı +%10 çarpan
-  return Math.min(100, (average * aestheticWelfareMultiplier(state) + townHappinessBonus(state)) * goldenWelfareMultiplier(state));
+  const raw = Math.min(100, (average * aestheticWelfareMultiplier(state) + townHappinessBonus(state)) * goldenWelfareMultiplier(state));
+  // (28.4) Geç oyun beklentisi: lüks kalemleri (şerbet, kumaş, handa sıcak yemek) eksikse refah düşer
+  return Math.max(0, raw - lateDiscontent(state));
 }
 
 /**

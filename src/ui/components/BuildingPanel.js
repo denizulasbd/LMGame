@@ -64,6 +64,7 @@ import { INN_SHERBET, GARMENT, CLOTH_WELFARE } from '../../data/refinery.js';
 import { CONTRACTS, MARKET, IMPORTS, IMPORT_KEYS } from '../../data/tradePost.js';
 import { contractStatus, importStatus, priceMultiplier, shipDocked } from '../../systems/TradePost.js';
 import { clothWelfare } from '../../systems/Refinery.js';
+import { DOCTRINES, DOCTRINE_KEYS } from '../../data/doctrines.js';
 import { GRANDMASTER, PROFESSIONS } from '../../data/apprenticeship.js';
 import { grandmasterAt, grandmasterMasterworkMultiplier } from '../../systems/Grandmaster.js';
 import { doorOpen, apprenticesAt, pickMaster, acceptsApprentice, canApprentice, apprenticeSlots } from '../../systems/Apprenticeship.js';
@@ -208,11 +209,12 @@ export class BuildingPanel {
       ? CIVIC_PROJECT_KEYS.map((id) => {
           const st = civicStatus(state, id, building.functional);
           return `${st.ok}:${st.reason}:${st.level}`;
-        }).join(',')
+        }).join(',') + `:${state.doctrine?.chosen}`
       : '';
     const researchKey = building.definition.academy
       ? [
           state.research.active?.id,
+          state.doctrine?.chosen,
           state.research.active ? Math.floor((state.research.active.progress / RESEARCH[state.research.active.id].work) * 100) : 0,
           RESEARCH_KEYS.map((id) => researchStatus(state, id, this.academyReady(building)).reason).join(','),
         ].join(':')
@@ -552,11 +554,12 @@ export class BuildingPanel {
       return el('div', { className: `decree${done ? ' is-done' : ''}` }, [
         el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL(project.icon), alt: '' }), project.name, el('span', { className: 'decree-state', text: levelText })]),
         el('div', { className: 'upgrade-text', text: project.description }),
+        ...(project.doctrine ? [el('div', { className: `upgrade-text doctrine-tag${!st.ok && st.reason?.startsWith('Doktrin kilitli') ? '' : ' is-active'}`, text: `Doktrin: ${DOCTRINES[project.doctrine].name}${st.reason?.startsWith('Doktrin kilitli') ? ' (kilitli)' : ''}` })] : []),
         ...(done ? [] : [el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, costs), go])]),
         ...(!st.ok && !done ? [el('div', { className: 'upgrade-text is-active', text: st.reason })] : []),
       ]);
     });
-    this.decrees.replaceChildren(el('div', { className: 'building-section-title', text: 'Belediye Fermanları' }), ...cards);
+    this.decrees.replaceChildren(el('div', { className: 'building-section-title', text: 'Belediye Fermanları' }), this.doctrineSummary(state), ...cards);
   }
 
   /** İşçi Ata listesi: bu yapıya sabitli olmayan yetişkinler, bu işteki ustalığa göre (en usta önce). */
@@ -843,6 +846,24 @@ export class BuildingPanel {
     return building.functional && !building.damaged;
   }
 
+  /** (28.4) Kasaba Doktrini özeti: seçilmişse etkileri, değilse üç yol ve "ilk araştırma / ferman seçer" uyarısı. */
+  doctrineSummary(state) {
+    const chosen = state.doctrine?.chosen;
+    if (chosen) {
+      const d = DOCTRINES[chosen];
+      return el('div', { className: 'decree doctrine-card is-done' }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL(d.icon), alt: '' }), `Kasaba Doktrini: ${d.name}`, el('span', { className: 'decree-state', text: `Gün ${state.doctrine.day}` })]),
+        el('div', { className: 'upgrade-text', text: d.description }),
+        el('div', { className: 'upgrade-text', text: 'Öteki iki doktrinin araştırma ve fermanları kilitlidir.' }),
+      ]);
+    }
+    return el('div', { className: 'decree doctrine-card' }, [
+      el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('book'), alt: '' }), 'Kasaba Doktrini: henüz seçilmedi']),
+      el('div', { className: 'upgrade-text is-active', text: 'Bir doktrine bağlı ilk araştırmayı ya da fermanı başlattığında o doktrin SEÇİLİR; ötekilerin yolları kalıcı olarak kilitlenir.' }),
+      ...DOCTRINE_KEYS.map((k) => el('div', { className: 'upgrade-text', text: `${DOCTRINES[k].name}: ${DOCTRINES[k].short}` })),
+    ]);
+  }
+
   /** Bilgelik Evi: dört araştırmanın kartları (durum, maliyet, Araştır düğmesi) ve süren araştırmanın ilerlemesi. */
   renderResearch(building, state) {
     const show = Boolean(building.definition.academy) && building.functional;
@@ -857,6 +878,7 @@ export class BuildingPanel {
       const children = [
         el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL(def.icon), alt: '' }), def.name, el('span', { className: 'decree-state', text: stateText })]),
         el('div', { className: 'upgrade-text', text: def.description }),
+        ...(def.doctrine ? [el('div', { className: `upgrade-text doctrine-tag${st.locked ? '' : ' is-active'}`, text: `Doktrin: ${DOCTRINES[def.doctrine].name}${st.locked ? ' (kilitli)' : ''}` })] : []),
       ];
       if (st.active) {
         children.push(el('div', { className: 'need-bar building-progress' }, [el('span', { className: 'need-fill need-fun', style: `width: ${Math.floor(Math.min(1, active.progress / def.work) * 100)}%` })]));
@@ -872,7 +894,7 @@ export class BuildingPanel {
       }
       return el('div', { className: `decree${st.done ? ' is-done' : ''}` }, children);
     });
-    this.research.replaceChildren(el('div', { className: 'building-section-title', text: 'Kasaba Araştırmaları' }), ...cards);
+    this.research.replaceChildren(el('div', { className: 'building-section-title', text: 'Kasaba Araştırmaları' }), this.doctrineSummary(state), ...cards);
   }
 
   /**

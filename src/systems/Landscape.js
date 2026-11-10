@@ -1,6 +1,7 @@
 // (18. aşama) Peyzaj ve kasaba estetiğinin saf hesapları (durum değiştirmez): çevre estetiği haritası, kasabanın toplam
 // estetik puanı ve refaha eklediği yüzde, süs fidanının büyümesi, gece bir karoya ışık düşüp düşmediği.
 // LandscapeSystem, arayüz ve testler aynı hesabı kullanır.
+import { doctrineAestheticMultiplier } from './Doctrine.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { AESTHETIC, DARKNESS, ORNAMENTAL_TREES, aestheticPercent } from '../data/landscape.js';
 import { CONFIG } from '../config.js';
@@ -73,7 +74,7 @@ export { aestheticPercent };
 
 /** Refah çarpanı: 1 + yüzde / 100 (kayıttaki son hesap; LandscapeSystem günceller). */
 export function aestheticWelfareMultiplier(state) {
-  return 1 + (state.landscape?.percent ?? 0) / 100;
+  return (1 + (state.landscape?.percent ?? 0) / 100) * doctrineAestheticMultiplier(state); // (28.4) Sanayi Doktrini estetiği düşürür
 }
 
 /** Estetik puanının okunabilir düzeyi (ipucu ve panel). */

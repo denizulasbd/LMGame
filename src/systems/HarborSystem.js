@@ -11,6 +11,8 @@
 //             350'ye indirerek fazlalığı boşaltır; yükün değeri %10 fazladır ('harbor:grandVoyage' { building }).
 // Durum state.trade'dedir (kayda girer): { boat, nextBoatAt, shipments, goldEarned, exported, last, grandDay,
 // grandPending, grandVoyages }.
+import { researchExportMultiplier } from './ResearchSystem.js';
+import { doctrineExportMultiplier } from './Doctrine.js';
 import { EXPORT } from '../data/trade.js';
 import { RESOURCES } from '../data/resources.js';
 import { TOWN_BUFFS } from '../data/town.js';
@@ -390,7 +392,7 @@ export class HarborSystem {
     const boat = this.trade.boat;
     const cargo = boat.cargo ?? {};
     const grand = Boolean(boat.grand);
-    const gold = cargoValue(cargo, relicExportValue(this.state) * (grand ? EXPORT.grandVoyage.valueBonus : 1));
+    const gold = cargoValue(cargo, relicExportValue(this.state) * researchExportMultiplier(this.state) * doctrineExportMultiplier(this.state) * (grand ? EXPORT.grandVoyage.valueBonus : 1)); // (28.4)
     const trade = this.trade;
     let bonus = null;
     if (gold > 0) {

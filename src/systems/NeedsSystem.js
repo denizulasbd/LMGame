@@ -7,6 +7,7 @@
 // odun bitince (ocaklar sönük) herkesin tüm ihtiyaçları çok daha hızlı azalır.
 // 9. aşama: kışlık palto dışarıdaki üşümenin etkisini azaltır, sırt çantası yolda yorgunluğu azaltır,
 // "Mutlu Yuva" morali keyfin yavaş düşmesini sağlar, oynayan çocuklar yanındaki yetişkinleri keyiflendirir.
+import { lateDecayMultiplier } from './LateGame.js';
 import { NEEDS, NEED_KEYS, SLEEP_DECAY_MULTIPLIER } from '../data/characters.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { RAIN_EFFECTS, isRainActive, WEATHER_TYPES } from '../data/weather.js';
@@ -45,6 +46,7 @@ export class NeedsSystem {
     const now = state.totalMinutes;
     const season = getSeason(state.time.day);
     const freezing = isFreezing(state);
+    const lateMult = lateDecayMultiplier(state);
     for (const c of this.world.characters) {
       if (c.away) continue; // keşif seferindekiler kendi erzaklarıyla yaşar (ihtiyaçları donar)
       const sleeping = c.isSleeping;
@@ -65,6 +67,8 @@ export class NeedsSystem {
         // (14. aşama) Sisli sabah dinlendirir: dışarıdakilerin keyfi yavaş düşer
         if (need === 'fun' && c.visible && weatherFun !== 1) multiplier *= weatherFun;
         if (need === 'fun') multiplier *= funBuff;
+        // (28.4) Geç oyun beklentisi: Gelişmiş Şehir / Altın Çağ'da Keyif ve Sosyallik %30 çabuk azalır
+        if (need === 'fun' || need === 'social') multiplier *= lateMult;
         if (need === 'hunger' && (c.buffs.warmMeal ?? -1) > now) multiplier *= WARM_MEAL.hungerDecay;
         // Kışın üşüyen sakin daha çabuk yorulur ve keyfi kaçar; odun bitince evler de soğuktur ve
         // herkes donar: keyif çok hızlı kaçar, beden çabuk acıkır, kimse sohbete çıkmaz

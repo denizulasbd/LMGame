@@ -44,6 +44,8 @@ export async function installMonitor(page) {
     window.__refineryMod = await import('/src/systems/Refinery.js').catch(() => null); // (24.2)
     window.__tradeMod = await import('/src/systems/TradePost.js').catch(() => null); // (24.3)
     window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
+    window.__lateMod = await import('/src/systems/LateGame.js').catch(() => null); // (28.4)
+    window.__tsMod = await import('/src/systems/TownStatus.js').catch(() => null);
     window.__apprMod = await import('/src/systems/Apprenticeship.js').catch(() => null); // (25.2)
     window.__socialData = await import('/src/data/social.js').catch(() => null); // (25.3)
     window.__lineageMod = await import('/src/systems/Lineage.js').catch(() => null); // (25.4)
@@ -204,6 +206,15 @@ export async function installMonitor(page) {
         }
         // ---- (19. aşama) Evlilik akışı: taşınma, ortak ev, kutlama, huylar, dedikodu ----
         m.minPop = Math.min(m.minPop, s.characters.length);
+        // (28.4) Geç oyun beklentisi: açıkken anlık refah ve eksik lüks örnekleri
+        if (window.__lateMod && window.__tsMod && window.__lateMod.lateGameActive(s)) {
+          const lt = (m.late ??= { n: 0, sum: 0, min: 100, max: 0, below100: 0, missingSum: 0, below90: 0, since: s.time.day });
+          const hp = window.__tsMod.townHappiness(s);
+          lt.n += 1; lt.sum += hp; lt.min = Math.min(lt.min, hp); lt.max = Math.max(lt.max, hp);
+          if (hp < 99.5) lt.below100 += 1;
+          if (hp < 90) lt.below90 += 1;
+          lt.missingSum += window.__lateMod.missingLuxuries(s).length;
+        }
         m.homelessMax = Math.max(m.homelessMax, s.characters.filter((c) => c.homeId === null && !c.role && !c.isVenerable).length); // (28.3) Saygın Büyükler yataksızdır
         const freeBed = s.buildings.some((b) => b.functional && b.capacity && (homeCount.get(b.id) ?? 0) <= b.capacity - 2);
         for (const c of s.characters) {
@@ -626,6 +637,9 @@ export async function installMonitor(page) {
                 // (28.3) Saygın Büyükler, nüfus (toplam / kotaya sayılan), en yaşlı sakin ve vefatın kopuk referans bırakmadığı (yukarıdaki referans denetimi) örnekleri
                 venerable: s.characters.filter((c) => c.isVenerable).map((c) => `${c.name}:${c.age}/${c.lifespan}`),
                 births: s.stats?.births ?? 0,
+                valley: s.valley,
+                doctrine: s.doctrine?.chosen ?? null,
+                late: m.late ?? null, // (28.4)
                 population: s.characters.length,
                 active: s.characters.filter((c) => !c.isVenerable).length,
                 lifespanMissing: s.characters.filter((c) => !c.role && !(c.lifespan >= 80 && c.lifespan <= 90)).length,

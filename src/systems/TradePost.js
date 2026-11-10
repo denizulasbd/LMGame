@@ -8,6 +8,7 @@
 //   importStatus(state, kind) : ithalat paketi alınabilir mi { ok, reason }
 //   shipDocked(state)         : gemi / kervan şu an kasabada mı
 import { RESOURCES } from '../data/resources.js';
+import { doctrineContractMultiplier } from './Doctrine.js';
 import { VISIT, CONTRACTS, FIXED_CONTRACTS, ROTATING_CONTRACTS, MARKET, IMPORTS } from '../data/tradePost.js';
 import { storageLimit } from './Granary.js';
 
@@ -73,7 +74,7 @@ export function priceMultiplier(state, resource) {
 }
 
 export function contractPrice(state, contract) {
-  return Math.max(1, Math.round(contract.gold * priceMultiplier(state, contract.resource)));
+  return Math.max(1, Math.round(contract.gold * priceMultiplier(state, contract.resource) * doctrineContractMultiplier(state))); // (28.4) Ticaret Doktrini
 }
 
 export function shipDocked(state) {
