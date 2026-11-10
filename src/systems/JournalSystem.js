@@ -153,6 +153,7 @@ export class JournalSystem {
       on('apprentice:crafted', ({ character, item }) => {
         if (character.apprenticeship?.crafted === 1) this.log(`Çırak ${character.name} ilk çırak işini çıkardı: ${ITEMS[item].name}`, 'sparkle');
       }),
+      on('apprentice:grandmaster', ({ character, profession }) => this.log(`${character.name} Başusta ${PROFESSIONS[profession].master} oldu: çıraklığını kusursuz bitirdi`, 'star')),
       on('apprentice:graduated', ({ character, profession, title, progress }) =>
         this.log(
           title

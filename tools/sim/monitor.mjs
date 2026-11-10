@@ -606,6 +606,7 @@ export async function installMonitor(page) {
                 active: s.characters.filter((c) => c.apprenticeship).length,
                 maxActive: m.maxApprentices ?? 0,
                 list: s.characters.filter((c) => c.apprenticeship).map((c) => `${c.name}:${c.apprenticeship.profession}:%${Math.floor(c.apprenticeship.progress)}`),
+                grandmasters: s.characters.filter((c) => c.isGrandmaster).map((c) => `${c.name}:${c.grandmasterProfession}:${c.grandmasterBatches}`), // (28.2)
                 orphanSamples: m.orphanSamples ?? 0,
                 adultApprentices: m.adultApprentices ?? 0,
                 state: { ...s.apprenticeship, open: undefined },

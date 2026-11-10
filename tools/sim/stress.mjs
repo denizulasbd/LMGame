@@ -130,7 +130,7 @@ console.log(
 const ap = (f) => sum((d) => (d.monitor.apprentice ? f(d.monitor.apprentice) : 0));
 console.log(
   `(25.2) çıraklık: açık kapı ${ap((p) => p.open)} · son gün çırak ${ap((p) => p.active)} (en çok toplam ${ap((p) => p.maxActive)}) · yazılan ${ap((p) => p.state.enrolled)}, mezun ${ap((p) => p.state.graduated)} · ` +
-    `Gururlu Usta ${ap((p) => p.state.masters)} · çırak mesaisi ${Math.round(ap((p) => p.state.minutes) / 60)} sa · çırak işi ${ap((p) => p.state.crafted)} (satılan ${ap((p) => p.state.sold)}) · yetişkin çırak ${ap((p) => p.adultApprentices)}`
+    `Gururlu Usta ${ap((p) => p.state.masters)} · çırak mesaisi ${Math.round(ap((p) => p.state.minutes) / 60)} sa · çırak işi ${ap((p) => p.state.crafted)} (satılan ${ap((p) => p.state.sold)}) · yetişkin çırak ${ap((p) => p.adultApprentices)} · (28.2) Başusta ${ap((p) => p.grandmasters.length)} (mezun %${Math.round((100 * ap((p) => p.grandmasters.length)) / Math.max(1, ap((p) => p.state.graduated)))}), hammaddesiz üretim ${ap((p) => p.state.grandmasterSaved ?? 0)}`
 );
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

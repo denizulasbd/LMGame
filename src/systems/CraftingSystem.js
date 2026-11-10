@@ -14,6 +14,7 @@
 //            tarifiyle (fallbackCost) üretilir; üreten yapı varsa zanaatkâr malzemeyi bekler. Tezgâhtaki işin
 //            hangi tarifle yapıldığı building.craft.recipe'tedir ('material' | 'fallback').
 // Ekipmanın etkileri src/systems/Equipment.js'teki saf yardımcılarla hesaplanır.
+import { grandmasterFreeDue, grandmasterCommit } from './Grandmaster.js';
 import { gearsNeeded } from './GoldenAge.js';
 import { CLOCK_GEAR } from '../data/goldenAge.js';
 import { EQUIPMENT, EQUIPMENT_KEYS, CRAFTING, CRAFT_MODES } from '../data/equipment.js';
@@ -167,12 +168,17 @@ export class CraftingSystem {
    * Zanaatkârın çalışması (BehaviorSystem çağırır): tezgâh boşsa sıradaki ekipmanın malzemesini
    * harcayıp başlar, iş bitince ekipman depoya girer. Yapacak iş kalmadıysa false (zanaatkâr ayrılır).
    */
-  work(building, amount) {
+  work(building, amount, worker = null) {
     if (!building.craft) {
       const { item, recipe } = this.chooseItem(building);
-      if (!item || !this.economy.spend(recipe.cost)) return false;
+      // (28.2) Başusta kendi atölyesinde her 5. işi hammaddesiz başlatır (yine de tarif karşılanabilir olmalı: kaynak bulunmayan kasabada Başusta icat etmez)
+      const free = Boolean(item) && grandmasterFreeDue(worker, building);
+      if (!item || (!free && !this.economy.spend(recipe.cost))) return false;
       building.craft = { item, progress: 0, recipe: recipe.kind };
-      this.saveIron(recipe.cost.iron ?? 0);
+      if (grandmasterCommit(worker, building, free)) {
+        this.state.apprenticeship.grandmasterSaved = (this.state.apprenticeship.grandmasterSaved ?? 0) + 1;
+        this.events.emit('grandmaster:saved', { character: worker, building });
+      } else this.saveIron(recipe.cost.iron ?? 0);
     }
     building.craft.progress += amount;
     const item = building.craft.item;

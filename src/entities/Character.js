@@ -14,6 +14,7 @@
 // ve konuşma baloncuğu (speech: { text, at, duration }; kaydedilmez, ikon balonundan ayrı bir katmandır).
 // 25.4: Aile Kütüğü (generation, parents: doğum ebeveynleri, familyId: ocak, children; LineageSystem).
 // 22. aşama: köyü terk etmeye karar verdiyse yola çıktığı an ve çıkış karosu (emigrating: { since, exit }; DesertionSystem).
+import { PROFESSIONS } from '../data/apprenticeship.js';
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { NEED_KEYS } from '../data/characters.js';
@@ -106,6 +107,9 @@ export class Character extends Entity {
     ageInDays = null,
     agedDays = 0,
     apprenticeship = null,
+    isGrandmaster = false,
+    grandmasterProfession = null,
+    grandmasterBatches = 0,
     quirkOrigin = null,
     generation = null,
     parents = null,
@@ -173,6 +177,10 @@ export class Character extends Entity {
     this.speech = null; // usta / çırak konuşma baloncuğu (kaydedilmez)
     // 25.3: huyun kaynağı (Aile mirası / Usta etkisi / Mesleğin doğası / Özgün gelişim; kayda girer)
     this.quirkOrigin = sanitizeOrigin(quirkOrigin);
+    // (28.2) Başusta: çıraklığı %100 bitirenin kalıcı unvanı (grandmasterProfession = çıraklık yapısı türü); batches: hammaddesiz üretim sayacı
+    this.isGrandmaster = Boolean(isGrandmaster) && PROFESSIONS[grandmasterProfession] !== undefined;
+    this.grandmasterProfession = this.isGrandmaster ? grandmasterProfession : null;
+    this.grandmasterBatches = this.isGrandmaster ? Math.max(0, Math.floor(Number(grandmasterBatches) || 0)) : 0;
     // 25.4: Aile Kütüğü (kayda girer; eksikse LineageSystem yüklemede tamamlar): kuşak, doğum ebeveynleri, ocak, çocuklar
     this.generation = Number.isInteger(generation) && generation >= 1 ? generation : null;
     this.parents = Array.isArray(parents) ? parents.filter((id) => Number.isFinite(id) && id !== this.id) : [...this.parentIds];
@@ -578,6 +586,9 @@ export class Character extends Entity {
       agedDays: this.agedDays,
       apprenticeship: this.apprenticeship,
       quirkOrigin: this.quirkOrigin,
+      isGrandmaster: this.isGrandmaster,
+      grandmasterProfession: this.grandmasterProfession,
+      grandmasterBatches: this.grandmasterBatches,
       generation: this.generation,
       parents: this.parents,
       familyId: this.familyId,

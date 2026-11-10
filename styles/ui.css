@@ -383,6 +383,13 @@
   box-shadow: inset -2px -2px 0 #e0a030, inset 2px 2px 0 var(--ui-card-hi), 0 0 0 1px var(--ui-card-hi);
 }
 
+/* (28.2) Başusta rozeti: altın-mor */
+.craft-badge.is-grandmaster {
+  background: linear-gradient(135deg, #ffd23f 0%, #b58cf0 100%);
+  color: var(--ui-ink-dark);
+  box-shadow: inset -2px -2px 0 #7a4fc0, inset 2px 2px 0 var(--ui-card-hi), 0 0 0 1px #ffd23f;
+}
+
 .trait-chip {
   font-size: 12px;
   font-weight: 600;

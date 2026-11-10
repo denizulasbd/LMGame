@@ -61,6 +61,7 @@ import { VINE } from '../data/exploration.js';
 import { ITEMS } from '../data/citizens.js';
 import { productionOf, cropOf } from './Granary.js';
 import { CROPS, DEFAULT_CROP } from '../data/crops.js';
+import { grandmasterFreeDue, grandmasterCommit } from './Grandmaster.js';
 import { INN_SHERBET } from '../data/refinery.js';
 import { PROFESSIONS } from '../data/apprenticeship.js';
 import { TEMPERAMENT } from '../data/temperament.js';
@@ -683,14 +684,14 @@ export class BehaviorSystem {
       return true;
     }
     if (building.definition.crafting) {
-      const working = this.crafting.work(building, amount);
+      const working = this.crafting.work(building, amount, c);
       if (working) c.activityLabel = this.performLabel(c, task, ACTIVITIES[task.activity]);
       return working;
     }
     // (24.2) Lüks atölye boşa düştüyse (kasaba açlıkta, malzeme yok) dokumacı / mahzen ustası işi bırakıp gıdaya döner
     if (building.definition.luxury && building.idle) return false;
     // (13. aşama) Güneş Saati Küresi üretim ve işleme yapılarında verimi artırır
-    if (building.definition.processing) return this.process(building, amount * relicProductionMultiplier(this.state) * (building.type === 'mill' ? schemeBakeMultiplier(this.state) : 1));
+    if (building.definition.processing) return this.process(building, amount * relicProductionMultiplier(this.state) * (building.type === 'mill' ? schemeBakeMultiplier(this.state) : 1), c);
     const production = productionOf(building); // (24. aşama) bahçede seçili mahsulün ürünü ve verimi
     if (!production) return false;
     // Verim (oduncu için çevredeki ağaç sayısı) StructureSystem'de hesaplanır; Bereket Boynuzu yiyeceği artırır
@@ -783,15 +784,18 @@ export class BehaviorSystem {
    * İşleme (değirmen-fırın): saatte perHour kez stoktan malzemeyi (1 yiyecek) alıp ürünü (1 ekmek) üretir.
    * Malzeme biter ya da ürünün deposu dolarsa iş biter (fırıncı başka işe geçer; yapı boşta kalır).
    */
-  process(building, amount) {
+  process(building, amount, worker = null) {
     const processing = building.definition.processing;
     building.productionBuffer += (processing.perHour / 60) * amount;
     while (building.productionBuffer >= 1) {
       const room = Object.keys(processing.output).every((r) => this.economy.room(r) > 0);
-      if (!room || !this.economy.spend(processing.input)) {
+      // (28.2) Başusta kendi mesleğinin yapısında her 5. üretimi hammaddesiz yapar (deterministik sayaç)
+      const free = room && grandmasterFreeDue(worker, building);
+      if (!room || (!free && !this.economy.spend(processing.input))) {
         building.productionBuffer = 0;
         return false;
       }
+      if (grandmasterCommit(worker, building, free)) this.noteGrandmasterSaved(worker, building);
       building.productionBuffer -= 1;
       for (const [resource, value] of Object.entries(processing.output)) {
         building.producedToday += this.economy.produce(resource, value, building);
@@ -799,6 +803,13 @@ export class BehaviorSystem {
       this.events.emit('processing:made', { building });
     }
     return true;
+  }
+
+  /** (28.2) Başustanın hammaddesiz üretimini sayar ve olay yayar. */
+  noteGrandmasterSaved(worker, building) {
+    this.state.apprenticeship.grandmasterSaved = (this.state.apprenticeship.grandmasterSaved ?? 0) + 1;
+    if (worker.visible) worker.showBubble('sparkle', 1.6);
+    this.events.emit('grandmaster:saved', { character: worker, building });
   }
 
   /**

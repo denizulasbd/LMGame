@@ -17,6 +17,22 @@ const SLOT_KEYS = {
  * türe çevrilir; kurulmuş ya da yarım kalmış lambalar yüklenince Sokak Feneri olarak çalışır.
  */
 function migrate(data) {
+  // (28.2) v32 -> v33: sakinlere Başusta alanları (hiçbiri Başusta değil), çıraklık sayaçlarına grandmasters / grandmasterSaved
+  if (data.version < 33) {
+    if (Array.isArray(data.characters)) {
+      for (const c of data.characters) {
+        if (c && typeof c === 'object') {
+          c.isGrandmaster = false;
+          c.grandmasterProfession = null;
+          c.grandmasterBatches = 0;
+        }
+      }
+    }
+    if (data.apprenticeship && typeof data.apprenticeship === 'object') {
+      data.apprenticeship.grandmasters = 0;
+      data.apprenticeship.grandmasterSaved = 0;
+    }
+  }
   // (28.1) v31 -> v32: yangınlara Acil Seferberlik bayrağı, vergiye Vergi Fermanı kilidi (alanlar eksikse güvenle eklenir)
   if (data.version < 32) {
     if (Array.isArray(data.buildings)) {

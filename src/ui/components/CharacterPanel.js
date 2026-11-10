@@ -41,7 +41,8 @@ import { inventoryCapacity, petitionOf, isRioter, raidOf } from '../../systems/C
 import { petitionProgress, grantStatus, formatRemaining } from '../../systems/Petitions.js';
 import { INJURY } from '../../data/crisis.js';
 import { LIFE_STAGES, AGING } from '../../data/lifeStages.js';
-import { PROFESSIONS, PROUD_MASTER } from '../../data/apprenticeship.js';
+import { PROFESSIONS, PROUD_MASTER, GRANDMASTER } from '../../data/apprenticeship.js';
+import { grandmasterTitle } from '../../systems/Grandmaster.js';
 import { apprenticesOf, graduationFor, acceptsApprentice, apprenticeStatus } from '../../systems/Apprenticeship.js';
 import { ORIGIN_NAMES } from '../../data/temperament.js';
 import { generationName } from '../../systems/Lineage.js';
@@ -614,11 +615,20 @@ export class CharacterPanel {
   /** (15. aşama) Ana mesleğin zanaat rozeti: "Usta Madenci" altın, "Kalfa Fırıncı" gümüş, "Çırak Oduncu" bronz. */
   renderBadge(character) {
     const main = character.isChild ? null : primarySkill(character);
-    const key = main ? `${main.skill}:${main.level.level}` : '';
+    const gmTitle = grandmasterTitle(character); // (28.2) "Başusta Demirci"
+    const key = main ? `${main.skill}:${main.level.level}:${gmTitle ?? ''}` : '';
     if (key === this.lastBadge) return;
     this.lastBadge = key;
     this.craftBadge.hidden = !main;
     if (!main) return;
+    if (gmTitle) {
+      // (28.2) Başusta: altın-mor rozet, yıldız ikonu
+      this.craftBadge.className = 'craft-badge is-grandmaster';
+      this.badgeIcon.src = getAnyIconURL('star');
+      this.badgeText.textContent = gmTitle;
+      this.craftBadge.title = `Başusta: çıraklığını %100 ile tamamladı · usta işi eser şansı 2 kat, her ${GRANDMASTER.saveEvery}. üretimde hammadde harcamaz (${PROFESSIONS[character.grandmasterProfession].name})`;
+      return;
+    }
     const badge = CRAFT_BADGES[main.level.level];
     const kit = OUTFIT_KITS[main.skill];
     const wear = main.level.level === 3 ? kit?.master : main.level.level === 2 ? kit?.journeyman : null;

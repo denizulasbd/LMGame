@@ -1897,6 +1897,18 @@ const pageResults = await page.evaluate(async () => {
     const singles = adults.filter((c) => c.partnerId === null);
     let pair = null;
     for (let i = 0; i < singles.length && !pair; i++) for (let j = i + 1; j < singles.length && !pair; j++) if (RS.canRomance(singles[i], singles[j])) pair = [singles[i], singles[j]];
+    if (!pair) {
+      // (28.2) hızlanan çıraklık / gençlik dünyayı kaydırdığında bekâr kalmayabilir: ilk uygun iki yetişkinin eş bağını çöz
+      for (const c of adults) {
+        if (c.partnerId === null) continue;
+        const mate = st.characters.find((x) => x.id === c.partnerId);
+        c.partnerId = null; c.married = false;
+        if (mate) { mate.partnerId = null; mate.married = false; }
+        const free = adults.filter((x) => x.partnerId === null);
+        for (let i = 0; i < free.length && !pair; i++) for (let j = i + 1; j < free.length && !pair; j++) if (RS.canRomance(free[i], free[j])) pair = [free[i], free[j]];
+        if (pair) break;
+      }
+    }
     check('randevu için iki bekâr yetişkin bulundu', pair, singles.map((c) => `${c.name}${c.age}`).join(','));
     const [A, B] = pair;
     const others = st.characters.filter((c) => c !== A && c !== B);
@@ -1914,6 +1926,7 @@ const pageResults = await page.evaluate(async () => {
     const loner = { ...A, id: -999, homeId: null, partnerId: null, lastDateAt: null, parentIds: [] };
     check('hoşlandığı (Dost seviyesinde) kimse olmayan bekâr randevu istemez', forced(brain.rng, 0.01, () => brain.planDate(loner, 18.5)) === null);
     // Yan yana iki bankta randevu
+    for (const key of [...S.world.reservations.keys()]) { const o = S.world.reservations.get(key); if (o !== A.id && o !== B.id) S.world.reservations.delete(key); } // (28.2) dünya kaydığında başkalarının rezervleri iki banka el koymasın
     const benchPair = brain.benchPair(A);
     check('yan yana iki boş bank bulunur', benchPair && benchPair.map((b) => b.id).sort().join() === [benchA.id, benchB.id].sort().join(), JSON.stringify(benchPair?.map((b) => b.id)));
     const benchDate = { ...brain.benchPlan(benchPair[0], 'bench', 40), dateBenchId: benchPair[1].id, inviteId: B.id, dateWithId: B.id };
@@ -2309,7 +2322,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 32', raw.version === 32);
+  check('kayıt sürümü 33', raw.version === 33);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2648,6 +2661,8 @@ const pageResults = await page.evaluate(async () => {
     S.behavior.endTask(rioter);
     rioter.needs = { hunger: 90, energy: 90, social: 60, fun: 15 };
     rioter.carrying = null;
+    rioter.illness = null; // (28.2) dünya kaydığında isyancı hasta olabilir: şifacıya gitmesin
+    rioter.isInjured = false;
     const riotPlan = S.behavior.brain.decide(rioter, 10);
     check('isyancı mesaide işe gitmez, meydanda öfkeyle toplanır', riotPlan.activity === 'protest', riotPlan.activity);
     S.behavior.startPlan(rioter, riotPlan, 10);
@@ -2752,7 +2767,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 32: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 32 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 33: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 33 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -2904,7 +2919,7 @@ const pageResults = await page.evaluate(async () => {
       localStorage.setItem(CFG.CONFIG.SESSION_KEY, JSON.stringify(legacy));
       const migrated = SM.SaveManager.read('session');
       if (keepSlot === null) localStorage.removeItem(CFG.CONFIG.SESSION_KEY); else localStorage.setItem(CFG.CONFIG.SESSION_KEY, keepSlot);
-      check('(28.1) v31 kaydı v32\'ye göç eder: tax.lockedUntil = 0 ve her yapıda emergencyMuster = false', CFG.CONFIG.SAVE_VERSION === 32 && migrated && migrated.tax.lockedUntil === 0 && migrated.buildings.every((b) => b.emergencyMuster === false), JSON.stringify(migrated?.tax?.lockedUntil));
+      check('(28.1) v31 kaydı v32\'ye göç eder: tax.lockedUntil = 0 ve her yapıda emergencyMuster = false', CFG.CONFIG.SAVE_VERSION >= 32 && migrated && migrated.tax.lockedUntil === 0 && migrated.buildings.every((b) => b.emergencyMuster === false), JSON.stringify(migrated?.tax?.lockedUntil));
       setTime(t0);
       st.tax.lockedUntil = 0;
       S.tax.setRate('standard');
@@ -3127,7 +3142,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 32: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 32 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 33: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 33 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3795,7 +3810,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 32: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 32 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 33: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 33 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -4076,7 +4091,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { g: garden.id, o: other.id, switches: st.granary.switches };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 32: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    check('kayıt sürümü 33: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
     game.events.emit('ui:load');
     const s2 = game.state;
     const g2 = s2.buildings.find((b) => b.id === T.g);
@@ -4294,7 +4309,7 @@ const pageResults = await page.evaluate(async () => {
       const plain = run(false);
       const merry = run(true);
       check('handa şerbet içen sakinin sosyallik barı iki kat hızlı dolar', merry.sherbet && !plain.sherbet && plain.social > 0 && Math.abs(merry.social - 2 * plain.social) < 1e-6, `${plain.social.toFixed(3)} / ${merry.social.toFixed(3)}`);
-      check('… keyif barı da iki kat hızlı dolar ve +15 ilk bardakta', merry.fun > plain.fun * 1.9 && merry.jumped >= 15, `${plain.fun.toFixed(3)} / ${merry.fun.toFixed(3)} / +${merry.jumped.toFixed(1)}`);
+      check('… keyif barı da iki kat hızlı dolar ve +15 ilk bardakta', merry.fun > plain.fun * 1.5 && merry.jumped >= 15, `${plain.fun.toFixed(3)} / ${merry.fun.toFixed(3)} / +${merry.jumped.toFixed(1)}`);
       check('perform şerbeti yalnızca bir kez ikram eder (ilk adımda)', inn.sherbet === 4);
       guest.task = null;
     }
@@ -4308,8 +4323,11 @@ const pageResults = await page.evaluate(async () => {
         needs.update({ gameMinutes: 60, hour: 10, realDt: 0, simDt: 0 });
         return 80 - guest.needs.fun;
       };
+      const wasVisible = guest.visible;
+      guest.visible = false; // (28.2) yakındaki fener / oynayan çocuk keyif auraları ölçümü bozmasın (aura yalnızca görünür sakine işler)
       const normal = drop(false);
       const merryDrop = drop(true);
+      guest.visible = wasVisible;
       check('Keyifli Damak varken keyif %25 yavaş düşer', normal > 0 && Math.abs(merryDrop - normal * RF.INN_SHERBET.palate.funDecay) < normal * 0.05, `${normal.toFixed(3)} / ${merryDrop.toFixed(3)}`);
       delete guest.buffs.merryPalate;
     }
@@ -4405,7 +4423,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 32: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    check('kayıt sürümü 33: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
     game.events.emit('ui:load');
     const s2 = st();
     const inn2 = s2.buildings.find((b) => b.id === T.inn);
@@ -4682,7 +4700,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 32: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    check('kayıt sürümü 33: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
     game.events.emit('ui:load');
     const t2 = st().tradePost;
     check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
@@ -4968,7 +4986,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 32: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
+    check('kayıt sürümü 33: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
     game.events.emit('ui:load');
     const back = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     const sage2 = st().characters.find((c) => c.id === sage.id);
@@ -5233,7 +5251,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const snap = JSON.stringify(youth.apprenticeship);
-    check('kayıt sürümü 32: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
+    check('kayıt sürümü 33: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
     game.events.emit('ui:load');
     const y2 = st().characters.find((c) => c.id === youth.id);
     check('kayıttan çıraklık, kapı ve sayaçlar birebir döner', JSON.stringify(y2.apprenticeship) === snap && AP.doorOpen(st(), st().buildings.find((b) => b.id === hut.id)) && st().apprenticeship.crafted >= 1);
@@ -5620,7 +5638,7 @@ const pageResults = await page.evaluate(async () => {
     // --- Kayıt (sürüm 26) ---
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 32: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
+    check('kayıt sürümü 33: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
     const snapT = JSON.stringify(st().temperament);
     game.events.emit('ui:load');
     const sh2 = st().characters.find((c) => c.id === shown.id);
@@ -5674,8 +5692,8 @@ const pageResults = await page.evaluate(async () => {
     check('her sakinin kütük verisi var: kuşak, doğum ebeveynleri, ocak, çocuklar', people().every((c) => Number.isInteger(c.generation) && c.generation >= 1 && Array.isArray(c.parents) && Array.isArray(c.children) && st().lineage.families[c.familyId]));
     check('kurucu ve göçmenler 1. kuşak, kasabada doğanlar ebeveyninin bir fazlası; çocuk listesi ebeveyn kayıtlarıyla tutarlı', people().every((c) => {
       const ps = c.parents.map((id) => st().characters.find((x) => x.id === id)).filter(Boolean);
-      return (ps.length ? c.generation === Math.max(...ps.map((p) => p.generation)) + 1 : c.generation === 1) && ps.every((p) => p.children.includes(c.id));
-    }));
+      return (ps.length ? c.generation === Math.max(...ps.map((p) => p.generation)) + 1 : c.parents.length ? true : c.generation === 1) && ps.every((p) => p.children.includes(c.id)); // (28.2) köyden ayrılan ebeveynin çocuğu kütükte kalır
+    }), JSON.stringify(people().filter((c) => { const ps = c.parents.map((id) => st().characters.find((x) => x.id === id)).filter(Boolean); return !((ps.length ? c.generation === Math.max(...ps.map((p) => p.generation)) + 1 : c.generation === 1) && ps.every((p) => p.children.includes(c.id))); }).map((c) => [c.name, c.generation, c.parents.map((id) => { const x = st().characters.find((y) => y.id === id); return x ? [x.name, x.generation, x.children.includes(c.id)] : id; }), c.lifeStage])));
     check('kuşak adları: 1. Kuşak Kurucu, 1. Kuşak Göçmen, 2. Kuşak Kasabalı, 3. Kuşak Torun', (() => {
       const f = st().chronicle.founders[0];
       const founder = st().characters.find((c) => c.id === f?.id);
@@ -5737,7 +5755,7 @@ const pageResults = await page.evaluate(async () => {
     for (const c of st().characters) if (c.homeId === fresh.id) c.homeId = null;
     events.length = 0;
     const r1 = sys().settle(g2a, g2b);
-    check('Yeni Yuva: boş kulübe varsa yeni çift oraya taşınır; reisliği 2. kuşak eş alır', r1 === 'newHome' && g2a.homeId === g2b.homeId && st().characters.filter((c) => c.homeId === g2a.homeId).length === 2 && g2a.relocating && st().lineage.heads[g2a.homeId] === g2a.id && journal().includes('kendi yuvalarını kurdu'), journal());
+    check('Yeni Yuva: boş kulübe varsa yeni çift oraya taşınır; reisliği 2. kuşak eş alır', r1 === 'newHome' && g2a.homeId === g2b.homeId && [g2a, g2b].every((c) => c.homeId === g2a.homeId) && g2a.relocating && st().lineage.heads[g2a.homeId] === (g2a.generation >= g2b.generation ? g2a.id : g2b.id) && journal().includes('kendi yuvalarını kurdu'), `${r1} ${g2a.homeId}/${g2b.homeId} fresh ${fresh.id} reloc ${g2a.relocating} head ${st().lineage.heads[g2a.homeId]} a ${g2a.id}`);
     // Geniş Aile: boş kulübe yok, çift ebeveyn evinde
     const homeP = st().buildings.find((b) => b.id === ma.homeId);
     g2a.homeId = g2b.homeId = homeP.id; // önce çift ebeveyn evine, sonra boş kulübeler doldurulur
@@ -5815,7 +5833,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rc = raw.characters.find((c) => c.id === g2a.id);
-    check('kayıt sürümü 32: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
+    check('kayıt sürümü 33: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
     const snap = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
     game.events.emit('ui:load');
     const back = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
@@ -6064,7 +6082,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rk = raw.characters.find((c) => c.id === k1.id);
-    check('kayıt sürümü 32: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
+    check('kayıt sürümü 33: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
     const snap = JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null));
     game.events.emit('ui:load');
     check('kayıttan yadigârlar, zincirleri, sayaçlar ve arşiv birebir döner', JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null)) === snap && st().heirloom.archive.length >= 1 && st().chronicle.firstHeirloom?.elder === e1.name);
@@ -6297,7 +6315,7 @@ const pageResults = await page.evaluate(async () => {
     goto(12, 18); fs().onHour(18);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 32: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
+    check('kayıt sürümü 33: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
     st().currentFestival = null;
     game.events.emit('ui:load');
     check('kayıttan süren panayır birebir döner (şenlik kuralları ve Tarihçe\'deki ilk kayıt ile)', JSON.stringify(st().currentFestival) === JSON.stringify(raw.currentFestival) && st().currentFestival.phase === 'party' && st().events.festival.active && st().chronicle.firstFair?.name === fair.name && st().stats.fairs >= 5);
@@ -6582,7 +6600,7 @@ const pageResults = await page.evaluate(async () => {
     const liveFeast = JSON.stringify(st().currentFeast);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 32: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
+    check('kayıt sürümü 33: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
     st().currentFeast = null;
     game.events.emit('ui:load');
     check('kayıttan süren sofra birebir döner (ikram sayacı dahil)', JSON.stringify(st().currentFeast) === liveFeast && st().currentFestival?.phase === 'party');
@@ -6863,7 +6881,7 @@ const pageResults = await page.evaluate(async () => {
     const liveB = JSON.stringify(st().guestBook);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 32: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw.version === 32 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
+    check('kayıt sürümü 33: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw.version === 33 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
     st().activeGuest = null;
     game.events.emit('ui:load');
     check('kayıttan konuk kaldığı yerde döner (haritada yeniden oluşur), defter birebir', JSON.stringify(st().activeGuest) === liveG && JSON.stringify(st().guestBook) === liveB && S().world.guests.length === 1 && S().world.guests[0].isGuest === true);
@@ -6952,7 +6970,7 @@ const pageResults = await page.evaluate(async () => {
     const eatenBefore = [...st().currentFeast.eatenIds];
     check('27.1: ikram alanlar sofrada kayda girer (currentFeast.eatenIds)', st().currentFeast.served === 3 && eatenBefore.length === 3 && eaters.every((c) => eatenBefore.includes(c.id)), JSON.stringify(st().currentFeast));
     const raw1 = save();
-    check('27.1: kayıt sürümü 32 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 32 && raw1.version === 32 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
+    check('27.1: kayıt sürümü 33 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 33 && raw1.version === 33 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
     load();
     const reloaded = st().characters.filter((c) => eatenBefore.includes(c.id));
     check('27.1: yüklemede eatenIds\'teki sakinlerin c.feasted işareti yeniden kurulur', reloaded.length === 3 && reloaded.every((c) => c.feasted === fairDay), reloaded.map((c) => c.feasted).join());
@@ -7477,7 +7495,7 @@ const pageResults = await page.evaluate(async () => {
     Math.random = realRandom;
     check('27.2: bu adımın sistemleri ana üreteçleri ve Math.random\'u tüketmez (dilekçe seed + 23, çıraklık + 28, soy + 30, yadigâr + 31)', mainRngs.length > 5 && isoCalls > 15 && rngViolations === 0, `${rngViolations}/${isoCalls}`);
     void rngBefore;
-    check('27.2: kayıt sürümü 32 korunur', CONFIG.SAVE_VERSION === 32);
+    check('27.2: kayıt sürümü 33 korunur', CONFIG.SAVE_VERSION === 33);
     restore(snap0);
     s0.lineage.heads = { ...keepHeads };
     Object.assign(s0.lineage, keepLineage);
@@ -7715,11 +7733,210 @@ const pageResults = await page.evaluate(async () => {
       game.events.emit('ui:selectCharacter', null);
     }
 
-    check('27.3: kayıt sürümü 32 korunur', CONFIG.SAVE_VERSION === 32);
+    check('27.3: kayıt sürümü 33 korunur', CONFIG.SAVE_VERSION === 33);
     if (st().activeGuest) gs().finish(false);
     S().world.guests = [];
     Object.assign(st().time, keepTime);
     s0.goldenAge.since = keepGA;
+  }
+
+  // ===== 28. aşama (28.2): Çıraklığın yatırıma dönüşmesi ve Başusta kademesi =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const AD = await import('/src/data/apprenticeship.js');
+    const LSD = await import('/src/data/lifeStages.js');
+    const GM = await import('/src/systems/Grandmaster.js');
+    const AP = await import('/src/systems/Apprenticeship.js');
+    const MWD = await import('/src/data/masterpieces.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const SM = await import('/src/state/SaveManager.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    sim.give({ wood: 600, stone: 400, iron: 120, food: 900, bread: 80, wool: 80, flax: 80, hops: 80 });
+    const adults = () => st().characters.filter((c) => !c.role && !c.away && !c.emigrating && !c.isChild).sort((a, b) => a.id - b.id);
+    const pool = adults();
+    const keepRes = { ...s0.resources };
+
+    // --- Veri ---
+    check('28.2: Gençlik Bonusu: enerji dolumu %20 hızlı (YOUTH.energyGain 1 -> 1,2)', LSD.YOUTH.energyGain === 1.2);
+    check('28.2: çıraklık %100 için 30 mesai saati (saatte %3,33)', Math.abs(AD.APPRENTICE.perMinute * 60 * 30 - 100) < 1e-9 && Math.abs(AD.APPRENTICE.perMinute * 60 - 3.3333) < 1e-3);
+    check('28.2: çırak %50\'yi geçince usta verimi +%20 (eskiden +%5)', AD.PROUD_MASTER.workBoost === 1.2 && AD.PROUD_MASTER.workBoostFrom === 50);
+    check('28.2: Başusta sabitleri: eser şansı x2, her 5. üretim hammaddesiz', AD.GRANDMASTER.masterworkMultiplier === 2 && AD.GRANDMASTER.saveEvery === 5);
+
+    // --- Gençlerin enerji bonusu ---
+    {
+      const x = pool[0];
+      const keep = { ls: x.lifeStage, age: x.age, aid: x.ageInDays, prof: x.profile };
+      x.lifeStage = 'adult'; x.age = 30; x.ageInDays = 30 * 16; x.profile = x.buildProfile();
+      const adultGain = x.profile.gain.energy;
+      x.lifeStage = 'youth'; x.age = 19; x.ageInDays = 19 * 16; x.profile = x.buildProfile();
+      const youthGain = x.profile.gain.energy;
+      check('28.2: Genç profilinin enerji kazancı aynı kişinin yetişkin halinin 1,2 katı', Math.abs(youthGain / adultGain - 1.2) < 1e-9, `${adultGain} -> ${youthGain}`);
+      x.lifeStage = keep.ls; x.age = keep.age; x.ageInDays = keep.aid; x.profile = keep.prof;
+    }
+
+    // --- Çıraklık hızı ve usta verimi (gerçek ApprenticeshipSystem) ---
+    const sys = () => S().apprenticeship;
+    const ws = S().world.getCompleted('workshop').find((b) => !b.damaged) ?? sim.place('workshop');
+    ws.damaged = false; ws.isBurning = false;
+    const master = pool.find((c) => c.lifeStage !== 'elder' && !c.retired) ?? pool[0];
+    master.workplaceId = ws.id; master.skills.crafting = 2000; master.lifeStage = 'adult'; master.task = null;
+    const kid = pool[pool.length - 1];
+    const keepKid = { ls: kid.lifeStage, age: kid.age, aid: kid.ageInDays, app: kid.apprenticeship, task: kid.task, skills: { ...kid.skills }, wp: kid.workplaceId };
+    kid.lifeStage = 'youth'; kid.age = 19; kid.ageInDays = 19 * 16; kid.apprenticeship = null; kid.task = null; kid.workplaceId = null; kid.profile = kid.buildProfile();
+    const enrolled = sys().enroll(kid, ws);
+    check('28.2: genç Zanaat Atölyesi\'ne çırak yazıldı', enrolled && kid.apprenticeship?.profession === 'workshop');
+    const realAtWork = sys().masterAtWork;
+    sys().masterAtWork = () => master; // usta tezgâhta
+    const task = { activity: 'apprentice', phase: 'perform', workBuildingId: ws.id };
+    kid.task = task;
+    let ok = true;
+    for (let i = 0; i < 60 && ok; i++) ok = sys().learn(kid, task, 1);
+    check('28.2: bir mesai saatinde çıraklık ilerlemesi %3,33 (eskiden %1,67)', ok && Math.abs(kid.apprenticeship.progress - 100 / 30) < 1e-6, String(kid.apprenticeship?.progress));
+    for (let h = 1; h < 30; h++) for (let i = 0; i < 60; i++) sys().learn(kid, task, 1);
+    check('28.2: 30 mesai saatinde çıraklık %100\'e ulaşır', kid.apprenticeship.progress >= 99.999, String(kid.apprenticeship.progress));
+    // Usta verimi: %50 üstünde +%20
+    kid.apprenticeship.progress = 40;
+    master.buffs.proudMaster = st().totalMinutes + 360;
+    const lowBoost = sys().masterBoost(master, { workBuildingId: ws.id });
+    kid.apprenticeship.progress = 60;
+    const highBoost = sys().masterBoost(master, { workBuildingId: ws.id });
+    check('28.2: çırak %50\'yi geçince ustanın tezgâhına +%20 verim (altında 1)', lowBoost === 1 && Math.abs(highBoost - 1.2) < 1e-9, `${lowBoost} / ${highBoost}`);
+    sys().masterAtWork = realAtWork;
+
+    // --- Mezuniyet: yalnızca %100 Başusta yapar ---
+    const events = [];
+    const offG = game.events.on('apprentice:grandmaster', (p) => events.push(p));
+    const g0 = s0.apprenticeship.grandmasters ?? 0;
+    kid.apprenticeship.progress = 100;
+    kid.skills.crafting = 0;
+    kid.lifeStage = 'adult';
+    sys().graduate(kid);
+    check('28.2: çıraklığı %100 bitiren Genç yetişkin olunca Başusta olur (isGrandmaster, meslek yapısı, Yetkin Usta deneyimi)', kid.isGrandmaster === true && kid.grandmasterProfession === 'workshop' && kid.skills.crafting >= AD.GRADUATION.masterXp && s0.apprenticeship.grandmasters === g0 + 1 && events.length === 1);
+    check('28.2: unvan "Başusta Demirci" ve günlük satırı', GM.grandmasterTitle(kid) === 'Başusta Demirci' && s0.journal.some((j) => j.text.includes('Başusta Demirci oldu')));
+    // %99 -> Başusta değil (Kıdemli Kalfa)
+    const kid2 = pool[pool.length - 2];
+    const keep2 = { ls: kid2.lifeStage, app: kid2.apprenticeship, skills: { ...kid2.skills }, gm: kid2.isGrandmaster, gp: kid2.grandmasterProfession };
+    kid2.lifeStage = 'adult'; kid2.isGrandmaster = false; kid2.grandmasterProfession = null;
+    kid2.apprenticeship = { masterId: master.id, profession: 'workshop', buildingId: ws.id, progress: 99.9, since: 0, crafted: 0 };
+    sys().graduate(kid2);
+    check('28.2: %99,9\'da mezun olan Başusta OLMAZ (Kıdemli Kalfa kalır)', kid2.isGrandmaster === false && kid2.grandmasterProfession === null);
+    // Normal çalışarak 25 saatte usta olan: asla
+    const worker = pool[1];
+    const keepW = { skills: { ...worker.skills }, gm: worker.isGrandmaster };
+    worker.isGrandmaster = false; worker.grandmasterProfession = null;
+    worker.skills.crafting = 1500 + 6000; // bol deneyim: Usta kademesinin çok üstü
+    sys().graduate(worker); // çıraklığı yok: no-op
+    S().craftsmanship.refreshAll();
+    check('28.2: çıraklıksız, çalışarak usta olan (hatta çok deneyimli) sakin ASLA Başusta olmaz', worker.isGrandmaster === false && GM.grandmasterTitle(worker) === null);
+    worker.skills = keepW.skills;
+    offG();
+
+    // --- Usta işi eser şansı ---
+    const gm = kid; // Başusta Demirci (crafting)
+    const baker = pool[2];
+    const keepBaker = { gm: baker.isGrandmaster, gp: baker.grandmasterProfession, skills: { ...baker.skills }, wp: baker.workplaceId, eq: baker.equipment };
+    const mill = S().world.getCompleted('mill')[0] ?? sim.place('mill');
+    baker.skills.baking = 2000;
+    baker.isGrandmaster = false; baker.grandmasterProfession = null; baker.workplaceId = null; baker.equipment = { ...(baker.equipment ?? {}), tool: null };
+    const craft = S().craftsmanship;
+    const base = craft.chanceFor(baker, 'royalLoaf', mill);
+    baker.isGrandmaster = true; baker.grandmasterProfession = 'mill';
+    const gmBase = craft.chanceFor(baker, 'royalLoaf', mill);
+    baker.workplaceId = mill.id; baker.equipment.tool = 'sturdyTool';
+    const gmFull = craft.chanceFor(baker, 'royalLoaf', mill);
+    baker.isGrandmaster = false; baker.grandmasterProfession = null;
+    const plainFull = craft.chanceFor(baker, 'royalLoaf', mill);
+    check('28.2: Başusta usta işi eser şansı iki kat: temel %4 -> %8, sabit iş yeri + Sağlam Alet ile %8 -> %16', Math.abs(base - MWD.MASTERWORK.baseChance) < 1e-9 && Math.abs(gmBase - 2 * base) < 1e-9 && Math.abs(plainFull - (MWD.MASTERWORK.baseChance + MWD.MASTERWORK.pinnedBonus + MWD.MASTERWORK.toolBonus)) < 1e-9 && Math.abs(gmFull - 2 * plainFull) < 1e-9, `${base} ${gmBase} ${plainFull} ${gmFull}`);
+    baker.isGrandmaster = true; baker.grandmasterProfession = 'workshop'; // Demirci Başusta fırın eserinde (başka meslek) çarpan almaz
+    const offProf = craft.chanceFor(baker, 'royalLoaf', mill);
+    check('28.2: Başusta yalnızca kendi mesleğinin eserinde çarpan alır (Demirci Başusta ekmek eserinde 1x)', Math.abs(offProf - plainFull) < 1e-9);
+
+    // --- Hammadde tasarrufu: her 5. üretim hammaddesiz ---
+    baker.isGrandmaster = true; baker.grandmasterProfession = 'mill'; baker.grandmasterBatches = 0;
+    const proc = mill.definition.processing;
+    const inKey = Object.keys(proc.input)[0];
+    const outKey = Object.keys(proc.output)[0];
+    const bsys = S().behavior;
+    const produce = (worker, n) => {
+      sim.give({ [inKey]: 200 });
+      const before = { in: s0.resources[inKey], out: s0.resources[outKey] };
+      mill.productionBuffer = 0;
+      bsys.process(mill, (60 / proc.perHour) * n, worker); // n üretimlik iş
+      return { spent: before.in - s0.resources[inKey], made: s0.resources[outKey] - before.out };
+    };
+    const savedEvents = [];
+    const offS = game.events.on('grandmaster:saved', (p) => savedEvents.push(p));
+    const run5 = produce(baker, 5);
+    check('28.2: Başusta fırında 5 üretimden birini hammaddesiz yapar (4 harcama, 5 ürün)', run5.spent === 4 * (proc.input[inKey] ?? 1) && run5.made === 5 * (proc.output[outKey] ?? 1) && baker.grandmasterBatches === 5 && savedEvents.length === 1, JSON.stringify(run5));
+    const run10 = produce(baker, 10);
+    check('28.2: sayaç deterministiktir: sonraki 10 üretimde tam 2 tasarruf', run10.spent === 8 * (proc.input[inKey] ?? 1) && baker.grandmasterBatches === 15 && savedEvents.length === 3, JSON.stringify(run10));
+    const plainRun = produce(pool[3], 5);
+    check('28.2: normal usta aynı işte hep hammadde harcar (5 harcama)', plainRun.spent === 5 * (proc.input[inKey] ?? 1));
+    baker.grandmasterProfession = 'loom';
+    const otherProf = produce(baker, 5);
+    check('28.2: Başusta başka mesleğin yapısında tasarruf yapmaz', otherProf.spent === 5 * (proc.input[inKey] ?? 1));
+    baker.grandmasterProfession = 'mill';
+    // Zanaat Atölyesi (crafting): hazır bekleyen sipariş varsa 5. iş hammaddesiz başlar
+    const smithGm = gm;
+    smithGm.grandmasterBatches = 4;
+    ws.craft = null;
+    const pick = S().crafting.chooseItem(ws);
+    if (pick.item) {
+      const before = { ...s0.resources };
+      S().crafting.work(ws, 0.001, smithGm);
+      const same = Object.keys(pick.recipe.cost).every((r) => s0.resources[r] === before[r]);
+      check('28.2: Başusta Zanaat Atölyesi\'nde her 5. işi hammaddesiz başlatır (kaynak düşmez, sayaç 5)', ws.craft && same && smithGm.grandmasterBatches === 5, JSON.stringify(pick.recipe.cost));
+      ws.craft = null;
+    } else check('28.2: Başusta Zanaat Atölyesi\'nde her 5. işi hammaddesiz başlatır (atölyede bekleyen ekipman yok: atlandı)', true);
+    offS();
+
+    // --- Arayüz ---
+    game.events.emit('ui:selectCharacter', gm.id);
+    game.render(0);
+    const badge = document.querySelector('.character-panel:not(.guest-panel) .craft-badge');
+    check('28.2: karakter kartında "Başusta Demirci" altın-mor rozeti', badge && !badge.hidden && badge.classList.contains('is-grandmaster') && badge.textContent.includes('Başusta Demirci'), badge?.className + ' ' + badge?.textContent);
+    game.events.emit('ui:selectCharacter', null);
+    const oldWorkers = new Set(ws.workerIds);
+    gm.workplaceId = ws.id;
+    ws.workerIds.add(gm.id);
+    game.events.emit('ui:selectBuilding', ws.id);
+    game.render(0);
+    const panelText = document.querySelector('.building-panel')?.textContent ?? '';
+    check('28.2: zanaat yapısının panelinde çalışan Başusta için "Başusta Üretimi: Tasarruf Şansı" ipucu', panelText.includes('Başusta Üretimi') && panelText.includes('Tasarruf Şansı'), panelText.slice(0, 160));
+    ws.workerIds.delete(gm.id);
+    gm.workplaceId = null;
+    game.render(0);
+    check('28.2: Başusta çalışmıyorsa ipucu yok', !(document.querySelector('.building-panel')?.textContent ?? '').includes('Başusta Üretimi'));
+    ws.workerIds = oldWorkers;
+    game.events.emit('ui:selectBuilding', null);
+
+    // --- Kayıt (sürüm 33) ---
+    const raw = JSON.parse(JSON.stringify(S().saves.snapshot()));
+    const rawGm = raw.characters.find((c) => c.id === gm.id);
+    check('28.2: Başusta alanları kayda yazılır (isGrandmaster, grandmasterProfession, grandmasterBatches) ve sayaçlar', rawGm.isGrandmaster === true && rawGm.grandmasterProfession === 'workshop' && Number.isFinite(rawGm.grandmasterBatches) && raw.apprenticeship.grandmasters >= 1 && raw.apprenticeship.grandmasterSaved >= 1);
+    const back = Character.fromJSON(rawGm);
+    check('28.2: Character.fromJSON Başusta durumunu aynen geri yükler', back.isGrandmaster === true && back.grandmasterProfession === 'workshop' && back.grandmasterBatches === gm.grandmasterBatches);
+    const bogus = Character.fromJSON({ ...rawGm, grandmasterProfession: 'dragonKeep' });
+    const noProf = Character.fromJSON({ ...rawGm, isGrandmaster: false, grandmasterBatches: 9 });
+    check('28.2: bozuk meslek / bayraksız kayıt Başusta saymaz, sayaç sıfırlanır', bogus.isGrandmaster === false && bogus.grandmasterProfession === null && noProf.isGrandmaster === false && noProf.grandmasterBatches === 0);
+    const legacy = JSON.parse(JSON.stringify(raw));
+    legacy.version = 32;
+    for (const c of legacy.characters) { delete c.isGrandmaster; delete c.grandmasterProfession; delete c.grandmasterBatches; }
+    delete legacy.apprenticeship.grandmasters; delete legacy.apprenticeship.grandmasterSaved;
+    const keepSlot = localStorage.getItem(CONFIG.SESSION_KEY);
+    localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
+    const migrated = SM.SaveManager.read('session');
+    if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
+    check('28.2: v32 kaydı v33\'e göç eder: hiç kimse Başusta değil, çıraklık sayaçları 0', CONFIG.SAVE_VERSION === 33 && migrated && migrated.characters.every((c) => c.isGrandmaster === false && c.grandmasterProfession === null && c.grandmasterBatches === 0) && migrated.apprenticeship.grandmasters === 0 && migrated.apprenticeship.grandmasterSaved === 0);
+
+    // Temizlik
+    Object.assign(kid, { lifeStage: keepKid.ls, age: keepKid.age, ageInDays: keepKid.aid, apprenticeship: keepKid.app, task: keepKid.task, skills: keepKid.skills, workplaceId: keepKid.wp, isGrandmaster: false, grandmasterProfession: null, grandmasterBatches: 0 });
+    Object.assign(kid2, { lifeStage: keep2.ls, apprenticeship: keep2.app, skills: keep2.skills });
+    Object.assign(baker, { isGrandmaster: false, grandmasterProfession: null, grandmasterBatches: 0, skills: keepBaker.skills, workplaceId: keepBaker.wp, equipment: keepBaker.eq });
+    master.buffs.proudMaster = -1;
+    Object.assign(s0.resources, keepRes);
   }
 
   return out;

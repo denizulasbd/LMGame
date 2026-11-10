@@ -957,7 +957,7 @@ if (mon.apprentice) {
   console.log(
     `(25.2) çıraklık: açık kapı ${P.open} · çırak ${P.active} (en çok ${P.maxActive}; ${P.list.join(', ') || '-'}) · yazılan ${P.state.enrolled}, mezun ${P.state.graduated} · ` +
       `Gururlu Usta ${P.state.masters} · çırak mesaisi ${Math.round(P.state.minutes / 60)} sa · çırak işi ${P.state.crafted} (satılan ${P.state.sold}, +${P.state.coins} altın) · ` +
-      `ustasız çırak ${P.orphanSamples} örnek · yetişkin çırak ${P.adultApprentices}`
+      `ustasız çırak ${P.orphanSamples} örnek · yetişkin çırak ${P.adultApprentices} · (28.2) Başusta ${P.grandmasters.length} (${P.grandmasters.join(', ') || '-'}), hammaddesiz üretim ${P.state.grandmasterSaved ?? 0}`
   );
 }
 if (mon.life) {

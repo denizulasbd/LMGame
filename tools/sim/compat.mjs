@@ -59,7 +59,8 @@
 //   save-v30.json: 26.2'nin oyunu (kayıt sürümü 30, bugünkü): otopilotla 73 gün (--crisis-state); 72. gün (Yaz Güneşi Şenliği panayırı) hazırlık evresinde kurulmuş Zengin Şölen Sofrası
 //                  (currentFeast: 5 fıçı şerbet, 9 ekmek, 22 yiyecek, 1 kumaş bağışı, 32 ikram), daha önce 10 sofra ve 171 ikram. Eski kayıtlarda
 //                  (sürüm 2-29) currentFeast yoktur: null ile açılır
-//   save-v32.json: 28.1'in oyunu (kayıt sürümü 32, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42, 28.1 kurallarıyla yeni referans).
+//   save-v33.json: 28.2'nin oyunu (kayıt sürümü 33, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42, 28.2 kurallarıyla yeni referans; 3 Başusta).
+//   save-v32.json: 28.1'in oyunu (kayıt sürümü 32): otopilotla 72 gün (--crisis-state; tohum 42, 28.1 kurallarıyla yeni referans).
 //   save-v31.json: 26.3'ün oyunu (kayıt sürümü 31): otopilotla 69 gün (--crisis-state); 68. gün 12:xx'de haritadaki Seyyar Ozan
 //                  (68. gün geldi, ayrılış 69. gün 09:00), konuk defterinde 6 ziyaret; çıraklar ve Çırak Kapıları da hâlâ açık. Eski kayıtlarda
 //                  (sürüm 2-30) activeGuest ve konuk defteri yoktur: null / boş defterle açılır
@@ -67,7 +68,7 @@
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -616,12 +617,12 @@ for (const { name, raw } of fixtures) {
   {
     const P = r.loaded.appr;
     if (data.version < 25) {
-      results.push({ name: `${tag}: çırak yok, Çırak Kapıları kapalı, sayaçlar boş`, ok: P.list.length === 0 && P.state === JSON.stringify({ open: [], enrolled: 0, graduated: 0, masters: 0, crafted: 0, sold: 0, coins: 0, minutes: 0 }) && r.apprAfter.n === 0 });
+      results.push({ name: `${tag}: çırak yok, Çırak Kapıları kapalı, sayaçlar boş`, ok: P.list.length === 0 && P.state === JSON.stringify({ open: [], enrolled: 0, graduated: 0, masters: 0, crafted: 0, sold: 0, coins: 0, minutes: 0, grandmasters: 0, grandmasterSaved: 0 }) && r.apprAfter.n === 0 });
     } else {
       const saved = new Map(data.characters.filter((c) => c.apprenticeship).map((c) => [c.id, JSON.stringify(c.apprenticeship)]));
       results.push({
         name: `${tag}: çıraklar, ustaları, ilerlemeleri, açık kapılar ve sayaçlar korundu`,
-        ok: P.list.length === saved.size && P.list.length > 0 && P.list.every((x) => x.youth && saved.get(x.id) === x.a) && P.state === JSON.stringify(data.apprenticeship),
+        ok: P.list.length === saved.size && P.list.length > 0 && P.list.every((x) => x.youth && saved.get(x.id) === x.a) && P.state === JSON.stringify({ ...data.apprenticeship, grandmasters: data.apprenticeship.grandmasters ?? 0, grandmasterSaved: data.apprenticeship.grandmasterSaved ?? 0 }), // (28.2) v33'ten eski kayıtlarda Başusta sayaçları 0 gelir
         detail: `${P.list.length} çırak · ${data.apprenticeship.open.length} açık kapı · ${data.apprenticeship.crafted} çırak işi`,
       });
     }

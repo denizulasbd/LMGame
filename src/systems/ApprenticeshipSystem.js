@@ -20,7 +20,8 @@
 // Bu sistem KENDİ tohumlanmış üretecini kullanır (TownScene -> seed + 28). Hiçbir çırak yokken hiçbir şeyi değiştirmez.
 // Yayınladığı olaylar: 'apprentice:enrolled' { character, master, building }, 'apprentice:released' { character, reason },
 //   'apprentice:graduated' { character, profession, title }, 'apprentice:crafted' { character, item }, 'apprentice:proud' { master, apprentice }.
-import { PROFESSIONS, APPRENTICE, PROUD_MASTER, APPRENTICE_CRAFT } from '../data/apprenticeship.js';
+import { PROFESSIONS, APPRENTICE, PROUD_MASTER, APPRENTICE_CRAFT, GRADUATION } from '../data/apprenticeship.js';
+import { grandmasterTitle } from './Grandmaster.js';
 import { ITEMS } from '../data/citizens.js';
 import { WORK_SESSION } from '../data/jobs.js';
 import {
@@ -319,9 +320,21 @@ export class ApprenticeshipSystem {
     const after = levelFor(c.skills[prof.skill]);
     c.apprenticeship = null;
     if (title) this.state.apprenticeship.graduated += 1;
+    // (28.2) Başusta: yalnızca çıraklığı %100 ile bitirenler (Yetkin Usta); kalıcıdır, başka yoldan verilmez
+    const grandmaster = a.progress >= GRADUATION.master && !c.isGrandmaster;
+    if (grandmaster) {
+      c.isGrandmaster = true;
+      c.grandmasterProfession = a.profession;
+      c.grandmasterBatches = 0;
+      this.state.apprenticeship.grandmasters = (this.state.apprenticeship.grandmasters ?? 0) + 1;
+    }
     if (after.level > before.level) this.events.emit('skill:levelUp', { character: c, skill: prof.skill, level: after });
-    this.events.emit('apprentice:graduated', { character: c, profession: a.profession, title, progress: a.progress, masterId: a.masterId });
-    if (title) {
+    this.events.emit('apprentice:graduated', { character: c, profession: a.profession, title, progress: a.progress, masterId: a.masterId, grandmaster });
+    if (grandmaster) {
+      this.events.emit('toast', { text: `${c.name} çıraklığını %100 ile tamamladı: artık ${grandmasterTitle(c)}! Usta işi eser şansı iki katına çıktı, her 5. üretimde hammadde harcamaz.`, tone: 'success', icon: 'star' });
+      addMemory(this.state, c, `Çıraklığını kusursuz tamamlayıp ${grandmasterTitle(c)} unvanını aldı`, 'star', { kind: 'apprentice' });
+      this.events.emit('apprentice:grandmaster', { character: c, profession: a.profession });
+    } else if (title) {
       this.events.emit('toast', { text: `${c.name} çıraklığını tamamladı: artık ${title} ${prof.master}!`, tone: 'success', icon: 'star' });
       addMemory(this.state, c, `Çıraklığını tamamlayıp ${title} ${prof.master} olarak yetişkinliğe adım attı`, 'star', { kind: 'apprentice' });
     }

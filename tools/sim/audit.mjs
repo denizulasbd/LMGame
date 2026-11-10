@@ -351,6 +351,24 @@ const PAGE_HELPERS = () => {
       check('yüklenen ferman teslim edilir', !s.crown.decree && s.crown.delivered >= 1);
     }
 
+    // --- 2k2. (28.2) Başusta kayıt -> yükleme: bayrak, meslek, sayaç ve hammaddesiz üretim sayacı aynen döner; Başusta yalnızca çıraklık mezunudur ---
+    {
+      const gm = s.characters.find((c) => !c.isChild && !c.role && c.visible);
+      gm.isGrandmaster = true;
+      gm.grandmasterProfession = 'mill';
+      gm.grandmasterBatches = 7;
+      s.apprenticeship.grandmasters = (s.apprenticeship.grandmasters ?? 0) + 1;
+      const diff = A.roundtrip();
+      check('(28.2) Başusta kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const g2 = s.characters.find((c) => c.id === gm.id);
+      check('(28.2) yüklenen Başusta bayrağı, mesleği ve üretim sayacı aynen döner', g2?.isGrandmaster === true && g2.grandmasterProfession === 'mill' && g2.grandmasterBatches === 7);
+      const others = s.characters.filter((c) => c.id !== gm.id && c.isGrandmaster);
+      check('(28.2) çıraklıktan mezun olmayan hiç kimse Başusta değil (tek Başusta test bayrağı)', others.length === 0, `${others.length}`);
+      g2.isGrandmaster = false;
+      g2.grandmasterProfession = null;
+      g2.grandmasterBatches = 0;
+    }
+
     // --- 2l. (23. aşama) Yangın sürerken, haydut izi beklerken, hasarlı yapı ve yaralı sakin varken ---
     {
       rich();
@@ -747,11 +765,11 @@ const PAGE_HELPERS = () => {
       const p1 = s.characters.find((c) => c.id === youth.id).apprenticeship?.progress ?? 0;
       const diff = A.roundtrip();
       const y2 = s.characters.find((c) => c.id === youth.id);
-      run(16);
+      run(17); // (28.2) Gençler artık daha hızlı toparlandığından şekerleme zamanlaması kayabilir: pencere mesainin sonuna kadar
       const p2 = y2.apprenticeship?.progress ?? 0;
       const hut2 = sim.scene().world.getBuilding(hut.id);
-      const maxGain = (4 * 60 + 30) * 100 / 3600; // 12:00 -> 16:00 arası tam hızdan bile fazla olamaz
-      check('27.2: rafları dolu (idle) Şifacı Kulübesi\'nde çırak gerçek mesaide Tezgâh Pratiği ile ilerler; kayıt -> yüklemede durum kayması yok, yüklemeden sonra da ilerler', enrolled && hut2.idle && practiced > 0 && p1 > p0 && p2 > p1 && p2 - p1 <= maxGain && diff.length === 0, `${p0.toFixed(2)} -> ${p1.toFixed(2)} -> ${p2.toFixed(2)} pratik ${practiced} ${diff.join(' | ')}`);
+      const maxGain = (5 * 60 + 30) * 100 / 1800; // 12:00 -> 17:00 arası tam hızdan bile fazla olamaz
+      check('27.2: rafları dolu (idle) Şifacı Kulübesi\'nde çırak gerçek mesaide Tezgâh Pratiği ile ilerler; kayıt -> yüklemede durum kayması yok, yüklemeden sonra da ilerler', enrolled && hut2.idle && practiced > 0 && p1 > p0 && p2 > p1 && p2 - p1 <= maxGain && diff.length === 0, `${p0.toFixed(2)} -> ${p1.toFixed(2)} -> ${p2.toFixed(2)} pratik ${practiced} ${diff.join(' | ')} | ${y2.task?.activity}/${y2.task?.phase} en${Math.round(y2.needs.energy)} h${s.time.hour} ${y2.lifeStage} idle${hut2.idle} dmg${hut2.damaged}`);
       y2.apprenticeship = null;
       Object.assign(y2, keep.y);
       y2.profile = y2.buildProfile();

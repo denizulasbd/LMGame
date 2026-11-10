@@ -3754,6 +3754,62 @@ yazar; `GameState.restore` eksik / bozuk değerleri de aynı varsayılana çeker
 - **Otopilot:** yangın yarıyı aşınca (altın >= 30) Acil Seferberlik ilan eder; hasarı önce ustalara bırakır (fırtına hasarı için onarım projesini kendisi başlatır),
   24 saati aşarsa pahalı anında tamire başvurur; vergi kilidini gözetir.
 
+## Çıraklığın Yatırıma Dönüşmesi ve Başusta Kademesi (28. aşama, 28.2 mikro adımı)
+
+**Kayıt sürümü 33.** Kule öncesi bayt bayt kuralı 28. aşamada kaldırıldığı için 25.1'de eski takvimi bozmamak adına kilitli tutulan Gençlik Bonusu da açıldı. Kural: Tohum 42, 28.2 koduyla
+art arda koşturulunca her seferinde **kendi içinde %100 aynı** sonucu verir (aşağıda doğrulandı).
+
+### 1. Hızlı çıraklık ve Gençlik Bonusu (`data/apprenticeship.js`, `data/lifeStages.js`)
+
+| Sayı | Eski | Yeni |
+|---|---|---|
+| `YOUTH.energyGain` (Gençlerin uykuda / dinlenirken enerji dolumu) | 1 | **1,2** (%20 hızlı; `TraitProfile`) |
+| `APPRENTICE.perMinute` (çıraklık %100 için mesai) | 100 / 3600 (60 saat) | **100 / 1800 (30 saat, saatte %3,33)** |
+| `PROUD_MASTER.workBoost` (çırak %50'yi geçince ustanın tezgâhına verim) | 1,05 | **1,2** |
+
+Çırak bulundurmak artık hemen kârlıdır: yarım yoldaki çırak ustanın tezgâhını %20 hızlandırır. Tezgâh Pratiği (usta yokken %60 hız) ve gıda / çekirdek iş gücü korumaları aynen sürer.
+
+### 2. Başusta (`systems/Grandmaster.js`, `ApprenticeshipSystem.graduate`, `Character`)
+
+- **Verilişi:** Genç 21 yaşında Yetişkin olduğunda çıraklığı **%100** ise Yetkin Usta olmanın yanında kalıcı `isGrandmaster = true` ve `grandmasterProfession` (çıraklık yapısı türü)
+  alır. Başka hiçbir yoldan verilmez: çıraklıksız, çalışarak (ne kadar deneyimli olursa olsun) usta olanlar ve %99,9'da mezun olanlar Başusta olamaz.
+- **Usta İşi Eser şansı x2:** Başusta kendi mesleğinin eserinde şansı iki katına çıkarır (taban %4 -> %8; sabit iş yeri ve Sağlam Alet ile %8 -> **%16**). Başka mesleğin eserinde (örn. Demirci Başusta
+  ekmek eserinde) çarpan yoktur. Kasabadaki günlük ve usta başına bekleme sınırları aynen geçerlidir.
+- **Hammadde tasarrufu (deterministik, üreteç yok):** Başusta kendi mesleğinin yapısında (Fırın, Dokuma Tezgâhı, Şerbethane, Zanaat Atölyesi) her **5. üretimi hiç hammadde harcamadan** yapar
+  (`grandmasterBatches` sayacı; kayda girer, `grandmaster:saved` olayı ve `apprenticeship.grandmasterSaved` sayacı). Başka mesleğin yapısında tasarruf yoktur. Kereste Atölyesi ve Şifacı Kulübesi
+  girdi tüketmediği için o mesleklerin Başustası yalnızca eser şansı bonusu alır.
+- **Haber:** mezuniyette toast, anı ("... Başusta ... unvanını aldı") ve Kasaba Günlüğü satırı; `apprentice:grandmaster` olayı.
+
+### 3. Arayüz
+
+- **Karakter kartı:** unvanı olan sakinin zanaat rozeti **"Başusta Demirci"** (yıldız ikonu, altın-mor degrade `.craft-badge.is-grandmaster`) olur; ipucunda etkiler yazar.
+- **Yapı paneli:** çalışan bir Başusta varsa "★ Başusta Üretimi: ... · her 5. üretim hammaddesiz (Tasarruf Şansı) · usta işi eser ihtimali 2 kat (Yüksek Eser İhtimali)" satırı görünür.
+
+### Kayıt (sürüm 33)
+
+`characters[].isGrandmaster`, `grandmasterProfession`, `grandmasterBatches` ve `apprenticeship.grandmasters` / `grandmasterSaved` eklendi. `SaveManager.migrate` v32 -> v33'te kimseyi Başusta saymaz
+(hepsi `false` / `null` / 0); `Character` yükleme sırasında bozuk meslek ya da bayraksız kaydı da Başusta saymaz. `SAVE_VERSION = 33`. Yeni fikstür `save-v33.json` (otopilot, 72 gün, 3 Başusta).
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1232 -> **1259**; 27'si yeni): sabitler (1,2 / 30 saat / 1,2 / x2 / 5), Genç profilinin enerji kazancının yetişkininkinin 1,2 katı, gerçek `learn` ile saatte %3,33 ve 30 saatte %100,
+  `masterBoost` %50 altında 1 / üstünde 1,2, %100 mezun -> Başusta (bayrak, meslek, Yetkin Usta deneyimi, sayaç, olay, unvan "Başusta Demirci", günlük), %99,9 -> Başusta değil, çıraklıksız deneyimli usta -> asla,
+  eser şansı (%4 -> %8, %8 -> %16, başka meslekte 1x), fırında 5 üretimde 1 hammaddesiz (4 harcama, 5 ürün), sonraki 10 üretimde tam 2, normal usta / başka meslek tasarruf etmez, atölyede 5. iş hammaddesiz,
+  karakter kartı rozeti, yapı paneli etiketi (çalışmıyorsa yok), kayıt alanları, bozuk veri, v32 -> v33 göçü.
+  - **Tohum kaymasında sağlamlaştırılan eski testler** (kural gevşemedi, yalnızca dünyanın artakalan durumuna bağımlılık kalktı): randevu için bekâr çift ve bank rezervleri, Keyifli Damak ölçümünde görünürlük (fener / çocuk
+    auraları), isyancının hastalığı, kurucu / göçmen kuşağı (köyden ayrılan ebeveyn), Yeni Yuva reisi ve ev halkı, Keyifli han bardağı oranı.
+- **Denetim** (`audit.mjs`): 138 -> **141**. Başusta kayıt -> yükleme durum kayması yok, bayrak / meslek / sayaç aynen döner, tek Başusta test bayrağıdır; 27.2'nin Tezgâh Pratiği ölçümü 30 saatlik hıza ve
+  Gençlerin daha çabuk toparlanıp şekerleme zamanının kaymasına uyarlandı.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-33): 1176 -> **1215**.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0; refah %100. **Ulu Saat Kulesi 6/6, Altın Çağ
+  G32, G32, G32, G31, G31, G30** (28.1: G31, G33, G31, G30, G38, G34). 40 günde Gençler henüz 21'e basmadığı için mezun / Başusta 0'dır; Başusta uzun koşuda ölçülür.
+- **Tohum 42, 72 gün, yeni referans noktası.** `autopilot.mjs 42 72 --crisis-state` iki kez art arda koşturuldu: `--json` raporu, kayıt dosyası ve günlük **bayt bayt aynı** (tek fark günlükteki dosya adı).
+  Ulu Saat Kulesi aşamaları **G27 / G29 / G30 -> G28 / G30 / G31**, Altın Çağ **G30 -> G31**. Çıraklık: yazılan 8, **mezun 3 -> 4**, çırak mesaisi 525 -> **774 saat**, çırak işi 86 -> **192**; yetişkin olan dört
+  mezundan **üçü Başusta** oldu (hepsi Kereste Atölyesi çırağı: eser şansı x2; hammadde tüketmeyen meslekte tasarruf sayacı 0). %100'e ulaşan iki çırak (Demircilik, Şifacılık) yetişkin olunca Başusta olacak.
+  Krallık Vergisi 11/11, haydut baskını 7, yangın 11, takılma 0, kopuk referans 0, sayfa hatası yok.
+- **Not (denge):** çıraklık hızı iki katına çıktığı için Gençlerin çoğu 21'e gelmeden %100'ü görür; Başusta artık nadir değil, "mezun çırakların çoğu" olur. Eser şansı kasabadaki günlük ve usta başına bekleme sınırlarıyla
+  zaten sınırlıdır; gerekirse `GRANDMASTER` sabitlerinden ayarlanır.
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.
@@ -3919,6 +3975,8 @@ düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 | Oyunun adı, başlangıç ekranı | `config.js` → `GAME_TITLE`, `ui/components/TitleMenu.js` |
 | Takas teklifleri, tüccar takvimi | `data/trade.js` |
 | (28.1) Acil Seferberlik, anında / usta onarımı bedelleri | `data/crisis.js` → `FIRE.muster`, `REPAIR` |
+| (28.2) Çıraklık hızı, Gençlik enerji bonusu, usta verimi | `data/apprenticeship.js` → `APPRENTICE.perMinute`, `PROUD_MASTER.workBoost`; `data/lifeStages.js` → `YOUTH.energyGain` |
+| (28.2) Başusta etkileri (eser şansı çarpanı, tasarruf aralığı) | `data/apprenticeship.js` → `GRANDMASTER` (+ `systems/Grandmaster.js`) |
 | (28.1) Vergi Fermanı kilit süresi | `data/crown.js` → `TAX.lockDays` |
 | (28.1) İhracat sözleşmesi altınları (limana göre en az %40 prim) | `data/tradePost.js` → `CONTRACTS`, `CONTRACT_MIN_PREMIUM` |
 | Yeni ses ya da ambiyans | `systems/AudioSystem.js` (sentez araçları `core/SoundEngine.js`) |

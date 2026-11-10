@@ -64,7 +64,8 @@ import { INN_SHERBET, GARMENT, CLOTH_WELFARE } from '../../data/refinery.js';
 import { CONTRACTS, MARKET, IMPORTS, IMPORT_KEYS } from '../../data/tradePost.js';
 import { contractStatus, importStatus, priceMultiplier, shipDocked } from '../../systems/TradePost.js';
 import { clothWelfare } from '../../systems/Refinery.js';
-import { PROFESSIONS } from '../../data/apprenticeship.js';
+import { GRANDMASTER, PROFESSIONS } from '../../data/apprenticeship.js';
+import { grandmasterAt, grandmasterMasterworkMultiplier } from '../../systems/Grandmaster.js';
 import { doorOpen, apprenticesAt, pickMaster, acceptsApprentice, canApprentice, apprenticeSlots } from '../../systems/Apprenticeship.js';
 import { headOf } from '../../systems/Lineage.js';
 import { FEAST, TIERS as FEAST_TIERS } from '../../data/feast.js';
@@ -1187,6 +1188,14 @@ export class BuildingPanel {
     if (def.production && building.factors) lines.push(...this.productionLines(building, state));
     if (def.processing) lines.push(...this.processingLines(building, state));
 
+    // (28.2) Çalışan bir Başusta varsa: tasarruf şansı ve yüksek eser ihtimali
+    {
+      const gm = state.characters.filter((c) => grandmasterAt(c, building) && (building.workerIds?.has(c.id) || c.workplaceId === building.id));
+      if (gm.length) {
+        const mw = gm.some((c) => grandmasterMasterworkMultiplier(c, Object.keys(MASTERPIECES).find((k) => MASTERPIECES[k].skill === PROFESSIONS[building.type]?.skill) ?? '') > 1);
+        lines.push(`★ Başusta Üretimi: ${gm.map((c) => c.name).join(', ')} · her ${GRANDMASTER.saveEvery}. üretim hammaddesiz (Tasarruf Şansı)${mw ? ' · usta işi eser ihtimali 2 kat (Yüksek Eser İhtimali)' : ''}`);
+      }
+    }
     switch (building.type) {
       case 'cabin': {
         const people = state.characters.filter((c) => c.homeId === building.id);

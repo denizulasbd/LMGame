@@ -96,7 +96,7 @@ export function graduationFor(progress) {
 
 /** Kayıttaki çıraklık durumu: açık kapılar ve sayaçlar. */
 export function emptyApprenticeshipState() {
-  return { open: [], enrolled: 0, graduated: 0, masters: 0, crafted: 0, sold: 0, coins: 0, minutes: 0 };
+  return { open: [], enrolled: 0, graduated: 0, masters: 0, crafted: 0, sold: 0, coins: 0, minutes: 0, grandmasters: 0, grandmasterSaved: 0 }; // (28.2) Başusta sayısı ve hammaddesiz üretimler
 }
 
 export function restoreApprenticeshipState(data, buildings = []) {
@@ -104,7 +104,7 @@ export function restoreApprenticeshipState(data, buildings = []) {
   if (!data || typeof data !== 'object') return out;
   const valid = new Set(buildings.filter((b) => b && PROFESSIONS[b.type]).map((b) => b.id));
   out.open = [...new Set(Array.isArray(data.open) ? data.open : [])].filter((id) => valid.has(id));
-  for (const key of ['enrolled', 'graduated', 'masters', 'crafted', 'sold', 'coins']) out[key] = Math.max(0, Math.floor(Number(data[key]) || 0));
+  for (const key of ['enrolled', 'graduated', 'masters', 'crafted', 'sold', 'coins', 'grandmasters', 'grandmasterSaved']) out[key] = Math.max(0, Math.floor(Number(data[key]) || 0));
   out.minutes = Number.isFinite(Number(data.minutes)) ? Math.max(0, Number(data.minutes)) : 0;
   return out;
 }

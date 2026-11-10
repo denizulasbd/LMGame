@@ -31,7 +31,8 @@ export const AGING = {
 // Gençlik: energyGain, uykuda ve dinlenirken enerjinin dolma çarpanıdır. 25.1'de 1 (kapalı): 1,15 denendiğinde tohum 42'nin
 // Altın Çağ'ı G28'den G31'e kaydı (gençler daha erken uyanıp iş düzeni değişiyor). Determinizm kuralı gereği bonus, çıraklıkla
 // birlikte dengelenmek üzere 25.2'ye bırakıldı; çalışma ve iş yükü yetişkinle aynıdır.
-export const YOUTH = { energyGain: 1 };
+// (28.2) Gençler uykuda ve dinlenirken %20 daha hızlı toparlanır (eski takvimi korumak için kilitli olan 1 değeri kalktı)
+export const YOUTH = { energyGain: 1.2 };
 
 // Kıdemli Bilge
 //   minCoreAdults: kasabada çalışabilir en az bu kadar yetişkin / genç kalır. Daha azsa en dinç bilgeler (kimlik sırasıyla)
