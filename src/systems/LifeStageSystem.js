@@ -1,7 +1,7 @@
 // (25. aşama, 25.1) Yaşam evreleri ve yaş döngüsü: Çocuk -> Genç -> Yetişkin -> Kıdemli Bilge.
 //
 //   Yaşlanma    : her gün dönümünde (00:00, 'time:newDay') kasabalı her sakinin yaşı bir gün ilerler (ageInDays); bir oyun yılı
-//                 (16 gün) dolunca bir yaş büyür. Genç (18-20) 21 yaşında Yetişkin, Yetişkin 70 yaşında Kıdemli Bilge olur.
+//                 (16 gün) dolunca bir yaş büyür. Genç (18-20) 21 yaşında Yetişkin, Yetişkin 65 yaşında Kıdemli Bilge olur.
 //                 Çocuğun büyümesi FamilySystem'in işidir: büyüyen çocuk Genç evresinden başlar.
 //   Emeklilik   : Kıdemli Bilge ağır işlere (inşaat, toplama, üretim, itfaiye, baskın savunması, keşif seferi) gitmez; ÖLMEZ ve
 //                 oyundan silinmez. Kasabada çalışabilir en az 3 çekirdek sakin (genç / yetişkin) güvencesi korunur: daha azsa

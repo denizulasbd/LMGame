@@ -167,10 +167,38 @@ export class ConstructionSystem {
       const isolated = this.world.wouldIsolate(footprint, reachableAfter());
       if (isolated) reason = `${isolated.name} kasabadan kopar: aradaki geçidi kapatma`;
     }
+    // (29.2b) Yakındaki bir şantiyenin ya da iş yerinin SON açık çalışma karosunu kapatmasın (iş sonsuza dek beklemesin)
+    if (!reason && !def.walkable) {
+      const starved = this.wouldStarveWork(footprint, reachableAfter());
+      if (starved) reason = `${starved.name} ${starved.underConstruction ? 'şantiyesinin' : 'iş yerinin'} son çalışma yerini kapatır: etrafında bir karo açık bırak`;
+    }
     if (!reason && !this.economy.canAfford(def.cost)) {
       reason = `Yetersiz kaynak: ${this.economy.missing(def.cost).join(', ')}`;
     }
     return { ok: !reason, reason, footprint, doors, orientation };
+  }
+
+  /**
+   * (29.2b) Bu ayak izi kurulursa çalışma noktası (halka / kapı önü / ön cephe) bugün var ama kurulunca SIFIRA inecek yakın bir
+   * şantiye ya da iş yeri var mı? İlkini döndürür (yoksa null). Yalnızca ayak izine iki karo yakın yapılara bakılır.
+   */
+  wouldStarveWork(footprint, after) {
+    const map = this.world.map;
+    const covered = new Set(footprint.map((t) => map.index(t.x, t.y)));
+    const xs = footprint.map((t) => t.x);
+    const ys = footprint.map((t) => t.y);
+    const [x0, x1, y0, y1] = [Math.min(...xs) - 2, Math.max(...xs) + 2, Math.min(...ys) - 2, Math.max(...ys) + 2];
+    const usableNow = (x, y) => map.inBounds(x, y) && map.isWalkable(x, y) && this.world.isReachable(x, y);
+    const usableAfter = (x, y) => map.inBounds(x, y) && map.isWalkable(x, y) && !covered.has(map.index(x, y)) && after[map.index(x, y)] === 1;
+    for (const b of this.world.buildings) {
+      const { w, h } = BUILDINGS[b.type].size;
+      if (b.tileX + w - 1 < x0 || b.tileX > x1 || b.tileY + h - 1 < y0 || b.tileY > y1) continue;
+      if (!b.underConstruction && !b.workerSlots) continue; // yalnızca şantiye ve iş yerleri
+      // Yalnızca doğrudan (1 karolu) çalışma noktalarına bakılır: iki karo uzaktan çalışma yedeği (World.getSpots) kuralı gevşetmez
+      if (this.world.computeSpots(b, usableNow).length === 0) continue; // zaten kapalıysa bu yapının suçu değil
+      if (this.world.computeSpots(b, usableAfter).length === 0) return b;
+    }
+    return null;
   }
 
   /**

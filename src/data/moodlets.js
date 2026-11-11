@@ -68,9 +68,9 @@ export const MOOD_RULES = {
   proudQuirk: 'craftsman',
   // Kişiliğe ters işler (etkinlik adları): Doğa Sever yer altını, Hırslı tarla işini sevmez
   misfit: { natureLover: ['mine', 'quarry', 'mineIron'], ambitious: ['farm', 'forage'], introvert: ['teach'] },
-  flowEnergy: 55, // Ustalık Akışı: enerji ve keyif en az bu kadar
-  flowFun: 55,
-  flowStreak: 2, // kendi sabit iş yerinde art arda bu kadar mesai
+  flowEnergy: 50, // Ustalık Akışı: enerji ve keyif bunun ÜSTÜNDE olmalı (> %50)
+  flowFun: 50,
+  flowStreak: 2, // kendi uzmanlık yapısında art arda bu kadar üretim
   feastStrongTraits: ['glutton', 'cheerful'],
   rationFoodPerHead: 2, // kişi başı yiyecek değeri bunun altındaysa "kıtlık"
   restedEnergy: 95,

@@ -187,7 +187,7 @@ export class Character extends Entity {
     // 25.3: huyun kaynağı (Aile mirası / Usta etkisi / Mesleğin doğası / Özgün gelişim; kayda girer)
     this.quirkOrigin = sanitizeOrigin(quirkOrigin);
     // (28.2) Başusta: çıraklığı %100 bitirenin kalıcı unvanı (grandmasterProfession = çıraklık yapısı türü); batches: hammaddesiz üretim sayacı
-    // (28.3) Saygın Büyük: ocağını ve yadigârını devredip yatağını boşaltan Kıdemli Bilge (nüfus kotasından muaf); lifespan: vefat yaşı (80-90)
+    // (28.3) Saygın Büyük: ocağını ve yadigârını devredip yatağını boşaltan Kıdemli Bilge (nüfus kotasından muaf); lifespan: vefat yaşı (66-75)
     this.isVenerable = Boolean(isVenerable) && this.lifeStage === 'elder';
     this.lifespan = sanitizeLifespan(lifespan);
     this.isGrandmaster = Boolean(isGrandmaster) && PROFESSIONS[grandmasterProfession] !== undefined;

@@ -25,7 +25,7 @@ import { addMoodlet, removeMoodlet, expireMoodlets, hasMoodlet, traumaOf, soothe
 import { getFriendship, isFamily, arePartners } from './RelationshipSystem.js';
 import { chemistryFor, hasTag, addTag, refreshChemistry } from './Chemistry.js';
 import { skillLevel, skillForActivity } from './SkillSystem.js';
-import { isGrandmaster } from './Grandmaster.js';
+import { isGrandmaster, grandmasterAt } from './Grandmaster.js';
 import { isShivering, isFreezing } from './HeatingSystem.js';
 import { coldProtection } from './Equipment.js';
 import { isRainActive } from '../data/weather.js';
@@ -107,8 +107,7 @@ export class MoodletSystem {
       on('relationship:quarrel', ({ a, b } = {}) => this.onQuarrel(a, b)),
       on('relationship:levelDown', ({ a, b, level } = {}) => this.onLevelDown(a, b, level)),
       on('population:dying', ({ character } = {}) => this.onDying(character)),
-      on('crisis:fireOut', ({ building, helpers } = {}) => this.onFire(building, helpers ?? [], 'shaken_fire', 'minor')),
-      on('crisis:burnedDown', ({ building } = {}) => this.onFire(building, [], 'shaken_burned', 'major')),
+      on('crisis:burnedDown', ({ building } = {}) => this.onFire(building, 'shaken_burned', 'major')),
       on('crisis:injured', ({ character } = {}) => this.apply(character, 'shaken', { reason: 'shaken_injured', tier: 'major' })),
       on('life:fatalAccident', ({ character } = {}) => this.onAccident(character)),
       on('chemistry:unrequited', ({ from, target } = {}) => this.apply(from, 'heartbroken', { reason: 'heart_unrequited', tier: 'major', whoId: target?.id, whoName: target?.name })),
@@ -195,18 +194,21 @@ export class MoodletSystem {
     }
   }
 
-  /** Üretim yapısında mesai bitti: kendi sabit iş yerinde, dinç ve keyifli Usta / Başusta art arda üretince akışa girer. */
+  /**
+   * Üretim yapısında mesai bitti: Usta (Sv.3+) ya da Başusta, kendi uzmanlık mesleğinin yapısında dinç (enerji > %50) ve keyifli
+   * (keyif > %50) art arda 2 üretim tamamlarsa Ustalık Akışı'na girer. (29.2b) Oyuncunun sakini sabitlemesi gerekmez: otopilot da akışa girer.
+   */
   onProduction(c, building) {
     if (!c || !building) return;
-    const own = c.workplaceId !== null && c.workplaceId === building.id;
-    const skill = skillForActivity(c.task?.activity);
-    const master = isGrandmaster(c) || (skill && skillLevel(c, skill).level >= 3);
-    if (!own || !master || c.needs.energy < MOOD_RULES.flowEnergy || c.needs.fun < MOOD_RULES.flowFun) {
+    const skill = skillForActivity(building.definition?.workActivity);
+    const grand = grandmasterAt(c, building);
+    const master = grand || Boolean(skill && skillLevel(c, skill).level >= 3);
+    if (!master || c.needs.energy <= MOOD_RULES.flowEnergy || c.needs.fun <= MOOD_RULES.flowFun) {
       c.flowStreak = 0;
       return;
     }
     c.flowStreak = (c.flowStreak ?? 0) + 1;
-    if (c.flowStreak >= MOOD_RULES.flowStreak) this.apply(c, 'flow_state', { reason: 'flow', tier: isGrandmaster(c) ? 'major' : 'minor' });
+    if (c.flowStreak >= MOOD_RULES.flowStreak) this.apply(c, 'flow_state', { reason: 'flow', tier: grand ? 'major' : 'minor' });
   }
 
   /** Sabah uyanışı: deliksiz uyku ya da üşüyerek uyanma. */
@@ -306,12 +308,15 @@ export class MoodletSystem {
     }
   }
 
-  /** Yangın: söndürenler ve yapının içindekiler / sakinleri sarsılır. */
-  onFire(building, helperIds, reason, tier) {
+  /**
+   * Yangında bina kül oldu: yapının içindekiler, sakinleri ve çalışanları sarsılır. (29.2b) Yangını söndürmek kahramanlıktır,
+   * sarsılma yalnızca kaybedilen yapıda (ve yaralanmada / kazada tanıklıkta) verilir.
+   */
+  onFire(building, reason, tier) {
     if (!building) return;
     for (const c of this.world.characters) {
       if (c.role || c.isChild) continue;
-      const involved = helperIds.includes(c.id) || c.homeId === building.id || c.insideBuildingId === building.id || building.workerIds?.has(c.id);
+      const involved = c.homeId === building.id || c.insideBuildingId === building.id || building.workerIds?.has(c.id);
       if (involved) this.apply(c, 'shaken', { reason, tier });
     }
   }

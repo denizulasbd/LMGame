@@ -540,7 +540,7 @@ for (const { name, raw } of fixtures) {
     const valid = (x) => (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage)) && Number.isInteger(x.days) && x.days >= 0 && x.age === Math.floor(x.days / 16);
     if (data.version < 24) {
       const ageOf = new Map(data.characters.map((c) => [c.id, c.age]));
-      const expected = (x) => (x.child ? 'child' : x.age >= 70 ? 'elder' : 'adult');
+      const expected = (x) => (x.child ? 'child' : x.age >= 65 ? 'elder' : 'adult');
       results.push({
         name: `${tag}: evresi olmayan yetişkinler 'adult', çocuklar 'child' başladı; yaşlar değişmedi, gün sayacı yaştan kuruldu`,
         ok: L.every(valid) && L.every((x) => x.stage === expected(x)) && L.every((x) => !Number.isFinite(ageOf.get(x.id)) || x.child || x.age === Math.floor(ageOf.get(x.id))) && r.loaded.lifeState === JSON.stringify({ adviceMinutes: 0, elders: 0, adults: 0, lastElderLine: null, venerables: 0, deaths: 0, accidents: 0, lastDeath: null }),
@@ -728,7 +728,7 @@ for (const { name, raw } of fixtures) {
   if (data.version < 11) {
     results.push({
       name: `${tag}: yadigâr, sabit işçi boş; arşiv kuruldu; düğün sayacı tahmin edildi`,
-      ok: Object.keys(r.luxury.relics).length === 0 && !r.luxury.silk && r.pinned === 0 && r.history >= 1 && r.weddings === Math.floor(r.married / 2),
+      ok: Object.keys(r.luxury.relics).length === 0 && !r.luxury.silk && r.pinned === 0 && r.history >= 1 && r.weddings >= Math.floor(r.married / 2), // (29.2b) kayıttaki bir bilge doğal vefat ederse evli sayısı düşer, düğün sayacı düşmez
       detail: `arşiv ${r.history} gün, düğün ${r.weddings}`,
     });
   } else {

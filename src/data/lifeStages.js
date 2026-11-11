@@ -21,11 +21,11 @@ export const LIFE_STAGES = {
 };
 
 // Takvim: bir yaş = bir oyun yılı (4 mevsim). Gençlik youthUntil yaşına kadar sürer; elderAt yaşında sakin Kıdemli Bilge olur.
-// Kuruluş sakinlerinin en yaşlısı (66) ilk kez yaklaşık 57-64. günlerde bilgeleşir (çocuklar 18 yaşında Genç olur).
+// (29.2b) Kuruluş sakinlerinin en yaşlısı (66) oyunun ilk günlerinde bilgeleşir, ikincisi (58) yaklaşık 7 yıl (112 gün) sonra (çocuklar 18 yaşında Genç olur).
 export const AGING = {
   daysPerYear: CONFIG.DAYS_PER_SEASON * 4,
   youthUntil: 21,
-  elderAt: 70,
+  elderAt: 65,
   // Doğum günleri kimliğe göre yılın ilk birthdaySpread gününe dağılır (herkes aynı gün yaşlanmasın; rastgelelik yok)
   birthdaySpread: 8,
 };
@@ -64,15 +64,16 @@ export const ELDER_LINES = [
 export const ELDER_ADVICE = ['Sabır her işin başıdır, evlat.', 'Ağaç yaşken eğilir.', 'Komşu komşunun külüne muhtaç.', 'Bir elin nesi var, iki elin sesi var.', 'Damlaya damlaya göl olur.'];
 
 // (28.3) Sürdürülebilir kuşak döngüsü
-//   LIFESPAN  : her sakinin ömrü (yaş olarak; 1 yaş = AGING.daysPerYear oyun günü) 80-90 arasından kimliğinden ve tohumdan türetilir
+//   LIFESPAN  : her sakinin ömrü (yaş olarak; 1 yaş = AGING.daysPerYear oyun günü) 66-75 arasından kimliğinden ve tohumdan türetilir
 //               (Venerable.lifespanFor: izole üreteç, ana üretece dokunmaz). Kıdemli Bilge / Saygın Büyük bu yaşa ulaştığı gün dönümünde (00:00) vefat eder.
 //   VENERABLE : Kıdemli Bilge, Ocak Devri'ni ve Yadigâr Devri'ni tamamlayınca Saygın Büyük olur (kontrol her gün 19:00'da; Yadigâr töreni 18:00'dır).
 //               hearthGraceAge: ocağını bu yaşa dek devredememiş (evlatları evlenmemiş) bilgenin devri muaf sayılır (kasaba kilitlenmesin).
 //               sleepVenues: yatağı olmayan Saygın Büyük'ün geceleri sabahladığı yapılar (öncelik sırasıyla)
 //   FATAL     : trajik kazalar. chance = yaralanma zarının hemen yanındaki ölümcül aralık (tek zar: üreteç akışı değişmez), minAble: kasabada en az bu kadar
 //               sağlam yetişkin varsa (çekirdek iş gücü korunur) ölüm gerçekleşir. Seferde: yalnızca kafileden kaza geçiren (mishap) biri için ek zar.
-export const LIFESPAN = { min: 80, max: 90, seedOffset: 35 };
-export const VENERABLE = { checkHour: 19, hearthGraceAge: 75, sleepVenues: ['academy', 'inn', 'townHall', 'library'] };
+// (29.2b) 80-90 yaşlık ömür 50-72 günlük koşularda hiç doğal vefat / Derin Yas getirmiyordu: ömür 66-75'e, Kıdemli Bilge yaşı 70'ten 65'e çekildi.
+export const LIFESPAN = { min: 66, max: 75, seedOffset: 30 };
+export const VENERABLE = { checkHour: 19, hearthGraceAge: 68, sleepVenues: ['academy', 'inn', 'townHall', 'library'] };
 export const FATAL = { fire: 0.015, raid: 0.02, expedition: 0.02, minAble: 6 };
 
 /** Kayıttan gelen ömür: geçerli değilse null (LifecycleSystem kimlikten atar). */

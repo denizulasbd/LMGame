@@ -223,7 +223,7 @@ const PAGE_HELPERS = () => {
     {
       const RS = await import('/src/systems/RelationshipSystem.js');
       while (s.time.hour < 9 || s.time.hour >= 16) hours(1);
-      const singles = s.characters.filter((c) => !c.isChild && !c.away && c.partnerId === null);
+      const singles = s.characters.filter((c) => !c.isChild && !c.away && c.partnerId === null && c.lifeStage !== 'elder'); // (29.2b) bilgeler (65+) düğün senaryosuna girmez
       let pair = null;
       for (let i = 0; i < singles.length && !pair; i++) for (let j = i + 1; j < singles.length && !pair; j++) if (RS.canRomance(singles[i], singles[j])) pair = [singles[i], singles[j]];
       const fountain = scene().world.getCompleted('fountain')[0];
@@ -491,8 +491,8 @@ const PAGE_HELPERS = () => {
       const Y = 16;
       const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
       const sage = adults[0];
-      sage.ageInDays = 70 * Y - 1;
-      sage.age = 69;
+      sage.ageInDays = 65 * Y - 1; // (29.2b) Kıdemli Bilge yaşı 65
+      sage.age = 64;
       const youth = adults[1];
       youth.ageInDays = 21 * Y - 1;
       youth.age = 20;
@@ -507,7 +507,7 @@ const PAGE_HELPERS = () => {
       check('Kıdemli Bilge emekliyken kayıt -> yükleme durum kayması yok (evre, gün cinsinden yaş, sayaçlar)', diff.length === 0 && sage2.lifeStage === 'elder' && sage2.retired && youth2.lifeStage === 'adult' && promoted.n === 2, diff.join(' | ') + ` · ${promoted.n} geçiş`);
       const again = counter('lifeStage:changed');
       hours(30);
-      check('yüklemeden sonra bilge yeniden kutlanmaz, emekli kalır, yaşlar gün dönümünde bir kez ilerler', again.n === 0 && sage2.retired && sage2.ageInDays === 70 * Y + 1 && s.characters.includes(sage2), `${again.n} geçiş · ${sage2.ageInDays}`);
+      check('yüklemeden sonra bilge yeniden kutlanmaz, emekli kalır, yaşlar gün dönümünde bir kez ilerler', again.n === 0 && sage2.retired && sage2.ageInDays === 65 * Y + 1 && s.characters.includes(sage2), `${again.n} geçiş · ${sage2.ageInDays}`);
       check('emekli bilge işe gitmez (yükleme sonrası 30 saat)', !sage2.task?.jobId && !sage2.task?.workBuildingId);
       promoted.off();
       again.off();

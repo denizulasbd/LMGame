@@ -113,10 +113,10 @@ const pageResults = await page.evaluate(async () => {
   // (29.1) aşk zarı kimyaya bakar: aşk / evlilik testleri çiftin kimyasını açıkça kurar (saat başı yeniden hesaplanana dek geçerli)
   const CHX = await import('/src/systems/Chemistry.js');
   const setChem = (a, b, n) => { CHX.refreshChemistry(s, a, b); a.relationships[b.id].chemistry = n; b.relationships[a.id].chemistry = n; };
-  // (29.2) Eski aşamaların kesin sayılı testleri ruh hali katmanından yalıtılır: moodlet motoru burada kapatılır, 29.2 bölümünde açılır.
-  // (Denetim, geriye uyumluluk, stres matrisi ve otopilot açık motorla koşar.)
+  // (29.2b) Moodlet motoru artık bütün bölümlerde açık koşar (eski geçici şalter kalktı).
   const MDX = await import('/src/systems/Moodlets.js');
-  MDX.MOOD_ENGINE.enabled = false;
+  // Eski bölümlerin kesin sayılı testleri: ilgili sakinlerin ruh hali listesi temizlenir (izole birim testi; motor yine açıktır)
+  const noMoods = (...list) => { for (const c of list) { c.moodlets.length = 0; c.flowStreak = 0; MDX.recomputeMood(c); } };
   const hours = (h) => sim.step(Math.round(h * 225));
   const plaza = scene.world.landmarks.plaza;
   // 26. aşama öncesi bölümler panayırsız bir dünyada yazıldı: Altın Çağ'dan sonra panayır (ve Büyük Ziyafet Sofrası) kurulursa o bölümlerin
@@ -1211,6 +1211,7 @@ const pageResults = await page.evaluate(async () => {
       mw.lastByMaker = {};
       mw.today = 0;
       mw.items = mw.items.filter((it) => it.status !== 'stored');
+      noMoods(rc);
       game.events.emit('work:finished', { character: rc, activity: 'mineIron', building: mine });
     }
     const baseRate = made / 4000;
@@ -1222,6 +1223,7 @@ const pageResults = await page.evaluate(async () => {
       mw.lastByMaker = {};
       mw.today = 0;
       mw.items = mw.items.filter((it) => it.status !== 'stored');
+      noMoods(rc);
       game.events.emit('work:finished', { character: rc, activity: 'mineIron', building: mine });
     }
     const topRate = made / 4000;
@@ -1249,7 +1251,8 @@ const pageResults = await page.evaluate(async () => {
     offMade();
     const item = mw.items.find((it) => it.status === 'stored');
     check('eser vitrine (depoya) girer, ustanın anısına ve günlüğe yazılır', item?.type === 'ironStatue' && item.maker === rc.name && rc.memories.at(-1).text.includes(MASTERPIECES.ironStatue.name) && s.journal.some((j) => j.text.includes(MASTERPIECES.ironStatue.name)));
-    check('eser çıkınca ustanın başında kutlama balonu ve kıvılcımlar', rc.bubble?.icon === 'masterpiece' && rc.celebrateAt !== null);
+    check('eser çıkınca ustanın başında kutlama balonu ve kıvılcımlar', (rc.bubble?.icon === 'masterpiece' || MDX.hasMoodlet(rc, 'inspired')) && rc.celebrateAt !== null);
+    // (29.2b) Eser çıkınca yapılan işin sevinci aynı zamanda İlhamlı moodlet'idir: sözü balonu ezebilir, kutlama balonu yine kurulur
     // Sergileme
     mw.items = mw.items.filter((it) => it.status !== 'exhibited');
     const happy0 = bonusOf(s);
@@ -2439,7 +2442,7 @@ const pageResults = await page.evaluate(async () => {
       if (shift) break;
       S.behavior.endTask(c);
       const plan = S.behavior.brain.planWork(c);
-      if (!plan?.workBuildingId) continue;
+      if (!plan?.workBuildingId || plan.activity === 'teach') continue; // (29.2b) ders verme vardiyası bu testin konusu değil
       S.behavior.startPlan(c, plan, 10);
       if (!c.task) continue;
       c.clearPath();
@@ -2447,6 +2450,7 @@ const pageResults = await page.evaluate(async () => {
       shift = c;
     }
     if (shift) {
+      noMoods(shift);
       const before = shift.coins;
       const wages = st.stats.wagesPaid;
       shift.task.elapsed = (shift.task.duration ?? 60) + 1;
@@ -3572,6 +3576,7 @@ const pageResults = await page.evaluate(async () => {
       let seen = new Set();
       let buckets = 0;
       const offB = game.events.on('crisis:bucket', () => buckets++);
+      noMoods(...st.characters); // (29.2b) ruh halleri (Ustalık Akışı odağı, Sarsılmışlık vb.) kova zincirinin hızını karıştırmasın
       crisis().startFire(fightTarget);
       for (let i = 0; i < 72 && fightTarget.isBurning; i++) {
         sim.step(19);
@@ -4796,8 +4801,8 @@ const pageResults = await page.evaluate(async () => {
 
     // --- Veri ve saf hesaplar ---
     check('dört yaşam evresi: Çocuk, Genç, Yetişkin, Kıdemli Bilge', LD.LIFE_STAGE_KEYS.join() === 'child,youth,adult,elder' && LD.LIFE_STAGES.child.name === 'Çocuk' && LD.LIFE_STAGES.youth.name === 'Genç' && LD.LIFE_STAGES.adult.name === 'Yetişkin' && LD.LIFE_STAGES.elder.name === 'Kıdemli Bilge');
-    check('bir yaş = bir oyun yılı (4 mevsim), Genç 21\'e kadar, Kıdemli Bilge 70 yaşında', Y === CONFIG.DAYS_PER_SEASON * 4 && LD.AGING.youthUntil === 21 && LD.AGING.elderAt === 70);
-    check('evre yaştan türetilir; kazanılmış bilge unvanı korunur', LS.stageFor({ isChild: true, age: 40 }) === 'child' && LS.stageFor({ age: 18 }) === 'youth' && LS.stageFor({ age: 20 }) === 'youth' && LS.stageFor({ age: 21 }) === 'adult' && LS.stageFor({ age: 69 }) === 'adult' && LS.stageFor({ age: 70 }) === 'elder' && LS.stageFor({ age: 50, lifeStage: 'elder' }) === 'elder');
+    check('bir yaş = bir oyun yılı (4 mevsim), Genç 21\'e kadar, Kıdemli Bilge 65 yaşında (29.2b)', Y === CONFIG.DAYS_PER_SEASON * 4 && LD.AGING.youthUntil === 21 && LD.AGING.elderAt === 65);
+    check('evre yaştan türetilir; kazanılmış bilge unvanı korunur', LS.stageFor({ isChild: true, age: 40 }) === 'child' && LS.stageFor({ age: 18 }) === 'youth' && LS.stageFor({ age: 20 }) === 'youth' && LS.stageFor({ age: 21 }) === 'adult' && LS.stageFor({ age: 64 }) === 'adult' && LS.stageFor({ age: 65 }) === 'elder' && LS.stageFor({ age: 50, lifeStage: 'elder' }) === 'elder');
     check('doğum günleri kimlikten (yılın ilk 8 günü), yaş / gün dönüşümü tutarlı', [1, 2, 3, 17, 99].every((id) => LS.birthdayOffset(id) >= 0 && LS.birthdayOffset(id) < 8 && LS.ageFromDays(LS.daysForAge(33, id)) === 33) && new Set([1, 2, 3, 4, 5, 6, 7, 8].map(LS.birthdayOffset)).size === 8);
 
     // --- Karakter modeli ---
@@ -5034,7 +5039,7 @@ const pageResults = await page.evaluate(async () => {
       delete c.lifeStage;
       delete c.ageInDays;
       delete c.agedDays;
-      if (!c.growsUpAt && c.age >= 70) c.age = 66; // v23'te bilge yoktu
+      if (!c.growsUpAt && c.age >= 65) c.age = 60; // v23'te bilge yoktu (29.2b: bilge yaşı 65)
     }
     // (29.1) dünya kaysa da kayıtta 21 yaşından küçük bir yetişkin bulunsun (v23'te büyüyen çocuklar 18 yaşında yetişkin olurdu)
     if (!old.characters.some((c) => !c.growsUpAt && c.age < 21)) old.characters.find((c) => !c.growsUpAt && !c.married && c.age < 60).age = 19;
@@ -5171,6 +5176,7 @@ const pageResults = await page.evaluate(async () => {
       const other = adults[1];
       const f = (c) => { c.needs.fun = 80; };
       f(master); f(other);
+      noMoods(master, other);
       const sm = master.buffs.proudMaster;
       // aynı koşulda karşılaştırmak için profilleri ve öteki bonusları eşitle
       const pm = master.profile, po = other.profile;
@@ -7860,6 +7866,7 @@ const pageResults = await page.evaluate(async () => {
     const keepBaker = { gm: baker.isGrandmaster, gp: baker.grandmasterProfession, skills: { ...baker.skills }, wp: baker.workplaceId, eq: baker.equipment };
     const mill = S().world.getCompleted('mill')[0] ?? sim.place('mill');
     baker.skills.baking = 2000;
+    noMoods(baker); // (29.2b) eser şansı ruh halinden (İlham / Ustalık Akışı) bağımsız ölçülür
     baker.isGrandmaster = false; baker.grandmasterProfession = null; baker.workplaceId = null; baker.equipment = { ...(baker.equipment ?? {}), tool: null };
     const craft = S().craftsmanship;
     const base = craft.chanceFor(baker, 'royalLoaf', mill);
@@ -7976,27 +7983,28 @@ const pageResults = await page.evaluate(async () => {
     const s0 = st();
     const lc = () => S().lifecycle;
     const adults = () => st().characters.filter((c) => !c.role && !c.isChild && !c.away && !c.emigrating).sort((a, b) => a.id - b.id);
-    const pool = adults();
+    // (29.2b) Kıdemli Bilge yaşı 65'e indi: önceki bölümlerin uzun koşusunda yaşlanan kurucular havuza girmesin (evi olan, bilge / Saygın Büyük olmayan yetişkinler)
+    const pool = adults().filter((c) => c.lifeStage !== 'elder' && !c.isVenerable && c.homeId !== null);
     sim.give({ wood: 600, stone: 400, food: 900, bread: 80 });
     const events = [];
     const offs = ['venerable:became', 'population:died', 'population:left', 'heirloom:archived', 'life:fatalAccident'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
     const keep = new Map(st().characters.map((c) => [c, { ls: c.lifeStage, age: c.age, aid: c.ageInDays, ven: c.isVenerable, home: c.homeId, kids: [...(c.children ?? [])], inv: [...(c.inventory ?? [])], lifespan: c.lifespan, retired: c.retired, married: c.married, partner: c.partnerId }]));
 
     // --- Veri ve ömür ---
-    check('28.3: ömür 80-90 yaş, tohumdan türeyen izole üreteç (seed + 35)', LSD.LIFESPAN.min === 80 && LSD.LIFESPAN.max === 90 && LSD.LIFESPAN.seedOffset === 35);
+    check('28.3: ömür 66-75 yaş (29.2b), tohumdan türeyen izole üreteç (seed + 30)', LSD.LIFESPAN.min === 66 && LSD.LIFESPAN.max === 75 && LSD.LIFESPAN.seedOffset === 30);
     const ids = Array.from({ length: 300 }, (_, i) => i + 1);
     const spans = ids.map((i) => VN.lifespanFor(42, i));
-    check('28.3: lifespanFor deterministik, 80-90 aralığında ve çeşitli (aynı tohum + kimlik = aynı ömür)', spans.every((v, i) => v === VN.lifespanFor(42, ids[i]) && v >= 80 && v <= 90) && new Set(spans).size >= 8 && VN.lifespanFor(42, 7) !== undefined && spans.some((v, i) => v !== VN.lifespanFor(43, ids[i])));
-    check('28.3: her sakinin ömrü atanmış (80-90)', st().characters.every((c) => c.lifespan >= 80 && c.lifespan <= 90 && c.lifespan === VN.lifespanFor(s0.seed, c.id)));
+    check('28.3: lifespanFor deterministik, 66-75 aralığında ve çeşitli (aynı tohum + kimlik = aynı ömür)', spans.every((v, i) => v === VN.lifespanFor(42, ids[i]) && v >= 66 && v <= 75) && new Set(spans).size >= 8 && VN.lifespanFor(42, 7) !== undefined && spans.some((v, i) => v !== VN.lifespanFor(43, ids[i])));
+    check('28.3: her sakinin ömrü atanmış (66-75)', st().characters.every((c) => c.lifespan >= 66 && c.lifespan <= 75 && c.lifespan === VN.lifespanFor(s0.seed, c.id)));
     const born = new Character({ name: 'Yeni Bebek', age: 0, traits: ['cheerful'], appearance: { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'sky', pants: 'navy' } });
     st().characters.push(born);
     game.events.emit('population:changed', st().characters.length);
-    check('28.3: sonradan katılan / doğan sakine ömür atanır (kimlikten türer)', born.lifespan === VN.lifespanFor(s0.seed, born.id) && born.lifespan >= 80);
+    check('28.3: sonradan katılan / doğan sakine ömür atanır (kimlikten türer)', born.lifespan === VN.lifespanFor(s0.seed, born.id) && born.lifespan >= 66);
     st().characters.splice(st().characters.indexOf(born), 1);
 
     // --- Saygın Büyük ---
     const E = pool[0];
-    const mkElder = (c, age = 72) => { c.lifeStage = 'elder'; c.age = age; c.ageInDays = age * 16; c.retired = true; c.isVenerable = false; };
+    const mkElder = (c, age = 72) => { c.lifeStage = 'elder'; c.age = age; c.ageInDays = age * 16; c.retired = true; c.isVenerable = false; c.lifespan = LSD.LIFESPAN.max; }; // (29.2b) test bilgeleri kendi sınav yaşlarında istemeden vefat etmesin
     const noHeirloom = (c) => { c.inventory = (c.inventory ?? []).filter((x) => !x.heirloom); };
     mkElder(E);
     E.children = [];
@@ -8013,14 +8021,14 @@ const pageResults = await page.evaluate(async () => {
     // Koşullar: evladı olan, reisi olduğu ocağı devredemeyen bilge bekler; 75 yaşında zaman aşımı ile muaf
     const F = pool[1];
     const kid = pool[2];
-    mkElder(F, 72);
+    mkElder(F, 66);
     noHeirloom(F);
     F.children = [kid.id]; kid.parentIds = [F.id]; kid.married = false; kid.partnerId = null;
     const cabin = S().world.getBuilding(F.homeId);
     st().lineage.heads[cabin.id] = F.id;
     const waits = !lc().checkVenerables().includes(F) && !F.isVenerable;
-    F.age = 75; F.ageInDays = 75 * 16;
-    check('28.3: ocağını devredemeyen (evladı evli değil) bilge bekler; 75 yaşında devir muaf sayılır', waits && lc().checkVenerables().includes(F) && F.isVenerable);
+    F.age = 68; F.ageInDays = 68 * 16;
+    check('28.3: ocağını devredemeyen (evladı evli değil) bilge bekler; 68 yaşında devir muaf sayılır', waits && lc().checkVenerables().includes(F) && F.isVenerable);
     // Yadigâr: teslim edilmemiş yadigâr varken Saygın Büyük olunmaz; devredecek kimse yoksa arşive kalkar
     const G = pool[3];
     mkElder(G, 73);
@@ -8089,8 +8097,8 @@ const pageResults = await page.evaluate(async () => {
     const child = pool[7];
     const youth = pool[8];
     const D0 = { kids: D.children, par: partner.parentIds };
-    mkElder(D, 84);
-    D.lifespan = 84;
+    mkElder(D, 72);
+    D.lifespan = 72;
     D.married = true; D.partnerId = partner.id; partner.married = true; partner.partnerId = D.id; partner.lifeStage = 'adult';
     D.children = [child.id]; child.parentIds = [D.id]; child.parents = [D.id];
     D.coins = 100; partner.coins = 5;
@@ -8104,18 +8112,22 @@ const pageResults = await page.evaluate(async () => {
     D.inventory = [{ kind: 'heirloomHammer', qty: 1, name: 'Ata Yadigârı Çekiç', heirloom: { ownerId: D.id, ownerName: D.name, story: 'x', since: st().time.day - 2, chain: [D.name] } }];
     child.inventory = (child.inventory ?? []).filter((x) => !x.heirloom);
     child.lifeStage = 'adult'; child.isChild = false;
-    const peopleBefore = st().characters.length;
-    const deaths0 = st().lifeStages.deaths;
+    let peopleBefore = st().characters.length;
+    let deaths0 = st().lifeStages.deaths;
     events.length = 0;
     // Ömrüne ulaşmadan ölmez
-    D.age = 83;
+    D.age = 71;
     const early = lc().dailyDeaths();
     check('28.3: ömrüne ulaşmayan bilge vefat etmez', !early.includes(D) && st().characters.includes(D));
-    D.age = 84;
+    // (29.2b) Kurucu bilgeler artık ömrüne ulaşıp aynı çağrıda vefat edebilir: sayaçlar bu çağrıdan sonra alınır
+    peopleBefore = st().characters.length;
+    deaths0 = st().lifeStages.deaths;
+    events.length = 0;
+    D.age = 72;
     const dueBefore = new Set(st().characters.filter((c) => c.lifeStage === 'elder' && !c.away && c.age >= c.lifespan).map((c) => c.id));
     const died = lc().dailyDeaths();
-    check('28.3: ömrüne ulaşan Kıdemli Bilge gün dönümünde vefat eder ve sistemden çıkar (state ve world)', died.includes(D) && !st().characters.includes(D) && !S().world.characters.includes(D) && st().characters.length === peopleBefore - died.length && S().world.getCharacter(D.id) === undefined | S().world.getCharacter(D.id) === null);
-    check('28.3: kasaba günlüğü ve olay: "[İsim] [Yaş] yaşında huzur içinde hayata gözlerini yumdu."', st().journal.some((j) => j.text === `${D.name} 84 yaşında huzur içinde hayata gözlerini yumdu.`) && events.some((e) => e.n === 'population:died' && e.p.character === D && e.p.age === 84 && e.p.cause === 'age'));
+    check('28.3: ömrüne ulaşan Kıdemli Bilge gün dönümünde vefat eder ve sistemden çıkar (state ve world)', died.includes(D) && !st().characters.includes(D) && !S().world.characters.includes(D) && st().characters.length === peopleBefore - died.length && S().world.getCharacter(D.id) === undefined | S().world.getCharacter(D.id) === null, `${died.map((c) => c.name + c.age)} ${D.name} ${D.age}/${D.lifespan} ${peopleBefore} ${st().characters.length}`);
+    check('28.3: kasaba günlüğü ve olay: "[İsim] [Yaş] yaşında huzur içinde hayata gözlerini yumdu."', st().journal.some((j) => j.text === `${D.name} 72 yaşında huzur içinde hayata gözlerini yumdu.`) && events.some((e) => e.n === 'population:died' && e.p.character === D && e.p.age === 72 && e.p.cause === 'age'));
     check('28.3: vefat sayaçları ve son vefat kaydı', st().lifeStages.deaths === deaths0 + died.length && st().lifeStages.lastDeath?.name === died.at(-1).name && !st().journal.some((j) => j.text.includes(`${D.name} kesesindeki`)));
     // Kopuk referans bırakmaz
     const Did = D.id;
@@ -8137,15 +8149,15 @@ const pageResults = await page.evaluate(async () => {
     // Yetişkin (Bilge olmayan) ömrünü doldursa da ölmez; seferdeki ertelenir
     const K = pool[9];
     const kAge = K.age; const kLs = K.lifeStage;
-    K.lifeStage = 'adult'; K.age = 90; K.lifespan = 80;
+    K.lifeStage = 'adult'; K.age = 78; K.lifespan = 66;
     const away = pool[10];
-    mkElder(away, 90); away.lifespan = 85; away.away = { stage: 'away' };
+    mkElder(away, 78); away.lifespan = 70; away.away = { stage: 'away' };
     const dd = lc().dailyDeaths();
     check('28.3: yalnızca Kıdemli Bilge / Saygın Büyük ömründen ölür (yetişkin ölmez); seferdeki bilge dönene dek ertelenir', !dd.includes(K) && !dd.includes(away) && st().characters.includes(K) && st().characters.includes(away));
     away.away = null; K.lifeStage = kLs; K.age = kAge;
     // Saygın Büyük de ömrüyle vefat eder
     const venDie = E;
-    venDie.lifespan = 85; venDie.age = 85;
+    venDie.lifespan = 75; venDie.age = 75;
     check('28.3: Saygın Büyük de ömrüne ulaşınca vefat eder', lc().dailyDeaths().includes(venDie) && !st().characters.includes(venDie));
 
     // --- Trajik kazalar ---
@@ -8219,7 +8231,7 @@ const pageResults = await page.evaluate(async () => {
 
     // --- Kayıt (sürüm 34) ---
     const rawSave = JSON.parse(JSON.stringify(S().saves.snapshot()));
-    check('28.3: ömür ve Saygın Büyük kayda yazılır (characters[].lifespan / isVenerable), vefat sayaçları', rawSave.characters.every((c) => c.lifespan >= 80 && c.lifespan <= 90 && typeof c.isVenerable === 'boolean') && rawSave.characters.some((c) => c.isVenerable) && rawSave.lifeStages.deaths >= 3 && rawSave.lifeStages.accidents >= 2 && typeof rawSave.lifeStages.lastDeath.name === 'string' && rawSave.version === undefined | true);
+    check('28.3: ömür ve Saygın Büyük kayda yazılır (characters[].lifespan / isVenerable), vefat sayaçları', rawSave.characters.every((c) => c.lifespan >= 66 && c.lifespan <= 75 && typeof c.isVenerable === 'boolean') && rawSave.characters.some((c) => c.isVenerable) && rawSave.lifeStages.deaths >= 3 && rawSave.lifeStages.accidents >= 2 && typeof rawSave.lifeStages.lastDeath.name === 'string' && rawSave.version === undefined | true, `${rawSave.characters.filter((c) => !(c.lifespan >= 66 && c.lifespan <= 75)).map((c) => c.name + ':' + c.lifespan)} ven ${rawSave.characters.filter((c) => c.isVenerable).length} d ${rawSave.lifeStages.deaths} a ${rawSave.lifeStages.accidents}`);
     const venRaw = rawSave.characters.find((c) => c.isVenerable);
     const venBack = Character.fromJSON(venRaw);
     const badLife = Character.fromJSON({ ...venRaw, lifespan: 12 });
@@ -8516,7 +8528,7 @@ const pageResults = await page.evaluate(async () => {
     check('29.1: ara skorlar: +2 (kıvılcım +1, ortak özellik), 0 (kıvılcım -1, rezonans)', total(mk(p1, { traits: ['glutton'] }), mk(p2, { traits: ['glutton'] })) === 2 && total(mk(n1, { quirk: 'musician' }), mk(n2, { quirk: 'festive' })) === 0);
 
     // --- Determinizm: ana üreteç, sistem üreteçleri ve Math.random sıfır çağrı ---
-    const adults = s0.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.visible !== undefined).sort((a, b) => a.id - b.id);
+    const adults = s0.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.visible !== undefined && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
     const keepRel = new Map(s0.characters.map((c) => [c, JSON.stringify(c.relationships)]));
     const keepScores = JSON.stringify(s0.relationships);
     const keepStats = { ...s0.stats };
@@ -8569,6 +8581,7 @@ const pageResults = await page.evaluate(async () => {
     setChem(A, B, 2);
     s0.relationships[key] = 50;
     A.needs.fun = 40; A.needs.social = 40;
+    noMoods(A, B);
     const fun0 = A.needs.fun;
     S().behavior.performSocial(A, A.task, ACTIVITIES.fountain, 10);
     check('29.1: gerçek sohbette (performSocial) güçlü çekim keyfi doldurur', Math.abs(A.needs.fun - fun0 - (friend.funBonus * 1.5 + CD.CHEMISTRY_LEVELS[2].funFlat) * 10) < 1e-6, `${fun0} -> ${A.needs.fun}`);
@@ -8603,7 +8616,7 @@ const pageResults = await page.evaluate(async () => {
     const loveKey = RSX.pairKey(L1.id, L2.id);
     cast.push(L1, L2);
     const group = { activity: 'fountain', buildingId: fountain.id, kind: 'chat' };
-    const love = (n, score, roll = 0) => { L1.partnerId = L2.partnerId = null; setChem(L1, L2, n); s0.relationships[loveKey] = score; forced(rel.rng, roll, () => rel.tryRomance(L1, L2, group, 1)); return RSX.arePartners(L1, L2); };
+    const love = (n, score, roll = 0) => { noMoods(L1, L2); L1.partnerId = L2.partnerId = null; setChem(L1, L2, n); s0.relationships[loveKey] = score; forced(rel.rng, roll, () => rel.tryRomance(L1, L2, group, 1)); return RSX.arePartners(L1, L2); };
     check('29.1: kimyası 0 ya da eksi olanlar ilişki puanı 100 olsa da aşık olamaz', !love(0, 100) && !love(-1, 100) && !love(-2, 100));
     check('29.1: kimya +1: aşk 85 puandan başlar (84\'te olmaz)', !love(1, 84) && love(1, 85));
     check('29.1: kimya +2: 75 puanda, +3: 65 puanda aşık olur (tutkulu); +2 64 / 74\'te olmaz', !love(2, 74) && love(2, 75) && !love(3, 64) && love(3, 65));
@@ -8706,6 +8719,7 @@ const pageResults = await page.evaluate(async () => {
     for (const c of s0.characters) { c.partnerId = null; c.married = false; }
     const X = adults.find((c) => c !== L1 && c !== L2 && RSX.canRomance(c, L1));
     if (X) {
+      s0.relationships[RSX.pairKey(X.id, L2.id)] = 0; // hoşlandığı kişi L1: L2'ye karşı daha yakın olmasın
       setChem(X, L1, 2);
       s0.relationships[RSX.pairKey(X.id, L1.id)] = 70;
       L1.partnerId = L2.id; L2.partnerId = L1.id;
@@ -8726,18 +8740,19 @@ const pageResults = await page.evaluate(async () => {
     // Ruh İkizi (gerçek saat başı güncellemesi: kimya yeniden hesaplanır)
     const keepQuirks = [A.quirk, B.quirk, A.traits, B.traits];
     A.quirk = B.quirk = 'musician'; A.traits = ['glutton']; B.traits = ['glutton'];
-    for (const x of [A, B]) for (const y of [C, D, L1, L2]) if (x !== y) s0.relationships[RSX.pairKey(x.id, y.id)] = 10; // başka bir ruh ikizi adayı araya girmesin (kişi başı tek bağ)
+    for (const x of [A, B]) for (const y of s0.characters) if (x !== y && y !== A && y !== B && !y.role) { s0.relationships[RSX.pairKey(x.id, y.id)] = 10; CH.removeTag(x, y.id, 'kindred'); CH.removeTag(y, x.id, 'kindred'); } // başka bir ruh ikizi adayı araya girmesin (kişi başı tek bağ)
     CH.chemistryOf(s0, A, B);
     A.relationships[B.id].craft = B.relationships[A.id].craft = true;
     CH.removeTag(A, B.id, 'kindred'); CH.removeTag(B, A.id, 'kindred');
     s0.relationships[key] = 30;
     const bonds0 = s0.stats.kindredBonds ?? 0;
+    noMoods(A, B);
     chem.onHour();
     const tooEarly = CH.hasTag(A, B.id, 'kindred');
     s0.relationships[key] = 80;
     chem.onHour();
     const realChem = A.relationships[B.id].chemistry;
-    check('29.1: kimyası +2 / +3 olan çift en iyi arkadaş olunca aralarında RUH İKİZİ bağı filizlenir (karşılıklı; günlük ve anı)', realChem >= 2 && !tooEarly && CH.hasTag(A, B.id, 'kindred') && CH.hasTag(B, A.id, 'kindred') && s0.stats.kindredBonds >= bonds0 + 1 && chem.kindredCount(A) === 1 && s0.journal.slice(-12).some((e) => e.text.includes('ruh ikizi') && e.text.includes(A.name) && e.text.includes(B.name)) && A.memories.some((m) => m.text.includes('ruh ikizi')), `kimya ${realChem} erken ${tooEarly} ${JSON.stringify(A.relationships[B.id])} sayaç ${bonds0}->${s0.stats.kindredBonds}`);
+    check('29.1: kimyası +2 / +3 olan çift en iyi arkadaş olunca aralarında RUH İKİZİ bağı filizlenir (karşılıklı; günlük ve anı)', realChem >= 2 && !tooEarly && CH.hasTag(A, B.id, 'kindred') && CH.hasTag(B, A.id, 'kindred') && s0.stats.kindredBonds >= bonds0 + 1 && chem.kindredCount(A) === 1 && s0.journal.slice(-12).some((e) => e.text.includes('ruh ikizi') && e.text.includes(A.name) && e.text.includes(B.name)) && A.memories.some((m) => m.text.includes('ruh ikizi')), `kimya ${realChem} erken ${tooEarly} ${JSON.stringify(A.relationships[B.id])} sayaç ${bonds0}->${s0.stats.kindredBonds} kA ${chem.kindredCount(A)} kB ${chem.kindredCount(B)} skor ${RSX.getFriendship?.(s0, A, B)} ${s0.relationships[key]} ${A.name}/${B.name}`);
     check('29.1: Ruh İkizi kalıcıdır (süresi yok), öteki etiketlerin bitiş dakikası vardır', A.relationships[B.id].until.kindred === undefined && CD.EMOTION_TAGS.kindred.days === null && Number.isFinite(A.relationships[B.id].until.grateful));
     A.relationships[B.id].until.grateful = s0.totalMinutes - 1;
     chem.onHour();
@@ -8938,13 +8953,13 @@ const pageResults = await page.evaluate(async () => {
     const { Character } = await import('/src/entities/Character.js');
     const { ACTIVITIES } = await import('/src/data/activities.js');
     const { CONFIG } = await import('/src/config.js');
-    MO.MOOD_ENGINE.enabled = true; // (eski bölümlerde kapalıydı)
     const ms = S().moodlets;
     const brain = S().behavior.brain;
     const rel = S().relationships;
     const forced = (rng, value, fn) => { rng.next = () => value; try { return fn(); } finally { delete rng.next; } };
     const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
-    const adults = s0.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((a, b) => a.id - b.id);
+    // (29.2b) Kıdemli Bilge yaşı 65'e indi: ruh hali testlerinin 4 kişilik kadrosu bilgelerden değil, çalışan yetişkinlerden seçilir
+    const adults = s0.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
     const [A, B, C, D] = adults;
     const keep = new Map(s0.characters.map((c) => [c, { moodlets: JSON.stringify(c.moodlets), rel: JSON.stringify(c.relationships), traits: c.traits, quirk: c.quirk, profile: c.profile, needs: { ...c.needs }, task: c.task, x: c.x, y: c.y, visible: c.visible, speech: c.speech, bubble: c.bubble, memories: c.memories.length, homeId: c.homeId, workplaceId: c.workplaceId, skills: { ...c.skills }, partnerId: c.partnerId, married: c.married, buffs: { ...c.buffs }, lastConsoleAt: c.lastConsoleAt, inside: c.insideBuildingId, pose: c.pose, flowStreak: c.flowStreak }]));
     const keepStats = JSON.stringify(s0.moodlets);
@@ -8998,7 +9013,7 @@ const pageResults = await page.evaluate(async () => {
     const sleepy = work(['sleepyhead'], 'mine');
     check('29.2: aynı iş, farklı kişilik: Çalışkan iş bitince Alın Teri, Uykucu ağır işte Angarya Bıkkınlığı alır', proud?.key === 'proud_work' && proud.reason === 'proud_trait' && sleepy?.key === 'drudgery' && sleepy.reason === 'drudgery_sleepy');
     check('29.2: Hırslı ve Zanaatkâr Ruhu da üretimden gurur duyar; sıradan sakin sıradan işte moodlet almaz', work(['ambitious'], 'mine')?.reason === 'proud_ambitious' && work(['glutton'], 'craft', 80, 'craftsman')?.reason === 'proud_craft' && work(['glutton'], 'chop') === null);
-    check('29.2: enerjisi %35\'in altında ağır işte (maden, taş ocağı, inşaat) çalıştırılan herkes bıkar; hafif işte bıkmaz', work(['hardworking'], 'build', 30)?.reason === 'drudgery_tired' && work(['glutton'], 'quarry', 20)?.key === 'drudgery' && work(['glutton'], 'farm', 20) === null && MD.MOOD_RULES.heavyWork.join() === 'mine,quarry,mineIron,build');
+    check('29.2: enerjisi %35\'in altında ağır işte (maden, taş ocağı, inşaat) çalıştırılan herkes bıkar; hafif işte bıkmaz', work(['hardworking'], 'build', 30)?.reason === 'drudgery_tired' && work(['glutton'], 'quarry', 20)?.key === 'drudgery' && work(['glutton'], 'chop', 20) === null && MD.MOOD_RULES.heavyWork.join() === 'mine,quarry,mineIron,build');
     check('29.2: doğasına ters iş: Doğa Sever taş ocağında, Hırslı tarlada bıkar (Hırslı madende gurur duyar)', work(['natureLover'], 'quarry')?.reason === 'drudgery_misfit' && work(['ambitious'], 'farm')?.reason === 'drudgery_misfit' && work(['ambitious'], 'mineIron')?.key === 'proud_work');
     setTraits(A, ['glutton']);
     clear(A);
@@ -9034,13 +9049,24 @@ const pageResults = await page.evaluate(async () => {
     ms.onProduction(A, garden);
     const flowOne = MO.hasMoodlet(A, 'flow_state');
     ms.onProduction(A, garden);
-    check('29.2: Ustalık Akışı: kendi sabit iş yerinde dinç ve keyifli Usta art arda iki mesaide akışa girer (iş +%12, deneyim +%25, eser şansı +%2)', !flowOne && MO.hasMoodlet(A, 'flow_state') && near(A.mood.workMul, 1.12) && near(A.mood.xpMul, 1.25) && near(A.mood.masterwork, 0.02));
-    clear(A); A.flowStreak = 0; A.needs.energy = 30;
+    check('29.2: Ustalık Akışı: dinç ve keyifli Usta kendi uzmanlık yapısında art arda iki üretimde akışa girer, sabitlenmesi gerekmez (iş +%12, deneyim +%25, eser şansı +%2)', !flowOne && A.workplaceId === garden.id && MO.hasMoodlet(A, 'flow_state') && near(A.mood.workMul, 1.12) && near(A.mood.xpMul, 1.25) && near(A.mood.masterwork, 0.02));
+    // (29.2b) Sabitleme şartı kalktı: otopilottaki (sabitlenmemiş) usta da akışa girer
+    clear(A); A.flowStreak = 0; A.workplaceId = null;
     ms.onProduction(A, garden); ms.onProduction(A, garden);
-    const tiredFlow = MO.hasMoodlet(A, 'flow_state');
-    A.needs.energy = 90; A.workplaceId = null; A.flowStreak = 0;
-    ms.onProduction(A, garden); ms.onProduction(A, garden);
-    check('29.2: yorgun ya da başka iş yerindeki usta akışa giremez', !tiredFlow && !MO.hasMoodlet(A, 'flow_state'));
+    const unpinnedFlow = MO.hasMoodlet(A, 'flow_state');
+    // yorgun (enerji 30), tam sınırda (enerji 50: "%50'den fazla" olmalı), keyifsiz, acemi (Sv.1) ya da başka mesleğin yapısındaki usta akışa giremez
+    const blockedFlow = [];
+    for (const [label, setup] of [['yorgun', () => { A.needs.energy = 30; }], ['sınırda', () => { A.needs.energy = 50; }], ['keyifsiz', () => { A.needs.fun = 40; }], ['acemi', () => { A.skills.farming = 0; }], ['başka meslek', () => { A.skills.farming = 0; A.skills.mining = 2000; }]]) {
+      clear(A); A.flowStreak = 0; A.needs.energy = 90; A.needs.fun = 90; A.skills.farming = 2000; A.skills.mining = 0; setup();
+      ms.onProduction(A, garden); ms.onProduction(A, garden); ms.onProduction(A, garden);
+      blockedFlow.push(`${label}:${MO.hasMoodlet(A, 'flow_state')}`);
+    }
+    clear(A); A.flowStreak = 0; A.needs.energy = 90; A.needs.fun = 90; A.skills.farming = 2000; A.skills.mining = 0;
+    ms.onProduction(A, garden);
+    const brokenStreak = A.flowStreak === 1;
+    A.needs.energy = 20; ms.onProduction(A, garden); // yorgun mesai seriyi sıfırlar
+    check('29.2b: Ustalık Akışı sabitlemesiz tetiklenir; yorgun / keyifsiz / sınırda (%50) / acemi / başka meslekte olmaz, yorgun mesai seriyi sıfırlar', unpinnedFlow && blockedFlow.every((x) => x.endsWith(':false')) && brokenStreak && A.flowStreak === 0, blockedFlow.join(' '));
+    A.needs.energy = 90; A.flowStreak = 0;
     A.skills = { ...keep.get(A).skills }; A.workplaceId = keep.get(A).workplaceId; [A.isGrandmaster, A.grandmasterProfession] = keepGM;
     const CS = S().craftsmanship;
     clear(A);
@@ -9185,6 +9211,7 @@ const pageResults = await page.evaluate(async () => {
     const realConsole = brain.planConsole.bind(brain);
     brain.planConsole = () => null;
     brain.planWork = () => fakeHeavy;
+    s0.social.party = null; // (29.2b) 29.1 aşk testlerinden kalan düğün kutlaması bu bölümün karar testlerine karışmasın
     const noFest = () => !s0.events.festival.active && !s0.goldenAge?.celebration && !s0.social?.party;
     const d0 = forced(brain.rng, 0.99, () => brain.decide(A, 10));
     MO.addMoodlet(A, 'drudgery', now());
@@ -9232,6 +9259,7 @@ const pageResults = await page.evaluate(async () => {
     for (const o of [B, C]) { sitQuiet(o); o.x = A.x + 30; o.y = A.y; }
     C.x = A.x + 34;
     setChem(A, B, 0); setChem(A, C, 3);
+    for (const o of [B, C]) for (const tag of ['resentful', 'grateful', 'jealous', 'admiration', 'kindred']) { CH2.removeTag(A, o.id, tag); CH2.removeTag(o, A.id, tag); } // (29.2b) önceki bölümlerin etiketleri sıralamayı karıştırmasın
     s0.relationships[RS2.pairKey(A.id, B.id)] = 20; s0.relationships[RS2.pairKey(A.id, C.id)] = 20;
     const others2 = s0.characters.filter((c) => ![A, B, C].includes(c)).map((c) => [c, c.away]);
     for (const [c] of others2) c.away = { stage: 'away' };
@@ -9239,7 +9267,7 @@ const pageResults = await page.evaluate(async () => {
     clear(A);
     const nearest = brain.findPartner(A, 19);
     for (const [c, a] of others2) c.away = a;
-    check('29.2: dost arayan sakin kimyası yüksek olanı seçer (gerçek Brain.findPartner); ruh hali geçince en yakına döner', friend === C && nearest === B, `${friend?.name} ${nearest?.name}`);
+    check('29.2: dost arayan sakin kimyası yüksek olanı seçer (gerçek Brain.findPartner); ruh hali geçince en yakına döner', friend === C && nearest === B, `${friend?.name} ${nearest?.name} B=${B.name} C=${C.name} ${A.mood.seek} ${JSON.stringify(A.relationships[C.id])}`);
     const weights = (setup) => { clear(A); setup(); const real = brain.rng.weighted; let seen = null; brain.rng.weighted = (opts) => { seen ??= Object.fromEntries(opts); return opts[0][0]; }; const realResolve = brain.resolveLeisure.bind(brain); brain.resolveLeisure = () => ({ activity: 'wait', duration: 1 }); brain.planLeisure(A, 13); brain.resolveLeisure = realResolve; delete brain.rng.weighted; return seen ?? {}; };
     setTraits(A, ['glutton']);
     const wPlain = weights(() => {});
@@ -9342,15 +9370,22 @@ const pageResults = await page.evaluate(async () => {
     // Öteki travmalar ve zaferler
     const home = { id: -77, workerIds: new Set([C.id]) };
     A.homeId = -77;
-    ms.onFire(home, [B.id], 'shaken_fire', 'minor');
-    check('29.2: yangın: söndüren, yapının sakini ve çalışanı Sarsılmış olur (24 saat; iş -%10, gece ürkme x2); ilgisiz sakin olmaz', MO.hasMoodlet(A, 'shaken') && MO.hasMoodlet(B, 'shaken') && MO.hasMoodlet(C, 'shaken') && !MO.hasMoodlet(D, 'shaken') && near(B.mood.workMul, 0.9) && B.mood.scareMul === 2 && MO.getMoodlet(B, 'shaken').until === Math.round(now() + 24 * 60));
+    ms.onFire(home, 'shaken_burned', 'major');
+    check('29.2b: yangında bina kül olunca yapının sakini ve çalışanı Sarsılmış olur (24 saat; büyük kademede iş -%15, gece ürkme x2); söndürmeye koşan ve ilgisiz sakin olmaz', MO.hasMoodlet(A, 'shaken') && MO.hasMoodlet(C, 'shaken') && !MO.hasMoodlet(B, 'shaken') && !MO.hasMoodlet(D, 'shaken') && near(C.mood.workMul, 0.85) && C.mood.scareMul === 2.5 && MO.getMoodlet(C, 'shaken').until === Math.round(now() + 24 * 60), [A, B, C, D].map((c) => `${c.name}:${c.moodlets.map((m) => m.key)}:${c.mood.workMul}`).join(' '));
     A.homeId = keep.get(A).homeId;
     for (const c of [A, B, C, D]) clear(c);
-    game.events.emit('crisis:fireOut', { building: { id: -78, name: 'Deneme', workerIds: new Set() }, helpers: [D.id], byPlayer: false, progress: 0 });
+    // (29.2b) Yangını başarıyla söndürmek kahramanlıktır: söndürenler (ve yapının sakinleri) Sarsılmış olmaz
+    A.homeId = -78;
+    game.events.emit('crisis:fireOut', { building: { id: -78, name: 'Deneme', workerIds: new Set([C.id]) }, helpers: [B.id, D.id], byPlayer: false, progress: 0 });
+    const heroesCalm = ![A, B, C, D].some((c) => MO.hasMoodlet(c, 'shaken'));
+    A.homeId = keep.get(A).homeId;
+    game.events.emit('crisis:burnedDown', { building: { id: -79, name: 'Kül', workerIds: new Set([D.id]) } });
+    const ashesShaken = MO.hasMoodlet(D, 'shaken') && !MO.hasMoodlet(B, 'shaken') && MO.getMoodlet(D, 'shaken').reason === 'shaken_burned' && MO.getMoodlet(D, 'shaken').tier === 'major';
+    clear(D);
     ms.apply(A, 'shaken', { reason: 'shaken_injured', tier: 'major' });
     A.x = 500; A.y = 500; B.x = 540; B.y = 500; C.x = 2000; C.y = 2000; B.visible = A.visible = true;
     ms.onAccident(A);
-    check('29.2: yangın olayı (crisis:fireOut) dinlenir; yaralanan ve kazaya yakından tanık olan sarsılır, uzaktaki sarsılmaz', MO.hasMoodlet(D, 'shaken') && MO.getMoodlet(A, 'shaken').reason === 'shaken_injured' && MO.getMoodlet(B, 'shaken')?.reason === 'shaken_witness' && MO.getMoodlet(B, 'shaken').whoName === A.name && !MO.hasMoodlet(C, 'shaken'));
+    check('29.2b: yangın söndürülünce (crisis:fireOut) kimse sarsılmaz, bina kül olunca (crisis:burnedDown) çalışanı sarsılır; yaralanan ve kazaya yakından tanık olan sarsılır, uzaktaki sarsılmaz', heroesCalm && ashesShaken && MO.getMoodlet(A, 'shaken').reason === 'shaken_injured' && MO.getMoodlet(B, 'shaken')?.reason === 'shaken_witness' && MO.getMoodlet(B, 'shaken').whoName === A.name && !MO.hasMoodlet(C, 'shaken'));
     for (const c of [A, B, C, D]) clear(c);
     game.events.emit('chemistry:unrequited', { from: A, target: B, rival: C });
     ms.onLevelDown(C, D, { key: 'rival' });
@@ -9383,7 +9418,7 @@ const pageResults = await page.evaluate(async () => {
     ms.scanBard();
     guests.splice(guests.indexOf(fakeBard), 1);
     check('29.2: Seyyar Ozan çalarken yakınında duran ilham alır, uzaktaki almaz', MO.getMoodlet(A, 'inspired')?.reason === 'inspired_bard' && !MO.hasMoodlet(C, 'inspired'));
-    check('29.2: sistem olayları dinler (23 dinleyici) ve motor şalteri kapalıyken moodlet eklenmez', ms.unsubscribers.length === 23 && (MO.MOOD_ENGINE.enabled = false, clear(A), MO.addMoodlet(A, 'euphoric', now()) === null && A.moodlets.length === 0) && (MO.MOOD_ENGINE.enabled = true));
+    check('29.2b: sistem olayları dinler (22 dinleyici: yangın söndürme artık dinlenmez) ve motor her zaman açıktır (test şalteri kalktı; yine de kod şalteri kapalıyken moodlet eklenmez)', ms.unsubscribers.length === 22 && MO.MOOD_ENGINE.enabled === true && (MO.MOOD_ENGINE.enabled = false, clear(A), MO.addMoodlet(A, 'euphoric', now()) === null && A.moodlets.length === 0) && (MO.MOOD_ENGINE.enabled = true));
 
     // --- Süre ---
     clear(A);
@@ -9500,6 +9535,101 @@ const pageResults = await page.evaluate(async () => {
     Object.assign(s0.relationships, JSON.parse(keepScores));
     s0.journal.length = Math.min(s0.journal.length, keepJournal);
     s0.time.hour = decideKeep.hour;
+  }
+
+  // ===== 29.2b: Cila, denge ve şantiye erişim yaması =====
+  {
+    const LSB = await import('/src/data/lifeStages.js');
+    const VNB = await import('/src/systems/Venerable.js');
+    const LS2 = await import('/src/systems/LifeStages.js');
+    const { BUILDINGS: BLD } = await import('/src/data/buildings.js');
+    const world = scene.world;
+    const cons = scene.construction;
+    const st2 = game.state;
+    sim.give({ wood: 600, stone: 400, iron: 100, gold: 2000, food: 400 });
+
+    // --- Şantiye erişimi: son açık çalışma karosu kapanmaz; tamamen kapalıysa 2 karo uzaktan çalışılır ---
+    // Etrafı 5x5 boş, yürünebilir ve kasabaya bağlı bir alan (şantiyenin çevresi dışarıdan da ulaşılabilir olsun)
+    const plazaB = world.landmarks.plaza;
+    const openAreas = [];
+    for (let y = plazaB.y - 30; y < plazaB.y + 30; y++) {
+      for (let x = plazaB.x - 30; x < plazaB.x + 30; x++) {
+        let all = true;
+        for (let dy = -2; dy <= 2 && all; dy++) for (let dx = -2; dx <= 2 && all; dx++) {
+          const tx = x + dx; const ty = y + dy;
+          all = world.map.inBounds(tx, ty) && world.map.isWalkable(tx, ty) && world.map.getOccupant(tx, ty) === 0 && !world.map.getObject(tx, ty) && world.isReachable(tx, ty);
+        }
+        if (all && cons.checkPlacement('lantern', x, y).ok) openAreas.push({ x, y });
+      }
+    }
+    const lanternSpot = openAreas[0] ?? null;
+    const site = lanternSpot ? cons.placeSite('lantern', lanternSpot.x, lanternSpot.y, { quiet: true }).building : null;
+    check('29.2b: Fener (spots: none) şantiyesi kurulur ve işi açılır', Boolean(site) && BLD.lantern.spots === 'none' && scene.jobs.jobs.some((j) => j.buildingId === site.id));
+    const ring = [];
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) ring.push({ x: site.tileX + dx, y: site.tileY + dy });
+    const fakeId = 987654;
+    const refresh = () => { world.refreshStaticData(); };
+    const open = ring.filter((r) => world.map.isWalkable(r.x, r.y) && world.isReachable(r.x, r.y) && cons.checkPlacement('lantern', r.x, r.y).ok);
+    const keepTile = open.find((r) => (r.x === site.tileX || r.y === site.tileY));
+    const blockedTiles = [];
+    const blockOthers = (except) => {
+      for (const r of ring) {
+        if (except.some((e) => e.x === r.x && e.y === r.y)) continue;
+        if (world.map.getOccupant(r.x, r.y) !== 0) continue;
+        world.map.setOccupant(r.x, r.y, fakeId, false);
+        blockedTiles.push(r);
+      }
+      refresh();
+    };
+    if (keepTile) {
+      // İki açık karo kalsın: ikisinden biri kapanabilir (hâlâ bir karo kalır)
+      const second = open.find((r) => r !== keepTile && (r.x === site.tileX || r.y === site.tileY));
+      blockOthers(second ? [keepTile, second] : [keepTile]);
+      const twoLeft = world.getSpots(site).filter((s) => ring.some((r) => r.x === s.x && r.y === s.y)).length;
+      const allowedWhileTwo = second ? cons.checkPlacement('lantern', keepTile.x, keepTile.y).ok : null;
+      // Son açık karoyu kapatmak reddedilir ve oyuncuya anlamlı bir mesaj döner
+      if (second) { world.map.setOccupant(second.x, second.y, fakeId, false); blockedTiles.push(second); refresh(); }
+      const lastLeft = world.getSpots(site).length;
+      const denied = cons.checkPlacement('lantern', keepTile.x, keepTile.y);
+      check('29.2b: şantiyenin SON açık çalışma karosunu kapatan yapı reddedilir (anlamlı mesaj); iki karo açıkken izin verilir', twoLeft === (second ? 2 : 1) && (second ? allowedWhileTwo === true : true) && lastLeft === 1 && denied.ok === false && /son çalışma yerini kapatır/.test(denied.reason) && denied.reason.includes(site.name), `${twoLeft}/${lastLeft} ${allowedWhileTwo} ${denied.reason}`);
+      const farOk = world.buildings.length > 0 && cons.checkPlacement('lantern', lanternSpot.x + 6, lanternSpot.y + 6);
+      check('29.2b: uzaktaki yerleşim etkilenmez (yalnızca ayak izine yakın şantiyeler korunur)', farOk && (farOk.ok || !/son çalışma yerini/.test(farOk.reason)), farOk?.reason);
+      // Tamamen kapanırsa: işçiler çapraz / 2 karo uzaktan çalışır (spotsFor boş dönmez)
+      world.map.setOccupant(keepTile.x, keepTile.y, fakeId, false); blockedTiles.push(keepTile); refresh();
+      const job = scene.jobs.jobs.find((j) => j.buildingId === site.id);
+      const far = scene.jobs.spotsFor(job);
+      const cheb = (a) => Math.max(Math.abs(a.x - site.tileX), Math.abs(a.y - site.tileY));
+      check('29.2b: çevresi tamamen kapanan şantiyede spotsFor boş değildir: işçiler 2 karo uzaktan da çalışır', ring.every((r) => !world.map.isWalkable(r.x, r.y)) && far.length > 0 && far.every((s) => cheb(s) === 2 && world.isReachable(s.x, s.y)), `${far.length}`);
+      // Yeniden açılınca yakın (1 karo) halka geri gelir
+      for (const r of blockedTiles) world.map.setOccupant(r.x, r.y, 0);
+      refresh();
+      check('29.2b: çevre yeniden açılınca çalışma noktaları yine 1 karolu halkadır', scene.jobs.spotsFor(job).length > 0 && scene.jobs.spotsFor(job).every((s) => cheb(s) === 1));
+    } else check('29.2b: şantiye çevresinde yerleşim denemesi için açık karo bulunamadı', false);
+    // Kendi başına şantiyesi erişilemez bir yere yapı kurulmaz (en az 1 çalışma karosu): tamamen çevrili tek bir karo
+    {
+      const lone = openAreas.find((a) => Math.abs(a.x - lanternSpot.x) + Math.abs(a.y - lanternSpot.y) > 6) ?? openAreas.at(-1);
+      const around = [];
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) around.push({ x: lone.x + dx, y: lone.y + dy });
+      const blockedNow = [];
+      for (const r of around) if (world.map.getOccupant(r.x, r.y) === 0) { world.map.setOccupant(r.x, r.y, fakeId, false); blockedNow.push(r); }
+      refresh();
+      const res = cons.checkPlacement('lantern', lone.x, lone.y);
+      check('29.2b: çevresi tamamen kapalı bir karoya yapı / şantiye kurulamaz (en az bir erişilebilir çalışma karosu şart)', res.ok === false && /ulaşılamıyor|kopar|açık/.test(res.reason ?? ''), res.reason);
+      for (const r of blockedNow) world.map.setOccupant(r.x, r.y, 0);
+      refresh();
+    }
+    // Temizlik
+    scene.jobs.cancelForBuilding(site.id);
+    world.removeBuilding(site);
+
+    // --- Ustalık Akışı ve Sarsılmış kuralları sistem düzeyinde (ayrıntılı birim testleri 29.2 bölümünde) ---
+    check('29.2b: moodlet motoru her zaman açıktır (testlerde şalter yok) ve yangını söndüren kahraman Sarsılmış olmaz (yalnızca kül, yaralanma, kazada tanıklık)', MDX.MOOD_ENGINE.enabled === true && scene.moodlets.unsubscribers.length === 22);
+
+    // --- Doğal ömür: 66-75 yaş ---
+    const spans = Array.from({ length: 400 }, (_, i) => VNB.lifespanFor(42, i + 1));
+    check('29.2b: doğal ömür 66-75 yaş (400 kimlikte aralığın tamamı görülür), Kıdemli Bilge yaşı 65, ocak muafiyeti ömür sınırının altında', LSB.LIFESPAN.min === 66 && LSB.LIFESPAN.max === 75 && spans.every((v) => v >= 66 && v <= 75) && new Set(spans).size === 10 && LSB.AGING.elderAt === 65 && LSB.AGING.elderAt < LSB.LIFESPAN.min && LSB.VENERABLE.hearthGraceAge < LSB.LIFESPAN.max, [...new Set(spans)].sort().join());
+    check('29.2b: kayıttaki 80-90 yaşlık eski ömür geçersizdir (kimlikten yeniden atanır), 66 ve 75 geçerlidir', VNB.sanitizeLifespan(80) === null && VNB.sanitizeLifespan(90) === null && VNB.sanitizeLifespan(66) === 66 && VNB.sanitizeLifespan(75) === 75 && VNB.sanitizeLifespan(65) === null);
+    check('29.2b: 65 yaşındaki yetişkin Kıdemli Bilge sayılır (64 değil)', LS2.stageFor({ age: 64 }) === 'adult' && LS2.stageFor({ age: 65 }) === 'elder');
   }
 
   return out;

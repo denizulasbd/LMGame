@@ -1,7 +1,7 @@
 // (28.3) Sürdürülebilir kuşak döngüsü: Saygın Büyük statüsü, doğal vefat ve trajik kazalar. Saf hesaplar ./Venerable.js'te, sayılar
 // data/lifeStages.js'te (LIFESPAN, VENERABLE, FATAL).
 //
-//   Ömür         : her sakine (doğum / göç / yükleme) kimliğinden ve tohumdan türeyen 80-90 yaşlık bir ömür atanır (lifespanFor: izole üreteç, seed + 35).
+//   Ömür         : her sakine (doğum / göç / yükleme) kimliğinden ve tohumdan türeyen 66-75 yaşlık bir ömür atanır (lifespanFor: izole üreteç, seed + 35).
 //   Saygın Büyük : her gün 19:00'da Kıdemli Bilge, Ocak Devri'ni (devretti / evladı yok / zaman aşımı) ve Yadigâr Devri'ni (teslim etti; devredecek
 //                  kimsesi yoksa yadigâr kasaba arşivine kalkar) tamamlamışsa `isVenerable = true` olur: evini / yatağını boşaltır (homeId = null),
 //                  nüfus kotasına sayılmaz ('venerable:became'). Geceleri Bilgelik Evi'nde, handa ya da belediyede sabahlar (Brain.planSleep).

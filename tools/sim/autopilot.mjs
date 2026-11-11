@@ -984,7 +984,7 @@ if (mon.life) {
   if (md) {
     const total = Object.values(md.given).reduce((x, y) => x + y, 0);
     console.log(`(29.2) verilen moodlet ${total}: ${Object.entries(md.given).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(' · ')}`);
-    console.log(`(29.2) yas tutan ${md.mourners} · anma ${md.grieved} · teselli ${md.consoled} · son gün ${JSON.stringify(md.now)} · baskın ruh hali ${JSON.stringify(md.feels)} · ortalama iş çarpanı ${md.work ? (md.work.sum / md.work.n).toFixed(3) : '-'} (en düşük ${md.work?.min.toFixed(2)}, en yüksek ${md.work?.max.toFixed(2)}) · en çok ${md.max} moodlet`);
+    console.log(`(29.2) yas tutan ${md.mourners} · anma ${md.grieved} · teselli ${md.consoled} (travmaya göre ${JSON.stringify(md.consoledBy ?? {})}) · son gün ${JSON.stringify(md.now)} · baskın ruh hali ${JSON.stringify(md.feels)} · ortalama iş çarpanı ${md.work ? (md.work.sum / md.work.n).toFixed(3) : '-'} (en düşük ${md.work?.min.toFixed(2)}, en yüksek ${md.work?.max.toFixed(2)}) · en çok ${md.max} moodlet`);
   }
   // (29.1) Sosyal kimya ve duygusal etiketler
   const ch = L.chemistry;

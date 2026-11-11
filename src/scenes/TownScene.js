@@ -211,7 +211,7 @@ export class TownScene extends Scene {
     this.temperament = new TemperamentSystem(this.game, this.world, new Random(state.seed + 29));
     // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
     this.lifeStages = new LifeStageSystem(this.game, this.world, new Random(state.seed + 27));
-    // (28.3) Saygın Büyük, doğal vefat ve kazalar (ömür kimlikten türer: seed + 35 izole üreteci; rastgelelik tüketmez). Yaşlanmadan SONRA kayıt olur.
+    // (28.3) Saygın Büyük, doğal vefat ve kazalar (ömür kimlikten türer: seed + 30 izole üreteci; rastgelelik tüketmez). Yaşlanmadan SONRA kayıt olur.
     this.lifecycle = new LifecycleSystem(this.game, this.world, { jobs: this.jobs });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,

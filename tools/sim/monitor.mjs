@@ -44,6 +44,9 @@ export async function installMonitor(page) {
     window.__refineryMod = await import('/src/systems/Refinery.js').catch(() => null); // (24.2)
     window.__tradeMod = await import('/src/systems/TradePost.js').catch(() => null); // (24.3)
     window.__moodDefs = (await import('/src/data/moodlets.js').catch(() => null))?.MOODLETS ?? null; // (29.2)
+    // (29.2b) teselli hangi travmaya yapıldı (Derin Yas / Sarsılmış / Kalbi Kırık): yalnızca sayar, oyunun durumuna ve üretecine dokunmaz
+    window.__consoledBy = {};
+    window.game?.events.on('moodlet:consoled', (p) => { const k = p?.trauma?.key ?? '?'; window.__consoledBy[k] = (window.__consoledBy[k] ?? 0) + 1; });
     window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
     window.__lateMod = await import('/src/systems/LateGame.js').catch(() => null); // (28.4)
     window.__tsMod = await import('/src/systems/TownStatus.js').catch(() => null);
@@ -517,7 +520,8 @@ export async function installMonitor(page) {
           for (const a of job.assignees ?? []) if (!ids.has(a)) broke(`iş ${job.type}#${job.id}: atanan sakin yok (${a})`);
           if (job.buildingId && !buildings.has(job.buildingId)) broke(`iş ${job.type}#${job.id}: yapısı yok`);
           const jt = m.jobTrack.get(job.id);
-          if (!jt || jt.progress !== job.progress) m.jobTrack.set(job.id, { progress: job.progress, since: now, flagged: false, type: job.type });
+          // (29.2b) Atananı olmayan iş "ilerlemiyor" sayılmaz (çalışma yeri açılana dek bekleyen iş yanlış alarm vermesin); çalışma yeri hiç yoksa ayrıca işaretlenir
+          if (!jt || jt.progress !== job.progress || (job.assignees?.length ?? 0) === 0) m.jobTrack.set(job.id, { progress: job.progress, since: now, flagged: false, type: job.type });
           else if (!jt.flagged && (job.assignees?.length ?? 0) > 0 && now - jt.since > JOB_STALE_DAYS * 1440) {
             jt.flagged = true;
             const jb = job.buildingId ? buildings.get(job.buildingId) : null;
@@ -679,6 +683,7 @@ export async function installMonitor(page) {
                   consoled: s.moodlets?.consoled ?? 0,
                   grieved: s.moodlets?.grieved ?? 0,
                   mourners: s.moodlets?.mourners ?? 0,
+                  consoledBy: { ...(window.__consoledBy ?? {}) },
                   now: s.characters.reduce((o, c) => { for (const x of c.moodlets) o[x.key] = (o[x.key] ?? 0) + 1; return o; }, {}),
                   feels: s.characters.reduce((o, c) => { o[c.mood.feel] = (o[c.mood.feel] ?? 0) + 1; return o; }, {}),
                   work: m.moodWork ?? null,
