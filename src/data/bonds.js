@@ -2,7 +2,7 @@
 // Saf hesaplar src/systems/Bonds.js'te, olaylar ve moodlet'ler src/systems/BondSystem.js'te. Hiç zar çekilmez.
 
 export const BOND_RULES = {
-  tilesPerPoint: 2, // findWorkFor: puan başına iş bu kadar karo yakın / uzak görünür
+  tilesPerPoint: 1, // findWorkFor: puan başına iş bu kadar karo yakın / uzak görünür
   sideAt: 2, // "Omuz Omuza" için en az bağ puanı
   rubAt: -2, // "Diken Üstünde" için en çok bağ puanı
   scanRadius: 64, // aynı işte sayılmak için piksel uzaklığı (şantiye ve toplama emirlerinde)
