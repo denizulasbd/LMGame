@@ -72,6 +72,10 @@ import { headOf } from '../../systems/Lineage.js';
 import { FEAST, TIERS as FEAST_TIERS } from '../../data/feast.js';
 import { currentFeastOf } from '../../systems/Feast.js';
 import { currentFair } from '../../systems/Fair.js';
+import { condolenceStatus, riteWindow } from '../../systems/Rites.js';
+import { foodSupply } from '../../systems/TownStatus.js';
+import { RITE_RULES } from '../../data/rites.js';
+import { engineOn } from '../../systems/Engines.js';
 
 const thumbnailCache = new Map();
 
@@ -114,6 +118,7 @@ export class BuildingPanel {
     this.bell = el('div', { className: 'building-decrees building-bell' });
     this.feastBox = el('div', { className: 'building-decrees building-feast', hidden: true }); // (27.3) Büyük Ziyafet Sofrası
     this.trustBox = el('div', { className: 'building-decrees building-trust' }); // (21. aşama) Yönetim Güveni
+    this.riteBox = el('div', { className: 'building-decrees building-rite', hidden: true }); // (29.7) anma töreni, Taziye Sofrası, kitabe
     this.crownBox = el('div', { className: 'building-decrees building-crown' }); // (22. aşama) iç vergi ve Krallık
     this.crisisBox = el('div', { className: 'building-decrees building-crisis' }); // (23. aşama) yangın, tamir, kuyu, kule
     this.expedition = el('div', { className: 'building-decrees building-expedition' });
@@ -164,6 +169,7 @@ export class BuildingPanel {
       this.feastBox,
       this.crownBox,
       this.trustBox,
+      this.riteBox,
       this.crisisBox,
       this.bell,
       this.expedition,
@@ -256,7 +262,10 @@ export class BuildingPanel {
     const tradeKey = building.type === 'tradingPost' ? JSON.stringify([state.tradePost, state.resources, Math.floor(state.totalMinutes / 60)]) : '';
     // (27.3) Büyük Ziyafet Sofrası (meydan havuzu, Belediye Konağı): sofra, evre, ikram sayacı ve bonus bitişleri (saat)
     const feastKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.currentFeast, currentFair(state)?.phase ?? null, ...FEAST.buffs.rich.map((k) => Math.ceil(((state.buffs[k] ?? 0) - state.totalMinutes) / 60))]) : '';
+    // (29.7) anma töreni ve kitabe (anıt, meydan havuzu, Belediye Konağı)
+    const riteKey = ['monument', 'fountain', 'townHall'].includes(building.type) || building.definition.civic ? JSON.stringify([state.rites?.active, state.rites?.names?.length, state.rites?.held, Math.floor(state.totalMinutes / 60), state.resources.gold, state.resources.food]) : '';
     const key = [
+      riteKey,
       feastKey,
       tradeKey,
       cropKey,
@@ -315,6 +324,7 @@ export class BuildingPanel {
     this.renderLuxury(building, state);
     this.renderCrown(building, state);
     this.renderTrust(building, state);
+    this.renderRite(building, state);
     this.renderCrisis(building, state);
     this.renderBell(building, state);
     this.renderFeast(building, state);
@@ -690,6 +700,38 @@ export class BuildingPanel {
         reliefButton('gold'),
       ])
     );
+  }
+
+  /** (29.7) Anma töreni: tören günü Taziye Sofrası düğmesi (anıt, meydan havuzu, Belediye Konağı); anıtta kitabe listesi. */
+  renderRite(building, state) {
+    const venue = ['monument', 'fountain'].includes(building.type) || Boolean(building.definition.civic);
+    const rites = state.rites;
+    const active = rites?.active ?? null;
+    const w = active ? riteWindow(state, active) : null;
+    const ceremony = Boolean(w) && state.totalMinutes >= w.prep && state.totalMinutes < w.end;
+    const names = building.type === 'monument' ? rites?.names ?? [] : [];
+    const show = engineOn('rites') && venue && building.functional && (ceremony || names.length > 0);
+    this.riteBox.hidden = !show;
+    if (!show) return this.riteBox.replaceChildren();
+    const nodes = [el('div', { className: 'building-section-title', text: 'Anma Töreni' })];
+    if (ceremony) {
+      const st = condolenceStatus(state, foodSupply(state));
+      const b = this.button(active.condolence ? 'Taziye Sofrası kuruldu' : 'Taziye Sofrası Kur', st.ok ? `${RITE_RULES.condolenceCost.food} yiyecek + ${RITE_RULES.condolenceCost.gold} altın: yas daha çok hafifler, katılanlar Yönetime ısınır` : st.reason, () => this.events.emit('ui:condolence'));
+      b.classList.add('upgrade-button');
+      b.disabled = !st.ok;
+      nodes.push(
+        el('div', { className: 'decree luxury-card' }, [
+          el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('candle'), alt: '' }), `${active.names.join(', ')} için`, el('span', { className: 'decree-state', text: state.totalMinutes >= w.start ? 'Tören sürüyor' : 'Bugün 18:00' })]),
+          el('div', { className: 'upgrade-text', text: `Yas tutanlar ve dostları 18:00-19:00 arasında anar; ${active.attendees.length} kişi katıldı.` }),
+          el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, [el('span', { className: `build-cost${st.ok || active.condolence ? '' : ' is-missing'}` }, [el('img', { src: getAnyIconURL('coin'), alt: '' }), String(RITE_RULES.condolenceCost.gold)])]), b]),
+        ])
+      );
+    }
+    if (names.length) {
+      nodes.push(el('div', { className: 'upgrade-text', text: 'Kitabe:' }), ...[...names].reverse().slice(0, 12).map((n) => el('div', { className: 'upgrade-text', text: `${n.name} (${n.age} yaş) · ${n.day}. gün` })));
+      if (names.length > 12) nodes.push(el('div', { className: 'upgrade-text', text: `... ve ${names.length - 12} ad daha` }));
+    }
+    this.riteBox.replaceChildren(...nodes);
   }
 
   /** (23. aşama) Panelin kriz bölümünün değişim anahtarı (anahtar değişmedikçe DOM'a dokunulmaz). */

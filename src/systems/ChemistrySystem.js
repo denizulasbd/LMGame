@@ -40,6 +40,8 @@ import { ageGap } from './LifeStages.js';
 import { closeKin } from './Lineage.js';
 import { addMemory } from './MemorySystem.js';
 import { clamp } from '../utils/math.js';
+import { engineOn } from './Engines.js';
+import { DEBT_RULES, DEBT_MEMORIES } from '../data/loyalty.js';
 
 // Selamda öne çıkan etiket (ilk bulunan söylenir)
 const GREETING_ORDER = ['resentful', 'jealous', 'grateful', 'admiration', 'kindred'];
@@ -134,10 +136,15 @@ export class ChemistrySystem {
   onFireOut(building, helperIds) {
     if (!building || helperIds.length === 0) return;
     const saved = this.world.characters.filter((c) => !c.role && (c.homeId === building.id || c.workplaceId === building.id || building.workerIds?.has(c.id)));
+    // (29.6) Vefa: söndürenlerden en çok DEBT_RULES.fireThanks kişiye (kimlik sırasıyla) minnet ve kişinin adıyla bir anı
+    const loyalty = engineOn('loyalty');
     for (const c of saved) {
-      for (const id of helperIds) {
+      const ids = loyalty ? helperIds.filter((id) => id !== c.id && this.world.getCharacter(id)).sort((a, b) => a - b).slice(0, DEBT_RULES.fireThanks) : helperIds;
+      for (const id of ids) {
         if (id !== c.id && this.world.getCharacter(id)) this.tag(c, id, 'grateful');
       }
+      const first = loyalty ? this.world.getCharacter(ids[0]) : null;
+      if (first) addMemory(this.state, c, (c.homeId === building.id ? DEBT_MEMORIES.fireHome : DEBT_MEMORIES.fireWork).replace('{who}', first.name), 'bucket', { kind: 'life', fond: true, whoId: first.id });
     }
   }
 

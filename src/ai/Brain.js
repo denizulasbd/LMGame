@@ -61,6 +61,8 @@ import { WARMTH_LEISURE } from '../systems/Wants.js';
 import { getMoodlet } from '../systems/Moodlets.js';
 import { findSufferer } from '../systems/MoodletSystem.js';
 import { TEMPERAMENT } from '../data/temperament.js';
+import { isMemorialTime, memorialEligible, urgentNeed, riteWindow, riteVenue } from '../systems/Rites.js';
+import { engineOn } from '../systems/Engines.js';
 
 const COLD_SEASONS = ['autumn', 'winter']; // (29.3) "Soğukta üşümek" korkusunun sıcak mekân arayışı
 
@@ -170,6 +172,11 @@ export class Brain {
     // (14. aşama) Toplanma Zili çaldıysa uyanık herkes meydana koşar
     if (isRallyActive(this.world.state)) {
       const plan = this.planRally(c);
+      if (plan) return plan;
+    }
+    // (29.7) Anma Töreni: 18:00-19:00 arasında ölen için yas tutanlar ve dostları anıtın / meydan havuzunun başında (zar çekmez)
+    if (engineOn('rites') && !c.isChild && isMemorialTime(this.world.state) && memorialEligible(this.world.state, c) && !urgentNeed(c)) {
+      const plan = this.planMemorial(c);
       if (plan) return plan;
     }
     // (29.2) bıkkın, tükenmiş ya da üşüyerek uyanmış sakin dinlenmeye çok daha erken yönelir
@@ -843,7 +850,7 @@ export class Brain {
    * - Havuzda sohbet edenler yan yana durur: nearSpot (davet edenin yeri) verilirse ona en yakın boş yer.
    * - Ateş başında herkes ateşe döner: dolu yerlerin yanına ceza verilerek çember boyunca yayılırlar.
    */
-  planGathering(c, building, nearSpot = null, mode = 'gather') {
+  planGathering(c, building, nearSpot = null, mode = 'gather', fixedDuration = null) {
     const spots = this.world.freeGatherSpots(building, c.id, mode);
     if (spots.length === 0) return null;
     const spread = mode === 'festival' || Boolean(ACTIVITIES[building.type]?.faceBuilding);
@@ -864,8 +871,22 @@ export class Brain {
       // Çardakta önündeki karodan içeri, bankına oturur
       ...(spot.seat ? { finalPoint: spot.seat, facing: 'down' } : {}),
       // Liman ve iskele gibi toplanma etkinliği olmayan festival yerlerinde süreyi çağıran belirler
-      duration: ACTIVITIES[building.type] ? this.durationFor(building.type) : 60,
+      // (29.7) fixedDuration: süre çağırandan gelir, zar çekilmez (anma töreni)
+      duration: fixedDuration ?? (ACTIVITIES[building.type] ? this.durationFor(building.type) : 60),
     };
+  }
+
+  /** (29.7) Anma Töreni: anıtın (yoksa meydan havuzunun) çevresinde tören bitene (19:00) kadar; zar çekmez. */
+  planMemorial(c) {
+    const state = this.world.state;
+    const w = riteWindow(state);
+    const now = state.totalMinutes;
+    if (!w || now >= w.end - 3) return null;
+    const venue = this.world.getBuilding(state.rites.active.place) ?? riteVenue(state);
+    if (!venue?.functional) return null;
+    const plan = this.planGathering(c, venue, null, 'festival', Math.max(3, w.end - now));
+    if (!plan) return null;
+    return { ...plan, activity: 'memorial' };
   }
 
   /** Toplanma Zili: meydanın çevresinde zil süresi bitene kadar beklemek. */

@@ -192,7 +192,7 @@ export class Hud {
     // (21. aşama) açık dilekçeler ve isyan
     const petitions = state.petitions?.list ?? [];
     const revoltNow = state.trust?.revolt ?? null;
-    const buffKey = `${state.valley}|${state.doctrine?.chosen}|${lateGameActive(state)}|${missingLuxuries(state).join(',')}|${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${fairNow?.type}:${fairNow?.phase}|${guestNow?.type}:${guestNow?.guest.name}:${guestNow?.guest.leaving}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}`;
+    const buffKey = `${state.valley}|${state.doctrine?.chosen}|${lateGameActive(state)}|${missingLuxuries(state).join(',')}|${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${fairNow?.type}:${fairNow?.phase}|${guestNow?.type}:${guestNow?.guest.name}:${guestNow?.guest.leaving}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}:${revoltNow.leaderId ?? ''}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}`;
     const griefKey = mourners * 10000 + shaken * 100 + (griefId % 97);
     if (buffKey !== this.lastBuffs || griefKey !== this.lastGrief) {
       this.lastBuffs = buffKey;
@@ -258,7 +258,7 @@ export class Hud {
       if (revoltNow) {
         const venue = state.buildings.find((b) => b.functional && b.type === 'fountain') ?? state.buildings.find((b) => b.functional && BUILDINGS[b.type].civic);
         chips.unshift(
-          action('torch', `İsyan! ${revoltNow.rioters.length} isyancı${revoltNow.raids.length ? ' · yağma' : ''}`, 'Sakinler işi bıraktı. Tıkla: meydan havuzunda / Belediye Konağı\'nda acil erzak ve altın dağıt', ' is-revolt', () => venue && this.game.events.emit('ui:selectBuilding', venue.id))
+          action('torch', `İsyan! ${revoltNow.rioters.length} isyancı${revoltNow.raids.length ? ' · yağma' : ''}`, `Sakinler işi bıraktı.${leaderOf(state, revoltNow) ? ` Elebaşı: ${leaderOf(state, revoltNow)}.` : ''} Tıkla: meydan havuzunda / Belediye Konağı\'nda acil erzak ve altın dağıt`, ' is-revolt', () => venue && this.game.events.emit('ui:selectBuilding', venue.id))
         );
       }
       // (23. aşama) Yangın alarmı (her yanan yapı için, tıklayınca yapı seçilir) ve haydut izi (tıklayınca karar penceresi)
@@ -578,4 +578,9 @@ export class Hud {
 
 function formatDelta(value) {
   return value > 0 ? `+${value}` : String(value);
+}
+
+/** (29.6) İsyan elebaşının adı (yoksa null). */
+function leaderOf(state, revolt) {
+  return Number.isFinite(revolt?.leaderId) ? state.characters.find((c) => c.id === revolt.leaderId)?.name ?? null : null;
 }

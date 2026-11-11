@@ -19,6 +19,8 @@ import { emptyTrust, trustValue, addItem, addCoins, roomFor, raidOf } from './Ci
 import { townHappiness, happinessOf, foodSupply } from './TownStatus.js';
 import { addMemory } from './MemorySystem.js';
 import { clamp } from '../utils/math.js';
+import { engineOn } from './Engines.js';
+import { unrestKey, pickLeader, hungryNow } from './Loyalty.js';
 
 export const LOOT_ITEMS = { food: 'ration', bread: 'bread', wood: 'firewood' };
 
@@ -142,7 +144,12 @@ export class TrustSystem {
   pickRioters(existing = []) {
     const adults = this.adults();
     const cap = Math.max(REVOLT.minRioters, Math.ceil(adults.length * REVOLT.maxShare));
-    const ranked = adults.filter((c) => !c.away && !existing.includes(c.id)).map((c) => ({ c, h: happinessOf(c) })).sort((a, b) => a.h - b.h || a.c.id - b.c.id);
+    // (29.6) sıralama anahtarı: mutluluk + sadakat x riotWeight (Kırgın önce ayaklanır); öfke eşiği yine yalnızca mutluluğa bakar
+    const loyalty = engineOn('loyalty');
+    const ranked = adults
+      .filter((c) => !c.away && !existing.includes(c.id))
+      .map((c) => ({ c, h: happinessOf(c), k: loyalty ? unrestKey(happinessOf(c), c) : happinessOf(c) }))
+      .sort((a, b) => a.k - b.k || a.c.id - b.c.id);
     const angry = ranked.filter((x) => x.h < REVOLT.angryBelow - (existing.length ? 10 : 0));
     const chosen = existing.length || angry.length >= REVOLT.minRioters ? angry : ranked.slice(0, REVOLT.minRioters);
     return chosen.slice(0, Math.max(0, cap - existing.length)).map((x) => x.c.id);
@@ -156,6 +163,8 @@ export class TrustSystem {
     if (rioters.length < REVOLT.minRioters) return null;
     const now = s.totalMinutes;
     this.trust.revolt = { since: now, rioters, raids: [], nextRaidAt: now + 60, nextJoinAt: now + REVOLT.rejoinEveryMinutes, nextRaidId: 1, looted: {} };
+    // (29.6) elebaşı: en düşük sadakatli isyancı (kayda girer)
+    if (engineOn('loyalty')) this.trust.revolt.leaderId = pickLeader(s, rioters);
     this.trust.revolts = (this.trust.revolts ?? 0) + 1;
     s.stats.revolts = (s.stats.revolts ?? 0) + 1;
     for (const id of rioters) {
@@ -163,7 +172,8 @@ export class TrustSystem {
       if (c?.visible) c.showBubble('angry', 2.6);
     }
     const names = rioters.map((id) => this.world.getCharacter(id)?.name).filter(Boolean);
-    this.events.emit('revolt:started', { rioters, names });
+    const leader = engineOn('loyalty') ? this.world.getCharacter(this.trust.revolt.leaderId) : null;
+    this.events.emit('revolt:started', { rioters, names, ...(leader ? { leaderId: leader.id, leaderName: leader.name } : {}) });
     this.events.emit('toast', { text: `İsyan çıktı! ${names.length} sakin işi bıraktı ve meydanda toplanıyor. Erzak / altın dağıt ya da dilekleri karşıla.`, tone: 'warn', icon: 'torch' });
     return this.trust.revolt;
   }
@@ -302,8 +312,8 @@ export class TrustSystem {
     this.events.emit('revolt:raidEnded', { raid, names });
   }
 
-  /** İsyan biter: isyancılar işlerine döner. */
-  endRevolt() {
+  /** İsyan biter: isyancılar işlerine döner. appeased: (29.6) yardım dağıtımıyla yatıştı. */
+  endRevolt({ appeased = false } = {}) {
     const r = this.trust.revolt;
     if (!r) return;
     this.trust.revolt = null;
@@ -315,7 +325,7 @@ export class TrustSystem {
       if (c.visible) c.showBubble('sparkle', 2);
     }
     const hours = Math.round((this.state.totalMinutes - r.since) / 60);
-    this.events.emit('revolt:ended', { rioters: r.rioters, looted: r.looted, hours });
+    this.events.emit('revolt:ended', { rioters: r.rioters, looted: r.looted, hours, ...(engineOn('loyalty') ? { appeased, leaderId: r.leaderId ?? null } : {}) });
     this.events.emit('toast', { text: 'İsyan yatıştı: sakinler işlerinin başına dönüyor.', tone: 'success', icon: 'trust' });
   }
 
@@ -332,12 +342,15 @@ export class TrustSystem {
       this.events.emit('toast', { text: `${def?.name ?? 'Dağıtım'}: ${st.reason}`, tone: 'warn', icon: def?.icon ?? 'coin' });
       return st;
     }
+    const hungryIds = engineOn('loyalty') ? hungryNow(s) : []; // (29.6) dağıtımdan hemen önce aç olanlar
+    let recipientIds = [];
     if (kind === 'food') {
       if (!this.economy.consumeFood(st.cost).ok) return { ok: false, reason: 'Kilerde yiyecek yok' };
       for (const c of s.characters) {
         if (c.role) continue;
         c.needs.hunger = clamp(c.needs.hunger + def.hunger, 0, 100);
         c.needs.fun = clamp(c.needs.fun + def.fun, 0, 100);
+        recipientIds.push(c.id);
       }
     } else {
       if (!this.economy.spend({ gold: st.cost })) return { ok: false, reason: 'Hazinede altın yok' };
@@ -346,16 +359,17 @@ export class TrustSystem {
       for (const c of adults) {
         addCoins(c, share);
         c.needs.fun = clamp(c.needs.fun + def.fun, 0, 100);
+        recipientIds.push(c.id);
       }
     }
     for (const c of s.characters) if (c.visible && !c.role && !c.bubble) c.showBubble(kind === 'food' ? 'apple' : 'purse', 2);
     this.trust.relief[kind] = s.totalMinutes;
     s.stats.reliefs = (s.stats.reliefs ?? 0) + 1;
     this.adjust(def.trust, `relief:${kind}`);
-    this.events.emit('relief:given', { kind, cost: st.cost, trust: trustValue(s) });
+    this.events.emit('relief:given', { kind, cost: st.cost, trust: trustValue(s), ...(engineOn('loyalty') ? { recipientIds, hungryIds } : {}) });
     this.events.emit('toast', { text: `${def.name}: ${kind === 'food' ? `${st.cost} yiyecek değeri` : `${st.cost} altın`} halka dağıtıldı (güven %${Math.round(trustValue(s))})`, tone: 'success', icon: def.icon });
     // İsyan sürüyorsa eşiği aşan güven hemen yatıştırır
-    if (this.trust.revolt && trustValue(s) >= REVOLT.endTrust && trustWelfare(s) >= REVOLT.critical) this.endRevolt();
+    if (this.trust.revolt && trustValue(s) >= REVOLT.endTrust && trustWelfare(s) >= REVOLT.critical) this.endRevolt({ appeased: true });
     return { ok: true };
   }
 }

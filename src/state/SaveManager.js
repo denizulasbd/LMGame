@@ -31,6 +31,16 @@ function migrate(data) {
   if (data.version < 37) migrateMoodlets(data);
   // (29.4) v38 -> v39: her sakine sıfır eksenler, boş listeler ve sayaçlar; duruma boş evrim sayaçları (özellikler değişmez, zar çekilmez)
   if (data.version < 39) migrateEvolution(data);
+  // (29.6-29.7) v39 -> v40: her sakine sadakat 0, evlilik günü ve özel gün yok; boş tören durumu; isyan sürüyorsa elebaşı yok (zar çekmez)
+  if (data.version < 40) {
+    if (Array.isArray(data.characters)) {
+      for (const c of data.characters) {
+        if (c && typeof c === 'object') Object.assign(c, { loyalty: 0, weddingDay: null, specialDay: null });
+      }
+    }
+    data.rites = { pending: [], active: null, names: [], held: 0, condolences: 0, celebrated: 0, forgotten: 0 };
+    if (data.trust?.revolt && typeof data.trust.revolt === 'object') data.trust.revolt.leaderId = null;
+  }
   // (29.3) v37 -> v38: her sakine boş arzu / korku listeleri, 50 doyum, boş sonuç kaydı; duruma boş sayaçlar (zar çekmez:
   // listeler yüklemeden sonraki ilk 06:00'da dolar)
   if (data.version < 38) migrateWants(data);

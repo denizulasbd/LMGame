@@ -486,8 +486,8 @@ export class MoodletSystem {
     refreshChemistry(state, sufferer, by);
     by.lastConsoleAt = now;
     const what = result.trauma.key === 'mourning' ? 'yasında' : result.trauma.key === 'shaken' ? 'korkusunda' : 'kederinde';
-    addMemory(state, sufferer, `${by.name} ${what} onu teselli etti`, 'handshake', { kind: 'life', fond: true });
-    addMemory(state, by, `${sufferer.name} acılıyken yanında oldu, onu teselli etti`, 'handshake', { kind: 'life', fond: true });
+    addMemory(state, sufferer, `${by.name} ${what} onu teselli etti`, 'handshake', { kind: 'life', fond: true, whoId: by.id });
+    addMemory(state, by, `${sufferer.name} acılıyken yanında oldu, onu teselli etti`, 'handshake', { kind: 'life', fond: true, whoId: sufferer.id });
     if (by.visible) {
       by.showBubble('heart', 2.4);
       if (!by.speech) by.speech = { text: CONSOLE_LINES[Math.floor(this.rng.next() * CONSOLE_LINES.length)], at: -1, duration: MOOD_RULES.speechSeconds };

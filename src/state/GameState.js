@@ -42,6 +42,7 @@ import { emptyHeirloomState, restoreHeirloomState } from '../systems/Heirloom.js
 import { sanitizeCurrentFestival } from '../systems/Fair.js';
 import { sanitizeCurrentFeast } from '../systems/Feast.js';
 import { emptyGuestBook, restoreGuestBook, sanitizeActiveGuest } from '../systems/Guest.js';
+import { emptyRites, restoreRites, pruneRites } from '../systems/Rites.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
 
@@ -205,6 +206,7 @@ export class GameState {
     this.temperament = emptyTemperament(); // (25.3) mizaç gelişimi sayaçları
     this.moodlets = emptyMoodletStats(); // (29.2) ruh hali sayaçları: { given: { anahtar: adet }, consoled, grieved, mourners }
     this.wants = emptyWantStats(); // (29.3) arzu / korku sayaçları: { rolled, fulfilled, expired, fearsRolled, realized, passed } (anahtar -> adet)
+    this.rites = emptyRites(); // (29.7) anma törenleri (bekleyen, süren, kitabe) ve özel gün sayaçları
     this.evolution = emptyEvolutionStats(); // (29.4) kişilik evrimi sayaçları: { turned, deepened, acquired (özellik -> adet), total }
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
     this.heirloom = emptyHeirloomState(); // (25.5) aile yadigârları: sayaçlar, arşiv, Kuşak Şöleni
@@ -295,6 +297,7 @@ export class GameState {
       moodlets: this.moodlets,
       wants: this.wants,
       evolution: this.evolution,
+      rites: this.rites,
       lineage: this.lineage,
       heirloom: this.heirloom,
       currentFestival: this.currentFestival,
@@ -415,6 +418,7 @@ export class GameState {
     next.moodlets = restoreMoodletStats(data.moodlets); // (29.2)
     next.wants = restoreWantStats(data.wants); // (29.3)
     next.evolution = restoreEvolutionStats(data.evolution); // (29.4)
+    next.rites = restoreRites(data.rites); // (29.7) v2-v39 kayıtlarında yoktur: boş
     next.lineage = restoreLineage(data.lineage);
     next.activeGuest = sanitizeActiveGuest(data.activeGuest); // (26.3) v2-v30 kayıtlarında alan yoktur: null
     next.guestBook = restoreGuestBook(data.guestBook);
@@ -547,6 +551,7 @@ function restoreTrust(data) {
       nextJoinAt: Number.isFinite(r.nextJoinAt) ? r.nextJoinAt : r.since,
       nextRaidId: Math.max(1, Math.floor(Number(r.nextRaidId) || 1)),
       looted: { ...(r.looted ?? {}) },
+      ...(Number.isFinite(r.leaderId) ? { leaderId: r.leaderId } : r.leaderId === null ? { leaderId: null } : {}), // (29.6) elebaşı
     };
   }
   out.lastLoot = data.lastLoot && typeof data.lastLoot === 'object' ? { ...data.lastLoot } : null;
@@ -730,8 +735,10 @@ function sanitizeReferences(next) {
   const revolt = next.trust.revolt;
   if (revolt) {
     revolt.rioters = revolt.rioters.filter((id) => people.has(id));
+    if (Object.hasOwn(revolt, 'leaderId') && !people.has(revolt.leaderId)) revolt.leaderId = null; // (29.6) elebaşı hayatta değilse
     revolt.raids = revolt.raids.filter((r) => buildings.has(r.targetId)).map((r) => ({ ...r, members: r.members.filter((id) => people.has(id)) })).filter((r) => r.members.length > 0);
   }
+  pruneRites(next.rites, new Set(people.keys())); // (29.7)
   const residents = new Map();
   for (const c of next.characters) if (c.homeId !== null) residents.set(c.homeId, (residents.get(c.homeId) ?? 0) + 1);
   for (const c of next.characters) {

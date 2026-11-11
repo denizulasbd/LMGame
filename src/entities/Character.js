@@ -48,6 +48,7 @@ import { sanitizeMoodlets, neutralMood, recomputeMood } from '../systems/Moodlet
 import { sanitizeGrowth, sanitizeGrowthToday, sanitizeGrowthCause, sanitizeDeepTraits, sanitizeEvolutions, sanitizeEvoCount } from '../systems/Evolution.js';
 import { sanitizeWants, sanitizeWantLog, clampSatisfaction, sanitizeCount, neutralDrive, recomputeDrive } from '../systems/Wants.js';
 import { WANTS, FEARS, WANT_CAPS } from '../data/wants.js';
+import { sanitizeLoyalty } from '../systems/Loyalty.js';
 
 const HALF_WIDTH = CHARACTER_WIDTH / 2;
 const BUBBLE_POP_TIME = 0.15;
@@ -143,6 +144,9 @@ export class Character extends Entity {
     evolutions = null,
     evolutionCount = 0,
     acquiredCount = 0,
+    loyalty = 0,
+    weddingDay = null,
+    specialDay = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -239,6 +243,11 @@ export class Character extends Entity {
     this.evolutions = child ? [] : sanitizeEvolutions(evolutions);
     this.evolutionCount = child ? 0 : Math.max(sanitizeEvoCount(evolutionCount), this.evolutions.length);
     this.acquiredCount = child ? 0 : sanitizeEvoCount(acquiredCount);
+    // (29.6) Yönetime sadakat -100..+100 (çocukta 0); (29.7) evlendiği gün ve o günün özel gün durumu (kayda girer)
+    this.loyalty = sanitizeLoyalty(loyalty, child);
+    this.weddingDay = Number.isFinite(weddingDay) && weddingDay >= 1 ? Math.floor(weddingDay) : null;
+    this.specialDay = sanitizeSpecialDay(specialDay);
+    this.specialSeek = []; // (29.7) özel günde aranan kişiler (kaydedilmez; RiteSystem kurar)
     this.drive = neutralDrive();
     recomputeDrive(this);
     this.mood = neutralMood();
@@ -668,6 +677,9 @@ export class Character extends Entity {
       evolutions: this.evolutions,
       evolutionCount: this.evolutionCount,
       acquiredCount: this.acquiredCount,
+      loyalty: this.loyalty,
+      weddingDay: this.weddingDay,
+      specialDay: this.specialDay,
     };
   }
 
@@ -696,4 +708,10 @@ export class Character extends Entity {
     }
     return c;
   }
+}
+
+/** (29.7) Kayıttaki özel gün durumu: { day, kind, celebrated, gifted } ya da null. */
+function sanitizeSpecialDay(d) {
+  if (!d || typeof d !== 'object' || !Number.isFinite(d.day) || (d.kind !== 'birthday' && d.kind !== 'anniversary')) return null;
+  return { day: Math.max(1, Math.floor(d.day)), kind: d.kind, celebrated: Boolean(d.celebrated), gifted: Boolean(d.gifted) };
 }

@@ -301,6 +301,21 @@ export const ACTIVITIES = {
     effects: { fun: 0.05 },
     bubbles: ['candle', 'memory'],
   },
+  // (29.7) Anma Töreni: vefatın ertesi akşamı (18:00-19:00) anıtın / meydan havuzunun başında ölenler anılır (Brain.planMemorial)
+  memorial: {
+    kind: 'social',
+    target: 'fountain',
+    travelLabel: 'Anma törenine yürüyor',
+    label: 'Anma töreninde sessizce duruyor',
+    partnerLabel: '{partner} ile anma töreninde',
+    duration: [60, 60],
+    effects: { fun: 0.05 },
+    socialGain: 0.6,
+    aloneSocialGain: 0.3,
+    faceBuilding: true,
+    bubbles: ['candle', 'memory'],
+    partnerBubbles: ['candle', 'memory'],
+  },
   // (29.2) Teselli: acılı dostunun yanına gidip onu teselli eder ({name}: teselli edilen)
   console: {
     kind: 'leisure',

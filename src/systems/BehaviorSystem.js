@@ -133,6 +133,9 @@ export class BehaviorSystem {
         }
       }),
       // (21. aşama) İsyan: isyancılar ve yağmaya çıkanlar elindeki (yarıda kesilebilen) işi bırakır; bitince işlerine döner
+      // (29.7) Anma Töreni: 18:00'de yas tutanlar ve ölenin dostları elindeki (yarıda kesilebilen) işi bırakıp anma yerine yürür
+      game.events.on('rite:started', ({ ids }) => this.interrupt(ids)),
+      game.events.on('rite:ended', ({ ids }) => this.interrupt(ids, ['memorial'], true)),
       game.events.on('revolt:started', ({ rioters }) => this.interrupt(rioters)),
       game.events.on('revolt:joined', ({ ids }) => this.interrupt(ids)),
       game.events.on('revolt:raid', ({ raid }) => this.interrupt(raid.members, ['protest'])),

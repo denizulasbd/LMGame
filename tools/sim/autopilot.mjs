@@ -99,6 +99,27 @@ await page.evaluate(async (off) => {
     if (moodlet?.key === 'side_by_side') got.side.add(character.id);
     if (moodlet?.key === 'rubbing_wrong') got.rub.add(character.id);
   });
+  // (29.6-29.7) sadakat / tören / özel gün ölçümü (yalnızca dinler; otopilot taziye ve armağan kullanmaz)
+  const R = (window.__riteStats = { leaders: [], held: 0, attendance: [], deathDays: [], late: 0, celebrated: 0, forgotten: 0 });
+  const ev = window.game.events;
+  ev.on('revolt:started', ({ leaderName }) => leaderName && R.leaders.push(`G${window.game.state.time.day}:${leaderName}`));
+  ev.on('rite:held', ({ attendees }) => { R.held += 1; R.attendance.push(attendees.length); });
+  ev.on('population:died', () => { const d = window.game.state.time.day; if (!R.deathDays.includes(d)) R.deathDays.push(d); });
+  ev.on('special:celebrated', () => (R.celebrated += 1));
+  ev.on('special:forgotten', () => (R.forgotten += 1));
+  // (29.6 §2 teşhisi) yapı türü başına çalışılan saat (mesaide yapıda / iş emrinde 'perform' evresindeki sakin başına saat başı 1)
+  const WH = (window.__workHours = {});
+  ev.on('time:hour', () => {
+    const s = window.game.state;
+    for (const c of s.characters) {
+      const t = c.task;
+      if (!t || t.phase !== 'perform' || (!t.workBuildingId && !t.jobId)) continue;
+      const b = t.workBuildingId ? s.buildings.find((x) => x.id === t.workBuildingId) : null;
+      const k = b ? b.type : `job:${t.activity}`;
+      WH[k] = (WH[k] ?? 0) + 1;
+    }
+  });
+  ev.on('time:hour', (h) => { if (h === 20) R.late += window.game.state.characters.filter((c) => c.task?.activity === 'memorial').length; });
 }, options['engines-off'] ?? '');
 await page.evaluate((passive) => {
   const game = window.game;
@@ -931,6 +952,34 @@ const bondStats = await page.evaluate(() => {
   const pop = window.game.state.characters.filter((c) => !c.isChild && !c.role).length;
   return { side: given.side_by_side ?? 0, rub: given.rubbing_wrong ?? 0, ever: ever.side.size, everRub: ever.rub.size, pop, pairs };
 });
+const riteStats = await page.evaluate(() => {
+  const s = window.game.state;
+  const R = window.__riteStats;
+  const adults = s.characters.filter((c) => !c.isChild && !c.role);
+  const L = adults.map((c) => c.loyalty ?? 0);
+  const t = s.time;
+  const due = R.deathDays.filter((d) => d + 1 < t.day || (d + 1 === t.day && t.hour >= 19)).length;
+  return {
+    avg: L.length ? L.reduce((a, b) => a + b, 0) / L.length : 0,
+    min: L.length ? Math.min(...L) : 0,
+    max: L.length ? Math.max(...L) : 0,
+    loyal: L.filter((v) => v >= 40).length,
+    bitter: L.filter((v) => v <= -40).length,
+    n: L.length,
+    leaders: R.leaders,
+    held: R.held,
+    stateHeld: s.rites?.held ?? 0,
+    attendance: R.attendance.length ? R.attendance.reduce((a, b) => a + b, 0) / R.attendance.length : 0,
+    deathDays: R.deathDays.length,
+    dueDeathDays: due,
+    late: R.late,
+    celebrated: R.celebrated,
+    forgotten: R.forgotten,
+    workHours: window.__workHours,
+  };
+});
+console.log(`(29.6) sadakat: ortalama ${riteStats.avg.toFixed(1)} (en düşük ${riteStats.min}, en yüksek ${riteStats.max}; ${riteStats.n} yetişkin) · Sadık ${riteStats.loyal} · Kırgın ${riteStats.bitter} · isyan elebaşları ${riteStats.leaders.join(', ') || '-'}`);
+console.log(`(29.7) anma töreni ${riteStats.held} (vefat günü ${riteStats.deathDays}, töreni gelmiş ${riteStats.dueDeathDays}) · ortalama katılım ${riteStats.attendance.toFixed(1)} · 20:00'de süren tören görevi ${riteStats.late} · özel gün kutlanan ${riteStats.celebrated} / unutulan ${riteStats.forgotten} (%${Math.round((100 * riteStats.celebrated) / Math.max(1, riteStats.celebrated + riteStats.forgotten))})`);
 console.log(`(29.5) Omuz Omuza ${bondStats.side} · Diken Üstünde ${bondStats.rub} · en az bir kez Omuz Omuza alan ${bondStats.ever}/${bondStats.pop} (%${Math.round((100 * bondStats.ever) / Math.max(1, bondStats.pop))}) · Diken Üstünde alan ${bondStats.everRub} · en çok birlikte çalışan çiftler: ${bondStats.pairs.join(', ') || '-'}`);
 const so = mon.social;
 console.log(
@@ -1072,7 +1121,7 @@ for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}
 const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0 && mon.social.stuck.length === 0;
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, healthy }, null, 1));
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, gold: report.gold, healthy }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();

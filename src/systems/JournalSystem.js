@@ -275,7 +275,7 @@ export class JournalSystem {
         else if (outcome === 'rejected') this.log(`${genitive(petition.name)} dilekçesi reddedildi (${what})`, 'sulk');
         else this.log(`${genitive(petition.name)} dilekçesi yanıtsız kaldı, süresi doldu (${what})`, 'sulk');
       }),
-      on('revolt:started', ({ names }) => this.log(`ALARM · İsyan çıktı! ${names.join(', ')} işi bıraktı, meydanda öfkeyle toplanıyor`, 'torch')),
+      on('revolt:started', ({ names, leaderName }) => this.log(`ALARM · İsyan çıktı! ${names.join(', ')} işi bıraktı, meydanda öfkeyle toplanıyor${leaderName ? ` (elebaşı: ${leaderName})` : ''}`, 'torch')), // (29.6) elebaşı
       on('revolt:raidEnded', ({ raid, names }) => {
         const parts = Object.entries(raid.goods).map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`);
         if (raid.gold) parts.push(`${raid.gold} altın`);
