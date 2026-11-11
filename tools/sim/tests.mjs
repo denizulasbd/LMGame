@@ -116,7 +116,10 @@ const pageResults = await page.evaluate(async () => {
   // (29.2b) Moodlet motoru artık bütün bölümlerde açık koşar (eski geçici şalter kalktı).
   const MDX = await import('/src/systems/Moodlets.js');
   // Eski bölümlerin kesin sayılı testleri: ilgili sakinlerin ruh hali listesi temizlenir (izole birim testi; motor yine açıktır)
-  const noMoods = (...list) => { for (const c of list) { c.moodlets.length = 0; c.flowStreak = 0; MDX.recomputeMood(c); } };
+  // (29.3) arzular / korkular da temizlenir, doyum 50'ye çekilir (drive nötr): eski bölümlerin kesin sayılı testleri arzu kancalarından yalıtılır
+  const WTX = await import('/src/systems/Wants.js');
+  const noWants = (...list) => { for (const c of list) { c.wants.length = 0; c.fears.length = 0; c.satisfaction = 50; WTX.recomputeDrive(c); MDX.recomputeMood(c); } };
+  const noMoods = (...list) => { for (const c of list) { c.moodlets.length = 0; c.flowStreak = 0; MDX.recomputeMood(c); } noWants(...list); };
   const hours = (h) => sim.step(Math.round(h * 225));
   const plaza = scene.world.landmarks.plaza;
   // 26. aşama öncesi bölümler panayırsız bir dünyada yazıldı: Altın Çağ'dan sonra panayır (ve Büyük Ziyafet Sofrası) kurulursa o bölümlerin
@@ -127,6 +130,11 @@ const pageResults = await page.evaluate(async () => {
   const { GuestSystem: GuestClass } = await import('/src/systems/GuestSystem.js');
   const realArrive = GuestClass.prototype.arrive;
   GuestClass.prototype.arrive = () => false; // gezgin konuklar 26.3 bölümüne kadar kapalı (aynı gerekçe)
+  // (29.3) Arzu / korku dolumu da 29.3 bölümüne kadar kapalıdır (aynı gerekçe: eski bölümlerin geçmişe bağımlı beklentileri arzu
+  // kancalarının değiştirdiği kararlarla kaymasın). Sistem kurulur ve olayları dinler; yalnızca 06:00 dolumu yapılmaz.
+  const { WantSystem: WantClass } = await import('/src/systems/WantSystem.js');
+  const realRoll = WantClass.prototype.roll;
+  WantClass.prototype.roll = () => false;
 
   // ===== 10. aşama =====
   // Yiyecek değeri
@@ -750,6 +758,7 @@ const pageResults = await page.evaluate(async () => {
     const [a, b] = s.characters.filter((c) => !c.isChild && !c.away && !c.illness && c.visible).slice(-2);
     const brain = scene.behavior.brain;
     if (s.goldenAge.celebration) { s.goldenAge.celebration.until = s.totalMinutes; sim.step(5); } // (29.1) süren Çağ Kutlaması sakinleri meydana çekmesin
+    noWants(a, b); // (29.3) mesleğinde ilerlemek isteyen (drive.focus) mesai saatinde çardaktan kalkıp işe gitmesin
     for (const c of [a, b]) scene.behavior.endTask(c);
     const planA = brain.planGathering(a, gazebo);
     scene.behavior.startPlan(a, planA, s.time.hour);
@@ -759,6 +768,7 @@ const pageResults = await page.evaluate(async () => {
     let both = false;
     for (let i = 0; i < 12 && !both; i++) {
       hours(0.25);
+      noWants(a, b); // (29.3) 06:00 dolumu araya girerse
       both = [a, b].every((c) => c.task?.activity === 'gazebo' && c.task.phase === 'perform');
       // (29.1) araya başka bir etkinlik girdiyse sakin yeniden çardağa yollanır
       for (const c of [a, b]) {
@@ -768,6 +778,8 @@ const pageResults = await page.evaluate(async () => {
         if (again) scene.behavior.startPlan(c, again, s.time.hour);
       }
     }
+    // (29.3) kısa süren çardak görevi son çeyrek saatte bitip sakini işe yollamasın (takvim 29.3'te kaydı): süre en az 1 saat
+    for (const c of [a, b]) if (c.task?.activity === 'gazebo') c.task.duration = Math.max(c.task.duration ?? 0, (c.task.elapsed ?? 0) + 60);
     hours(0.25);
     const sat = [a, b].every((c) => c.task?.activity === 'gazebo' && c.pose === 'sit');
     check('iki sakin çardakta oturup sohbet eder', both && sat, `${a.task?.activity}/${a.pose} ${b.task?.activity}/${b.pose}`);
@@ -1204,6 +1216,7 @@ const pageResults = await page.evaluate(async () => {
     for (let i = 0; i < 300; i++) game.events.emit('work:finished', { character: rc, activity: 'mineIron', building: mine });
     check('Kalfa usta işi eser çıkarmaz', made === 0);
     rc.skills = { mining: 2000 };
+    const rcPin = rc.workplaceId; // (29.3) aynı sakin sabitleme testinin sakini olabilir: test sonunda geri konur
     rc.workplaceId = null;
     rc.equipment.tool = null;
     const before = mw.items.length;
@@ -1228,7 +1241,7 @@ const pageResults = await page.evaluate(async () => {
     }
     const topRate = made / 4000;
     check('sabit iş yeri ve Sağlam Alet şansı %8e çıkarır', topRate > 0.065 && topRate < 0.095, topRate.toFixed(3));
-    rc.workplaceId = null;
+    rc.workplaceId = rcPin;
     // Günde bir eser
     mw.items = mw.items.filter((it) => it.status !== 'stored');
     mw.lastByMaker = {};
@@ -2342,7 +2355,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 37', raw.version === 37);
+  check('kayıt sürümü 38', raw.version === 38);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2521,6 +2534,7 @@ const pageResults = await page.evaluate(async () => {
     B.coins = 20;
     resetBag(B);
     S.behavior.endTask(B);
+    noMoods(B); // (29.3) yalnızlık sızısı / sohbet arzusu (dost arama) Pazar planının önüne geçmesin
     B.lastShopAt = null;
     B.needs = { hunger: 95, energy: 95, social: 95, fun: 95 };
     let shopPlan = null;
@@ -2528,7 +2542,7 @@ const pageResults = await page.evaluate(async () => {
       B.lastShopAt = null;
       shopPlan = S.behavior.brain.decide(B, 19);
     }
-    check('boş zamanında kesesi olan sakin Pazar Yeri\'ne alışverişe gider', shopPlan?.activity === 'shop' && shopPlan.buildingId === market.id);
+    check('boş zamanında kesesi olan sakin Pazar Yeri\'ne alışverişe gider', shopPlan?.activity === 'shop' && shopPlan.buildingId === market.id, `${shopPlan?.activity} ${B.name} ${B.lifeStage} ${B.coins} ${JSON.stringify(B.inventory)} mood ${B.mood.feel} ${B.isInjured} ${B.illness}`);
     const inn = W.getCompleted('inn')[0];
     inn.meals = 6;
     resetBag(B);
@@ -2788,7 +2802,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 37: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 37 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 38: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 38 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -3164,7 +3178,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 37: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 37 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 38: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 38 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3579,11 +3593,12 @@ const pageResults = await page.evaluate(async () => {
       noMoods(...st.characters); // (29.2b) ruh halleri (Ustalık Akışı odağı, Sarsılmışlık vb.) kova zincirinin hızını karıştırmasın
       crisis().startFire(fightTarget);
       for (let i = 0; i < 72 && fightTarget.isBurning; i++) {
+        if (st.dilemma.active) game.events.emit('ui:chooseDilemma', { optionId: st.dilemma.active.defaultId }); // (29.3) açılan karar penceresi oyunu dondurmasın
         sim.step(19);
         for (const c of st.characters) if (c.task && ['fetchWater', 'fightFire'].includes(c.task.activity)) seen.add(c.task.activity);
       }
       offB();
-      check('sakinler işi bırakıp kova taşır: su alır (fetchWater), yangına boşaltır (fightFire) ve yangını söndürür', !fightTarget.isBurning && seen.has('fetchWater') && seen.has('fightFire') && buckets >= 3 && !fightTarget.damaged, `${[...seen]} ${buckets} kova · saat ${st.time.hour} · yanıyor ${fightTarget.isBurning} hasar ${fightTarget.damaged} · uyanık yetişkin ${st.characters.filter((c) => !c.isChild && !c.isSleeping && !c.away).length} · gerek ${CRI.bucketsNeeded(st, fightTarget)} · kutlama ${Boolean(st.goldenAge.celebration)} · şenlik ${st.events.festival.active}`);
+      check('sakinler işi bırakıp kova taşır: su alır (fetchWater), yangına boşaltır (fightFire) ve yangını söndürür', !fightTarget.isBurning && seen.has('fetchWater') && seen.has('fightFire') && buckets >= 3 && !fightTarget.damaged, `${[...seen]} ${buckets} kova · saat ${st.time.hour} · yanıyor ${fightTarget.isBurning} hasar ${fightTarget.damaged} · uyanık yetişkin ${st.characters.filter((c) => !c.isChild && !c.isSleeping && !c.away).length} · gerek ${CRI.bucketsNeeded(st, fightTarget)} · kutlama ${Boolean(st.goldenAge.celebration)} · şenlik ${st.events.festival.active} · ${fightTarget.type} · ${st.characters.filter((c) => c.task && ['fetchWater', 'fightFire'].includes(c.task.activity)).map((c) => `${c.name}:${c.task.activity}/${c.task.phase}/${c.waterBucket}`).join(',')}`);
       check('yangını söndüren kova taşıyıcıların başında su kovası balonu çıkar', (() => { try { return UI.getBubbleSprite('bucket') && UI.getBubbleSprite('shield') && UI.getBubbleSprite('bandit') && UI.getBubbleSprite('bandage'); } catch (e) { return false; } })());
     }
     // Kuyu yokken nehirden su taşıma: kovayı dolduranlar yangına koşar (sorumlu sakinler kova doluyken sıralamadan düşmez)
@@ -3833,7 +3848,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 37: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 37 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 38: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 38 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -4114,7 +4129,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { g: garden.id, o: other.id, switches: st.granary.switches };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 37: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    check('kayıt sürümü 38: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
     game.events.emit('ui:load');
     const s2 = game.state;
     const g2 = s2.buildings.find((b) => b.id === T.g);
@@ -4446,7 +4461,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 37: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    check('kayıt sürümü 38: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
     game.events.emit('ui:load');
     const s2 = st();
     const inn2 = s2.buildings.find((b) => b.id === T.inn);
@@ -4723,7 +4738,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 37: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    check('kayıt sürümü 38: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
     game.events.emit('ui:load');
     const t2 = st().tradePost;
     check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
@@ -5009,7 +5024,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 37: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
+    check('kayıt sürümü 38: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
     game.events.emit('ui:load');
     const back = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     const sage2 = st().characters.find((c) => c.id === sage.id);
@@ -5277,7 +5292,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const snap = JSON.stringify(youth.apprenticeship);
-    check('kayıt sürümü 37: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
+    check('kayıt sürümü 38: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
     game.events.emit('ui:load');
     const y2 = st().characters.find((c) => c.id === youth.id);
     check('kayıttan çıraklık, kapı ve sayaçlar birebir döner', JSON.stringify(y2.apprenticeship) === snap && AP.doorOpen(st(), st().buildings.find((b) => b.id === hut.id)) && st().apprenticeship.crafted >= 1);
@@ -5664,7 +5679,7 @@ const pageResults = await page.evaluate(async () => {
     // --- Kayıt (sürüm 26) ---
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 37: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
+    check('kayıt sürümü 38: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
     const snapT = JSON.stringify(st().temperament);
     game.events.emit('ui:load');
     const sh2 = st().characters.find((c) => c.id === shown.id);
@@ -5789,6 +5804,7 @@ const pageResults = await page.evaluate(async () => {
     for (const h of st().buildings.filter((b) => b.type === 'cabin' && b.functional)) {
       if (S().world.getResidents(h).length === 0) {
         const filler = people().find((c) => c !== g2a && c !== g2b && c !== ma && c !== pa && c.homeId !== h.id && !blockers.some(([x]) => x === c) && (c.homeId === null || people().filter((x) => x.homeId === c.homeId).length > 1)); // (29.1) tek başına oturanı taşımak kendi evini boşaltır
+        if (!filler) continue; // (29.3) taşınabilecek sakin kalmadıysa (kulübe boş kalır; aşağıdaki beklenti bunu ölçer)
         blockers.push([filler, filler.homeId]);
         filler.homeId = h.id;
       }
@@ -5859,7 +5875,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rc = raw.characters.find((c) => c.id === g2a.id);
-    check('kayıt sürümü 37: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
+    check('kayıt sürümü 38: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
     const snap = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
     game.events.emit('ui:load');
     const back = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
@@ -6074,7 +6090,11 @@ const pageResults = await page.evaluate(async () => {
     carrier.mentees = [];
     events.length = 0;
     const a0 = st().heirloom.archive.length;
+    // (29.3) mirasçı adayı kalmasın (geçmişe bağlı olarak bir çırağı ya da manevi evladı olabilir): ötekiler geçici olarak "yola çıkmış" sayılır
+    const keepEmig = st().characters.filter((c) => c !== carrier).map((c) => [c, c.emigrating]);
+    for (const [c] of keepEmig) c.emigrating = c.emigrating ?? { since: 0, exit: null };
     game.events.emit('population:left', { character: carrier, coins: 0, items: 0 });
+    for (const [c, e] of keepEmig) c.emigrating = e;
     check('köyden ayrılan taşıyıcının mirasçısı yoksa yadigâr kasaba arşivine emanet edilir (yok olmaz)', !CI.heirloomSlot(carrier) && st().heirloom.archive.length === a0 + 1 && st().heirloom.archive.at(-1).kind === cs.kind && events.some((x) => x.n === 'heirloom:archived'));
 
     // --- Ocak Devri yadigâr da getirir ---
@@ -6108,7 +6128,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rk = raw.characters.find((c) => c.id === k1.id);
-    check('kayıt sürümü 37: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
+    check('kayıt sürümü 38: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
     const snap = JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null));
     game.events.emit('ui:load');
     check('kayıttan yadigârlar, zincirleri, sayaçlar ve arşiv birebir döner', JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null)) === snap && st().heirloom.archive.length >= 1 && st().chronicle.firstHeirloom?.elder === e1.name);
@@ -6286,6 +6306,7 @@ const pageResults = await page.evaluate(async () => {
     check('1. kuşak Şenlik Neşesi\'li sakin bu fazladan neşeyi yaymaz (yalnızca 2. kuşak)', Math.abs(near.needs.fun - (40 + base)) < 1e-6);
     // Konuşmalar: olasılık 1'e çıkarılır (dakika çok büyük)
     for (const c of crowd) c.speech = null;
+    noWants(...crowd); // (29.3) panayırın olayları bir arzuyu gerçekleştirip ikon balonu çıkarmasın
     dancer.generation = 2;
     fs().update({ gameMinutes: 1e4 });
     check('Kıdemli Bilge gençleri izlerken nostalji sözü söyler (c.speech)', FD.ELDER_LINES.includes(elder.speech?.text));
@@ -6341,7 +6362,7 @@ const pageResults = await page.evaluate(async () => {
     goto(12, 18); fs().onHour(18);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 37: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
+    check('kayıt sürümü 38: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
     st().currentFestival = null;
     game.events.emit('ui:load');
     check('kayıttan süren panayır birebir döner (şenlik kuralları ve Tarihçe\'deki ilk kayıt ile)', JSON.stringify(st().currentFestival) === JSON.stringify(raw.currentFestival) && st().currentFestival.phase === 'party' && st().events.festival.active && st().chronicle.firstFair?.name === fair.name && st().stats.fairs >= 5);
@@ -6626,7 +6647,7 @@ const pageResults = await page.evaluate(async () => {
     const liveFeast = JSON.stringify(st().currentFeast);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 37: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
+    check('kayıt sürümü 38: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
     st().currentFeast = null;
     game.events.emit('ui:load');
     check('kayıttan süren sofra birebir döner (ikram sayacı dahil)', JSON.stringify(st().currentFeast) === liveFeast && st().currentFestival?.phase === 'party');
@@ -6907,7 +6928,7 @@ const pageResults = await page.evaluate(async () => {
     const liveB = JSON.stringify(st().guestBook);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 37: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
+    check('kayıt sürümü 38: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
     st().activeGuest = null;
     game.events.emit('ui:load');
     check('kayıttan konuk kaldığı yerde döner (haritada yeniden oluşur), defter birebir', JSON.stringify(st().activeGuest) === liveG && JSON.stringify(st().guestBook) === liveB && S().world.guests.length === 1 && S().world.guests[0].isGuest === true);
@@ -6996,7 +7017,7 @@ const pageResults = await page.evaluate(async () => {
     const eatenBefore = [...st().currentFeast.eatenIds];
     check('27.1: ikram alanlar sofrada kayda girer (currentFeast.eatenIds)', st().currentFeast.served === 3 && eatenBefore.length === 3 && eaters.every((c) => eatenBefore.includes(c.id)), JSON.stringify(st().currentFeast));
     const raw1 = save();
-    check('27.1: kayıt sürümü 37 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw1.version === 37 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
+    check('27.1: kayıt sürümü 38 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw1.version === 38 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
     load();
     const reloaded = st().characters.filter((c) => eatenBefore.includes(c.id));
     check('27.1: yüklemede eatenIds\'teki sakinlerin c.feasted işareti yeniden kurulur', reloaded.length === 3 && reloaded.every((c) => c.feasted === fairDay), reloaded.map((c) => c.feasted).join());
@@ -7522,7 +7543,7 @@ const pageResults = await page.evaluate(async () => {
     Math.random = realRandom;
     check('27.2: bu adımın sistemleri ana üreteçleri ve Math.random\'u tüketmez (dilekçe seed + 23, çıraklık + 28, soy + 30, yadigâr + 31)', mainRngs.length > 5 && isoCalls > 15 && rngViolations === 0, `${rngViolations}/${isoCalls}`);
     void rngBefore;
-    check('27.2: kayıt sürümü 37 korunur', CONFIG.SAVE_VERSION === 37);
+    check('27.2: kayıt sürümü 38 korunur', CONFIG.SAVE_VERSION === 38);
     restore(snap0);
     s0.lineage.heads = { ...keepHeads };
     Object.assign(s0.lineage, keepLineage);
@@ -7760,7 +7781,7 @@ const pageResults = await page.evaluate(async () => {
       game.events.emit('ui:selectCharacter', null);
     }
 
-    check('27.3: kayıt sürümü 37 korunur', CONFIG.SAVE_VERSION === 37);
+    check('27.3: kayıt sürümü 38 korunur', CONFIG.SAVE_VERSION === 38);
     if (st().activeGuest) gs().finish(false);
     S().world.guests = [];
     Object.assign(st().time, keepTime);
@@ -7991,7 +8012,7 @@ const pageResults = await page.evaluate(async () => {
     const keep = new Map(st().characters.map((c) => [c, { ls: c.lifeStage, age: c.age, aid: c.ageInDays, ven: c.isVenerable, home: c.homeId, kids: [...(c.children ?? [])], inv: [...(c.inventory ?? [])], lifespan: c.lifespan, retired: c.retired, married: c.married, partner: c.partnerId }]));
 
     // --- Veri ve ömür ---
-    check('28.3: ömür 66-75 yaş (29.2b), tohumdan türeyen izole üreteç (seed + 30)', LSD.LIFESPAN.min === 66 && LSD.LIFESPAN.max === 75 && LSD.LIFESPAN.seedOffset === 30);
+    check('28.3: ömür 67-75 yaş (29.3), tohumdan türeyen izole üreteç (seed + 30)', LSD.LIFESPAN.min === 67 && LSD.LIFESPAN.max === 75 && LSD.LIFESPAN.seedOffset === 30);
     const ids = Array.from({ length: 300 }, (_, i) => i + 1);
     const spans = ids.map((i) => VN.lifespanFor(42, i));
     check('28.3: lifespanFor deterministik, 66-75 aralığında ve çeşitli (aynı tohum + kimlik = aynı ömür)', spans.every((v, i) => v === VN.lifespanFor(42, ids[i]) && v >= 66 && v <= 75) && new Set(spans).size >= 8 && VN.lifespanFor(42, 7) !== undefined && spans.some((v, i) => v !== VN.lifespanFor(43, ids[i])));
@@ -8312,6 +8333,7 @@ const pageResults = await page.evaluate(async () => {
     const harvest = (b, res, mins = 150) => {
       const keepRes = { ...s0.resources };
       const keepSkills = { ...worker.skills }; // deneyim kazandıkça hızlanmasın: her ölçüm aynı beceriyle
+      noMoods(worker); // (29.3) ölçüm sırasındaki beceri atlaması "Mesleğimde ilerleyeyim" arzusunu gerçekleştirip iş çarpanını değiştirmesin
       worker.needs.energy = 100; worker.needs.fun = 100; worker.illness = null;
       s0.resources[res] = 0; b.productionBuffer = 0; b.producedToday = 0; b.extraBuffers = {};
       for (let i = 0; i < mins; i++) { worker.needs.energy = 100; worker.needs.fun = 100; S().behavior.performWork(worker, { workBuildingId: b.id, activity: 'farm' }, 1); }
@@ -8467,7 +8489,7 @@ const pageResults = await page.evaluate(async () => {
     localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
     const migrated = SMX.SaveManager.read('session');
     if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
-    check('28.4: v34 kaydı v35\'e göç eder: tohumdan deterministik vadi, boş doktrin', CONFIG.SAVE_VERSION === 37 && migrated && migrated.valley === VY.valleyFor(legacy.seed) && migrated.doctrine.chosen === null && migrated.doctrine.day === null);
+    check('28.4: v34 kaydı v35\'e göç eder: tohumdan deterministik vadi, boş doktrin', CONFIG.SAVE_VERSION === 38 && migrated && migrated.valley === VY.valleyFor(legacy.seed) && migrated.doctrine.chosen === null && migrated.doctrine.day === null);
 
     // Temizlik
     for (const o of offs) o();
@@ -8921,7 +8943,7 @@ const pageResults = await page.evaluate(async () => {
     const mById = new Map((migrated?.characters ?? []).map((c) => [c.id, c]));
     const pairs = Object.keys(legacy.relationships).map((k) => k.split('-').map(Number)).filter(([a, b]) => mById.has(a) && mById.has(b));
     const boundOk = pairs.length > 0 && pairs.every(([a, b]) => { const ra = mById.get(a).relationships[b]; const rb = mById.get(b).relationships[a]; return ra && rb && ra.chemistry === rb.chemistry && ra.chemistry === CH.chemistryFor(legacy.seed, mById.get(a), mById.get(b)) && ra.tags.length === 0 && ra.craft === false; });
-    check('29.1: v35 kaydı v36\'ya göç eder: her mevcut ilişkiye deterministik kimya ve boş etiket yapısı bağlanır', CONFIG.SAVE_VERSION === 37 && migrated && boundOk && migrated.characters.every((c) => c.relationships && typeof c.relationships === 'object'), `${pairs.length} çift`);
+    check('29.1: v35 kaydı v36\'ya göç eder: her mevcut ilişkiye deterministik kimya ve boş etiket yapısı bağlanır', CONFIG.SAVE_VERSION === 38 && migrated && boundOk && migrated.characters.every((c) => c.relationships && typeof c.relationships === 'object'), `${pairs.length} çift`);
     const again = (() => { localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy)); const m = SMX.SaveManager.read('session'); if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot); return m; })();
     check('29.1: göç deterministiktir (iki kez göç birebir aynı kayıt)', JSON.stringify(again.characters.map((c) => c.relationships)) === JSON.stringify(migrated.characters.map((c) => c.relationships)));
 
@@ -8965,7 +8987,7 @@ const pageResults = await page.evaluate(async () => {
     const keepStats = JSON.stringify(s0.moodlets);
     const keepScores = JSON.stringify(s0.relationships);
     const keepJournal = s0.journal.length;
-    const clear = (...list) => { for (const c of list) { c.moodlets.length = 0; MO.recomputeMood(c); c.speech = null; c.bubble = null; } };
+    const clear = (...list) => { for (const c of list) { c.moodlets.length = 0; MO.recomputeMood(c); c.speech = null; c.bubble = null; } noWants(...list); }; // (29.3) arzu kancaları da
     const setTraits = (c, traits, quirk = null) => { c.traits = traits; c.quirk = quirk; c.profile = c.buildProfile(); };
     const keys = (c) => c.moodlets.map((m) => m.key).join();
     const now = () => s0.totalMinutes;
@@ -8973,7 +8995,7 @@ const pageResults = await page.evaluate(async () => {
 
     // --- Veri ve mimari ---
     const byLayer = (layer) => MD.MOODLET_KEYS.filter((k) => MD.MOODLETS[k].layer === layer);
-    check('29.2: üç katman ve tavanları: 1 çekirdek + 3 eylem + 2 ihtiyaç = en çok 6 moodlet', MD.MOODLET_CAPS.core === 1 && MD.MOODLET_CAPS.action === 3 && MD.MOODLET_CAPS.need === 2 && byLayer('core').length === 6 && byLayer('action').length === 11 && byLayer('need').length === 7);
+    check('29.2: üç katman ve tavanları: 1 çekirdek + 3 eylem + 2 ihtiyaç = en çok 6 moodlet', MD.MOODLET_CAPS.core === 1 && MD.MOODLET_CAPS.action === 3 && MD.MOODLET_CAPS.need === 2 && byLayer('core').length === 6 && byLayer('action').length === 13 && byLayer('need').length === 7);
     check('29.2: kademeler minor / major / critical etkinin sapmasını 1 / 1,5 / 2 ile çarpar', MD.TIER_SCALE.minor === 1 && MD.TIER_SCALE.major === 1.5 && MD.TIER_SCALE.critical === 2);
     check('29.2: süreler: Alın Teri 8, Angarya 6, Ustalık Akışı 10, Damak Şöleni 8, Kuru Tayın 6, Deliksiz Uyku 10, Üşüyerek Uyandı 8, Tatlı Sohbet 6, Tatsız Karşılaşma 8, İç Huzuru 8 saat', ['proud_work', 'drudgery', 'flow_state', 'feast_bliss', 'raw_ration', 'well_rested', 'cold_wake', 'warm_chat', 'sour_encounter', 'quiet_peace'].map((k) => MD.MOODLETS[k].hours).join() === '8,6,10,8,6,10,8,6,8,8');
     check('29.2: travma / zafer süreleri: Derin Yas 72, Sarsılmış 24, Kalbi Kırık 36, Sesimiz Duyulmadı 36, Hayatının Günü 48, İlham Dolu 24, Yüreği Ferahladı 24 saat', ['mourning', 'shaken', 'heartbroken', 'neglected', 'euphoric', 'inspired', 'comforted'].map((k) => MD.MOODLETS[k].hours).join() === '72,24,36,36,48,24,24');
@@ -9261,12 +9283,13 @@ const pageResults = await page.evaluate(async () => {
     setChem(A, B, 0); setChem(A, C, 3);
     for (const o of [B, C]) for (const tag of ['resentful', 'grateful', 'jealous', 'admiration', 'kindred']) { CH2.removeTag(A, o.id, tag); CH2.removeTag(o, A.id, tag); } // (29.2b) önceki bölümlerin etiketleri sıralamayı karıştırmasın
     s0.relationships[RS2.pairKey(A.id, B.id)] = 20; s0.relationships[RS2.pairKey(A.id, C.id)] = 20;
-    const others2 = s0.characters.filter((c) => ![A, B, C].includes(c)).map((c) => [c, c.away]);
-    for (const [c] of others2) c.away = { stage: 'away' };
+    // (29.3) dünyadaki herkes (ziyaretçi dahil) sohbete müsait olmasın: sohbet uygunluğu görünürlüğe bakar (away'e değil)
+    const others2 = S().world.characters.filter((c) => ![A, B, C].includes(c)).map((c) => [c, c.away, c.visible]);
+    for (const [c] of others2) { c.away = { stage: 'away' }; c.visible = false; }
     const friend = brain.findPartner(A, 19);
     clear(A);
     const nearest = brain.findPartner(A, 19);
-    for (const [c, a] of others2) c.away = a;
+    for (const [c, a, v] of others2) { c.away = a; c.visible = v; }
     check('29.2: dost arayan sakin kimyası yüksek olanı seçer (gerçek Brain.findPartner); ruh hali geçince en yakına döner', friend === C && nearest === B, `${friend?.name} ${nearest?.name} B=${B.name} C=${C.name} ${A.mood.seek} ${JSON.stringify(A.relationships[C.id])}`);
     const weights = (setup) => { clear(A); setup(); const real = brain.rng.weighted; let seen = null; brain.rng.weighted = (opts) => { seen ??= Object.fromEntries(opts); return opts[0][0]; }; const realResolve = brain.resolveLeisure.bind(brain); brain.resolveLeisure = () => ({ activity: 'wait', duration: 1 }); brain.planLeisure(A, 13); brain.resolveLeisure = realResolve; delete brain.rng.weighted; return seen ?? {}; };
     setTraits(A, ['glutton']);
@@ -9520,7 +9543,7 @@ const pageResults = await page.evaluate(async () => {
     localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
     const migrated = SM2.SaveManager.read('session');
     if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
-    check('29.2: v36 kaydı v37\'ye göç eder: her sakine moodlets: [], duruma boş ruh hali sayaçları', CONFIG.SAVE_VERSION === 37 && migrated && migrated.characters.every((c) => Array.isArray(c.moodlets) && c.moodlets.length === 0) && JSON.stringify(migrated.moodlets) === JSON.stringify(MO.emptyMoodletStats()));
+    check('29.2: v36 kaydı v37\'ye göç eder: her sakine moodlets: [], duruma boş ruh hali sayaçları', CONFIG.SAVE_VERSION === 38 && migrated && migrated.characters.every((c) => Array.isArray(c.moodlets) && c.moodlets.length === 0) && JSON.stringify(migrated.moodlets) === JSON.stringify(MO.emptyMoodletStats()));
 
     // Temizlik
     brain.planConsole = realConsole;
@@ -9627,9 +9650,470 @@ const pageResults = await page.evaluate(async () => {
 
     // --- Doğal ömür: 66-75 yaş ---
     const spans = Array.from({ length: 400 }, (_, i) => VNB.lifespanFor(42, i + 1));
-    check('29.2b: doğal ömür 66-75 yaş (400 kimlikte aralığın tamamı görülür), Kıdemli Bilge yaşı 65, ocak muafiyeti ömür sınırının altında', LSB.LIFESPAN.min === 66 && LSB.LIFESPAN.max === 75 && spans.every((v) => v >= 66 && v <= 75) && new Set(spans).size === 10 && LSB.AGING.elderAt === 65 && LSB.AGING.elderAt < LSB.LIFESPAN.min && LSB.VENERABLE.hearthGraceAge < LSB.LIFESPAN.max, [...new Set(spans)].sort().join());
-    check('29.2b: kayıttaki 80-90 yaşlık eski ömür geçersizdir (kimlikten yeniden atanır), 66 ve 75 geçerlidir', VNB.sanitizeLifespan(80) === null && VNB.sanitizeLifespan(90) === null && VNB.sanitizeLifespan(66) === 66 && VNB.sanitizeLifespan(75) === 75 && VNB.sanitizeLifespan(65) === null);
+    check('29.2b: doğal ömür 67-75 yaş (29.3; 400 kimlikte aralığın tamamı görülür), Kıdemli Bilge yaşı 65, ocak muafiyeti ömür sınırının altında', LSB.LIFESPAN.min === 67 && LSB.LIFESPAN.max === 75 && spans.every((v) => v >= 67 && v <= 75) && new Set(spans).size === 9 && LSB.AGING.elderAt === 65 && LSB.AGING.elderAt < LSB.LIFESPAN.min && LSB.VENERABLE.hearthGraceAge < LSB.LIFESPAN.max, [...new Set(spans)].sort().join());
+    check('29.2b: kayıttaki 80-90 yaşlık eski ömür geçersizdir (kimlikten yeniden atanır), 67 ve 75 geçerlidir (29.3: 66 artık geçersiz)', VNB.sanitizeLifespan(80) === null && VNB.sanitizeLifespan(90) === null && VNB.sanitizeLifespan(66) === null && VNB.sanitizeLifespan(67) === 67 && VNB.sanitizeLifespan(75) === 75 && VNB.sanitizeLifespan(65) === null);
     check('29.2b: 65 yaşındaki yetişkin Kıdemli Bilge sayılır (64 değil)', LS2.stageFor({ age: 64 }) === 'adult' && LS2.stageFor({ age: 65 }) === 'elder');
+  }
+
+  // ===== 29. aşama (29.3): Arzular, Korkular ve Yaşam Doyumu (kayıt sürümü 38) =====
+  {
+    WantClass.prototype.roll = realRoll; // (29.3) dolum bu bölümden itibaren açık
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const s0 = game.state;
+    const WD = await import('/src/data/wants.js');
+    const WT = await import('/src/systems/Wants.js');
+    const MO3 = await import('/src/systems/Moodlets.js');
+    const MD3 = await import('/src/data/moodlets.js');
+    const SM3 = await import('/src/state/SaveManager.js');
+    const RS3 = await import('/src/systems/RelationshipSystem.js');
+    const CH3 = await import('/src/systems/Chemistry.js');
+    const VN3 = await import('/src/systems/Venerable.js');
+    const { EventBus } = await import('/src/core/EventBus.js');
+    const { Random } = await import('/src/utils/random.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const { CONFIG } = await import('/src/config.js');
+    const ws = S().wants;
+    const brain = S().behavior.brain;
+    const now = () => st().totalMinutes;
+    const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
+    const adults = s0.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
+    const [A, B, C, D] = adults;
+    const keepA = { x: A.x, y: A.y, visible: A.visible, parentIds: [...B.parentIds], groups: S().relationships.groups };
+    // Olaylı testler için sonda: ayrı bir olay yolunda dinleyen ikinci bir WantSystem (aynı durum, gerçek MoodletSystem). Oyunun öteki
+    // sistemleri (aile, günlük, kriz) sahte olaylardan etkilenmez; moodlet'e bağlı tetikler gerçek sistemle (moodlets.apply) sınanır.
+    const bus = new EventBus();
+    const probe = new WantClass({ state: s0, events: bus }, S().world, new Random(1), { moodlets: S().moodlets, relationships: S().relationships });
+    const reset = (c, sat = 40) => { c.wants.length = 0; c.fears.length = 0; c.wantLog.length = 0; c.moodlets.length = 0; c.satisfaction = sat; c.fearStreak = 0; WT.recomputeDrive(c); MO3.recomputeMood(c); c.speech = null; c.bubble = null; };
+    const give = (c, kind, key, who = null, until = undefined) => {
+      const def = (kind === 'fear' ? WD.FEARS : WD.WANTS)[key];
+      const e = { key, since: now(), until: until !== undefined ? until : def.days === null ? null : now() + def.days * 1440 };
+      if (who) { e.whoId = who.id; e.whoName = who.name; }
+      (kind === 'fear' ? c.fears : c.wants).push(e);
+      WT.recomputeDrive(c);
+      return e;
+    };
+    const statOf = (group, key) => st().wants[group][key] ?? 0;
+
+    // --- Veri ve kurulum ---
+    check('29.3: 18 arzu ve 10 korku tanımlı (sıra = seçim sırası); her girdinin adı, puanı, ikonu var; izole üreteç tohum + 39', WD.WANT_KEYS.length === 18 && WD.FEAR_KEYS.length === 10 && WD.WANT_KEYS[0] === 'see_pupil_master' && WD.WANT_KEYS.at(-1) === 'be_heard' && [...Object.values(WD.WANTS), ...Object.values(WD.FEARS)].every((d) => d.name && d.points > 0 && d.icon && d.base > 0) && WD.WANT_SEED_OFFSET === 39 && ws.rng !== S().moodlets.rng && ws.rng !== brain.rng);
+    check('29.3: iki yeni moodlet (toplam 26): Dileği Oldu / Korktuğu Başına Geldi eylem katmanında (çekirdeği ezmez)', MD3.MOODLET_KEYS.length === 26 && MD3.MOODLETS.wish_come_true.layer === 'action' && MD3.MOODLETS.dread_realized.layer === 'action' && MD3.MOODLETS.dread_realized.seek === true && MD3.MOOD_REASONS.wish_get_married.includes('{who} ile evleneyim') && MD3.MOOD_LINES.wish_come_true.length >= 2);
+    check('29.3: WantSystem sahnede kurulur, olayları dinler; kayıt sürümü 38', ws && ws.unsubscribers.length >= 25 && CONFIG.SAVE_VERSION === 38 && S().disposables.includes(ws) && S().disposables.indexOf(ws) === S().disposables.indexOf(S().moodlets) + 1);
+
+    // --- Durumsuz seçim ---
+    const r1 = WT.wantRng(42, 7, 10, 0).next();
+    check('29.3: wantRng durumsuzdur: aynı (tohum, kimlik, gün, salt) aynı sayıyı, farklı gün / kimlik / salt farklı sayıyı verir', r1 === WT.wantRng(42, 7, 10, 0).next() && r1 !== WT.wantRng(42, 7, 11, 0).next() && r1 !== WT.wantRng(42, 8, 10, 0).next() && r1 !== WT.wantRng(42, 7, 10, 1).next() && r1 !== WT.wantRng(43, 7, 10, 0).next());
+    reset(A);
+    const listA = WT.eligibleWants(st(), S().world, A);
+    const pickOn = (day) => WT.pickWeighted(listA, WT.wantRng(st().seed, A.id, day, 0))?.key;
+    const days = Array.from({ length: 30 }, (_, i) => pickOn(i + 1));
+    check('29.3: aynı gün aynı seçim (tekrarlı), günden güne ayrışır; liste boşsa zar çekilmez', listA.length > 3 && pickOn(5) === pickOn(5) && new Set(days).size >= 3 && (() => { const r = WT.wantRng(1, 1, 1, 0); const s1 = r.state; return WT.pickWeighted([], r) === null && r.state === s1; })(), `${listA.map((x) => x.key).join(',')} · ${[...new Set(days)].join(',')}`);
+
+    // --- Sızıntı: dolum + gerçekleşme + süre dolumu boyunca hiçbir üreteç tüketilmez ---
+    {
+      const rngs = Object.entries(S()).filter(([, v]) => v && v.rng && Number.isFinite(v.rng.state)).map(([, v]) => v.rng);
+      rngs.push(brain.rng, brain.citizenRng ?? brain.rng);
+      const states = rngs.map((r) => r.state);
+      let randomCalls = 0;
+      const realRandom = Math.random;
+      Math.random = () => { randomCalls++; return realRandom(); };
+      reset(A); A.visible = false; // görünmez: söz / balon da çıkmaz (kozmetik üreteç de sayılır)
+      ws.roll(A);
+      const rolled = A.wants.length + A.fears.length;
+      const w0 = A.wants[0];
+      if (w0) w0.until = now() - 1;
+      ws.sweep(A, now());
+      give(A, 'want', 'level_up_skill');
+      probe.fulfilFirst(A, ['level_up_skill']);
+      S().moodlets.apply(A, 'hangry', { reason: 'hangry' });
+      ws.onNewDay();
+      Math.random = realRandom;
+      A.visible = keepA.visible;
+      check('29.3: dolum, gerçekleşme, süre dolumu ve gün dönümü ana üreteci, öteki üreteçleri ve Math.random\'u hiç tüketmez', rngs.length > 8 && rngs.every((r, i) => r.state === states[i]) && randomCalls === 0 && rolled > 0, `${rngs.length} üreteç · ${randomCalls} çağrı · ${rolled} dolum`);
+    }
+
+    // --- Tavanlar ---
+    {
+      for (const c of adults) reset(c, 50);
+      for (const c of adults) ws.roll(c);
+      const ok = adults.every((c) => c.wants.length <= 3 && c.fears.length <= 2 && new Set(c.wants.map((w) => WD.WANTS[w.key].cat)).size === c.wants.length && c.wants.filter((w) => WD.WANTS[w.key].days === null).length <= 1 && new Set(c.fears.map((f) => f.key)).size === c.fears.length);
+      const full = adults.filter((c) => c.wants.length === 3 && c.fears.length === 2).length;
+      check('29.3: 06:00 dolumu: en çok 3 arzu / 2 korku, kategori başına 1 arzu, uzun soluklu en çok 1; until = şimdi + gün x 1440 ya da null', ok && full > 0 && adults.every((c) => [...c.wants, ...c.fears].every((e) => e.until === null || e.until === e.since + ((WD.WANTS[e.key] ?? WD.FEARS[e.key]).days * 1440))), `${full}/${adults.length} dolu`);
+      const before = JSON.stringify(A.wants);
+      ws.roll(A);
+      check('29.3: dolu yuvalar yeniden dolmaz (zar çekilmez)', JSON.stringify(A.wants) === before);
+      reset(A);
+      A.wantLog.push({ key: 'quiet_day', kind: 'want', outcome: 'fulfilled', day: st().time.day - 1 });
+      const recent = WT.eligibleWants(st(), S().world, A).some((x) => x.key === 'quiet_day');
+      A.wantLog[0].day = st().time.day - 3;
+      const old = WT.eligibleWants(st(), S().world, A).some((x) => x.key === 'quiet_day');
+      give(A, 'want', 'feast_meal');
+      const sameCat = WT.eligibleWants(st(), S().world, A).some((x) => WD.WANTS[x.key].cat === 'comfort');
+      check('29.3: son 2 günde görülen anahtar yeniden seçilmez (3 gün önce görülen seçilebilir); aynı kategoriden ikinci arzu seçilmez', !recent && old && !sameCat);
+      const keepGrow = D.growsUpAt;
+      reset(D); D.growsUpAt = now() + 5000;
+      ws.roll(D);
+      const childEmpty = D.wants.length === 0 && D.fears.length === 0 && WT.eligibleWants(st(), S().world, D).length === 0;
+      D.growsUpAt = keepGrow;
+      check('29.3: çocukta arzu / korku dolmaz (listeler boş, doyum 50)', childEmpty && D.satisfaction === 40 && new Character({ id: 99001, name: 'Bebek', x: 0, y: 0, age: 2, traits: [], appearance: A.appearance, growsUpAt: 9e9, wants: [{ key: 'quiet_day', since: 0, until: 9 }], satisfaction: 90 }).wants.length === 0);
+    }
+
+    // --- Gerçekleşmeler: her arzu anahtarı ---
+    const inn = { id: 777001, type: 'inn' };
+    const wantCases = {
+      see_pupil_master: { who: B, fire: () => bus.emit('apprentice:graduated', { character: B, masterId: A.id, grandmaster: true }), extra: 8 },
+      pass_heirloom: { fire: () => bus.emit('heirloom:passed', { from: A, to: B }) },
+      see_grandchild: { setup: () => { B.parentIds = [A.id]; }, fire: () => bus.emit('family:childBorn', { child: { id: 99002, name: 'Bebek' }, parents: [B, C] }), after: () => { B.parentIds = keepA.parentIds; } },
+      get_married: { who: B, fire: () => bus.emit('relationship:married', { a: A, b: B }) },
+      have_child: { fire: () => bus.emit('family:childBorn', { child: { id: 99003, name: 'Bebek' }, parents: [A, B] }) },
+      find_love: { fire: () => bus.emit('relationship:partnered', { a: A, b: B }) },
+      craft_masterwork: { fire: () => bus.emit('masterwork:created', { character: A }) },
+      level_up_skill: { fire: () => bus.emit('skill:levelUp', { character: A, skill: 'farming' }) },
+      chat_kindred: { who: B, fire: () => { S().relationships.groups = [{ kind: 'chat', members: [A, B] }]; probe.scanKindred(A); S().relationships.groups = keepA.groups; } },
+      make_friend: { fire: () => bus.emit('relationship:levelUp', { a: A, b: B, level: { key: 'friend', min: 40 }, previous: { key: 'acquaintance', min: 10 } }) },
+      reconcile: { who: B, fire: () => bus.emit('relationship:reconciled', { a: A, b: B }) },
+      sherbet_with_spouse: { who: B, setup: () => { B.visible = true; B.x = A.x + 10; B.y = A.y; }, fire: () => bus.emit('citizen:sherbet', { character: A, building: inn }) },
+      family_dinner: { fire: () => bus.emit('social:familyDinner', { a: B, b: A }) },
+      feast_meal: { fire: () => bus.emit('feast:served', { character: A }) },
+      quiet_day: { fire: () => S().moodlets.apply(A, 'quiet_peace', { reason: 'quiet' }) },
+      treat_self: { fire: () => bus.emit('citizen:bought', { character: A, kind: 'fruit' }) },
+      go_expedition: { fire: () => bus.emit('expedition:memberReturned', { character: A }) },
+      be_heard: { fire: () => bus.emit('petition:resolved', { character: A, outcome: 'fulfilled' }) },
+    };
+    const wantFails = [];
+    for (const key of WD.WANT_KEYS) {
+      const t = wantCases[key];
+      reset(A, 40);
+      t.setup?.();
+      const e = give(A, 'want', key, t.who ?? null);
+      const n0 = statOf('fulfilled', key);
+      const wish0 = A.wishCount;
+      const mem0 = A.memories.length;
+      A.fearStreak = 3;
+      t.fire();
+      t.after?.();
+      const pts = WD.WANTS[key].points + (t.extra ?? 0);
+      const m = MO3.getMoodlet(A, 'wish_come_true');
+      const log = A.wantLog.at(-1);
+      const ok = !A.wants.includes(e) && A.satisfaction === Math.min(100, 40 + pts) && m?.reason === `wish_${key}` && m.tier === WT.tierForPoints(pts) && log?.key === key && log.outcome === 'fulfilled' && log.kind === 'want' && statOf('fulfilled', key) === n0 + 1 && A.wishCount === wish0 + 1 && A.fearStreak === 0 && (pts >= WD.WANT_RULES.memoryAt ? A.memories.at(-1).text.startsWith('Dileği oldu') && A.memories.at(-1).fond === true : !A.memories.at(-1)?.text.startsWith(`Dileği oldu: ${WT.wantName('want', e)}`));
+      if (!ok) wantFails.push(`${key}: sat ${A.satisfaction} m ${m?.reason}/${m?.tier} log ${JSON.stringify(log)} n ${statOf('fulfilled', key) - n0}`);
+    }
+    check('29.3: her arzu kendi olayıyla gerçekleşir (18/18): doyum +puan, Dileği Oldu (puana göre kademe), sonuç kaydı, sayaç, wishCount +1, fearStreak 0, 12+ puanda anı', wantFails.length === 0, wantFails.join(' | '));
+    reset(A, 40);
+    give(A, 'want', 'see_pupil_master', B);
+    bus.emit('apprentice:graduated', { character: B, masterId: A.id, grandmaster: false });
+    check('29.3: çırak mezuniyeti 14, Başusta mezuniyeti 22 (14 + 8) doyum verir', A.satisfaction === 54);
+    reset(A, 40);
+    give(A, 'want', 'sherbet_with_spouse', B);
+    B.x = A.x + 300; B.insideBuildingId = null; B.task = null;
+    bus.emit('citizen:sherbet', { character: A, building: inn });
+    const alone = A.wants.length === 1;
+    B.x = keepA.x; B.insideBuildingId = inn.id;
+    bus.emit('citizen:sherbet', { character: A, building: inn });
+    B.insideBuildingId = null;
+    check('29.3: "handa şerbet" eşi aynı handa değilse gerçekleşmez; aynı handaysa (insideBuildingId) gerçekleşir', alone && A.wants.length === 0 && A.satisfaction === 50);
+    reset(A, 40);
+    give(A, 'want', 'feast_meal'); give(A, 'want', 'treat_self', null);
+    A.wants.splice(1, 1); give(A, 'want', 'find_love');
+    give(A, 'want', 'treat_self');
+    const two = A.wants.map((w) => w.key).join();
+    bus.emit('citizen:bought', { character: A, kind: 'pie' });
+    check('29.3: aynı olay bir sakinde en çok bir arzuyu gerçekleştirir (katalog sırasıyla ilki: börek önce ziyafet arzusunu)', A.wants.some((w) => w.key === 'treat_self') && !A.wants.some((w) => w.key === 'feast_meal'), two);
+    reset(A, 40);
+    give(A, 'want', 'be_heard');
+    bus.emit('petition:resolved', { character: A, outcome: 'rejected' });
+    check('29.3: dilekçe reddedilirse "kabul görsün" arzusu cezasız silinir (void)', A.wants.length === 0 && A.satisfaction === 40 && A.wantLog.at(-1).outcome === 'void');
+
+    // --- Korkular: her korku anahtarı ---
+    const homeB = { id: A.homeId ?? 777002, workerIds: new Set([A.id]) };
+    const fearCases = {
+      fire_at_work: { fire: () => bus.emit('crisis:fireStarted', { building: homeB }) },
+      quarrel_foe: { who: B, fire: () => bus.emit('relationship:quarrel', { a: B, b: A }) },
+      winter_cold: { fire: () => S().moodlets.apply(A, 'chilled', { reason: 'chilled' }) },
+      go_hungry: { fire: () => S().moodlets.apply(A, 'hangry', { reason: 'hangry' }) },
+      loss_of_loved: { who: B, fire: () => S().moodlets.apply(A, 'mourning', { reason: 'mourn_spouse', tier: 'major', whoId: B.id, whoName: B.name }), noDread: true },
+      be_lonely: { fire: () => S().moodlets.apply(A, 'lonely_ache', { reason: 'lonely' }) },
+      fall_ill: { fire: () => bus.emit('health:fellIll', { character: A }) },
+      heartbreak: { fire: () => S().moodlets.apply(A, 'heartbroken', { reason: 'heart_unrequited' }) },
+      unheard: { fire: () => S().moodlets.apply(A, 'neglected', { reason: 'neglect_rejected' }) },
+      burnout: { fire: () => S().moodlets.apply(A, 'exhausted', { reason: 'exhausted' }) },
+    };
+    const fearFails = [];
+    for (const key of WD.FEAR_KEYS) {
+      const t = fearCases[key];
+      reset(A, 60);
+      const e = give(A, 'fear', key, t.who ?? null);
+      const n0 = statOf('realized', key);
+      A.fearStreak = 1;
+      t.fire();
+      const pts = WD.FEARS[key].points;
+      const m = MO3.getMoodlet(A, 'dread_realized');
+      const log = A.wantLog.at(-1);
+      const moodOk = t.noDread ? m === null : m?.reason === `dread_${key}` && m.tier === WT.tierForPoints(pts);
+      const ok = !A.fears.includes(e) && A.satisfaction === 60 - pts && moodOk && log?.key === key && log.outcome === 'realized' && log.kind === 'fear' && statOf('realized', key) === n0 + 1 && A.fearStreak === 2;
+      if (!ok) fearFails.push(`${key}: sat ${A.satisfaction} m ${m?.reason}/${m?.tier} log ${JSON.stringify(log)} n ${statOf('realized', key) - n0} streak ${A.fearStreak}`);
+    }
+    check('29.3: her korku kendi tetiğiyle başına gelir (10/10): doyum -puan, Korktuğu Başına Geldi (kademe), kayıt, sayaç, fearStreak +1', fearFails.length === 0, fearFails.join(' | '));
+    reset(A, 60);
+    give(A, 'fear', 'loss_of_loved', B);
+    S().moodlets.apply(A, 'mourning', { reason: 'mourn_spouse', tier: 'major', whoId: B.id, whoName: B.name });
+    check('29.3: "yokluğu" korkusu gerçekleşince Korktuğu Başına Geldi VERİLMEZ (Derin Yas yeterli); doyum -20 ve anı', A.satisfaction === 40 && !MO3.hasMoodlet(A, 'dread_realized') && MO3.hasMoodlet(A, 'mourning') && A.memories.at(-1).text.startsWith('Korktuğu başına geldi') && A.memories.at(-1).fond === false);
+    reset(A, 60);
+    give(A, 'fear', 'loss_of_loved', C);
+    S().moodlets.apply(A, 'mourning', { reason: 'mourn_spouse', tier: 'major', whoId: B.id, whoName: B.name });
+    check('29.3: başka birinin yası "yokluğu" korkusunu gerçekleştirmez (whoId eşleşmeli)', A.fears.length === 1 && A.satisfaction === 60);
+    reset(A, 60);
+    give(A, 'fear', 'fire_at_work');
+    const fires0 = statOf('realized', 'fire_at_work');
+    bus.emit('crisis:fireStarted', { building: homeB });
+    const afterStart = A.satisfaction;
+    bus.emit('crisis:burnedDown', { building: homeB });
+    bus.emit('crisis:burnedDown', { building: homeB });
+    check('29.3: iş yerinde yangın: tutuşunca -10, aynı yangında kül olunca ek -6 (toplam -16), sayaç yalnızca 1 artar; ikinci kül bildirimi yeniden düşürmez', afterStart === 50 && A.satisfaction === 44 && statOf('realized', 'fire_at_work') === fires0 + 1 && A.wantLog.at(-1).burned === true);
+    reset(A, 60);
+    give(A, 'fear', 'fire_at_work');
+    bus.emit('crisis:burnedDown', { building: homeB });
+    check('29.3: tutuşta henüz korkmayan, kül olurken korkusu sürüyorsa tek seferde -16', A.satisfaction === 44 && A.fears.length === 0);
+    reset(A, 60);
+    give(A, 'fear', 'quarrel_foe', B);
+    bus.emit('relationship:quarrel', { a: A, b: C });
+    check('29.3: hedefli korku başka biriyle kavgada gerçekleşmez', A.fears.length === 1 && A.satisfaction === 60);
+    reset(A, 60);
+    give(A, 'fear', 'unheard');
+    bus.emit('petition:resolved', { character: A, outcome: 'fulfilled' });
+    check('29.3: dilekçe olumlu kapanırsa "sesimin duyulmaması" korkusu geçer (passed, +2)', A.fears.length === 0 && A.satisfaction === 62 && A.wantLog.at(-1).outcome === 'passed');
+
+    // --- Süre ve uygunluk ---
+    reset(A, 50);
+    give(A, 'want', 'quiet_day', null, now() - 1);
+    const exp0 = statOf('expired', 'quiet_day');
+    ws.sweep(A, now());
+    const expiredOk = A.wants.length === 0 && A.satisfaction === 48 && A.wantLog.at(-1).outcome === 'expired' && statOf('expired', 'quiet_day') === exp0 + 1;
+    give(A, 'fear', 'go_hungry', null, now() - 1);
+    const pass0 = statOf('passed', 'go_hungry');
+    ws.sweep(A, now());
+    check('29.3: süresi dolan arzu -2 (expired), gerçekleşmeden geçen korku +2 (passed)', expiredOk && A.fears.length === 0 && A.satisfaction === 50 && A.wantLog.at(-1).outcome === 'passed' && statOf('passed', 'go_hungry') === pass0 + 1);
+    reset(A, 50);
+    const keepPartner = A.partnerId;
+    A.partnerId = null;
+    give(A, 'want', 'get_married', B);
+    give(A, 'want', 'chat_kindred', B);
+    ws.sweep(A, now());
+    A.partnerId = keepPartner;
+    check('29.3: uygunluğu biten kayıt (partner yok, ruh ikizi değil) cezasız silinir (void)', A.wants.length === 0 && A.satisfaction === 50 && A.wantLog.slice(-2).every((e) => e.outcome === 'void'));
+
+    // --- Vefat / göç: hedef gidince bütün referanslar temizlenir ---
+    {
+      for (const c of [A, C, D]) reset(c, 50);
+      give(A, 'want', 'reconcile', B); give(C, 'fear', 'quarrel_foe', B); give(D, 'fear', 'loss_of_loved', B);
+      bus.emit('exodus:leaving', { ids: [B.id] });
+      const cleared = [A, C, D].every((c) => ![...c.wants, ...c.fears].some((e) => e.whoId === B.id)) && [A, C, D].every((c) => c.wantLog.at(-1)?.outcome === 'void' && c.wantLog.at(-1).whoName === B.name && !('whoId' in c.wantLog.at(-1)));
+      give(A, 'want', 'reconcile', B);
+      bus.emit('population:dying', { character: B });
+      const dying = A.wants.length === 0;
+      give(A, 'want', 'reconcile', B);
+      bus.emit('population:left', { character: B });
+      check('29.3: hedef göçe çıkınca / vefat edince / ayrılınca ona bağlı bütün arzu / korku kayıtları cezasız silinir; kayıtta yalnızca ad kalır', cleared && dying && A.wants.length === 0 && A.satisfaction === 50);
+      const list = [{ id: 1, wants: [{ key: 'reconcile', whoId: 2 }, { key: 'quiet_day' }], fears: [{ key: 'quarrel_foe', whoId: 9 }] }, { id: 2, wants: [], fears: [] }];
+      WT.pruneWantRefs(list);
+      check('29.3: yüklemede hayatta olmayan kişiye bağlı kayıt atılır (pruneWantRefs)', list[0].wants.length === 2 && list[0].fears.length === 0);
+    }
+
+    // --- Doyum ---
+    {
+      const T = WT.satisfactionTier;
+      check('29.3: doyum 0..100 kırpılır, sayı değilse 50', WT.clampSatisfaction(150) === 100 && WT.clampSatisfaction(-5) === 0 && WT.clampSatisfaction('x') === 50 && WT.clampSatisfaction(41.6) === 42);
+      check('29.3: kademe sınırları 19/20, 39/40, 64/65, 84/85', T(19).key === 'crushed' && T(20).key === 'restless' && T(39).key === 'restless' && T(40).key === 'content' && T(64).key === 'content' && T(65).key === 'fulfilled' && T(84).key === 'fulfilled' && T(85).key === 'radiant' && T(100).key === 'radiant' && T(0).key === 'crushed');
+      reset(A, 60); reset(C, 45); reset(D, 51);
+      const dz = S().characters?.length;
+      ws.onNewDay();
+      check('29.3: gün dönümünde doyum 50\'ye doğru kayar (üstünde -2, altında +1; 50\'yi geçmez)', A.satisfaction === 58 && C.satisfaction === 46 && D.satisfaction === 50, `${A.satisfaction} ${C.satisfaction} ${D.satisfaction} ${dz}`);
+      reset(A, 90);
+      const radiant = { ...A.mood };
+      reset(A, 10);
+      const crushed = { ...A.mood };
+      reset(A, 50);
+      check('29.3: kademe etkileri c.mood\'a katılır (Gönlü Zengin iş x1,05 / deneyim x1,1; Hayal Kırıklığı iş x0,95, atışma x1,2); mood.satisfaction kademe anahtarı', near(radiant.workMul, 1.05) && near(radiant.xpMul, 1.1) && near(radiant.joyRateMul, 0.85) && radiant.satisfaction === 'radiant' && near(crushed.workMul, 0.95) && near(crushed.quarrelMul, 1.2) && crushed.satisfaction === 'crushed' && A.mood.satisfaction === 'content' && near(A.mood.workMul, 1));
+      reset(A, 95);
+      for (const k of ['euphoric', 'flow_state', 'proud_work', 'well_rested', 'wish_come_true']) MO3.addMoodlet(A, k, now(), { tier: 'critical' });
+      check('29.3: doyum etkisi kırpmadan önce katılır: toplam yine MOOD_LIMITS içinde', A.mood.workMul <= MD3.MOOD_LIMITS.workMul[1] + 1e-9 && A.mood.joyRateMul >= MD3.MOOD_LIMITS.joyRateMul[0] - 1e-9, A.mood.workMul);
+      reset(A, 21);
+      const tiers = [];
+      const off = bus.on('satisfaction:tierChanged', (p) => tiers.push(`${p.from}>${p.to}`));
+      probe.adjust(A, -1);
+      probe.adjust(A, -1);
+      probe.adjust(A, 200);
+      off();
+      check('29.3: kademe değişince satisfaction:tierChanged yayınlanır (aynı kademede yayınlanmaz)', tiers.join() === 'restless>crushed,crushed>radiant' && A.satisfaction === 100, tiers.join());
+    }
+
+    // --- Davranış kancaları (ana üretece dokunmadan) ---
+    {
+      const forced = (rng, value, fn) => { rng.next = () => value; try { return fn(); } finally { delete rng.next; } };
+      const quiet = (c) => { c.task = null; c.visible = true; c.insideBuildingId = null; c.away = null; c.illness = null; c.isInjured = false; c.carrying = null; c.newcomer = false; c.relocating = false; Object.assign(c.needs, { energy: 80, hunger: 90, social: 90, fun: 80 }); };
+      reset(A, 50);
+      let captured = null;
+      const leisureWeights = () => { const real = brain.rng.weighted; const STOP = {}; brain.rng.weighted = (opts) => { captured = Object.fromEntries(opts); throw STOP; }; try { brain.planLeisure(A, 19); } catch (e) { if (e !== STOP) throw e; } finally { brain.rng.weighted = real; } return captured ?? {}; };
+      const w0 = leisureWeights();
+      give(A, 'want', 'quiet_day');
+      const w1 = leisureWeights();
+      const scaled = Object.keys(w0).filter((k) => WD.QUIET_LEISURE.includes(k)).every((k) => near(w1[k], w0[k] * WD.WANT_RULES.leisureMul));
+      const closedStay = Object.keys(w1).every((k) => w0[k] !== undefined) && Object.keys(w0).filter((k) => !WD.QUIET_LEISURE.includes(k)).every((k) => near(w1[k], w0[k]));
+      MO3.addMoodlet(A, 'mourning', now(), { reason: 'mourn_spouse' });
+      const w0g = (() => { const keepW = A.wants.slice(); A.wants.length = 0; WT.recomputeDrive(A); const r = leisureWeights(); A.wants.push(...keepW); WT.recomputeDrive(A); return r; })();
+      const w1g = leisureWeights();
+      check('29.3: "Kafamı dinleyeyim": tenha boş zaman etkinlikleri x2,5 (yalnızca açık olanlar; kapalı mekân açılmaz, öteki etkinlikler aynı); yastayken uygulanmaz (gerçek planLeisure)', A.drive.leisure.bench === 2.5 && scaled && closedStay && Object.keys(w0).some((k) => WD.QUIET_LEISURE.includes(k)) && JSON.stringify(w0g) === JSON.stringify(w1g), `${JSON.stringify(w0)} -> ${JSON.stringify(w1)}`);
+      // findPartner: arzunun hedefi 60 piksel yakınmış gibi
+      reset(A, 50); reset(B, 50); reset(C, 50);
+      const others = S().world.characters.filter((c) => ![A, B, C].includes(c)).map((c) => [c, c.visible]);
+      for (const [c] of others) c.visible = false;
+      for (const o of [A, B, C]) quiet(o);
+      for (const o of [B, C]) { o.needs.social = 30; o.y = A.y; for (const tag of ['resentful', 'grateful']) { CH3.removeTag(A, o.id, tag); } }
+      B.x = A.x + 70; C.x = A.x + 30;
+      st().relationships[RS3.pairKey(A.id, B.id)] = 20; st().relationships[RS3.pairKey(A.id, C.id)] = 20;
+      const plain = brain.findPartner(A, 19);
+      give(A, 'want', 'chat_kindred', B);
+      const pulled = brain.findPartner(A, 19);
+      MO3.addMoodlet(A, 'mourning', now(), { reason: 'mourn_spouse' });
+      const mourning = brain.findPartner(A, 19);
+      for (const [c, v] of others) c.visible = v;
+      check('29.3: findPartner: dertleşmek / barışmak istediği kişi 60 piksel yakınmış gibi öne geçer (yastayken değil)', plain === C && pulled === B && mourning === C && A.drive.seekIds.includes(B.id), `${plain?.name} ${pulled?.name} ${mourning?.name}`);
+      // companyMood: kavgasından korktuğu kişi kırgınlık gibi sayılır
+      reset(A, 50);
+      const m0 = brain.companyMood(A, [B]);
+      give(A, 'fear', 'quarrel_foe', B);
+      check('29.3: kavgasından korktuğu kişinin olduğu toplanma yerinden kaçınır (companyMood -1)', m0 >= 0 && brain.companyMood(A, [B]) === -1 && brain.companyMood(A, [C]) >= 0);
+      // Brain.decide: mola, açlık ve enerji eşikleri
+      const realPlanWork = brain.planWork.bind(brain);
+      const realConsole = brain.planConsole.bind(brain);
+      const realSnack = brain.planSnack.bind(brain);
+      const realSleep = brain.planSleep.bind(brain);
+      brain.planConsole = () => null;
+      brain.planWork = () => ({ activity: 'farm', workBuildingId: -1, duration: 60 });
+      reset(A, 50); quiet(A);
+      const breakRoll = A.profile.work.breakChance / 2;
+      let calls = 0;
+      const count = (fn) => { const real = brain.rng.next; brain.rng.next = () => { calls++; return breakRoll; }; try { return fn(); } finally { brain.rng.next = real; delete brain.rng.next; } };
+      calls = 0; const rest = count(() => brain.decide(A, 10)); const restCalls = calls;
+      give(A, 'want', 'level_up_skill');
+      calls = 0; const focused = count(() => brain.decide(A, 10)); const focusCalls = calls;
+      check('29.3: "Mesleğimde ilerleyeyim" (drive.focus): mola zarı tutsa da işini bırakmaz; zar yine atılır (gerçek Brain.decide)', rest.activity !== 'farm' && focused.activity === 'farm' && focusCalls >= 1 && restCalls >= 1 && A.drive.focus, `${rest?.activity} ${focused?.activity} ${restCalls}/${focusCalls}`);
+      reset(A, 50); quiet(A);
+      brain.planSnack = () => ({ activity: 'snack', marker: 'hunger', duration: 5 });
+      brain.planSleep = () => ({ activity: 'sleep', marker: 'sleep', duration: 60 });
+      A.needs.hunger = A.profile.thresholds.hunger + 4;
+      const fed0 = forced(brain.rng, 0.99, () => brain.decide(A, 10));
+      give(A, 'fear', 'go_hungry');
+      const fed1 = forced(brain.rng, 0.99, () => brain.decide(A, 10));
+      reset(A, 50); quiet(A);
+      A.needs.energy = A.profile.thresholds.energy + 3;
+      const slept0 = forced(brain.rng, 0.99, () => brain.decide(A, 10));
+      give(A, 'fear', 'burnout');
+      const slept1 = forced(brain.rng, 0.99, () => brain.decide(A, 10));
+      brain.planWork = realPlanWork; brain.planConsole = realConsole; brain.planSnack = realSnack; brain.planSleep = realSleep;
+      check('29.3: "Aç kalmak" korkusu daha erken yedirir (+8), "Tükenmek" korkusu daha erken dinlendirir (+6) (gerçek Brain.decide)', fed0.marker !== 'hunger' && fed1.marker === 'hunger' && slept0.marker !== 'sleep' && slept1.marker === 'sleep' && WD.WANT_RULES.hungerBonus === 8 && WD.WANT_RULES.energyBonus === 6, `${fed0?.activity} ${fed1?.activity} ${slept0?.activity} ${slept1?.activity}`);
+      reset(A, 50);
+      give(A, 'want', 'craft_masterwork'); give(A, 'want', 'treat_self'); give(A, 'fear', 'winter_cold');
+      const d = A.drive;
+      check('29.3: drive eşlemesi: eser arzusu focus + ownCraft, alışveriş arzusu Pazar zarı x2,5, soğuk korkusu sıcak mekân; arzusuz sakinde nötr', d.focus && d.ownCraft && d.shopMul === 2.5 && d.warmth && (reset(A, 50), JSON.stringify({ ...A.drive, version: 0 }) === JSON.stringify(WT.neutralDrive())));
+      reset(A, 50);
+      const jobKeep = A.skills;
+      A.skills = { farming: 2000, woodcutting: 10 };
+      give(A, 'want', 'level_up_skill');
+      check('29.3: findWorkFor: kendi uzmanlık işi 4 karo yakınmış gibi (ownCraftSkill = ana meslek); arzusuzken yok', WT.ownCraftSkill(A) === 'farming' && (reset(A, 50), WT.ownCraftSkill(A) === null) && WD.WANT_RULES.workTiles === 4);
+      A.skills = jobKeep;
+    }
+
+    // --- Kayıt, göç ve bozuk veri ---
+    {
+      reset(A, 73);
+      give(A, 'want', 'chat_kindred', B); give(A, 'want', 'get_married', C); give(A, 'fear', 'quarrel_foe', D);
+      A.wantLog.push({ key: 'quiet_day', kind: 'want', outcome: 'fulfilled', day: 3, whoName: 'Ece' });
+      A.fearStreak = 2; A.wishCount = 5;
+      const rawSave = JSON.parse(JSON.stringify(S().saves.snapshot()));
+      const rawA = rawSave.characters.find((c) => c.id === A.id);
+      check('29.3: arzular, korkular, doyum, sonuç kaydı ve sayaçlar kayda yazılır; drive kaydedilmez', rawA.wants.length === 2 && rawA.fears.length === 1 && rawA.satisfaction === 73 && rawA.wantLog.length === 1 && rawA.fearStreak === 2 && rawA.wishCount === 5 && rawA.drive === undefined && typeof rawSave.wants.rolled === 'object' && typeof rawSave.wants.passed === 'object', JSON.stringify([rawSave.version, rawA.wants, rawA.fears, rawA.satisfaction, rawA.wantLog, rawA.fearStreak, rawA.wishCount, Object.keys(rawSave.wants ?? {})]));
+      const back = Character.fromJSON(rawA);
+      check('29.3: kayıttan yükleme birebir; drive yüklemede yeniden kurulur, doyum kademesi c.mood\'a yansır', JSON.stringify([back.wants, back.fears, back.satisfaction, back.wantLog, back.fearStreak, back.wishCount]) === JSON.stringify([rawA.wants, rawA.fears, rawA.satisfaction, rawA.wantLog, rawA.fearStreak, rawA.wishCount]) && back.drive.seekIds.includes(B.id) && back.drive.avoidIds.includes(D.id) && back.mood.satisfaction === 'fulfilled');
+      const dirty = WT.sanitizeWants([{ key: 'dragon', until: 5 }, { key: 'quiet_day', until: null }, { key: 'quiet_day', since: 'x', until: 100 }, { key: 'quiet_day', until: 200 }, { key: 'feast_meal', until: 300 }, { key: 'get_married', until: null, whoId: 4, whoName: 'Ece' }, { key: 'have_child', until: null }, { key: 'level_up_skill', until: 'bozuk' }, { key: 'make_friend', until: 9 }, { key: 'reconcile', until: 9 }, null], WD.WANTS, 3);
+      check('29.3: bozuk arzu kaydı temizlenir (bilinmeyen, yinelenen, bozuk süre, kategori tekrarı, ikinci uzun soluklu, tavan)', JSON.stringify(dirty) === JSON.stringify([{ key: 'quiet_day', since: 0, until: 100 }, { key: 'get_married', since: 0, until: null, whoId: 4, whoName: 'Ece' }, { key: 'make_friend', since: 0, until: 9 }]), JSON.stringify(dirty));
+      const dirtyF = WT.sanitizeWants([{ key: 'go_hungry', until: 1 }, { key: 'loss_of_loved', until: 5 }, { key: 'unheard', until: null }, { key: 'burnout', until: 2 }], WD.FEARS, 2);
+      const dirtyLog = WT.sanitizeWantLog([...Array.from({ length: 10 }, (_, i) => ({ key: 'quiet_day', kind: 'want', outcome: 'fulfilled', day: i })), { key: 'go_hungry', kind: 'want', outcome: 'realized', day: 1 }, { key: 'x', kind: 'fear', outcome: 'passed', day: 1 }, { key: 'burnout', kind: 'fear', outcome: 'meh', day: 1 }]);
+      check('29.3: bozuk korku kaydı ve sonuç kaydı temizlenir; sonuç kaydı en çok 8; sayaçlar bilinmeyen anahtarı atar', JSON.stringify(dirtyF.map((f) => f.key)) === '["go_hungry","unheard"]' && dirtyLog.length === 8 && dirtyLog[0].day === 2 && JSON.stringify(WT.restoreWantStats({ rolled: { quiet_day: 3.7, dragon: 2 }, realized: { burnout: 2, quiet_day: 1 }, passed: 'x' })) === JSON.stringify({ rolled: { quiet_day: 3 }, fulfilled: {}, expired: {}, fearsRolled: {}, realized: { burnout: 2 }, passed: {} }) && new Character({ id: 99004, name: 'Ece', x: 0, y: 0, age: 30, traits: [], appearance: A.appearance, satisfaction: 'çok', fearStreak: -3, wishCount: 'x' }).satisfaction === 50);
+      const legacy = JSON.parse(JSON.stringify(rawSave));
+      legacy.version = 37;
+      for (const c of legacy.characters) { for (const k of ['wants', 'fears', 'satisfaction', 'wantLog', 'fearStreak', 'wishCount']) delete c[k]; }
+      delete legacy.wants;
+      legacy.characters[0].lifespan = 66;
+      const keepSlot = localStorage.getItem(CONFIG.SESSION_KEY);
+      localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
+      let randomCalls = 0;
+      const realRandom = Math.random;
+      Math.random = () => { randomCalls++; return realRandom(); };
+      const migrated = SM3.SaveManager.read('session');
+      Math.random = realRandom;
+      if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
+      check('29.3: v37 kaydı v38\'e göç eder: her sakine boş arzu / korku, 50 doyum, boş kayıt; duruma boş sayaçlar; göç zar çekmez', migrated && migrated.characters.every((c) => Array.isArray(c.wants) && c.wants.length === 0 && c.fears.length === 0 && c.satisfaction === 50 && c.wantLog.length === 0 && c.fearStreak === 0 && c.wishCount === 0) && JSON.stringify(migrated.wants) === JSON.stringify(WT.emptyWantStats()) && randomCalls === 0);
+      const reborn = Character.fromJSON(migrated.characters[0]);
+      check('29.3: v37 kaydında 66 yaşlık ömür artık geçersiz: yüklemede null, LifecycleSystem kimlikten 67-75 atar', reborn.lifespan === null && VN3.lifespanFor(st().seed, reborn.id) >= 67 && VN3.lifespanFor(st().seed, reborn.id) <= 75);
+    }
+
+    // --- Arayüz ---
+    {
+      reset(A, 72);
+      give(A, 'want', 'chat_kindred', B); give(A, 'fear', 'go_hungry');
+      game.events.emit('ui:selectCharacter', A.id);
+      game.render(0);
+      const box = document.querySelector('.want-box');
+      const label = document.querySelector('.satisfaction-label')?.textContent;
+      const wantChips = [...document.querySelectorAll('.want-list:not(.fear-list) .want-chip')];
+      const fearChips = [...document.querySelectorAll('.fear-list .fear-chip')];
+      check('29.3: Karakter Kartı: moodlet listesinin altında "Arzular, Korkular ve Yaşam Doyumu" (çubuk + kademe, arzu / korku çipleri, kalan süre, doyum etkisi, boş yuva satırı)', box && box.closest('.relations')?.previousElementSibling?.querySelector('.moodlet-list') && label === '72 · Doyumlu' && document.querySelector('.satisfaction-bar').classList.contains('is-fulfilled') && wantChips.length === 1 && wantChips[0].querySelector('.want-name').textContent === `${B.name} ile dertleşeyim` && wantChips[0].title.includes('+8 doyum') && wantChips[0].querySelector('.moodlet-time').textContent === '2 gün' && fearChips.length === 1 && fearChips[0].title.includes('−8 doyum') && document.querySelectorAll('.want-empty').length === 2, `${label} ${wantChips.length} ${fearChips.length}`);
+      const node0 = document.querySelector('.want-list').firstChild;
+      game.render(0); game.render(0);
+      const same = document.querySelector('.want-list').firstChild === node0;
+      A.satisfaction = 30;
+      game.render(0);
+      check('29.3: kart yalnızca drive / doyum / saat değişince yeniden kurulur (aynı karelerde aynı düğüm)', same && document.querySelector('.satisfaction-label').textContent === '30 · Arayışta' && document.querySelector('.want-list').firstChild !== node0);
+      const keepGrow = D.growsUpAt;
+      D.growsUpAt = now() + 5000;
+      game.events.emit('ui:selectCharacter', D.id);
+      game.render(0);
+      const hiddenChild = document.querySelector('.want-box')?.closest('.relations')?.hidden === true;
+      D.growsUpAt = keepGrow;
+      game.events.emit('ui:selectCharacter', null);
+      game.render(0);
+      check('29.3: çocuğun kartında bölüm gizli', hiddenChild);
+    }
+    probe.destroy();
+    for (const c of adults) reset(c, 50);
+    B.parentIds = keepA.parentIds;
+
+    // --- Kaydet-yükle: 05:xx'te kaydet -> yükle -> 06:00 dolumu kesintisiz koşuyla birebir aynı ---
+    {
+      const pass = () => { if (st().dilemma.active) game.events.emit('ui:chooseDilemma', { optionId: st().dilemma.active.defaultId }); };
+      let guard = 0;
+      while (!(st().time.hour === 5 && st().time.minute >= 50) && guard++ < 5000) { pass(); sim.step(5); }
+      for (const c of st().characters) if (!c.role) { c.wants.length = 0; c.fears.length = 0; WT.recomputeDrive(c); }
+      // önce bir kez kaydedilip yüklenir: önceki bölümlerin elle kurduğu tutarsız referansları (ör. tek yönlü eş) yükleme onarır, iki koşu
+      // da aynı (yüklenmiş) durumdan başlar
+      game.events.emit('ui:save');
+      game.events.emit('ui:load');
+      game.events.emit('ui:save');
+      const raw = localStorage.getItem('lmgame.save.v2');
+      const pick = () => JSON.stringify(st().characters.filter((c) => !c.role).map((c) => [c.id, c.wants.map((w) => [w.key, w.whoId ?? null, w.until]), c.fears.map((f) => [f.key, f.whoId ?? null, f.until])]));
+      guard = 0;
+      while (st().time.hour !== 6 && guard++ < 2000) { pass(); sim.step(3); }
+      const straight = pick();
+      localStorage.setItem('lmgame.save.v2', raw);
+      game.events.emit('ui:load');
+      guard = 0;
+      while (st().time.hour !== 6 && guard++ < 2000) { pass(); sim.step(3); }
+      const reloaded = pick();
+      const filled = st().characters.filter((c) => !c.role && !c.isChild && c.wants.length > 0).length;
+      const diff = (() => { const a = JSON.parse(straight); const b = JSON.parse(reloaded); const i = a.findIndex((x, k) => JSON.stringify(x) !== JSON.stringify(b[k])); return i < 0 ? '' : `${JSON.stringify(a[i])} / ${JSON.stringify(b[i])}`; })();
+      check('29.3: 05:xx\'te kaydet -> yükle -> 06:00 dolumu kesintisiz koşuyla birebir aynı (durumsuz seçim)', straight === reloaded && filled > 3, `${filled} sakin doldu ${diff}`);
+    }
   }
 
   return out;

@@ -15,6 +15,8 @@
 // Davranış bayrakları (Brain): shirk ağır işten kaçar / erken dinlenir, focus mola vermez ve tezgâhta uzun kalır,
 // seek dost arar (İçine Kapanık tenha köşe arar), grief eğlenceye ve flörte girmez.
 
+import { WANTS, FEARS } from './wants.js';
+
 export const MOODLET_SEED_OFFSET = 38; // izole üreteç: tohum + 38 (yalnızca söz seçimi ve söz olasılığı)
 export const MOODLET_CAPS = { core: 1, action: 3, need: 2 };
 export const MOODLET_LAYERS = ['core', 'action', 'need'];
@@ -37,6 +39,9 @@ export const MOODLETS = {
   quiet_peace: { name: 'İç Huzuru', layer: 'action', tone: 'positive', icon: 'book', hours: 8, weight: 2, priority: 2, feel: 'Dingin', effects: { workMul: 1.08, joyRateMul: 0.8 } },
   // Teselli eylem katmanındadır: çekirdekteki travmayla birlikte durur ve onun cezalarını yarıya indirir
   comforted: { name: 'Yüreği Ferahladı', layer: 'action', tone: 'positive', icon: 'handshake', hours: 24, weight: 2, priority: 6, feel: 'Dingin', effects: {}, soothes: 0.5 },
+  // (29.3) Arzu / korku sonucu: eylem katmanındadır, çekirdekteki yası / coşkuyu ezmez
+  wish_come_true: { name: 'Dileği Oldu', layer: 'action', tone: 'positive', icon: 'sparkle', hours: 12, weight: 3, priority: 5, feel: 'Coşkulu', effects: { workMul: 1.05, joyRateMul: 0.75 } },
+  dread_realized: { name: 'Korktuğu Başına Geldi', layer: 'action', tone: 'negative', icon: 'sulk', hours: 12, weight: 3, priority: 5, feel: 'Sarsılmış', effects: { joyRateMul: 1.2, scareMul: 1.5 }, seek: true },
 
   // --- Katman B: ihtiyaç ve çevre ---
   exhausted: { name: 'Tükenmiş', layer: 'need', tone: 'negative', icon: 'zzz', hours: null, weight: 3, priority: 6, feel: 'Yorgun', effects: { moveMul: 0.82, workMul: 0.8 }, shirk: true },
@@ -176,6 +181,9 @@ export const MOOD_REASONS = {
   inspired_work: 'Usta işi bir eser ortaya koydu',
   inspired_date: '{who} ile unutulmaz bir randevuya çıktı',
   inspired_bard: 'Seyyar Ozan\'ın ezgisini dinledi',
+  // (29.3) arzu / korku sonuçları: wish_<arzu> ve dread_<korku> (adı data/wants.js'ten; {who} hedef kişinin adı)
+  ...Object.fromEntries(Object.entries(WANTS).map(([k, w]) => [`wish_${k}`, `Dileği oldu: ${w.name}`])),
+  ...Object.fromEntries(Object.entries(FEARS).map(([k, f]) => [`dread_${k}`, `Korktuğu başına geldi: ${f.name}`])),
 };
 
 // Moodlet oluşunca söylenen sözler ({who}: kişi adı). Kişiliğe özgü sözler önce denenir (TRAIT_LINES).
@@ -204,6 +212,8 @@ export const MOOD_LINES = {
   neglected: ['Sesimizi duyan yok.', 'Boşuna yazmışım.'],
   euphoric: ['Hayatımın en güzel günü!', 'Dünyalar benim oldu!'],
   inspired: ['Aklıma neler geliyor!', 'İçimde bir kıpırtı var.'],
+  wish_come_true: ['Dileğim oldu!', 'Gönlümce oldu!'],
+  dread_realized: ['Korktuğum başıma geldi...', 'Bunu hiç istememiştim.'],
 };
 // Kişiliğe özgü söz: moodlet -> özellik / huy -> söz
 export const TRAIT_LINES = {

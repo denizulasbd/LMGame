@@ -56,9 +56,13 @@ import { ELDER } from '../data/lifeStages.js';
 import { hasTag } from '../systems/Chemistry.js';
 import { EMOTION_RULES } from '../data/chemistry.js';
 import { MOOD_RULES, CONSOLE } from '../data/moodlets.js';
+import { WANT_RULES } from '../data/wants.js';
+import { WARMTH_LEISURE } from '../systems/Wants.js';
 import { getMoodlet } from '../systems/Moodlets.js';
 import { findSufferer } from '../systems/MoodletSystem.js';
 import { TEMPERAMENT } from '../data/temperament.js';
+
+const COLD_SEASONS = ['autumn', 'winter']; // (29.3) "Soğukta üşümek" korkusunun sıcak mekân arayışı
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
 const PLAYGROUND_TYPES = ['fountain', 'campfire', 'inn', 'monument'];
@@ -169,7 +173,8 @@ export class Brain {
       if (plan) return plan;
     }
     // (29.2) bıkkın, tükenmiş ya da üşüyerek uyanmış sakin dinlenmeye çok daha erken yönelir
-    if (bedtime || needs.energy < profile.thresholds.energy + (c.mood.shirk ? MOOD_RULES.shirkEnergyBonus : 0)) {
+    // (29.3) "Tükenmek" korkusu: biraz daha erken dinlenir
+    if (bedtime || needs.energy < profile.thresholds.energy + (c.mood.shirk ? MOOD_RULES.shirkEnergyBonus : 0) + c.drive.energyBonus) {
       const plan = this.planSleep(c, !bedtime);
       if (plan) return plan;
     }
@@ -182,7 +187,8 @@ export class Brain {
       const plan = this.planHomeDinner(c, hour);
       if (plan) return plan;
     }
-    if (needs.hunger < profile.thresholds.hunger) {
+    // (29.3) "Aç kalmak" korkusu: biraz daha erken yer
+    if (needs.hunger < profile.thresholds.hunger + c.drive.hungerBonus) {
       const snack = this.planSnack(c, false);
       if (snack) return snack;
       const plan = this.planEat(c);
@@ -201,7 +207,8 @@ export class Brain {
     let onBreak = false;
     if (isWorkHours(hour) && !c.isChild) {
       // (29.2) gururlu / akıştaki / ilhamlı sakin mola vermez (zar yine atılır: üretecin sırası değişmez)
-      if (this.rng.next() >= profile.work.breakChance || c.mood.focus) {
+      // (29.3) mesleğinde ilerlemek / eser çıkarmak isteyen de (drive.focus)
+      if (this.rng.next() >= profile.work.breakChance || c.mood.focus || c.drive.focus) {
         // (25.2) Çırak: ustası tezgâhtaysa onun yanına (mola zarı her zamanki gibi atıldı; çırak planı kendi üretecini kullanır)
         const plan = (c.apprenticeship && this.apprenticeship?.planFor(c)) || this.planWork(c);
         // (29.2) bıkkın / tükenmiş / üşümüş sakin ağır işten (maden, taş ocağı, inşaat) kaçınır; öncelikli iş emri hariç
@@ -232,7 +239,8 @@ export class Brain {
       if (plan) return { ...plan, onBreak };
     }
     // (29.2) yalnızlık sızısı / tatsız karşılaşma: dost arar (İçine Kapanık ise kalabalığa değil tenha köşeye çekilir: planLeisure)
-    const seeking = c.mood.seek && !c.traits.includes('introvert');
+    // (29.3) sohbet / dost / barışma arzusu olan (İçine Kapanık dahil) de arar; yastaki sakinde arzular davranışa yansımaz
+    const seeking = (c.drive.social && !grieving) || (c.mood.seek && !c.traits.includes('introvert'));
     if ((needs.social < profile.thresholds.social || seeking) && !c.isChild) {
       const plan = this.planSocial(c, hour);
       if (plan) return { ...plan, onBreak };
@@ -355,7 +363,8 @@ export class Brain {
     const markets = this.world.getCompleted('market');
     if (markets.length === 0 || (roomFor(c, 'fruit') <= 0 && roomFor(c, 'souvenir') <= 0)) return null;
     // (25.3) Girişimci ve Zanaatkâr Pazar'a daha sık uğrar (zar her sakinde aynı atılır)
-    if (this.citizenRng.next() >= SHOP.chance * (TEMPERAMENT.shopBoost[c.quirk] ?? 1)) return null;
+    // (29.3) "Kendime bir şey alayım" arzusu: eşik shopMul kat (zar yine bir kez atılır)
+    if (this.citizenRng.next() >= SHOP.chance * (TEMPERAMENT.shopBoost[c.quirk] ?? 1) * c.drive.shopMul) return null;
     const origin = this.originTile(c);
     for (const market of markets) {
       const doors = this.world.getSpots(market);
@@ -925,6 +934,12 @@ export class Brain {
       for (const k of ['bench', 'river', 'readBench', 'readLibrary', 'viewpoint', 'shade', 'flowers']) if (weights[k]) weights[k] *= 3;
       for (const k of ['inn', 'fountain', 'campfire', 'gazebo']) if (weights[k]) weights[k] *= 0.3;
     }
+    // (29.3) arzular: işaret ettikleri boş zaman etkinlikleri (yalnızca zaten açık olanlar ölçeklenir; kapalı mekân açılmaz);
+    // "Soğukta üşümek" korkusu sonbahar / kışta han ve ateş başını öne çıkarır. Yastaki sakinde uygulanmaz.
+    if (!c.mood.grief) {
+      for (const [k, m] of Object.entries(c.drive.leisure)) if (weights[k]) weights[k] *= m;
+      if (c.drive.warmth && COLD_SEASONS.includes(getSeason(this.world.state.time.day).key)) for (const k of WARMTH_LEISURE) if (weights[k]) weights[k] *= WANT_RULES.warmthMul;
+    }
     // (25.1) Kıdemli Bilge: çardak ve gölge (yukarıda yeniden hesaplanır) ile Bilgelik Evi'nde kitap okumak daha cazip
     if (c.profile.elder) {
       if (weights.gazebo) weights.gazebo *= ELDER.leisure.gazebo;
@@ -1348,7 +1363,7 @@ export class Brain {
   companyMood(c, people) {
     let mood = 0;
     for (const o of people) {
-      if (hasTag(c, o.id, 'resentful')) return -1;
+      if (hasTag(c, o.id, 'resentful') || c.drive.avoidIds.includes(o.id)) return -1; // (29.3) kavgasından korktuğu kişi de
       if (hasTag(c, o.id, 'grateful')) mood = 1;
     }
     return mood;
@@ -1362,7 +1377,9 @@ export class Brain {
       if (hasTag(c, other.id, 'resentful')) continue; // (29.1) kırgın olduğu kişiyi sohbete çağırmaz
       // (29.2) dost arayan (yalnız / keyfi kaçmış) sakin kimyası yüksek olanı seçer
       const pull = c.mood.seek ? (c.relationships[other.id]?.chemistry ?? 0) * MOOD_RULES.seekChemistry : 0;
-      const rank = Math.sqrt(distanceSq(other, c)) - this.relationships.get(c, other) * 0.8 - (hasTag(c, other.id, 'grateful') ? 40 : 0) - pull;
+      // (29.3) arzunun hedefi (ruh ikizi, barışmak istediği, eşi) bu kadar piksel yakınmış gibi (yastayken değil)
+      const want = !c.mood.grief && c.drive.seekIds.includes(other.id) ? WANT_RULES.partnerPull : 0;
+      const rank = Math.sqrt(distanceSq(other, c)) - this.relationships.get(c, other) * 0.8 - (hasTag(c, other.id, 'grateful') ? 40 : 0) - pull - want;
       if (!best || rank < best.rank) best = { other, rank };
     }
     return best?.other ?? null;

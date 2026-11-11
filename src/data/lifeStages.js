@@ -64,7 +64,7 @@ export const ELDER_LINES = [
 export const ELDER_ADVICE = ['Sabır her işin başıdır, evlat.', 'Ağaç yaşken eğilir.', 'Komşu komşunun külüne muhtaç.', 'Bir elin nesi var, iki elin sesi var.', 'Damlaya damlaya göl olur.'];
 
 // (28.3) Sürdürülebilir kuşak döngüsü
-//   LIFESPAN  : her sakinin ömrü (yaş olarak; 1 yaş = AGING.daysPerYear oyun günü) 66-75 arasından kimliğinden ve tohumdan türetilir
+//   LIFESPAN  : her sakinin ömrü (yaş olarak; 1 yaş = AGING.daysPerYear oyun günü) 67-75 arasından kimliğinden ve tohumdan türetilir
 //               (Venerable.lifespanFor: izole üreteç, ana üretece dokunmaz). Kıdemli Bilge / Saygın Büyük bu yaşa ulaştığı gün dönümünde (00:00) vefat eder.
 //   VENERABLE : Kıdemli Bilge, Ocak Devri'ni ve Yadigâr Devri'ni tamamlayınca Saygın Büyük olur (kontrol her gün 19:00'da; Yadigâr töreni 18:00'dır).
 //               hearthGraceAge: ocağını bu yaşa dek devredememiş (evlatları evlenmemiş) bilgenin devri muaf sayılır (kasaba kilitlenmesin).
@@ -72,7 +72,8 @@ export const ELDER_ADVICE = ['Sabır her işin başıdır, evlat.', 'Ağaç yaş
 //   FATAL     : trajik kazalar. chance = yaralanma zarının hemen yanındaki ölümcül aralık (tek zar: üreteç akışı değişmez), minAble: kasabada en az bu kadar
 //               sağlam yetişkin varsa (çekirdek iş gücü korunur) ölüm gerçekleşir. Seferde: yalnızca kafileden kaza geçiren (mishap) biri için ek zar.
 // (29.2b) 80-90 yaşlık ömür 50-72 günlük koşularda hiç doğal vefat / Derin Yas getirmiyordu: ömür 66-75'e, Kıdemli Bilge yaşı 70'ten 65'e çekildi.
-export const LIFESPAN = { min: 66, max: 75, seedOffset: 30 };
+// (29.3) 66 -> 67: 66 yaşında başlayan kurucunun ömrü 66 çıkınca ilk günlerde (tohum 21: G2) vefat ediyordu; en kısa ömür artık 67.
+export const LIFESPAN = { min: 67, max: 75, seedOffset: 30 };
 export const VENERABLE = { checkHour: 19, hearthGraceAge: 68, sleepVenues: ['academy', 'inn', 'townHall', 'library'] };
 export const FATAL = { fire: 0.015, raid: 0.02, expedition: 0.02, minAble: 6 };
 

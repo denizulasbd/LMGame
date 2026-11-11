@@ -1128,6 +1128,87 @@ button.relation-row:hover {
   white-space: nowrap;
 }
 
+/* ---------- Arzular, korkular ve yaşam doyumu (29.3) ---------- */
+.want-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.satisfaction-bar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.satisfaction-track {
+  height: 8px;
+  background: rgba(27, 20, 35, 0.45);
+  border: 2px solid var(--ui-wood);
+}
+
+.satisfaction-fill {
+  display: block;
+  height: 100%;
+  background: #7a6a58;
+}
+
+.satisfaction-label {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.satisfaction-bar.is-crushed .satisfaction-fill { background: #8a3fa0; }
+.satisfaction-bar.is-restless .satisfaction-fill { background: #d98a2c; }
+.satisfaction-bar.is-content .satisfaction-fill { background: #a89a6a; }
+.satisfaction-bar.is-fulfilled .satisfaction-fill { background: #3f8f4d; }
+.satisfaction-bar.is-radiant .satisfaction-fill { background: #d9a520; }
+
+.want-subtitle {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+.want-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.want-chip,
+.fear-chip {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 6px;
+  background: var(--ui-card);
+  border: 2px solid var(--ui-wood);
+  border-left-width: 5px;
+  border-left-color: #d9a520;
+}
+
+.fear-chip {
+  border-left-color: #8a3fa0;
+  background: var(--ui-card-bad);
+}
+
+.want-name {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.want-empty {
+  font-size: 10px;
+  opacity: 0.5;
+  padding: 0 6px;
+}
+
 .buff-chip.hud-grief-chip {
   border-color: #8a3fa0;
 }

@@ -10,6 +10,7 @@ import { lifespanFor } from '../systems/Venerable.js';
 import { valleyFor } from '../systems/Valley.js';
 import { migrateChemistry } from '../systems/Chemistry.js';
 import { migrateMoodlets } from '../systems/Moodlets.js';
+import { migrateWants } from '../systems/Wants.js';
 
 const SLOT_KEYS = {
   main: CONFIG.SAVE_KEY,
@@ -27,6 +28,9 @@ function migrate(data) {
   const bindChemistry = data.version < 36;
   // (29.2) v36 -> v37: her sakine boş ruh hali listesi (moodlets: []), duruma boş ruh hali sayaçları (state.moodlets)
   if (data.version < 37) migrateMoodlets(data);
+  // (29.3) v37 -> v38: her sakine boş arzu / korku listeleri, 50 doyum, boş sonuç kaydı; duruma boş sayaçlar (zar çekmez:
+  // listeler yüklemeden sonraki ilk 06:00'da dolar)
+  if (data.version < 38) migrateWants(data);
   // (28.4) v34 -> v35: tohumdan deterministik Vadi Karakteri, boş Kasaba Doktrini
   if (data.version < 35) {
     data.valley = valleyFor(data.seed);

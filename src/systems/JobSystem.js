@@ -14,6 +14,8 @@ import { BUILDINGS } from '../data/buildings.js';
 import { ACTIVITY_SKILLS, SKILL_PREFERENCE_TILES } from '../data/skills.js';
 import { getSeason } from '../data/seasons.js';
 import { skillLevel } from './SkillSystem.js';
+import { ownCraftSkill } from './Wants.js';
+import { WANT_RULES } from '../data/wants.js';
 import { LUXURY_WORK } from '../data/refinery.js';
 import { hasTag, hasAnyTag } from './Chemistry.js';
 import { EMOTION_RULES } from '../data/chemistry.js';
@@ -264,9 +266,12 @@ export class JobSystem {
     };
 
     // Deneyimli olduğu iş daha yakınmış gibi görünür: ustalar kendi işini seçer (Hırslı taş işini sever)
+    // (29.3) mesleğinde ilerlemek / eser çıkarmak isteyen kendi uzmanlık işini biraz daha yakın görür (öncelik sırası değişmez)
+    const ownSkill = ownCraftSkill(c);
     const preference = (activity) => {
       const skill = ACTIVITY_SKILLS[activity];
-      return skill ? (skillLevel(c, skill).level - 1) * SKILL_PREFERENCE_TILES + (c.profile.skillPreference[skill] ?? 0) : 0;
+      if (!skill) return 0;
+      return (skillLevel(c, skill).level - 1) * SKILL_PREFERENCE_TILES + (c.profile.skillPreference[skill] ?? 0) + (ownSkill !== null && skill === ownSkill ? WANT_RULES.workTiles : 0);
     };
 
     const grateful = hasAnyTag(c, 'grateful');
