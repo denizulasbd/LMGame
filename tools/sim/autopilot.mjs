@@ -45,6 +45,7 @@
 //   --crisis  : (23. aşama) tehlike sıklığı (varsayılan dengeli); huzurlu + --no-safety, 22. aşamayla bire bir aynı koşuyu verir
 //   --crisis-state : (23. aşama) kayıttan hemen önce bir yangın, bir hasarlı yapı, bir yaralı ve bekleyen bir haydut baskını oluşturur
 //               (save-v20.json fikstürü bu bayrakla üretilir: kriz alanlarının hepsi kayda girer)
+//   --engines-off : (29.5) mekanik şalterlerini kapatır (A/B): --engines-off bonds
 //   --evo     : (29.4) evrim verisini bellekte geçersiz kılar (denge denemesi): "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
 //   --pushes  : (29.4) katkı kaynağı dökümü ve karakter başına günlük net katkı yüzdelikleri
 //   --no-agri : (24. aşama) Ürün Silosu kurulmaz ve bahçeler hep Buğday ekili kalır (mahsul bozulması yine işler)
@@ -89,6 +90,16 @@ await page.evaluate((o) => {
   if (o.crisis) window.game.state.crisis.difficulty = o.crisis; // doğrudan durumdan (bildirim / ses tüketmesin: huzurlu + --no-safety koşusu 22. aşamayla bire bir aynı olmalı)
 }, { noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null });
 
+// (29.5) --engines-off bonds[,ad...] : A/B karşılaştırması için mekanik şalterlerini kapatır; bağ ölçümü (yalnızca dinler, durumu değiştirmez)
+await page.evaluate(async (off) => {
+  const { ENGINES } = await import('/src/systems/Engines.js');
+  for (const k of String(off || '').split(',').filter(Boolean)) ENGINES[k] = false;
+  const got = (window.__bondGot = { side: new Set(), rub: new Set() });
+  window.game.events.on('moodlet:added', ({ character, moodlet } = {}) => {
+    if (moodlet?.key === 'side_by_side') got.side.add(character.id);
+    if (moodlet?.key === 'rubbing_wrong') got.rub.add(character.id);
+  });
+}, options['engines-off'] ?? '');
 await page.evaluate((passive) => {
   const game = window.game;
   const sim = window.sim;
@@ -911,6 +922,16 @@ if (options.save) {
   console.log('kayıt yazıldı:', options.save);
 }
 const mon = await monitorReport(page);
+const bondStats = await page.evaluate(() => {
+  const sc = window.game.scenes.current;
+  const given = window.game.state.moodlets?.given ?? {};
+  const ever = window.__bondGot;
+  const names = (id) => window.game.state.characters.find((c) => c.id === id)?.name ?? `#${id}`;
+  const pairs = [...(sc.bonds?.pairs ?? [])].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 3).map(([k, n]) => `${k.split('-').map((x) => names(Number(x))).join(' & ')} ${n} sa`);
+  const pop = window.game.state.characters.filter((c) => !c.isChild && !c.role).length;
+  return { side: given.side_by_side ?? 0, rub: given.rubbing_wrong ?? 0, ever: ever.side.size, everRub: ever.rub.size, pop, pairs };
+});
+console.log(`(29.5) Omuz Omuza ${bondStats.side} · Diken Üstünde ${bondStats.rub} · en az bir kez Omuz Omuza alan ${bondStats.ever}/${bondStats.pop} (%${Math.round((100 * bondStats.ever) / Math.max(1, bondStats.pop))}) · Diken Üstünde alan ${bondStats.everRub} · en çok birlikte çalışan çiftler: ${bondStats.pairs.join(', ') || '-'}`);
 const so = mon.social;
 console.log(
   `(19. aşama) evli çift ${so.couples} (aynı evde ${so.couplesTogether}) · randevu ${so.dates} · düğün kutlaması ${so.parties} · akşam yemeği ${so.dinners} · ` +
@@ -1051,7 +1072,7 @@ for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}
 const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0 && mon.social.stuck.length === 0;
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, healthy }, null, 1));
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, healthy }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();

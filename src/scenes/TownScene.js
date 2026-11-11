@@ -36,6 +36,7 @@ import { ChemistrySystem } from '../systems/ChemistrySystem.js';
 import { MoodletSystem } from '../systems/MoodletSystem.js';
 import { WantSystem } from '../systems/WantSystem.js';
 import { EvolutionSystem } from '../systems/EvolutionSystem.js';
+import { BondSystem } from '../systems/BondSystem.js';
 import { ConflictSystem } from '../systems/ConflictSystem.js';
 import { FamilySystem } from '../systems/FamilySystem.js';
 import { CraftingSystem } from '../systems/CraftingSystem.js';
@@ -172,6 +173,8 @@ export class TownScene extends Scene {
     this.wants = new WantSystem(this.game, this.world, new Random(state.seed + 39), { moodlets: this.moodlets, relationships: this.relationships });
     // (29.4) Kalıcı kişilik evrimi (WantSystem'den hemen sonra; izole üreteç seed + 40: yalnızca sözler, evrim zar çekmez)
     this.evolution = new EvolutionSystem(this.game, this.world, new Random(state.seed + 40), { moodlets: this.moodlets, relationships: this.relationships });
+    // (29.5) Omuz Omuza: yan yana çalışma moodlet'leri (üreteci yok)
+    this.bonds = new BondSystem(this.game, this.world, { moodlets: this.moodlets, relationships: this.relationships });
     this.social = new SocialSystem(this.game, this.world, new Random(state.seed + 19), { relationships: this.relationships });
     this.crafting = new CraftingSystem(this.game, this.world, this.economy);
     this.health = new HealthSystem(this.game, this.world, new Random(state.seed + 8));
@@ -309,6 +312,7 @@ export class TownScene extends Scene {
       this.moodlets,
       this.wants,
       this.evolution,
+      this.bonds,
       this.family,
       this.social,
       this.crafting,

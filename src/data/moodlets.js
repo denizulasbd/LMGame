@@ -41,6 +41,9 @@ export const MOODLETS = {
   comforted: { name: 'Yüreği Ferahladı', layer: 'action', tone: 'positive', icon: 'handshake', hours: 24, weight: 2, priority: 6, feel: 'Dingin', effects: {}, soothes: 0.5 },
   // (29.3) Arzu / korku sonucu: eylem katmanındadır, çekirdekteki yası / coşkuyu ezmez
   wish_come_true: { name: 'Dileği Oldu', layer: 'action', tone: 'positive', icon: 'sparkle', hours: 12, weight: 3, priority: 5, feel: 'Coşkulu', effects: { workMul: 1.05, joyRateMul: 0.75 } },
+  // (29.5) Yan yana çalışma: dostla Omuz Omuza, kırgınla Diken Üstünde
+  side_by_side: { name: 'Omuz Omuza', layer: 'action', tone: 'positive', icon: 'handshake', hours: 4, weight: 2, priority: 3, feel: 'Keyifli', effects: { workMul: 1.06, joyRateMul: 0.85 } },
+  rubbing_wrong: { name: 'Diken Üstünde', layer: 'action', tone: 'negative', icon: 'angry', hours: 4, weight: 2, priority: 3, feel: 'Bıkkın', effects: { workMul: 0.95, quarrelMul: 1.3 } },
   dread_realized: { name: 'Korktuğu Başına Geldi', layer: 'action', tone: 'negative', icon: 'sulk', hours: 12, weight: 3, priority: 5, feel: 'Sarsılmış', effects: { joyRateMul: 1.2, scareMul: 1.5 }, seek: true },
 
   // --- Katman B: ihtiyaç ve çevre ---
@@ -180,6 +183,8 @@ export const MOOD_REASONS = {
   euphoric_master: 'Başusta oldu',
   inspired_work: 'Usta işi bir eser ortaya koydu',
   inspired_date: '{who} ile unutulmaz bir randevuya çıktı',
+  side_by_side: '{who} ile omuz omuza çalıştı',
+  rubbing_wrong: '{who} ile aynı tezgâhta',
   inspired_bard: 'Seyyar Ozan\'ın ezgisini dinledi',
   // (29.3) arzu / korku sonuçları: wish_<arzu> ve dread_<korku> (adı data/wants.js'ten; {who} hedef kişinin adı)
   ...Object.fromEntries(Object.entries(WANTS).map(([k, w]) => [`wish_${k}`, `Dileği oldu: ${w.name}`])),
@@ -213,6 +218,8 @@ export const MOOD_LINES = {
   euphoric: ['Hayatımın en güzel günü!', 'Dünyalar benim oldu!'],
   inspired: ['Aklıma neler geliyor!', 'İçimde bir kıpırtı var.'],
   wish_come_true: ['Dileğim oldu!', 'Gönlümce oldu!'],
+  side_by_side: ['Böyle ekip olur!', 'Seninle çalışmak keyif.'],
+  rubbing_wrong: ['Yine aynı tezgâh...', 'Şu yüzü görmesem.'],
   dread_realized: ['Korktuğum başıma geldi...', 'Bunu hiç istememiştim.'],
 };
 // Kişiliğe özgü söz: moodlet -> özellik / huy -> söz

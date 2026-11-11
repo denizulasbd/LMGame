@@ -9710,7 +9710,7 @@ const pageResults = await page.evaluate(async () => {
 
     // --- Veri ve kurulum ---
     check('29.3: 18 arzu ve 10 korku tanımlı (sıra = seçim sırası); her girdinin adı, puanı, ikonu var; izole üreteç tohum + 39', WD.WANT_KEYS.length === 18 && WD.FEAR_KEYS.length === 10 && WD.WANT_KEYS[0] === 'see_pupil_master' && WD.WANT_KEYS.at(-1) === 'be_heard' && [...Object.values(WD.WANTS), ...Object.values(WD.FEARS)].every((d) => d.name && d.points > 0 && d.icon && d.base > 0) && WD.WANT_SEED_OFFSET === 39 && ws.rng !== S().moodlets.rng && ws.rng !== brain.rng);
-    check('29.3: iki yeni moodlet (toplam 26): Dileği Oldu / Korktuğu Başına Geldi eylem katmanında (çekirdeği ezmez)', MD3.MOODLET_KEYS.length === 26 && MD3.MOODLETS.wish_come_true.layer === 'action' && MD3.MOODLETS.dread_realized.layer === 'action' && MD3.MOODLETS.dread_realized.seek === true && MD3.MOOD_REASONS.wish_get_married.includes('{who} ile evleneyim') && MD3.MOOD_LINES.wish_come_true.length >= 2);
+    check('29.3: iki yeni moodlet (toplam 28): Dileği Oldu / Korktuğu Başına Geldi eylem katmanında (çekirdeği ezmez)', MD3.MOODLET_KEYS.length === 28 && MD3.MOODLETS.wish_come_true.layer === 'action' && MD3.MOODLETS.dread_realized.layer === 'action' && MD3.MOODLETS.dread_realized.seek === true && MD3.MOOD_REASONS.wish_get_married.includes('{who} ile evleneyim') && MD3.MOOD_LINES.wish_come_true.length >= 2);
     check('29.3: WantSystem sahnede kurulur, olayları dinler; kayıt sürümü 39', ws && ws.unsubscribers.length >= 25 && CONFIG.SAVE_VERSION === 39 && S().disposables.includes(ws) && S().disposables.indexOf(ws) === S().disposables.indexOf(S().moodlets) + 1);
 
     // --- Durumsuz seçim ---

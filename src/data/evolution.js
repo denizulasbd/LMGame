@@ -92,6 +92,8 @@ export const EVOLUTION_SOURCES = {
     drudgery: [[DRIVE, -2]],
     cold_wake: [[DRIVE, -1]],
     warm_chat: [[COMPANY, 1]],
+    side_by_side: [[COMPANY, 1]],
+    rubbing_wrong: [[COMPANY, -1]],
     sour_encounter: [[COMPANY, -1]], // şartname başlangıcı -2
     lonely_ache: [[COMPANY, -2]],
     quiet_peace: [[COMPANY, -1], [CALLING, 2]],
@@ -181,6 +183,8 @@ export const CAUSE_TEXT = {
   'moodlet:neglected': 'sesi duyulmayınca',
   'moodlet:heartbroken': 'kalbi kırılınca',
   'moodlet:euphoric': "Hayatının Günü'nün ardından",
+  'moodlet:side_by_side': 'omuz omuza çalıştıkça',
+  'moodlet:rubbing_wrong': 'diken üstünde çalışmaktan',
   'moodlet:flow_state': 'tezgâhta akışa girdikçe',
   'moodlet:proud_work': 'alın terinin gururuyla',
   'moodlet:exhausted': 'tükenip bitince',
