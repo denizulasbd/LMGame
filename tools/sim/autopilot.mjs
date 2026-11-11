@@ -54,7 +54,9 @@
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
 //               bulunursa çıkış kodu 1 olur
 import fs from 'fs';
-import { openGame, parseArgs, runHours } from './lib.mjs';
+import { openGame, parseArgs, runHours, capOutput } from './lib.mjs';
+
+capOutput('autopilot');
 import { installMonitor, monitorReport } from './monitor.mjs';
 
 const { positional, options } = parseArgs();

@@ -21,7 +21,9 @@
 //
 // Kullanım: node tools/sim/audit.mjs [--shots klasör]   (sunucu: python3 tools/serve.py)
 import fs from 'fs';
-import { openGame, createChecks, parseArgs, BASE_URL } from './lib.mjs';
+import { openGame, createChecks, parseArgs, BASE_URL, capOutput } from './lib.mjs';
+
+capOutput('audit');
 import { installMonitor, monitorReport } from './monitor.mjs';
 
 const { options } = parseArgs();
@@ -70,6 +72,7 @@ const PAGE_HELPERS = () => {
     const check = (name, ok, detail = '') => out.push({ name, ok: Boolean(ok), detail: String(detail) });
     const hours = (h) => sim.step(Math.round(h * 225));
     const scene = () => game.scenes.current;
+    { const { ENGINES } = await import('/src/systems/Engines.js'); check('(29.4b) açılışta ENGINES şalterlerinin hepsi açık', Object.values(ENGINES).every((v) => v !== false), Object.keys(ENGINES).join(', ') || 'liste boş'); }
     const rich = () => sim.give({ wood: 400, stone: 400, food: 300, iron: 100, wool: 100, bread: 100, gold: 2000 });
     const count = () => [...game.events.listeners.values()].reduce((n, set) => n + set.size, 0);
     const counter = (name) => {

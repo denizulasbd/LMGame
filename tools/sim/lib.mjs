@@ -4,12 +4,15 @@
 //
 // Gereken: Playwright (npm i -g playwright) ve proje kökünde çalışan sunucu: python3 tools/serve.py
 // Adres: LMGAME_URL ortam değişkeni (varsayılan http://localhost:8080).
+import fs from 'fs';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 
 export const BASE_URL = process.env.LMGAME_URL ?? 'http://localhost:8080';
 export const STEPS_PER_HOUR = 225;
+/** Ayrıntılı çıktı: --verbose bayrağı ya da LMGAME_VERBOSE=1 (varsayılan: sessiz). */
+export const VERBOSE = process.argv.includes('--verbose') || process.env.LMGAME_VERBOSE === '1';
 
 /** Komut satırı: konum argümanları ve --anahtar değer seçenekleri. */
 export function parseArgs(argv = process.argv.slice(2)) {
@@ -186,11 +189,36 @@ export function createChecks() {
       results.push({ name, ok: Boolean(ok), detail });
     },
     report(errors = []) {
-      for (const r of results) console.log(`${r.ok ? 'GEÇTİ' : 'KALDI'} ${r.name}${r.detail ? ` (${r.detail})` : ''}`);
+      // Varsayılan: yalnızca KALAN testler, toplam satırı ve sayfa hataları. --verbose / LMGAME_VERBOSE=1: her satır.
+      for (const r of results) if (VERBOSE || !r.ok) console.log(`${r.ok ? 'GEÇTİ' : 'KALDI'} ${r.name}${r.detail ? ` (${r.detail})` : ''}`);
       const failed = results.filter((r) => !r.ok).length;
       console.log(`\n${results.length - failed}/${results.length} test geçti`);
       console.log('Sayfa hataları:', errors.length ? `\n${errors.join('\n')}` : 'yok');
       return failed === 0 && errors.length === 0;
     },
   };
+}
+
+/**
+ * Ekrana en çok `limit` satır basar (29.4b). Varsayılan: console.log çıktısı toplanır; çıkışta 60 satırı geçmişse yalnızca son
+ * 40 satır ve tam günlüğün yolu (tools/sim/out/<ad>.log) basılır. --verbose / LMGAME_VERBOSE=1: her şey olduğu gibi akar.
+ */
+export function capOutput(name, { limit = 60, tail = 40 } = {}) {
+  if (VERBOSE) return;
+  const lines = [];
+  const orig = console.log.bind(console);
+  console.log = (...a) => { lines.push(a.join(' ')); };
+  process.on('exit', () => {
+    const text = lines.join('\n').split('\n');
+    if (text.length <= limit) return orig(text.join('\n'));
+    const dir = new URL('./out/', import.meta.url);
+    let where = '';
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const file = new URL(`${name}.log`, dir);
+      fs.writeFileSync(file, text.join('\n'));
+      where = ` (tam günlük: tools/sim/out/${name}.log; hepsi için --verbose)`;
+    } catch { /* yazılamadı */ }
+    orig(`... ${text.length - tail} satır kısaltıldı${where}\n${text.slice(-tail).join('\n')}`);
+  });
 }

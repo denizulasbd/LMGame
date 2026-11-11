@@ -7,3 +7,6 @@
 
 # Yerel test kayıtları
 tools/.sim-save*.json
+
+# Kapı ve sim çıktıları
+tools/sim/out/

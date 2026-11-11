@@ -4441,6 +4441,16 @@ fermanları ve terk edenleri raporlar; 23. aşamadan beri yanan / hasarlı yapı
 varken 48 saat ayrı evlerde kalan evli çift, bitiş vaktini aşan kutlama, huyu olmayan sakin, kayıp sakine işaret eden haber) ve en
 düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 
+**Hafif test altyapısı (29.4b).** Tek kapı komutu: `node tools/sim/gate.mjs --quick [--only <desen>]` (aşama testleri + duman koşusu
+`autopilot 42 12` + audit) ve `--full` (dondurulmuş `tests.mjs`, `tests/*`, audit, `compat.mjs --sample`, `stress.mjs --speeds 4 --days 50`,
+tohum 42 × 50 gün determinizm karşılaştırması); araçlar paralel koşar (`--jobs`), çıktı en çok 40 satırdır, günlükler `tools/sim/out/gate/`
+altına yazılır. Her aşama testini kendi dosyasında yazar (`tools/sim/tests/29.5-ad.mjs`, iskelet: `_template.mjs`); `tests.mjs` DONDURULDU, yeni
+test eklenmez. Her yeni mekanik anahtarını `src/systems/Engines.js` içindeki `ENGINES`'e `true` ekler ve kancalarını `engineOn(key)` ile sarar:
+`tests.mjs` hepsini kapatıp eski dünyanın tarihini sabit tutar, diğer araçlar hepsi açık koşar (audit denetler). Araçlar varsayılan olarak
+sessizdir (yalnızca kalan testler ve toplam; `--verbose` ya da `LMGAME_VERBOSE=1` her satırı basar). `compat.mjs --sample` v2, v6, v10, v14, v18,
+v22, v26, v30, v33, v36 ve son üç sürümü koşar (göç adımları bağımsız `version < N` blokları olduğundan örneklenen kayıt bütün sonraki adımlardan
+geçer); `--all` bütün fikstürleri koşar (29.10'da ve elle). Aşama notları `docs/CHANGELOG.md` dosyasına yazılır.
+
 ## Arayüz yerleşimi ve dar pencereler
 
 17. aşamadan beri arayüz ekranın kenarlarında ince şeritler hâlinde durur, ortası oyun alanına kalır

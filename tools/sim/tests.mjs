@@ -1,3 +1,7 @@
+// DONDURULDU (29.4): yeni test buraya eklenmez. Yeni aşama testleri tools/sim/tests/ altında kendi dosyasında yazılır
+// (şablon: tools/sim/tests/_template.mjs; koşu: node tools/sim/gate.mjs --quick --only <aşama>).
+// Bu dosya bütün ENGINES şalterlerini kapatıp (src/systems/Engines.js) eski dünyanın tarihini sabit tutar.
+//
 // Hedefli testler: oyunun kurallarını tarayıcıda, gerçek sistemlerle tek tek dener.
 // Kullanım: node tools/sim/tests.mjs   (sunucu: python3 tools/serve.py)
 //   10. aşama: yiyecek değeri, seviye kilitleri, eski usul / asıl tarif, tüccar malları, belediye, unvan, yerleşim
@@ -95,10 +99,14 @@
 //              ayrı metin katmanı, Tarihçe'deki ilk panayır, çizim, izole üreteç (seed + 32), kayıt sürümü 29 (gidiş-dönüş, bozuk değerler, v28 kaydı)
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
-import { openGame, createChecks } from './lib.mjs';
+import { openGame, createChecks, capOutput } from './lib.mjs';
+
+capOutput('tests');
 
 const { browser, page, errors } = await openGame({ seed: 5 });
 const { results, report } = createChecks();
+// Dondurulmuş dünya: sonradan eklenen mekanik şalterlerinin hepsi kapalı (bugün liste boş)
+await page.evaluate(async () => { const { ENGINES } = await import('/src/systems/Engines.js'); for (const k of Object.keys(ENGINES)) ENGINES[k] = false; });
 
 const pageResults = await page.evaluate(async () => {
   const game = window.game;
