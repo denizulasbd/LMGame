@@ -14,9 +14,14 @@ import { BUILDINGS } from '../data/buildings.js';
 import { ACTIVITY_SKILLS, SKILL_PREFERENCE_TILES } from '../data/skills.js';
 import { getSeason } from '../data/seasons.js';
 import { skillLevel } from './SkillSystem.js';
+import { ownCraftSkill } from './Wants.js';
+import { WANT_RULES } from '../data/wants.js';
 import { LUXURY_WORK } from '../data/refinery.js';
 import { hasTag, hasAnyTag } from './Chemistry.js';
 import { EMOTION_RULES } from '../data/chemistry.js';
+import { BOND_RULES } from '../data/bonds.js';
+import { crewBond } from './Bonds.js';
+import { engineOn } from './Engines.js';
 
 const PRODUCTION_PRIORITY = 2; // üretim binalarında çalışmak, emirli işlerden sonra gelir
 const PATH_CHECKS = 5; // en yakın birkaç aday için gerçek yol aranır
@@ -264,11 +269,15 @@ export class JobSystem {
     };
 
     // Deneyimli olduğu iş daha yakınmış gibi görünür: ustalar kendi işini seçer (Hırslı taş işini sever)
+    // (29.3) mesleğinde ilerlemek / eser çıkarmak isteyen kendi uzmanlık işini biraz daha yakın görür (öncelik sırası değişmez)
+    const ownSkill = ownCraftSkill(c);
     const preference = (activity) => {
       const skill = ACTIVITY_SKILLS[activity];
-      return skill ? (skillLevel(c, skill).level - 1) * SKILL_PREFERENCE_TILES + (c.profile.skillPreference[skill] ?? 0) : 0;
+      if (!skill) return 0;
+      return (skillLevel(c, skill).level - 1) * SKILL_PREFERENCE_TILES + (c.profile.skillPreference[skill] ?? 0) + (ownSkill !== null && skill === ownSkill ? WANT_RULES.workTiles : 0);
     };
 
+    const bonds = engineOn('bonds');
     const grateful = hasAnyTag(c, 'grateful');
     for (const job of this.jobs) {
       const full = job.assignees.length >= JOBS[job.type].maxWorkers && !job.assignees.includes(c.id);
@@ -277,7 +286,7 @@ export class JobSystem {
       // Öncelikli işaretlenen hedef her işten önce gelir
       // (29.1) minnettar olduğu biri o işte çalışıyorsa yardıma koşar (iş daha yakınmış gibi görünür)
       const helping = grateful && job.assignees.some((id) => hasTag(c, id, 'grateful')) ? EMOTION_RULES.helpTiles : 0;
-      if (spot) candidates.push({ priority: job.urgent ? -1 : JOBS[job.type].priority, d: dist(spot, origin) - preference(job.type) - helping, job, spot });
+      if (spot) candidates.push({ priority: job.urgent ? -1 : JOBS[job.type].priority, d: dist(spot, origin) - preference(job.type) - helping - (bonds ? crewBond(this.state, c, job.assignees) * BOND_RULES.tilesPerPoint : 0), job, spot });
     }
     for (const building of this.world.getCompleted()) {
       const def = BUILDINGS[building.type];
@@ -291,7 +300,7 @@ export class JobSystem {
       // (23. aşama) Gözcü Kulesi'nde nöbet, üretim yuvaları dolunca boşta kalan yetişkinlerin işidir (üretimden daha az öncelikli)
       // (24.2) Dokuma Tezgâhı ve Şerbethane lüks / ticaret fazlası işlerdir: fırıncı, çiftçi ve inşaat yuvalarından sonra gelir
       const priority = def.guard ? PRODUCTION_PRIORITY + 1 : def.luxury ? PRODUCTION_PRIORITY + LUXURY_WORK.priority : PRODUCTION_PRIORITY;
-      if (spot) candidates.push({ priority, d: dist(spot, origin) - preference(def.workActivity), building, spot });
+      if (spot) candidates.push({ priority, d: dist(spot, origin) - preference(def.workActivity) - (bonds ? crewBond(this.state, c, building.workerIds) * BOND_RULES.tilesPerPoint : 0), building, spot });
     }
 
     candidates.sort((a, b) => a.priority - b.priority || a.d - b.d);

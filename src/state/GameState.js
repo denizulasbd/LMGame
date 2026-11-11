@@ -3,6 +3,8 @@
 // Harita kaydedilmez: aynı tohumdan (seed) yeniden üretilir, yalnızca değişen karolar
 // kayda eklenir (bkz. world/TerrainSnapshot.js; kayıt dosyasını SaveManager yazar).
 import { emptyMoodletStats, restoreMoodletStats } from '../systems/Moodlets.js';
+import { emptyWantStats, restoreWantStats, pruneWantRefs } from '../systems/Wants.js';
+import { emptyEvolutionStats, restoreEvolutionStats } from '../systems/Evolution.js';
 import { valleyFor, sanitizeValley } from '../systems/Valley.js';
 import { emptyDoctrine, restoreDoctrine } from '../systems/Doctrine.js';
 import { emptyGoldenAge, emptyChronicle } from '../systems/GoldenAge.js';
@@ -202,6 +204,8 @@ export class GameState {
     this.apprenticeship = emptyApprenticeshipState(); // (25.2) açık çırak kapıları ve sayaçlar
     this.temperament = emptyTemperament(); // (25.3) mizaç gelişimi sayaçları
     this.moodlets = emptyMoodletStats(); // (29.2) ruh hali sayaçları: { given: { anahtar: adet }, consoled, grieved, mourners }
+    this.wants = emptyWantStats(); // (29.3) arzu / korku sayaçları: { rolled, fulfilled, expired, fearsRolled, realized, passed } (anahtar -> adet)
+    this.evolution = emptyEvolutionStats(); // (29.4) kişilik evrimi sayaçları: { turned, deepened, acquired (özellik -> adet), total }
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
     this.heirloom = emptyHeirloomState(); // (25.5) aile yadigârları: sayaçlar, arşiv, Kuşak Şöleni
     this.activeGuest = null; // (26.3) geçici gezgin konuk (GuestSystem): null | { type, name, look, arrivalDay, departureDay, x, y, leaving, resting, barters, lastBarterDay, exit } (27.1: exit isteğe bağlı)
@@ -289,6 +293,8 @@ export class GameState {
       apprenticeship: this.apprenticeship,
       temperament: this.temperament,
       moodlets: this.moodlets,
+      wants: this.wants,
+      evolution: this.evolution,
       lineage: this.lineage,
       heirloom: this.heirloom,
       currentFestival: this.currentFestival,
@@ -407,6 +413,8 @@ export class GameState {
     next.lifeStages = restoreLifeStages(data.lifeStages);
     next.temperament = restoreTemperament(data.temperament); // (25.3)
     next.moodlets = restoreMoodletStats(data.moodlets); // (29.2)
+    next.wants = restoreWantStats(data.wants); // (29.3)
+    next.evolution = restoreEvolutionStats(data.evolution); // (29.4)
     next.lineage = restoreLineage(data.lineage);
     next.activeGuest = sanitizeActiveGuest(data.activeGuest); // (26.3) v2-v30 kayıtlarında alan yoktur: null
     next.guestBook = restoreGuestBook(data.guestBook);
@@ -715,6 +723,8 @@ function sanitizeReferences(next) {
     }
     if (c.parentIds.some((id) => id === c.id || !people.has(id))) c.parentIds = c.parentIds.filter((id) => id !== c.id && people.has(id));
   }
+  // (29.3) hayatta olmayan kişiye bağlı arzu / korku kayıtları atılır
+  pruneWantRefs(next.characters);
   // (21. aşama) kayıp sakine ait dilekçe ve isyancılar atlanır; yağma hedefi yıkılmışsa baskın biter
   next.petitions.list = next.petitions.list.filter((p) => people.has(p.characterId));
   const revolt = next.trust.revolt;

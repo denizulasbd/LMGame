@@ -45,6 +45,9 @@
 //   --crisis  : (23. aşama) tehlike sıklığı (varsayılan dengeli); huzurlu + --no-safety, 22. aşamayla bire bir aynı koşuyu verir
 //   --crisis-state : (23. aşama) kayıttan hemen önce bir yangın, bir hasarlı yapı, bir yaralı ve bekleyen bir haydut baskını oluşturur
 //               (save-v20.json fikstürü bu bayrakla üretilir: kriz alanlarının hepsi kayda girer)
+//   --engines-off : (29.5) mekanik şalterlerini kapatır (A/B): --engines-off bonds
+//   --evo     : (29.4) evrim verisini bellekte geçersiz kılar (denge denemesi): "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
+//   --pushes  : (29.4) katkı kaynağı dökümü ve karakter başına günlük net katkı yüzdelikleri
 //   --no-agri : (24. aşama) Ürün Silosu kurulmaz ve bahçeler hep Buğday ekili kalır (mahsul bozulması yine işler)
 //   --no-apprentice : (25.2) Çırak Kapısı hiç açılmaz (çıraklık katmanının kapalıyken oyunu hiç değiştirmediğini göstermek için)
 //   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
@@ -52,7 +55,9 @@
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
 //               bulunursa çıkış kodu 1 olur
 import fs from 'fs';
-import { openGame, parseArgs, runHours } from './lib.mjs';
+import { openGame, parseArgs, runHours, capOutput } from './lib.mjs';
+
+capOutput('autopilot');
 import { installMonitor, monitorReport } from './monitor.mjs';
 
 const { positional, options } = parseArgs();
@@ -63,6 +68,21 @@ const speed = Number(options.speed ?? 4);
 const { browser, page, errors } = await openGame({ seed });
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
+// (29.4) --evo "rules.decayPerDay=3;sources.moodlets.quarrel=..." : denge denemeleri için evrim verisini bellekte geçersiz kılar (dosyaya yazmaz).
+// Yol: evolution.js dışa aktarımı.alan...; değer JSON. Örn: --evo "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
+if (options.evo) {
+  await page.evaluate(async (spec) => {
+    const mod = await import('/src/data/evolution.js');
+    for (const part of String(spec).split(';')) {
+      const [path, raw] = part.split('=');
+      if (!path || raw === undefined) continue;
+      const keys = path.trim().split('.');
+      let obj = mod;
+      for (const k of keys.slice(0, -1)) obj = obj[k];
+      obj[keys[keys.length - 1]] = JSON.parse(raw);
+    }
+  }, options.evo);
+}
 await page.evaluate((o) => {
   window.__noSafety = o.noSafety;
   window.__noAgri = o.noAgri; // (24. aşama)
@@ -70,6 +90,16 @@ await page.evaluate((o) => {
   if (o.crisis) window.game.state.crisis.difficulty = o.crisis; // doğrudan durumdan (bildirim / ses tüketmesin: huzurlu + --no-safety koşusu 22. aşamayla bire bir aynı olmalı)
 }, { noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null });
 
+// (29.5) --engines-off bonds[,ad...] : A/B karşılaştırması için mekanik şalterlerini kapatır; bağ ölçümü (yalnızca dinler, durumu değiştirmez)
+await page.evaluate(async (off) => {
+  const { ENGINES } = await import('/src/systems/Engines.js');
+  for (const k of String(off || '').split(',').filter(Boolean)) ENGINES[k] = false;
+  const got = (window.__bondGot = { side: new Set(), rub: new Set() });
+  window.game.events.on('moodlet:added', ({ character, moodlet } = {}) => {
+    if (moodlet?.key === 'side_by_side') got.side.add(character.id);
+    if (moodlet?.key === 'rubbing_wrong') got.rub.add(character.id);
+  });
+}, options['engines-off'] ?? '');
 await page.evaluate((passive) => {
   const game = window.game;
   const sim = window.sim;
@@ -892,6 +922,16 @@ if (options.save) {
   console.log('kayıt yazıldı:', options.save);
 }
 const mon = await monitorReport(page);
+const bondStats = await page.evaluate(() => {
+  const sc = window.game.scenes.current;
+  const given = window.game.state.moodlets?.given ?? {};
+  const ever = window.__bondGot;
+  const names = (id) => window.game.state.characters.find((c) => c.id === id)?.name ?? `#${id}`;
+  const pairs = [...(sc.bonds?.pairs ?? [])].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 3).map(([k, n]) => `${k.split('-').map((x) => names(Number(x))).join(' & ')} ${n} sa`);
+  const pop = window.game.state.characters.filter((c) => !c.isChild && !c.role).length;
+  return { side: given.side_by_side ?? 0, rub: given.rubbing_wrong ?? 0, ever: ever.side.size, everRub: ever.rub.size, pop, pairs };
+});
+console.log(`(29.5) Omuz Omuza ${bondStats.side} · Diken Üstünde ${bondStats.rub} · en az bir kez Omuz Omuza alan ${bondStats.ever}/${bondStats.pop} (%${Math.round((100 * bondStats.ever) / Math.max(1, bondStats.pop))}) · Diken Üstünde alan ${bondStats.everRub} · en çok birlikte çalışan çiftler: ${bondStats.pairs.join(', ') || '-'}`);
 const so = mon.social;
 console.log(
   `(19. aşama) evli çift ${so.couples} (aynı evde ${so.couplesTogether}) · randevu ${so.dates} · düğün kutlaması ${so.parties} · akşam yemeği ${so.dinners} · ` +
@@ -986,6 +1026,35 @@ if (mon.life) {
     console.log(`(29.2) verilen moodlet ${total}: ${Object.entries(md.given).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(' · ')}`);
     console.log(`(29.2) yas tutan ${md.mourners} · anma ${md.grieved} · teselli ${md.consoled} (travmaya göre ${JSON.stringify(md.consoledBy ?? {})}) · son gün ${JSON.stringify(md.now)} · baskın ruh hali ${JSON.stringify(md.feels)} · ortalama iş çarpanı ${md.work ? (md.work.sum / md.work.n).toFixed(3) : '-'} (en düşük ${md.work?.min.toFixed(2)}, en yüksek ${md.work?.max.toFixed(2)}) · en çok ${md.max} moodlet`);
   }
+  // (29.3) Arzular, korkular ve yaşam doyumu
+  const wd = L.wants;
+  if (wd) {
+    const W = wd.stats;
+    const sum = (o) => Object.values(o ?? {}).reduce((x, y) => x + y, 0);
+    const keys = (a, b) => [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])];
+    const pct = (a, b) => (b ? `%${Math.round((100 * a) / b)}` : '-');
+    console.log(`(29.3) arzu: dolan ${sum(W.rolled)} · gerçekleşen ${sum(W.fulfilled)} (${pct(sum(W.fulfilled), sum(W.rolled))}) · süresi dolan ${sum(W.expired)} · aktif ${wd.active} · ömür boyu dilek ${wd.wishes}`);
+    console.log(`(29.3) arzu anahtarları (dolan/gerçekleşen/süresi dolan): ${keys(W.rolled, W.fulfilled).map((k) => `${k} ${W.rolled[k] ?? 0}/${W.fulfilled[k] ?? 0}/${W.expired[k] ?? 0}`).join(' · ')}`);
+    console.log(`(29.3) korku: dolan ${sum(W.fearsRolled)} · gerçekleşen ${sum(W.realized)} (${pct(sum(W.realized), sum(W.fearsRolled))}) · geçen ${sum(W.passed)} · aktif ${wd.activeFears}`);
+    console.log(`(29.3) korku anahtarları (dolan/gerçekleşen/geçen): ${keys(W.fearsRolled, W.realized).map((k) => `${k} ${W.fearsRolled[k] ?? 0}/${W.realized[k] ?? 0}/${W.passed[k] ?? 0}`).join(' · ')}`);
+    console.log(`(29.3) son gün doyum: ortalama ${wd.avg?.toFixed(1)} (en düşük ${wd.min}, en yüksek ${wd.max}; ${wd.n} yetişkin) · kademeler ${JSON.stringify(wd.tiers)} · ortalama fearStreak ${wd.fearStreak.toFixed(2)}`);
+  }
+  // (29.4) Kalıcı kişilik evrimi
+  const ev = L.evolution;
+  if (ev) {
+    const E = ev.stats;
+    const sum = (o) => Object.values(o ?? {}).reduce((x, y) => x + y, 0);
+    const pct = (a, b) => (b ? `%${Math.round((100 * a) / b)}` : '-');
+    const list = (o) => Object.entries(o ?? {}).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(' · ') || '-';
+    console.log(`(29.4) değişim ${E.total} (edinim ${sum(E.acquired)} · dönüşüm ${sum(E.turned)} · derinleşme ${sum(E.deepened)}) · artı yön ${ev.dir.plus} / eksi yön ${ev.dir.minus} · değişim yaşayan sakin ${ev.evolved}/${ev.ever} (${pct(ev.evolved, ev.ever)})`);
+    console.log(`(29.4) türe ve özelliğe göre: edinim { ${list(E.acquired)} } · dönüşüm { ${list(E.turned)} } · derinleşme { ${list(E.deepened)} }`);
+    console.log(`(29.4) son gün özellik dağılımı (${ev.n} yetişkin): ${list(ev.traitDist)} · en yaygın %${Math.round((100 * Math.max(0, ...Object.values(ev.traitDist))) / Math.max(1, ev.n))} · derin ${ev.deepNow} · üç özellikli ${ev.threeNow}`);
+    console.log(`(29.4) eksen değerleri: ortalama ${ev.avg?.toFixed(2)} (mutlak ${ev.avgAbs?.toFixed(2)}) · en düşük ${ev.min} · en yüksek ${ev.max} · eğilim ipucu gösteren ${ev.hinted}`);
+    console.log(`(29.4) değişim nedenleri: ${list(ev.causes)}`);
+    if (options.pushes) console.log(`(29.4) karakter başına günlük net katkı (eksen: n min/p10/p25/p50/p75/p90/max): ${(ev.perDay ?? []).map((d, i) => `#${i} ${d.n} ${d.min}/${d.p10}/${d.p25}/${d.p50}/${d.p75}/${d.p90}/${d.max}`).join(' | ')}`);
+    if (options.pushes) console.log(`(29.4) katkı dökümü (eksen:kaynak n / net / mutlak): ${Object.entries(ev.pushes ?? {}).sort((x, y) => y[1].abs - x[1].abs).slice(0, 40).map(([k, v]) => `${k} ${v.n}/${v.sum}/${v.abs}`).join(' · ')}`);
+    for (const e of ev.log.slice(0, 12)) console.log(`  G${e.day} ${e.name} (${e.stage}) ${e.kind} ${e.from ? `${e.from} -> ` : ''}${e.to} [${e.cause ?? '-'}]${e.journal ? ` · "${e.journal}"` : ''}`);
+  }
   // (29.1) Sosyal kimya ve duygusal etiketler
   const ch = L.chemistry;
   if (ch) console.log(`(29.1) kimya kaydı ${ch.records} çift ${JSON.stringify(ch.dist)} · şimdiki etiketler ${JSON.stringify(ch.tags)} (Yönetime ${ch.ruler}) · verilen etiket ${ch.given} · ruh ikizi bağı ${ch.kindred} · şimşek ${ch.sparks} · ikram ${ch.treats} · etiketli selam ${ch.greetings}`);
@@ -1003,7 +1072,7 @@ for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}
 const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0 && mon.social.stuck.length === 0;
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, healthy }, null, 1));
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, healthy }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();

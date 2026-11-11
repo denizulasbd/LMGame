@@ -17,6 +17,7 @@
 // (25.2) "Çıraklık": çırağın ustası, meslek dalı, ilerleme çubuğu (%X Çıraklık), çırak işleri ve mezuniyet beklentisi
 // ('ui:releaseApprentice'); çırak olmayan Genç için "Çıraklığa Yaz" ('ui:enrollApprentice'); ustanın kartında "Çırağı: ..."
 // ve Gururlu Usta etiketi.
+// (29.3) "Arzular, Korkular ve Yaşam Doyumu": doyum çubuğu ve kademesi, en çok 3 arzu ve 2 korku çipi (kalan süre, doyum etkisi); çocukta gizli.
 import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../../art/sprites/index.js';
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
@@ -51,6 +52,10 @@ import { generationName } from '../../systems/Lineage.js';
 import { heirloomSlot } from '../../systems/Citizens.js';
 import { MOODLETS, TIER_NAMES } from '../../data/moodlets.js';
 import { effectText, reasonText, remainingHours, soothingOf } from '../../systems/Moodlets.js';
+import { WANTS, FEARS, WANT_CAPS } from '../../data/wants.js';
+import { satisfactionTier, tierEffectText, wantName, remainingText } from '../../systems/Wants.js';
+import { hintOf, evolutionKey } from '../../systems/Evolution.js';
+import { DEEP_TRAITS, CAUSE_TEXT, EVOLUTION_TEXT } from '../../data/evolution.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -104,6 +109,7 @@ export class CharacterPanel {
     this.stageBadge = el('div', { className: 'life-stage-row' });
     this.meta = el('div', { className: 'character-meta' });
     this.traits = el('div', { className: 'character-traits' });
+    this.traitHint = el('div', { className: 'trait-hint', hidden: true }); // (29.4) eğilim ipucu
     // (15. aşama) Zanaat rozeti: ana meslek ve kademesi (Çırak bronz, Kalfa gümüş, Usta altın) ve giydiği kıyafet
     this.badgeIcon = el('img', { className: 'craft-badge-icon', alt: '' });
     this.badgeText = el('span', { className: 'craft-badge-text' });
@@ -133,6 +139,14 @@ export class CharacterPanel {
     this.lastMoodVersion = -1;
     this.lastMoodHour = -1;
     this.lastMoodId = null;
+    // (29.3) Yaşam Doyumu çubuğu, Arzular ve Korkular (moodlet listesinin hemen altında; çocukta gizli)
+    this.satisfactionFill = el('span', { className: 'satisfaction-fill' });
+    this.satisfactionLabel = el('span', { className: 'satisfaction-label' });
+    this.satisfactionBar = el('div', { className: 'satisfaction-bar' }, [el('span', { className: 'satisfaction-track' }, [this.satisfactionFill]), this.satisfactionLabel]);
+    this.wantList = el('div', { className: 'want-list' });
+    this.fearList = el('div', { className: 'want-list fear-list' });
+    this.wantBox = el('div', { className: 'want-box' }, [this.satisfactionBar, el('div', { className: 'want-subtitle', text: 'Arzular' }), this.wantList, el('div', { className: 'want-subtitle', text: 'Korkular' }), this.fearList]);
+    this.lastWantKey = null;
     this.familyList = el('div', { className: 'family-list' });
     this.relationsList = el('div', { className: 'relations-list' });
     this.equipmentList = el('div', { className: 'equipment-slots' });
@@ -162,12 +176,13 @@ export class CharacterPanel {
       closeButton,
       el('div', { className: 'character-header' }, [
         el('div', { className: 'character-portrait-column' }, [el('div', { className: 'character-portrait-frame' }, [this.portrait]), this.moodBadge]),
-        el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.stageBadge, this.meta, this.craftBadge, this.traits]),
+        el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.stageBadge, this.meta, this.craftBadge, this.traits, this.traitHint]),
       ]),
       el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
       this.petitionBox,
       el('div', { className: 'character-needs' }, needs),
       section('Ruh Hali ve İç Dünya', this.moodList),
+      (this.wantSection = section('Arzular, Korkular ve Yaşam Doyumu', this.wantBox)),
       section('Aile', this.familyList),
       section('İlişkiler', this.relationsList),
       section('Sosyal Hayat', this.socialList),
@@ -221,7 +236,7 @@ export class CharacterPanel {
 
   /** Kimlik bilgisi değişince yeniden kurulur (karakter, ev, çocukluk, aile durumu). */
   identityKey(character) {
-    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}:${character.lifeStage}:${character.age}:${character.retired}`;
+    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}:${character.lifeStage}:${character.age}:${character.retired}:${evolutionKey(character)}`; // (29.4) özellikler / derin biçimler / ipucu değişince
   }
 
   /** Değişmedikçe bir kez kurulan kısımlar: ad, yaş, ev, özellik etiketleri. */
@@ -243,11 +258,22 @@ export class CharacterPanel {
     this.traits.replaceChildren(
       ...character.traits.map((key) => {
         const opposite = opposingTrait(key);
-        const title = `${TRAITS[key]?.description ?? ''}${opposite ? ` · Zıddı: ${TRAITS[opposite].name} (atışabilirler)` : ''}`;
-        return el('span', { className: 'trait-chip', text: TRAITS[key]?.name ?? key, title });
+        // (29.4) derin biçim: derin ad + yıldız, derin açıklama; sonradan edinilen / dönüşen özellik: "sonradan" işareti ve geçmiş
+        const deep = character.deepTraits.includes(key) ? DEEP_TRAITS[key] : null;
+        const born = [...character.evolutions].reverse().find((e) => e.to === key && (e.kind === 'turned' || e.kind === 'acquired'));
+        const title = `${(deep ?? TRAITS[key])?.description ?? ''}${opposite ? ` · Zıddı: ${TRAITS[opposite].name} (atışabilirler)` : ''}`;
+        const marks = [];
+        if (deep) marks.push(el('span', { className: 'trait-mark trait-star', text: '★', title: `Derinleşti: ${deep.name}` }));
+        if (born) marks.push(el('span', { className: 'trait-mark trait-later', text: 'sonradan' }));
+        const bornTitle = born ? `G${born.day} · ${born.cause && CAUSE_TEXT[born.cause] ? CAUSE_TEXT[born.cause] : EVOLUTION_TEXT.noCause}${born.from ? ` · ${TRAITS[born.from]?.name ?? born.from} → ${TRAITS[born.to]?.name ?? born.to}` : ' · ortaya çıktı'}` : '';
+        const classes = `trait-chip${deep ? ' is-deep' : ''}${born ? ' is-evolved' : ''}`;
+        return el('span', { className: classes, title: born ? bornTitle : title }, [deep?.name ?? TRAITS[key]?.name ?? key, ...marks]);
       }),
       ...(quirk ? [el('span', { className: `trait-chip quirk-chip${quirk.color ? ` quirk-${quirk.color}` : ''}`, title: `Huyu: ${quirk.description}${quirk.generation ? ' (yeni nesil huy)' : ''}` }, [el('img', { src: getAnyIconURL(quirk.icon), alt: '' }), quirk.name])] : [])
     );
+    const hint = hintOf(character);
+    this.traitHint.hidden = !hint;
+    this.traitHint.textContent = hint ? hint.text : '';
     this.resetCaches();
   }
 
@@ -283,6 +309,7 @@ export class CharacterPanel {
     this.lastPurse = null;
     this.lastApprentice = null;
     this.lastPetition = null;
+    this.lastWantKey = null;
   }
 
   render(game) {
@@ -315,6 +342,7 @@ export class CharacterPanel {
       row.classList.toggle('is-low', value < LOW_NEED);
     }
     this.renderMood(character, game.state);
+    this.renderWants(character, game.state);
     this.renderFamily(character, game.state);
     this.renderRelations(character, game.state);
     this.renderEquipment(character);
@@ -366,6 +394,43 @@ export class CharacterPanel {
         ]);
       });
     this.moodList.replaceChildren(...rows);
+  }
+
+  /**
+   * (29.3) Yaşam Doyumu, Arzular ve Korkular. Yalnızca sakin, drive.version, doyum ya da saat değişince yeniden kurulur (moodlet listesiyle
+   * aynı disiplin); öteki karelerde tek bir anahtar karşılaştırılır.
+   */
+  renderWants(character, state) {
+    const hour = Math.floor(state.totalMinutes / 60);
+    const hidden = character.isChild || Boolean(character.role);
+    const key = hidden ? `${character.id}:hidden` : `${character.id}:${character.drive.version}:${character.satisfaction}:${hour}`;
+    if (key === this.lastWantKey) return;
+    this.lastWantKey = key;
+    this.wantSection.hidden = hidden;
+    if (hidden) return;
+    const value = character.satisfaction;
+    const tier = satisfactionTier(value);
+    this.satisfactionFill.style.width = `${value}%`;
+    this.satisfactionBar.className = `satisfaction-bar is-${tier.key}`;
+    this.satisfactionBar.title = `Yaşam doyumu ${value}/100 · ${tier.name}: ${tierEffectText(tier)}`;
+    this.satisfactionLabel.textContent = `${value} · ${tier.name}`;
+    const now = state.totalMinutes;
+    const chips = (kind, list, cap) => {
+      const catalog = kind === 'fear' ? FEARS : WANTS;
+      const rows = list.map((e) => {
+        const def = catalog[e.key];
+        const points = def.points;
+        return el('div', { className: kind === 'fear' ? 'fear-chip' : 'want-chip', title: kind === 'fear' ? `−${points} doyum (başına gelirse)` : `+${points} doyum (gerçekleşirse)` }, [
+          el('img', { className: 'moodlet-icon', src: getAnyIconURL(def.icon), alt: '' }),
+          el('span', { className: 'want-name', text: wantName(kind, e) }),
+          el('span', { className: 'moodlet-time', text: remainingText(e, now) }),
+        ]);
+      });
+      if (rows.length < cap) rows.push(el('div', { className: 'want-empty', text: '— yeni bir heves bekliyor' }));
+      return rows;
+    };
+    this.wantList.replaceChildren(...chips('want', character.wants, WANT_CAPS.wants));
+    this.fearList.replaceChildren(...chips('fear', character.fears, WANT_CAPS.fears));
   }
 
   /** (25.2) Çıraklık: çırağın ustası, dalı ve ilerlemesi; ustanın çırakları; Genç için "Çıraklığa Yaz". */

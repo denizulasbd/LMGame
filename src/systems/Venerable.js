@@ -1,5 +1,5 @@
 // (28.3) Sürdürülebilir kuşak döngüsünün saf hesapları: ömür (izole üreteç), aktif nüfus, Saygın Büyük hazırlığı. Durum değiştirmez.
-//   lifespanFor(seed, id)   : sakinin ömrü (66-75 yaş); tohum + 30'dan ve kimlikten türeyen izole bir üreteçle (ana üretece dokunmaz, sıraya bağlı değil)
+//   lifespanFor(seed, id)   : sakinin ömrü (67-75 yaş); tohum + 30'dan ve kimlikten türeyen izole bir üreteçle (ana üretece dokunmaz, sıraya bağlı değil)
 //   activePopulation(state) : nüfus kotasına sayılan sakinler (Saygın Büyükler hariç)
 //   venerables(state)       : Saygın Büyükler
 //   hearthSettled / heirloomSettled / venerableReady : Saygın Büyük olma koşulları

@@ -9,7 +9,9 @@
 //   traumaOf(c)                    : teselli edilebilir, henüz teselli edilmemiş travma (yas, sarsıntı, kalp kırıklığı) ya da null
 //   soothe(c, now, by)             : teselli: travmanın kalan süresi %40 kısalır, "Yüreği Ferahladı" eklenir
 //   effectText(m) / remainingHours : kart metinleri
+//   (29.3) recomputeMood yaşam doyumu kademesinin (Wants.satisfactionTier) etkilerini de katar: mood.satisfaction = kademe anahtarı
 import { MOODLETS, MOODLET_CAPS, MOOD_LIMITS, TIER_SCALE, NEUTRAL_FEEL, DOMINANT_THRESHOLD, MOOD_RULES, CONSOLE, MOOD_REASONS } from '../data/moodlets.js';
+import { satisfactionTier } from './Wants.js';
 
 /**
  * Motorun ana şalteri. Oyunda hep açıktır. Hedefli testler (tools/sim/tests.mjs) eski aşamaların kesin sayılı kurallarını
@@ -22,7 +24,7 @@ const MUL_KEYS = ['workMul', 'moveMul', 'joyRateMul', 'socialMul', 'xpMul', 'ene
 const EFFECT_NAMES = { workMul: 'İş', moveMul: 'Yürüme', joyRateMul: 'Keyif düşüşü', socialMul: 'Sohbet kazancı', xpMul: 'Deneyim', energyMul: 'Enerji kaybı', quarrelMul: 'Atışma', scareMul: 'Gece ürkme' };
 
 export function neutralMood() {
-  return { workMul: 1, moveMul: 1, joyRateMul: 1, socialMul: 1, xpMul: 1, energyMul: 1, quarrelMul: 1, scareMul: 1, masterwork: 0, shirk: false, focus: false, seek: false, grief: false, feel: NEUTRAL_FEEL, tone: 'neutral', net: 0, version: 0 };
+  return { workMul: 1, moveMul: 1, joyRateMul: 1, socialMul: 1, xpMul: 1, energyMul: 1, quarrelMul: 1, scareMul: 1, masterwork: 0, shirk: false, focus: false, seek: false, grief: false, feel: NEUTRAL_FEEL, tone: 'neutral', net: 0, satisfaction: 'content', version: 0 };
 }
 
 export function emptyMoodletStats() {
@@ -180,6 +182,10 @@ export function recomputeMood(c) {
   }
   // Huysuz + aç: atışma olasılığı iki katına çıkar
   if (hangry && Array.isArray(c.traits) && c.traits.includes('grumpy')) mood.quarrelMul *= MOOD_RULES.hangryGrumpyQuarrel;
+  // (29.3) Yaşam doyumu kademesi: çarpanlar kırpmadan ÖNCE katılır (toplam yine MOOD_LIMITS içinde kalır)
+  const tier = satisfactionTier(c.satisfaction);
+  for (const k in tier.effects) mood[k] *= tier.effects[k];
+  mood.satisfaction = tier.key;
   for (const k of MUL_KEYS) {
     const limit = MOOD_LIMITS[k];
     if (mood[k] < limit[0]) mood[k] = limit[0];

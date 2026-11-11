@@ -21,7 +21,9 @@
 //
 // Kullanım: node tools/sim/audit.mjs [--shots klasör]   (sunucu: python3 tools/serve.py)
 import fs from 'fs';
-import { openGame, createChecks, parseArgs, BASE_URL } from './lib.mjs';
+import { openGame, createChecks, parseArgs, BASE_URL, capOutput } from './lib.mjs';
+
+capOutput('audit');
 import { installMonitor, monitorReport } from './monitor.mjs';
 
 const { options } = parseArgs();
@@ -70,6 +72,7 @@ const PAGE_HELPERS = () => {
     const check = (name, ok, detail = '') => out.push({ name, ok: Boolean(ok), detail: String(detail) });
     const hours = (h) => sim.step(Math.round(h * 225));
     const scene = () => game.scenes.current;
+    { const { ENGINES } = await import('/src/systems/Engines.js'); check('(29.4b) açılışta ENGINES şalterlerinin hepsi açık', Object.values(ENGINES).every((v) => v !== false), Object.keys(ENGINES).join(', ') || 'liste boş'); }
     const rich = () => sim.give({ wood: 400, stone: 400, food: 300, iron: 100, wool: 100, bread: 100, gold: 2000 });
     const count = () => [...game.events.listeners.values()].reduce((n, set) => n + set.size, 0);
     const counter = (name) => {
@@ -307,6 +310,7 @@ const PAGE_HELPERS = () => {
       const ended = counter('revolt:ended');
       s.town.welfare = 70;
       s.trust.relief = {};
+      s.trust.value = Math.max(s.trust.value, 25); // (29.3) yağma saatlerinde güvenin ne kadar eridiği geçmişe bağlıdır: yardım dağıtımının ölçüldüğü taban
       game.events.emit('ui:relief', { kind: 'gold' });
       game.events.emit('ui:relief', { kind: 'food' });
       hours(1.2);
@@ -506,8 +510,10 @@ const PAGE_HELPERS = () => {
       const youth2 = s.characters.find((c) => c.id === youth.id);
       check('Kıdemli Bilge emekliyken kayıt -> yükleme durum kayması yok (evre, gün cinsinden yaş, sayaçlar)', diff.length === 0 && sage2.lifeStage === 'elder' && sage2.retired && youth2.lifeStage === 'adult' && promoted.n === 2, diff.join(' | ') + ` · ${promoted.n} geçiş`);
       const again = counter('lifeStage:changed');
+      const day0 = s.time.day;
       hours(30);
-      check('yüklemeden sonra bilge yeniden kutlanmaz, emekli kalır, yaşlar gün dönümünde bir kez ilerler', again.n === 0 && sage2.retired && sage2.ageInDays === 65 * Y + 1 && s.characters.includes(sage2), `${again.n} geçiş · ${sage2.ageInDays}`);
+      const turns = s.time.day - day0; // (29.3) 30 saat, başlangıç saatine göre bir ya da iki gün dönümü geçer
+      check('yüklemeden sonra bilge yeniden kutlanmaz, emekli kalır, yaşlar gün dönümünde bir kez ilerler', again.n === 0 && sage2.retired && turns >= 1 && sage2.ageInDays === 65 * Y + turns && s.characters.includes(sage2), `${again.n} geçiş · ${sage2.ageInDays} · ${turns} gün dönümü`);
       check('emekli bilge işe gitmez (yükleme sonrası 30 saat)', !sage2.task?.jobId && !sage2.task?.workBuildingId);
       promoted.off();
       again.off();
@@ -665,6 +671,7 @@ const PAGE_HELPERS = () => {
       Object.assign(t, { day: 4 * Math.ceil((t.day + 1) / 4), hour: 5, minute: 58 });
       sim.step(10);
       while (t.hour < 19) sim.step(30);
+      { const WTa = await import('/src/systems/Wants.js'); for (const c of s.characters) { c.wants.length = 0; c.fears.length = 0; WTa.recomputeDrive(c); } } // (29.3) arzu kancaları (han / ziyafet) kiler ölçümünü karıştırmasın
       A.roundtrip();
       const live = JSON.stringify(s.currentFeast);
       const diff = A.roundtrip();
@@ -717,6 +724,7 @@ const PAGE_HELPERS = () => {
       Object.assign(t, { day: 4 * Math.ceil((t.day + 1) / 4), hour: 5, minute: 58 });
       sim.step(10);
       while (t.hour < 19) sim.step(30);
+      { const WTa = await import('/src/systems/Wants.js'); for (const c of s.characters) { c.wants.length = 0; c.fears.length = 0; WTa.recomputeDrive(c); } } // (29.3) aynı gerekçe
       A.roundtrip();
       const eaten = [...(s.currentFeast?.eatenIds ?? [])];
       const dancers = [...(s.currentFestival?.participants ?? [])];
@@ -873,7 +881,8 @@ const PAGE_HELPERS = () => {
       const ids = [a.id, b.id, c3.id];
       const before = new Map([a, b, c3].map((c) => [c.id, JSON.stringify(c.moodlets)]));
       const stats0 = JSON.stringify(s.moodlets);
-      for (const c of [a, b, c3]) { c.moodlets.length = 0; MO.recomputeMood(c); }
+      const sat0 = [a, b, c3].map((c) => c.satisfaction);
+      for (const c of [a, b, c3]) { c.moodlets.length = 0; c.satisfaction = 50; MO.recomputeMood(c); } // (29.3) doyum kademesi beklenen çarpanları kaydırmasın
       const now = s.totalMinutes;
       MO.addMoodlet(a, 'mourning', now, { tier: 'major', reason: 'mourn_spouse', whoId: 987654, whoName: 'Deniz' });
       MO.addMoodlet(a, 'comforted', now, { reason: 'comforted', whoId: b.id, whoName: b.name });
@@ -892,8 +901,85 @@ const PAGE_HELPERS = () => {
       check('(29.2) toplam etki (c.mood) kayda girmez, yüklemede aynı değerlerle yeniden hesaplanır; teselli yüklemeden sonra da travmayı yarılar', loaded.map((c) => [c.mood.workMul, c.mood.moveMul, c.mood.joyRateMul, c.mood.xpMul, c.mood.feel].join()).join('|') === moods.join('|') && loaded[0].mood.grief === true && MO.traumaOf(loaded[0]) === null && Math.abs(loaded[2].mood.workMul - 0.85) < 1e-9, moods.join('|'));
       scene().moodlets.onHour();
       check('(29.2) yüklemeden sonra saat taraması katman tavanlarını korur (en çok 6; 1 çekirdek + 3 eylem + 2 ihtiyaç)', s.characters.every((c) => c.moodlets.length <= 6 && c.moodlets.filter((m) => m.key === 'mourning' || m.key === 'neglected' || m.key === 'shaken' || m.key === 'heartbroken' || m.key === 'euphoric' || m.key === 'inspired').length <= 1));
-      for (const id of ids) { const c = s.characters.find((x) => x.id === id); c.moodlets = JSON.parse(before.get(id)); MO.recomputeMood(c); }
+      for (const [i, id] of ids.entries()) { const c = s.characters.find((x) => x.id === id); c.moodlets = JSON.parse(before.get(id)); c.satisfaction = sat0[i]; MO.recomputeMood(c); }
       s.moodlets = JSON.parse(stats0);
+    }
+    // --- 2za. (29.3) Arzular, korkular ve yaşam doyumu: kayıt -> yükleme birebir; kopuk referans yok; tavanlar korunur ---
+    {
+      const WT = await import('/src/systems/Wants.js');
+      const MO = await import('/src/systems/Moodlets.js');
+      const pick = () => s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((x, y) => x.id - y.id).slice(0, 3);
+      const [a, b, c3] = pick();
+      const ids = [a.id, b.id, c3.id];
+      const fields = ['wants', 'fears', 'satisfaction', 'wantLog', 'fearStreak', 'wishCount'];
+      const before = new Map([a, b, c3].map((c) => [c.id, JSON.stringify(fields.map((f) => c[f]))]));
+      const stats0 = JSON.stringify(s.wants);
+      const now = s.totalMinutes;
+      a.wants = [{ key: 'chat_kindred', since: now, until: now + 2880, whoId: b.id, whoName: b.name }, { key: 'get_married', since: now, until: null, whoId: c3.id, whoName: c3.name }, { key: 'quiet_day', since: now, until: now + 2880 }];
+      a.fears = [{ key: 'quarrel_foe', since: now, until: now + 4320, whoId: c3.id, whoName: c3.name }, { key: 'go_hungry', since: now, until: now + 4320 }];
+      a.satisfaction = 88; a.fearStreak = 0; a.wishCount = 4;
+      a.wantLog = [{ key: 'make_friend', kind: 'want', outcome: 'fulfilled', day: s.time.day }, { key: 'fire_at_work', kind: 'fear', outcome: 'realized', day: s.time.day, burned: true }];
+      b.wants = [{ key: 'level_up_skill', since: now, until: now + 4320 }]; b.fears = []; b.satisfaction = 12; b.fearStreak = 3; b.wishCount = 0; b.wantLog = [];
+      c3.wants = []; c3.fears = [{ key: 'loss_of_loved', since: now, until: null, whoId: a.id, whoName: a.name }]; c3.satisfaction = 50; c3.wantLog = [{ key: 'reconcile', kind: 'want', outcome: 'void', day: s.time.day, whoName: 'Deniz' }];
+      for (const c of [a, b, c3]) { WT.recomputeDrive(c); MO.recomputeMood(c); }
+      s.wants.rolled.quiet_day = (s.wants.rolled.quiet_day ?? 0) + 1; s.wants.realized.fire_at_work = (s.wants.realized.fire_at_work ?? 0) + 1;
+      const want = JSON.stringify(s.characters.map((c) => [c.id, fields.map((f) => c[f])]));
+      const wantStats = JSON.stringify(s.wants);
+      const moods = [a, b, c3].map((c) => [c.mood.workMul, c.mood.joyRateMul, c.mood.xpMul, c.mood.satisfaction].join());
+      const diff = A.roundtrip();
+      check('(29.3) arzular, korkular, doyum, sonuç kaydı ve sayaçlar kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const loaded = ids.map((id) => s.characters.find((c) => c.id === id));
+      check('(29.3) yüklenen arzu / korku / doyum / kayıt / sayaçlar birebir aynı; drive ve doyum kademesi (c.mood) yüklemede yeniden kurulur', JSON.stringify(s.characters.map((c) => [c.id, fields.map((f) => c[f])])) === want && JSON.stringify(s.wants) === wantStats && loaded.map((c) => [c.mood.workMul, c.mood.joyRateMul, c.mood.xpMul, c.mood.satisfaction].join()).join('|') === moods.join('|') && loaded[0].drive.seekIds.includes(b.id) && loaded[0].drive.avoidIds.includes(c3.id) && loaded[1].mood.satisfaction === 'crushed');
+      const people = new Set(s.characters.map((c) => c.id));
+      check('(29.3) yüklemeden sonra hiçbir arzu / korku kopuk kişiye işaret etmez; tavanlar korunur (3 arzu, 2 korku, kategori başına 1, uzun soluklu 1)', s.characters.every((c) => [...c.wants, ...c.fears].every((e) => !Number.isFinite(e.whoId) || (people.has(e.whoId) && e.whoId !== c.id)) && c.wants.length <= 3 && c.fears.length <= 2 && c.wantLog.length <= 8 && new Set(c.wants.map((w) => w.key)).size === c.wants.length));
+      loaded[0].wants.push({ key: 'reconcile', since: now, until: now + 999, whoId: 987654, whoName: 'Hayalet' });
+      loaded[0].wants.splice(0, 1); // kategori yeri açılsın (sosyal)
+      const diff2 = A.roundtrip();
+      const a2 = s.characters.find((c) => c.id === ids[0]);
+      check('(29.3) kayıp sakine işaret eden arzu yüklemede temizlenir', !a2.wants.some((w) => w.whoId === 987654) && a2.wants.some((w) => w.key === 'get_married'), diff2.slice(0, 2).join(' | '));
+      for (const id of ids) { const c = s.characters.find((x) => x.id === id); const v = JSON.parse(before.get(id)); fields.forEach((f, i) => (c[f] = v[i])); WT.recomputeDrive(c); MO.recomputeMood(c); }
+      s.wants = JSON.parse(stats0);
+    }
+    // --- 2zb. (29.4) Kalıcı kişilik evrimi: kayıt -> yükleme birebir; değişmezler (deepTraits ⊆ traits, en çok 3 özellik, tekrar yok) ---
+    {
+      const EVX = await import('/src/systems/Evolution.js');
+      const ED = await import('/src/data/evolution.js');
+      const pick = () => s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((x, y) => x.id - y.id).slice(0, 3);
+      const [a, b, c3] = pick();
+      const ids = [a.id, b.id, c3.id];
+      const fields = ['traits', 'growth', 'growthToday', 'growthCause', 'deepTraits', 'evolutions', 'evolutionCount', 'acquiredCount'];
+      const before = new Map([a, b, c3].map((c) => [c.id, JSON.stringify(fields.map((f) => c[f]))]));
+      const stats0 = JSON.stringify(s.evolution);
+      const day = s.time.day;
+      a.traits = ['hardworking', 'cheerful', 'natureLover']; a.deepTraits = ['hardworking', 'cheerful']; a.growth = [-12, 40, -33, 8]; a.growthToday = [0, 7, -5, 0];
+      a.growthCause = [null, 'want:make_friend', 'moodlet:nature_bliss', 'tier:fulfilled'];
+      a.evolutions = [{ day: day - 20, kind: 'acquired', axis: 2, from: null, to: 'natureLover', cause: 'moodlet:nature_bliss' }, { day: day - 5, kind: 'deepened', axis: 0, from: null, to: 'hardworking', cause: 'masterwork' }];
+      a.evolutionCount = 2; a.acquiredCount = 1;
+      b.traits = ['grumpy', 'sleepyhead']; b.deepTraits = []; b.growth = [0, 0, 0, -100]; b.growthToday = [0, 0, 0, -20]; b.growthCause = [null, null, null, 'moodlet:mourning'];
+      b.evolutions = [{ day: day - 2, kind: 'turned', axis: 3, from: 'cheerful', to: 'grumpy', cause: 'moodlet:mourning' }]; b.evolutionCount = 1; b.acquiredCount = 0;
+      c3.traits = ['hardworking', 'sleepyhead']; c3.deepTraits = []; c3.growth = [0, 0, 0, 0]; c3.growthToday = [0, 0, 0, 0]; c3.growthCause = [null, null, null, null]; c3.evolutions = []; c3.evolutionCount = 0; c3.acquiredCount = 0;
+      for (const c of [a, b, c3]) { c.profile = c.buildProfile(); }
+      s.evolution.turned.grumpy = (s.evolution.turned.grumpy ?? 0) + 1; s.evolution.acquired.natureLover = (s.evolution.acquired.natureLover ?? 0) + 1; s.evolution.deepened.hardworking = (s.evolution.deepened.hardworking ?? 0) + 1; s.evolution.total += 3;
+      const want = JSON.stringify(s.characters.map((c) => [c.id, fields.map((f) => c[f])]));
+      const wantStats = JSON.stringify(s.evolution);
+      const diff = A.roundtrip();
+      check('(29.4) eksenler, derin özellikler, evrim kaydı, sayaçlar ve 3 özellikli sakin kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const loaded = ids.map((id) => s.characters.find((c) => c.id === id));
+      check('(29.4) yüklenen evrim alanları ve sayaçlar birebir aynı (traits dahil)', JSON.stringify(s.characters.map((c) => [c.id, fields.map((f) => c[f])])) === want && JSON.stringify(s.evolution) === wantStats, `${JSON.stringify(s.characters.map((c) => [c.id, fields.map((f) => c[f])])).slice(0, 300)} || ${want.slice(0, 300)} || ${JSON.stringify(s.evolution)} || ${wantStats}`);
+      check('(29.4) derin yama yüklemede profile yeniden uygulanır (Yorulmaz yorgunluğu 0,5; Gönül Ferahı x Doğa Sever keyif düşüşü 0,6 x 0,9; derinsiz Çalışkan x Uykucu 0,6 x 1,3)', Math.abs(loaded[0].profile.work.fatigue - 0.5) < 1e-9 && Math.abs(loaded[0].profile.decay.fun - 0.6 * 0.9) < 1e-9 && Math.abs(loaded[2].profile.work.fatigue - 0.6 * 1.3) < 1e-9, JSON.stringify([loaded[0].profile.work.fatigue, loaded[0].profile.decay.fun, loaded[2].profile.work.fatigue]));
+      const invariants = () => s.characters.every((c) => c.deepTraits.every((t) => c.traits.includes(t)) && c.traits.length <= 3 && new Set(c.traits).size === c.traits.length && c.growth.length === 4 && c.growth.every((v) => Number.isInteger(v) && Math.abs(v) <= 100) && c.evolutions.length <= ED.EVOLUTION_RULES.logMax && c.evolutionCount >= c.evolutions.length);
+      check('(29.4) değişmezler: deepTraits ⊆ traits, özellik sayısı ≤ 3, aynı özellik iki kez yok, 4 eksen, tam sayı ve ±100 içinde, log ≤ 4', invariants());
+      // bozuk veri: kayıttan geçerken temizlenir
+      loaded[2].growth = [250, 'x', -300, 1.6]; loaded[2].growthToday = [99, 0, 0, 0]; loaded[2].growthCause = ['bilinmeyen', 3, 'masterwork', null]; loaded[2].deepTraits = ['grumpy', 'hardworking', 'hardworking', 'obur']; loaded[2].evolutions = [{ day: 1, kind: 'x' }, { day: 3, kind: 'acquired', axis: 9, to: 'cheerful' }, { day: 4, kind: 'deepened', axis: 0, to: 'hardworking' }];
+      const diff2 = A.roundtrip();
+      const c2 = s.characters.find((c) => c.id === ids[2]);
+      check('(29.4) bozuk eksen / neden / derin özellik / kayıt yüklemede temizlenir (aralık, bilinmeyen anahtar, traits dışı derin özellik, bozuk kayıt)', JSON.stringify(c2.growth) === '[100,0,-100,2]' && JSON.stringify(c2.growthToday) === '[20,0,0,0]' && JSON.stringify(c2.growthCause) === '[null,null,"masterwork",null]' && JSON.stringify(c2.deepTraits) === '["hardworking"]' && c2.evolutions.length === 1 && c2.evolutions[0].kind === 'deepened', `${JSON.stringify([c2.growth, c2.growthCause, c2.deepTraits, c2.evolutions])} ${diff2.slice(0, 2).join(' | ')}`);
+      // yükleme sonrası 05:00 sınırı: eşiği aşan eksen sabaha karşı kesintisiz uygulanır
+      c2.growth = [0, 0, 0, 0]; c2.growthToday = [0, 0, 0, 0]; c2.evolutions = []; c2.evolutionCount = 0; c2.deepTraits = [];
+      const diff3 = A.roundtrip();
+      check('(29.4) yüklemeden sonra da değişmezler korunur', invariants() && diff3.length === 0, diff3.slice(0, 2).join(' | '));
+      for (const id of ids) { const c = s.characters.find((x) => x.id === id); const v = JSON.parse(before.get(id)); fields.forEach((f, i) => (c[f] = v[i])); c.profile = c.buildProfile(); }
+      s.evolution = JSON.parse(stats0);
     }
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {

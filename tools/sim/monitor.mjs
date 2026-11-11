@@ -47,6 +47,33 @@ export async function installMonitor(page) {
     // (29.2b) teselli hangi travmaya yapıldı (Derin Yas / Sarsılmış / Kalbi Kırık): yalnızca sayar, oyunun durumuna ve üretecine dokunmaz
     window.__consoledBy = {};
     window.game?.events.on('moodlet:consoled', (p) => { const k = p?.trauma?.key ?? '?'; window.__consoledBy[k] = (window.__consoledBy[k] ?? 0) + 1; });
+    window.__wantData = await import('/src/data/wants.js').catch(() => null); // (29.3)
+    // (29.4) kişilik evrimi: eski sürümlerde (karşılaştırma koşuları) bu modül yoktur; değişimleri olaydan toplar (yalnızca dinler / okur)
+    window.__evoData = await import('/src/data/evolution.js').catch(() => null);
+    window.__evoLog = [];
+    window.__evoPushes = {}; // eksen:kaynak -> { n, sum }: hangi kaynak eksenleri ne kadar iter (yalnızca sayar; üreteç tüketmez)
+    const EvoSys = await import('/src/systems/EvolutionSystem.js').catch(() => null);
+    if (EvoSys && !EvoSys.EvolutionSystem.prototype.__counted) {
+      const realPush = EvoSys.EvolutionSystem.prototype.push;
+      EvoSys.EvolutionSystem.prototype.push = function (c, axis, amount, source, opts) {
+        const d = realPush.call(this, c, axis, amount, source, opts);
+        if (d) {
+          const e = (window.__evoPushes[`${axis}:${source}`] ??= { n: 0, sum: 0, abs: 0 }); e.n++; e.sum += d; e.abs += Math.abs(d);
+          const pc = (window.__evoPerChar ??= {});
+          const rec = (pc[c.id] ??= { first: window.game.state.time.day, net: [0, 0, 0, 0] });
+          rec.net[axis] += d;
+        }
+        return d;
+      };
+      EvoSys.EvolutionSystem.prototype.__counted = true;
+    }
+    window.__evoEver = new Set();
+    window.game?.events.on('trait:evolved', (p) => {
+      const c = p?.character;
+      const entry = window.game.state.journal?.[window.game.state.journal.length - 1] ?? window.game.state.journal?.at?.(-1);
+      window.__evoLog.push({ day: window.game.state.time.day, id: c?.id, name: c?.name, stage: c?.lifeStage, kind: p.kind, axis: p.axis, from: p.from, to: p.to, cause: p.cause, traits: [...(c?.traits ?? [])], journal: entry?.text ?? null });
+    });
+    // (29.3) "Ne kadar tatmin edildi": doyum örnekleri (yalnızca okur)
     window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
     window.__lateMod = await import('/src/systems/LateGame.js').catch(() => null); // (28.4)
     window.__tsMod = await import('/src/systems/TownStatus.js').catch(() => null);
@@ -159,6 +186,42 @@ export async function installMonitor(page) {
             if (!c.isChild && !c.role) { sum += c.mood.workMul; n++; lo = Math.min(lo, c.mood.workMul); hi = Math.max(hi, c.mood.workMul); }
           }
           if (n) { const w = (m.moodWork ??= { n: 0, sum: 0, min: Infinity, max: 0 }); w.n++; w.sum += sum / n; w.min = Math.min(w.min, lo); w.max = Math.max(w.max, hi); }
+        }
+        // ---- (29.3) Arzular / korkular: tavanlar, bilinmeyen anahtar, kopuk / kendine işaret eden hedef, süresi geçmiş kayıt, doyum aralığı ----
+        if (window.__wantData) {
+          const WD = window.__wantData;
+          for (const c of s.characters) {
+            if (!Array.isArray(c.wants)) continue;
+            if (c.wants.length > WD.WANT_CAPS.wants || c.fears.length > WD.WANT_CAPS.fears) broke(`${c.name}: ${c.wants.length} arzu / ${c.fears.length} korku (tavan 3 / 2)`);
+            if ((c.isChild || c.role) && (c.wants.length || c.fears.length)) broke(`${c.name}: çocukta / ziyaretçide arzu`);
+            const cats = new Set();
+            for (const [kind, list] of [['want', c.wants], ['fear', c.fears]]) {
+              for (const e of list) {
+                const d = (kind === 'want' ? WD.WANTS : WD.FEARS)[e.key];
+                if (!d) { broke(`${c.name}: bilinmeyen ${kind} ${e.key}`); continue; }
+                if (kind === 'want') { if (cats.has(d.cat)) broke(`${c.name}: aynı kategoride iki arzu (${d.cat})`); cats.add(d.cat); }
+                if (Number.isFinite(e.whoId) && (!byId.has(e.whoId) || e.whoId === c.id)) broke(`${c.name}: ${e.key} kopuk kişiye işaret ediyor (${e.whoId})`);
+                if (e.until !== null && e.until < now - 61) broke(`${c.name}: süresi geçmiş ${kind} ${e.key}`);
+              }
+            }
+            if (!(c.satisfaction >= 0 && c.satisfaction <= 100)) broke(`${c.name}: doyum ${c.satisfaction}`);
+          }
+        }
+
+        // ---- (29.4) Kişilik evrimi: eksen aralığı, özellik sayısı, tekrar, derin özellik, çocukta birikim yok ----
+        if (window.__evoData) {
+          const ED = window.__evoData;
+          for (const c of s.characters) {
+            if (!Array.isArray(c.growth)) continue;
+            if (!c.isChild && !c.role) window.__evoEver.add(c.id);
+            if (c.growth.length !== 4 || c.growth.some((v) => !Number.isInteger(v) || Math.abs(v) > ED.EVOLUTION_RULES.clamp)) broke(`${c.name}: eksenler ${JSON.stringify(c.growth)}`);
+            if (c.growthToday.some((v) => Math.abs(v) > ED.EVOLUTION_RULES.dailyCap)) broke(`${c.name}: günlük değişim ${JSON.stringify(c.growthToday)} (sınır ${ED.EVOLUTION_RULES.dailyCap})`);
+            if (c.traits.length > ED.EVOLUTION_RULES.maxTraits) broke(`${c.name}: ${c.traits.length} özellik`);
+            if (new Set(c.traits).size !== c.traits.length) broke(`${c.name}: aynı özellik iki kez (${c.traits.join(',')})`);
+            if (c.deepTraits.some((t) => !c.traits.includes(t))) broke(`${c.name}: derin özellik özelliklerde yok (${c.deepTraits.join(',')} / ${c.traits.join(',')})`);
+            if ((c.isChild || c.role) && (c.growth.some((v) => v !== 0) || c.evolutionCount)) broke(`${c.name}: çocukta / ziyaretçide evrim`);
+            if (c.evolutionCount > ED.EVOLUTION_RULES.lifetimeMax || c.acquiredCount > ED.EVOLUTION_RULES.acquiredMax) broke(`${c.name}: evrim sayacı ${c.evolutionCount} / edinim ${c.acquiredCount}`);
+          }
         }
 
         // ---- (29.1) Sosyal kimya: kayıp sakine işaret eden ilişki kaydı, sınır dışı kimya, bilinmeyen etiket, tek yönlü kimya ----
@@ -689,6 +752,67 @@ export async function installMonitor(page) {
                   work: m.moodWork ?? null,
                   max: m.moodMax ?? 0,
                 },
+                // (29.3) arzular / korkular: dolan / gerçekleşen / süresi dolan / geçen sayaçları, son gün doyum dağılımı ve kademeler
+                wants: s.wants ? (() => {
+                  const adults = s.characters.filter((c) => !c.role && !c.isChild);
+                  const sat = adults.map((c) => c.satisfaction);
+                  const tiers = {};
+                  const tierOf = (v) => (window.__wantData?.SATISFACTION.tiers.find((t) => v < t.below) ?? { key: '?' }).key;
+                  for (const v of sat) tiers[tierOf(v)] = (tiers[tierOf(v)] ?? 0) + 1;
+                  return {
+                    stats: JSON.parse(JSON.stringify(s.wants)),
+                    n: adults.length,
+                    avg: sat.length ? sat.reduce((x, y) => x + y, 0) / sat.length : null,
+                    min: sat.length ? Math.min(...sat) : null,
+                    max: sat.length ? Math.max(...sat) : null,
+                    tiers,
+                    fearStreak: adults.length ? adults.reduce((x, c) => x + (c.fearStreak ?? 0), 0) / adults.length : 0,
+                    wishes: adults.reduce((x, c) => x + (c.wishCount ?? 0), 0),
+                    active: adults.reduce((x, c) => x + c.wants.length, 0),
+                    activeFears: adults.reduce((x, c) => x + c.fears.length, 0),
+                  };
+                })() : null,
+                // (29.4) kişilik evrimi: sayaçlar, değişim yaşayan sakin oranı, özellik dağılımı, eksen değerleri, nedenler
+                evolution: window.__evoData && s.evolution ? (() => {
+                  const adults = s.characters.filter((c) => !c.role && !c.isChild);
+                  const traitDist = {};
+                  for (const c of adults) for (const t of c.traits) traitDist[t] = (traitDist[t] ?? 0) + 1;
+                  const vals = adults.flatMap((c) => c.growth);
+                  const evolvedIds = new Set(window.__evoLog.map((e) => e.id));
+                  const causes = {};
+                  for (const e of window.__evoLog) causes[e.cause ?? '-'] = (causes[e.cause ?? '-'] ?? 0) + 1;
+                  const dir = { plus: 0, minus: 0 };
+                  for (const e of window.__evoLog) dir[(window.__evoData.EVOLUTION_AXES[e.axis]?.plus === e.to) ? 'plus' : 'minus']++;
+                  return {
+                    stats: JSON.parse(JSON.stringify(s.evolution)),
+                    n: adults.length,
+                    ever: window.__evoEver.size,
+                    evolved: evolvedIds.size,
+                    log: JSON.parse(JSON.stringify(window.__evoLog)),
+                    causes,
+                    dir,
+                    traitDist,
+                    deepNow: adults.reduce((x, c) => x + c.deepTraits.length, 0),
+                    threeNow: adults.filter((c) => c.traits.length === 3).length,
+                    avg: vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : null,
+                    avgAbs: vals.length ? vals.reduce((x, y) => x + Math.abs(y), 0) / vals.length : null,
+                    min: vals.length ? Math.min(...vals) : null,
+                    max: vals.length ? Math.max(...vals) : null,
+                    pushes: JSON.parse(JSON.stringify(window.__evoPushes ?? {})),
+                    perDay: (() => {
+                      // karakter başına eksen başına günlük net katkı (ilk katkıdan bugüne): yüzdelikler (yalnızca okur)
+                      const today = s.time.day;
+                      const out = [[], [], [], []];
+                      for (const rec of Object.values(window.__evoPerChar ?? {})) {
+                        const days = Math.max(5, today - rec.first + 1);
+                        rec.net.forEach((v, i) => out[i].push(v / days));
+                      }
+                      const q = (arr, p) => { const a = [...arr].sort((x, y) => x - y); return a.length ? +a[Math.min(a.length - 1, Math.floor(p * a.length))].toFixed(2) : null; };
+                      return out.map((a) => ({ n: a.length, min: q(a, 0), p10: q(a, 0.1), p25: q(a, 0.25), p50: q(a, 0.5), p75: q(a, 0.75), p90: q(a, 0.9), max: q(a, 0.999) }));
+                    })(),
+                    hinted: adults.filter((c) => Math.max(...c.growth.map(Math.abs)) >= window.__evoData.EVOLUTION_RULES.hintAt).length,
+                  };
+                })() : null,
                 // (29.1) sosyal kimya ve duygusal etiketler
                 chemistry: (() => {
                   const dist = {}; const tags = {}; let records = 0; let ruler = 0;

@@ -8,7 +8,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { parseArgs } from './lib.mjs';
+import { parseArgs, capOutput } from './lib.mjs';
+
+capOutput('stress');
 
 const { options } = parseArgs();
 const seeds = String(options.seeds ?? '7,13,21,42,77,101').split(',').map(Number);
