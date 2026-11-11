@@ -1,13 +1,15 @@
 // (22. aşama) Krallık katmanının saf hesapları (durum değiştirmez): vergi oranı ve verim çarpanı, takvim, Krallık Vergisi
 // tutarı, itibar seviyesi, ferman ihtiyacı ve durumu, kötü şöhretin göçe etkisi. TownStatus da bunları kullanır; bu yüzden
 // burada TownStatus içe aktarılmaz.
+import { doctrineLevyMultiplier } from './Doctrine.js';
+import { CIVIC_PROJECTS } from '../data/town.js';
 import { TAX, TAX_RATES, LEVY, REPUTATION, DECREES, DECREE, EXODUS } from '../data/crown.js';
 import { RESOURCES } from '../data/resources.js';
 import { trustValue } from './Citizens.js';
 import { isGoldenAge } from './GoldenAge.js';
 
 export function emptyTax() {
-  return { rate: TAX.defaultRate, nextAt: null, collections: 0, totalGold: 0, totalGoods: 0, last: null, log: [] };
+  return { rate: TAX.defaultRate, nextAt: null, lockedUntil: 0, collections: 0, totalGold: 0, totalGoods: 0, last: null, log: [] };
 }
 
 export function emptyCrown() {
@@ -48,6 +50,11 @@ export function taxRateOf(state) {
 /** Ağır Vergi seçili kaldıkça kasabanın çalışma hızı çarpanı (öteki kademelerde 1). */
 export function taxWorkMultiplier(state) {
   return taxRateOf(state).workSpeed ?? 1;
+}
+
+/** (28.1) Vergi Fermanı kilidine kalan oyun dakikası (0 = kilit yok). */
+export function taxLockLeft(state) {
+  return Math.max(0, (state.tax?.lockedUntil ?? 0) - state.totalMinutes);
 }
 
 /** Bir sakinden bu oranla kesilecek altın (kesesi azsa 0). */
@@ -95,7 +102,8 @@ export function levyAmount(state) {
   const pop = state.characters.filter((c) => !c.role).length;
   const golden = isGoldenAge(state) ? LEVY.goldenAge : 1;
   const rep = reputationLevel(state.crown?.reputation ?? REPUTATION.start).levy;
-  return Math.round((LEVY.base + LEVY.perTier * tier + LEVY.perResident * pop) * golden * rep);
+  const trade = doctrineLevyMultiplier(state) * (state.civic?.tradeCharter ? CIVIC_PROJECTS.tradeCharter.levyMultiplier : 1); // (28.4) Ticaret Doktrini ve Beratı
+  return Math.round((LEVY.base + LEVY.perTier * tier + LEVY.perResident * pop) * golden * rep * trade);
 }
 
 /**

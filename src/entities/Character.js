@@ -13,7 +13,11 @@
 // 25.2: çıraklık (apprenticeship: { masterId, profession, buildingId, progress 0-100, since, crafted }; ApprenticeshipSystem)
 // ve konuşma baloncuğu (speech: { text, at, duration }; kaydedilmez, ikon balonundan ayrı bir katmandır).
 // 25.4: Aile Kütüğü (generation, parents: doğum ebeveynleri, familyId: ocak, children; LineageSystem).
+// 29.2: ruh halleri (moodlets: en çok 6; mood: toplam etki ve baskın ruh hali; MoodletSystem).
+// 29.1: sosyal kimya ve duygusal etiketler (relationships: { karşıKimlik: { chemistry -2..+3, craft, tags, until } }; ChemistrySystem).
 // 22. aşama: köyü terk etmeye karar verdiyse yola çıktığı an ve çıkış karosu (emigrating: { since, exit }; DesertionSystem).
+import { PROFESSIONS } from '../data/apprenticeship.js';
+import { sanitizeLifespan } from '../data/lifeStages.js';
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
 import { NEED_KEYS } from '../data/characters.js';
@@ -37,6 +41,8 @@ import {
 } from '../art/ui/index.js';
 import { sanitizeOrigin } from '../systems/Temperament.js';
 import { sanitizeMentees } from '../systems/Heirloom.js';
+import { sanitizeRelations } from '../systems/Chemistry.js';
+import { sanitizeMoodlets, neutralMood, recomputeMood } from '../systems/Moodlets.js';
 
 const HALF_WIDTH = CHARACTER_WIDTH / 2;
 const BUBBLE_POP_TIME = 0.15;
@@ -106,12 +112,19 @@ export class Character extends Entity {
     ageInDays = null,
     agedDays = 0,
     apprenticeship = null,
+    isGrandmaster = false,
+    isVenerable = false,
+    lifespan = null,
+    grandmasterProfession = null,
+    grandmasterBatches = 0,
     quirkOrigin = null,
     generation = null,
     parents = null,
     familyId = null,
     children = null,
     mentees = null,
+    relationships = null,
+    moodlets = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -173,6 +186,13 @@ export class Character extends Entity {
     this.speech = null; // usta / çırak konuşma baloncuğu (kaydedilmez)
     // 25.3: huyun kaynağı (Aile mirası / Usta etkisi / Mesleğin doğası / Özgün gelişim; kayda girer)
     this.quirkOrigin = sanitizeOrigin(quirkOrigin);
+    // (28.2) Başusta: çıraklığı %100 bitirenin kalıcı unvanı (grandmasterProfession = çıraklık yapısı türü); batches: hammaddesiz üretim sayacı
+    // (28.3) Saygın Büyük: ocağını ve yadigârını devredip yatağını boşaltan Kıdemli Bilge (nüfus kotasından muaf); lifespan: vefat yaşı (66-75)
+    this.isVenerable = Boolean(isVenerable) && this.lifeStage === 'elder';
+    this.lifespan = sanitizeLifespan(lifespan);
+    this.isGrandmaster = Boolean(isGrandmaster) && PROFESSIONS[grandmasterProfession] !== undefined;
+    this.grandmasterProfession = this.isGrandmaster ? grandmasterProfession : null;
+    this.grandmasterBatches = this.isGrandmaster ? Math.max(0, Math.floor(Number(grandmasterBatches) || 0)) : 0;
     // 25.4: Aile Kütüğü (kayda girer; eksikse LineageSystem yüklemede tamamlar): kuşak, doğum ebeveynleri, ocak, çocuklar
     this.generation = Number.isInteger(generation) && generation >= 1 ? generation : null;
     this.parents = Array.isArray(parents) ? parents.filter((id) => Number.isFinite(id) && id !== this.id) : [...this.parentIds];
@@ -180,11 +200,20 @@ export class Character extends Entity {
     this.children = Array.isArray(children) ? children.filter((id) => Number.isFinite(id)) : [];
     // 25.5: ustanın yetiştirdiği çıraklar [{ id, progress }] (yadigâr mirasçısı için; kayda girer)
     this.mentees = sanitizeMentees(mentees);
+    // (29.1) Sosyal kimya ve duygusal etiketler: { karşıKimlik: { chemistry, craft, tags, until } } (kayda girer; systems/Chemistry.js)
+    this.relationships = sanitizeRelations(relationships, this.id);
+    // (29.2) Ruh halleri: [{ key, tier, since, until, reason, whoId?, whoName? }] (kayda girer); mood: toplam çarpanlar ve baskın ruh hali
+    // (kaydedilmez; Moodlets.recomputeMood yerinde günceller, sıcak yollar yalnızca okur)
+    this.moodlets = sanitizeMoodlets(moodlets);
+    this.mood = neutralMood();
+    this.flowStreak = 0; // kendi tezgâhında art arda verimli mesai (kaydedilmez)
+    this.lastConsoleAt = null; // son teselli ettiği oyun dakikası (kaydedilmez)
     this.retired = false; // emekli bilge mi (kaydedilmez; LifeStageSystem çekirdek sakin kuralıyla hesaplar)
     this.waterBucket = false; // yangında kovası dolu mu (kaydedilmez)
     this.recall = null;
     this.flowerCrown = false;
     this.profile = this.buildProfile();
+    recomputeMood(this);
 
     // Anlık durum (kaydedilmez, yapay zekâ yeniden kurar)
     this.facing = 'down';
@@ -578,11 +607,18 @@ export class Character extends Entity {
       agedDays: this.agedDays,
       apprenticeship: this.apprenticeship,
       quirkOrigin: this.quirkOrigin,
+      isGrandmaster: this.isGrandmaster,
+      isVenerable: this.isVenerable,
+      lifespan: this.lifespan,
+      grandmasterProfession: this.grandmasterProfession,
+      grandmasterBatches: this.grandmasterBatches,
       generation: this.generation,
       parents: this.parents,
       familyId: this.familyId,
       children: this.children,
       mentees: this.mentees,
+      relationships: this.relationships,
+      moodlets: this.moodlets,
     };
   }
 

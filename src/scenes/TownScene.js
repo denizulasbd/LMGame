@@ -32,6 +32,8 @@ import { NatureSystem } from '../systems/NatureSystem.js';
 import { PopulationSystem } from '../systems/PopulationSystem.js';
 import { WeatherSystem } from '../systems/WeatherSystem.js';
 import { RelationshipSystem } from '../systems/RelationshipSystem.js';
+import { ChemistrySystem } from '../systems/ChemistrySystem.js';
+import { MoodletSystem } from '../systems/MoodletSystem.js';
 import { ConflictSystem } from '../systems/ConflictSystem.js';
 import { FamilySystem } from '../systems/FamilySystem.js';
 import { CraftingSystem } from '../systems/CraftingSystem.js';
@@ -81,6 +83,7 @@ import { AudioSystem } from '../systems/AudioSystem.js';
 import { FestivalEffects } from '../rendering/FestivalEffects.js';
 import { Random } from '../utils/random.js';
 import { getSelectionRing, getTargetMarker } from '../art/ui/index.js';
+import { LifecycleSystem } from '../systems/LifecycleSystem.js';
 import { LifeStageSystem } from '../systems/LifeStageSystem.js';
 import { ApprenticeshipSystem } from '../systems/ApprenticeshipSystem.js';
 import { drawSpeechBubbles, updateSpeechBubbles } from '../rendering/SpeechBubbles.js';
@@ -158,6 +161,10 @@ export class TownScene extends Scene {
     this.relationships = new RelationshipSystem(this.game, this.world, new Random(state.seed + 5));
     this.conflicts = new ConflictSystem(this.game, this.world, this.relationships, new Random(state.seed + 6));
     this.family = new FamilySystem(this.game, this.world, new Random(state.seed + 7));
+    // (29.1) Sosyal kimya ve duygusal etiketler (üreteci yok: kıvılcım kimlik çiftinden ve tohumdan türer, seed + 37 izole)
+    this.chemistry = new ChemistrySystem(this.game, this.world, { relationships: this.relationships });
+    // (29.2) Moodlet motoru, yas ve teselli (izole üreteç seed + 38: yalnızca sözler)
+    this.moodlets = new MoodletSystem(this.game, this.world, new Random(state.seed + 38), { relationships: this.relationships });
     this.social = new SocialSystem(this.game, this.world, new Random(state.seed + 19), { relationships: this.relationships });
     this.crafting = new CraftingSystem(this.game, this.world, this.economy);
     this.health = new HealthSystem(this.game, this.world, new Random(state.seed + 8));
@@ -204,6 +211,8 @@ export class TownScene extends Scene {
     this.temperament = new TemperamentSystem(this.game, this.world, new Random(state.seed + 29));
     // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
     this.lifeStages = new LifeStageSystem(this.game, this.world, new Random(state.seed + 27));
+    // (28.3) Saygın Büyük, doğal vefat ve kazalar (ömür kimlikten türer: seed + 30 izole üreteci; rastgelelik tüketmez). Yaşlanmadan SONRA kayıt olur.
+    this.lifecycle = new LifecycleSystem(this.game, this.world, { jobs: this.jobs });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       crisis: this.crisis,
@@ -249,6 +258,8 @@ export class TownScene extends Scene {
       this.animals,
       this.relationships,
       this.conflicts,
+      this.chemistry,
+      this.moodlets,
       this.family,
       this.social,
       this.townEvents,
@@ -287,6 +298,8 @@ export class TownScene extends Scene {
       this.heating,
       this.milestones,
       this.relationships,
+      this.chemistry,
+      this.moodlets,
       this.family,
       this.social,
       this.crafting,
@@ -320,6 +333,7 @@ export class TownScene extends Scene {
       this.temperament,
       this.lineageSystem,
       this.heirloomSystem,
+      this.lifecycle,
     ];
 
     this.camera = new Camera();

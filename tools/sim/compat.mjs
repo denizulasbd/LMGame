@@ -59,14 +59,23 @@
 //   save-v30.json: 26.2'nin oyunu (kayıt sürümü 30, bugünkü): otopilotla 73 gün (--crisis-state); 72. gün (Yaz Güneşi Şenliği panayırı) hazırlık evresinde kurulmuş Zengin Şölen Sofrası
 //                  (currentFeast: 5 fıçı şerbet, 9 ekmek, 22 yiyecek, 1 kumaş bağışı, 32 ikram), daha önce 10 sofra ve 171 ikram. Eski kayıtlarda
 //                  (sürüm 2-29) currentFeast yoktur: null ile açılır
-//   save-v31.json: 26.3'ün oyunu (kayıt sürümü 31, bugünkü): otopilotla 69 gün (--crisis-state); 68. gün 12:xx'de haritadaki Seyyar Ozan
+//   save-v37.json: 29.2'nin oyunu (kayıt sürümü 37, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin üzerindeki ruh halleri (moodlet'ler)
+//                  ve ruh hali sayaçları. Eski kayıtlarda (sürüm 2-36) moodlets yoktur: boş liste ve boş sayaçlarla açılır
+//   save-v36.json: 29.1'in oyunu (kayıt sürümü 36): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin kimya kayıtları, zanaat bağları ve
+//                  duygusal etiketleri (Minnettar, Hayran, Kırgın, Kıskanç, Ruh İkizi; Yönetime karşı hisler). Eski kayıtlarda (sürüm 2-35)
+//                  characters[].relationships yoktur: her mevcut ilişkiye deterministik kimya ve boş etiket yapısı bağlanır
+//   save-v35.json: 28.4'ün oyunu (kayıt sürümü 35): otopilotla 72 gün (--crisis-state; tohum 42: Bereketli Delta, Tarım Doktrini, seviye 4 G30, Altın Çağ G51).
+//   save-v34.json: 28.3'ün oyunu (kayıt sürümü 34, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42; 64. gün ilk Saygın Büyük Deniz, kotaya sayılan 30 / toplam 31).
+//   save-v33.json: 28.2'nin oyunu (kayıt sürümü 33, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42, 28.2 kurallarıyla yeni referans; 3 Başusta).
+//   save-v32.json: 28.1'in oyunu (kayıt sürümü 32): otopilotla 72 gün (--crisis-state; tohum 42, 28.1 kurallarıyla yeni referans).
+//   save-v31.json: 26.3'ün oyunu (kayıt sürümü 31): otopilotla 69 gün (--crisis-state); 68. gün 12:xx'de haritadaki Seyyar Ozan
 //                  (68. gün geldi, ayrılış 69. gün 09:00), konuk defterinde 6 ziyaret; çıraklar ve Çırak Kapıları da hâlâ açık. Eski kayıtlarda
 //                  (sürüm 2-30) activeGuest ve konuk defteri yoktur: null / boş defterle açılır
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -205,9 +214,25 @@ for (const { name, raw } of fixtures) {
     loaded.feast = { cf: JSON.parse(JSON.stringify(s.currentFeast)), fair: JSON.parse(JSON.stringify(s.currentFestival)), day: s.time.day, hour: s.time.hour };
     // (26.1) mevsimlik panayır (yüklendiği an)
     loaded.fair = { cf: JSON.parse(JSON.stringify(s.currentFestival)), first: JSON.parse(JSON.stringify(s.chronicle.firstFair)), fairs: s.stats.fairs ?? 0, time: { day: s.time.day, hour: s.time.hour } };
+    // (28.4) Vadi Karakteri ve Kasaba Doktrini (yüklendiği an)
+    loaded.valley = { key: s.valley, expected: (await import('/src/systems/Valley.js')).valleyFor(s.seed), doctrine: JSON.stringify(s.doctrine), tradeCharter: s.civic.tradeCharter };
+    // (29.2) Ruh halleri (yüklendiği an)
+    const moodSnap = () => ({ json: JSON.stringify(s.characters.map((c) => [c.id, c.moodlets])), stats: JSON.stringify(s.moodlets), count: s.characters.reduce((n, c) => n + c.moodlets.length, 0), over: s.characters.filter((c) => c.moodlets.length > 6).length, moods: s.characters.every((c) => c.mood && c.mood.workMul >= 0.6 && c.mood.workMul <= 1.25 && typeof c.mood.feel === 'string') });
+    loaded.moodlets = moodSnap();
+    // (29.1) Sosyal kimya ve duygusal etiketler (yüklendiği an)
+    const chemSnap = () => (() => {
+      const byId = new Map(s.characters.map((c) => [c.id, c]));
+      const pairs = Object.keys(s.relationships).map((k) => k.split('-').map(Number)).filter(([a, b]) => byId.has(a) && byId.has(b));
+      let bound = 0; let symmetric = 0; let dangling = 0; let range = true; let tags = 0; let records = 0;
+      for (const [a, b] of pairs) { const ra = byId.get(a).relationships[b]; const rb = byId.get(b).relationships[a]; if (ra && rb) bound++; if (ra && rb && ra.chemistry === rb.chemistry) symmetric++; }
+      for (const c of s.characters) for (const [k, r] of Object.entries(c.relationships ?? {})) { records++; if (k !== '0' && !byId.has(Number(k))) dangling++; if (!Number.isInteger(r.chemistry) || r.chemistry < -2 || r.chemistry > 3) range = false; tags += r.tags.length; }
+      return { pairs: pairs.length, bound, symmetric, dangling, range, tags, records, json: JSON.stringify(s.characters.map((c) => [c.id, c.relationships])) };
+    })();
+    loaded.chemistry = chemSnap();
+    loaded.chemistryFor = await (async () => { const CH = await import('/src/systems/Chemistry.js'); const byId = new Map(s.characters.map((c) => [c.id, c])); return Object.keys(s.relationships).map((k) => k.split('-').map(Number)).filter(([a, b]) => byId.has(a) && byId.has(b)).every(([a, b]) => { const x = byId.get(a).relationships[b]?.chemistry; return x >= -2 && x <= 3 && Math.abs(x - CH.chemistryFor(s.seed, byId.get(a), byId.get(b))) <= 1; }); })();
     // (25.4) Aile Kütüğü (yüklendiği an)
     loaded.lineage = {
-      people: s.characters.filter((c) => !c.role).map((c) => ({ id: c.id, g: c.generation, f: c.familyId, p: c.parents, pi: c.parentIds, k: c.children, fam: Boolean(s.lineage.families[c.familyId]) })),
+      people: s.characters.filter((c) => !c.role).map((c) => ({ id: c.id, g: c.generation, f: c.familyId, p: [...(c.parents ?? [])], pi: [...c.parentIds], k: [...(c.children ?? [])], fam: Boolean(s.lineage.families[c.familyId]) })),
       families: Object.keys(s.lineage.families).length,
       first: s.chronicle.firstGen2Couple,
       weddings: s.lineage.gen2Weddings,
@@ -273,6 +298,8 @@ for (const { name, raw } of fixtures) {
       crownAfter: { pop: s.characters.length, left: s.exodus.left, active: Boolean(s.exodus.active), rate: s.tax.rate },
       apprAfter: { ok: s.characters.every((c) => !c.apprenticeship || (c.lifeStage === 'youth' && s.buildings.some((b) => b.id === c.apprenticeship.buildingId) && c.apprenticeship.progress >= 0 && c.apprenticeship.progress <= 100)), n: s.characters.filter((c) => c.apprenticeship).length },
       lifeAfter: s.characters.map((c) => ({ id: c.id, days: c.ageInDays, stage: c.lifeStage, child: c.isChild })),
+      moodletsAfter: (() => { const m = moodSnap(); delete m.json; return m; })(),
+      chemistryAfter: (() => { const c = chemSnap(); delete c.json; return c; })(),
       tradeAfter: { visits: s.tradePost.visits, scheduled: s.tradePost.nextShipAt !== null || Boolean(s.tradePost.ship) },
       agriAfter: { crops: s.buildings.filter((b) => b.type === 'garden').map((b) => b.crop), capacity: s.granaryCapacity },
       crisisAfter: { fires: s.crisis.fires, raids: s.crisis.raids, raidPending: s.crisis.raid !== null, nextWarn: s.crisis.nextRaidWarnAt, burning: s.buildings.filter((b) => b.isBurning).length, injured: s.characters.filter((c) => c.isInjured).length, day: s.time.day },
@@ -475,23 +502,55 @@ for (const { name, raw } of fixtures) {
       results.push({ name: `${tag}: bir gün sonra takvim sürüyor`, ok: r.tradeAfter.scheduled && r.tradeAfter.visits >= t.visits });
     }
   }
+  // (29.2) Ruh halleri
+  {
+    const M = r.loaded.moodlets;
+    const after = r.moodletsAfter;
+    if (data.version < 37) {
+      results.push({ name: `${tag}: her sakine boş ruh hali listesi (moodlets: []), boş sayaçlar; ruh hali nötr`, ok: M.count === 0 && M.stats === JSON.stringify({ given: {}, consoled: 0, grieved: 0, mourners: 0 }) && M.moods });
+    } else {
+      results.push({ name: `${tag}: ruh halleri (moodlet'ler) ve sayaçları korundu`, ok: M.json === JSON.stringify(data.characters.map((c) => [c.id, c.moodlets])) && M.stats === JSON.stringify(data.moodlets) && M.moods && M.over === 0, detail: `${M.count} moodlet` });
+    }
+    results.push({ name: `${tag}: bir gün sonra ruh halleri yaşıyor (tavanlar ve çarpan sınırları içinde)`, ok: after.over === 0 && after.moods && after.count > 0, detail: `${after.count} moodlet` });
+  }
+  // (29.1) Sosyal kimya ve duygusal etiketler
+  {
+    const C = r.loaded.chemistry;
+    const after = r.chemistryAfter;
+    if (data.version < 36) {
+      results.push({ name: `${tag}: mevcut her ilişkiye deterministik kimya bağlandı (iki yönlü, -2..+3), etiket yok`, ok: C.pairs === C.bound && C.bound === C.symmetric && C.range && C.tags === 0 && C.dangling === 0 && r.loaded.chemistryFor, detail: `${C.bound}/${C.pairs} çift` });
+    } else {
+      const want = JSON.stringify(data.characters.map((c) => [c.id, c.relationships]));
+      results.push({ name: `${tag}: kimya, zanaat bağı ve duygusal etiketler korundu`, ok: C.json === want && C.range && C.dangling === 0 && C.records > 0, detail: `${C.records} kayıt · ${C.tags} etiket` });
+    }
+    results.push({ name: `${tag}: bir gün sonra kimya kayıtları tutarlı (kopuk kayıt yok, iki yönlü, sınır içinde)`, ok: after.dangling === 0 && after.range && after.bound === after.symmetric, detail: `${after.records} kayıt · ${after.tags} etiket` });
+  }
+  // (28.4) Vadi Karakteri ve Kasaba Doktrini
+  {
+    const V = r.loaded.valley;
+    if (data.version < 35) {
+      results.push({ name: `${tag}: vadi karakteri tohumdan atandı, doktrin seçilmedi, Ticaret Beratı yok`, ok: V.key === V.expected && V.doctrine === JSON.stringify({ chosen: null, day: null }) && V.tradeCharter === false, detail: V.key });
+    } else {
+      results.push({ name: `${tag}: vadi karakteri ve kasaba doktrini korundu`, ok: V.key === data.valley && V.key === V.expected && V.doctrine === JSON.stringify(data.doctrine), detail: `${V.key} · doktrin ${data.doctrine.chosen ?? '-'}` });
+    }
+  }
   // (25.1) yaşam evreleri
   {
     const L = r.loaded.life;
     const valid = (x) => (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage)) && Number.isInteger(x.days) && x.days >= 0 && x.age === Math.floor(x.days / 16);
     if (data.version < 24) {
       const ageOf = new Map(data.characters.map((c) => [c.id, c.age]));
-      const expected = (x) => (x.child ? 'child' : x.age >= 70 ? 'elder' : 'adult');
+      const expected = (x) => (x.child ? 'child' : x.age >= 65 ? 'elder' : 'adult');
       results.push({
         name: `${tag}: evresi olmayan yetişkinler 'adult', çocuklar 'child' başladı; yaşlar değişmedi, gün sayacı yaştan kuruldu`,
-        ok: L.every(valid) && L.every((x) => x.stage === expected(x)) && L.every((x) => !Number.isFinite(ageOf.get(x.id)) || x.child || x.age === Math.floor(ageOf.get(x.id))) && r.loaded.lifeState === JSON.stringify({ adviceMinutes: 0, elders: 0, adults: 0, lastElderLine: null }),
+        ok: L.every(valid) && L.every((x) => x.stage === expected(x)) && L.every((x) => !Number.isFinite(ageOf.get(x.id)) || x.child || x.age === Math.floor(ageOf.get(x.id))) && r.loaded.lifeState === JSON.stringify({ adviceMinutes: 0, elders: 0, adults: 0, lastElderLine: null, venerables: 0, deaths: 0, accidents: 0, lastDeath: null }),
         detail: Object.entries(L.reduce((m, x) => ({ ...m, [x.stage]: (m[x.stage] ?? 0) + 1 }), {})).map(([k, v]) => `${k} ${v}`).join(', '),
       });
     } else {
       const saved = new Map(data.characters.map((c) => [c.id, c]));
       results.push({
         name: `${tag}: yaşam evreleri, gün cinsinden yaşlar ve evre sayaçları korundu`,
-        ok: L.every(valid) && L.every((x) => saved.get(x.id)?.lifeStage === x.stage && saved.get(x.id)?.ageInDays === x.days) && r.loaded.lifeState === JSON.stringify(data.lifeStages),
+        ok: L.every(valid) && L.every((x) => saved.get(x.id)?.lifeStage === x.stage && saved.get(x.id)?.ageInDays === x.days) && r.loaded.lifeState === JSON.stringify({ ...data.lifeStages, venerables: data.lifeStages.venerables ?? 0, deaths: data.lifeStages.deaths ?? 0, accidents: data.lifeStages.accidents ?? 0, lastDeath: data.lifeStages.lastDeath ?? null }), // (28.3) v34'ten eski kayıtlarda vefat alanları 0 / null
         detail: `${L.filter((x) => x.stage === 'elder').length} bilge, ${L.filter((x) => x.stage === 'youth').length} genç · ${r.loaded.lifeState}`,
       });
       const elders = L.filter((x) => x.stage === 'elder');
@@ -606,7 +665,7 @@ for (const { name, raw } of fixtures) {
       const savedO = new Map(data.characters.filter((c) => c.quirkOrigin).map((c) => [c.id, JSON.stringify(c.quirkOrigin, ['kind', 'fromId', 'fromName', 'day'])]));
       results.push({
         name: `${tag}: yeni nesil huylar, huy kaynakları ve mizaç sayaçları korundu`,
-        ok: T.valid && kept && T.generation > 0 && T.origins.length === savedO.size && T.origins.every(([id, o]) => savedO.get(id) === o) && JSON.parse(T.state).developed === data.temperament.developed && JSON.parse(T.state).family === data.temperament.family,
+        ok: T.valid && kept && T.generation === data.characters.filter((c) => ['craftsman', 'entrepreneur', 'philosopher', 'festive'].includes(c.quirk)).length && (data.version >= 37 || T.generation > 0) && T.origins.length === savedO.size && T.origins.every(([id, o]) => savedO.get(id) === o) && JSON.parse(T.state).developed === data.temperament.developed && JSON.parse(T.state).family === data.temperament.family,
         detail: `${T.generation} yeni nesil huylu · ${T.origins.length} kaynaklı · ${T.state}`,
       });
     }
@@ -615,12 +674,12 @@ for (const { name, raw } of fixtures) {
   {
     const P = r.loaded.appr;
     if (data.version < 25) {
-      results.push({ name: `${tag}: çırak yok, Çırak Kapıları kapalı, sayaçlar boş`, ok: P.list.length === 0 && P.state === JSON.stringify({ open: [], enrolled: 0, graduated: 0, masters: 0, crafted: 0, sold: 0, coins: 0, minutes: 0 }) && r.apprAfter.n === 0 });
+      results.push({ name: `${tag}: çırak yok, Çırak Kapıları kapalı, sayaçlar boş`, ok: P.list.length === 0 && P.state === JSON.stringify({ open: [], enrolled: 0, graduated: 0, masters: 0, crafted: 0, sold: 0, coins: 0, minutes: 0, grandmasters: 0, grandmasterSaved: 0 }) && r.apprAfter.n === 0 });
     } else {
       const saved = new Map(data.characters.filter((c) => c.apprenticeship).map((c) => [c.id, JSON.stringify(c.apprenticeship)]));
       results.push({
         name: `${tag}: çıraklar, ustaları, ilerlemeleri, açık kapılar ve sayaçlar korundu`,
-        ok: P.list.length === saved.size && P.list.length > 0 && P.list.every((x) => x.youth && saved.get(x.id) === x.a) && P.state === JSON.stringify(data.apprenticeship),
+        ok: P.list.length === saved.size && P.list.length > 0 && P.list.every((x) => x.youth && saved.get(x.id) === x.a) && P.state === JSON.stringify({ ...data.apprenticeship, grandmasters: data.apprenticeship.grandmasters ?? 0, grandmasterSaved: data.apprenticeship.grandmasterSaved ?? 0 }), // (28.2) v33'ten eski kayıtlarda Başusta sayaçları 0 gelir
         detail: `${P.list.length} çırak · ${data.apprenticeship.open.length} açık kapı · ${data.apprenticeship.crafted} çırak işi`,
       });
     }
@@ -669,7 +728,7 @@ for (const { name, raw } of fixtures) {
   if (data.version < 11) {
     results.push({
       name: `${tag}: yadigâr, sabit işçi boş; arşiv kuruldu; düğün sayacı tahmin edildi`,
-      ok: Object.keys(r.luxury.relics).length === 0 && !r.luxury.silk && r.pinned === 0 && r.history >= 1 && r.weddings === Math.floor(r.married / 2),
+      ok: Object.keys(r.luxury.relics).length === 0 && !r.luxury.silk && r.pinned === 0 && r.history >= 1 && r.weddings >= Math.floor(r.married / 2), // (29.2b) kayıttaki bir bilge doğal vefat ederse evli sayısı düşer, düğün sayacı düşmez
       detail: `arşiv ${r.history} gün, düğün ${r.weddings}`,
     });
   } else {

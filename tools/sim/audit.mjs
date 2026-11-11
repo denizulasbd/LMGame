@@ -223,7 +223,7 @@ const PAGE_HELPERS = () => {
     {
       const RS = await import('/src/systems/RelationshipSystem.js');
       while (s.time.hour < 9 || s.time.hour >= 16) hours(1);
-      const singles = s.characters.filter((c) => !c.isChild && !c.away && c.partnerId === null);
+      const singles = s.characters.filter((c) => !c.isChild && !c.away && c.partnerId === null && c.lifeStage !== 'elder'); // (29.2b) bilgeler (65+) düğün senaryosuna girmez
       let pair = null;
       for (let i = 0; i < singles.length && !pair; i++) for (let j = i + 1; j < singles.length && !pair; j++) if (RS.canRomance(singles[i], singles[j])) pair = [singles[i], singles[j]];
       const fountain = scene().world.getCompleted('fountain')[0];
@@ -341,8 +341,84 @@ const PAGE_HELPERS = () => {
       check('yüklenen Krallık Vergisi vakti gelince bir kez ödenir', paid.n === 1 && !s.crown.notice, `${paid.n}`);
       paid.off();
       game.events.emit('ui:deliverDecree');
+      // (28.1) Vergi Fermanı: Ağır Vergi seçileli 26 saat geçti; kayıttan dönen kilit hâlâ sürer, kademe değişmez
+      const lockLeft = s.tax.lockedUntil - s.totalMinutes;
+      game.events.emit('ui:setTaxRate', { rate: 'exempt' });
+      check('(28.1) kilitliyken (yüklemeden sonra da) vergi kademesi değişmez', lockLeft > 0 && s.tax.rate === 'heavy', `kilit ${Math.round(lockLeft)} dk kaldı, kademe ${s.tax.rate}`);
+      s.tax.lockedUntil = 0;
       game.events.emit('ui:setTaxRate', { rate: 'standard' });
+      check('(28.1) kilit dolunca vergi kademesi yeniden değişir ve 3 gün kilitlenir', s.tax.rate === 'standard' && s.tax.lockedUntil - s.totalMinutes === 3 * 1440);
       check('yüklenen ferman teslim edilir', !s.crown.decree && s.crown.delivered >= 1);
+    }
+
+    // --- 2k2. (28.2) Başusta kayıt -> yükleme: bayrak, meslek, sayaç ve hammaddesiz üretim sayacı aynen döner; Başusta yalnızca çıraklık mezunudur ---
+    {
+      const gm = s.characters.find((c) => !c.isChild && !c.role && c.visible);
+      gm.isGrandmaster = true;
+      gm.grandmasterProfession = 'mill';
+      gm.grandmasterBatches = 7;
+      s.apprenticeship.grandmasters = (s.apprenticeship.grandmasters ?? 0) + 1;
+      const diff = A.roundtrip();
+      check('(28.2) Başusta kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const g2 = s.characters.find((c) => c.id === gm.id);
+      check('(28.2) yüklenen Başusta bayrağı, mesleği ve üretim sayacı aynen döner', g2?.isGrandmaster === true && g2.grandmasterProfession === 'mill' && g2.grandmasterBatches === 7);
+      const others = s.characters.filter((c) => c.id !== gm.id && c.isGrandmaster);
+      check('(28.2) çıraklıktan mezun olmayan hiç kimse Başusta değil (tek Başusta test bayrağı)', others.length === 0, `${others.length}`);
+      g2.isGrandmaster = false;
+      g2.grandmasterProfession = null;
+      g2.grandmasterBatches = 0;
+    }
+
+    // --- 2k3. (28.3) Saygın Büyük ve vefat: kayıt -> yükleme durum kayması yok; ölenin eş / iş / çırak / ev / ilişki referansı kalmaz ---
+    {
+      const lc = scene().lifecycle;
+      const pool = s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
+      const v = pool.find((c) => c.partnerId === null);
+      const d = pool.find((c) => c !== v && c.partnerId !== null);
+      const mate = s.characters.find((c) => c.id === d.partnerId);
+      const ward = pool.find((c) => c !== v && c !== d && c !== mate && !c.apprenticeship);
+      const workshop = s.buildings.find((b) => b.type === 'workshop' && b.functional);
+      for (const c of [v, d]) { c.lifeStage = 'elder'; c.age = 72; c.ageInDays = 72 * 16; c.children = []; c.inventory = (c.inventory ?? []).filter((x) => !x.heirloom); }
+      const homeV = v.homeId;
+      const venerableNow = lc.makeVenerable(v);
+      if (workshop) { ward.lifeStage = 'youth'; ward.apprenticeship = { masterId: d.id, profession: 'workshop', buildingId: workshop.id, progress: 10, since: 0, crafted: 0 }; }
+      const hadWork = d.workplaceId;
+      const diedNow = lc.die(d, { cause: 'age' });
+      const dangling = s.characters.filter((c) => c.partnerId === d.id || c.parentIds.includes(d.id) || c.apprenticeship?.masterId === d.id).length + s.buildings.filter((b) => b.workerIds.has(d.id) || b.occupants.has(d.id)).length;
+      check('(28.3) vefat eden sakin arkada eş, çırak (usta), iş ya da yapı referansı bırakmaz', venerableNow && diedNow && dangling === 0 && !s.characters.includes(d) && mate.married === false && (!workshop || ward.apprenticeship?.masterId === null), `${dangling}`);
+      const diff = A.roundtrip();
+      check('(28.3) Saygın Büyük ve vefat sonrası kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const v2 = s.characters.find((c) => c.id === v.id);
+      check('(28.3) yüklenen Saygın Büyük yataksız kalır (yükleme ona yatak bulmaz), ömrü korunur, ölen geri gelmez', v2?.isVenerable === true && v2.homeId === null && v2.lifespan === v.lifespan && !s.characters.some((c) => c.id === d.id));
+      const ids2 = new Set(s.characters.map((c) => c.id));
+      const refs = s.characters.filter((c) => (c.partnerId !== null && !ids2.has(c.partnerId)) || c.parentIds.some((x) => !ids2.has(x))).length;
+      check('(28.3) yüklemeden sonra kopuk eş / ebeveyn referansı yok', refs === 0, `${refs}`);
+      sim.step(30);
+      check('(28.3) Saygın Büyük adım atınca da yatak aramaz ve evsiz kalsa da takılmaz', s.characters.some((c) => c.id === v.id) && s.characters.find((c) => c.id === v.id).homeId === null);
+      // v2 Saygın Büyük olarak kalır (yataksızlık kayıt -> yüklemede de kararlıdır); ana kasaba akışını bozmaması için emekli sayılır
+      const w2 = s.characters.find((c) => c.id === ward.id);
+      if (w2) { w2.apprenticeship = null; w2.lifeStage = 'adult'; } // geçici çırak: sonraki çıraklık bölümlerine karışmasın
+    }
+
+    // --- 2k4. (28.4) Vadi Karakteri, Kasaba Doktrini ve geç oyun beklentisi: kayıt -> yükleme durum kayması yok; kilitli yol yüklemeden sonra da kilitli ---
+    {
+      const valley0 = s.valley;
+      s.doctrine = { chosen: 'commerce', day: s.time.day };
+      s.civic.tradeCharter = true;
+      s.town.tier = 4;
+      const welfare0 = Math.round(scene().townHappiness?.() ?? 0);
+      const diff = A.roundtrip();
+      check('(28.4) vadi, doktrin ve Gelişmiş Şehir (geç oyun) kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      check('(28.4) yüklenen vadi ve doktrin aynen döner (vadi tohumdan, doktrin seçili, Ticaret Beratı)', s.valley === valley0 && s.valley === (await import('/src/systems/Valley.js')).valleyFor(s.seed) && s.doctrine.chosen === 'commerce' && s.civic.tradeCharter === true);
+      const RSX = await import('/src/systems/ResearchSystem.js');
+      const CVX = await import('/src/systems/CivicSystem.js');
+      const lockedAfter = ['gears', 'herbalism', 'cropRotation'].every((id) => !RSX.researchStatus(s, id, true).ok && RSX.researchStatus(s, id, true).locked) && !CVX.civicStatus(s, 'craftGuild', true).ok;
+      check('(28.4) doktrin kilidi yüklemeden sonra da sürer (öteki doktrinlerin araştırma ve fermanları kapalı)', lockedAfter);
+      const LGX = await import('/src/systems/LateGame.js');
+      check('(28.4) yüklemeden sonra geç oyun beklentisi hâlâ açık (seviye 4): azalma x1,3', LGX.lateGameActive(s) && LGX.lateDecayMultiplier(s) === 1.3);
+      s.doctrine = { chosen: null, day: null };
+      s.civic.tradeCharter = false;
+      s.town.tier = Math.min(s.town.tier, 3);
     }
 
     // --- 2l. (23. aşama) Yangın sürerken, haydut izi beklerken, hasarlı yapı ve yaralı sakin varken ---
@@ -415,8 +491,8 @@ const PAGE_HELPERS = () => {
       const Y = 16;
       const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
       const sage = adults[0];
-      sage.ageInDays = 70 * Y - 1;
-      sage.age = 69;
+      sage.ageInDays = 65 * Y - 1; // (29.2b) Kıdemli Bilge yaşı 65
+      sage.age = 64;
       const youth = adults[1];
       youth.ageInDays = 21 * Y - 1;
       youth.age = 20;
@@ -431,7 +507,7 @@ const PAGE_HELPERS = () => {
       check('Kıdemli Bilge emekliyken kayıt -> yükleme durum kayması yok (evre, gün cinsinden yaş, sayaçlar)', diff.length === 0 && sage2.lifeStage === 'elder' && sage2.retired && youth2.lifeStage === 'adult' && promoted.n === 2, diff.join(' | ') + ` · ${promoted.n} geçiş`);
       const again = counter('lifeStage:changed');
       hours(30);
-      check('yüklemeden sonra bilge yeniden kutlanmaz, emekli kalır, yaşlar gün dönümünde bir kez ilerler', again.n === 0 && sage2.retired && sage2.ageInDays === 70 * Y + 1 && s.characters.includes(sage2), `${again.n} geçiş · ${sage2.ageInDays}`);
+      check('yüklemeden sonra bilge yeniden kutlanmaz, emekli kalır, yaşlar gün dönümünde bir kez ilerler', again.n === 0 && sage2.retired && sage2.ageInDays === 65 * Y + 1 && s.characters.includes(sage2), `${again.n} geçiş · ${sage2.ageInDays}`);
       check('emekli bilge işe gitmez (yükleme sonrası 30 saat)', !sage2.task?.jobId && !sage2.task?.workBuildingId);
       promoted.off();
       again.off();
@@ -710,11 +786,14 @@ const PAGE_HELPERS = () => {
       rich();
       const hut = sim.scene().world.getCompleted('healerHut').find((b) => !b.damaged) ?? sim.place('healerHut');
       const spec = hut.definition.apothecary;
-      const fill = () => { const h = sim.scene().world.getBuilding(hut.id); if (h) { h.remedies = spec.maxRemedies; h.herbs = spec.maxHerbs; } }; // yüklemeden sonra yapı yeni nesnedir
+      let lessonIds = [];
+      // (29.2) usta ve çırak ölçüm boyunca tok ve dinç tutulur: açlık / ruh hali dersi bölüp ölçümü kaydırmasın
+      const fill = () => { const h = sim.scene().world.getBuilding(hut.id); if (h) { h.remedies = spec.maxRemedies; h.herbs = spec.maxHerbs; } for (const id of lessonIds) { const c = s.characters.find((x) => x.id === id); if (c) { c.needs.hunger = Math.max(c.needs.hunger, 85); c.needs.energy = Math.max(c.needs.energy, 85); c.needs.social = Math.max(c.needs.social, 85); c.needs.fun = Math.max(c.needs.fun, 70); } } }; // yüklemeden sonra yapı yeni nesnedir
       fill();
       const pool = s.characters.filter((c) => !c.role && !c.isChild && !c.away && !c.emigrating && c.lifeStage !== 'elder' && !c.apprenticeship).sort((a, b) => a.id - b.id);
       const master = pool[0];
       const youth = pool[pool.length - 1];
+      lessonIds = [master.id, youth.id];
       const keep = { m: { workplaceId: master.workplaceId, herb: master.skills.herbalism }, y: { lifeStage: youth.lifeStage, ageInDays: youth.ageInDays, age: youth.age, workplaceId: youth.workplaceId } };
       master.workplaceId = hut.id;
       master.skills.herbalism = Math.max(master.skills.herbalism ?? 0, 1600);
@@ -741,11 +820,11 @@ const PAGE_HELPERS = () => {
       const p1 = s.characters.find((c) => c.id === youth.id).apprenticeship?.progress ?? 0;
       const diff = A.roundtrip();
       const y2 = s.characters.find((c) => c.id === youth.id);
-      run(16);
+      run(17); // (28.2) Gençler artık daha hızlı toparlandığından şekerleme zamanlaması kayabilir: pencere mesainin sonuna kadar
       const p2 = y2.apprenticeship?.progress ?? 0;
       const hut2 = sim.scene().world.getBuilding(hut.id);
-      const maxGain = (4 * 60 + 30) * 100 / 3600; // 12:00 -> 16:00 arası tam hızdan bile fazla olamaz
-      check('27.2: rafları dolu (idle) Şifacı Kulübesi\'nde çırak gerçek mesaide Tezgâh Pratiği ile ilerler; kayıt -> yüklemede durum kayması yok, yüklemeden sonra da ilerler', enrolled && hut2.idle && practiced > 0 && p1 > p0 && p2 > p1 && p2 - p1 <= maxGain && diff.length === 0, `${p0.toFixed(2)} -> ${p1.toFixed(2)} -> ${p2.toFixed(2)} pratik ${practiced} ${diff.join(' | ')}`);
+      const maxGain = (5 * 60 + 30) * 100 / 1800; // 12:00 -> 17:00 arası tam hızdan bile fazla olamaz
+      check('27.2: rafları dolu (idle) Şifacı Kulübesi\'nde çırak gerçek mesaide Tezgâh Pratiği ile ilerler; kayıt -> yüklemede durum kayması yok, yüklemeden sonra da ilerler', enrolled && hut2.idle && practiced > 0 && p1 > p0 && p2 > p1 && p2 - p1 <= maxGain && diff.length === 0, `${p0.toFixed(2)} -> ${p1.toFixed(2)} -> ${p2.toFixed(2)} pratik ${practiced} ${diff.join(' | ')} | ${y2.task?.activity}/${y2.task?.phase} en${Math.round(y2.needs.energy)} h${s.time.hour} ${y2.lifeStage} idle${hut2.idle} dmg${hut2.damaged}`);
       y2.apprenticeship = null;
       Object.assign(y2, keep.y);
       y2.profile = y2.buildProfile();
@@ -755,6 +834,67 @@ const PAGE_HELPERS = () => {
       s.goldenAge.since = keepGA;
     }
 
+    // --- 2y. (29.1) Sosyal kimya ve duygusal etiketler: kayıt -> yükleme durum kayması yok; kopuk kayıt yüklemede temizlenir ---
+    {
+      const CH = await import('/src/systems/Chemistry.js');
+      const pick = () => s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((x, y) => x.id - y.id).slice(0, 3);
+      const [a, b, c3] = pick();
+      const ids = [a.id, b.id, c3.id];
+      const before = new Map([a, b, c3].map((c) => [c.id, JSON.stringify(c.relationships)]));
+      CH.chemistryOf(s, a, b);
+      CH.chemistryOf(s, a, c3);
+      CH.addTag(a, b.id, 'grateful', s.totalMinutes);
+      CH.addTag(b, a.id, 'jealous', s.totalMinutes);
+      CH.addTag(a, 0, 'resentful', s.totalMinutes);
+      CH.addTag(a, c3.id, 'kindred', s.totalMinutes);
+      CH.addTag(c3, a.id, 'kindred', s.totalMinutes);
+      a.relationships[b.id].together = b.relationships[a.id].together = 24;
+      a.relationships[b.id].craft = b.relationships[a.id].craft = true;
+      CH.refreshChemistry(s, a, b);
+      const want = JSON.stringify(s.characters.map((c) => [c.id, c.relationships]));
+      const diff = A.roundtrip();
+      check('(29.1) kimya, zanaat bağı ve duygusal etiketler kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const [a2, b2, c2] = ids.map((id) => s.characters.find((c) => c.id === id));
+      check('(29.1) yüklenen kayıtlar birebir aynı (yönlü etiketler, Yönetime kırgınlık, ruh ikizi, zanaat bağı)', JSON.stringify(s.characters.map((c) => [c.id, c.relationships])) === want && CH.hasTag(a2, b2.id, 'grateful') && !CH.hasTag(b2, a2.id, 'grateful') && CH.hasTag(b2, a2.id, 'jealous') && CH.hasTag(a2, 0, 'resentful') && CH.hasTag(c2, a2.id, 'kindred') && a2.relationships[b2.id].craft === true);
+      check('(29.1) yüklemeden sonra kimya aynı hesaplanır (kimlik çifti + tohum: deterministik)', a2.relationships[b2.id].chemistry === CH.chemistryFor(s.seed, a2, b2) && a2.relationships[c2.id].chemistry === CH.chemistryFor(s.seed, a2, c2));
+      a2.relationships[987654] = { chemistry: 2, craft: false, together: 0, tags: ['grateful'], until: { grateful: s.totalMinutes + 999 } };
+      A.roundtrip();
+      const a3 = s.characters.find((c) => c.id === ids[0]);
+      check('(29.1) kayıp sakine işaret eden kimya kaydı yüklemede temizlenir (Yönetim kaydı kalır)', !a3.relationships[987654] && CH.hasTag(a3, 0, 'resentful') && CH.hasTag(a3, ids[1], 'grateful'));
+      for (const id of ids) { const c = s.characters.find((x) => x.id === id); c.relationships = JSON.parse(before.get(id)); }
+      for (const c of s.characters) for (const id of ids) { const r = c.relationships[id]; const back = s.characters.find((x) => x.id === id).relationships[c.id]; if (r && !back) delete c.relationships[id]; }
+    }
+
+    // --- 2z. (29.2) Ruh halleri, yas ve teselli: kayıt -> yükleme durum kayması yok; toplam etki yüklemede yeniden kurulur ---
+    {
+      const MO = await import('/src/systems/Moodlets.js');
+      const pick = () => s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((x, y) => x.id - y.id).slice(0, 3);
+      const [a, b, c3] = pick();
+      const ids = [a.id, b.id, c3.id];
+      const before = new Map([a, b, c3].map((c) => [c.id, JSON.stringify(c.moodlets)]));
+      const stats0 = JSON.stringify(s.moodlets);
+      for (const c of [a, b, c3]) { c.moodlets.length = 0; MO.recomputeMood(c); }
+      const now = s.totalMinutes;
+      MO.addMoodlet(a, 'mourning', now, { tier: 'major', reason: 'mourn_spouse', whoId: 987654, whoName: 'Deniz' });
+      MO.addMoodlet(a, 'comforted', now, { reason: 'comforted', whoId: b.id, whoName: b.name });
+      MO.addMoodlet(a, 'exhausted', now, { reason: 'exhausted' });
+      MO.addMoodlet(b, 'proud_work', now, { reason: 'proud_trait' });
+      MO.addMoodlet(b, 'flow_state', now, { reason: 'flow', tier: 'major' });
+      MO.addMoodlet(c3, 'neglected', now, { reason: 'neglect_rejected', tier: 'major', harsh: true });
+      s.moodlets.consoled += 1; s.moodlets.given.mourning = (s.moodlets.given.mourning ?? 0) + 1;
+      const want = JSON.stringify(s.characters.map((c) => [c.id, c.moodlets]));
+      const wantStats = JSON.stringify(s.moodlets);
+      const moods = [a, b, c3].map((c) => [c.mood.workMul, c.mood.moveMul, c.mood.joyRateMul, c.mood.xpMul, c.mood.feel].join());
+      const diff = A.roundtrip();
+      check('(29.2) ruh halleri (yas + teselli, akış, ihmal) ve sayaçlar kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const loaded = ids.map((id) => s.characters.find((c) => c.id === id));
+      check('(29.2) yüklenen moodlet\'ler ve sayaçlar birebir aynı (kişi adı, kademe, süre, koşula bağlı moodlet)', JSON.stringify(s.characters.map((c) => [c.id, c.moodlets])) === want && JSON.stringify(s.moodlets) === wantStats && MO.getMoodlet(loaded[0], 'mourning').whoName === 'Deniz' && MO.getMoodlet(loaded[0], 'exhausted').until === null);
+      check('(29.2) toplam etki (c.mood) kayda girmez, yüklemede aynı değerlerle yeniden hesaplanır; teselli yüklemeden sonra da travmayı yarılar', loaded.map((c) => [c.mood.workMul, c.mood.moveMul, c.mood.joyRateMul, c.mood.xpMul, c.mood.feel].join()).join('|') === moods.join('|') && loaded[0].mood.grief === true && MO.traumaOf(loaded[0]) === null && Math.abs(loaded[2].mood.workMul - 0.85) < 1e-9, moods.join('|'));
+      scene().moodlets.onHour();
+      check('(29.2) yüklemeden sonra saat taraması katman tavanlarını korur (en çok 6; 1 çekirdek + 3 eylem + 2 ihtiyaç)', s.characters.every((c) => c.moodlets.length <= 6 && c.moodlets.filter((m) => m.key === 'mourning' || m.key === 'neglected' || m.key === 'shaken' || m.key === 'heartbroken' || m.key === 'euphoric' || m.key === 'inspired').length <= 1));
+      for (const id of ids) { const c = s.characters.find((x) => x.id === id); c.moodlets = JSON.parse(before.get(id)); MO.recomputeMood(c); }
+      s.moodlets = JSON.parse(stats0);
+    }
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();

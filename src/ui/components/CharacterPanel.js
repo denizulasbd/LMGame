@@ -21,7 +21,9 @@ import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
 import { EQUIPMENT, EQUIPMENT_SLOTS, SLOT_KEYS } from '../../data/equipment.js';
-import { topFriends, worstRelation, partnerOf, childrenOf, getFriendship } from '../../systems/RelationshipSystem.js';
+import { topFriends, worstRelation, partnerOf, childrenOf, getFriendship, levelForScore } from '../../systems/RelationshipSystem.js';
+import { chemistryFor, chemistryLevel, tagsOf } from '../../systems/Chemistry.js';
+import { EMOTION_TAGS, RULER_ID } from '../../data/chemistry.js';
 import { topSkills, progressToNext, primarySkill } from '../../systems/SkillSystem.js';
 import { isShivering } from '../../systems/HeatingSystem.js';
 import { coldProtection } from '../../systems/Equipment.js';
@@ -41,11 +43,14 @@ import { inventoryCapacity, petitionOf, isRioter, raidOf } from '../../systems/C
 import { petitionProgress, grantStatus, formatRemaining } from '../../systems/Petitions.js';
 import { INJURY } from '../../data/crisis.js';
 import { LIFE_STAGES, AGING } from '../../data/lifeStages.js';
-import { PROFESSIONS, PROUD_MASTER } from '../../data/apprenticeship.js';
+import { PROFESSIONS, PROUD_MASTER, GRANDMASTER } from '../../data/apprenticeship.js';
+import { grandmasterTitle } from '../../systems/Grandmaster.js';
 import { apprenticesOf, graduationFor, acceptsApprentice, apprenticeStatus } from '../../systems/Apprenticeship.js';
 import { ORIGIN_NAMES } from '../../data/temperament.js';
 import { generationName } from '../../systems/Lineage.js';
 import { heirloomSlot } from '../../systems/Citizens.js';
+import { MOODLETS, TIER_NAMES } from '../../data/moodlets.js';
+import { effectText, reasonText, remainingHours, soothingOf } from '../../systems/Moodlets.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -122,6 +127,12 @@ export class CharacterPanel {
       return row;
     });
 
+    // (29.2) Baskın ruh hali (portrenin altında) ve "Ruh Hali ve İç Dünya" listesi
+    this.moodBadge = el('div', { className: 'mood-badge is-neutral', text: 'Dengeli' });
+    this.moodList = el('div', { className: 'moodlet-list' });
+    this.lastMoodVersion = -1;
+    this.lastMoodHour = -1;
+    this.lastMoodId = null;
     this.familyList = el('div', { className: 'family-list' });
     this.relationsList = el('div', { className: 'relations-list' });
     this.equipmentList = el('div', { className: 'equipment-slots' });
@@ -150,12 +161,13 @@ export class CharacterPanel {
     this.element = el('div', { className: 'panel character-panel ui-interactive', hidden: true }, [
       closeButton,
       el('div', { className: 'character-header' }, [
-        el('div', { className: 'character-portrait-frame' }, [this.portrait]),
+        el('div', { className: 'character-portrait-column' }, [el('div', { className: 'character-portrait-frame' }, [this.portrait]), this.moodBadge]),
         el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.stageBadge, this.meta, this.craftBadge, this.traits]),
       ]),
       el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
       this.petitionBox,
       el('div', { className: 'character-needs' }, needs),
+      section('Ruh Hali ve İç Dünya', this.moodList),
       section('Aile', this.familyList),
       section('İlişkiler', this.relationsList),
       section('Sosyal Hayat', this.socialList),
@@ -250,7 +262,9 @@ export class CharacterPanel {
     this.stageBadge.replaceChildren(
       el('span', { className: `life-stage-badge is-${key}`, title }, [el('img', { src: getAnyIconURL(stage.icon), alt: '' }), stage.name]),
       el('span', { className: 'life-stage-age', text: `${character.age} yaşında` }),
-      ...(note ? [el('span', { className: 'life-stage-note', text: note })] : [])
+      ...(note ? [el('span', { className: 'life-stage-note', text: note })] : []),
+      // (28.3) Saygın Büyük: nüfus kotasından muaf, yatağı yok
+      ...(character.isVenerable ? [el('span', { className: 'life-stage-venerable', title: 'Ocağını ve yadigârını devretti; yatağını gençlere bıraktı. Nüfus sınırına sayılmaz; geceleri Bilgelik Evi\'nde, handa ya da belediyede sabahlar.', text: 'Saygın Büyük (Nüfus Kotasından Muaf)' })] : [])
     );
   }
 
@@ -300,6 +314,7 @@ export class CharacterPanel {
       label.textContent = String(value);
       row.classList.toggle('is-low', value < LOW_NEED);
     }
+    this.renderMood(character, game.state);
     this.renderFamily(character, game.state);
     this.renderRelations(character, game.state);
     this.renderEquipment(character);
@@ -311,6 +326,46 @@ export class CharacterPanel {
     this.renderPurse(character, game.state);
     this.renderApprenticeship(character, game.state);
     this.renderPetition(character, game.state);
+  }
+
+  /**
+   * (29.2) Baskın ruh hali ve aktif moodlet çipleri. Yalnızca sakinin ruh hali değişince (mood.version) ya da saat dönünce
+   * (kalan süre) yeniden kurulur; öteki karelerde üç sayı karşılaştırılır, hiçbir şey tahsis edilmez.
+   */
+  renderMood(character, state) {
+    const mood = character.mood;
+    const hour = Math.floor(state.totalMinutes / 60);
+    if (this.lastMoodId === character.id && this.lastMoodVersion === mood.version && this.lastMoodHour === hour) return;
+    this.lastMoodId = character.id;
+    this.lastMoodVersion = mood.version;
+    this.lastMoodHour = hour;
+    this.moodBadge.textContent = mood.feel;
+    this.moodBadge.className = `mood-badge is-${mood.tone}`;
+    this.moodBadge.title = `Baskın ruh hali: ${mood.feel} (aktif ruh hallerinin net ağırlığı ${mood.net > 0 ? '+' : ''}${Math.round(mood.net * 10) / 10})`;
+    const list = character.moodlets;
+    if (list.length === 0) {
+      this.moodList.replaceChildren(el('div', { className: 'relations-empty', text: 'Şu an içinde fırtına kopmuyor: gündelik hayatına dengeyle devam ediyor.' }));
+      return;
+    }
+    const soothing = soothingOf(character);
+    const order = { core: 0, action: 1, need: 2 };
+    const rows = [...list]
+      .sort((a, b) => order[MOODLETS[a.key].layer] - order[MOODLETS[b.key].layer] || MOODLETS[b.key].weight - MOODLETS[a.key].weight)
+      .map((m) => {
+        const def = MOODLETS[m.key];
+        const left = remainingHours(m, state.totalMinutes);
+        const effect = effectText(m, soothing);
+        return el('div', { className: `moodlet-chip is-${def.tone} layer-${def.layer}`, title: `${def.name} (${TIER_NAMES[m.tier]})${effect ? `: ${effect}` : ''}` }, [
+          el('img', { className: 'moodlet-icon', src: getAnyIconURL(def.icon), alt: '' }),
+          el('div', { className: 'moodlet-text' }, [
+            el('span', { className: 'moodlet-name', text: `${def.name}${m.tier !== 'minor' ? ` · ${TIER_NAMES[m.tier]}` : ''}` }),
+            el('span', { className: 'moodlet-reason', text: reasonText(m) }),
+            ...(effect ? [el('span', { className: 'moodlet-effect', text: effect })] : []),
+          ]),
+          el('span', { className: 'moodlet-time', text: left === null ? 'sürüyor' : `${left} sa` }),
+        ]);
+      });
+    this.moodList.replaceChildren(...rows);
   }
 
   /** (25.2) Çıraklık: çırağın ustası, dalı ve ilerlemesi; ustanın çırakları; Genç için "Çıraklığa Yaz". */
@@ -554,18 +609,48 @@ export class CharacterPanel {
       ...friends.map((f) => ({ ...f, kind: 'friend' })),
       ...(rival ? [{ ...rival, kind: 'rival' }] : []),
     ];
-    const key = entries.map((e) => `${e.kind}:${e.character.id}:${Math.floor(e.score)}`).join('|');
+    // (29.1) Etiketi olan ama listeye girmeyen sakinler de (minnettar olduğu şifacı, kırgın olduğu komşu...) gösterilir
+    const listed = new Set(entries.map((e) => e.character.id));
+    for (const other of state.characters) {
+      if (other === character || listed.has(other.id) || tagsOf(character, other.id).length === 0) continue;
+      const score = getFriendship(state, character, other);
+      entries.push({ character: other, score, level: levelForScore(score), kind: score < 0 ? 'rival' : 'friend' });
+    }
+    for (const e of entries) {
+      e.chemistry = character.relationships?.[e.character.id]?.chemistry ?? chemistryFor(state.seed, character, e.character);
+      e.tags = tagsOf(character, e.character.id);
+    }
+    const rulerTags = tagsOf(character, RULER_ID);
+    const key = `${entries.map((e) => `${e.kind}:${e.character.id}:${Math.floor(e.score)}:${e.chemistry}:${e.tags.join(',')}`).join('|')}#${rulerTags.join(',')}`;
     if (key === this.lastRelations) return;
     this.lastRelations = key;
 
+    // Yönetime (oyuncuya) karşı hisler: dilekçesi reddedildiyse kırgın, dileği karşılandıysa minnettar
+    const rulerRow = rulerTags.length ? [el('div', { className: 'relation-ruler' }, [el('span', { className: 'family-label', text: 'Yönetime karşı' }), this.tagChips(rulerTags)])] : [];
+    if (entries.length === 0 && rulerRow.length) {
+      this.relationsList.replaceChildren(...rulerRow);
+      return;
+    }
     if (entries.length === 0) {
       this.relationsList.replaceChildren(el('div', { className: 'relations-empty', text: 'Henüz yakın bir bağı yok. Sohbet ettikçe ve birlikte çalıştıkça arkadaş olurlar.' }));
       return;
     }
-    this.relationsList.replaceChildren(...entries.map((entry) => this.relationRow(character, entry)));
+    this.relationsList.replaceChildren(...entries.map((entry) => this.relationRow(character, entry)), ...rulerRow);
   }
 
-  relationRow(character, { character: other, score, level, kind }) {
+  /** (29.1) Duygusal etiket çipleri: [Minnettar] [Hayran] [Kırgın]... */
+  tagChips(tags) {
+    return el('span', { className: 'emotion-chips' }, tags.map((t) => el('span', { className: `emotion-chip is-${EMOTION_TAGS[t].color}`, text: EMOTION_TAGS[t].name, title: EMOTION_TAGS[t].description })));
+  }
+
+  /** (29.1) Kimya rozeti: ⚡⚡ güçlü çekim, ⚡ uyum, kırık çizgi antipati (nötrde rozet yok). */
+  chemistryBadge(chemistry) {
+    if (!chemistry) return null;
+    const level = chemistryLevel(chemistry);
+    return el('span', { className: `chemistry-badge is-${level.key}`, text: level.icon, title: `Kimya ${chemistry > 0 ? '+' : ''}${chemistry}: ${level.name}` });
+  }
+
+  relationRow(character, { character: other, score, level, kind, chemistry = 0, tags = [] }) {
     const isRival = kind === 'rival';
     const isPartner = kind === 'partner';
     const label = isPartner ? (character.married ? 'Eşi' : 'Sevgilisi') : level.name;
@@ -575,11 +660,13 @@ export class CharacterPanel {
     const name = el('span', { className: 'relation-name' }, [
       other.name,
       ...(isPartner ? [el('img', { className: 'relation-heart', src: getAnyIconURL(character.married ? 'ring' : 'love'), alt: '' })] : []),
+      ...(chemistry ? [this.chemistryBadge(chemistry)] : []),
     ]);
     const row = el('button', { className: `relation-row${isRival ? ' is-rival' : ''}${isPartner ? ' is-partner' : ''}`, type: 'button', tabIndex: -1, title: `${other.name}: ${Math.floor(score)} puan · tıkla ve seç` }, [
       el('img', { className: 'relation-portrait', src: getCharacterPortraitURL(other.appearance, other.look), alt: '' }),
       el('div', { className: 'relation-info' }, [name, el('span', { className: `relation-level ${levelClass}`, text: isRival ? `${label} · anlaşamıyorlar` : label })]),
       el('span', { className: 'need-bar relation-bar' }, [el('span', { className: `need-fill relation-fill ${levelClass}`, style: `width: ${width}%` })]),
+      ...(tags.length ? [this.tagChips(tags)] : []),
     ]);
     row.addEventListener('mousedown', (e) => e.preventDefault());
     row.addEventListener('click', () => this.events.emit('ui:selectCharacter', other.id));
@@ -614,11 +701,20 @@ export class CharacterPanel {
   /** (15. aşama) Ana mesleğin zanaat rozeti: "Usta Madenci" altın, "Kalfa Fırıncı" gümüş, "Çırak Oduncu" bronz. */
   renderBadge(character) {
     const main = character.isChild ? null : primarySkill(character);
-    const key = main ? `${main.skill}:${main.level.level}` : '';
+    const gmTitle = grandmasterTitle(character); // (28.2) "Başusta Demirci"
+    const key = main ? `${main.skill}:${main.level.level}:${gmTitle ?? ''}` : '';
     if (key === this.lastBadge) return;
     this.lastBadge = key;
     this.craftBadge.hidden = !main;
     if (!main) return;
+    if (gmTitle) {
+      // (28.2) Başusta: altın-mor rozet, yıldız ikonu
+      this.craftBadge.className = 'craft-badge is-grandmaster';
+      this.badgeIcon.src = getAnyIconURL('star');
+      this.badgeText.textContent = gmTitle;
+      this.craftBadge.title = `Başusta: çıraklığını %100 ile tamamladı · usta işi eser şansı 2 kat, her ${GRANDMASTER.saveEvery}. üretimde hammadde harcamaz (${PROFESSIONS[character.grandmasterProfession].name})`;
+      return;
+    }
     const badge = CRAFT_BADGES[main.level.level];
     const kit = OUTFIT_KITS[main.skill];
     const wear = main.level.level === 3 ? kit?.master : main.level.level === 2 ? kit?.journeyman : null;

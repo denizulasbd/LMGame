@@ -383,6 +383,24 @@
   box-shadow: inset -2px -2px 0 #e0a030, inset 2px 2px 0 var(--ui-card-hi), 0 0 0 1px var(--ui-card-hi);
 }
 
+/* (28.3) Saygın Büyük etiketi */
+.life-stage-venerable {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ui-ink-dark);
+  background: linear-gradient(135deg, #ffe9a8 0%, #d9c2f5 100%);
+  border: 2px solid var(--ui-line);
+  padding: 0 6px;
+  margin-left: 4px;
+}
+
+/* (28.2) Başusta rozeti: altın-mor */
+.craft-badge.is-grandmaster {
+  background: linear-gradient(135deg, #ffd23f 0%, #b58cf0 100%);
+  color: var(--ui-ink-dark);
+  box-shadow: inset -2px -2px 0 #7a4fc0, inset 2px 2px 0 var(--ui-card-hi), 0 0 0 1px #ffd23f;
+}
+
 .trait-chip {
   font-size: 12px;
   font-weight: 600;
@@ -1026,6 +1044,146 @@ button.relation-row:hover {
 /* Anlaşamadığı kişi: çubuk eksi puanın büyüklüğünü kırmızıyla gösterir */
 .relation-fill.is-dislike { background: #d98a5a; }
 .relation-fill.is-rival { background: var(--ui-bad); }
+
+/* ---------- Ruh halleri (29.2): baskın ruh hali ve moodlet çipleri ---------- */
+.character-portrait-column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.mood-badge {
+  padding: 1px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: #fff8e7;
+  background: #7a6a58;
+  border: 2px solid rgba(27, 20, 35, 0.6);
+}
+
+.mood-badge.is-positive { background: #3f8f4d; }
+.mood-badge.is-negative { background: #c9782c; }
+.mood-badge.is-trauma { background: #7d3f8f; }
+
+.moodlet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.moodlet-chip {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  background: var(--ui-card);
+  border: 2px solid var(--ui-wood);
+  border-left-width: 5px;
+}
+
+.moodlet-chip.is-positive { border-left-color: #3f8f4d; }
+.moodlet-chip.is-positive.layer-core { border-left-color: #d9a520; }
+.moodlet-chip.is-negative { border-left-color: #d98a2c; }
+.moodlet-chip.is-trauma { border-left-color: #8a3fa0; background: var(--ui-card-bad); }
+
+.moodlet-icon {
+  width: 14px;
+  height: 12px;
+  image-rendering: pixelated;
+}
+
+.moodlet-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.moodlet-name {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.moodlet-reason {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.moodlet-effect {
+  font-size: 10px;
+  font-weight: 600;
+  color: #f2c078;
+}
+
+.moodlet-chip.is-positive .moodlet-effect { color: #9be28a; }
+.moodlet-chip.is-trauma .moodlet-effect { color: #e6a8ee; }
+
+.moodlet-time {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.buff-chip.hud-grief-chip {
+  border-color: #8a3fa0;
+}
+
+/* ---------- Sosyal kimya ve duygusal etiketler (29.1) ---------- */
+.chemistry-badge {
+  margin-left: 4px;
+  /* şimşek / kırık çizgi simgeleri piksel yazı tipinde yoktur: sistem simge yazı tipiyle çizilir */
+  font-family: 'Segoe UI Symbol', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Noto Sans Symbols 2', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  white-space: nowrap;
+}
+
+.chemistry-badge.is-harmony { color: #4aa3df; }
+.chemistry-badge.is-attraction,
+.chemistry-badge.is-cosmic { color: #2f6fb5; text-shadow: 0 0 3px rgba(155, 227, 242, 0.9); }
+.chemistry-badge.is-antipathy,
+.chemistry-badge.is-clash { color: #9e2e2a; }
+
+.emotion-chips {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding-bottom: 2px;
+}
+
+.emotion-chip {
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  color: #fff8e7;
+  border: 1px solid rgba(27, 20, 35, 0.55);
+}
+
+.emotion-chip.is-grateful { background: #3f8f4d; }
+.emotion-chip.is-admiration { background: #b8862b; }
+.emotion-chip.is-resentful { background: #8a4b8f; }
+.emotion-chip.is-jealous { background: #b5482f; }
+.emotion-chip.is-kindred { background: #d9507a; }
+
+.relation-ruler {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  background: var(--ui-card);
+  border: 2px dashed var(--ui-wood);
+}
+
+.relation-ruler .emotion-chips {
+  padding-bottom: 0;
+}
 
 /* ---------- Aile ve ekipman (karakter paneli, 9. aşama) ---------- */
 .family-list {
@@ -4596,3 +4754,17 @@ kbd {
 .heirloom-chain .chain-arrow {
   color: var(--ui-ink-soft);
 }
+
+/* (28.4) Vadi Karakteri / Doktrin çipi ve doktrin kartları */
+.hud-valley-chip {
+  font-size: 12px;
+  font-weight: 700;
+}
+.doctrine-card {
+  border-left: 4px solid #b58cf0;
+}
+.doctrine-tag.is-active {
+  color: #6a3fb5;
+  font-weight: 700;
+}
+

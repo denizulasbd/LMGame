@@ -15,6 +15,7 @@ import { MASTERPIECES, MASTERPIECE_BY_ACTIVITY, MASTERWORK } from '../data/maste
 import { skillLevel, outfitFor } from './SkillSystem.js';
 import { masterworkItem, masterworkSaleStatus, masterworkExhibitStatus, storedMasterworks } from './Masterworks.js';
 import { addMemory } from './MemorySystem.js';
+import { grandmasterMasterworkMultiplier } from './Grandmaster.js';
 
 export class CraftsmanshipSystem {
   /**
@@ -74,7 +75,8 @@ export class CraftsmanshipSystem {
     let chance = MASTERWORK.baseChance;
     if (c.workplaceId !== null && c.workplaceId === building?.id) chance += MASTERWORK.pinnedBonus;
     if (c.equipment?.tool === 'sturdyTool') chance += MASTERWORK.toolBonus;
-    return chance;
+    chance += c.mood?.masterwork ?? 0; // (29.2) Ustalık Akışı +%2, İlham Dolu +%3
+    return chance * grandmasterMasterworkMultiplier(c, type); // (28.2) Başusta kendi mesleğinin eserinde 2 kat
   }
 
   onWorkFinished({ character: c, activity, building }) {

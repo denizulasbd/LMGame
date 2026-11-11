@@ -43,7 +43,13 @@ export async function installMonitor(page) {
     window.__granaryMod = await import('/src/systems/Granary.js').catch(() => null);
     window.__refineryMod = await import('/src/systems/Refinery.js').catch(() => null); // (24.2)
     window.__tradeMod = await import('/src/systems/TradePost.js').catch(() => null); // (24.3)
+    window.__moodDefs = (await import('/src/data/moodlets.js').catch(() => null))?.MOODLETS ?? null; // (29.2)
+    // (29.2b) teselli hangi travmaya yapıldı (Derin Yas / Sarsılmış / Kalbi Kırık): yalnızca sayar, oyunun durumuna ve üretecine dokunmaz
+    window.__consoledBy = {};
+    window.game?.events.on('moodlet:consoled', (p) => { const k = p?.trauma?.key ?? '?'; window.__consoledBy[k] = (window.__consoledBy[k] ?? 0) + 1; });
     window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
+    window.__lateMod = await import('/src/systems/LateGame.js').catch(() => null); // (28.4)
+    window.__tsMod = await import('/src/systems/TownStatus.js').catch(() => null);
     window.__apprMod = await import('/src/systems/Apprenticeship.js').catch(() => null); // (25.2)
     window.__socialData = await import('/src/data/social.js').catch(() => null); // (25.3)
     window.__lineageMod = await import('/src/systems/Lineage.js').catch(() => null); // (25.4)
@@ -134,6 +140,39 @@ export async function installMonitor(page) {
         const byId = new Map(s.characters.map((c) => [c.id, c]));
         const buildings = new Map(s.buildings.map((b) => [b.id, b]));
 
+        // ---- (29.2) Ruh halleri: katman tavanları, bilinmeyen anahtar, süresi geçmiş kayıt; yetişkinlerin ortalama iş çarpanı ----
+        {
+          const caps = { core: 1, action: 3, need: 2 };
+          const defs = window.__moodDefs;
+          let sum = 0; let n = 0; let lo = Infinity; let hi = 0;
+          for (const c of s.characters) {
+            const count = { core: 0, action: 0, need: 0 };
+            for (const x of c.moodlets) {
+              const d = defs?.[x.key];
+              if (!d) { broke(`${c.name}: bilinmeyen moodlet ${x.key}`); continue; }
+              count[d.layer]++;
+              if (x.until !== null && x.until < now - 61) broke(`${c.name}: süresi geçmiş moodlet ${x.key}`);
+            }
+            for (const k of Object.keys(caps)) if (count[k] > caps[k]) broke(`${c.name}: ${k} katmanında ${count[k]} moodlet (tavan ${caps[k]})`);
+            if (c.moodlets.length > 6) broke(`${c.name}: 6'dan fazla moodlet`);
+            m.moodMax = Math.max(m.moodMax ?? 0, c.moodlets.length);
+            if (!c.isChild && !c.role) { sum += c.mood.workMul; n++; lo = Math.min(lo, c.mood.workMul); hi = Math.max(hi, c.mood.workMul); }
+          }
+          if (n) { const w = (m.moodWork ??= { n: 0, sum: 0, min: Infinity, max: 0 }); w.n++; w.sum += sum / n; w.min = Math.min(w.min, lo); w.max = Math.max(w.max, hi); }
+        }
+
+        // ---- (29.1) Sosyal kimya: kayıp sakine işaret eden ilişki kaydı, sınır dışı kimya, bilinmeyen etiket, tek yönlü kimya ----
+        for (const c of s.characters) {
+          for (const [key, rel] of Object.entries(c.relationships ?? {})) {
+            const id = Number(key);
+            if (id !== 0 && !ids.has(id)) broke(`${c.name}: kimya kaydı kayıp sakine (#${id}) işaret ediyor`);
+            if (!Number.isInteger(rel.chemistry) || rel.chemistry < -2 || rel.chemistry > 3) broke(`${c.name}: sınır dışı kimya ${rel.chemistry}`);
+            if (rel.tags.some((t) => !['grateful', 'admiration', 'resentful', 'jealous', 'kindred'].includes(t))) broke(`${c.name}: bilinmeyen duygusal etiket ${rel.tags}`);
+            const back = id !== 0 ? byId.get(id)?.relationships?.[c.id] : null;
+            if (id !== 0 && ids.has(id) && (!back || back.chemistry !== rel.chemistry)) broke(`${c.name}: #${id} ile kimya tek yönlü / uyumsuz`);
+          }
+        }
+
         // ---- Takılma ----
         for (const c of s.characters) {
           for (const k of Object.keys(m.minNeeds)) if (c.needs[k] !== undefined) m.minNeeds[k] = Math.min(m.minNeeds[k], c.needs[k]);
@@ -204,7 +243,16 @@ export async function installMonitor(page) {
         }
         // ---- (19. aşama) Evlilik akışı: taşınma, ortak ev, kutlama, huylar, dedikodu ----
         m.minPop = Math.min(m.minPop, s.characters.length);
-        m.homelessMax = Math.max(m.homelessMax, s.characters.filter((c) => c.homeId === null && !c.role).length);
+        // (28.4) Geç oyun beklentisi: açıkken anlık refah ve eksik lüks örnekleri
+        if (window.__lateMod && window.__tsMod && window.__lateMod.lateGameActive(s)) {
+          const lt = (m.late ??= { n: 0, sum: 0, min: 100, max: 0, below100: 0, missingSum: 0, below90: 0, since: s.time.day });
+          const hp = window.__tsMod.townHappiness(s);
+          lt.n += 1; lt.sum += hp; lt.min = Math.min(lt.min, hp); lt.max = Math.max(lt.max, hp);
+          if (hp < 99.5) lt.below100 += 1;
+          if (hp < 90) lt.below90 += 1;
+          lt.missingSum += window.__lateMod.missingLuxuries(s).length;
+        }
+        m.homelessMax = Math.max(m.homelessMax, s.characters.filter((c) => c.homeId === null && !c.role && !c.isVenerable).length); // (28.3) Saygın Büyükler yataksızdır
         const freeBed = s.buildings.some((b) => b.functional && b.capacity && (homeCount.get(b.id) ?? 0) <= b.capacity - 2);
         for (const c of s.characters) {
           if (!(window.__socialData ? window.__socialData.QUIRKS[c.quirk] : ['animalLover', 'bookworm', 'musician', 'natureEnthusiast'].includes(c.quirk))) broke(`${c.name}: huyu yok (${c.quirk})`);
@@ -218,7 +266,7 @@ export async function installMonitor(page) {
           const p = c.married ? byId.get(c.partnerId) : null;
           if (!p || c.id > p.id) continue;
           const key = `${c.id}-${p.id}`;
-          if (c.homeId !== p.homeId && freeBed) {
+          if (c.homeId !== p.homeId && freeBed && !c.isVenerable && !p.isVenerable) { // (28.3) Saygın Büyük yataksızdır
             if (!m.apartSince.has(key)) m.apartSince.set(key, now);
             else if (now - m.apartSince.get(key) > MAX_APART_HOURS * 60) {
               m.socialStuck.push(`G${s.time.day} ${c.name} & ${p.name}: boş yatak varken ${MAX_APART_HOURS} saattir ayrı evlerde`);
@@ -472,10 +520,13 @@ export async function installMonitor(page) {
           for (const a of job.assignees ?? []) if (!ids.has(a)) broke(`iş ${job.type}#${job.id}: atanan sakin yok (${a})`);
           if (job.buildingId && !buildings.has(job.buildingId)) broke(`iş ${job.type}#${job.id}: yapısı yok`);
           const jt = m.jobTrack.get(job.id);
-          if (!jt || jt.progress !== job.progress) m.jobTrack.set(job.id, { progress: job.progress, since: now, flagged: false, type: job.type });
+          // (29.2b) Atananı olmayan iş "ilerlemiyor" sayılmaz (çalışma yeri açılana dek bekleyen iş yanlış alarm vermesin); çalışma yeri hiç yoksa ayrıca işaretlenir
+          if (!jt || jt.progress !== job.progress || (job.assignees?.length ?? 0) === 0) m.jobTrack.set(job.id, { progress: job.progress, since: now, flagged: false, type: job.type });
           else if (!jt.flagged && (job.assignees?.length ?? 0) > 0 && now - jt.since > JOB_STALE_DAYS * 1440) {
             jt.flagged = true;
-            m.staleJobs.push(`G${s.time.day} ${job.type}#${job.id} @${job.x},${job.y} atanan ${job.assignees.length}`);
+            const jb = job.buildingId ? buildings.get(job.buildingId) : null;
+            // (29.2) teşhis: yapı türü, ilerleme ve atananların o anki görevi / ruh hali
+            m.staleJobs.push(`G${s.time.day} ${job.type}#${job.id} @${job.x},${job.y} atanan ${job.assignees.length}${jb ? ` · ${jb.type}${job.project ? ` (${job.project})` : ''}` : ''} · ilerleme ${Math.round(job.progress ?? 0)}/${Math.round(job.work ?? 0)} · ${job.assignees.map((id) => { const c = byId.get(id); return c ? `${c.name}:${c.task?.activity ?? '-'}/${c.task?.phase ?? '-'}${c.task?.jobId === job.id ? '*' : ''}:${c.mood?.feel}${c.mood?.shirk ? '!' : ''}` : id; }).join(', ')}`);
           }
         }
 
@@ -606,6 +657,7 @@ export async function installMonitor(page) {
                 active: s.characters.filter((c) => c.apprenticeship).length,
                 maxActive: m.maxApprentices ?? 0,
                 list: s.characters.filter((c) => c.apprenticeship).map((c) => `${c.name}:${c.apprenticeship.profession}:%${Math.floor(c.apprenticeship.progress)}`),
+                grandmasters: s.characters.filter((c) => c.isGrandmaster).map((c) => `${c.name}:${c.grandmasterProfession}:${c.grandmasterBatches}`), // (28.2)
                 orphanSamples: m.orphanSamples ?? 0,
                 adultApprentices: m.adultApprentices ?? 0,
                 state: { ...s.apprenticeship, open: undefined },
@@ -622,6 +674,37 @@ export async function installMonitor(page) {
                 retireLag: m.retireLag ?? 0,
                 ages: s.characters.filter((c) => !c.role).map((c) => c.age),
                 state: { ...(s.lifeStages ?? {}) },
+                // (28.3) Saygın Büyükler, nüfus (toplam / kotaya sayılan), en yaşlı sakin ve vefatın kopuk referans bırakmadığı (yukarıdaki referans denetimi) örnekleri
+                venerable: s.characters.filter((c) => c.isVenerable).map((c) => `${c.name}:${c.age}/${c.lifespan}`),
+                births: s.stats?.births ?? 0,
+                // (29.2) ruh halleri: verilen moodlet sayıları, son günün dağılımı, baskın ruh halleri, örneklerdeki ortalama iş çarpanı
+                moodlets: {
+                  given: { ...(s.moodlets?.given ?? {}) },
+                  consoled: s.moodlets?.consoled ?? 0,
+                  grieved: s.moodlets?.grieved ?? 0,
+                  mourners: s.moodlets?.mourners ?? 0,
+                  consoledBy: { ...(window.__consoledBy ?? {}) },
+                  now: s.characters.reduce((o, c) => { for (const x of c.moodlets) o[x.key] = (o[x.key] ?? 0) + 1; return o; }, {}),
+                  feels: s.characters.reduce((o, c) => { o[c.mood.feel] = (o[c.mood.feel] ?? 0) + 1; return o; }, {}),
+                  work: m.moodWork ?? null,
+                  max: m.moodMax ?? 0,
+                },
+                // (29.1) sosyal kimya ve duygusal etiketler
+                chemistry: (() => {
+                  const dist = {}; const tags = {}; let records = 0; let ruler = 0;
+                  for (const c of s.characters) for (const [k, r] of Object.entries(c.relationships ?? {})) {
+                    if (k === '0') ruler += r.tags.length; else if (Number(k) > c.id) { dist[r.chemistry] = (dist[r.chemistry] ?? 0) + 1; records++; }
+                    for (const t of r.tags) tags[t] = (tags[t] ?? 0) + 1;
+                  }
+                  return { records, dist, tags, ruler, given: s.stats.emotionTags ?? 0, kindred: s.stats.kindredBonds ?? 0, sparks: s.stats.sparks ?? 0, treats: s.stats.treats ?? 0, greetings: s.stats.tagGreetings ?? 0 };
+                })(),
+                valley: s.valley,
+                doctrine: s.doctrine?.chosen ?? null,
+                late: m.late ?? null, // (28.4)
+                population: s.characters.length,
+                active: s.characters.filter((c) => !c.isVenerable).length,
+                lifespanMissing: s.characters.filter((c) => !c.role && !(c.lifespan >= 80 && c.lifespan <= 90)).length,
+                venerableWithHome: s.characters.filter((c) => c.isVenerable && c.homeId !== null).length,
               }
             : null,
           // (24.3)

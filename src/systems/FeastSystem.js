@@ -169,6 +169,7 @@ export class FeastSystem {
     c.feasted = feast.day; // bellekte; kayıtta feast.eatenIds'ten yeniden kurulur
     feast.eatenIds.push(c.id);
     feast.served += 1;
+    this.events.emit('feast:served', { character: c, tier: feast.tier }); // (29.2) Damak Şöleni
     c.needs.hunger = clamp(c.needs.hunger + fill.hunger, 0, 100);
     c.needs.fun = clamp(c.needs.fun + fill.fun, 0, 100);
     c.needs.social = clamp(c.needs.social + fill.social, 0, 100);

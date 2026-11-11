@@ -61,8 +61,14 @@ import { VINE } from '../data/exploration.js';
 import { ITEMS } from '../data/citizens.js';
 import { productionOf, cropOf } from './Granary.js';
 import { CROPS, DEFAULT_CROP } from '../data/crops.js';
+import { grandmasterFreeDue, grandmasterCommit } from './Grandmaster.js';
+import { valleyProductionMultiplier } from './Valley.js';
+import { doctrineProductionMultiplier } from './Doctrine.js';
 import { INN_SHERBET } from '../data/refinery.js';
 import { PROFESSIONS } from '../data/apprenticeship.js';
+import { hasTag } from './Chemistry.js';
+import { MOOD_RULES, GRIEVE_LABEL, GRIEVE_FALLBACK } from '../data/moodlets.js';
+import { genitive } from '../utils/turkish.js';
 import { TEMPERAMENT } from '../data/temperament.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
@@ -390,6 +396,7 @@ export class BehaviorSystem {
       if (partner) return `${partner.name} ile ${task.dateWithId !== undefined ? 'randevuya' : 'buluşmaya'} gidiyor`;
     }
     let label = activity.travelLabel ?? activity.label;
+    if (task.consoleName) label = label.replace('{name}', task.consoleName); // (29.2)
     // (19. aşama) huyların etkinlikleri: hayvanın adı ve çalınan yer
     if (task.petName) label = label.replace('{pet}', task.petName);
     if (task.placeTo) label = label.replace('{place}', task.placeTo);
@@ -403,6 +410,7 @@ export class BehaviorSystem {
     const building = task.buildingId ? this.world.getBuilding(task.buildingId) : null;
     let label = activity.label;
     if (task.activity === 'sleep' && task.nap) label = activity.napLabel;
+    if (task.activity === 'sleep' && c.isVenerable) label = building ? `${building.name}'nde sabahlıyor (Saygın Büyük)` : 'Sabahlıyor'; // (28.3)
     if (task.activity === 'meal' && building?.type === 'storage') label = task.bread ? activity.breadStorageLabel : activity.storageLabel;
     else if (task.activity === 'meal' && task.bread) label = activity.breadLabel;
     if ((task.activity === 'bake' || task.activity === 'weave' || task.activity === 'brewSherbet') && building?.idle) label = activity.idleLabel;
@@ -415,6 +423,9 @@ export class BehaviorSystem {
     if (building) label = label.replace('{target}', building.name);
     // (19. aşama) huyların etkinlikleri
     if (task.activity === 'viewpoint' && task.view === 'tree') label = activity.treeLabel;
+    // (29.2) yas ve teselli
+    if (task.grieve) label = task.grieveFor ? GRIEVE_LABEL.replace('{who}', genitive(task.grieveFor)) : GRIEVE_FALLBACK;
+    if (task.consoleName) label = label.replace('{name}', task.consoleName);
     if (task.petName) label = label.replace('{pet}', task.petName);
     if (task.placeAt) label = label.replace('{place}', task.placeAt);
     if (task.bagItem) label = label.replace('{bag}', ITEMS[task.bagItem].name.toLocaleLowerCase('tr'));
@@ -555,6 +566,7 @@ export class BehaviorSystem {
       if (activity.kind === 'work') {
         this.events.emit('work:shiftEnded', { character: c, activity: task.activity, building: task.workBuildingId ? this.world.getBuilding(task.workBuildingId) : null });
       }
+      this.events.emit('task:finished', { character: c, task }); // (29.2) eylem x kişilik moodlet'leri
       if (activity.finishEvent) this.events.emit(activity.finishEvent, { character: c, task, building: task.buildingId ? this.world.getBuilding(task.buildingId) : null });
       // Sıcak yemek bir süre tok tutar (NeedsSystem acıkmayı yavaşlatır)
       if (task.activity === 'innMeal') {
@@ -593,8 +605,9 @@ export class BehaviorSystem {
     if (partner) {
       // Yakın arkadaşla sohbet sosyalliği daha hızlı doldurur ve keyif de verir
       const bond = this.relationships.bondFor(c, partner);
-      gain *= bond.socialBonus;
-      c.needs.fun = clamp(c.needs.fun + bond.funBonus * minutes, 0, 100);
+      // (29.2) Tatlı Sohbet kazancı artırır, Kalbi Kırık azaltır (yalnızca olumlu keyif kazancı çarpılır)
+      gain *= bond.socialBonus * c.mood.socialMul;
+      c.needs.fun = clamp(c.needs.fun + (bond.funBonus > 0 ? bond.funBonus * c.mood.socialMul : bond.funBonus) * minutes, 0, 100);
     }
     if (task.sherbet) gain *= INN_SHERBET.multiplier; // (24.2) fıçı şerbetiyle sohbet iki kat
     c.needs.social = clamp(c.needs.social + gain * minutes, 0, 100);
@@ -643,7 +656,8 @@ export class BehaviorSystem {
       workBonus(c, task.activity) *
       equipmentWorkSpeed(c) *
       healthWorkMultiplier(c, this.state.totalMinutes) *
-      spiceWorkMultiplier(c, this.state.totalMinutes);
+      spiceWorkMultiplier(c, this.state.totalMinutes) *
+      c.mood.workMul; // (29.2) ruh hali: gurur / akış hızlandırır, angarya / yas / açlık yavaşlatır
     // Zanaat Loncası fermanı üretim yapılarında (inşaat ve toplama emirleri hariç) verimi artırır
     if (task.workBuildingId) amount *= civicProductionMultiplier(this.state);
     if (crafty) amount *= TEMPERAMENT.craftWorkSpeed;
@@ -658,7 +672,7 @@ export class BehaviorSystem {
       amount *= towerMasteryMultiplier(c, tower, skillLevel);
       recordTowerWork(this.state, c, amount);
     }
-    addExperience(this.events, c, task.activity, minutes, civicXpMultiplier(this.state) * relicXpMultiplier(this.state));
+    addExperience(this.events, c, task.activity, minutes, civicXpMultiplier(this.state) * relicXpMultiplier(this.state) * c.mood.xpMul);
 
     if (task.jobId) {
       const job = this.jobs.getJob(task.jobId);
@@ -677,20 +691,22 @@ export class BehaviorSystem {
     if (building.definition.guard) return true;
     // (12. aşama) Gelişmiş Çarklar: oduncu, taş ocağı, maden ve değirmende verim +%20
     amount *= researchProductionMultiplier(this.state, building.type);
+    // (28.4) Vadi Karakteri ve Kasaba Doktrini: yapı türüne göre asimetrik verim
+    amount *= valleyProductionMultiplier(this.state, building.type) * doctrineProductionMultiplier(this.state, building.type);
     if (building.definition.apothecary) return this.apothecaryWork(building, task, amount * (task.activity === 'brew' ? healSpeedMultiplier(this.state) : 1));
     if (building.definition.kitchen) {
       this.cook(building, amount);
       return true;
     }
     if (building.definition.crafting) {
-      const working = this.crafting.work(building, amount);
+      const working = this.crafting.work(building, amount, c);
       if (working) c.activityLabel = this.performLabel(c, task, ACTIVITIES[task.activity]);
       return working;
     }
     // (24.2) Lüks atölye boşa düştüyse (kasaba açlıkta, malzeme yok) dokumacı / mahzen ustası işi bırakıp gıdaya döner
     if (building.definition.luxury && building.idle) return false;
     // (13. aşama) Güneş Saati Küresi üretim ve işleme yapılarında verimi artırır
-    if (building.definition.processing) return this.process(building, amount * relicProductionMultiplier(this.state) * (building.type === 'mill' ? schemeBakeMultiplier(this.state) : 1));
+    if (building.definition.processing) return this.process(building, amount * relicProductionMultiplier(this.state) * (building.type === 'mill' ? schemeBakeMultiplier(this.state) : 1), c);
     const production = productionOf(building); // (24. aşama) bahçede seçili mahsulün ürünü ve verimi
     if (!production) return false;
     // Verim (oduncu için çevredeki ağaç sayısı) StructureSystem'de hesaplanır; Bereket Boynuzu yiyeceği artırır
@@ -783,15 +799,18 @@ export class BehaviorSystem {
    * İşleme (değirmen-fırın): saatte perHour kez stoktan malzemeyi (1 yiyecek) alıp ürünü (1 ekmek) üretir.
    * Malzeme biter ya da ürünün deposu dolarsa iş biter (fırıncı başka işe geçer; yapı boşta kalır).
    */
-  process(building, amount) {
+  process(building, amount, worker = null) {
     const processing = building.definition.processing;
     building.productionBuffer += (processing.perHour / 60) * amount;
     while (building.productionBuffer >= 1) {
       const room = Object.keys(processing.output).every((r) => this.economy.room(r) > 0);
-      if (!room || !this.economy.spend(processing.input)) {
+      // (28.2) Başusta kendi mesleğinin yapısında her 5. üretimi hammaddesiz yapar (deterministik sayaç)
+      const free = room && grandmasterFreeDue(worker, building);
+      if (!room || (!free && !this.economy.spend(processing.input))) {
         building.productionBuffer = 0;
         return false;
       }
+      if (grandmasterCommit(worker, building, free)) this.noteGrandmasterSaved(worker, building);
       building.productionBuffer -= 1;
       for (const [resource, value] of Object.entries(processing.output)) {
         building.producedToday += this.economy.produce(resource, value, building);
@@ -799,6 +818,13 @@ export class BehaviorSystem {
       this.events.emit('processing:made', { building });
     }
     return true;
+  }
+
+  /** (28.2) Başustanın hammaddesiz üretimini sayar ve olay yayar. */
+  noteGrandmasterSaved(worker, building) {
+    this.state.apprenticeship.grandmasterSaved = (this.state.apprenticeship.grandmasterSaved ?? 0) + 1;
+    if (worker.visible) worker.showBubble('sparkle', 1.6);
+    this.events.emit('grandmaster:saved', { character: worker, building });
   }
 
   /**
@@ -849,7 +875,9 @@ export class BehaviorSystem {
     // Şenlik bitince herkes dağılır
     if (activity.kind === 'festival' && !this.world.state.events.festival.active) return true;
     if (INTERRUPTIBLE_KINDS.has(activity.kind) && this.shouldStop(c, activity, hour)) return true;
-    return task.elapsed >= (task.duration ?? 0);
+    // (29.2) gururlu / akıştaki / ilhamlı sakin tezgâh başında daha uzun kalır
+    const stretch = activity.kind === 'work' && c.mood.focus ? MOOD_RULES.focusDuration : 1;
+    return task.elapsed >= (task.duration ?? 0) * stretch;
   }
 
   /** Aynı toplanma yerinde etkinliğini sürdüren diğer karakter: yakın olan, ama arkadaşlar öne geçer. */
@@ -858,7 +886,9 @@ export class BehaviorSystem {
     for (const other of this.world.characters) {
       if (other === c || other.task?.buildingId !== task.buildingId) continue;
       if (other.task.activity !== task.activity || other.task.phase !== 'perform') continue;
-      const rank = Math.hypot(other.x - c.x, other.y - c.y) - this.relationships.get(c, other) * 0.8;
+      // (29.1) kırgın olduğu kişiye ancak başka kimse yoksa döner; minnettar olduğuna öncelik verir
+      const feeling = hasTag(c, other.id, 'resentful') ? 500 : hasTag(c, other.id, 'grateful') ? -40 : 0;
+      const rank = Math.hypot(other.x - c.x, other.y - c.y) - this.relationships.get(c, other) * 0.8 + feeling;
       if (!best || rank < best.rank) best = { other, rank };
     }
     return best?.other ?? null;

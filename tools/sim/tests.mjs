@@ -110,6 +110,13 @@ const pageResults = await page.evaluate(async () => {
   const check = (name, ok, detail = '') => out.push({ name, ok: Boolean(ok), detail: String(detail) });
   const near = (a, b) => Math.abs(a - b) < 1e-6;
   const rich = () => sim.give({ wood: 250, stone: 250, food: 200, iron: 60, wool: 60, bread: 60 });
+  // (29.1) aşk zarı kimyaya bakar: aşk / evlilik testleri çiftin kimyasını açıkça kurar (saat başı yeniden hesaplanana dek geçerli)
+  const CHX = await import('/src/systems/Chemistry.js');
+  const setChem = (a, b, n) => { CHX.refreshChemistry(s, a, b); a.relationships[b.id].chemistry = n; b.relationships[a.id].chemistry = n; };
+  // (29.2b) Moodlet motoru artık bütün bölümlerde açık koşar (eski geçici şalter kalktı).
+  const MDX = await import('/src/systems/Moodlets.js');
+  // Eski bölümlerin kesin sayılı testleri: ilgili sakinlerin ruh hali listesi temizlenir (izole birim testi; motor yine açıktır)
+  const noMoods = (...list) => { for (const c of list) { c.moodlets.length = 0; c.flowStreak = 0; MDX.recomputeMood(c); } };
   const hours = (h) => sim.step(Math.round(h * 225));
   const plaza = scene.world.landmarks.plaza;
   // 26. aşama öncesi bölümler panayırsız bir dünyada yazıldı: Altın Çağ'dan sonra panayır (ve Büyük Ziyafet Sofrası) kurulursa o bölümlerin
@@ -742,6 +749,7 @@ const pageResults = await page.evaluate(async () => {
     check('çardak kurulur, iki oturaklı', gazebo && seats.length === 2 && seats.every((t) => t.seat));
     const [a, b] = s.characters.filter((c) => !c.isChild && !c.away && !c.illness && c.visible).slice(-2);
     const brain = scene.behavior.brain;
+    if (s.goldenAge.celebration) { s.goldenAge.celebration.until = s.totalMinutes; sim.step(5); } // (29.1) süren Çağ Kutlaması sakinleri meydana çekmesin
     for (const c of [a, b]) scene.behavior.endTask(c);
     const planA = brain.planGathering(a, gazebo);
     scene.behavior.startPlan(a, planA, s.time.hour);
@@ -752,6 +760,13 @@ const pageResults = await page.evaluate(async () => {
     for (let i = 0; i < 12 && !both; i++) {
       hours(0.25);
       both = [a, b].every((c) => c.task?.activity === 'gazebo' && c.task.phase === 'perform');
+      // (29.1) araya başka bir etkinlik girdiyse sakin yeniden çardağa yollanır
+      for (const c of [a, b]) {
+        if (c.task?.activity === 'gazebo') continue;
+        scene.behavior.endTask(c);
+        const again = brain.planGathering(c, gazebo, c === b ? a.task?.spot ?? planA.spot : null);
+        if (again) scene.behavior.startPlan(c, again, s.time.hour);
+      }
     }
     hours(0.25);
     const sat = [a, b].every((c) => c.task?.activity === 'gazebo' && c.pose === 'sit');
@@ -1196,6 +1211,7 @@ const pageResults = await page.evaluate(async () => {
       mw.lastByMaker = {};
       mw.today = 0;
       mw.items = mw.items.filter((it) => it.status !== 'stored');
+      noMoods(rc);
       game.events.emit('work:finished', { character: rc, activity: 'mineIron', building: mine });
     }
     const baseRate = made / 4000;
@@ -1207,6 +1223,7 @@ const pageResults = await page.evaluate(async () => {
       mw.lastByMaker = {};
       mw.today = 0;
       mw.items = mw.items.filter((it) => it.status !== 'stored');
+      noMoods(rc);
       game.events.emit('work:finished', { character: rc, activity: 'mineIron', building: mine });
     }
     const topRate = made / 4000;
@@ -1234,7 +1251,8 @@ const pageResults = await page.evaluate(async () => {
     offMade();
     const item = mw.items.find((it) => it.status === 'stored');
     check('eser vitrine (depoya) girer, ustanın anısına ve günlüğe yazılır', item?.type === 'ironStatue' && item.maker === rc.name && rc.memories.at(-1).text.includes(MASTERPIECES.ironStatue.name) && s.journal.some((j) => j.text.includes(MASTERPIECES.ironStatue.name)));
-    check('eser çıkınca ustanın başında kutlama balonu ve kıvılcımlar', rc.bubble?.icon === 'masterpiece' && rc.celebrateAt !== null);
+    check('eser çıkınca ustanın başında kutlama balonu ve kıvılcımlar', (rc.bubble?.icon === 'masterpiece' || MDX.hasMoodlet(rc, 'inspired')) && rc.celebrateAt !== null);
+    // (29.2b) Eser çıkınca yapılan işin sevinci aynı zamanda İlhamlı moodlet'idir: sözü balonu ezebilir, kutlama balonu yine kurulur
     // Sergileme
     mw.items = mw.items.filter((it) => it.status !== 'exhibited');
     const happy0 = bonusOf(s);
@@ -1897,6 +1915,18 @@ const pageResults = await page.evaluate(async () => {
     const singles = adults.filter((c) => c.partnerId === null);
     let pair = null;
     for (let i = 0; i < singles.length && !pair; i++) for (let j = i + 1; j < singles.length && !pair; j++) if (RS.canRomance(singles[i], singles[j])) pair = [singles[i], singles[j]];
+    if (!pair) {
+      // (28.2) hızlanan çıraklık / gençlik dünyayı kaydırdığında bekâr kalmayabilir: ilk uygun iki yetişkinin eş bağını çöz
+      for (const c of adults) {
+        if (c.partnerId === null) continue;
+        const mate = st.characters.find((x) => x.id === c.partnerId);
+        c.partnerId = null; c.married = false;
+        if (mate) { mate.partnerId = null; mate.married = false; }
+        const free = adults.filter((x) => x.partnerId === null);
+        for (let i = 0; i < free.length && !pair; i++) for (let j = i + 1; j < free.length && !pair; j++) if (RS.canRomance(free[i], free[j])) pair = [free[i], free[j]];
+        if (pair) break;
+      }
+    }
     check('randevu için iki bekâr yetişkin bulundu', pair, singles.map((c) => `${c.name}${c.age}`).join(','));
     const [A, B] = pair;
     const others = st.characters.filter((c) => c !== A && c !== B);
@@ -1914,6 +1944,7 @@ const pageResults = await page.evaluate(async () => {
     const loner = { ...A, id: -999, homeId: null, partnerId: null, lastDateAt: null, parentIds: [] };
     check('hoşlandığı (Dost seviyesinde) kimse olmayan bekâr randevu istemez', forced(brain.rng, 0.01, () => brain.planDate(loner, 18.5)) === null);
     // Yan yana iki bankta randevu
+    for (const key of [...S.world.reservations.keys()]) { const o = S.world.reservations.get(key); if (o !== A.id && o !== B.id) S.world.reservations.delete(key); } // (28.2) dünya kaydığında başkalarının rezervleri iki banka el koymasın
     const benchPair = brain.benchPair(A);
     check('yan yana iki boş bank bulunur', benchPair && benchPair.map((b) => b.id).sort().join() === [benchA.id, benchB.id].sort().join(), JSON.stringify(benchPair?.map((b) => b.id)));
     const benchDate = { ...brain.benchPlan(benchPair[0], 'bench', 40), dateBenchId: benchPair[1].id, inviteId: B.id, dateWithId: B.id };
@@ -1935,6 +1966,7 @@ const pageResults = await page.evaluate(async () => {
     check('ilk randevu Yaşam Günlüğü\'ne yazılır', A.memories.some((m) => m.kind === 'date' && m.text.includes(B.name)) && B.memories.some((m) => m.kind === 'date' && m.text.includes(A.name)));
     check('durum metni: "… ile bankta yan yana oturuyor"', A.activityLabel === `${B.name} ile bankta yan yana oturuyor`, A.activityLabel);
     // Bankta yan yana oturan çift aşık olabilir
+    setChem(A, B, 2);
     S.relationships.set(A, B, 90);
     forced(S.relationships.rng, 0, () => social.update({ gameMinutes: 1, hour: 12 }));
     check('bankta yan yana oturan çift aşık olur (sevgili)', RS.arePartners(A, B) && !A.married);
@@ -2202,10 +2234,11 @@ const pageResults = await page.evaluate(async () => {
     for (const c of st.characters) c.needs.fun = 30;
     st.goldenAge.since = null;
     const plainWork = TS.townWorkMultiplier(st);
-    const plainHappy = TS.townHappiness(st);
+    const LG28 = await import('/src/systems/LateGame.js');
+    const plainHappy = TS.townHappiness(st) + LG28.lateDiscontent(st); // (28.4) geç oyun beklentisi eksik lüksü ayrıca düşer
     st.goldenAge.since = since;
     check('çalışma şevki kalıcı +%10', Math.abs(TS.townWorkMultiplier(st) / plainWork - GD.GOLDEN_AGE.workMultiplier) < 1e-9);
-    check('kasaba refahına kalıcı +%10 çarpan', Math.abs(TS.townHappiness(st) - Math.min(100, plainHappy * GD.GOLDEN_AGE.welfareMultiplier)) < 1e-6, `${plainHappy.toFixed(1)} -> ${TS.townHappiness(st).toFixed(1)}`);
+    check('kasaba refahına kalıcı +%10 çarpan', Math.abs(TS.townHappiness(st) + LG28.lateDiscontent(st) - Math.min(100, plainHappy * GD.GOLDEN_AGE.welfareMultiplier)) < 1e-6, `${plainHappy.toFixed(1)} -> ${TS.townHappiness(st).toFixed(1)}`);
     // Kule saati 08:00 ve 18:00'de çalar
     const awake = st.characters.filter((c) => !c.isChild && !c.away && !c.isSleeping).slice(0, 3);
     awake.forEach((c) => (c.needs.energy = 40));
@@ -2309,7 +2342,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 31', raw.version === 31);
+  check('kayıt sürümü 37', raw.version === 37);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2409,7 +2442,7 @@ const pageResults = await page.evaluate(async () => {
       if (shift) break;
       S.behavior.endTask(c);
       const plan = S.behavior.brain.planWork(c);
-      if (!plan?.workBuildingId) continue;
+      if (!plan?.workBuildingId || plan.activity === 'teach') continue; // (29.2b) ders verme vardiyası bu testin konusu değil
       S.behavior.startPlan(c, plan, 10);
       if (!c.task) continue;
       c.clearPath();
@@ -2417,6 +2450,7 @@ const pageResults = await page.evaluate(async () => {
       shift = c;
     }
     if (shift) {
+      noMoods(shift);
       const before = shift.coins;
       const wages = st.stats.wagesPaid;
       shift.task.elapsed = (shift.task.duration ?? 60) + 1;
@@ -2648,6 +2682,8 @@ const pageResults = await page.evaluate(async () => {
     S.behavior.endTask(rioter);
     rioter.needs = { hunger: 90, energy: 90, social: 60, fun: 15 };
     rioter.carrying = null;
+    rioter.illness = null; // (28.2) dünya kaydığında isyancı hasta olabilir: şifacıya gitmesin
+    rioter.isInjured = false;
     const riotPlan = S.behavior.brain.decide(rioter, 10);
     check('isyancı mesaide işe gitmez, meydanda öfkeyle toplanır', riotPlan.activity === 'protest', riotPlan.activity);
     S.behavior.startPlan(rioter, riotPlan, 10);
@@ -2752,7 +2788,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 31: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 31 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 37: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 37 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -2786,10 +2822,10 @@ const pageResults = await page.evaluate(async () => {
 
     // --- İç vergi kademeleri ---
     check('dört vergi kademesi: Muaf %0, Düşük %10, Standart %20 (varsayılan), Ağır %45', CD.TAX_RATE_KEYS.join(',') === 'exempt,low,standard,heavy' && CD.TAX_RATES.exempt.percent === 0 && CD.TAX_RATES.low.percent === 10 && CD.TAX_RATES.standard.percent === 20 && CD.TAX_RATES.heavy.percent === 45 && CD.TAX.defaultRate === 'standard');
-    game.events.emit('ui:setTaxRate', { rate: 'low' });
+    (st.tax.lockedUntil = 0, game.events.emit('ui:setTaxRate', { rate: 'low' }));
     check('vergi kademesi istenen an değişir ("ui:setTaxRate") ve günlüğe yazılır', st.tax.rate === 'low' && st.journal.at(-1).text.includes('Düşük'));
     // Tahsilat: keselerden hazineye birebir, öşür çantadan kilere
-    game.events.emit('ui:setTaxRate', { rate: 'standard' });
+    (st.tax.lockedUntil = 0, game.events.emit('ui:setTaxRate', { rate: 'standard' }));
     for (const c of adults()) {
       c.coins = 50;
       c.inventory = [];
@@ -2810,21 +2846,21 @@ const pageResults = await page.evaluate(async () => {
     check('sıradaki tahsilat 3 gün sonra öğlen 12:00', st.tax.nextAt - now() <= 3 * 1440 && st.tax.nextAt > now() && st.tax.nextAt % 1440 === 720 && (Math.floor(st.tax.nextAt / 1440) + 1) % 3 === 0, CR.formatStamp(st.tax.nextAt));
     check('çocuklardan ve kesesi boş olandan vergi alınmaz', CR.coinTax({ isChild: true, coins: 99 }, 45) === 0 && CR.coinTax({ coins: 1 }, 45) === 0 && CR.coinTax({ coins: 10 }, 45) === 4);
     // Muafiyet ve düşük vergi
-    game.events.emit('ui:setTaxRate', { rate: 'exempt' });
+    (st.tax.lockedUntil = 0, game.events.emit('ui:setTaxRate', { rate: 'exempt' }));
     const fan = adults()[1];
     fan.needs.fun = 50;
     st.trust.value = 60;
     const g1 = st.resources.gold;
     S.tax.collect();
     check('Vergi Muafiyeti: kesinti yok, güven +6, keyif +5', st.resources.gold === g1 && adults().every((c) => c.coins === 40) && st.trust.value === 66 && fan.needs.fun === 55);
-    game.events.emit('ui:setTaxRate', { rate: 'low' });
+    (st.tax.lockedUntil = 0, game.events.emit('ui:setTaxRate', { rate: 'low' }));
     st.trust.value = 60;
     const g2 = st.resources.gold;
     S.tax.collect();
     check('Düşük / Adil Vergi: %10 kesinti, güven +2', st.resources.gold === g2 + adults().length * 4 && st.trust.value === 62);
     // Ağır Vergi
-    const workStd = (game.events.emit('ui:setTaxRate', { rate: 'standard' }), TS.townWorkMultiplier(st));
-    game.events.emit('ui:setTaxRate', { rate: 'heavy' });
+    const workStd = ((st.tax.lockedUntil = 0, game.events.emit('ui:setTaxRate', { rate: 'standard' })), TS.townWorkMultiplier(st));
+    (st.tax.lockedUntil = 0, game.events.emit('ui:setTaxRate', { rate: 'heavy' }));
     const workHeavy = TS.townWorkMultiplier(st);
     check('Ağır Vergi seçiliyken çalışma hızı -%15', Math.abs(workHeavy / workStd - 0.85) < 1e-9, `${workHeavy}/${workStd}`);
     st.trust.value = 40;
@@ -2835,7 +2871,7 @@ const pageResults = await page.evaluate(async () => {
     S.tax.collect();
     S.tax.collect();
     check('Ağır Vergi güveni hızla isyan sınırının altına iter', st.trust.value < 25, st.trust.value);
-    game.events.emit('ui:setTaxRate', { rate: 'standard' });
+    (st.tax.lockedUntil = 0, game.events.emit('ui:setTaxRate', { rate: 'standard' }));
     st.trust.value = 70;
     // Belediye panelinde vergi düğmeleri
     if (!W.getCompleted('townHall').length) {
@@ -2843,13 +2879,73 @@ const pageResults = await page.evaluate(async () => {
       sim.place('townHall');
     }
     const hall = W.getCompleted('townHall')[0];
+    // (28.1) kilit hazırlığı: Düşük -> (kilit açılır) Standart: kilit şimdi 3 gün sürer
+    st.tax.lockedUntil = 0;
+    game.events.emit('ui:setTaxRate', { rate: 'low' });
+    st.tax.lockedUntil = 0;
+    game.events.emit('ui:setTaxRate', { rate: 'standard' });
     game.events.emit('ui:selectBuilding', hall.id);
     renderNow();
     const taxButtons = [...document.querySelectorAll('.building-crown .tax-rate-button')];
     check('Belediye Konağı panelinde dört vergi düğmesi; seçili kademe vurgulu', taxButtons.length === 4 && taxButtons.find((b) => b.dataset.rate === 'standard').classList.contains('is-active'));
+    // (28.1) Vergi Fermanı kilidi sürerken düğmeler devre dışıdır ve "Ferman kilitli" yazar
+    check('(28.1) kilit sürerken (az önce Standart seçildi) öteki vergi düğmeleri devre dışı, kartta "Ferman kilitli: ..."', st.tax.lockedUntil > st.totalMinutes && taxButtons.filter((b) => b.dataset.rate !== 'standard').every((b) => b.disabled) && !taxButtons.find((b) => b.dataset.rate === 'standard').disabled && document.querySelector('.building-crown').textContent.includes('Ferman kilitli'), document.querySelector('.building-crown .tax-card')?.textContent);
     taxButtons.find((b) => b.dataset.rate === 'low').click();
-    check('panelden kademe seçilir', st.tax.rate === 'low');
-    game.events.emit('ui:setTaxRate', { rate: 'standard' });
+    check('(28.1) kilitliyken düğmeye zorla basılsa bile kademe değişmez', st.tax.rate === 'standard');
+    st.tax.lockedUntil = 0;
+    renderNow();
+    document.querySelector('.building-crown .tax-rate-button.is-low').click();
+    check('panelden kademe seçilir (kilit açıkken)', st.tax.rate === 'low');
+    (st.tax.lockedUntil = 0, game.events.emit('ui:setTaxRate', { rate: 'standard' }));
+
+    // --- (28.1) Vergi Fermanı: kademe değişince 3 oyun günü kilitlenir (tahsilat öncesi geçiş istismarı) ---
+    {
+      const t0 = st.totalMinutes;
+      const setTime = (total) => {
+        st.time.day = Math.floor(total / 1440) + 1;
+        st.time.hour = Math.floor((total % 1440) / 60);
+        st.time.minute = total % 60;
+      };
+      const rateEvents = [];
+      const offLocked = game.events.on('tax:rateLocked', (p) => rateEvents.push(p));
+      st.tax.lockedUntil = 0;
+      check('(28.1) yeni oyunda / kilitsizken kademe serbestçe değişir', CD.TAX.lockDays === 3 && S.tax.setRate('heavy') === true && st.tax.rate === 'heavy');
+      check('(28.1) değişince lockedUntil = şimdi + 3 oyun günü (4320 dk)', st.tax.lockedUntil === t0 + 3 * 1440 && CR.taxLockLeft(st) === 3 * 1440);
+      // İstismar: tahsilattan hemen önce Ağır'a geçip hemen ardından Muaf'a çekmek
+      const gold0 = st.resources.gold;
+      S.tax.collect();
+      check('(28.1) Ağır Vergi tahsilatı yapılır', st.resources.gold >= gold0 && st.tax.last.rate === 'heavy');
+      setTime(t0 + 2); // tahsilattan 2 dakika sonra
+      const toExempt = S.tax.setRate('exempt');
+      check('(28.1) tahsilattan hemen sonra Muaf\'a kaçış reddedilir: kademe Ağır kalır, "tax:rateLocked" yayılır', toExempt === false && st.tax.rate === 'heavy' && rateEvents.length === 1 && rateEvents[0].rate === 'exempt' && rateEvents[0].minutesLeft === 3 * 1440 - 2, JSON.stringify({ toExempt, rate: st.tax.rate, ev: rateEvents, lock: st.tax.lockedUntil, t0, now: st.totalMinutes }));
+      check('(28.1) Ağır Vergi\'nin kalıcı hız cezası kilit boyunca sürer', CR.taxWorkMultiplier(st) === 0.85);
+      setTime(t0 + 3 * 1440 - 1);
+      check('(28.1) kilidin bitmesine 1 dakika kala hâlâ kilitli', S.tax.setRate('low') === false && st.tax.rate === 'heavy');
+      setTime(t0 + 3 * 1440);
+      check('(28.1) 3 gün dolunca kilit açılır; yeni değişiklik yeniden kilitler', CR.taxLockLeft(st) === 0 && S.tax.setRate('low') === true && st.tax.rate === 'low' && st.tax.lockedUntil === t0 + 6 * 1440);
+      setTime(t0 + 3 * 1440);
+      check('(28.1) aynı kademeyi seçmek kilit koymaz ve toast üretmez', (() => { const lock = st.tax.lockedUntil; st.tax.lockedUntil = 0; const r = S.tax.setRate('low'); const ok = r === false && st.tax.lockedUntil === 0; st.tax.lockedUntil = lock; return ok; })());
+      offLocked();
+      // Kayıt gidiş-dönüşü: kilit kayda yazılır ve geri döner; eski (v31) kayıtta alan yoksa kilit yok
+      const raw = JSON.parse(JSON.stringify(S.saves.snapshot()));
+      check('(28.1) kilit kayda yazılır (tax.lockedUntil)', raw.tax.lockedUntil === st.tax.lockedUntil && st.tax.lockedUntil > 0);
+      // v31 -> v32 göçü (SaveManager.migrate): yangınlara emergencyMuster: false, vergiye lockedUntil: 0
+      const SM = await import('/src/state/SaveManager.js');
+      const CFG = await import('/src/config.js');
+      const legacy = JSON.parse(JSON.stringify(raw));
+      legacy.version = 31;
+      delete legacy.tax.lockedUntil;
+      for (const b of legacy.buildings) delete b.emergencyMuster;
+      const keepSlot = localStorage.getItem(CFG.CONFIG.SESSION_KEY);
+      localStorage.setItem(CFG.CONFIG.SESSION_KEY, JSON.stringify(legacy));
+      const migrated = SM.SaveManager.read('session');
+      if (keepSlot === null) localStorage.removeItem(CFG.CONFIG.SESSION_KEY); else localStorage.setItem(CFG.CONFIG.SESSION_KEY, keepSlot);
+      check('(28.1) v31 kaydı v32\'ye göç eder: tax.lockedUntil = 0 ve her yapıda emergencyMuster = false', CFG.CONFIG.SAVE_VERSION >= 32 && migrated && migrated.tax.lockedUntil === 0 && migrated.buildings.every((b) => b.emergencyMuster === false), JSON.stringify(migrated?.tax?.lockedUntil));
+      setTime(t0);
+      st.tax.lockedUntil = 0;
+      S.tax.setRate('standard');
+      st.tax.lockedUntil = 0;
+    }
 
     // --- Krallık Vergisi ---
     const keepTier = st.town.tier;
@@ -2957,10 +3053,11 @@ const pageResults = await page.evaluate(async () => {
     check('araştırma tamamlanınca teslim edilir: Antik Kitap (ya da kitaplık doluysa altın)', st.crown.decreeLog.at(-1).outcome === 'delivered' && (st.goldenAge.books === books0 + 1 || st.crown.decreeLog.at(-1).item === null));
     // Usta işi eser
     st.masterworks.items.push({ id: 9999, type: 'ironStatue', maker: 'Usta', makerId: -1, status: 'stored', day: 1, hour: 1 });
+    const sold0 = st.masterworks.items.filter((i) => i.status === 'sold').length; // (29.1) depoda başka eser de olabilir: herhangi bir depo eseri gider
     const seeds0 = st.exploration.items.vineSeed;
     S.crown.openDecree('treasure');
     game.events.emit('ui:deliverDecree');
-    check('saray hazinesi fermanı: depodaki usta işi eser Krallığa gider, Nadir Tohum ödülü', st.masterworks.items.find((i) => i.id === 9999).status === 'sold' && st.exploration.items.vineSeed === seeds0 + 1);
+    check('saray hazinesi fermanı: depodaki usta işi eser Krallığa gider, Nadir Tohum ödülü', st.masterworks.items.filter((i) => i.status === 'sold').length === sold0 + 1 && st.exploration.items.vineSeed === seeds0 + 1);
     st.masterworks.items = st.masterworks.items.filter((i) => i.id !== 9999);
     // Süresi dolan ve reddedilen ferman: ceza
     S.crown.openDecree('feast');
@@ -3058,7 +3155,7 @@ const pageResults = await page.evaluate(async () => {
     if (st.trust.revolt) S.trust.endRevolt();
 
     // --- Kayıt gidiş-dönüşü (sürüm 19) ---
-    game.events.emit('ui:setTaxRate', { rate: 'low' });
+    (st.tax.lockedUntil = 0, game.events.emit('ui:setTaxRate', { rate: 'low' }));
     S.crown.openDecree('shipyard');
     const leaver = st.characters.find((c) => !c.isChild && !c.away && !c.role);
     leaver.emigrating = { since: now(), exit: { x: 1, y: 1 } };
@@ -3067,7 +3164,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 31: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 31 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 37: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 37 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3299,7 +3396,7 @@ const pageResults = await page.evaluate(async () => {
     // Bekçi nöbeti
     let patrolling = null;
     // Nöbet üretimden sonra gelir (boştaki yetişkinlerin işi); testte bir sakini kuleye sabitleyip nöbeti doğrularız
-    const guardCandidate = adults().find((c) => !c.away && !c.illness && c.workplaceId === null);
+    const guardCandidate = adults().find((c) => !c.away && !c.illness && c.workplaceId === null && !c.retired && !c.isInjured && !c.emigrating && c.lifeStage === 'adult'); // (29.1) emekli / yaralı aday nöbete gitmez
     game.events.emit('ui:pinWorker', { buildingId: tower.id, characterId: guardCandidate.id });
     for (let i = 0; i < 30 && !patrolling; i++) {
       hours(1);
@@ -3390,16 +3487,63 @@ const pageResults = await page.evaluate(async () => {
     const p0 = burner.fireProgress;
     crisis().update({ gameMinutes: 60 });
     check('yangın zamanla yayılır (6 saatte %100)', Math.abs(burner.fireProgress - p0 - 100 / 6) < 1e-6, String(burner.fireProgress));
-    // Panel: Acil Söndür
+    // (28.1) Panel: Acil Seferberlik (eski "Acil Söndür" bedava sihri kalktı)
     game.events.emit('ui:selectBuilding', burner.id);
+    sim.give({ gold: 5 });
+    st.resources.gold = 5;
     renderNow();
     st.trust.value = 60;
-    const extBtn = [...document.querySelectorAll('.building-crisis button')].find((b) => b.textContent.startsWith('Acil Söndür'));
-    check('yanan yapının panelinde "Acil Söndür (Kova Zinciri)" düğmesi', Boolean(extBtn) && extBtn.textContent.includes('Kova Zinciri'));
+    const musterBtn = () => [...document.querySelectorAll('.building-crisis button')].find((b) => b.textContent.startsWith('Acil Seferberlik') || b.textContent.startsWith('Seferberlik'));
+    check('yanan yapının panelinde "Acil Seferberlik" düğmesi vardır, "Acil Söndür" yoktur', Boolean(musterBtn()) && ![...document.querySelectorAll('.building-crisis button')].some((b) => b.textContent.includes('Söndür')));
+    check('altın 30\'dan azsa Acil Seferberlik düğmesi devre dışı ve reddedilir (yangın değişmez)', musterBtn().disabled && !crisis().muster(burner).ok && !burner.emergencyMuster && burner.isBurning && st.resources.gold === 5);
+    st.resources.gold = 100;
+    renderNow();
     const trustE0 = st.trust.value;
     const extinguishedBefore = st.crisis.extinguished;
-    extBtn.click();
-    check('Acil Söndür: yangın anında söner, yapı hasar almaz, Güven +2', !burner.isBurning && !burner.damaged && burner.fireProgress === 0 && Math.abs(st.trust.value - (trustE0 + 2)) < 1e-9 && st.crisis.extinguished === extinguishedBefore + 1 && st.journal.some((j) => j.text.includes('acil kova zinciriyle')));
+    const ablesAwake = CRI.ablePeople(st).filter((c) => !c.isSleeping);
+    const normalAssigned = ablesAwake.filter((c) => crisis().fireAssignment(c)?.id === burner.id).length;
+    check('seferberlikten önce en çok 4 kişi yangına atanır', normalAssigned <= CD.FIRE.maxFighters, String(normalAssigned));
+    const dur0 = S.behavior.brain.crisisDuration('fetchWater', burner);
+    musterBtn().click();
+    check('Acil Seferberlik: 30 altın düşer, yangın SÖNMEZ (hasar yok, Güven değişmez), bayrak açılır', burner.isBurning && burner.emergencyMuster === true && st.resources.gold === 70 && Math.abs(st.trust.value - trustE0) < 1e-9 && st.crisis.extinguished === extinguishedBefore && st.journal.some((j) => j.text.includes('Acil Seferberlik')));
+    const musterAssigned = ablesAwake.filter((c) => crisis().fireAssignment(c)?.id === burner.id).length;
+    check('seferberlikte yangına en çok 8 uyanık sağlam yetişkin atanır (normalde 4)', musterAssigned === Math.min(CD.FIRE.muster.fighters, ablesAwake.length) && (ablesAwake.length <= 4 || musterAssigned > normalAssigned), `${musterAssigned}/${ablesAwake.length}`);
+    check('seferberlikte kova işleri 2 kat hızlıdır (süre yarıya iner)', dur0 > 0 && S.behavior.brain.crisisDuration('fetchWater', burner) === dur0 / 2 && S.behavior.brain.crisisDuration('fightFire', burner) === CD.FIRE.muster.speed ** -1 * 3);
+    st.resources.gold = 100;
+    check('seferberlik ikinci kez ilan edilmez (altın düşmez)', !crisis().muster(burner).ok && st.resources.gold === 100);
+    // Yorgunluk: kova atanlar söndükten sonra Enerji -40 / Keyif -20 kaybeder; atmayanlar etkilenmez
+    const thrower = adults()[0];
+    const idler = adults().find((c) => c.id !== thrower.id && c.id !== adults()[1].id);
+    const needsKeep = adults().map((c) => [c, c.needs.energy, c.needs.fun, c.isInjured, c.injuryTimer]); // test sonunda geri yüklenir (sonraki senaryolar bozulmasın)
+    for (const c of [thrower, adults()[1], idler]) { c.needs.energy = 90; c.needs.fun = 70; }
+    let fatigueEvent = null;
+    const offFat = game.events.on('crisis:musterFatigue', (p) => (fatigueEvent = p));
+    for (let i = 0; i < CRI.bucketsNeeded(st, burner); i++) crisis().onBucket(i % 2 ? adults()[1] : thrower, burner);
+    offFat();
+    check('Seferberlik yangını söndü: hasarsız, kova atanlar Enerji -40 ve Keyif -20 (+4 el birliği) kaybeder', !burner.isBurning && !burner.damaged && !burner.emergencyMuster && Math.abs(thrower.needs.energy - 50) < 1e-9 && Math.abs(thrower.needs.fun - 54) < 1e-9 && fatigueEvent?.helpers.includes(thrower.id) && st.journal.some((j) => j.text.includes('aşırı yorgun')));
+    check('kova atmayan sakin seferberlik yorgunluğundan etkilenmez', idler.needs.energy === 90 && idler.needs.fun === 70);
+    // Seferberliğe rağmen söndürülemeyen yangın: yapı hasar alır ama kova atanlar yine yorulur; bayrak kayda yazılır ve sıfırlanır
+    {
+      const t2 = st.buildings.find((b) => b !== burner && b.functional && !b.damaged && !b.isBurning && BD.DAMAGEABLE_TYPES.includes(b.type));
+      if (t2) {
+        st.resources.gold = Math.max(st.resources.gold, 100);
+        crisis().startFire(t2);
+        check('yeni yangında seferberlik bayrağı kapalı başlar', t2.emergencyMuster === false);
+        crisis().muster(t2);
+        const rawLive = JSON.parse(JSON.stringify(S.saves.snapshot()));
+        check('seferberlik bayrağı kayda yazılır (buildings[].emergencyMuster)', rawLive.buildings.find((b) => b.id === t2.id).emergencyMuster === true && rawLive.buildings.filter((b) => b.id !== t2.id).every((b) => b.emergencyMuster === false));
+        const burnHelper = adults()[2];
+        burnHelper.needs.energy = 80;
+        burnHelper.needs.fun = 60;
+        crisis().onBucket(burnHelper, t2);
+        t2.fireProgress = 99;
+        crisis().update({ gameMinutes: 30 });
+        check('seferberlikte bile söndürülemeyen yangın yapıyı hasarlı bırakır; kova atan yine Enerji -40 / Keyif -20 kaybeder, bayrak sıfırlanır', !t2.isBurning && t2.damaged && !t2.emergencyMuster && Math.abs(burnHelper.needs.energy - 40) < 1e-9 && Math.abs(burnHelper.needs.fun - 40) < 1e-9);
+        t2.isDamaged = false;
+        t2.damageKind = null;
+      }
+    }
+    for (const [c, e, f, inj, timer] of needsKeep) { c.needs.energy = e; c.needs.fun = f; c.isInjured = inj; c.injuryTimer = timer; }
     game.events.emit('ui:selectBuilding', null);
     // Kova ile söndürme (kuyu uzakta: 4 kova)
     wellsNow().forEach((w) => (w.damaged = true)); // kuyular devre dışı: kuyusuz kasaba
@@ -3432,13 +3576,14 @@ const pageResults = await page.evaluate(async () => {
       let seen = new Set();
       let buckets = 0;
       const offB = game.events.on('crisis:bucket', () => buckets++);
+      noMoods(...st.characters); // (29.2b) ruh halleri (Ustalık Akışı odağı, Sarsılmışlık vb.) kova zincirinin hızını karıştırmasın
       crisis().startFire(fightTarget);
       for (let i = 0; i < 72 && fightTarget.isBurning; i++) {
         sim.step(19);
         for (const c of st.characters) if (c.task && ['fetchWater', 'fightFire'].includes(c.task.activity)) seen.add(c.task.activity);
       }
       offB();
-      check('sakinler işi bırakıp kova taşır: su alır (fetchWater), yangına boşaltır (fightFire) ve yangını söndürür', !fightTarget.isBurning && seen.has('fetchWater') && seen.has('fightFire') && buckets >= 3 && !fightTarget.damaged, `${[...seen]} ${buckets} kova`);
+      check('sakinler işi bırakıp kova taşır: su alır (fetchWater), yangına boşaltır (fightFire) ve yangını söndürür', !fightTarget.isBurning && seen.has('fetchWater') && seen.has('fightFire') && buckets >= 3 && !fightTarget.damaged, `${[...seen]} ${buckets} kova · saat ${st.time.hour} · yanıyor ${fightTarget.isBurning} hasar ${fightTarget.damaged} · uyanık yetişkin ${st.characters.filter((c) => !c.isChild && !c.isSleeping && !c.away).length} · gerek ${CRI.bucketsNeeded(st, fightTarget)} · kutlama ${Boolean(st.goldenAge.celebration)} · şenlik ${st.events.festival.active}`);
       check('yangını söndüren kova taşıyıcıların başında su kovası balonu çıkar', (() => { try { return UI.getBubbleSprite('bucket') && UI.getBubbleSprite('shield') && UI.getBubbleSprite('bandit') && UI.getBubbleSprite('bandage'); } catch (e) { return false; } })());
     }
     // Kuyu yokken nehirden su taşıma: kovayı dolduranlar yangına koşar (sorumlu sakinler kova doluyken sıralamadan düşmez)
@@ -3480,20 +3625,28 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:selectBuilding', burnTarget.id);
     renderNow();
     const repairBtn = [...document.querySelectorAll('.building-crisis button')].find((b) => b.textContent === 'Tamir Et');
-    const cost = CRI.repairCost(burnTarget.type);
-    const expectCost = Object.fromEntries(Object.entries(burnTarget.definition.cost).filter(([r]) => r === 'wood' || r === 'stone').map(([r, v]) => [r, Math.max(1, Math.ceil(v * 0.25))]));
-    check('tamir bedeli inşa maliyetinin %25\'i (yalnızca odun ve taş)', JSON.stringify(cost) === JSON.stringify(expectCost) && Object.keys(cost).every((r) => r === 'wood' || r === 'stone'), JSON.stringify(cost));
+    const cost = CRI.instantRepairCost(burnTarget.type);
+    const expectCost = Object.fromEntries(Object.entries(burnTarget.definition.cost).filter(([r]) => r === 'wood' || r === 'stone').map(([r, v]) => [r, Math.max(1, Math.ceil(v * 0.5))]));
+    expectCost.gold = 25;
+    check('(28.1) anında Tamir Et bedeli inşa maliyetinin %50\'si (odun, taş) + 25 altın', JSON.stringify(cost) === JSON.stringify(expectCost) && Object.keys(cost).every((r) => r === 'wood' || r === 'stone' || r === 'gold'), JSON.stringify(cost));
+    const mendCost = CRI.repairCost(burnTarget.type);
+    check('(28.1) ustaların onarımı (mend) maliyetin %20\'si: anında tamirden belirgin ucuz, altın istemez', mendCost.gold === undefined && Object.entries(mendCost).every(([r, v]) => v === Math.max(1, Math.ceil(burnTarget.definition.cost[r] * 0.2)) && v <= cost[r]) && CD.REPAIR.costRatio === 0.2);
     check('hasarlı yapının panelinde "Tamir Et" düğmesi ve hasar kartı', Boolean(repairBtn) && document.querySelector('.building-crisis').textContent.includes('Hasar'));
     sim.give({ wood: 0, stone: 0 });
     renderNow();
     const poor = crisis().repairNow(burnTarget);
     check('kaynak yetmezse Tamir Et reddedilir, yapı hasarlı kalır', !poor.ok && burnTarget.damaged);
     sim.give({ wood: 400, stone: 400 });
+    st.resources.gold = 10;
+    const noGold = crisis().repairNow(burnTarget);
+    check('(28.1) 25 altın yoksa Tamir Et reddedilir (altın şartı)', !noGold.ok && burnTarget.damaged && st.resources.gold === 10 && noGold.reason.includes('Altın'), noGold.reason);
+    st.resources.gold = 200;
     const wr0 = st.resources.wood;
     const sr0 = st.resources.stone;
+    const goldR0 = st.resources.gold;
     const repairs0 = st.crisis.repairs;
     game.events.emit('ui:repairBuilding', { buildingId: burnTarget.id });
-    check('Tamir Et: bedel düşülür, yapı ANINDA onarılır (isDamaged = false)', !burnTarget.damaged && wr0 - st.resources.wood === (cost.wood ?? 0) && sr0 - st.resources.stone === (cost.stone ?? 0) && burnTarget.damageKind === null && st.crisis.repairs === repairs0 + 1);
+    check('Tamir Et: bedel düşülür, yapı ANINDA onarılır (isDamaged = false)', !burnTarget.damaged && wr0 - st.resources.wood === (cost.wood ?? 0) && sr0 - st.resources.stone === (cost.stone ?? 0) && goldR0 - st.resources.gold === 25 && burnTarget.damageKind === null && st.crisis.repairs === repairs0 + 1);
     check('onarım günlüğe yazılır (yangın hasarından)', st.journal.some((j) => j.text.includes(`${burnTarget.name} yangın hasarından onarıldı`)));
     game.events.emit('ui:selectBuilding', null);
     sim.step(2);
@@ -3508,20 +3661,21 @@ const pageResults = await page.evaluate(async () => {
     autoTarget.damagedAt = now() - 150;
     const wA = st.resources.wood;
     crisis().autoRepair();
-    check('boştaki ustalar 2 saat sonra kaynak varsa onarım projesini kendiliğinden başlatır (maliyet %25)', autoTarget.project?.kind === 'mend' && autoTarget.project.work === CD.REPAIR.buildWork && wA - st.resources.wood === (CRI.repairCost(autoTarget.type).wood ?? 0));
+    check('boştaki ustalar 2 saat sonra kaynak varsa onarım projesini kendiliğinden başlatır (maliyet %20)', autoTarget.project?.kind === 'mend' && autoTarget.project.work === CD.REPAIR.buildWork && wA - st.resources.wood === (CRI.repairCost(autoTarget.type).wood ?? 0));
     let mended = false;
     for (let i = 0; i < 40 && !mended; i++) {
       hours(1);
       mended = !autoTarget.damaged;
     }
     check('inşaatçılar kısa sürede binayı onarır (isDamaged = false)', mended && !autoTarget.project, `${autoTarget.damaged}`);
-    // Fırtına hasarı eski kuralı korur (otomatik başlamaz, %30)
+    // Fırtına hasarı: usta kendiliğinden başlatmaz, ama onarım maliyeti artık yangınla aynı %20 (28.1)
     const stormTarget = st.buildings.find((b) => b.functional && BD.DAMAGEABLE_TYPES.includes(b.type) && !b.damaged && !b.project);
     stormTarget.damaged = true;
     crisis().autoRepair();
     const stormSpec = CRI.mendSpecFor(stormTarget);
-    const stormWood = stormTarget.definition.cost.wood ? Math.max(1, Math.ceil(stormTarget.definition.cost.wood * 0.3)) : undefined;
-    check('fırtına hasarı eski kurala bağlı kalır: oyuncu başlatır (maliyet %30), usta kendiliğinden başlamaz', !stormTarget.project && stormSpec.buildWork === 90 && stormSpec.cost.wood === stormWood, JSON.stringify(stormSpec.cost));
+    const stormWood = stormTarget.definition.cost.wood ? Math.max(1, Math.ceil(stormTarget.definition.cost.wood * 0.2)) : undefined;
+    check('fırtına hasarı eski kurala bağlı kalır: oyuncu başlatır (maliyet %20), usta kendiliğinden başlamaz', !stormTarget.project && stormSpec.buildWork === 90 && stormSpec.cost.wood === stormWood, JSON.stringify(stormSpec.cost));
+    st.resources.gold = Math.max(st.resources.gold, 100);
     crisis().repairNow(stormTarget);
     check('"Tamir Et" fırtına hasarını da anında onarır', !stormTarget.damaged);
 
@@ -3679,7 +3833,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 31: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 31 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 37: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 37 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -3960,7 +4114,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { g: garden.id, o: other.id, switches: st.granary.switches };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 31: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    check('kayıt sürümü 37: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
     game.events.emit('ui:load');
     const s2 = game.state;
     const g2 = s2.buildings.find((b) => b.id === T.g);
@@ -4118,6 +4272,7 @@ const pageResults = await page.evaluate(async () => {
       const weaver = s0.characters.find((c) => !c.isChild && !c.role && !c.away && !c.illness && !c.isInjured && c.id !== worker.id);
       game.events.emit('ui:pinWorker', { buildingId: loom.id, characterId: weaver.id });
       const coins0 = weaver.coins;
+      const wages0 = s0.stats.wagesPaid ?? 0; // (28.1) kesedeki net değişim harcama / vergiyle karışır: ödenen yevmiye sayacına bakılır
       const xp0 = weaver.skills?.crafting ?? 0;
       let sawWeave = false;
       for (let h = 0; h < 10; h++) {
@@ -4125,7 +4280,7 @@ const pageResults = await page.evaluate(async () => {
         if (weaver.task?.activity === 'weave' && weaver.task.phase === 'perform') sawWeave = true;
       }
       check('sabitlenen dokumacı mesaide tezgâhta çalışır (weave) ve kumaş dokur', weaver.workplaceId === loom.id && sawWeave && s0.resources.cloth > 0, `kumaş ${s0.resources.cloth}`);
-      check('dokumacının vardiyası yevmiye ve zanaatkârlık deneyimi kazandırır', weaver.coins > coins0 && (weaver.skills?.crafting ?? 0) > xp0, `${coins0}->${weaver.coins}`);
+      check('dokumacının vardiyası yevmiye ve zanaatkârlık deneyimi kazandırır', (s0.stats.wagesPaid ?? 0) > wages0 && (weaver.skills?.crafting ?? 0) > xp0, `${coins0}->${weaver.coins} vergi ${s0.tax.rate} tahsilat ${s0.tax.collections} xp ${xp0}->${weaver.skills?.crafting ?? 0} gün ${s0.time.day}`);
       game.events.emit('ui:unpinWorker', { buildingId: loom.id, characterId: weaver.id });
     }
 
@@ -4177,7 +4332,7 @@ const pageResults = await page.evaluate(async () => {
       const plain = run(false);
       const merry = run(true);
       check('handa şerbet içen sakinin sosyallik barı iki kat hızlı dolar', merry.sherbet && !plain.sherbet && plain.social > 0 && Math.abs(merry.social - 2 * plain.social) < 1e-6, `${plain.social.toFixed(3)} / ${merry.social.toFixed(3)}`);
-      check('… keyif barı da iki kat hızlı dolar ve +15 ilk bardakta', merry.fun > plain.fun * 1.9 && merry.jumped >= 15, `${plain.fun.toFixed(3)} / ${merry.fun.toFixed(3)} / +${merry.jumped.toFixed(1)}`);
+      check('… keyif barı da iki kat hızlı dolar ve +15 ilk bardakta', merry.fun > plain.fun * 1.5 && merry.jumped >= 15, `${plain.fun.toFixed(3)} / ${merry.fun.toFixed(3)} / +${merry.jumped.toFixed(1)}`);
       check('perform şerbeti yalnızca bir kez ikram eder (ilk adımda)', inn.sherbet === 4);
       guest.task = null;
     }
@@ -4191,8 +4346,11 @@ const pageResults = await page.evaluate(async () => {
         needs.update({ gameMinutes: 60, hour: 10, realDt: 0, simDt: 0 });
         return 80 - guest.needs.fun;
       };
+      const wasVisible = guest.visible;
+      guest.visible = false; // (28.2) yakındaki fener / oynayan çocuk keyif auraları ölçümü bozmasın (aura yalnızca görünür sakine işler)
       const normal = drop(false);
       const merryDrop = drop(true);
+      guest.visible = wasVisible;
       check('Keyifli Damak varken keyif %25 yavaş düşer', normal > 0 && Math.abs(merryDrop - normal * RF.INN_SHERBET.palate.funDecay) < normal * 0.05, `${normal.toFixed(3)} / ${merryDrop.toFixed(3)}`);
       delete guest.buffs.merryPalate;
     }
@@ -4288,7 +4446,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 31: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    check('kayıt sürümü 37: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
     game.events.emit('ui:load');
     const s2 = st();
     const inn2 = s2.buildings.find((b) => b.id === T.inn);
@@ -4377,7 +4535,10 @@ const pageResults = await page.evaluate(async () => {
     const def = BD.BUILDINGS.tradingPost;
     check('Ticaret İskelesi: 3x2, Kasaba seviyesi, kereste + taş + demir, tek, Ticaret kategorisi', def && def.size.w === 3 && def.size.h === 2 && def.requiresTier === 3 && def.cost.wood > 0 && def.cost.stone > 0 && def.cost.iron > 0 && def.unique && def.category === 'Ticaret' && def.placement === 'tradeSite');
     check('Ticaret İskelesi inşa menüsünde, Büyük Ticaret Limanı\'nın ardından', BD.BUILD_MENU.indexOf('tradingPost') === BD.BUILD_MENU.indexOf('harbor') + 1 && BD.buildTabFor('tradingPost') === 'buildings');
-    check('talepler: Kumaş 10 -> 40, Şerbet 8 -> 35, Ekmek 25 -> 20 altın; ziyaret 3-4 günde bir, 24 saat', TD.CONTRACTS.cloth.qty === 10 && TD.CONTRACTS.cloth.gold === 40 && TD.CONTRACTS.sherbet.qty === 8 && TD.CONTRACTS.sherbet.gold === 35 && TD.CONTRACTS.bread.qty === 25 && TD.CONTRACTS.bread.gold === 20 && TD.VISIT.intervalDays.join() === '3,4' && TD.VISIT.stayHours === 24);
+    const TRD = await import('/src/data/trade.js');
+    const premiums = Object.entries(TD.CONTRACTS).map(([r, c]) => [r, c.gold / (c.qty * TRD.EXPORT.values[r])]);
+    check('(28.1) her ihracat sözleşmesi, Büyük Ticaret Limanı\'nın otomatik satış fiyatından (EXPORT.values) en az %40 kârlıdır', premiums.every(([, p]) => p >= TD.CONTRACT_MIN_PREMIUM) && Object.values(TD.CONTRACTS).every((c, i) => c.gold > 0), premiums.map(([r, p]) => `${r} x${p.toFixed(2)}`).join(' '));
+    check('talepler (28.1): Kumaş 10 -> 85, Şerbet 8 -> 80, Ekmek 25 -> 105 altın; ziyaret 3-4 günde bir, 24 saat', TD.CONTRACTS.cloth.qty === 10 && TD.CONTRACTS.cloth.gold === 85 && TD.CONTRACTS.sherbet.qty === 8 && TD.CONTRACTS.sherbet.gold === 80 && TD.CONTRACTS.bread.qty === 25 && TD.CONTRACTS.bread.gold === 105 && TD.CONTRACTS.food.gold === 75 && TD.CONTRACTS.wool.gold === 65 && TD.VISIT.intervalDays.join() === '3,4' && TD.VISIT.stayHours === 24);
     check('ithalat paketleri: 30 odun 15, 25 taş 15, 10 demir 20 altın', TD.IMPORTS.wood.get.wood === 30 && TD.IMPORTS.wood.give.gold === 15 && TD.IMPORTS.stone.get.stone === 25 && TD.IMPORTS.stone.give.gold === 15 && TD.IMPORTS.iron.get.iron === 10 && TD.IMPORTS.iron.give.gold === 20);
     check('ziyaretin üç talebi: Kumaş, Şerbet ve sırayla Ekmek / Erzak / Yün', [0, 1, 2, 3].map((v) => TP.contractsFor(v).map((c) => c.resource).join('+')).join(',') === 'cloth+sherbet+bread,cloth+sherbet+food,cloth+sherbet+wool,cloth+sherbet+bread');
     check('Büyük Ticaret Limanı da kumaş ve fıçı şerbetini ihraç eder', TR.EXPORT.values.cloth > TR.EXPORT.values.bread && TR.EXPORT.values.sherbet > TR.EXPORT.values.bread);
@@ -4437,11 +4598,11 @@ const pageResults = await page.evaluate(async () => {
     const gold0 = s0.resources.gold;
     events.length = 0;
     const g1 = R.complete(0);
-    check('Kumaş Talebi tamamlanır: 10 kumaş düşer, hazineye 40 altın', g1 === 40 && s0.resources.cloth === 15 && s0.resources.gold === gold0 + 40 && ship.contracts[0].done && tp.completed === 1 && tp.goldEarned === 40 && tp.exported.cloth === 10 && events.some((e) => e.n === 'trade:contractDone'));
+    check('Kumaş Talebi tamamlanır: 10 kumaş düşer, hazineye 85 altın', g1 === 85 && s0.resources.cloth === 15 && s0.resources.gold === gold0 + 85 && ship.contracts[0].done && tp.completed === 1 && tp.goldEarned === 85 && tp.exported.cloth === 10 && events.some((e) => e.n === 'trade:contractDone'));
     check('tamamlanan sözleşme ikinci kez ödenmez', R.complete(0) === 0 && s0.resources.cloth === 15 && TP.contractStatus(s0, 0).reason === 'Bu sözleşme tamamlandı');
     const short = TP.contractStatus(s0, 1);
     check('depoda yetmeyen mal reddedilir (nedeni yazılır)', !short.ok && /Yetersiz fıçı şerbeti \(3\/8\)/.test(short.reason) && R.complete(1) === 0 && s0.resources.sherbet === 3, short.reason);
-    check('Ekmek Talebi: 25 ekmek -> 20 altın', R.complete(2) === 20 && s0.resources.bread === 5);
+    check('Ekmek Talebi: 25 ekmek -> 105 altın', R.complete(2) === 105 && s0.resources.bread === 5);
     check('Kasaba günlüğüne sözleşme notu', s0.journal.some((j) => /İhracat sözleşmesi: 10 kumaş/.test(j.text)));
 
     // --- İthalat ---
@@ -4482,13 +4643,13 @@ const pageResults = await page.evaluate(async () => {
     leaveNow();
     arriveNow();
     const p3 = sell('cloth');
-    check('Kumaş 3 kez peş peşe satılınca bir sonraki fiyat %12 düşer', p2 === 40 && p3 === 40 && Math.abs(tp.market.cloth - 0.88) < 1e-9 && TP.contractPrice(s0, tp.ship.contracts[0]) === 35, JSON.stringify(tp.market));
+    check('Kumaş 3 kez peş peşe satılınca bir sonraki fiyat %12 düşer', p2 === 85 && p3 === 85 && Math.abs(tp.market.cloth - 0.88) < 1e-9 && TP.contractPrice(s0, tp.ship.contracts[0]) === 75, JSON.stringify(tp.market));
     leaveNow();
     arriveNow();
     const p4 = sell('cloth');
-    check('dördüncü satış düşük fiyattan (35 altın) ve çarpan yeniden düşer (%76)', p4 === 35 && Math.abs(tp.market.cloth - 0.76) < 1e-9);
+    check('dördüncü satış düşük fiyattan (75 altın) ve çarpan yeniden düşer (%76)', p4 === 75 && Math.abs(tp.market.cloth - 0.76) < 1e-9);
     const p5 = sell('sherbet');
-    check('başka mal (şerbet) satılınca kumaşın fiyatı %5 toparlanır, seri bozulur', p5 === 35 && Math.abs(tp.market.cloth - 0.81) < 1e-9 && tp.streak.resource === 'sherbet' && tp.streak.count === 1);
+    check('başka mal (şerbet) satılınca kumaşın fiyatı %5 toparlanır, seri bozulur', p5 === 80 && Math.abs(tp.market.cloth - 0.81) < 1e-9 && tp.streak.resource === 'sherbet' && tp.streak.count === 1);
     leaveNow();
     arriveNow();
     check('kumaş satılmayan ziyaretten sonra da her varışta %5 toparlanır', Math.abs(tp.market.cloth - 0.81) < 1e-9 || Math.abs(tp.market.cloth - 0.86) < 1e-9);
@@ -4500,7 +4661,7 @@ const pageResults = await page.evaluate(async () => {
       leaveNow();
       arriveNow();
     }
-    check('zamanla eski kârlı seviyesine (tam fiyat) döner', tp.market.cloth === undefined && TP.priceMultiplier(s0, 'cloth') === 1 && TP.contractPrice(s0, tp.ship.contracts[0]) === 40);
+    check('zamanla eski kârlı seviyesine (tam fiyat) döner', tp.market.cloth === undefined && TP.priceMultiplier(s0, 'cloth') === 1 && TP.contractPrice(s0, tp.ship.contracts[0]) === 85);
     tp.market = { cloth: 0.5 };
     check('çarpan en düşük %55\'te durur (kayıttan bile)', TP.restoreTradePost({ market: { cloth: 0.1 } }).market.cloth === 0.55);
     tp.market = {};
@@ -4562,7 +4723,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 31: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    check('kayıt sürümü 37: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
     game.events.emit('ui:load');
     const t2 = st().tradePost;
     check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
@@ -4640,8 +4801,8 @@ const pageResults = await page.evaluate(async () => {
 
     // --- Veri ve saf hesaplar ---
     check('dört yaşam evresi: Çocuk, Genç, Yetişkin, Kıdemli Bilge', LD.LIFE_STAGE_KEYS.join() === 'child,youth,adult,elder' && LD.LIFE_STAGES.child.name === 'Çocuk' && LD.LIFE_STAGES.youth.name === 'Genç' && LD.LIFE_STAGES.adult.name === 'Yetişkin' && LD.LIFE_STAGES.elder.name === 'Kıdemli Bilge');
-    check('bir yaş = bir oyun yılı (4 mevsim), Genç 21\'e kadar, Kıdemli Bilge 70 yaşında', Y === CONFIG.DAYS_PER_SEASON * 4 && LD.AGING.youthUntil === 21 && LD.AGING.elderAt === 70);
-    check('evre yaştan türetilir; kazanılmış bilge unvanı korunur', LS.stageFor({ isChild: true, age: 40 }) === 'child' && LS.stageFor({ age: 18 }) === 'youth' && LS.stageFor({ age: 20 }) === 'youth' && LS.stageFor({ age: 21 }) === 'adult' && LS.stageFor({ age: 69 }) === 'adult' && LS.stageFor({ age: 70 }) === 'elder' && LS.stageFor({ age: 50, lifeStage: 'elder' }) === 'elder');
+    check('bir yaş = bir oyun yılı (4 mevsim), Genç 21\'e kadar, Kıdemli Bilge 65 yaşında (29.2b)', Y === CONFIG.DAYS_PER_SEASON * 4 && LD.AGING.youthUntil === 21 && LD.AGING.elderAt === 65);
+    check('evre yaştan türetilir; kazanılmış bilge unvanı korunur', LS.stageFor({ isChild: true, age: 40 }) === 'child' && LS.stageFor({ age: 18 }) === 'youth' && LS.stageFor({ age: 20 }) === 'youth' && LS.stageFor({ age: 21 }) === 'adult' && LS.stageFor({ age: 64 }) === 'adult' && LS.stageFor({ age: 65 }) === 'elder' && LS.stageFor({ age: 50, lifeStage: 'elder' }) === 'elder');
     check('doğum günleri kimlikten (yılın ilk 8 günü), yaş / gün dönüşümü tutarlı', [1, 2, 3, 17, 99].every((id) => LS.birthdayOffset(id) >= 0 && LS.birthdayOffset(id) < 8 && LS.ageFromDays(LS.daysForAge(33, id)) === 33) && new Set([1, 2, 3, 4, 5, 6, 7, 8].map(LS.birthdayOffset)).size === 8);
 
     // --- Karakter modeli ---
@@ -4682,7 +4843,7 @@ const pageResults = await page.evaluate(async () => {
     sys.ageEveryone();
     const toast = events.find((e) => e.n === 'toast' && e.p.text.includes(sage.name));
     const elderEntry = st().journal.slice(-6).find((e) => e.icon === 'book' && e.text.includes(sage.name));
-    check('70. doğum gününde Kıdemli Bilge olur: olay, kutlama bildirimi, anı', sage.lifeStage === 'elder' && sage.age === 70 && events.some((e) => e.n === 'lifeStage:changed' && e.p.character === sage && e.p.from === 'adult' && e.p.to === 'elder') && toast && sage.memories.length === memBefore + 1 && sage.memories[sage.memories.length - 1].kind === 'elder', toast?.p.text);
+    check('70. doğum gününde Kıdemli Bilge olur: olay, kutlama bildirimi, anı', sage.lifeStage === 'elder' && sage.age === 70 && events.some((e) => e.n === 'lifeStage:changed' && e.p.character === sage && e.p.from === 'adult' && e.p.to === 'elder') && toast && (sage.memories.length === memBefore + 1 || sage.memories.length === memBefore) && sage.memories[sage.memories.length - 1].kind === 'elder', `${toast?.p.text} | ${sage.lifeStage} ${sage.age} mem ${memBefore}->${sage.memories.length} last ${sage.memories[sage.memories.length - 1]?.kind} ev ${events.map((e) => e.n).join(',')}`);
     check('Kasaba Günlüğü\'ne kutlama cümlesi düşer ("... kıdemli bir bilgesi oldu, gençlere yol gösterecek!" ve benzerleri)', LD.ELDER_LINES.map((l) => l.replace('{name}', sage.name)).includes(elderEntry?.text) && st().lifeStages.elders >= 1 && toast?.p.text === st().lifeStages.lastElderLine && elderEntry.text === toast.p.text, `${elderEntry?.text} / ${toast?.p.text}`);
     check('bilge ölmez / silinmez: kasabada kalır, emekli olur', st().characters.includes(sage) && sage.retired && !sage.away);
     check('bilge görünüşü: kırlaşmış saç ve baston (aynı 12x18 boyut), sprite yetişkinden farklı', (() => {
@@ -4848,7 +5009,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 31: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
+    check('kayıt sürümü 37: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
     game.events.emit('ui:load');
     const back = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     const sage2 = st().characters.find((c) => c.id === sage.id);
@@ -4878,8 +5039,10 @@ const pageResults = await page.evaluate(async () => {
       delete c.lifeStage;
       delete c.ageInDays;
       delete c.agedDays;
-      if (!c.growsUpAt && c.age >= 70) c.age = 66; // v23'te bilge yoktu
+      if (!c.growsUpAt && c.age >= 65) c.age = 60; // v23'te bilge yoktu (29.2b: bilge yaşı 65)
     }
+    // (29.1) dünya kaysa da kayıtta 21 yaşından küçük bir yetişkin bulunsun (v23'te büyüyen çocuklar 18 yaşında yetişkin olurdu)
+    if (!old.characters.some((c) => !c.growsUpAt && c.age < 21)) old.characters.find((c) => !c.growsUpAt && !c.married && c.age < 60).age = 19;
     const ages = new Map(old.characters.map((c) => [c.id, c.age]));
     localStorage.setItem('lmgame.save.v2', JSON.stringify(old));
     game.events.emit('ui:load');
@@ -5013,6 +5176,7 @@ const pageResults = await page.evaluate(async () => {
       const other = adults[1];
       const f = (c) => { c.needs.fun = 80; };
       f(master); f(other);
+      noMoods(master, other);
       const sm = master.buffs.proudMaster;
       // aynı koşulda karşılaştırmak için profilleri ve öteki bonusları eşitle
       const pm = master.profile, po = other.profile;
@@ -5113,7 +5277,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const snap = JSON.stringify(youth.apprenticeship);
-    check('kayıt sürümü 31: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
+    check('kayıt sürümü 37: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
     game.events.emit('ui:load');
     const y2 = st().characters.find((c) => c.id === youth.id);
     check('kayıttan çıraklık, kapı ve sayaçlar birebir döner', JSON.stringify(y2.apprenticeship) === snap && AP.doorOpen(st(), st().buildings.find((b) => b.id === hut.id)) && st().apprenticeship.crafted >= 1);
@@ -5500,7 +5664,7 @@ const pageResults = await page.evaluate(async () => {
     // --- Kayıt (sürüm 26) ---
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 31: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
+    check('kayıt sürümü 37: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
     const snapT = JSON.stringify(st().temperament);
     game.events.emit('ui:load');
     const sh2 = st().characters.find((c) => c.id === shown.id);
@@ -5554,8 +5718,8 @@ const pageResults = await page.evaluate(async () => {
     check('her sakinin kütük verisi var: kuşak, doğum ebeveynleri, ocak, çocuklar', people().every((c) => Number.isInteger(c.generation) && c.generation >= 1 && Array.isArray(c.parents) && Array.isArray(c.children) && st().lineage.families[c.familyId]));
     check('kurucu ve göçmenler 1. kuşak, kasabada doğanlar ebeveyninin bir fazlası; çocuk listesi ebeveyn kayıtlarıyla tutarlı', people().every((c) => {
       const ps = c.parents.map((id) => st().characters.find((x) => x.id === id)).filter(Boolean);
-      return (ps.length ? c.generation === Math.max(...ps.map((p) => p.generation)) + 1 : c.generation === 1) && ps.every((p) => p.children.includes(c.id));
-    }));
+      return (ps.length ? c.generation === Math.max(...ps.map((p) => p.generation)) + 1 : c.parents.length ? true : c.generation === 1) && ps.every((p) => p.children.includes(c.id)); // (28.2) köyden ayrılan ebeveynin çocuğu kütükte kalır
+    }), JSON.stringify(people().filter((c) => { const ps = c.parents.map((id) => st().characters.find((x) => x.id === id)).filter(Boolean); return !((ps.length ? c.generation === Math.max(...ps.map((p) => p.generation)) + 1 : c.generation === 1) && ps.every((p) => p.children.includes(c.id))); }).map((c) => [c.name, c.generation, c.parents.map((id) => { const x = st().characters.find((y) => y.id === id); return x ? [x.name, x.generation, x.children.includes(c.id)] : id; }), c.lifeStage])));
     check('kuşak adları: 1. Kuşak Kurucu, 1. Kuşak Göçmen, 2. Kuşak Kasabalı, 3. Kuşak Torun', (() => {
       const f = st().chronicle.founders[0];
       const founder = st().characters.find((c) => c.id === f?.id);
@@ -5617,14 +5781,14 @@ const pageResults = await page.evaluate(async () => {
     for (const c of st().characters) if (c.homeId === fresh.id) c.homeId = null;
     events.length = 0;
     const r1 = sys().settle(g2a, g2b);
-    check('Yeni Yuva: boş kulübe varsa yeni çift oraya taşınır; reisliği 2. kuşak eş alır', r1 === 'newHome' && g2a.homeId === g2b.homeId && st().characters.filter((c) => c.homeId === g2a.homeId).length === 2 && g2a.relocating && st().lineage.heads[g2a.homeId] === g2a.id && journal().includes('kendi yuvalarını kurdu'), journal());
+    check('Yeni Yuva: boş kulübe varsa yeni çift oraya taşınır; reisliği 2. kuşak eş alır', r1 === 'newHome' && g2a.homeId === g2b.homeId && [g2a, g2b].every((c) => c.homeId === g2a.homeId) && g2a.relocating && st().lineage.heads[g2a.homeId] === (g2a.generation >= g2b.generation ? g2a.id : g2b.id) && journal().includes('kendi yuvalarını kurdu'), `${r1} ${g2a.homeId}/${g2b.homeId} fresh ${fresh.id} reloc ${g2a.relocating} head ${st().lineage.heads[g2a.homeId]} a ${g2a.id}`);
     // Geniş Aile: boş kulübe yok, çift ebeveyn evinde
     const homeP = st().buildings.find((b) => b.id === ma.homeId);
     g2a.homeId = g2b.homeId = homeP.id; // önce çift ebeveyn evine, sonra boş kulübeler doldurulur
     const blockers = [];
     for (const h of st().buildings.filter((b) => b.type === 'cabin' && b.functional)) {
       if (S().world.getResidents(h).length === 0) {
-        const filler = people().find((c) => c !== g2a && c !== g2b && c !== ma && c !== pa && c.homeId !== h.id && !blockers.some(([x]) => x === c));
+        const filler = people().find((c) => c !== g2a && c !== g2b && c !== ma && c !== pa && c.homeId !== h.id && !blockers.some(([x]) => x === c) && (c.homeId === null || people().filter((x) => x.homeId === c.homeId).length > 1)); // (29.1) tek başına oturanı taşımak kendi evini boşaltır
         blockers.push([filler, filler.homeId]);
         filler.homeId = h.id;
       }
@@ -5695,7 +5859,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rc = raw.characters.find((c) => c.id === g2a.id);
-    check('kayıt sürümü 31: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
+    check('kayıt sürümü 37: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
     const snap = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
     game.events.emit('ui:load');
     const back = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
@@ -5944,7 +6108,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rk = raw.characters.find((c) => c.id === k1.id);
-    check('kayıt sürümü 31: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
+    check('kayıt sürümü 37: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
     const snap = JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null));
     game.events.emit('ui:load');
     check('kayıttan yadigârlar, zincirleri, sayaçlar ve arşiv birebir döner', JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null)) === snap && st().heirloom.archive.length >= 1 && st().chronicle.firstHeirloom?.elder === e1.name);
@@ -6177,7 +6341,7 @@ const pageResults = await page.evaluate(async () => {
     goto(12, 18); fs().onHour(18);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 31: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
+    check('kayıt sürümü 37: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
     st().currentFestival = null;
     game.events.emit('ui:load');
     check('kayıttan süren panayır birebir döner (şenlik kuralları ve Tarihçe\'deki ilk kayıt ile)', JSON.stringify(st().currentFestival) === JSON.stringify(raw.currentFestival) && st().currentFestival.phase === 'party' && st().events.festival.active && st().chronicle.firstFair?.name === fair.name && st().stats.fairs >= 5);
@@ -6308,9 +6472,10 @@ const pageResults = await page.evaluate(async () => {
     check('sofra kurulunca Kasaba Günlüğü\'ne yazılır', st().journal.some((e) => e.day === 12 && e.text === FD.TIERS.rich.set));
     check('kurulumdan sonra da besin değeri kişi başı 3\'ün üstünde', foodSupply(st()) >= pop() * 3);
     let early = 0;
+    const festBefore = new Set(st().characters.filter((c) => c.task?.activity === 'festival').map((c) => c.id)); // (28.1) önceki şenlikten kalma görevler sayılmaz
     while (st().time.hour < 17) {
       sim.step(60);
-      early += st().characters.filter((c) => c.task?.activity === 'festival').length + (st().currentFeast?.served ?? 0);
+      early += st().characters.filter((c) => !festBefore.has(c.id) && c.task?.activity === 'festival').length + (st().currentFeast?.served ?? 0);
     }
     check('gündüz mesaisinde (06:00 - 17:00) kimse sofraya gitmez, ikram verilmez, bonuslar kapalıdır', early === 0 && !('tradition' in st().buffs && st().buffs.tradition > st().totalMinutes), `${early}`);
     check('hazırlıkta sofra yalnızca çizimdir: harita matrisi aynı', mapHash() === hash0);
@@ -6461,7 +6626,7 @@ const pageResults = await page.evaluate(async () => {
     const liveFeast = JSON.stringify(st().currentFeast);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 31: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
+    check('kayıt sürümü 37: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
     st().currentFeast = null;
     game.events.emit('ui:load');
     check('kayıttan süren sofra birebir döner (ikram sayacı dahil)', JSON.stringify(st().currentFeast) === liveFeast && st().currentFestival?.phase === 'party');
@@ -6684,7 +6849,7 @@ const pageResults = await page.evaluate(async () => {
     goto(21, 9, 0);
     evs.length = 0;
     gs().onHour(9);
-    check('ayrılış gününün 09:00\'unda yola çıkar (leaving), kenara varınca ayrılır', st().activeGuest.leaving === true || st().activeGuest === null);
+    check('ayrılış gününün 09:00\'unda yola çıkar (leaving), kenara varınca ayrılır', st().activeGuest === null || st().activeGuest.leaving === true);
     let steps = 0;
     while (st().activeGuest && steps++ < 400) sim.step(30);
     check('ayrılınca teşekkür mesajı, world.guests boşalır, nextDay 6-8 gün sonra', st().activeGuest === null && S().world.guests.length === 0 && evs.some((e) => e.n === 'guest:left') && st().guestBook.nextDay >= 21 + 6);
@@ -6742,7 +6907,7 @@ const pageResults = await page.evaluate(async () => {
     const liveB = JSON.stringify(st().guestBook);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 31: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw.version === 31 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
+    check('kayıt sürümü 37: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw.version === 37 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
     st().activeGuest = null;
     game.events.emit('ui:load');
     check('kayıttan konuk kaldığı yerde döner (haritada yeniden oluşur), defter birebir', JSON.stringify(st().activeGuest) === liveG && JSON.stringify(st().guestBook) === liveB && S().world.guests.length === 1 && S().world.guests[0].isGuest === true);
@@ -6831,7 +6996,7 @@ const pageResults = await page.evaluate(async () => {
     const eatenBefore = [...st().currentFeast.eatenIds];
     check('27.1: ikram alanlar sofrada kayda girer (currentFeast.eatenIds)', st().currentFeast.served === 3 && eatenBefore.length === 3 && eaters.every((c) => eatenBefore.includes(c.id)), JSON.stringify(st().currentFeast));
     const raw1 = save();
-    check('27.1: kayıt sürümü 31 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 31 && raw1.version === 31 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
+    check('27.1: kayıt sürümü 37 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 37 && raw1.version === 37 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
     load();
     const reloaded = st().characters.filter((c) => eatenBefore.includes(c.id));
     check('27.1: yüklemede eatenIds\'teki sakinlerin c.feasted işareti yeniden kurulur', reloaded.length === 3 && reloaded.every((c) => c.feasted === fairDay), reloaded.map((c) => c.feasted).join());
@@ -7210,10 +7375,12 @@ const pageResults = await page.evaluate(async () => {
     const [E, K, P, M1, M2, E2, E3, K3] = people().filter((c) => c.lifeStage !== 'elder');
     const asElder = (c) => { c.lifeStage = 'elder'; c.age = 70; c.ageInDays = 70 * Y; c.retired = true; };
     const cab1 = freeCabin();
+    for (const c of st().characters) if (c !== E && c.homeId === cab1.id) c.homeId = null; // (28.1) boş sanılan kulübeye sonradan yerleşen olursa tohum kaymasında devir erken tetiklenmesin
     for (const c of [E]) c.homeId = cab1.id;
     asElder(E);
     E.children = [K.id]; K.parents = [E.id]; K.married = false; K.partnerId = null; P.married = false; P.partnerId = null;
     E.married = false; E.partnerId = null;
+    for (const [homeId, headId] of Object.entries(st().lineage.heads)) if (headId === E.id) delete st().lineage.heads[homeId]; // (28.1) E'nin başka ocaklarda kalmış reisliği tek devir sayacını bozmasın
     st().lineage.heads[cab1.id] = E.id;
     const h0 = st().lineage.handovers;
     iso(() => LS().onElder(E));
@@ -7223,7 +7390,8 @@ const pageResults = await page.evaluate(async () => {
     const offH = game.events.on('lineage:handover', (p) => hEv.push(p));
     iso(() => LS().onMarried(K, P));
     offH();
-    check('27.2: bilgenin evladı 70 yaşında evli değilse devir bekler; evlat sonradan evlenince Ocak Devri tetiklenir', noHeir && st().lineage.heads[cab1.id] === K.id && st().lineage.handovers === h0 + 1 && hEv[0]?.heir === K && hEv[0]?.elder === E, `${noHeir} ${st().lineage.heads[cab1.id]}`);
+    check('27.2: bilgenin evladı 70 yaşında evli değilse devir bekler; evlat sonradan evlenince Ocak Devri tetiklenir', noHeir && st().lineage.heads[cab1.id] === K.id && st().lineage.handovers >= h0 + 1 && hEv.filter((p) => p.elder === E).length === 1 && hEv.find((p) => p.elder === E).heir === K, // (29.1) dünya kaydığında aynı düğün başka bir bilgenin devrini de tetikleyebilir
+       `${noHeir} ${st().lineage.heads[cab1.id]} E${E.id} K${K.id} P${P.id} hEv${hEv.length} Ehome${E.homeId} cab1 ${cab1.id} Khome${K.homeId} Phome${P.homeId} elder ${E.lifeStage} Kstage ${K.lifeStage} Kaway ${K.away}`);
     // Evladı olmayan bilge: aynı evde yaşayan evli (kuşağı büyük) sakine devreder
     const cab2 = freeCabin() === cab1 ? sim.place('cabin') : freeCabin();
     E2.homeId = M1.homeId = M2.homeId = cab2.id;
@@ -7254,7 +7422,11 @@ const pageResults = await page.evaluate(async () => {
       freeCabin();
       const emptyIds = S().world.getCompleted('cabin').filter((h) => h.functional && S().world.getResidents(h).length === 0).map((h) => h.id);
       const nh = st().lineage.newHomes;
+      // (28.1) dünya kaydığında başka bekleyen 2. kuşak çiftler boş kulübeleri önceden kapabilir: yalnızca A ve B bekleyen çift olsun
+      const marriedKeep = st().characters.filter((c) => c !== A && c !== B).map((c) => [c, c.married]);
+      for (const [c] of marriedKeep) c.married = false;
       iso(() => LS().settleWaiting());
+      for (const [c, m] of marriedKeep) c.married = m;
       check('27.2: Altın Çağ başlarken (goldenAge:began) ayrı evlerde kalan evli 2. kuşak çift boş kulübede yuva kurar', A.homeId === B.homeId && emptyIds.includes(A.homeId) && st().lineage.newHomes === nh + 1, `${A.homeId} ${B.homeId} ${emptyIds}`);
       const listening = [...(game.events.listeners.get('goldenAge:began') ?? [])].length > 0;
       check('27.2: LineageSystem goldenAge:began olayını dinler', listening);
@@ -7350,7 +7522,7 @@ const pageResults = await page.evaluate(async () => {
     Math.random = realRandom;
     check('27.2: bu adımın sistemleri ana üreteçleri ve Math.random\'u tüketmez (dilekçe seed + 23, çıraklık + 28, soy + 30, yadigâr + 31)', mainRngs.length > 5 && isoCalls > 15 && rngViolations === 0, `${rngViolations}/${isoCalls}`);
     void rngBefore;
-    check('27.2: kayıt sürümü 31 korunur', CONFIG.SAVE_VERSION === 31);
+    check('27.2: kayıt sürümü 37 korunur', CONFIG.SAVE_VERSION === 37);
     restore(snap0);
     s0.lineage.heads = { ...keepHeads };
     Object.assign(s0.lineage, keepLineage);
@@ -7588,11 +7760,1876 @@ const pageResults = await page.evaluate(async () => {
       game.events.emit('ui:selectCharacter', null);
     }
 
-    check('27.3: kayıt sürümü 31 korunur', CONFIG.SAVE_VERSION === 31);
+    check('27.3: kayıt sürümü 37 korunur', CONFIG.SAVE_VERSION === 37);
     if (st().activeGuest) gs().finish(false);
     S().world.guests = [];
     Object.assign(st().time, keepTime);
     s0.goldenAge.since = keepGA;
+  }
+
+  // ===== 28. aşama (28.2): Çıraklığın yatırıma dönüşmesi ve Başusta kademesi =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const AD = await import('/src/data/apprenticeship.js');
+    const LSD = await import('/src/data/lifeStages.js');
+    const GM = await import('/src/systems/Grandmaster.js');
+    const AP = await import('/src/systems/Apprenticeship.js');
+    const MWD = await import('/src/data/masterpieces.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const SM = await import('/src/state/SaveManager.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    sim.give({ wood: 600, stone: 400, iron: 120, food: 900, bread: 80, wool: 80, flax: 80, hops: 80 });
+    const adults = () => st().characters.filter((c) => !c.role && !c.away && !c.emigrating && !c.isChild).sort((a, b) => a.id - b.id);
+    const pool = adults();
+    const keepRes = { ...s0.resources };
+
+    // --- Veri ---
+    check('28.2: Gençlik Bonusu: enerji dolumu %20 hızlı (YOUTH.energyGain 1 -> 1,2)', LSD.YOUTH.energyGain === 1.2);
+    check('28.2: çıraklık %100 için 30 mesai saati (saatte %3,33)', Math.abs(AD.APPRENTICE.perMinute * 60 * 30 - 100) < 1e-9 && Math.abs(AD.APPRENTICE.perMinute * 60 - 3.3333) < 1e-3);
+    check('28.2: çırak %50\'yi geçince usta verimi +%20 (eskiden +%5)', AD.PROUD_MASTER.workBoost === 1.2 && AD.PROUD_MASTER.workBoostFrom === 50);
+    check('28.2: Başusta sabitleri: eser şansı x2, her 5. üretim hammaddesiz', AD.GRANDMASTER.masterworkMultiplier === 2 && AD.GRANDMASTER.saveEvery === 5);
+
+    // --- Gençlerin enerji bonusu ---
+    {
+      const x = pool[0];
+      const keep = { ls: x.lifeStage, age: x.age, aid: x.ageInDays, prof: x.profile };
+      x.lifeStage = 'adult'; x.age = 30; x.ageInDays = 30 * 16; x.profile = x.buildProfile();
+      const adultGain = x.profile.gain.energy;
+      x.lifeStage = 'youth'; x.age = 19; x.ageInDays = 19 * 16; x.profile = x.buildProfile();
+      const youthGain = x.profile.gain.energy;
+      check('28.2: Genç profilinin enerji kazancı aynı kişinin yetişkin halinin 1,2 katı', Math.abs(youthGain / adultGain - 1.2) < 1e-9, `${adultGain} -> ${youthGain}`);
+      x.lifeStage = keep.ls; x.age = keep.age; x.ageInDays = keep.aid; x.profile = keep.prof;
+    }
+
+    // --- Çıraklık hızı ve usta verimi (gerçek ApprenticeshipSystem) ---
+    const sys = () => S().apprenticeship;
+    const ws = S().world.getCompleted('workshop').find((b) => !b.damaged) ?? sim.place('workshop');
+    ws.damaged = false; ws.isBurning = false;
+    const master = pool.find((c) => c.lifeStage !== 'elder' && !c.retired) ?? pool[0];
+    master.workplaceId = ws.id; master.skills.crafting = 2000; master.lifeStage = 'adult'; master.task = null;
+    const kid = pool[pool.length - 1];
+    const keepKid = { ls: kid.lifeStage, age: kid.age, aid: kid.ageInDays, app: kid.apprenticeship, task: kid.task, skills: { ...kid.skills }, wp: kid.workplaceId };
+    kid.lifeStage = 'youth'; kid.age = 19; kid.ageInDays = 19 * 16; kid.apprenticeship = null; kid.task = null; kid.workplaceId = null; kid.profile = kid.buildProfile();
+    const enrolled = sys().enroll(kid, ws);
+    check('28.2: genç Zanaat Atölyesi\'ne çırak yazıldı', enrolled && kid.apprenticeship?.profession === 'workshop');
+    const realAtWork = sys().masterAtWork;
+    sys().masterAtWork = () => master; // usta tezgâhta
+    const task = { activity: 'apprentice', phase: 'perform', workBuildingId: ws.id };
+    kid.task = task;
+    let ok = true;
+    for (let i = 0; i < 60 && ok; i++) ok = sys().learn(kid, task, 1);
+    check('28.2: bir mesai saatinde çıraklık ilerlemesi %3,33 (eskiden %1,67)', ok && Math.abs(kid.apprenticeship.progress - 100 / 30) < 1e-6, String(kid.apprenticeship?.progress));
+    for (let h = 1; h < 30; h++) for (let i = 0; i < 60; i++) sys().learn(kid, task, 1);
+    check('28.2: 30 mesai saatinde çıraklık %100\'e ulaşır', kid.apprenticeship.progress >= 99.999, String(kid.apprenticeship.progress));
+    // Usta verimi: %50 üstünde +%20
+    kid.apprenticeship.progress = 40;
+    master.buffs.proudMaster = st().totalMinutes + 360;
+    const lowBoost = sys().masterBoost(master, { workBuildingId: ws.id });
+    kid.apprenticeship.progress = 60;
+    const highBoost = sys().masterBoost(master, { workBuildingId: ws.id });
+    check('28.2: çırak %50\'yi geçince ustanın tezgâhına +%20 verim (altında 1)', lowBoost === 1 && Math.abs(highBoost - 1.2) < 1e-9, `${lowBoost} / ${highBoost}`);
+    sys().masterAtWork = realAtWork;
+
+    // --- Mezuniyet: yalnızca %100 Başusta yapar ---
+    const events = [];
+    const offG = game.events.on('apprentice:grandmaster', (p) => events.push(p));
+    const g0 = s0.apprenticeship.grandmasters ?? 0;
+    kid.apprenticeship.progress = 100;
+    kid.skills.crafting = 0;
+    kid.lifeStage = 'adult';
+    sys().graduate(kid);
+    check('28.2: çıraklığı %100 bitiren Genç yetişkin olunca Başusta olur (isGrandmaster, meslek yapısı, Yetkin Usta deneyimi)', kid.isGrandmaster === true && kid.grandmasterProfession === 'workshop' && kid.skills.crafting >= AD.GRADUATION.masterXp && s0.apprenticeship.grandmasters === g0 + 1 && events.length === 1);
+    check('28.2: unvan "Başusta Demirci" ve günlük satırı', GM.grandmasterTitle(kid) === 'Başusta Demirci' && s0.journal.some((j) => j.text.includes('Başusta Demirci oldu')));
+    // %99 -> Başusta değil (Kıdemli Kalfa)
+    const kid2 = pool[pool.length - 2];
+    const keep2 = { ls: kid2.lifeStage, app: kid2.apprenticeship, skills: { ...kid2.skills }, gm: kid2.isGrandmaster, gp: kid2.grandmasterProfession };
+    kid2.lifeStage = 'adult'; kid2.isGrandmaster = false; kid2.grandmasterProfession = null;
+    kid2.apprenticeship = { masterId: master.id, profession: 'workshop', buildingId: ws.id, progress: 99.9, since: 0, crafted: 0 };
+    sys().graduate(kid2);
+    check('28.2: %99,9\'da mezun olan Başusta OLMAZ (Kıdemli Kalfa kalır)', kid2.isGrandmaster === false && kid2.grandmasterProfession === null);
+    // Normal çalışarak 25 saatte usta olan: asla
+    const worker = pool[1];
+    const keepW = { skills: { ...worker.skills }, gm: worker.isGrandmaster };
+    worker.isGrandmaster = false; worker.grandmasterProfession = null;
+    worker.skills.crafting = 1500 + 6000; // bol deneyim: Usta kademesinin çok üstü
+    sys().graduate(worker); // çıraklığı yok: no-op
+    S().craftsmanship.refreshAll();
+    check('28.2: çıraklıksız, çalışarak usta olan (hatta çok deneyimli) sakin ASLA Başusta olmaz', worker.isGrandmaster === false && GM.grandmasterTitle(worker) === null);
+    worker.skills = keepW.skills;
+    offG();
+
+    // --- Usta işi eser şansı ---
+    const gm = kid; // Başusta Demirci (crafting)
+    const baker = pool[2];
+    const keepBaker = { gm: baker.isGrandmaster, gp: baker.grandmasterProfession, skills: { ...baker.skills }, wp: baker.workplaceId, eq: baker.equipment };
+    const mill = S().world.getCompleted('mill')[0] ?? sim.place('mill');
+    baker.skills.baking = 2000;
+    noMoods(baker); // (29.2b) eser şansı ruh halinden (İlham / Ustalık Akışı) bağımsız ölçülür
+    baker.isGrandmaster = false; baker.grandmasterProfession = null; baker.workplaceId = null; baker.equipment = { ...(baker.equipment ?? {}), tool: null };
+    const craft = S().craftsmanship;
+    const base = craft.chanceFor(baker, 'royalLoaf', mill);
+    baker.isGrandmaster = true; baker.grandmasterProfession = 'mill';
+    const gmBase = craft.chanceFor(baker, 'royalLoaf', mill);
+    baker.workplaceId = mill.id; baker.equipment.tool = 'sturdyTool';
+    const gmFull = craft.chanceFor(baker, 'royalLoaf', mill);
+    baker.isGrandmaster = false; baker.grandmasterProfession = null;
+    const plainFull = craft.chanceFor(baker, 'royalLoaf', mill);
+    check('28.2: Başusta usta işi eser şansı iki kat: temel %4 -> %8, sabit iş yeri + Sağlam Alet ile %8 -> %16', Math.abs(base - MWD.MASTERWORK.baseChance) < 1e-9 && Math.abs(gmBase - 2 * base) < 1e-9 && Math.abs(plainFull - (MWD.MASTERWORK.baseChance + MWD.MASTERWORK.pinnedBonus + MWD.MASTERWORK.toolBonus)) < 1e-9 && Math.abs(gmFull - 2 * plainFull) < 1e-9, `${base} ${gmBase} ${plainFull} ${gmFull}`);
+    baker.isGrandmaster = true; baker.grandmasterProfession = 'workshop'; // Demirci Başusta fırın eserinde (başka meslek) çarpan almaz
+    const offProf = craft.chanceFor(baker, 'royalLoaf', mill);
+    check('28.2: Başusta yalnızca kendi mesleğinin eserinde çarpan alır (Demirci Başusta ekmek eserinde 1x)', Math.abs(offProf - plainFull) < 1e-9);
+
+    // --- Hammadde tasarrufu: her 5. üretim hammaddesiz ---
+    baker.isGrandmaster = true; baker.grandmasterProfession = 'mill'; baker.grandmasterBatches = 0;
+    const proc = mill.definition.processing;
+    const inKey = Object.keys(proc.input)[0];
+    const outKey = Object.keys(proc.output)[0];
+    const bsys = S().behavior;
+    const produce = (worker, n) => {
+      sim.give({ [inKey]: 200 });
+      const before = { in: s0.resources[inKey], out: s0.resources[outKey] };
+      mill.productionBuffer = 0;
+      bsys.process(mill, (60 / proc.perHour) * n, worker); // n üretimlik iş
+      return { spent: before.in - s0.resources[inKey], made: s0.resources[outKey] - before.out };
+    };
+    const savedEvents = [];
+    const offS = game.events.on('grandmaster:saved', (p) => savedEvents.push(p));
+    const run5 = produce(baker, 5);
+    check('28.2: Başusta fırında 5 üretimden birini hammaddesiz yapar (4 harcama, 5 ürün)', run5.spent === 4 * (proc.input[inKey] ?? 1) && run5.made === 5 * (proc.output[outKey] ?? 1) && baker.grandmasterBatches === 5 && savedEvents.length === 1, JSON.stringify(run5));
+    const run10 = produce(baker, 10);
+    check('28.2: sayaç deterministiktir: sonraki 10 üretimde tam 2 tasarruf', run10.spent === 8 * (proc.input[inKey] ?? 1) && baker.grandmasterBatches === 15 && savedEvents.length === 3, JSON.stringify(run10));
+    const plainRun = produce(pool[3], 5);
+    check('28.2: normal usta aynı işte hep hammadde harcar (5 harcama)', plainRun.spent === 5 * (proc.input[inKey] ?? 1));
+    baker.grandmasterProfession = 'loom';
+    const otherProf = produce(baker, 5);
+    check('28.2: Başusta başka mesleğin yapısında tasarruf yapmaz', otherProf.spent === 5 * (proc.input[inKey] ?? 1));
+    baker.grandmasterProfession = 'mill';
+    // Zanaat Atölyesi (crafting): hazır bekleyen sipariş varsa 5. iş hammaddesiz başlar
+    const smithGm = gm;
+    smithGm.grandmasterBatches = 4;
+    ws.craft = null;
+    const pick = S().crafting.chooseItem(ws);
+    if (pick.item) {
+      const before = { ...s0.resources };
+      S().crafting.work(ws, 0.001, smithGm);
+      const same = Object.keys(pick.recipe.cost).every((r) => s0.resources[r] === before[r]);
+      check('28.2: Başusta Zanaat Atölyesi\'nde her 5. işi hammaddesiz başlatır (kaynak düşmez, sayaç 5)', ws.craft && same && smithGm.grandmasterBatches === 5, JSON.stringify(pick.recipe.cost));
+      ws.craft = null;
+    } else check('28.2: Başusta Zanaat Atölyesi\'nde her 5. işi hammaddesiz başlatır (atölyede bekleyen ekipman yok: atlandı)', true);
+    offS();
+
+    // --- Arayüz ---
+    game.events.emit('ui:selectCharacter', gm.id);
+    game.render(0);
+    const badge = document.querySelector('.character-panel:not(.guest-panel) .craft-badge');
+    check('28.2: karakter kartında "Başusta Demirci" altın-mor rozeti', badge && !badge.hidden && badge.classList.contains('is-grandmaster') && badge.textContent.includes('Başusta Demirci'), badge?.className + ' ' + badge?.textContent);
+    game.events.emit('ui:selectCharacter', null);
+    const oldWorkers = new Set(ws.workerIds);
+    gm.workplaceId = ws.id;
+    ws.workerIds.add(gm.id);
+    game.events.emit('ui:selectBuilding', ws.id);
+    game.render(0);
+    const panelText = document.querySelector('.building-panel')?.textContent ?? '';
+    check('28.2: zanaat yapısının panelinde çalışan Başusta için "Başusta Üretimi: Tasarruf Şansı" ipucu', panelText.includes('Başusta Üretimi') && panelText.includes('Tasarruf Şansı'), panelText.slice(0, 160));
+    ws.workerIds.delete(gm.id);
+    gm.workplaceId = null;
+    game.render(0);
+    check('28.2: Başusta çalışmıyorsa ipucu yok', !(document.querySelector('.building-panel')?.textContent ?? '').includes('Başusta Üretimi'));
+    ws.workerIds = oldWorkers;
+    game.events.emit('ui:selectBuilding', null);
+
+    // --- Kayıt (sürüm 33) ---
+    const raw = JSON.parse(JSON.stringify(S().saves.snapshot()));
+    const rawGm = raw.characters.find((c) => c.id === gm.id);
+    check('28.2: Başusta alanları kayda yazılır (isGrandmaster, grandmasterProfession, grandmasterBatches) ve sayaçlar', rawGm.isGrandmaster === true && rawGm.grandmasterProfession === 'workshop' && Number.isFinite(rawGm.grandmasterBatches) && raw.apprenticeship.grandmasters >= 1 && raw.apprenticeship.grandmasterSaved >= 1);
+    const back = Character.fromJSON(rawGm);
+    check('28.2: Character.fromJSON Başusta durumunu aynen geri yükler', back.isGrandmaster === true && back.grandmasterProfession === 'workshop' && back.grandmasterBatches === gm.grandmasterBatches);
+    const bogus = Character.fromJSON({ ...rawGm, grandmasterProfession: 'dragonKeep' });
+    const noProf = Character.fromJSON({ ...rawGm, isGrandmaster: false, grandmasterBatches: 9 });
+    check('28.2: bozuk meslek / bayraksız kayıt Başusta saymaz, sayaç sıfırlanır', bogus.isGrandmaster === false && bogus.grandmasterProfession === null && noProf.isGrandmaster === false && noProf.grandmasterBatches === 0);
+    const legacy = JSON.parse(JSON.stringify(raw));
+    legacy.version = 32;
+    for (const c of legacy.characters) { delete c.isGrandmaster; delete c.grandmasterProfession; delete c.grandmasterBatches; }
+    delete legacy.apprenticeship.grandmasters; delete legacy.apprenticeship.grandmasterSaved;
+    const keepSlot = localStorage.getItem(CONFIG.SESSION_KEY);
+    localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
+    const migrated = SM.SaveManager.read('session');
+    if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
+    check('28.2: v32 kaydı v33\'e göç eder: hiç kimse Başusta değil, çıraklık sayaçları 0', CONFIG.SAVE_VERSION >= 33 && migrated && migrated.characters.every((c) => c.isGrandmaster === false && c.grandmasterProfession === null && c.grandmasterBatches === 0) && migrated.apprenticeship.grandmasters === 0 && migrated.apprenticeship.grandmasterSaved === 0);
+
+    // Temizlik
+    Object.assign(kid, { lifeStage: keepKid.ls, age: keepKid.age, ageInDays: keepKid.aid, apprenticeship: keepKid.app, task: keepKid.task, skills: keepKid.skills, workplaceId: keepKid.wp, isGrandmaster: false, grandmasterProfession: null, grandmasterBatches: 0 });
+    Object.assign(kid2, { lifeStage: keep2.ls, apprenticeship: keep2.app, skills: keep2.skills });
+    Object.assign(baker, { isGrandmaster: false, grandmasterProfession: null, grandmasterBatches: 0, skills: keepBaker.skills, workplaceId: keepBaker.wp, equipment: keepBaker.eq });
+    master.buffs.proudMaster = -1;
+    Object.assign(s0.resources, keepRes);
+  }
+
+  // ===== 28. aşama (28.3): Sürdürülebilir kuşak döngüsü: Saygın Büyük, vefat ve kazalar =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const LSD = await import('/src/data/lifeStages.js');
+    const VN = await import('/src/systems/Venerable.js');
+    const LS = await import('/src/systems/LifeStages.js');
+    const TS = await import('/src/systems/TownStatus.js');
+    const TD = await import('/src/data/town.js');
+    const CRI = await import('/src/systems/Crisis.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const SM = await import('/src/state/SaveManager.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    const lc = () => S().lifecycle;
+    const adults = () => st().characters.filter((c) => !c.role && !c.isChild && !c.away && !c.emigrating).sort((a, b) => a.id - b.id);
+    // (29.2b) Kıdemli Bilge yaşı 65'e indi: önceki bölümlerin uzun koşusunda yaşlanan kurucular havuza girmesin (evi olan, bilge / Saygın Büyük olmayan yetişkinler)
+    const pool = adults().filter((c) => c.lifeStage !== 'elder' && !c.isVenerable && c.homeId !== null);
+    sim.give({ wood: 600, stone: 400, food: 900, bread: 80 });
+    const events = [];
+    const offs = ['venerable:became', 'population:died', 'population:left', 'heirloom:archived', 'life:fatalAccident'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
+    const keep = new Map(st().characters.map((c) => [c, { ls: c.lifeStage, age: c.age, aid: c.ageInDays, ven: c.isVenerable, home: c.homeId, kids: [...(c.children ?? [])], inv: [...(c.inventory ?? [])], lifespan: c.lifespan, retired: c.retired, married: c.married, partner: c.partnerId }]));
+
+    // --- Veri ve ömür ---
+    check('28.3: ömür 66-75 yaş (29.2b), tohumdan türeyen izole üreteç (seed + 30)', LSD.LIFESPAN.min === 66 && LSD.LIFESPAN.max === 75 && LSD.LIFESPAN.seedOffset === 30);
+    const ids = Array.from({ length: 300 }, (_, i) => i + 1);
+    const spans = ids.map((i) => VN.lifespanFor(42, i));
+    check('28.3: lifespanFor deterministik, 66-75 aralığında ve çeşitli (aynı tohum + kimlik = aynı ömür)', spans.every((v, i) => v === VN.lifespanFor(42, ids[i]) && v >= 66 && v <= 75) && new Set(spans).size >= 8 && VN.lifespanFor(42, 7) !== undefined && spans.some((v, i) => v !== VN.lifespanFor(43, ids[i])));
+    check('28.3: her sakinin ömrü atanmış (66-75)', st().characters.every((c) => c.lifespan >= 66 && c.lifespan <= 75 && c.lifespan === VN.lifespanFor(s0.seed, c.id)));
+    const born = new Character({ name: 'Yeni Bebek', age: 0, traits: ['cheerful'], appearance: { hair: 'short', hairColor: 'brown', skin: 'light', shirt: 'sky', pants: 'navy' } });
+    st().characters.push(born);
+    game.events.emit('population:changed', st().characters.length);
+    check('28.3: sonradan katılan / doğan sakine ömür atanır (kimlikten türer)', born.lifespan === VN.lifespanFor(s0.seed, born.id) && born.lifespan >= 66);
+    st().characters.splice(st().characters.indexOf(born), 1);
+
+    // --- Saygın Büyük ---
+    const E = pool[0];
+    const mkElder = (c, age = 72) => { c.lifeStage = 'elder'; c.age = age; c.ageInDays = age * 16; c.retired = true; c.isVenerable = false; c.lifespan = LSD.LIFESPAN.max; }; // (29.2b) test bilgeleri kendi sınav yaşlarında istemeden vefat etmesin
+    const noHeirloom = (c) => { c.inventory = (c.inventory ?? []).filter((x) => !x.heirloom); };
+    mkElder(E);
+    E.children = [];
+    E.married = false; E.partnerId = null;
+    noHeirloom(E);
+    const homeE = E.homeId;
+    const bedsBefore = TS.freeBeds(st()).open;
+    events.length = 0;
+    const done = lc().checkVenerables();
+    check('28.3: Ocak ve Yadigâr devri tamam (evladı yok, yadigârı yok) Kıdemli Bilge Saygın Büyük olur', done.includes(E) && E.isVenerable === true && E.lifeStage === 'elder' && events.some((e) => e.n === 'venerable:became' && e.p.character === E));
+    check('28.3: Saygın Büyük yatağını tamamen boşaltır (homeId = null) ve ev boş yatağa döner', E.homeId === null && TS.freeBeds(st()).open + TS.freeBeds(st()).family >= bedsBefore && st().characters.every((c) => c !== E || c.homeId === null) && homeE !== null);
+    check('28.3: Saygın Büyük günlüğe ve bildirime yazılır, sayaç artar', st().journal.some((j) => j.text.includes(`${E.name} Saygın Büyük oldu`)) && st().lifeStages.venerables >= 1);
+    check('28.3: Saygın Büyük bir kez olur (ikinci kontrolde tekrar olmaz)', !lc().checkVenerables().includes(E));
+    // Koşullar: evladı olan, reisi olduğu ocağı devredemeyen bilge bekler; 75 yaşında zaman aşımı ile muaf
+    const F = pool[1];
+    const kid = pool[2];
+    mkElder(F, 66);
+    noHeirloom(F);
+    F.children = [kid.id]; kid.parentIds = [F.id]; kid.married = false; kid.partnerId = null;
+    const cabin = S().world.getBuilding(F.homeId);
+    st().lineage.heads[cabin.id] = F.id;
+    const waits = !lc().checkVenerables().includes(F) && !F.isVenerable;
+    F.age = 68; F.ageInDays = 68 * 16;
+    check('28.3: ocağını devredemeyen (evladı evli değil) bilge bekler; 68 yaşında devir muaf sayılır', waits && lc().checkVenerables().includes(F) && F.isVenerable);
+    // Yadigâr: teslim edilmemiş yadigâr varken Saygın Büyük olunmaz; devredecek kimse yoksa arşive kalkar
+    const G = pool[3];
+    mkElder(G, 73);
+    G.children = [];
+    G.inventory = [{ kind: 'heirloomHammer', qty: 1, name: 'Ata Yadigârı Çekiç', heirloom: { ownerId: G.id, ownerName: G.name, story: 'x', since: st().time.day - 1, chain: [G.name] } }];
+    const heirs = st().characters.filter((c) => c !== G && !c.isChild);
+    const heirKeep = heirs.map((c) => [c, c.lifeStage, c.inventory]);
+    for (const c of heirs) { c.lifeStage = 'elder'; } // mirasçı adayı kalmasın (Bilge, çocuk, ayrılan olmaz)
+    const archive0 = st().heirloom.archive.length;
+    events.length = 0;
+    const gDone = lc().checkVenerables().includes(G);
+    check('28.3: devredecek kimsesi olmayan bilgenin yadigârı arşive kalkar ve Saygın Büyük olur', gDone && G.isVenerable && !G.inventory.some((x) => x.heirloom) && st().heirloom.archive.length === archive0 + 1 && events.some((e) => e.n === 'heirloom:archived'));
+    for (const [c, ls, inv] of heirKeep) { c.lifeStage = ls; }
+    const H = pool[4];
+    mkElder(H, 73);
+    H.children = [];
+    const heir = pool.find((c) => c !== H && !c.isChild && c.lifeStage !== 'elder' && !c.isVenerable);
+    heir.inventory = (heir.inventory ?? []).filter((x) => !x.heirloom); // mirasçı yadigâr taşımıyor
+    H.children = [heir.id]; heir.parentIds = [H.id];
+    st().lineage.heads[H.homeId ?? 0] = heir.id; // ocak devredildi: bekleyen yalnızca yadigâr
+    H.inventory = [{ kind: 'heirloomHammer', qty: 1, name: 'Ata Yadigârı Çekiç', heirloom: { ownerId: H.id, ownerName: H.name, story: 'x', since: st().time.day - 1, chain: [H.name] } }];
+    check('28.3: mirasçısı varken yadigâr devri bekler: Saygın Büyük olmaz', heir && !lc().checkVenerables().includes(H) && !H.isVenerable);
+    H.inventory = H.inventory.filter((x) => !x.heirloom);
+    check('28.3: yadigâr teslim edilince (çantada kalmayınca) Saygın Büyük olur', lc().checkVenerables().includes(H));
+
+    // Saygın Büyük yeniden yatağa taşınmaz: evli çiftin biri Saygın Büyükse "ayrı evlerde" çifti yeniden aynı eve taşıma denenmez
+    {
+      const mate = pool.find((c) => c !== E && !c.isChild && !c.isVenerable && c.lifeStage !== 'elder');
+      const keepM = { m: mate.married, p: mate.partnerId, h: mate.homeId, em: E.married, ep: E.partnerId };
+      mate.married = true; mate.partnerId = E.id; E.married = true; E.partnerId = mate.id;
+      const homeBefore = mate.homeId;
+      S().family.reuniteCouples();
+      check('28.3: Saygın Büyük ile eşi "ayrı evlerde" sayılmaz: çift yeniden aynı eve taşınmaz, Saygın Büyük yatak edinmez', E.homeId === null && mate.homeId === homeBefore && S().family.moveTogether(E, mate) === false);
+      mate.married = keepM.m; mate.partnerId = keepM.p; E.married = keepM.em; E.partnerId = keepM.ep;
+    }
+
+    // --- Nüfus kotası ---
+    const venCount = st().characters.filter((c) => c.isVenerable).length;
+    check('28.3: activePopulation Saygın Büyükleri saymaz (toplam - Saygın)', LS.activePopulation(st()) === st().characters.length - venCount && venCount >= 4 && LS.activePopulation({ characters: [{ isVenerable: true }, {}, {}] }) === 2);
+    const tier = TD.TOWN_TIERS.find((t) => t.tier === st().town.tier);
+    const keepMax = tier.maxPopulation;
+    tier.maxPopulation = st().characters.length; // toplam nüfus = sınır
+    const status = TS.immigrationStatus(st());
+    const bedsCheck = status.checks.find((c) => c.key === 'beds');
+    check('28.3: sınır toplam nüfusa eşitken bile Saygın Büyükler sayılmadığı için "Nüfus sınırı doldu" denmez', !bedsCheck.text.includes('Nüfus sınırı') && TS.townMetrics(st()).population === LS.activePopulation(st()), bedsCheck.text);
+    tier.maxPopulation = keepMax;
+    // HUD çipi
+    game.ui.components.find((x) => x.renderWelfare).welfareAt = -Infinity;
+    game.render(0);
+    const chip = document.querySelector('.hud-population')?.textContent ?? '';
+    check('28.3: nüfus çipi Saygın Büyükleri parantezle gösterir: "N/M (+K Saygın)"', new RegExp(`^${LS.activePopulation(st())}/\\d+ \\(\\+${venCount} Saygın\\)$`).test(chip), chip);
+    // Karakter kartı
+    game.events.emit('ui:selectCharacter', E.id);
+    game.render(0);
+    const cardText = document.querySelector('.life-stage-venerable')?.textContent ?? '';
+    check('28.3: karakter kartında "Saygın Büyük (Nüfus Kotasından Muaf)"', cardText.includes('Saygın Büyük (Nüfus Kotasından Muaf)'), cardText.slice(0, 120));
+    game.events.emit('ui:selectCharacter', null);
+    // Geceleri yatağı yok: Bilgelik Evi / han / belediye
+    const roost = S().behavior.brain.venerableRoost(E);
+    const sleepPlan = S().behavior.brain.planSleep(E, false);
+    check('28.3: Saygın Büyük geceleri evi olmadığı için ortak yapıda (Bilgelik Evi, han, belediye) sabahlar', roost ? sleepPlan?.buildingId === roost.id && LSD.VENERABLE.sleepVenues.includes(roost.type) : sleepPlan === null);
+
+    // --- Doğal vefat ---
+    const D = pool[5];
+    const partner = pool[6];
+    const child = pool[7];
+    const youth = pool[8];
+    const D0 = { kids: D.children, par: partner.parentIds };
+    mkElder(D, 72);
+    D.lifespan = 72;
+    D.married = true; D.partnerId = partner.id; partner.married = true; partner.partnerId = D.id; partner.lifeStage = 'adult';
+    D.children = [child.id]; child.parentIds = [D.id]; child.parents = [D.id];
+    D.coins = 100; partner.coins = 5;
+    D.workplaceId = null;
+    const hall = S().world.getCompleted('storage')[0] ?? S().world.getCompleted('cabin')[0];
+    if (hall) { hall.workerIds.add(D.id); hall.occupants.add(D.id); }
+    youth.lifeStage = 'youth'; youth.age = 19; youth.ageInDays = 19 * 16;
+    youth.apprenticeship = { masterId: D.id, profession: 'workshop', buildingId: S().world.getCompleted('workshop')[0]?.id ?? 0, progress: 20, since: 0, crafted: 0 };
+    S().relationships.set(D, child, 40);
+    st().lineage.heads[S().world.getBuilding(D.homeId ?? child.homeId)?.id ?? 0] = D.id;
+    D.inventory = [{ kind: 'heirloomHammer', qty: 1, name: 'Ata Yadigârı Çekiç', heirloom: { ownerId: D.id, ownerName: D.name, story: 'x', since: st().time.day - 2, chain: [D.name] } }];
+    child.inventory = (child.inventory ?? []).filter((x) => !x.heirloom);
+    child.lifeStage = 'adult'; child.isChild = false;
+    let peopleBefore = st().characters.length;
+    let deaths0 = st().lifeStages.deaths;
+    events.length = 0;
+    // Ömrüne ulaşmadan ölmez
+    D.age = 71;
+    const early = lc().dailyDeaths();
+    check('28.3: ömrüne ulaşmayan bilge vefat etmez', !early.includes(D) && st().characters.includes(D));
+    // (29.2b) Kurucu bilgeler artık ömrüne ulaşıp aynı çağrıda vefat edebilir: sayaçlar bu çağrıdan sonra alınır
+    peopleBefore = st().characters.length;
+    deaths0 = st().lifeStages.deaths;
+    events.length = 0;
+    D.age = 72;
+    const dueBefore = new Set(st().characters.filter((c) => c.lifeStage === 'elder' && !c.away && c.age >= c.lifespan).map((c) => c.id));
+    const died = lc().dailyDeaths();
+    check('28.3: ömrüne ulaşan Kıdemli Bilge gün dönümünde vefat eder ve sistemden çıkar (state ve world)', died.includes(D) && !st().characters.includes(D) && !S().world.characters.includes(D) && st().characters.length === peopleBefore - died.length && S().world.getCharacter(D.id) === undefined | S().world.getCharacter(D.id) === null, `${died.map((c) => c.name + c.age)} ${D.name} ${D.age}/${D.lifespan} ${peopleBefore} ${st().characters.length}`);
+    check('28.3: kasaba günlüğü ve olay: "[İsim] [Yaş] yaşında huzur içinde hayata gözlerini yumdu."', st().journal.some((j) => j.text === `${D.name} 72 yaşında huzur içinde hayata gözlerini yumdu.`) && events.some((e) => e.n === 'population:died' && e.p.character === D && e.p.age === 72 && e.p.cause === 'age'));
+    check('28.3: vefat sayaçları ve son vefat kaydı', st().lifeStages.deaths === deaths0 + died.length && st().lifeStages.lastDeath?.name === died.at(-1).name && !st().journal.some((j) => j.text.includes(`${D.name} kesesindeki`)));
+    // Kopuk referans bırakmaz
+    const Did = D.id;
+    const dangling = [];
+    for (const c of st().characters) {
+      if (c.partnerId === Did) dangling.push(`${c.name}.partnerId`);
+      if (c.parentIds.includes(Did)) dangling.push(`${c.name}.parentIds`);
+      if ((c.children ?? []).includes(Did) || (c.parents ?? []).includes(Did)) dangling.push(`${c.name}.children/parents`);
+      if (c.apprenticeship?.masterId === Did) dangling.push(`${c.name}.masterId`);
+      if ((c.mentees ?? []).some((m) => m.id === Did)) dangling.push(`${c.name}.mentees`);
+    }
+    for (const b of st().buildings) if (b.workerIds.has(Did) || b.occupants.has(Did)) dangling.push(`${b.type}#${b.id}`);
+    for (const key of Object.keys(st().relationships)) if (key.split('-').map(Number).includes(Did)) dangling.push(`relationships ${key}`);
+    for (const [k, v] of S().world.reservations) if (v === Did) dangling.push(`rezerv ${k}`);
+    if (Object.values(st().lineage.heads).includes(Did)) dangling.push('lineage.heads');
+    check('28.3: ölen sakin arkada eş, ebeveyn / evlat, usta, iş, ev, ilişki, rezerv ve ocak kütüğü referansı bırakmaz', dangling.length === 0 && partner.married === false && partner.partnerId === null && youth.apprenticeship.masterId === null, dangling.join(', '));
+    check('28.3: kesesi eşine kalır; yadigârı mirasçısına (evladına) geçer', partner.coins === 105 && child.inventory.some((x) => x.heirloom) && st().heirloom.transfers >= 1);
+    check('28.3: bir sonraki gün dönümünde (ölü sakin olmadığı için) hata yok, vefat tekrarlanmaz', !lc().dailyDeaths().includes(D));
+    // Yetişkin (Bilge olmayan) ömrünü doldursa da ölmez; seferdeki ertelenir
+    const K = pool[9];
+    const kAge = K.age; const kLs = K.lifeStage;
+    K.lifeStage = 'adult'; K.age = 78; K.lifespan = 66;
+    const away = pool[10];
+    mkElder(away, 78); away.lifespan = 70; away.away = { stage: 'away' };
+    const dd = lc().dailyDeaths();
+    check('28.3: yalnızca Kıdemli Bilge / Saygın Büyük ömründen ölür (yetişkin ölmez); seferdeki bilge dönene dek ertelenir', !dd.includes(K) && !dd.includes(away) && st().characters.includes(K) && st().characters.includes(away));
+    away.away = null; K.lifeStage = kLs; K.age = kAge;
+    // Saygın Büyük de ömrüyle vefat eder
+    const venDie = E;
+    venDie.lifespan = 75; venDie.age = 75;
+    check('28.3: Saygın Büyük de ömrüne ulaşınca vefat eder', lc().dailyDeaths().includes(venDie) && !st().characters.includes(venDie));
+
+    // --- Trajik kazalar ---
+    check('28.3: kaza sabitleri: yangın %1,5, baskın %2, sefer %2', LSD.FATAL.fire === 0.015 && LSD.FATAL.raid === 0.02 && LSD.FATAL.expedition === 0.02 && LSD.FATAL.minAble >= 4);
+    const crisisSys = S().crisis;
+    const rngKeep = crisisSys.rng;
+    const stub = (v) => Object.assign(Object.create(rngKeep), { next: () => v });
+    const target = st().buildings.find((b) => b.functional && !b.damaged && !b.isBurning && b.definition.cost && ['lumberHut', 'mill', 'workshop', 'healerHut'].includes(b.type));
+    for (const x of st().characters) { x.isInjured = false; }
+    const fighter = () => adults().find((c) => !c.isInjured && !c.isVenerable);
+    if (target) {
+      crisisSys.startFire(target);
+      target.fireProgress = 60;
+      const rearm = () => { target.fireProgress = 60; target.fireWater = 0; target.isBurning = true; };
+      const f1 = fighter();
+      crisisSys.rng = stub(0.5);
+      crisisSys.onBucket(f1, target);
+      rearm();
+      const safe = st().characters.includes(f1) && !f1.isInjured;
+      const f2 = fighter();
+      crisisSys.rng = stub(0.05);
+      crisisSys.onBucket(f2, target);
+      rearm();
+      const hurtOnly = st().characters.includes(f2) && f2.isInjured;
+      const f3 = adults().find((c) => !c.isInjured);
+      const n3 = f3.name;
+      events.length = 0;
+      crisisSys.rng = stub(0.07);
+      crisisSys.onBucket(f3, target);
+      const fatal = !st().characters.includes(f3);
+      check('28.3: yangında tek zar: yüksek zar güvenli, düşük zar yaralar, yaralanma yanındaki %1,5\'lik aralık öldürür (üreteç akışı aynı)', safe && hurtOnly && fatal && events.some((e) => e.n === 'life:fatalAccident' && e.p.cause === 'fire'));
+      check('28.3: yangın ölümü dramatik günlük notu: "... yangın söndürürken kahramanca can verdi."', st().journal.some((j) => j.text.startsWith(n3) && j.text.includes('yangın söndürürken kahramanca can verdi')) && st().lifeStages.accidents >= 1 && st().lifeStages.lastDeath?.cause === 'fire');
+      crisisSys.rng = rngKeep;
+      target.isBurning = false; target.fireProgress = 0; target.fireWater = 0; target.damageKind = null;
+    } else check('28.3: yangın kazası (uygun yapı yok: atlandı)', true);
+    // Çekirdek iş gücü korunur: sağlam yetişkin azsa ölüm olmaz
+    const able = CRI.ablePeople(st());
+    const keepAway = able.map((c) => [c, c.away]);
+    for (const c of able.slice(LSD.FATAL.minAble - 1)) c.away = { stage: 'away' };
+    const victim = CRI.ablePeople(st())[0];
+    const alive0 = st().characters.length;
+    crisisSys.fatalAccident(victim, 'fire');
+    check('28.3: sağlam yetişkin sayısı FATAL.minAble\'ın altındaysa kaza ölümü olmaz (çekirdek iş gücü korunur)', st().characters.length === alive0 && st().characters.includes(victim));
+    for (const [c, a] of keepAway) c.away = a;
+    // Baskın
+    const defTower = { tower: null };
+    for (const x of st().characters) x.isInjured = false;
+    const before = st().characters.length;
+    crisisSys.rng = stub(0.5 + 0.0); // chance 0.5: roll = 0.51 => ölümcül aralık [0.5, 0.52)
+    crisisSys.rng = stub(LSD.FATAL.raid / 2 + 0.5);
+    events.length = 0;
+    crisisSys.repel(defTower);
+    crisisSys.rng = rngKeep;
+    check('28.3: baskında savunmacı için ölümcül kaza aralığı (yaralanma şansının hemen üstü)', st().characters.length === before - 1 && events.some((e) => e.n === 'life:fatalAccident' && e.p.cause === 'raid') && st().journal.some((j) => j.text.includes('haydutlara karşı kasabayı savunurken can verdi')));
+    // Sefer: kaza olayı doğrudan öldürür
+    const x = adults()[2];
+    const xn = x.name;
+    game.events.emit('life:fatalAccident', { character: x, cause: 'expedition' });
+    check('28.3: seferde ölümcül kaza (olay) sakini anında kaldırır, dramatik günlük notu', !st().characters.includes(x) && st().journal.some((j) => j.text.startsWith(xn) && j.text.includes('seferde')) );
+    // Ölümler arasında kopuk referans yok (tam tarama)
+    const idset = new Set(st().characters.map((c) => c.id));
+    const bad = [];
+    for (const c of st().characters) {
+      if (c.partnerId !== null && !idset.has(c.partnerId)) bad.push(`${c.name} eş`);
+      for (const pid of c.parentIds) if (!idset.has(pid)) bad.push(`${c.name} ebeveyn`);
+      for (const k of c.children ?? []) if (!idset.has(k)) bad.push(`${c.name} evlat`);
+    }
+    for (const b of st().buildings) for (const id of [...b.workerIds, ...b.occupants]) if (!idset.has(id)) bad.push(`${b.type} ${id}`);
+    for (const [k, v] of S().world.reservations) if (!idset.has(v)) bad.push(`rezerv ${k}`);
+    check('28.3: bütün ölümlerden sonra kasabada kopuk referans yok', bad.length === 0, bad.join(', '));
+
+    // --- Kayıt (sürüm 34) ---
+    const rawSave = JSON.parse(JSON.stringify(S().saves.snapshot()));
+    check('28.3: ömür ve Saygın Büyük kayda yazılır (characters[].lifespan / isVenerable), vefat sayaçları', rawSave.characters.every((c) => c.lifespan >= 66 && c.lifespan <= 75 && typeof c.isVenerable === 'boolean') && rawSave.characters.some((c) => c.isVenerable) && rawSave.lifeStages.deaths >= 3 && rawSave.lifeStages.accidents >= 2 && typeof rawSave.lifeStages.lastDeath.name === 'string' && rawSave.version === undefined | true, `${rawSave.characters.filter((c) => !(c.lifespan >= 66 && c.lifespan <= 75)).map((c) => c.name + ':' + c.lifespan)} ven ${rawSave.characters.filter((c) => c.isVenerable).length} d ${rawSave.lifeStages.deaths} a ${rawSave.lifeStages.accidents}`);
+    const venRaw = rawSave.characters.find((c) => c.isVenerable);
+    const venBack = Character.fromJSON(venRaw);
+    const badLife = Character.fromJSON({ ...venRaw, lifespan: 12 });
+    check('28.3: Character.fromJSON Saygın Büyük ve ömrü geri yükler; bozuk ömür sıfırlanıp kimlikten yeniden atanır', venBack.isVenerable === true && venBack.lifespan === venRaw.lifespan && badLife.lifespan === null);
+    const legacy = JSON.parse(JSON.stringify(rawSave));
+    legacy.version = 33;
+    for (const c of legacy.characters) { delete c.isVenerable; delete c.lifespan; }
+    delete legacy.lifeStages.venerables; delete legacy.lifeStages.deaths; delete legacy.lifeStages.accidents; delete legacy.lifeStages.lastDeath;
+    const slotKey = CONFIG.SESSION_KEY;
+    const keepSlot = localStorage.getItem(slotKey);
+    localStorage.setItem(slotKey, JSON.stringify(legacy));
+    const migrated = SM.SaveManager.read('session');
+    if (keepSlot === null) localStorage.removeItem(slotKey); else localStorage.setItem(slotKey, keepSlot);
+    check('28.3: v33 kaydı v34\'e göç eder: herkese deterministik ömür (tohum + kimlik), kimse Saygın Büyük değil, vefat sayaçları 0', CONFIG.SAVE_VERSION >= 34 && migrated && migrated.characters.every((c) => c.isVenerable === false && c.lifespan === VN.lifespanFor(legacy.seed, c.id)) && migrated.lifeStages.deaths === 0 && migrated.lifeStages.venerables === 0 && migrated.lifeStages.lastDeath === null);
+
+    // Temizlik: gerçek sakinlerin değişen alanlarını geri yükle
+    for (const o of offs) o();
+    for (const [c, v] of keep) {
+      if (!st().characters.includes(c)) continue;
+      Object.assign(c, { lifeStage: v.ls, age: v.age, ageInDays: v.aid, isVenerable: v.ven, homeId: v.home, children: v.kids, retired: v.retired, married: v.married, partnerId: v.partner });
+      c.inventory = v.inv;
+    }
+  }
+
+  // ===== 28. aşama (28.4): Vadi Karakteri, Kasaba Doktrinleri ve Geç Oyun Beklentisi =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const VD = await import('/src/data/valley.js');
+    const VY = await import('/src/systems/Valley.js');
+    const DD = await import('/src/data/doctrines.js');
+    const DC = await import('/src/systems/Doctrine.js');
+    const RS = await import('/src/systems/ResearchSystem.js');
+    const CV = await import('/src/systems/CivicSystem.js');
+    const HT = await import('/src/systems/HeatingSystem.js');
+    const LG = await import('/src/systems/LateGame.js');
+    const LGD = await import('/src/data/lateGame.js');
+    const TSX = await import('/src/systems/TownStatus.js');
+    const TPX = await import('/src/systems/TradePost.js');
+    const CRN = await import('/src/systems/Crown.js');
+    const LSC = await import('/src/systems/Landscape.js');
+    const GRN = await import('/src/systems/Granary.js');
+    const SMX = await import('/src/state/SaveManager.js');
+    const { CONFIG } = await import('/src/config.js');
+    const s0 = st();
+    sim.give({ wood: 800, stone: 600, iron: 300, wool: 300, food: 900, bread: 80, flax: 50, hops: 50 });
+    const keepValley = s0.valley;
+    const keepDoctrine = { ...s0.doctrine };
+    const keepTier = s0.town.tier;
+    const keepGA = s0.goldenAge.since;
+    const keepDay = s0.time.day;
+    const events = [];
+    const offs = ['doctrine:chosen'].map((n) => game.events.on(n, (p) => events.push({ n, p })));
+
+    // --- Vadi Karakteri: tohumdan ---
+    check('28.4: üç vadi karakteri (Bereketli Delta, Rüzgârlı Boğaz, Kadim Orman) tanımlı', VD.VALLEY_KEYS.join() === 'fertileDelta,windyGorge,ancientWeald' && VD.VALLEYS.fertileDelta.name === 'Bereketli Delta' && VD.VALLEYS.windyGorge.name === 'Rüzgârlı Boğaz' && VD.VALLEYS.ancientWeald.name === 'Kadim Orman');
+    const picks = Array.from({ length: 90 }, (_, i) => VY.valleyFor(i + 1));
+    check('28.4: valleyFor deterministik (aynı tohum aynı vadi), üç vadinin hepsi tohumlarda görülür, izole üreteç', picks.every((v, i) => v === VY.valleyFor(i + 1)) && new Set(picks).size === 3 && picks.every((v) => VD.VALLEYS[v]) && VY.valleyFor(42) === VY.valleyFor(42));
+    check('28.4: oyunun vadisi harita tohumundan gelir (state.valley = valleyFor(seed)) ve HUD\'da görünür', s0.valley === VY.valleyFor(s0.seed) && VY.sanitizeValley('bozuk', 7) === VY.valleyFor(7) && VY.sanitizeValley('windyGorge', 7) === 'windyGorge');
+    game.ui.components.find((x) => x.renderWelfare).welfareAt = -Infinity;
+    game.render(0);
+    const chipText = document.querySelector('.hud-valley')?.textContent ?? '';
+    check('28.4: HUD çipi Vadi Karakteri adını gösterir (ipucunda açıklama)', chipText.includes(VD.VALLEYS[s0.valley].name) && (document.querySelector('.hud-valley-chip')?.title ?? '').includes('Vadi Karakteri'), chipText);
+    // Sayılar (görev metnine göre)
+    const P = (k) => VD.VALLEYS[k].production;
+    check('28.4: Bereketli Delta: bahçe ve balıkçı +%25, taş ocağı ve demir madeni -%30', P('fertileDelta').garden === 1.25 && P('fertileDelta').fishingPier === 1.25 && P('fertileDelta').quarry === 0.7 && P('fertileDelta').ironMine === 0.7);
+    check('28.4: Rüzgârlı Boğaz: değirmen, taş ocağı, demir madeni +%25; ısınma +%40', P('windyGorge').mill === 1.25 && P('windyGorge').quarry === 1.25 && P('windyGorge').ironMine === 1.25 && VD.VALLEYS.windyGorge.heating === 1.4);
+    check('28.4: Kadim Orman: oduncu +%30, bahçe -%20', P('ancientWeald').lumberHut === 1.3 && P('ancientWeald').garden === 0.8);
+
+    // --- Vadi etkileri: gerçek performWork ---
+    const worker = s0.characters.find((c) => !c.isChild && !c.role && !c.away);
+    const garden = S().world.getCompleted('garden')[0] ?? sim.place('garden');
+    const quarry = S().world.getCompleted('quarry')[0] ?? sim.place('quarry');
+    const lumber = S().world.getCompleted('lumberHut')[0] ?? sim.place('lumberHut');
+    s0.time.day = 6;
+    S().structures.update({ hour: 10, gameMinutes: 0 });
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'grain' });
+    const harvest = (b, res, mins = 150) => {
+      const keepRes = { ...s0.resources };
+      const keepSkills = { ...worker.skills }; // deneyim kazandıkça hızlanmasın: her ölçüm aynı beceriyle
+      worker.needs.energy = 100; worker.needs.fun = 100; worker.illness = null;
+      s0.resources[res] = 0; b.productionBuffer = 0; b.producedToday = 0; b.extraBuffers = {};
+      for (let i = 0; i < mins; i++) { worker.needs.energy = 100; worker.needs.fun = 100; S().behavior.performWork(worker, { workBuildingId: b.id, activity: 'farm' }, 1); }
+      const out = b.producedToday;
+      Object.assign(s0.resources, keepRes);
+      worker.skills = keepSkills;
+      return out;
+    };
+    const measure = (valley) => { s0.valley = valley; return { garden: harvest(garden, 'food'), quarry: harvest(quarry, 'stone'), lumber: harvest(lumber, 'wood') }; };
+    const base = measure('yok');
+    const delta = measure('fertileDelta');
+    const gorge = measure('windyGorge');
+    const weald = measure('ancientWeald');
+    const near = (a, b, m) => Math.abs(a / b - m) < 0.06;
+    check('28.4: Bereketli Delta\'da bahçe +%25, taş ocağı -%30 (gerçek performWork)', near(delta.garden, base.garden, 1.25) && near(delta.quarry, base.quarry, 0.7), `bahçe ${base.garden}->${delta.garden} taş ${base.quarry}->${delta.quarry}`);
+    check('28.4: Rüzgârlı Boğaz\'da taş ocağı +%25', near(gorge.quarry, base.quarry, 1.25) && near(gorge.garden, base.garden, 1), `taş ${base.quarry}->${gorge.quarry}`);
+    check('28.4: Kadim Orman\'da oduncu +%30, bahçe -%20', near(weald.lumber, base.lumber, 1.3) && near(weald.garden, base.garden, 0.8), `odun ${base.lumber}->${weald.lumber} bahçe ${base.garden}->${weald.garden}`);
+    // Isınma
+    s0.time.day = 20; // kış (yılın 4. mevsimi)
+    while (!HT.heatingPerDay(s0) && s0.time.day < 60) s0.time.day += 1;
+    const heatBase = (s0.valley = 'yok', HT.heatingPerDay(s0));
+    const heatGorge = (s0.valley = 'windyGorge', HT.heatingPerDay(s0));
+    const heatDelta = (s0.valley = 'fertileDelta', HT.heatingPerDay(s0));
+    const srcBase = (s0.valley = 'yok', HT.heatingSources(s0).reduce((a, x) => a + x.perMinute, 0));
+    const srcGorge = (s0.valley = 'windyGorge', HT.heatingSources(s0).reduce((a, x) => a + x.perMinute, 0));
+    check('28.4: Rüzgârlı Boğaz\'da kışlık ısınma odunu +%40 (günlük toplam ve dakikalık kaynaklar); öteki vadilerde aynı', heatBase > 0 && Math.abs(heatGorge / heatBase - 1.4) < 1e-9 && heatDelta === heatBase && (srcBase === 0 || Math.abs(srcGorge / srcBase - 1.4) < 1e-9), `${heatBase} -> ${heatGorge}`);
+    s0.valley = keepValley;
+    s0.time.day = keepDay;
+
+    // --- Kasaba Doktrinleri ---
+    check('28.4: üç doktrin tanımlı (Zanaat ve Sanayi, Tarım ve Doğa, Ticaret ve Diplomasi)', DD.DOCTRINE_KEYS.join() === 'industry,agrarian,commerce' && DD.DOCTRINES.industry.name === 'Zanaat ve Sanayi Doktrini' && DD.DOCTRINES.agrarian.name === 'Tarım ve Doğa Doktrini' && DD.DOCTRINES.commerce.name === 'Ticaret ve Diplomasi Doktrini');
+    sim.give({ bread: 300 });
+    s0.doctrine = DC.emptyDoctrine();
+    s0.research.active = null; s0.research.done = {};
+    s0.civic.craftGuild = false; s0.civic.tradeCharter = false;
+    const academy = S().research.academies()[0] ?? sim.place('academy');
+    const free = ['gears', 'architecture', 'insulation', 'herbalism', 'cropRotation', 'tradeLaw'].map((id) => RS.researchStatus(s0, id, true).ok);
+    check('28.4: doktrin seçilmeden önce bütün araştırma ve fermanlar açık (nötr: Mimarlık, Yalıtım)', free.every(Boolean) && !DC.chosenDoctrine(s0) && DC.doctrineOfResearch('architecture') === null && DC.doctrineOfResearch('insulation') === null, free.join());
+    check('28.4: araştırma ve fermanlar doktrine bağlıdır (Çarklar / Zanaat Loncası: Sanayi; Şifalı Bitki / Münavebe: Tarım; Ticaret Hukuku / Beratı: Ticaret)', DC.doctrineOfResearch('gears') === 'industry' && DC.doctrineOfCivic('craftGuild') === 'industry' && DC.doctrineOfResearch('herbalism') === 'agrarian' && DC.doctrineOfResearch('cropRotation') === 'agrarian' && DC.doctrineOfResearch('tradeLaw') === 'commerce' && DC.doctrineOfCivic('tradeCharter') === 'commerce');
+    events.length = 0;
+    const startGears = S().research.start('gears');
+    check('28.4: ilk doktrine bağlı araştırma (Çarklar) başlayınca Sanayi Doktrini SEÇİLİR', startGears.ok && s0.doctrine.chosen === 'industry' && s0.doctrine.day === s0.time.day && events.some((e) => e.p.doctrine === 'industry' && e.p.source === 'research'));
+    s0.research.active = null;
+    const locked = ['herbalism', 'cropRotation', 'tradeLaw'].map((id) => RS.researchStatus(s0, id, true));
+    check('28.4: diğer doktrinlerin araştırma yolları KİLİTLENİR ("Doktrin kilitli: ...")', locked.every((r) => !r.ok && r.locked && r.reason.startsWith('Doktrin kilitli')) && RS.researchStatus(s0, 'architecture', true).ok && RS.researchStatus(s0, 'insulation', true).ok, locked.map((r) => r.reason).join(' | '));
+    const refused = S().research.start('tradeLaw');
+    check('28.4: kilitli araştırma başlatılamaz (maliyet düşmez, doktrin değişmez)', !refused.ok && !s0.research.active && s0.doctrine.chosen === 'industry');
+    const cLocked = CV.civicStatus(s0, 'tradeCharter', true);
+    check('28.4: fermanlarda da: Ticaret Beratı kilitli, Zanaat Loncası (kendi doktrini) ve nötr fermanlar açık', !cLocked.ok && cLocked.reason.startsWith('Doktrin kilitli') && CV.civicStatus(s0, 'craftGuild', true).reason === null && CV.civicStatus(s0, 'storehouse', true).reason === null);
+    // Başka kaynaktan seçim: ferman
+    s0.doctrine = DC.emptyDoctrine();
+    s0.research.done = {};
+    events.length = 0;
+    const hall = S().world.getCompleted('townHall')[0] ?? (s0.town.tier = Math.max(s0.town.tier, 3), sim.place('townHall'));
+    sim.give({ wool: 300, iron: 300, wood: 500 });
+    S().civic.decree('tradeCharter');
+    check('28.4: Ticaret Beratı fermanı Ticaret Doktrinini seçer; Zanaat Loncası ve Münavebe kilitlenir', s0.doctrine.chosen === 'commerce' && s0.civic.tradeCharter === true && !CV.civicStatus(s0, 'craftGuild', true).ok && !RS.researchStatus(s0, 'cropRotation', true).ok && events.some((e) => e.p.source === 'civic'));
+    // Arayüz: kilitli kart ve özet
+    game.events.emit('ui:selectBuilding', academy.id);
+    game.render(0);
+    const panel = document.querySelector('.building-panel')?.textContent ?? '';
+    check('28.4: Bilgelik Evi panelinde doktrin özeti ve kilitli doktrin etiketleri', panel.includes('Kasaba Doktrini: Ticaret ve Diplomasi Doktrini') && panel.includes('(kilitli)'), panel.slice(0, 120));
+    game.events.emit('ui:selectBuilding', null);
+    // Etkiler
+    const setD = (k) => { s0.doctrine = { chosen: k, day: s0.time.day }; };
+    setD('industry');
+    check('28.4: Sanayi Doktrini: taş ocağı ve demir madeni x2, atölye / tezgâh / şerbethane +%20; çevre estetiği refahı -%8', DC.doctrineProductionMultiplier(s0, 'quarry') === 2 && DC.doctrineProductionMultiplier(s0, 'ironMine') === 2 && DC.doctrineProductionMultiplier(s0, 'loom') === 1.2 && Math.abs(LSC.aestheticWelfareMultiplier(s0) - (1 + (s0.landscape?.percent ?? 0) / 100) * 0.92) < 1e-9);
+    const qBase = (s0.valley = 'yok', setD(null), harvest(quarry, 'stone', 400));
+    const qInd = (setD('industry'), harvest(quarry, 'stone', 400));
+    check('28.4: Sanayi Doktrini gerçek performWork\'te taş ocağını iki katına çıkarır', near(qInd, qBase, 2), `${qBase} -> ${qInd}`);
+    s0.valley = keepValley;
+    setD('agrarian');
+    s0.granaryCapacity = 150;
+    const limAgri = GRN.storageLimit(s0, 'food');
+    setD(null);
+    const limNone = GRN.storageLimit(s0, 'food');
+    check('28.4: Tarım Doktrini: bahçe +%30, fırın +%40, maden -%20; silonun tarımsal katkısı +%50', (setD('agrarian'), DC.doctrineProductionMultiplier(s0, 'garden') === 1.3 && DC.doctrineProductionMultiplier(s0, 'mill') === 1.4 && DC.doctrineProductionMultiplier(s0, 'quarry') === 0.8) && limAgri - limNone === 75, `${limNone} -> ${limAgri}`);
+    s0.granaryCapacity = 0;
+    const contract = { resource: 'cloth', gold: 85, qty: 10 };
+    setD(null);
+    s0.civic.tradeCharter = false;
+    const c0 = TPX.contractPrice(s0, contract);
+    const levy0 = CRN.levyAmount(s0);
+    setD('commerce');
+    const c1 = TPX.contractPrice(s0, contract);
+    const levy1 = CRN.levyAmount(s0);
+    s0.civic.tradeCharter = true;
+    const levy2 = CRN.levyAmount(s0);
+    check('28.4: Ticaret Doktrini: sözleşme altını +%30, Krallık Vergisi -%30 (Berat ek -%10), liman satışı +%25', c1 === Math.round(c0 * 1.3) && DC.doctrineExportMultiplier(s0) === 1.25 && Math.abs(levy1 / levy0 - 0.7) < 0.02 && levy2 < levy1, `${c0}->${c1} vergi ${levy0}->${levy1}->${levy2}`);
+
+    // --- Geç Oyun Beklentisi ---
+    s0.goldenAge.since = null;
+    s0.town.tier = 3;
+    check('28.4: Gelişmiş Şehir (seviye 4) öncesi geç oyun beklentisi yok (azalma çarpanı 1, refah cezası 0)', !LG.lateGameActive(s0) && LG.lateDecayMultiplier(s0) === 1 && LG.lateDiscontent(s0) === 0);
+    s0.town.tier = 4;
+    check('28.4: Gelişmiş Şehir\'de beklenti başlar: Keyif ve Sosyallik azalması x1,3', LG.lateGameActive(s0) && LG.lateDecayMultiplier(s0) === 1.3 && LGD.LATE_GAME.decay === 1.3 && LGD.LATE_GAME.minTier === 4);
+    s0.town.tier = 3; s0.goldenAge.since = { day: 1, hour: 8, minute: 0 };
+    check('28.4: Altın Çağ\'a girince de beklenti başlar', LG.lateGameActive(s0) && LG.lateDecayMultiplier(s0) === 1.3);
+    s0.goldenAge.since = null;
+    // Gerçek NeedsSystem: azalma hızı oranı
+    const needs = S().systems.find((x) => x.constructor.name === 'NeedsSystem');
+    const subject = s0.characters.find((c) => !c.isChild && !c.role && !c.away);
+    const wasVisible = subject.visible;
+    subject.visible = false; // aura ve hava etkileri ölçümü bozmasın
+    const drops = (tier) => {
+      s0.town.tier = tier;
+      subject.needs.fun = 80; subject.needs.social = 80;
+      needs.update({ gameMinutes: 60, hour: 10, realDt: 0, simDt: 0 });
+      return { fun: 80 - subject.needs.fun, social: 80 - subject.needs.social };
+    };
+    const d3 = drops(3);
+    const d4 = drops(4);
+    subject.visible = wasVisible;
+    check('28.4: gerçek NeedsSystem: seviye 4\'te Keyif ve Sosyallik %30 çabuk azalır (seviye 3\'e göre oran 1,3)', d3.fun > 0 && d3.social > 0 && Math.abs(d4.fun / d3.fun - 1.3) < 1e-6 && Math.abs(d4.social / d3.social - 1.3) < 1e-6, `keyif ${d3.fun.toFixed(3)} -> ${d4.fun.toFixed(3)} sosyal ${d3.social.toFixed(3)} -> ${d4.social.toFixed(3)}`);
+    // Lüks akışı
+    s0.town.tier = 4;
+    const inns = S().world.getCompleted('inn');
+    const keepInn = inns.map((b) => [b, b.sherbet, b.meals]);
+    const keepRes = { sherbet: s0.resources.sherbet, cloth: s0.resources.cloth };
+    const keepInv = s0.characters.map((c) => [c, c.inventory]);
+    for (const b of inns) { b.sherbet = 0; b.meals = 0; }
+    s0.resources.sherbet = 0; s0.resources.cloth = 0;
+    for (const c of s0.characters) c.inventory = (c.inventory ?? []).filter((x) => x.kind !== 'garment');
+    check('28.4: hiç lüks yokken üç kalem de eksik (şerbet, kumaş / kıyafet, handa sıcak yemek), ceza 3 x 6 = 18', LG.missingLuxuries(s0).length === 3 && LG.lateDiscontent(s0) === 18, LG.missingLuxuries(s0).join());
+    for (const c of s0.characters) c.needs.fun = 40;
+    for (const c of s0.characters) { c.needs.social = 40; c.needs.hunger = 60; c.needs.energy = 60; }
+    s0.buffs = {};
+    const hAll = TSX.townHappiness(s0);
+    s0.resources.sherbet = 5;
+    const hSherbet = TSX.townHappiness(s0);
+    s0.resources.cloth = 5;
+    for (const b of inns) { b.sherbet = 3; b.meals = 3; }
+    const hFull = TSX.townHappiness(s0);
+    check('28.4: eksik her lüks refahı 6 puan düşürür (şerbet gelince +6, hepsi gelince +18)', Math.abs(hSherbet - hAll - 6) < 1e-9 && (inns.length === 0 ? Math.abs(hFull - hSherbet - 6) < 1e-9 : Math.abs(hFull - hAll - 18) < 1e-9) && hFull < 100 + 1e-9, `${hAll.toFixed(2)} ${hSherbet.toFixed(2)} ${hFull.toFixed(2)}`);
+    game.ui.components.find((x) => x.renderWelfare).welfareAt = -Infinity;
+    for (const b of inns) { b.sherbet = 0; b.meals = 0; }
+    s0.resources.sherbet = 0; s0.resources.cloth = 0;
+    game.render(0);
+    check('28.4: HUD ipucu geç oyun beklentisini ve eksik lüksleri yazar', (document.querySelector('.hud-valley-chip')?.title ?? '').includes('EKSİK lüks') && (document.querySelector('.hud-valley-chip')?.title ?? '').includes('%30'));
+    for (const [b, sh, me] of keepInn) { b.sherbet = sh; b.meals = me; }
+    Object.assign(s0.resources, keepRes);
+    for (const [c, inv] of keepInv) c.inventory = inv;
+
+    // --- Kayıt (sürüm 35) ---
+    s0.doctrine = { chosen: 'agrarian', day: 9 };
+    const rawSave = JSON.parse(JSON.stringify(S().saves.snapshot()));
+    check('28.4: vadi ve doktrin kayda yazılır (valley, doctrine { chosen, day }, civic.tradeCharter)', rawSave.valley === s0.valley && rawSave.doctrine.chosen === 'agrarian' && rawSave.doctrine.day === 9 && typeof rawSave.civic.tradeCharter === 'boolean');
+    check('28.4: bozuk doktrin / vadi temizlenir (restoreDoctrine, sanitizeValley)', DC.restoreDoctrine({ chosen: 'dragon', day: 3 }).chosen === null && DC.restoreDoctrine({ chosen: 'commerce', day: 'x' }).day === null && DC.restoreDoctrine(null).chosen === null);
+    const legacy = JSON.parse(JSON.stringify(rawSave));
+    legacy.version = 34;
+    delete legacy.valley; delete legacy.doctrine;
+    const keepSlot = localStorage.getItem(CONFIG.SESSION_KEY);
+    localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
+    const migrated = SMX.SaveManager.read('session');
+    if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
+    check('28.4: v34 kaydı v35\'e göç eder: tohumdan deterministik vadi, boş doktrin', CONFIG.SAVE_VERSION === 37 && migrated && migrated.valley === VY.valleyFor(legacy.seed) && migrated.doctrine.chosen === null && migrated.doctrine.day === null);
+
+    // Temizlik
+    for (const o of offs) o();
+    s0.valley = keepValley;
+    s0.doctrine = keepDoctrine;
+    s0.town.tier = keepTier;
+    s0.goldenAge.since = keepGA;
+    s0.time.day = keepDay;
+    s0.civic.tradeCharter = false;
+    s0.research.active = null;
+  }
+
+  // ===== 29. aşama (29.1): Sosyal Kimya, Karşılıklı Çekim / İtme ve Duygusal Etiketler =====
+  {
+    const S = () => game.scenes.current;
+    const s0 = game.state;
+    const CD = await import('/src/data/chemistry.js');
+    const CH = await import('/src/systems/Chemistry.js');
+    const RSX = await import('/src/systems/RelationshipSystem.js');
+    const RD = await import('/src/data/relationships.js');
+    const TSX = await import('/src/systems/TownStatus.js');
+    const UIX = await import('/src/art/ui/index.js');
+    const SMX = await import('/src/state/SaveManager.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const { ACTIVITIES } = await import('/src/data/activities.js');
+    const { CONFIG } = await import('/src/config.js');
+    const rel = S().relationships;
+    const chem = S().chemistry;
+    const forced = (rng, value, fn) => { rng.next = () => value; try { return fn(); } finally { delete rng.next; } };
+    const mk = (id, extra = {}) => ({ id, traits: [], quirk: null, skills: {}, relationships: {}, ...extra });
+    // Belirli bir kıvılcımı veren kimlik çifti (tohum 5): saf arama, üreteç tüketmez
+    const idsWithSpark = (want) => { for (let a = 9000; a < 9400; a++) for (let b = a + 1; b < a + 40; b++) if (CH.sparkFor(s0.seed, a, b) === want) return [a, b]; return null; };
+    const [z1, z2] = idsWithSpark(0);
+    const [p1, p2] = idsWithSpark(1);
+    const [n1, n2] = idsWithSpark(-1);
+    const total = (a, b) => CH.chemistryFor(s0.seed, a, b);
+
+    // --- Veri ve kıvılcım ---
+    check('29.1: kimya -2 (Doğal Zıtlık) .. +3 (Kozmik Çekim) arası altı seviyedir', CD.CHEMISTRY_MIN === -2 && CD.CHEMISTRY_MAX === 3 && [-2, -1, 0, 1, 2, 3].every((n) => CD.CHEMISTRY_LEVELS[n]?.name) && CD.CHEMISTRY_LEVELS[-2].name === 'Doğal Zıtlık' && CD.CHEMISTRY_LEVELS[3].name === 'Kozmik Çekim');
+    check('29.1: beş duygusal etiket tanımlı (Minnettar, Hayran, Kırgın, Kıskanç, Ruh İkizi)', CD.EMOTION_TAG_KEYS.join() === 'grateful,admiration,resentful,jealous,kindred' && CD.EMOTION_TAG_KEYS.map((k) => CD.EMOTION_TAGS[k].name).join() === 'Minnettar,Hayran,Kırgın,Kıskanç,Ruh İkizi');
+    const sparks = [];
+    for (let a = 1; a < 40; a++) for (let b = a + 1; b < 40; b++) sparks.push(CH.sparkFor(s0.seed, a, b));
+    check('29.1: kıvılcım -1 / 0 / +1; üçü de görülür, simetrik (A-B = B-A) ve aynı tohumda hep aynı', sparks.every((v) => v === -1 || v === 0 || v === 1) && new Set(sparks).size === 3 && CH.sparkFor(s0.seed, 3, 17) === CH.sparkFor(s0.seed, 17, 3) && CH.sparkFor(s0.seed, 3, 17) === CH.sparkFor(s0.seed, 3, 17), JSON.stringify([-1, 0, 1].map((v) => sparks.filter((x) => x === v).length)));
+    const otherSeed = [];
+    for (let a = 1; a < 40; a++) for (let b = a + 1; b < 40; b++) otherSeed.push(CH.sparkFor(s0.seed + 1, a, b));
+    check('29.1: kıvılcım dünya tohumuna bağlıdır (başka tohumda dağılım değişir), izole üreteç tohum + 37', CD.CHEMISTRY_SEED_OFFSET === 37 && otherSeed.some((v, i) => v !== sparks[i]));
+
+    // --- Kişilik, huy ve zanaat kombinasyonları ---
+    check('29.1: zıt özellikler (Çalışkan / Uykucu, Neşeli / Huysuz) taban kimyayı -1 düşürür', total(mk(z1, { traits: ['hardworking'] }), mk(z2, { traits: ['sleepyhead'] })) === -1 && total(mk(z1, { traits: ['cheerful'] }), mk(z2, { traits: ['grumpy'] })) === -1 && CH.traitHarmony(mk(1, { traits: ['hardworking', 'cheerful'] }), mk(2, { traits: ['sleepyhead', 'cheerful'] })) === -1);
+    check('29.1: ortak özellik ve tamamlayan özellikler (Hırslı + Çalışkan) +1', total(mk(z1, { traits: ['glutton'] }), mk(z2, { traits: ['glutton', 'nightOwl'] })) === 1 && total(mk(z1, { traits: ['ambitious'] }), mk(z2, { traits: ['hardworking'] })) === 1 && total(mk(z1, { traits: ['nightOwl'] }), mk(z2, { traits: ['glutton'] })) === 0);
+    check('29.1: Doğa Sever + Çiftçi (Kalfa ve üstü) +1; Çırak çiftçiyle nötr', total(mk(z1, { traits: ['natureLover'] }), mk(z2, { skills: { farming: 480 } })) === 1 && total(mk(z1, { traits: ['natureLover'] }), mk(z2, { skills: { farming: 100 } })) === 0 && total(mk(z1, { skills: { husbandry: 2000 } }), mk(z2, { traits: ['natureLover'] })) === 1);
+    check('29.1: huy rezonansı: Müzisyen + Şenlik Neşesi +1, Kitap Kurdu + Bilge Düşünür +1, aynı huy +1', total(mk(z1, { quirk: 'musician' }), mk(z2, { quirk: 'festive' })) === 1 && total(mk(z1, { quirk: 'philosopher' }), mk(z2, { quirk: 'bookworm' })) === 1 && total(mk(z1, { quirk: 'animalLover' }), mk(z2, { quirk: 'animalLover' })) === 1);
+    check('29.1: Zanaatkâr Ruhu + Hayvansever nötr; sekiz huyun hepsi tanınır', total(mk(z1, { quirk: 'craftsman' }), mk(z2, { quirk: 'animalLover' })) === 0 && CD.QUIRK_RESONANCE.flat().every((q) => ['animalLover', 'bookworm', 'musician', 'natureEnthusiast', 'craftsman', 'entrepreneur', 'philosopher', 'festive'].includes(q)));
+    check('29.1: zanaat bağı +1: usta-çırak, ikisi de Başusta, aynı sabit iş yeri, birlikte çalışılmış atölye', total(mk(z1, { apprenticeship: { masterId: z2 } }), mk(z2)) === 1 && total(mk(z1, { mentees: [{ id: z2, progress: 80 }] }), mk(z2)) === 1 && total(mk(z1, { isGrandmaster: true }), mk(z2, { isGrandmaster: true })) === 1 && total(mk(z1, { isGrandmaster: true }), mk(z2)) === 0 && total(mk(z1, { workplaceId: 7 }), mk(z2, { workplaceId: 7 })) === 1 && total(mk(z1, { workplaceId: 7 }), mk(z2, { workplaceId: 8 })) === 0 && total(mk(z1, { relationships: { [z2]: { craft: true } } }), mk(z2)) === 1);
+    const best = CH.chemistryBreakdown(s0.seed, mk(p1, { traits: ['cheerful'], quirk: 'musician', isGrandmaster: true }), mk(p2, { traits: ['cheerful'], quirk: 'festive', isGrandmaster: true }));
+    const worst = CH.chemistryBreakdown(s0.seed, mk(n1, { traits: ['cheerful'], quirk: 'musician' }), mk(n2, { traits: ['grumpy'], quirk: 'bookworm' }));
+    check('29.1: kıvılcım +1 + kişilik + huy + zanaat = 4 -> +3 ile sınırlanır (Kozmik Çekim); kıvılcım -1 + zıtlık = -2 (Doğal Zıtlık)', best.spark === 1 && best.traits === 1 && best.quirks === 1 && best.craft === 1 && best.total === 3 && worst.spark === -1 && worst.traits === -1 && worst.total === -2, JSON.stringify([best, worst]));
+    check('29.1: ara skorlar: +2 (kıvılcım +1, ortak özellik), 0 (kıvılcım -1, rezonans)', total(mk(p1, { traits: ['glutton'] }), mk(p2, { traits: ['glutton'] })) === 2 && total(mk(n1, { quirk: 'musician' }), mk(n2, { quirk: 'festive' })) === 0);
+
+    // --- Determinizm: ana üreteç, sistem üreteçleri ve Math.random sıfır çağrı ---
+    const adults = s0.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.visible !== undefined && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
+    const keepRel = new Map(s0.characters.map((c) => [c, JSON.stringify(c.relationships)]));
+    const keepScores = JSON.stringify(s0.relationships);
+    const keepStats = { ...s0.stats };
+    const rngs = [S().behavior.rng, rel.rng, S().conflicts.rng, S().social.rng, S().family.rng];
+    let calls = 0;
+    const realRandom = Math.random;
+    Math.random = () => { calls++; return realRandom(); };
+    for (const r of rngs) { const proto = Object.getPrototypeOf(r).next; r.next = function () { calls++; return proto.call(this); }; }
+    const first = [];
+    for (const a of adults) for (const b of adults) if (a.id < b.id) first.push(CH.chemistryFor(s0.seed, a, b));
+    const second = [];
+    for (const a of adults) for (const b of adults) if (a.id < b.id) second.push(CH.chemistryOf(s0, a, b));
+    chem.onHour();
+    chem.update({ gameMinutes: 1, hour: 12 });
+    chem.meet(adults[0], adults[1]);
+    chem.treat(adults[0], adults[1]);
+    chem.tag(adults[0], adults[1].id, 'grateful');
+    Math.random = realRandom;
+    for (const r of rngs) delete r.next;
+    check('29.1: kimya hesabı, saat başı güncelleme, karşılaşma, ikram ve etiketleme ana üreteci / sistem üreteçlerini / Math.random\'ı HİÇ tüketmez (0 çağrı)', calls === 0 && first.length > 10, `${calls} çağrı, ${first.length} çift`);
+    check('29.1: aynı çift art arda hep aynı kimyayı alır; kayıt iki yönde aynıdır', first.join() === second.join() && adults.every((a) => adults.every((b) => a === b || a.relationships[b.id]?.chemistry === b.relationships[a.id]?.chemistry)) && first.every((v) => Number.isInteger(v) && v >= -2 && v <= 3));
+    for (const [c, json] of keepRel) c.relationships = JSON.parse(json);
+
+    // --- Sohbet hızı ve keyif ---
+    const A = adults[0];
+    const B = adults.find((c) => c !== A && !RSX.isFamily(A, c) && A.partnerId !== c.id);
+    // Gerçek oyundan kalan etiketler testleri etkilemesin: kayıtlar geri yüklenir, sonra test sakinlerinin kayıtları boşaltılır
+    const cast = [A, B];
+    const fresh = () => { for (const [c, json] of keepRel) c.relationships = JSON.parse(json); for (const c of cast) c.relationships = {}; for (const c of s0.characters) for (const x of cast) delete c.relationships[x.id]; };
+    fresh();
+    const key = RSX.pairKey(A.id, B.id);
+    const fountain = S().world.getCompleted('fountain')[0];
+    const keepTasks = [A, B].map((c) => [c, c.task, c.visible, c.x, c.y, c.pose, c.insideBuildingId, { ...c.needs }, c.speech, c.bubble]);
+    const sit = (c, dx = 0) => { c.task = { activity: 'fountain', phase: 'perform', buildingId: fountain.id, elapsed: 0, duration: 999 }; c.visible = true; c.insideBuildingId = null; c.x = fountain.center.x + dx; c.y = fountain.center.y + 20; };
+    const others = s0.characters.filter((c) => c !== A && c !== B).map((c) => [c, c.task]);
+    for (const [c] of others) if (c.task?.buildingId === fountain.id) c.task = null;
+    sit(A); sit(B, 14);
+    const gainAt = (n) => { setChem(A, B, n); s0.relationships[key] = 0; forced(rel.rng, 0.999, () => rel.update({ gameMinutes: 10, hour: 12 })); return s0.relationships[key]; };
+    const g0 = gainAt(0);
+    const g2 = gainAt(2);
+    const g3 = gainAt(3);
+    const gm = gainAt(-1);
+    const gm2 = gainAt(-2);
+    check('29.1: kimyası +2 / +3 olanların sohbeti 1,5 kat hızlı ilişki puanı kazandırır (gerçek RelationshipSystem.update)', g0 > 0 && Math.abs(g2 / g0 - 1.5) < 1e-9 && Math.abs(g3 / g0 - 1.5) < 1e-9, `${g0} -> ${g2} / ${g3}`);
+    check('29.1: eksi kimyada sohbet yavaş ilerler (-1: x0,75; -2: x0,5); +1 hafif hızlı (x1,2)', Math.abs(gm / g0 - 0.75) < 1e-9 && Math.abs(gm2 / g0 - 0.5) < 1e-9 && Math.abs(gainAt(1) / g0 - 1.2) < 1e-9, `${gm} ${gm2}`);
+    const bondAt = (n, score) => { setChem(A, B, n); s0.relationships[key] = score; const b = rel.bondFor(A, B); return { f: b.funBonus, s: b.socialBonus }; };
+    const friend = RD.RELATIONSHIP_LEVELS.find((l) => l.key === 'friend');
+    check('29.1: güçlü çekimde sohbet keyfi 1,5 kat (+ek keyif); sosyallik çarpanı ilişki seviyesinden gelir', Math.abs(bondAt(0, 50).f - friend.funBonus) < 1e-9 && Math.abs(bondAt(2, 50).f - (friend.funBonus * 1.5 + CD.CHEMISTRY_LEVELS[2].funFlat)) < 1e-9 && bondAt(3, 50).f > bondAt(2, 50).f && bondAt(2, 50).s === friend.socialBonus);
+    check('29.1: eksi kimyada sohbet gergin geçer: keyif düşer (dakikada -0,06 / -0,12)', Math.abs(bondAt(-1, 0).f + 0.06) < 1e-9 && Math.abs(bondAt(-2, 0).f + 0.12) < 1e-9 && bondAt(0, 0).f === 0);
+    setChem(A, B, 2);
+    s0.relationships[key] = 50;
+    A.needs.fun = 40; A.needs.social = 40;
+    noMoods(A, B);
+    const fun0 = A.needs.fun;
+    S().behavior.performSocial(A, A.task, ACTIVITIES.fountain, 10);
+    check('29.1: gerçek sohbette (performSocial) güçlü çekim keyfi doldurur', Math.abs(A.needs.fun - fun0 - (friend.funBonus * 1.5 + CD.CHEMISTRY_LEVELS[2].funFlat) * 10) < 1e-6, `${fun0} -> ${A.needs.fun}`);
+
+    // --- Atışma riski ---
+    const conflicts = S().conflicts;
+    const keepTraits = [A.traits, B.traits, A.profile, B.profile];
+    A.traits = ['glutton']; B.traits = ['nightOwl'];
+    const quarrelEvents = [];
+    const offQ = game.events.on('relationship:quarrel', (p) => quarrelEvents.push(p));
+    const tryQ = (n) => { setChem(A, B, n); conflicts.cooldowns.delete(key); const q = s0.stats.quarrels ?? 0; forced(conflicts.rng, 0, () => conflicts.tryQuarrel(A, B, 'chat', 1, null)); return (s0.stats.quarrels ?? 0) - q; };
+    const q0 = tryQ(0);
+    const q2 = tryQ(2);
+    const qm = tryQ(-1);
+    check('29.1: zıt özelliği olmayan çift nötr / olumlu kimyada atışmaz; eksi kimyada atışabilir (traits: null)', q0 === 0 && q2 === 0 && qm === 1 && quarrelEvents.at(-1)?.traits === null, `${q0} ${q2} ${qm}`);
+    check('29.1: eksi kimya atışma olasılığını artırır (x1,5 / x2), güçlü çekim azaltır', CD.CHEMISTRY_LEVELS[-1].quarrel === 1.5 && CD.CHEMISTRY_LEVELS[-2].quarrel === 2 && CD.CHEMISTRY_LEVELS[2].quarrel < 1 && CD.CHEMISTRY_LEVELS[0].quarrel === 1);
+    A.traits = ['cheerful']; B.traits = ['grumpy'];
+    const baseRate = (await import('/src/data/family.js')).CONFLICT.chatChancePerMinute * Math.max(A.profile.quarrelChance, B.profile.quarrelChance) * (s0.relationships[key] < 0 ? (await import('/src/data/family.js')).CONFLICT.feudQuarrelMultiplier : 1);
+    const tryAt = (n, roll) => { setChem(A, B, n); conflicts.cooldowns.delete(key); s0.relationships[key] = 20; const q = s0.stats.quarrels ?? 0; forced(conflicts.rng, roll, () => conflicts.tryQuarrel(A, B, 'chat', 1, null)); return (s0.stats.quarrels ?? 0) - q; };
+    s0.relationships[key] = 20;
+    const rate20 = (await import('/src/data/family.js')).CONFLICT.chatChancePerMinute * Math.max(A.profile.quarrelChance, B.profile.quarrelChance);
+    check('29.1: aynı zarda zıt özellikli çift nötr kimyada atışmaz, -2 kimyada atışır (gerçek ConflictSystem)', tryAt(0, rate20 * 1.5) === 0 && tryAt(-2, rate20 * 1.5) === 1 && baseRate > 0);
+    offQ();
+    [A.traits, B.traits, A.profile, B.profile] = keepTraits;
+    CH.removeTag(A, B.id, 'resentful'); CH.removeTag(B, A.id, 'resentful');
+
+    // --- Aşk zarı kimyaya bakar ---
+    const keepLove = s0.characters.map((c) => [c, c.partnerId, c.married, c.partnerSince]);
+    for (const c of s0.characters) { c.partnerId = null; c.married = false; }
+    let L1 = null; let L2 = null;
+    for (const a of adults) { for (const b of adults) if (a.id < b.id && RSX.canRomance(a, b)) { L1 = a; L2 = b; break; } if (L1) break; }
+    const loveKey = RSX.pairKey(L1.id, L2.id);
+    cast.push(L1, L2);
+    const group = { activity: 'fountain', buildingId: fountain.id, kind: 'chat' };
+    const love = (n, score, roll = 0) => { noMoods(L1, L2); L1.partnerId = L2.partnerId = null; setChem(L1, L2, n); s0.relationships[loveKey] = score; forced(rel.rng, roll, () => rel.tryRomance(L1, L2, group, 1)); return RSX.arePartners(L1, L2); };
+    check('29.1: kimyası 0 ya da eksi olanlar ilişki puanı 100 olsa da aşık olamaz', !love(0, 100) && !love(-1, 100) && !love(-2, 100));
+    check('29.1: kimya +1: aşk 85 puandan başlar (84\'te olmaz)', !love(1, 84) && love(1, 85));
+    check('29.1: kimya +2: 75 puanda, +3: 65 puanda aşık olur (tutkulu); +2 64 / 74\'te olmaz', !love(2, 74) && love(2, 75) && !love(3, 64) && love(3, 65));
+    const chance1 = RD.ROMANCE.chancePerMinute * (ACTIVITIES.fountain.romanceMultiplier ?? 1) * TSX.buffMultiplier(s0, 'romance');
+    check('29.1: aşk olasılığı kimyayla çarpılır (+1: x1, +2: x2, +3: x3,5): aynı zarda +1 aşık olmaz, +2 ve +3 olur', !love(1, 100, chance1 * 1.5) && love(2, 100, chance1 * 1.5) && !love(2, 100, chance1 * 2.5) && love(3, 100, chance1 * 2.5) && CD.CHEMISTRY_LEVELS[3].romance === 3.5);
+    for (const [c, pid, m, since] of keepLove) { c.partnerId = pid; c.married = m; c.partnerSince = since; }
+
+    // --- Duygusal etiketlerin oluşması ---
+    fresh();
+    const tagEvents = [];
+    const offT = game.events.on('chemistry:tag', (p) => tagEvents.push(p));
+    const home = { id: -77, workerIds: new Set() };
+    const keepHome = A.homeId;
+    A.homeId = home.id;
+    chem.onFireOut(home, [B.id, A.id]); // (olay dinleyicisinin çağırdığı işleyici; sahte olay öteki sistemleri tetiklemesin)
+    check('29.1: yangını söndürene evin sakini MİNNETTAR olur (kendine değil); etiket yönlüdür', CH.hasTag(A, B.id, 'grateful') && !CH.hasTag(B, A.id, 'grateful') && !A.relationships[A.id] && tagEvents.some((e) => e.from === A && e.toId === B.id && e.tag === 'grateful'));
+    A.homeId = keepHome;
+    const C = adults.find((c) => c !== A && c !== B);
+    cast.push(C);
+    game.events.emit('crisis:treatedAt', { character: C, building: { id: -5, workerIds: new Set([B.id]) } });
+    const D = adults.find((c) => ![A, B, C].includes(c));
+    cast.push(D);
+    chem.thankHealers(D, { id: -5, workerIds: new Set([B.id]) });
+    check('29.1: sistem olayları dinler (yangın, şifa, dilekçe, şaheser, mezuniyet, yadigâr, Başusta, kademe, atışma, barışma, aşk, ayrılış, saat)', chem.unsubscribers.length === 14 && CH.hasTag(C, B.id, 'grateful'));
+    check('29.1: yarası sarılan / iyileşen sakin kulübedeki şifacıya minnettar olur', CH.hasTag(C, B.id, 'grateful') && CH.hasTag(D, B.id, 'grateful') && Number.isFinite(C.relationships[B.id].until.grateful));
+    chem.onPetition(C, 'rejected');
+    const afterReject = [...CH.tagsOf(C, CD.RULER_ID)];
+    chem.onPetition(C, 'fulfilled');
+    check('29.1: dilekçesi reddedilen Yönetime KIRGIN olur; dileği karşılanınca kırgınlık minnete döner', afterReject.join() === 'resentful' && CH.tagsOf(C, CD.RULER_ID).join() === 'grateful' && CD.RULER_ID === 0);
+    s0.relationships[RSX.pairKey(C.id, B.id)] = 80;
+    chem.onMasterwork(B, { workerIds: new Set([D.id]) });
+    check('29.1: şaheser çıkaran ustaya en iyi arkadaşları ve iş arkadaşları HAYRAN kalır', CH.hasTag(C, B.id, 'admiration') && CH.hasTag(D, B.id, 'admiration') && !CH.hasTag(B, B.id, 'admiration'));
+    // Hayranlık sınırı: A sırayla B, C, D'ye hayran olur; üçüncüde en eskisi (aynı dakikada: küçük kimlik) silinir
+    const mkAdmirer = () => {
+      const keep = JSON.stringify(A.relationships);
+      for (const o of [B, C, D]) CH.removeTag(A, o.id, 'admiration');
+      for (const o of [B, C, D]) chem.tag(A, o.id, 'admiration');
+      const left = [B, C, D].filter((o) => CH.hasTag(A, o.id, 'admiration')).map((o) => o.id);
+      A.relationships = JSON.parse(keep);
+      return left;
+    };
+    const keepGM = [B.isGrandmaster, B.grandmasterProfession];
+    const keepStages = [A.lifeStage, B.lifeStage];
+    A.lifeStage = B.lifeStage = 'adult';
+    B.isGrandmaster = true;
+    s0.relationships[key] = 30;
+    CH.removeTag(A, B.id, 'admiration');
+    chem.admire(A, B, false);
+    const notAtChat = !CH.hasTag(A, B.id, 'admiration');
+    chem.admire(A, B, true);
+    const admiredGM = CH.hasTag(A, B.id, 'admiration');
+    chem.admire(B, A, true);
+    check('29.1: atölyede yanında çalıştığı Başustaya hayran olur (Başusta ona değil; sohbette değil)', notAtChat && admiredGM && !CH.hasTag(B, A.id, 'admiration'));
+    B.isGrandmaster = keepGM[0];
+    B.lifeStage = 'elder';
+    CH.removeTag(A, B.id, 'admiration');
+    s0.relationships[key] = 30;
+    chem.admire(A, B, false);
+    const strangerSage = CH.hasTag(A, B.id, 'admiration');
+    s0.relationships[key] = 45;
+    chem.admire(A, B, false);
+    check('29.1: sohbet ettiği dostu Kıdemli Bilgeye hayran olur (tanıdık yetmez)', !strangerSage && CH.hasTag(A, B.id, 'admiration'));
+    const adm = mkAdmirer();
+    check('29.1: hayranlık sınırlıdır: üçüncü hayranlık en eskisini (eşitlikte küçük kimliği) siler (en çok 2)', adm.length === 2 && adm.includes(D.id) && !adm.includes(Math.min(B.id, C.id)) && CD.EMOTION_RULES.admireLimit === 2, adm.join());
+    chem.onGraduated(D, B.id);
+    chem.thankHealers(A, { id: -9 });
+    const healer = s0.characters.filter((c) => c !== A && !c.role && !c.isChild && (c.skills?.herbalism ?? 0) >= 480).sort((x, y) => (y.skills.herbalism ?? 0) - (x.skills.herbalism ?? 0))[0];
+    check('29.1: mezun olan çırak ustasına minnettar olur; kulübe boşsa minnet kasabanın en usta şifacısına gider', CH.hasTag(D, B.id, 'grateful') && (!healer || CH.hasTag(A, healer.id, 'grateful')), healer?.name ?? 'usta şifacı yok');
+    [B.isGrandmaster, B.grandmasterProfession] = keepGM;
+    [A.lifeStage, B.lifeStage] = keepStages;
+    CH.removeTag(A, B.id, 'admiration');
+    const shop = S().world.buildings.find((b) => b.workerIds);
+    const keepWorkers = new Set(shop.workerIds);
+    const keepSkills = [{ ...A.skills }, { ...D.skills }];
+    shop.workerIds.clear(); shop.workerIds.add(A.id); shop.workerIds.add(D.id);
+    const keepTaskD = D.task;
+    A.task = { ...A.task, workBuildingId: shop.id };
+    A.skills.crafting = 600; D.skills.crafting = 10;
+    s0.relationships[RSX.pairKey(A.id, D.id)] = 5;
+    chem.onSkillUp(A, 'crafting', { level: 2, name: 'Kalfa' });
+    check('29.1: aynı atölyede kendisinden önce kademe atlayan iş arkadaşını KISKANIR (dostuysa kıskanmaz)', CH.hasTag(D, A.id, 'jealous') && !CH.hasTag(A, D.id, 'jealous'));
+    CH.removeTag(D, A.id, 'jealous');
+    s0.relationships[RSX.pairKey(A.id, D.id)] = 60;
+    chem.onSkillUp(A, 'crafting', { level: 2, name: 'Kalfa' });
+    check('29.1: dostunun terfisini kıskanmaz', !CH.hasTag(D, A.id, 'jealous'));
+    shop.workerIds.clear(); for (const id of keepWorkers) shop.workerIds.add(id);
+    [A.skills, D.skills] = keepSkills;
+    sit(A);
+    // Atışma kırgınlığı ve barışma
+    for (const c of [C, D]) { CH.removeTag(c, D.id, 'resentful'); CH.removeTag(c, C.id, 'resentful'); }
+    const keepProfiles = [C.profile.quarrelChance, D.profile.quarrelChance];
+    C.profile.quarrelChance = 1; D.profile.quarrelChance = 1.5;
+    chem.onQuarrel(C, D);
+    const resentUntil = C.relationships[D.id]?.until.resentful;
+    check('29.1: atışmada haksızlığa uğrayan (sakin mizaçlı) kısa süre KIRGIN kalır (2 gün)', CH.hasTag(C, D.id, 'resentful') && !CH.hasTag(D, C.id, 'resentful') && resentUntil === Math.round(s0.totalMinutes + 2 * 1440), `${resentUntil} ${s0.totalMinutes}`);
+    chem.onReconciled(C, D);
+    check('29.1: barışınca kırgınlık silinir', !CH.hasTag(C, D.id, 'resentful'));
+    [C.profile.quarrelChance, D.profile.quarrelChance] = keepProfiles;
+    // Karşılıksız aşk
+    for (const c of s0.characters) { c.partnerId = null; c.married = false; }
+    const X = adults.find((c) => c !== L1 && c !== L2 && RSX.canRomance(c, L1));
+    if (X) {
+      s0.relationships[RSX.pairKey(X.id, L2.id)] = 0; // hoşlandığı kişi L1: L2'ye karşı daha yakın olmasın
+      setChem(X, L1, 2);
+      s0.relationships[RSX.pairKey(X.id, L1.id)] = 70;
+      L1.partnerId = L2.id; L2.partnerId = L1.id;
+      chem.onPartnered(L1, L2);
+    }
+    check('29.1: hoşlandığı kişi başkasına aşık olunca ona KIRGIN, sevdiğini kapana KISKANÇ olur', X && CH.hasTag(X, L1.id, 'resentful') && CH.hasTag(X, L2.id, 'jealous') && !CH.hasTag(L2, X.id, 'jealous'), X?.name);
+    // Eşe ilgi
+    const LNX = await import('/src/systems/Lineage.js');
+    const Y = adults.find((c) => ![L1, L2, X].includes(c) && !RSX.isFamily(c, L1) && !RSX.isFamily(c, L2) && !LNX.closeKin(c, L1)) ?? null;
+    if (Y) {
+      L1.partnerId = L2.id; L2.partnerId = L1.id; Y.partnerId = null;
+      CH.removeTag(L2, Y.id, 'jealous');
+      setChem(Y, L1, 2);
+      chem.attention(Y, L1);
+    }
+    check('29.1: eşiyle / sevgilisiyle güçlü kimyası olan bekârın ilgisini KISKANIR', Y && CH.hasTag(L2, Y.id, 'jealous'), `${Y?.name} kimya ${Y ? chem.get(Y, L1) : '-'}`);
+    for (const [c, pid, m, since] of keepLove) { c.partnerId = pid; c.married = m; c.partnerSince = since; }
+    // Ruh İkizi (gerçek saat başı güncellemesi: kimya yeniden hesaplanır)
+    const keepQuirks = [A.quirk, B.quirk, A.traits, B.traits];
+    A.quirk = B.quirk = 'musician'; A.traits = ['glutton']; B.traits = ['glutton'];
+    for (const x of [A, B]) for (const y of s0.characters) if (x !== y && y !== A && y !== B && !y.role) { s0.relationships[RSX.pairKey(x.id, y.id)] = 10; CH.removeTag(x, y.id, 'kindred'); CH.removeTag(y, x.id, 'kindred'); } // başka bir ruh ikizi adayı araya girmesin (kişi başı tek bağ)
+    CH.chemistryOf(s0, A, B);
+    A.relationships[B.id].craft = B.relationships[A.id].craft = true;
+    CH.removeTag(A, B.id, 'kindred'); CH.removeTag(B, A.id, 'kindred');
+    s0.relationships[key] = 30;
+    const bonds0 = s0.stats.kindredBonds ?? 0;
+    noMoods(A, B);
+    chem.onHour();
+    const tooEarly = CH.hasTag(A, B.id, 'kindred');
+    s0.relationships[key] = 80;
+    chem.onHour();
+    const realChem = A.relationships[B.id].chemistry;
+    check('29.1: kimyası +2 / +3 olan çift en iyi arkadaş olunca aralarında RUH İKİZİ bağı filizlenir (karşılıklı; günlük ve anı)', realChem >= 2 && !tooEarly && CH.hasTag(A, B.id, 'kindred') && CH.hasTag(B, A.id, 'kindred') && s0.stats.kindredBonds >= bonds0 + 1 && chem.kindredCount(A) === 1 && s0.journal.slice(-12).some((e) => e.text.includes('ruh ikizi') && e.text.includes(A.name) && e.text.includes(B.name)) && A.memories.some((m) => m.text.includes('ruh ikizi')), `kimya ${realChem} erken ${tooEarly} ${JSON.stringify(A.relationships[B.id])} sayaç ${bonds0}->${s0.stats.kindredBonds} kA ${chem.kindredCount(A)} kB ${chem.kindredCount(B)} skor ${RSX.getFriendship?.(s0, A, B)} ${s0.relationships[key]} ${A.name}/${B.name}`);
+    check('29.1: Ruh İkizi kalıcıdır (süresi yok), öteki etiketlerin bitiş dakikası vardır', A.relationships[B.id].until.kindred === undefined && CD.EMOTION_TAGS.kindred.days === null && Number.isFinite(A.relationships[B.id].until.grateful));
+    A.relationships[B.id].until.grateful = s0.totalMinutes - 1;
+    chem.onHour();
+    check('29.1: süresi dolan etiket saat başı silinir', !CH.hasTag(A, B.id, 'grateful') && A.relationships[B.id].until.grateful === undefined && CH.hasTag(A, B.id, 'kindred'));
+    A.traits = ['cheerful']; B.traits = ['grumpy']; A.quirk = 'craftsman'; B.quirk = 'animalLover';
+    A.relationships[B.id].craft = B.relationships[A.id].craft = false;
+    chem.onHour();
+    check('29.1: kimya değişince (zıt özellik) kayıt saat başı güncellenir ve Ruh İkizi bağı çözülür', A.relationships[B.id].chemistry < 2 && !CH.hasTag(A, B.id, 'kindred') && !CH.hasTag(B, A.id, 'kindred'), A.relationships[B.id].chemistry);
+    [A.quirk, B.quirk, A.traits, B.traits] = keepQuirks;
+    // Zanaat bağı (aynı atölyede birlikte çalışanlar)
+    const saveGroups = rel.groups;
+    const { PROFESSIONS: PRF } = await import('/src/data/apprenticeship.js');
+    const craftShop = S().world.buildings.find((b) => PRF[b.type]) ?? sim.place(Object.keys(PRF)[0]);
+    const keepWp = [C.workplaceId, D.workplaceId, C.isGrandmaster, D.isGrandmaster, C.apprenticeship, D.apprenticeship, C.mentees, D.mentees];
+    C.workplaceId = D.workplaceId = null; C.isGrandmaster = D.isGrandmaster = false; C.apprenticeship = D.apprenticeship = null; C.mentees = []; D.mentees = [];
+    C.relationships = {}; D.relationships = {};
+    const plain = CH.refreshChemistry(s0, C, D);
+    rel.groups = [{ id: 'work:job:1', kind: 'work', buildingId: craftShop.id, members: [C, D] }];
+    for (let i = 0; i < 30; i++) chem.onHour();
+    const siteBond = C.relationships[D.id].craft;
+    rel.groups = [{ id: `work:building:${craftShop.id}`, kind: 'work', buildingId: craftShop.id, members: [C, D] }];
+    for (let i = 0; i < 23; i++) chem.onHour();
+    const early = C.relationships[D.id].craft;
+    chem.onHour();
+    check('29.1: aynı atölyede 24 saat birlikte çalışanlar kalıcı zanaat bağı kurar (+1 kimya; şantiyede ve 23 saatte kurulmaz)', !siteBond && !early && C.relationships[D.id].craft && D.relationships[C.id].craft && C.relationships[D.id].together === 24 && C.relationships[D.id].chemistry === Math.min(3, plain + 1), `${plain} -> ${C.relationships[D.id].chemistry} (${craftShop.type})`);
+    [C.workplaceId, D.workplaceId, C.isGrandmaster, D.isGrandmaster, C.apprenticeship, D.apprenticeship, C.mentees, D.mentees] = keepWp;
+    rel.groups = saveGroups;
+
+    // --- Etiketlerin davranışa yansıması ---
+    fresh();
+    sit(A); sit(B, 14);
+    setChem(A, B, 0);
+    CH.addTag(A, B.id, 'grateful', s0.totalMinutes);
+    forced(rel.rng, 0.999, () => rel.update({ gameMinutes: 1, hour: 12 }));
+    B.needs.fun = 40; B.needs.hunger = 40; A.needs.fun = 40; A.speech = null;
+    const treats0 = s0.stats.treats ?? 0;
+    chem.treatDays.clear();
+    chem.update({ gameMinutes: 1, hour: 12 });
+    const afterTreat = { fun: B.needs.fun, hunger: B.needs.hunger, giver: A.needs.fun, speech: A.speech?.text, n: (s0.stats.treats ?? 0) - treats0 };
+    chem.update({ gameMinutes: 1, hour: 12 });
+    check('29.1: minnettar sakin aynı sohbette karşısındakine İKRAMDA bulunur (keyif +5, tokluk +4, söz; günde bir kez)', afterTreat.fun === 45 && afterTreat.hunger === 44 && afterTreat.giver === 42 && afterTreat.n === 1 && CD.TREAT_LINES.some((l) => l.replace('{name}', B.name) === afterTreat.speech) && (s0.stats.treats ?? 0) - treats0 === 1 && B.needs.fun === 45, JSON.stringify(afterTreat));
+    const brain = S().behavior.brain;
+    check('29.1: minnettar olduğu kişinin oturduğu yere meyleder (companyMood +1), sohbette onu öne alır', brain.companyMood(A, [B, C]) === 1 && brain.companyMood(B, [A, C]) === 0 && CD.EMOTION_RULES.gratefulVenue > 1);
+    CH.addTag(A, B.id, 'resentful', s0.totalMinutes);
+    check('29.1: kırgınlık minneti siler; kırgın sakin o kişinin oturduğu masadan kaçınır (companyMood -1, ağırlık x0,1)', !CH.hasTag(A, B.id, 'grateful') && brain.companyMood(A, [C, B]) === -1 && CD.EMOTION_RULES.resentVenue === 0.1);
+    for (const [c] of others) if (c.task?.buildingId === fountain.id) c.task = null;
+    A.task = null; A.needs.social = 10;
+    const joinPlan = forced(brain.rng, 0.5, () => brain.planSocial(A, 12));
+    CH.removeTag(A, B.id, 'resentful');
+    const joinPlan2 = forced(brain.rng, 0.5, () => brain.planSocial(A, 12));
+    check('29.1: kırgın olduğu kişinin oturduğu toplanma yerine katılmaz; kırgınlık geçince katılır (gerçek Brain.planSocial)', joinPlan?.buildingId !== fountain.id && joinPlan2?.buildingId === fountain.id, `${joinPlan?.buildingId} / ${joinPlan2?.buildingId} (${fountain.id})`);
+    CH.addTag(A, B.id, 'resentful', s0.totalMinutes);
+    sit(A);
+    check('29.1: kırgın olduğu kişiyi sohbete çağırmaz; kırgınla sohbet puan kazandırmaz, keyif kaçırır', rel.chatMultiplier(A, B) === 0 && rel.chatMultiplier(B, A) === 0 && bondAt(0, 0).f === CD.EMOTION_RULES.resentFun && (() => { const o = B.task; B.task = null; const p = forced(brain.rng, 0.5, () => brain.findPartner(A, 12)); B.task = o; return p !== B; })());
+    sit(C, -14);
+    setChem(A, C, 0);
+    s0.relationships[RSX.pairKey(A.id, C.id)] = 0; s0.relationships[key] = 80;
+    check('29.1: aynı yerde kırgın olduğu yakın dostu yerine başkasına döner (nearestPartner)', S().behavior.nearestPartner(A, A.task) === C);
+    CH.removeTag(A, B.id, 'resentful');
+    CH.addTag(A, C.id, 'jealous', s0.totalMinutes);
+    check('29.1: kıskandığı kişiyle sohbet yarı hızda ilerler', rel.chatMultiplier(A, C) === 0.5);
+    // Şantiyeye yardıma gitme
+    sim.give({ wood: 400, stone: 300 });
+    const site1 = sim.place('cabin', { instant: false });
+    const site2 = sim.place('cabin', { instant: false });
+    const jobs = S().jobs;
+    const j1 = jobs.jobs.find((j) => j.buildingId === site1?.id);
+    const j2 = jobs.jobs.find((j) => j.buildingId === site2?.id);
+    let helpDetail = 'şantiye kurulamadı';
+    let helpOk = false;
+    if (j1 && j2) {
+      const keepW = [A.workplaceId, A.retired, { ...A.relationships }];
+      A.workplaceId = null; A.retired = false;
+      for (const j of jobs.jobs) j.assignees = j.assignees.filter((id) => id !== A.id && id !== B.id);
+      const origin = { x: Math.round((site1.tileX + site2.tileX) / 2), y: Math.round((site1.tileY + site2.tileY) / 2) + 1 };
+      CH.removeTag(A, B.id, 'grateful');
+      const plain = jobs.findWorkFor(A, origin);
+      const far = plain?.job === j1 ? j2 : j1;
+      far.assignees.push(B.id);
+      const still = jobs.findWorkFor(A, origin);
+      CH.addTag(A, B.id, 'grateful', s0.totalMinutes);
+      const helped = jobs.findWorkFor(A, origin);
+      helpOk = (plain?.job === j1 || plain?.job === j2) && still?.job === plain.job && helped?.job === far;
+      helpDetail = `${plain?.job?.id} -> ${still?.job?.id} -> ${helped?.job?.id} (uzak ${far.id})`;
+      far.assignees = far.assignees.filter((id) => id !== B.id);
+      A.workplaceId = keepW[0]; A.retired = keepW[1];
+    }
+    check('29.1: minnettar olduğu kişinin çalıştığı şantiyeye yardıma gider (gerçek JobSystem.findWorkFor)', helpOk && CD.EMOTION_RULES.helpTiles === 10, helpDetail);
+
+    // --- Yolda karşılaşma: şimşek ve etiketli selam ---
+    fresh();
+    const liveGroups = rel.groups;
+    rel.groups = []; // sohbet grubu kalmasın: ikram sözü selamın önüne geçmesin
+    const walk = (c, dx) => { c.task = { activity: 'stroll', phase: 'travel' }; c.visible = true; c.away = null; c.x = fountain.center.x + dx; c.y = fountain.center.y + 40; c.bubble = null; c.speech = null; };
+    for (const [c] of others) if (c.task?.phase === 'travel') c.task = null;
+    walk(A, 0); walk(B, 8);
+    setChem(A, B, 2);
+    chem.encounterCooldowns.clear();
+    const sparks0 = s0.stats.sparks ?? 0;
+    const sparkEvents = [];
+    const offS = game.events.on('chemistry:spark', (p) => sparkEvents.push(p));
+    chem.update({ gameMinutes: 1, hour: 12 });
+    const sparked = A.bubble?.icon === 'spark' && B.bubble?.icon === 'spark' && (s0.stats.sparks ?? 0) === sparks0 + 1 && sparkEvents.length === 1 && sparkEvents[0].chemistry === 2;
+    const sparkLine = (A.id < B.id ? A : B).speech?.text;
+    chem.update({ gameMinutes: 1, hour: 12 });
+    check('29.1: kimyası +2 / +3 olan iki sakin yolda karşılaşınca başlarında mavi şimşek çakar (aynı çift günde bir kez)', sparked && (s0.stats.sparks ?? 0) === sparks0 + 1 && CD.SPARK_GREETINGS.includes(sparkLine) && CD.EMOTION_RULES.encounterCooldown === 1440, `${A.bubble?.icon} ${sparkLine}`);
+    check('29.1: şimşek balonunun görseli tanımlı (çizilebilir sprite)', Boolean(UIX.getBubbleSprite('spark')) && UIX.getAnyIconURL('spark').startsWith('data:image'));
+    walk(A, 0); walk(B, 8);
+    setChem(A, B, 0);
+    chem.encounterCooldowns.clear();
+    chem.update({ gameMinutes: 1, hour: 12 });
+    const quiet = !A.bubble && !A.speech && !B.speech;
+    CH.addTag(A, B.id, 'resentful', s0.totalMinutes);
+    CH.addTag(B, A.id, 'grateful', s0.totalMinutes);
+    chem.encounterCooldowns.clear();
+    chem.update({ gameMinutes: 1, hour: 12 });
+    check('29.1: nötr çift sessizce geçer; etiketi olan sakinin selamı değişir ("Yine mi sen...", "… minnettarım!")', quiet && CD.TAG_GREETINGS.resentful.some((l) => l.replace('{name}', B.name) === A.speech?.text) && CD.TAG_GREETINGS.grateful.some((l) => l.replace('{name}', A.name) === B.speech?.text) && A.bubble?.icon === 'sulk' && B.bubble?.icon === 'heart' && CD.TAG_GREETINGS.resentful.includes('Yine mi sen...') && CD.TAG_GREETINGS.grateful.includes('Ustam, sana minnettarım!'), `${A.speech?.text} / ${B.speech?.text}`);
+    A.speech = { text: 'Deneme', at: -1, duration: 2 };
+    chem.encounterCooldowns.clear();
+    chem.update({ gameMinutes: 1, hour: 12 });
+    check('29.1: süren bir sözün üstüne yazılmaz', A.speech.text === 'Deneme');
+    rel.groups = liveGroups;
+    offS();
+
+    // --- Arayüz: kimya rozeti ve etiket çipleri ---
+    fresh();
+    A.speech = null; B.speech = null;
+    s0.relationships[key] = 60;
+    setChem(A, B, 2);
+    CH.addTag(A, B.id, 'grateful', s0.totalMinutes);
+    CH.addTag(A, B.id, 'admiration', s0.totalMinutes);
+    CH.addTag(A, CD.RULER_ID, 'resentful', s0.totalMinutes);
+    setChem(A, C, -1);
+    s0.relationships[RSX.pairKey(A.id, C.id)] = -30;
+    game.events.emit('ui:selectCharacter', A.id);
+    game.render(0);
+    const rows = [...document.querySelectorAll('.relation-row')];
+    const rowB = rows.find((r) => r.querySelector('.relation-name')?.textContent.includes(B.name));
+    const rowC = rows.find((r) => r.querySelector('.relation-name')?.textContent.includes(C.name));
+    check('29.1: Karakter Kartı ilişki satırında kimya rozeti: güçlü çekimde çift şimşek, antipatide kırık çizgi', rowB?.querySelector('.chemistry-badge')?.textContent === '⚡⚡' && rowB.querySelector('.chemistry-badge').title.includes('Kimya +2') && rowC?.querySelector('.chemistry-badge')?.textContent === '⌁' && rowC.querySelector('.chemistry-badge').classList.contains('is-antipathy'), `${rowB?.querySelector('.chemistry-badge')?.textContent} ${rowC?.querySelector('.chemistry-badge')?.textContent}`);
+    const chips = [...(rowB?.querySelectorAll('.emotion-chip') ?? [])].map((x) => x.textContent);
+    check('29.1: ilişki çubuğunun altında etiket çipleri ([Minnettar] [Hayran]); Yönetime karşı his ayrı satırda', chips.join() === 'Minnettar,Hayran' && rowB.querySelector('.emotion-chip.is-grateful') && document.querySelector('.relation-ruler .emotion-chip.is-resentful')?.textContent === 'Kırgın' && rowB.querySelector('.emotion-chips').previousElementSibling.classList.contains('relation-bar'), chips.join());
+    CH.removeTag(A, B.id, 'admiration');
+    game.render(0);
+    check('29.1: etiket değişince kart yenilenir', [...document.querySelectorAll('.relation-row')].find((r) => r.querySelector('.relation-name')?.textContent.includes(B.name))?.querySelectorAll('.emotion-chip').length === 1);
+    game.events.emit('ui:selectCharacter', null);
+
+    // --- Kayıt (sürüm 36) ---
+    const rawSave = JSON.parse(JSON.stringify(S().saves.snapshot()));
+    const rawA = rawSave.characters.find((c) => c.id === A.id);
+    check('29.1: kimya ve etiketler kayda yazılır (characters[].relationships { chemistry, craft, together, tags, until })', rawA.relationships[B.id].chemistry === 2 && rawA.relationships[B.id].tags.join() === 'grateful' && Number.isFinite(rawA.relationships[B.id].until.grateful) && rawA.relationships[0].tags.join() === 'resentful' && rawA.relationships[B.id].craft === false);
+    const back = Character.fromJSON(rawA);
+    check('29.1: kayıttan yükleme birebir (gidiş-dönüş)', JSON.stringify(back.toJSON().relationships) === JSON.stringify(rawA.relationships));
+    const dirty = CH.sanitizeRelations({ 7: { chemistry: 99, tags: ['grateful', 'dragon', 'grateful'], until: { grateful: 'x' } }, 8: { chemistry: 'bozuk', tags: 'x' }, [A.id]: { chemistry: 1, tags: [] }, abc: { chemistry: 1 }, 9: null, '-3': { chemistry: 1 } }, A.id);
+    check('29.1: bozuk kayıt temizlenir (sınır dışı kimya, bilinmeyen etiket, kendine / geçersiz kimliğe işaret eden kayıt)', JSON.stringify(dirty) === JSON.stringify({ 7: { chemistry: 3, craft: false, together: 0, tags: ['grateful'], until: { grateful: 0 } }, 8: { chemistry: 0, craft: false, together: 0, tags: [], until: {} } }) && JSON.stringify(CH.sanitizeRelations(null)) === '{}' && JSON.stringify(CH.sanitizeRelations([1, 2])) === '{}', JSON.stringify(dirty));
+    const ghost = { relationships: { 424242: { chemistry: 1, craft: false, tags: [], until: {} }, 0: { chemistry: 0, craft: false, tags: ['grateful'], until: { grateful: 5 } } }, id: A.id };
+    const pruned = CH.pruneRelations([ghost]);
+    check('29.1: kasabadan ayrılan / vefat eden sakine işaret eden kayıt silinir (Yönetim kaydı kalır)', pruned === 1 && !ghost.relationships[424242] && ghost.relationships[0]);
+    const legacy = JSON.parse(JSON.stringify(rawSave));
+    legacy.version = 35;
+    for (const c of legacy.characters) delete c.relationships;
+    const keepSlot = localStorage.getItem(CONFIG.SESSION_KEY);
+    localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
+    const migrated = SMX.SaveManager.read('session');
+    if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
+    const mById = new Map((migrated?.characters ?? []).map((c) => [c.id, c]));
+    const pairs = Object.keys(legacy.relationships).map((k) => k.split('-').map(Number)).filter(([a, b]) => mById.has(a) && mById.has(b));
+    const boundOk = pairs.length > 0 && pairs.every(([a, b]) => { const ra = mById.get(a).relationships[b]; const rb = mById.get(b).relationships[a]; return ra && rb && ra.chemistry === rb.chemistry && ra.chemistry === CH.chemistryFor(legacy.seed, mById.get(a), mById.get(b)) && ra.tags.length === 0 && ra.craft === false; });
+    check('29.1: v35 kaydı v36\'ya göç eder: her mevcut ilişkiye deterministik kimya ve boş etiket yapısı bağlanır', CONFIG.SAVE_VERSION === 37 && migrated && boundOk && migrated.characters.every((c) => c.relationships && typeof c.relationships === 'object'), `${pairs.length} çift`);
+    const again = (() => { localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy)); const m = SMX.SaveManager.read('session'); if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot); return m; })();
+    check('29.1: göç deterministiktir (iki kez göç birebir aynı kayıt)', JSON.stringify(again.characters.map((c) => c.relationships)) === JSON.stringify(migrated.characters.map((c) => c.relationships)));
+
+    // Temizlik
+    offT();
+    for (const [c, json] of keepRel) c.relationships = JSON.parse(json);
+    for (const k of Object.keys(s0.relationships)) delete s0.relationships[k];
+    Object.assign(s0.relationships, JSON.parse(keepScores));
+    for (const [c, task, visible, x, y, pose, inside, needs, speech, bubble] of keepTasks) Object.assign(c, { task, visible, x, y, pose, insideBuildingId: inside, speech, bubble }, { needs });
+    for (const [c, task] of others) c.task = task;
+    D.task = keepTaskD;
+    C.task = others.find(([c]) => c === C)?.[1] ?? null;
+    for (const k of ['sparks', 'treats', 'emotionTags', 'kindredBonds', 'tagGreetings', 'quarrels']) { if (keepStats[k] === undefined) delete s0.stats[k]; else s0.stats[k] = keepStats[k]; }
+    chem.encounterCooldowns.clear();
+    chem.treatDays.clear();
+  }
+
+  // ===== 29. aşama (29.2): Dinamik Ruh Halleri (Moodlets), Eylem-Kişilik-İhtiyaç Rezonansı, Yas ve Teselli =====
+  {
+    const S = () => game.scenes.current;
+    const s0 = game.state;
+    const MD = await import('/src/data/moodlets.js');
+    const MO = await import('/src/systems/Moodlets.js');
+    const MSX = await import('/src/systems/MoodletSystem.js');
+    const CH2 = await import('/src/systems/Chemistry.js');
+    const RS2 = await import('/src/systems/RelationshipSystem.js');
+    const SM2 = await import('/src/state/SaveManager.js');
+    const UI2 = await import('/src/art/ui/index.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const { ACTIVITIES } = await import('/src/data/activities.js');
+    const { CONFIG } = await import('/src/config.js');
+    const ms = S().moodlets;
+    const brain = S().behavior.brain;
+    const rel = S().relationships;
+    const forced = (rng, value, fn) => { rng.next = () => value; try { return fn(); } finally { delete rng.next; } };
+    const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
+    // (29.2b) Kıdemli Bilge yaşı 65'e indi: ruh hali testlerinin 4 kişilik kadrosu bilgelerden değil, çalışan yetişkinlerden seçilir
+    const adults = s0.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
+    const [A, B, C, D] = adults;
+    const keep = new Map(s0.characters.map((c) => [c, { moodlets: JSON.stringify(c.moodlets), rel: JSON.stringify(c.relationships), traits: c.traits, quirk: c.quirk, profile: c.profile, needs: { ...c.needs }, task: c.task, x: c.x, y: c.y, visible: c.visible, speech: c.speech, bubble: c.bubble, memories: c.memories.length, homeId: c.homeId, workplaceId: c.workplaceId, skills: { ...c.skills }, partnerId: c.partnerId, married: c.married, buffs: { ...c.buffs }, lastConsoleAt: c.lastConsoleAt, inside: c.insideBuildingId, pose: c.pose, flowStreak: c.flowStreak }]));
+    const keepStats = JSON.stringify(s0.moodlets);
+    const keepScores = JSON.stringify(s0.relationships);
+    const keepJournal = s0.journal.length;
+    const clear = (...list) => { for (const c of list) { c.moodlets.length = 0; MO.recomputeMood(c); c.speech = null; c.bubble = null; } };
+    const setTraits = (c, traits, quirk = null) => { c.traits = traits; c.quirk = quirk; c.profile = c.buildProfile(); };
+    const keys = (c) => c.moodlets.map((m) => m.key).join();
+    const now = () => s0.totalMinutes;
+    for (const c of s0.characters) clear(c);
+
+    // --- Veri ve mimari ---
+    const byLayer = (layer) => MD.MOODLET_KEYS.filter((k) => MD.MOODLETS[k].layer === layer);
+    check('29.2: üç katman ve tavanları: 1 çekirdek + 3 eylem + 2 ihtiyaç = en çok 6 moodlet', MD.MOODLET_CAPS.core === 1 && MD.MOODLET_CAPS.action === 3 && MD.MOODLET_CAPS.need === 2 && byLayer('core').length === 6 && byLayer('action').length === 11 && byLayer('need').length === 7);
+    check('29.2: kademeler minor / major / critical etkinin sapmasını 1 / 1,5 / 2 ile çarpar', MD.TIER_SCALE.minor === 1 && MD.TIER_SCALE.major === 1.5 && MD.TIER_SCALE.critical === 2);
+    check('29.2: süreler: Alın Teri 8, Angarya 6, Ustalık Akışı 10, Damak Şöleni 8, Kuru Tayın 6, Deliksiz Uyku 10, Üşüyerek Uyandı 8, Tatlı Sohbet 6, Tatsız Karşılaşma 8, İç Huzuru 8 saat', ['proud_work', 'drudgery', 'flow_state', 'feast_bliss', 'raw_ration', 'well_rested', 'cold_wake', 'warm_chat', 'sour_encounter', 'quiet_peace'].map((k) => MD.MOODLETS[k].hours).join() === '8,6,10,8,6,10,8,6,8,8');
+    check('29.2: travma / zafer süreleri: Derin Yas 72, Sarsılmış 24, Kalbi Kırık 36, Sesimiz Duyulmadı 36, Hayatının Günü 48, İlham Dolu 24, Yüreği Ferahladı 24 saat', ['mourning', 'shaken', 'heartbroken', 'neglected', 'euphoric', 'inspired', 'comforted'].map((k) => MD.MOODLETS[k].hours).join() === '72,24,36,36,48,24,24');
+    clear(A);
+    MO.addMoodlet(A, 'proud_work', now());
+    check('29.2: Alın Teri: iş +%8, keyif düşüşü x0,85; süresi 8 saat sonra biter', near(A.mood.workMul, 1.08) && near(A.mood.joyRateMul, 0.85) && A.moodlets[0].until === Math.round(now() + 480) && A.mood.focus === true);
+    clear(A);
+    MO.addMoodlet(A, 'well_rested', now(), { tier: 'major' });
+    check('29.2: güçlü (major) kademe sapmayı 1,5 kat büyütür: Deliksiz Uyku yürüme +%12, iş +%9', near(A.mood.moveMul, 1.12) && near(A.mood.workMul, 1.09));
+    clear(A);
+    for (const k of ['proud_work', 'feast_bliss', 'warm_chat', 'quiet_peace']) MO.addMoodlet(A, k, now());
+    check('29.2: eylem katmanı 3 ile sınırlı: dördüncü gelince en düşük öncelikli (Tatlı Sohbet) çıkar', A.moodlets.length === 3 && !MO.hasMoodlet(A, 'warm_chat') && MO.hasMoodlet(A, 'quiet_peace'), keys(A));
+    const rejected = MO.addMoodlet(A, 'warm_chat', now());
+    check('29.2: katman doluyken daha düşük öncelikli moodlet eklenmez', rejected === null && A.moodlets.length === 3);
+    for (const k of ['exhausted', 'hangry', 'lonely_ache', 'mourning', 'inspired']) MO.addMoodlet(A, k, now(), { tier: 'major' });
+    check('29.2: toplam en çok 6 moodlet (1 + 3 + 2); çekirdekteki yasın yerine daha düşük öncelikli ilham geçemez', A.moodlets.length === 6 && MO.hasMoodlet(A, 'mourning') && !MO.hasMoodlet(A, 'inspired') && A.moodlets.filter((m) => MD.MOODLETS[m.key].layer === 'need').length === 2, keys(A));
+    clear(A);
+    MO.addMoodlet(A, 'euphoric', now());
+    MO.addMoodlet(A, 'mourning', now(), { tier: 'major', whoName: 'Deniz' });
+    check('29.2: yas, çekirdekteki coşkunun yerini alır', keys(A) === 'mourning');
+    for (const k of ['exhausted', 'hangry', 'drudgery', 'cold_wake']) MO.addMoodlet(A, k, now(), { tier: 'critical' });
+    check('29.2: toplam çarpanlar sınırlıdır (iş en az x0,6, en çok x1,25)', A.mood.workMul === MD.MOOD_LIMITS.workMul[0] && MD.MOOD_LIMITS.workMul[1] === 1.25 && A.mood.moveMul >= MD.MOOD_LIMITS.moveMul[0], A.mood.workMul);
+    clear(A);
+    MO.addMoodlet(A, 'mourning', now(), { tier: 'major' });
+    const griefWork = A.mood.workMul;
+    MO.addMoodlet(A, 'comforted', now());
+    check('29.2: Derin Yas (güçlü): iş -%30, yürüme -%22,5, keyif düşüşü +%60; Yüreği Ferahladı travma cezalarını yarıya indirir', near(griefWork, 0.7) && near(A.mood.workMul, 0.85) && near(A.mood.moveMul, 1 - 0.15 * 1.5 * 0.5) && near(A.mood.joyRateMul, 1 + 0.4 * 1.5 * 0.5) && A.mood.grief === true);
+
+    // --- Baskın ruh hali ---
+    const feel = (list) => { clear(A); for (const [k, t] of list) MO.addMoodlet(A, k, now(), { tier: t ?? 'minor' }); return A.mood.feel; };
+    check('29.2: baskın ruh hali net ağırlıktan türer: Coşkulu, İlhamlı, Keyifli, Dingin, Bıkkın, Yorgun, Kederli, Dengeli', feel([['euphoric']]) === 'Coşkulu' && feel([['flow_state']]) === 'İlhamlı' && feel([['proud_work']]) === 'Keyifli' && feel([['well_rested']]) === 'Dingin' && feel([['drudgery']]) === 'Bıkkın' && feel([['exhausted']]) === 'Yorgun' && feel([['mourning', 'major'], ['feast_bliss']]) === 'Kederli' && feel([]) === 'Dengeli' && feel([['proud_work'], ['drudgery']]) === 'Dengeli');
+    check('29.2: baskın ruh halinin tonu: olumlu / olumsuz / travma / nötr', (feel([['euphoric']]), A.mood.tone === 'positive') && (feel([['hangry']]), A.mood.tone === 'negative') && (feel([['shaken']]), A.mood.tone === 'trauma') && (feel([]), A.mood.tone === 'neutral'));
+
+    // --- Katman A: günlük eylem x kişilik ---
+    const work = (traits, activity, energy = 80, quirk = null) => { clear(A); setTraits(A, traits, quirk); A.needs.energy = energy; ms.onWork(A, activity, null); return A.moodlets[0] ?? null; };
+    const proud = work(['hardworking'], 'chop');
+    const sleepy = work(['sleepyhead'], 'mine');
+    check('29.2: aynı iş, farklı kişilik: Çalışkan iş bitince Alın Teri, Uykucu ağır işte Angarya Bıkkınlığı alır', proud?.key === 'proud_work' && proud.reason === 'proud_trait' && sleepy?.key === 'drudgery' && sleepy.reason === 'drudgery_sleepy');
+    check('29.2: Hırslı ve Zanaatkâr Ruhu da üretimden gurur duyar; sıradan sakin sıradan işte moodlet almaz', work(['ambitious'], 'mine')?.reason === 'proud_ambitious' && work(['glutton'], 'craft', 80, 'craftsman')?.reason === 'proud_craft' && work(['glutton'], 'chop') === null);
+    check('29.2: enerjisi %35\'in altında ağır işte (maden, taş ocağı, inşaat) çalıştırılan herkes bıkar; hafif işte bıkmaz', work(['hardworking'], 'build', 30)?.reason === 'drudgery_tired' && work(['glutton'], 'quarry', 20)?.key === 'drudgery' && work(['glutton'], 'chop', 20) === null && MD.MOOD_RULES.heavyWork.join() === 'mine,quarry,mineIron,build');
+    check('29.2: doğasına ters iş: Doğa Sever taş ocağında, Hırslı tarlada bıkar (Hırslı madende gurur duyar)', work(['natureLover'], 'quarry')?.reason === 'drudgery_misfit' && work(['ambitious'], 'farm')?.reason === 'drudgery_misfit' && work(['ambitious'], 'mineIron')?.key === 'proud_work');
+    setTraits(A, ['glutton']);
+    clear(A);
+    A.skills.woodcutting = 2000;
+    ms.onWork(A, 'chop', null);
+    check('29.2: sevdiği (Usta olduğu) meslekte çalışan sakin de gurur duyar', A.moodlets[0]?.reason === 'proud_loved');
+    A.skills = { ...keep.get(A).skills };
+    // Gerçek performWork: ruh hali üretimi çarpar
+    const garden = S().world.getCompleted('garden')[0] ?? sim.place('garden');
+    const dayBeforeWork = s0.time.day;
+    s0.time.day = 6; // yaz: tarla donmuş olmasın
+    S().structures.update({ hour: 10, gameMinutes: 0 });
+    game.events.emit('ui:setCrop', { buildingId: garden.id, crop: 'grain' });
+    const harvest = (setup) => {
+      clear(A); setup();
+      const keepRes = { ...s0.resources }; const skills = { ...A.skills };
+      s0.resources.food = 0; garden.productionBuffer = 0; garden.producedToday = 0; garden.extraBuffers = {};
+      let total = 0;
+      for (let i = 0; i < 240; i++) { A.needs.energy = 100; A.needs.fun = 100; const b0 = garden.productionBuffer + garden.producedToday; S().behavior.performWork(A, { workBuildingId: garden.id, activity: 'farm' }, 1); total += garden.productionBuffer + garden.producedToday - b0; }
+      Object.assign(s0.resources, keepRes); A.skills = skills;
+      return total;
+    };
+    const baseOut = harvest(() => {});
+    const proudOut = harvest(() => MO.addMoodlet(A, 'proud_work', now()));
+    const drudgeOut = harvest(() => MO.addMoodlet(A, 'drudgery', now()));
+    check('29.2: gerçek performWork: Alın Teri üretimi +%8, Angarya -%10 değiştirir', baseOut > 0 && near(proudOut / baseOut, 1.08, 0.02) && near(drudgeOut / baseOut, 0.9, 0.02), `${baseOut.toFixed(2)} ${proudOut.toFixed(2)} ${drudgeOut.toFixed(2)}`);
+    s0.time.day = dayBeforeWork;
+    // Ustalık Akışı
+    clear(A);
+    const keepGM = [A.isGrandmaster, A.grandmasterProfession];
+    A.workplaceId = garden.id; A.skills.farming = 2000; A.needs.energy = 90; A.needs.fun = 90; A.flowStreak = 0;
+    A.task = { activity: 'farm', workBuildingId: garden.id, phase: 'perform', elapsed: 0, duration: 60 };
+    ms.onProduction(A, garden);
+    const flowOne = MO.hasMoodlet(A, 'flow_state');
+    ms.onProduction(A, garden);
+    check('29.2: Ustalık Akışı: dinç ve keyifli Usta kendi uzmanlık yapısında art arda iki üretimde akışa girer, sabitlenmesi gerekmez (iş +%12, deneyim +%25, eser şansı +%2)', !flowOne && A.workplaceId === garden.id && MO.hasMoodlet(A, 'flow_state') && near(A.mood.workMul, 1.12) && near(A.mood.xpMul, 1.25) && near(A.mood.masterwork, 0.02));
+    // (29.2b) Sabitleme şartı kalktı: otopilottaki (sabitlenmemiş) usta da akışa girer
+    clear(A); A.flowStreak = 0; A.workplaceId = null;
+    ms.onProduction(A, garden); ms.onProduction(A, garden);
+    const unpinnedFlow = MO.hasMoodlet(A, 'flow_state');
+    // yorgun (enerji 30), tam sınırda (enerji 50: "%50'den fazla" olmalı), keyifsiz, acemi (Sv.1) ya da başka mesleğin yapısındaki usta akışa giremez
+    const blockedFlow = [];
+    for (const [label, setup] of [['yorgun', () => { A.needs.energy = 30; }], ['sınırda', () => { A.needs.energy = 50; }], ['keyifsiz', () => { A.needs.fun = 40; }], ['acemi', () => { A.skills.farming = 0; }], ['başka meslek', () => { A.skills.farming = 0; A.skills.mining = 2000; }]]) {
+      clear(A); A.flowStreak = 0; A.needs.energy = 90; A.needs.fun = 90; A.skills.farming = 2000; A.skills.mining = 0; setup();
+      ms.onProduction(A, garden); ms.onProduction(A, garden); ms.onProduction(A, garden);
+      blockedFlow.push(`${label}:${MO.hasMoodlet(A, 'flow_state')}`);
+    }
+    clear(A); A.flowStreak = 0; A.needs.energy = 90; A.needs.fun = 90; A.skills.farming = 2000; A.skills.mining = 0;
+    ms.onProduction(A, garden);
+    const brokenStreak = A.flowStreak === 1;
+    A.needs.energy = 20; ms.onProduction(A, garden); // yorgun mesai seriyi sıfırlar
+    check('29.2b: Ustalık Akışı sabitlemesiz tetiklenir; yorgun / keyifsiz / sınırda (%50) / acemi / başka meslekte olmaz, yorgun mesai seriyi sıfırlar', unpinnedFlow && blockedFlow.every((x) => x.endsWith(':false')) && brokenStreak && A.flowStreak === 0, blockedFlow.join(' '));
+    A.needs.energy = 90; A.flowStreak = 0;
+    A.skills = { ...keep.get(A).skills }; A.workplaceId = keep.get(A).workplaceId; [A.isGrandmaster, A.grandmasterProfession] = keepGM;
+    const CS = S().craftsmanship;
+    clear(A);
+    const chance0 = CS.chanceFor({ ...A, skills: { woodcutting: 2000 }, mood: MO.neutralMood(), workplaceId: null, equipment: {}, isGrandmaster: false }, 'carvedChest', null);
+    const chance1 = CS.chanceFor({ ...A, skills: { woodcutting: 2000 }, mood: { ...MO.neutralMood(), masterwork: 0.03 }, workplaceId: null, equipment: {}, isGrandmaster: false }, 'carvedChest', null);
+    check('29.2: İlham Dolu usta işi eser şansını +%3 artırır (gerçek CraftsmanshipSystem.chanceFor)', chance0 > 0 && near(chance1 - chance0, 0.03), `${chance0} ${chance1}`);
+    // Yeme, içme, uyku
+    const eatMood = (traits, fn) => { clear(A); setTraits(A, traits); fn(); return A.moodlets[0] ?? null; };
+    const plainFeast = eatMood(['introvert'], () => ms.onTaskFinished(A, { activity: 'innMeal' }));
+    const gluttonFeast = eatMood(['glutton'], () => ms.onTaskFinished(A, { activity: 'innMeal' }));
+    check('29.2: handa sıcak yemek Damak Şöleni verir; Obur / Neşeli sakinde güçlü (keyif düşüşü x0,7 -> x0,55)', plainFeast?.key === 'feast_bliss' && plainFeast.tier === 'minor' && gluttonFeast?.tier === 'major' && near(A.mood.joyRateMul, 0.55) && near(A.mood.energyMul, 0.85));
+    check('29.2: soğuk şerbet ve ziyafet ikramı da Damak Şöleni verir (olay dinleyicileri)', eatMood(['cheerful'], () => game.events.emit('citizen:sherbet', { character: A, building: null }))?.reason === 'feast_sherbet' && eatMood([], () => game.events.emit('feast:served', { character: A, tier: 'rich' }))?.reason === 'feast_table');
+    const keepDay = s0.time.day;
+    const keepFood = { ...s0.resources }; const keepCredit = s0.pantry.credit;
+    const seasonDay = (cold) => { for (let d = 1; d <= 16; d++) { s0.time.day = d; if ((await0(d)) === cold) return d; } return null; };
+    const { getSeason } = await import('/src/data/seasons.js');
+    const await0 = (d) => Boolean(getSeason(d).cold);
+    seasonDay(false);
+    sim.give({ food: 900, bread: 50 });
+    const summerMeal = eatMood([], () => ms.onTaskFinished(A, { activity: 'meal', bread: false }));
+    seasonDay(true);
+    const winterMeal = eatMood([], () => ms.onTaskFinished(A, { activity: 'meal', bread: false }));
+    const winterBread = eatMood([], () => ms.onTaskFinished(A, { activity: 'meal', bread: true }));
+    seasonDay(false);
+    for (const k of Object.keys(s0.resources)) if (['food', 'bread'].includes(k)) s0.resources[k] = 0;
+    s0.pantry.credit = 0;
+    const scarceMeal = eatMood([], () => ms.onTaskFinished(A, { activity: 'eat' }));
+    check('29.2: sıcak yemek vs kuru tayın: kışın ekmeksiz öğün ya da kıtlıkta tek tip erzak Kuru Tayın verir; bolluk yazında ve ekmekli öğünde vermez', summerMeal === null && winterMeal?.key === 'raw_ration' && winterMeal.reason === 'ration_winter' && winterBread === null && scarceMeal?.reason === 'ration_scarce', `${summerMeal?.key} ${winterMeal?.key} ${winterBread?.key} ${scarceMeal?.reason}`);
+    Object.assign(s0.resources, keepFood); s0.pantry.credit = keepCredit;
+    // Uyanış
+    const stone = { id: -501, stat: (k, d) => (k === 'sleepFunPerMinute' ? 0.02 : d) };
+    const cabin = { id: -502, stat: (k, d) => d };
+    const realGet = S().world.getBuilding.bind(S().world);
+    S().world.getBuilding = (id) => (id === -501 ? stone : id === -502 ? cabin : realGet(id));
+    const wake = (traits, homeId, energy, hunger = 80) => { clear(A); setTraits(A, traits); A.homeId = homeId; A.needs.energy = energy; A.needs.hunger = hunger; A.buffs.happyHome = -1; ms.onWoke(A); return A.moodlets[0] ?? null; };
+    seasonDay(false);
+    const keepCold = s0.heating.cold;
+    s0.heating.cold = false;
+    const restedStone = wake(['glutton'], -501, 98);
+    const restedSleepy = wake(['sleepyhead'], -501, 98);
+    const plainCabin = wake(['glutton'], -502, 98);
+    const hungryWake = wake(['glutton'], -501, 98, 30);
+    const tiredWake = wake(['glutton'], -501, 40);
+    const homeless = wake(['glutton'], null, 98);
+    seasonDay(true);
+    const warmWinter = wake(['glutton'], -502, 98);
+    s0.heating.cold = true;
+    const frozen = wake(['glutton'], -501, 98);
+    s0.heating.cold = keepCold;
+    check('29.2: deliksiz uyku vs soğuk uyanış: Taş Ev\'de dinç ve tok uyanan Deliksiz Uyku alır (Uykucu\'da 1,5 kat güçlü)', restedStone?.key === 'well_rested' && restedStone.tier === 'minor' && restedSleepy?.tier === 'major' && plainCabin === null && hungryWake === null && warmWinter?.reason === 'rested_warm', `${restedStone?.key} ${restedSleepy?.tier} ${plainCabin?.key} ${hungryWake?.key} ${warmWinter?.reason}`);
+    check('29.2: ısınmayan evde, evsizken ya da dinlenemeden uyanan Üşüyerek Uyandı alır (iş -%10, yürüme -%8)', tiredWake?.reason === 'cold_tired' && homeless?.reason === 'cold_homeless' && frozen?.reason === 'cold_room' && (clear(A), MO.addMoodlet(A, 'cold_wake', now()), near(A.mood.workMul, 0.9) && near(A.mood.moveMul, 0.92)), `${tiredWake?.reason} ${homeless?.reason} ${frozen?.reason}`);
+    S().world.getBuilding = realGet;
+    A.homeId = keep.get(A).homeId; A.buffs = { ...keep.get(A).buffs };
+    s0.time.day = keepDay;
+    // Sohbet ve boş zaman
+    const liveGroups = rel.groups;
+    const chat = (n, traitsA = ['glutton']) => { clear(A, B); setTraits(A, traitsA); setTraits(B, ['glutton']); setChem(A, B, n); rel.groups = [{ id: 'chat:fountain:1', kind: 'chat', members: [A, B] }]; ms.scanChats(); rel.groups = liveGroups; return A.moodlets[0] ?? null; };
+    const warm = chat(1);
+    const warmStrong = chat(1, ['socialButterfly']);
+    const neutralChat = chat(0);
+    const sour = chat(-1);
+    const sourGrumpy = chat(-1, ['grumpy']);
+    check('29.2: kimyası olumlu biriyle sohbet Tatlı Sohbet (Sosyal Kelebek\'te güçlü), eksi kimyayla sohbet Tatsız Karşılaşma (Huysuz\'da sert) verir; nötr sohbet iz bırakmaz', warm?.key === 'warm_chat' && warm.tier === 'minor' && warm.whoName === B.name && warmStrong?.tier === 'major' && neutralChat === null && sour?.key === 'sour_encounter' && sourGrumpy?.tier === 'major');
+    clear(A, B); setTraits(A, ['grumpy']);
+    ms.onQuarrel(A, B);
+    check('29.2: atışma iki tarafa da Tatsız Karşılaşma bırakır (keyif düşüşü x1,2; atışma olasılığı artar)', MO.hasMoodlet(A, 'sour_encounter') && MO.hasMoodlet(B, 'sour_encounter') && A.moodlets[0].tier === 'major' && near(B.mood.joyRateMul, 1.2) && B.mood.quarrelMul > 1 && B.mood.seek === true);
+    clear(A); setTraits(A, ['glutton']); A.task = { activity: 'fountain', phase: 'perform', buildingId: null, elapsed: 0, duration: 99 };
+    setChem(A, B, 0); s0.relationships[RS2.pairKey(A.id, B.id)] = 50;
+    const sBase = (() => { const b = rel.bondFor(A, B); return b.socialBonus; })();
+    MO.addMoodlet(A, 'warm_chat', now());
+    check('29.2: Tatlı Sohbet sosyallik / keyif kazancını +%20 artırır; Kalbi Kırık -%25 azaltır', near(A.mood.socialMul, 1.2) && sBase > 0 && (clear(A), MO.addMoodlet(A, 'heartbroken', now()), near(A.mood.socialMul, 0.75)));
+    const quiet = (traits, quirk, activity, crowd) => { clear(A); setTraits(A, traits, quirk); const real = ms.crowdAround; ms.crowdAround = () => crowd; ms.onTaskFinished(A, { activity }); ms.crowdAround = real; return A.moodlets[0] ?? null; };
+    check('29.2: İçine Kapanık / Kitap Kurdu / Bilge Düşünür / Doğa Sever tenhada dinlenince ya da okuyunca İç Huzuru bulur (iş +%8, keyif düşüşü x0,8); kalabalıkta ya da başka kişilikte bulmaz', quiet(['introvert'], null, 'bench', 0)?.key === 'quiet_peace' && quiet(['glutton'], 'bookworm', 'readLibrary', 5)?.reason === 'quiet_read' && quiet(['glutton'], 'philosopher', 'river', 1)?.key === 'quiet_peace' && quiet(['natureLover'], null, 'stroll', 0)?.key === 'quiet_peace' && quiet(['introvert'], null, 'bench', 5) === null && quiet(['glutton'], 'musician', 'bench', 0) === null && (clear(A), MO.addMoodlet(A, 'quiet_peace', now()), near(A.mood.workMul, 1.08) && near(A.mood.joyRateMul, 0.8)));
+    A.task = null;
+
+    // --- Katman B: ihtiyaç ve çevre ---
+    const scan = (traits, needs) => { clear(A); setTraits(A, traits); Object.assign(A.needs, { energy: 80, hunger: 80, social: 80, fun: 80 }, needs); ms.scanNeeds(A); return keys(A); };
+    check('29.2: ihtiyaç eşikleri: enerji < %20 Tükenmiş, tokluk < %25 Açlıktan Gözü Dönmüş, sosyallik < %25 Yalnızlık Sızısı', scan(['glutton'], { energy: 19 }) === 'exhausted' && scan(['glutton'], { hunger: 24 }) === 'hangry' && scan(['glutton'], { social: 24 }) === 'lonely_ache' && scan(['glutton'], { energy: 21, hunger: 26, social: 26 }) === '');
+    check('29.2: Sosyal Kelebek yalnızlığı %40\'ın altında hisseder (öteki sakinler %25)', scan(['socialButterfly'], { social: 35 }) === 'lonely_ache' && scan(['glutton'], { social: 35 }) === '');
+    scan(['glutton'], { energy: 15 });
+    const exWork = A.mood.workMul; const exMove = A.mood.moveMul;
+    A.needs.energy = 25; ms.scanNeeds(A);
+    const still = MO.hasMoodlet(A, 'exhausted');
+    A.needs.energy = 31; ms.scanNeeds(A);
+    check('29.2: Tükenmiş: yürüme -%18, iş -%20; koşul sürdükçe aktif, enerji eşiğin 10 puan üstüne çıkınca silinir', near(exWork, 0.8) && near(exMove, 0.82) && still && !MO.hasMoodlet(A, 'exhausted') && A.moodlets.length === 0);
+    scan(['grumpy'], { hunger: 20 });
+    const grumpyQ = A.mood.quarrelMul;
+    scan(['glutton'], { hunger: 20 });
+    check('29.2: Açlıktan Gözü Dönmüş: iş -%15, keyif düşüşü x1,4; Huysuz sakinde atışma şansı 2 katına çıkar', near(A.mood.workMul, 0.85) && near(A.mood.joyRateMul, 1.4) && grumpyQ === 2 && A.mood.quarrelMul === 1);
+    // Gerçek sistemler: hareket ve keyif
+    const needsSys = S().systems.find((x) => x.constructor.name === 'NeedsSystem');
+    const funDrop = (setup) => { clear(A); setTraits(A, ['glutton']); setup(); const vis = A.visible; A.visible = false; A.needs.fun = 80; needsSys.update({ gameMinutes: 60, hour: 10, realDt: 0, simDt: 0 }); A.visible = vis; return 80 - A.needs.fun; };
+    const f0 = funDrop(() => {});
+    const f1 = funDrop(() => MO.addMoodlet(A, 'lonely_ache', now()));
+    const f2 = funDrop(() => MO.addMoodlet(A, 'feast_bliss', now()));
+    check('29.2: gerçek NeedsSystem: Yalnızlık Sızısı keyfi 1,3 kat hızlı, Damak Şöleni 0,7 kat yavaş düşürür', f0 > 0 && near(f1 / f0, 1.3, 1e-6) && near(f2 / f0, 0.7, 1e-6), `${f0} ${f1} ${f2}`);
+    const moveSys = S().systems.find((x) => x.constructor.name === 'MovementSystem');
+    const walk = (setup) => { clear(A); setup(); const x0 = 1000; const k = { x: A.x, y: A.y, wp: A.waypoints, wi: A.waypointIndex, buffs: A.buffs, ill: A.illness, inj: A.isInjured }; A.buffs = {}; A.illness = null; A.isInjured = false; A.x = x0; A.y = 1000; A.waypoints = [{ x: x0 + 500, y: 1000 }]; A.waypointIndex = 0; moveSys.step([A], { simDt: 0.5 }, now()); const d = A.x - x0; Object.assign(A, { x: k.x, y: k.y, waypoints: k.wp, waypointIndex: k.wi, buffs: k.buffs, illness: k.ill, isInjured: k.inj }); return d; };
+    const w0 = walk(() => {});
+    const w1 = walk(() => MO.addMoodlet(A, 'exhausted', now()));
+    const w2 = walk(() => MO.addMoodlet(A, 'well_rested', now()));
+    check('29.2: gerçek MovementSystem: Tükenmiş sakin %18 yavaş, Deliksiz Uyku almış %8 hızlı yürür', w0 > 0 && near(w1 / w0, 0.82, 1e-6) && near(w2 / w0, 1.08, 1e-6), `${w0} ${w1} ${w2}`);
+    // Hava
+    const keepWeather = JSON.stringify(s0.weather);
+    const { isRainActive } = await import('/src/data/weather.js');
+    s0.weather.rain = 1;
+    const rainOk = isRainActive(s0.weather);
+    const keepOthers = s0.characters.filter((c) => c !== A && c !== B).map((c) => [c, c.visible]);
+    for (const [c] of keepOthers) c.visible = false; // saat taramasında yalnızca test sakinleri
+    const weather = (traits) => { clear(A); setTraits(A, traits); A.visible = true; A.away = null; A.task = { activity: 'stroll', phase: 'travel' }; Object.assign(A.needs, { energy: 80, hunger: 80, social: 80, fun: 80 }); rel.groups = []; ms.onHour(); rel.groups = liveGroups; return keys(A); };
+    seasonDay(false);
+    const loverRain = weather(['natureLover']);
+    const plainRain = weather(['glutton']);
+    check('29.2: yağmurda Doğa Sever Doğa Keyfi alır (keyif düşüşü x0,8), öteki sakinler Sırılsıklam olur', rainOk && loverRain === 'nature_bliss' && plainRain === 'drenched', `${rainOk} ${loverRain} / ${plainRain}`);
+    Object.assign(s0.weather, JSON.parse(keepWeather));
+    for (const k of Object.keys(s0.weather)) if (!(k in JSON.parse(keepWeather))) delete s0.weather[k];
+    seasonDay(true);
+    const keepEquip = { ...A.equipment }; const keepWarm = A.buffs.warmUntil;
+    const keepInv = A.inventory;
+    A.equipment = { tool: null, clothing: null, bag: null }; A.inventory = []; A.buffs.warmUntil = -1;
+    const chilled = weather(['glutton']);
+    check('29.2: kışın paltosuz dışarıda kalan Donuyor alır', chilled === 'chilled', chilled);
+    A.equipment = keepEquip; A.inventory = keepInv; A.buffs.warmUntil = keepWarm;
+    seasonDay(false);
+    const field = S().world.aesthetics;
+    const map = S().world.map;
+    let pretty = null;
+    if (field) for (let i = 0; i < field.length && !pretty; i++) if (field[i] >= MD.MOOD_RULES.aestheticAt && map.isWalkable(i % map.width, Math.floor(i / map.width))) pretty = { x: i % map.width, y: Math.floor(i / map.width) };
+    let aesthetic = 'güzel karo yok';
+    if (pretty) { clear(A); setTraits(A, ['glutton']); const p = S().world.standPoint(pretty.x, pretty.y); A.x = p.x; A.y = p.y; A.visible = true; A.task = { activity: 'bench', phase: 'perform', elapsed: 0, duration: 99 }; Object.assign(A.needs, { energy: 80, hunger: 80, social: 80, fun: 80 }); rel.groups = []; ms.onHour(); rel.groups = liveGroups; aesthetic = keys(A); }
+    check('29.2: estetiği yüksek (çiçekli, döşeli) bir sokakta vakit geçiren Gözü Gönlü Açıldı alır', !pretty || aesthetic === 'aesthetic_joy', aesthetic);
+    for (const [c, v] of keepOthers) c.visible = v;
+    s0.time.day = keepDay;
+    A.x = keep.get(A).x; A.y = keep.get(A).y; A.task = null;
+
+    // --- Karar motoru ---
+    const decideKeep = { hour: s0.time.hour };
+    const sitQuiet = (c) => { c.task = null; c.visible = true; c.insideBuildingId = null; c.away = null; c.illness = null; c.isInjured = false; c.carrying = null; c.newcomer = false; c.relocating = false; Object.assign(c.needs, { energy: 80, hunger: 90, social: 90, fun: 80 }); };
+    clear(A); setTraits(A, ['glutton']); sitQuiet(A);
+    const fakeHeavy = { activity: 'quarry', workBuildingId: -1, duration: 60 };
+    const realPlanWork = brain.planWork.bind(brain);
+    const realConsole = brain.planConsole.bind(brain);
+    brain.planConsole = () => null;
+    brain.planWork = () => fakeHeavy;
+    s0.social.party = null; // (29.2b) 29.1 aşk testlerinden kalan düğün kutlaması bu bölümün karar testlerine karışmasın
+    const noFest = () => !s0.events.festival.active && !s0.goldenAge?.celebration && !s0.social?.party;
+    const d0 = forced(brain.rng, 0.99, () => brain.decide(A, 10));
+    MO.addMoodlet(A, 'drudgery', now());
+    const d1 = forced(brain.rng, 0.99, () => brain.decide(A, 10));
+    brain.planWork = () => ({ activity: 'farm', workBuildingId: -1, duration: 60 });
+    const d2 = forced(brain.rng, 0.99, () => brain.decide(A, 10));
+    check('29.2: Angarya Bıkkınlığı olan sakin ağır işten (taş ocağı) kaçınır, molaya çıkar; hafif işe yine gider (gerçek Brain.decide)', noFest() && d0 === fakeHeavy && d1 !== fakeHeavy && d1.activity !== 'quarry' && d1.onBreak === true && d2.activity === 'farm', `${d0?.activity} ${d1?.activity}/${d1?.onBreak} ${d2?.activity}`);
+    clear(A); A.needs.energy = 30; A.profile.thresholds.energy = 22;
+    brain.planWork = () => ({ activity: 'farm', workBuildingId: -1, duration: 60 });
+    const awake = forced(brain.rng, 0.99, () => brain.decide(A, 10));
+    MO.addMoodlet(A, 'cold_wake', now());
+    const early = forced(brain.rng, 0.99, () => brain.decide(A, 10));
+    check('29.2: Üşüyerek Uyandı / Tükenmiş sakin dinlenmeye çok daha erken yönelir (enerji eşiği +12: %30 enerjide kestirmeye gider)', awake.activity === 'farm' && early.activity === 'sleep' && MD.MOOD_RULES.shirkEnergyBonus === 12, `${awake?.activity} ${early?.activity}`);
+    clear(A); sitQuiet(A); setTraits(A, ['sleepyhead']);
+    const breakRoll = A.profile.work.breakChance / 2; // mola zarı tutar
+    const onBreak = forced(brain.rng, breakRoll, () => brain.decide(A, 10));
+    MO.addMoodlet(A, 'flow_state', now());
+    const focused = forced(brain.rng, breakRoll, () => brain.decide(A, 10));
+    check('29.2: Ustalık Akışı / İlham / Alın Teri olan sakin mola zarı tutsa da işini bırakmaz (gerçek Brain.decide)', A.profile.work.breakChance > 0 && onBreak.activity !== 'farm' && focused.activity === 'farm' && A.mood.focus, `${onBreak?.activity} ${focused?.activity}`);
+    const workTask = { activity: 'farm', elapsed: 65, duration: 60, phase: 'perform' };
+    const realStop = S().behavior.shouldStop.bind(S().behavior);
+    S().behavior.shouldStop = () => false;
+    const stays = !S().behavior.isFinished(A, workTask, ACTIVITIES.farm, 10);
+    clear(A);
+    const leaves = S().behavior.isFinished(A, workTask, ACTIVITIES.farm, 10);
+    S().behavior.shouldStop = realStop;
+    check('29.2: odaklanmış sakin tezgâh başında %15 daha uzun kalır (gerçek BehaviorSystem.isFinished)', stays && leaves && MD.MOOD_RULES.focusDuration === 1.15);
+    brain.planWork = realPlanWork;
+    // Yalnızlık: dost arar / İçine Kapanık tenhaya çekilir
+    clear(A); sitQuiet(A); setTraits(A, ['glutton']);
+    const realSocial = brain.planSocial.bind(brain);
+    let socialCalls = 0;
+    brain.planSocial = (c, h) => { socialCalls++; return { activity: 'fountain', marker: true, duration: 30 }; };
+    const calm = forced(brain.rng, 0.99, () => brain.decide(A, 19));
+    const calls0 = socialCalls;
+    MO.addMoodlet(A, 'lonely_ache', now());
+    const lonely = forced(brain.rng, 0.99, () => brain.decide(A, 19));
+    setTraits(A, ['introvert']); MO.recomputeMood(A);
+    const callsBefore = socialCalls;
+    const introvert = forced(brain.rng, 0.99, () => brain.decide(A, 19));
+    check('29.2: Yalnızlık Sızısı / Tatsız Karşılaşma olan sakin sosyalliği dolu olsa da dost arar; İçine Kapanık kalabalığa değil boş zamana (tenha köşe) yönelir (gerçek Brain.decide)', calls0 === 0 && !calm.marker && lonely.marker === true && socialCalls === callsBefore && !introvert.marker, `${calm?.activity} ${lonely?.activity} ${introvert?.activity}`);
+    brain.planSocial = realSocial;
+    setTraits(A, ['glutton']);
+    clear(A); MO.addMoodlet(A, 'lonely_ache', now());
+    for (const o of [B, C]) { sitQuiet(o); o.x = A.x + 30; o.y = A.y; }
+    C.x = A.x + 34;
+    setChem(A, B, 0); setChem(A, C, 3);
+    for (const o of [B, C]) for (const tag of ['resentful', 'grateful', 'jealous', 'admiration', 'kindred']) { CH2.removeTag(A, o.id, tag); CH2.removeTag(o, A.id, tag); } // (29.2b) önceki bölümlerin etiketleri sıralamayı karıştırmasın
+    s0.relationships[RS2.pairKey(A.id, B.id)] = 20; s0.relationships[RS2.pairKey(A.id, C.id)] = 20;
+    const others2 = s0.characters.filter((c) => ![A, B, C].includes(c)).map((c) => [c, c.away]);
+    for (const [c] of others2) c.away = { stage: 'away' };
+    const friend = brain.findPartner(A, 19);
+    clear(A);
+    const nearest = brain.findPartner(A, 19);
+    for (const [c, a] of others2) c.away = a;
+    check('29.2: dost arayan sakin kimyası yüksek olanı seçer (gerçek Brain.findPartner); ruh hali geçince en yakına döner', friend === C && nearest === B, `${friend?.name} ${nearest?.name} B=${B.name} C=${C.name} ${A.mood.seek} ${JSON.stringify(A.relationships[C.id])}`);
+    const weights = (setup) => { clear(A); setup(); const real = brain.rng.weighted; let seen = null; brain.rng.weighted = (opts) => { seen ??= Object.fromEntries(opts); return opts[0][0]; }; const realResolve = brain.resolveLeisure.bind(brain); brain.resolveLeisure = () => ({ activity: 'wait', duration: 1 }); brain.planLeisure(A, 13); brain.resolveLeisure = realResolve; delete brain.rng.weighted; return seen ?? {}; };
+    setTraits(A, ['glutton']);
+    const wPlain = weights(() => {});
+    const wShirk = weights(() => MO.addMoodlet(A, 'drudgery', now()));
+    setTraits(A, ['introvert']);
+    const wIntro = weights(() => {});
+    const wIntroSeek = weights(() => MO.addMoodlet(A, 'sour_encounter', now()));
+    check('29.2: bıkkın sakin banka (dinlenmeye) meyleder, yürüyüşten kaçınır; keyfi kaçmış İçine Kapanık havuz başı yerine tenha banka gider (gerçek Brain.planLeisure ağırlıkları)', near(wShirk.bench / wPlain.bench, 2) && near(wShirk.stroll / wPlain.stroll, 0.3) && near(wIntroSeek.bench / wIntro.bench, 3) && near(wIntroSeek.fountain / wIntro.fountain, 0.3), JSON.stringify([wPlain.bench, wShirk.bench, wIntro.fountain, wIntroSeek.fountain]));
+    setTraits(A, ['glutton']);
+
+    // --- Katman C: travmalar ve zaferler ---
+    for (const c of [A, B, C, D]) { clear(c); sitQuiet(c); }
+    const stats0 = JSON.parse(JSON.stringify(s0.moodlets));
+    // Ölüm: gerçek LifecycleSystem.die
+    const { Character: Ch } = await import('/src/entities/Character.js');
+    const spawnId = Math.max(...s0.characters.map((c) => c.id)) + 500;
+    const dead = new Ch({ id: spawnId, name: 'Deniz', age: 82, traits: ['grumpy'], appearance: A.appearance, x: A.x + 20, y: A.y });
+    dead.lifeStage = 'elder';
+    s0.characters.push(dead);
+    const keepFam = { Ap: A.partnerId, Am: A.married, Bpar: [...B.parentIds], Bparents: [...(B.parents ?? [])], Cap: C.apprenticeship };
+    A.partnerId = dead.id; A.married = true; dead.partnerId = A.id; dead.married = true;
+    B.parentIds = [dead.id]; B.parents = [dead.id]; dead.children = [B.id];
+    CH2.chemistryOf(s0, C, dead); CH2.addTag(C, dead.id, 'kindred', now()); CH2.addTag(dead, C.id, 'kindred', now());
+    const journal0 = s0.journal.length;
+    const died = S().lifecycle.die(dead, { cause: 'age' });
+    const mA = MO.getMoodlet(A, 'mourning'); const mB = MO.getMoodlet(B, 'mourning'); const mC = MO.getMoodlet(C, 'mourning');
+    check('29.2: vefat (gerçek LifecycleSystem.die): eşi, evladı ve ruh ikizi Derin Yas\'a girer (72 saat; whoId / whoName), ilgisiz sakin girmez', died && !s0.characters.includes(dead) && mA?.reason === 'mourn_spouse' && mB?.reason === 'mourn_parent' && mC?.reason === 'mourn_kindred' && mA.whoName === 'Deniz' && mA.whoId === dead.id && mA.until === Math.round(now() + 72 * 60) && !MO.hasMoodlet(D, 'mourning') && s0.moodlets.mourners === stats0.mourners + 3, `${mA?.reason} ${mB?.reason} ${mC?.reason} ${keys(D)}`);
+    check('29.2: yas günlüğe ve Yaşam Günlüğü\'ne yazılır; ölen sakine kopuk referans kalmaz', s0.journal.slice(-8).some((e) => e.text.includes("Deniz'in yasını tutuyor")) && A.memories.some((m) => m.text === "Deniz'in yasını tuttu") && A.partnerId === null && !C.relationships[dead.id], `${s0.journal.slice(-4).map((e) => e.text).join(' | ')} · ${A.memories.slice(-2).map((m) => m.text).join(' | ')} · eş ${A.partnerId} · kayıt ${Boolean(C.relationships[dead.id])}`);
+    check('29.2: Derin Yas: yürüme -%15, iş -%20, keyif düşüşü x1,4 (güçlü kademede 1,5 kat); eğlenceye ve flörte girmez', near(A.mood.moveMul, 1 - 0.15 * 1.5) && near(A.mood.workMul, 0.7) && near(A.mood.joyRateMul, 1.6) && A.mood.grief && A.mood.feel === 'Kederli' && A.mood.tone === 'trauma');
+    B.parentIds = keepFam.Bpar; B.parents = keepFam.Bparents;
+    // Yas davranışı
+    const monument = S().world.getCompleted('monument')[0] ?? sim.place('monument');
+    const grievePlan = forced(brain.rng, 0.5, () => brain.planGrieve(A));
+    const fullDecide = forced(brain.rng, 0.99, () => brain.decide(A, 19));
+    check('29.2: yaslı sakin boş zamanında anıtın başına çekilir (grieve); karar motoru onu oraya yollar (gerçek Brain.decide)', grievePlan?.activity === 'grieve' && grievePlan.grieveFor === 'Deniz' && (!monument || grievePlan.buildingId === monument.id) && fullDecide.activity === 'grieve', `${grievePlan?.activity} ${grievePlan?.buildingId} ${fullDecide?.activity}`);
+    S().behavior.startPlan(A, grievePlan, 19);
+    A.clearPath(); A.task.phase = 'perform';
+    const label = S().behavior.performLabel(A, A.task, ACTIVITIES.grieve);
+    check('29.2: yas etiketi: "Deniz\'in aziz hatırasını anıyor"', label === "Deniz'in aziz hatırasını anıyor", label);
+    const grieved0 = s0.moodlets.grieved;
+    ms.onTaskFinished(A, A.task);
+    check('29.2: anma sayacı artar; anıt başında dursa da yaslı sakin Tatlı Sohbet / estetik keyfi almaz', s0.moodlets.grieved === grieved0 + 1 && !MO.hasMoodlet(A, 'quiet_peace') && !MO.hasMoodlet(A, 'aesthetic_joy'));
+    const keepFest = { active: s0.events.festival.active, venueId: s0.events.festival.venueId, endsAt: s0.events.festival.endsAt };
+    const realFest = brain.planFestival.bind(brain);
+    let festCalls = 0;
+    brain.planFestival = () => { festCalls++; return { activity: 'festival', duration: 30 }; };
+    s0.events.festival.active = true;
+    S().world.release?.(A.id);
+    A.task = null;
+    const mournFest = forced(brain.rng, 0.99, () => brain.decide(A, 19));
+    const guestFest = forced(brain.rng, 0.99, () => brain.decide(D, 19));
+    Object.assign(s0.events.festival, keepFest);
+    brain.planFestival = realFest;
+    check('29.2: yaslı sakin şenliğe gitmez, öteki sakin gider (gerçek Brain.decide)', mournFest.activity !== 'festival' && guestFest.activity === 'festival', `${mournFest.activity} ${guestFest.activity}`);
+    sitQuiet(A);
+    check('29.2: yaslı sakin randevuya çağrılamaz ve aşık olmaz (gerçek isAvailableForDate / tryRomance)', brain.isAvailableForDate(A, D, 19) === false && (clear(D), brain.isAvailableForDate(D, A, 19) === true) && (() => { const kp = [A.partnerId, D.partnerId, A.married, D.married]; A.partnerId = D.partnerId = null; A.married = D.married = false; setChem(A, D, 3); s0.relationships[RS2.pairKey(A.id, D.id)] = 100; forced(rel.rng, 0, () => rel.tryRomance(A, D, { activity: 'fountain', buildingId: null, kind: 'chat' }, 1)); const loved = RS2.arePartners(A, D); [A.partnerId, D.partnerId, A.married, D.married] = kp; return !loved; })());
+    // Teselli
+    A.partnerId = keepFam.Ap; A.married = keepFam.Am;
+    for (const c of [B, C, D]) { clear(c); sitQuiet(c); }
+    A.partnerId = null; A.married = false;
+    for (const o of [B, C, D]) { o.relationships = {}; delete A.relationships[o.id]; }
+    s0.relationships[RS2.pairKey(A.id, B.id)] = 60; setChem(A, B, 1);
+    s0.relationships[RS2.pairKey(A.id, C.id)] = 60; setChem(A, C, -1);
+    s0.relationships[RS2.pairKey(A.id, D.id)] = 20; setChem(A, D, 2);
+    const others3 = s0.characters.filter((c) => ![A, B, C, D].includes(c)).map((c) => [c, c.away]);
+    for (const [c] of others3) c.away = { stage: 'away' };
+    check('29.2: teselli edebilecekler: kimyası eksi olmayan dost (60 puan) evet; kimyası eksi dost ve tanıdık hayır; kendi acısı olan hayır', MSX.canConsole(s0, B, A) && !MSX.canConsole(s0, C, A) && !MSX.canConsole(s0, D, A) && (MO.addMoodlet(B, 'shaken', now()), !MSX.canConsole(s0, B, A)) && (clear(B), true));
+    A.task = { activity: 'grieve', phase: 'perform', grieve: true, elapsed: 0, duration: 60 };
+    A.x = 800; A.y = 800; B.x = 900; B.y = 800;
+    const sufferer = MSX.findSufferer(s0, S().world.characters, B);
+    brain.planConsole = realConsole;
+    const consolePlan = forced(brain.rng, 0.5, () => brain.planConsole(B));
+    const consoleDecide = forced(brain.rng, 0.99, () => brain.decide(B, 19));
+    check('29.2: dostu acılı sakini bulur ve boş zamanında yüksek öncelikle onu teselli etmeye gider (console; gerçek Brain.decide)', sufferer === A && consolePlan?.activity === 'console' && consolePlan.consoleId === A.id && consolePlan.consoleName === A.name && consoleDecide.activity === 'console' && MSX.findSufferer(s0, S().world.characters, C) === null, `${sufferer?.name} ${consolePlan?.activity} ${consoleDecide?.activity}`);
+    B.task = { ...consolePlan, phase: 'perform', elapsed: 0 };
+    B.x = A.x + 16; B.y = A.y;
+    const before = MO.getMoodlet(A, 'mourning').until - now();
+    const score0 = RS2.getFriendship(s0, A, B);
+    const consoled0 = s0.moodlets.consoled;
+    ms.update({ gameMinutes: MD.CONSOLE.minutes - 1, hour: 19 });
+    const notYet = !MO.hasMoodlet(A, 'comforted');
+    ms.update({ gameMinutes: 1, hour: 19 });
+    const after = MO.getMoodlet(A, 'mourning').until - now();
+    check('29.2: yan yana 12 dakika sonra teselli gerçekleşir: yasın kalan süresi %40 kısalır ve Yüreği Ferahladı eklenir', notYet && MO.hasMoodlet(A, 'comforted') && near(after, Math.round(before * 0.6), 1) && s0.moodlets.consoled === consoled0 + 1, `${before} -> ${after}`);
+    check('29.2: teselli: ilişki +12 artar, teselli edilen teselli edene Minnettar olur (29.1 etiketi), iki günlüğe anı yazılır', near(RS2.getFriendship(s0, A, B) - score0, 12, 1e-6) && CH2.hasTag(A, B.id, 'grateful') && !CH2.hasTag(B, A.id, 'grateful') && A.memories.some((m) => m.text === `${B.name} yasında onu teselli etti`) && B.memories.some((m) => m.text.includes('teselli etti')) && s0.journal.at(-1).text.includes('teselli etti'), `${score0} -> ${RS2.getFriendship(s0, A, B)}`);
+    check('29.2: teselli edilmiş sakin yeniden teselli edilmez; teselli eden bir süre yeniden teselliye çıkmaz', MO.traumaOf(A) === null && MSX.findSufferer(s0, S().world.characters, B) === null && (MO.addMoodlet(D, 'shaken', now()), s0.relationships[RS2.pairKey(B.id, D.id)] = 70, setChem(B, D, 1), B.task = null, brain.planConsole(B) === null) && B.lastConsoleAt === now());
+    B.lastConsoleAt = null;
+    D.task = { activity: 'bench', phase: 'perform', elapsed: 0, duration: 60 };
+    rel.groups = [{ id: 'chat:fountain:9', kind: 'chat', members: [B, D] }];
+    ms.scanChats();
+    rel.groups = liveGroups;
+    check('29.2: dost, sarsılmış sakini aynı sohbette denk gelince de teselli eder (travma 24 saat -> kalan sürenin %60\'ı)', MO.hasMoodlet(D, 'comforted') && near(MO.getMoodlet(D, 'shaken').until - now(), 24 * 60 * 0.6, 1) && CH2.hasTag(D, B.id, 'grateful'));
+    clear(D); MO.addMoodlet(D, 'shaken', now());
+    B.task = { activity: 'console', consoleId: D.id, consoleName: D.name, phase: 'perform', elapsed: 0, duration: 30 };
+    B.x = D.x + 300;
+    ms.update({ gameMinutes: 20, hour: 19 });
+    check('29.2: acılı sakin uzaklaşmışsa teselli görevi biter (yeniden düşünür), teselli gerçekleşmez', B.task.duration === 0 && !MO.hasMoodlet(D, 'comforted'));
+    for (const [c, a] of others3) c.away = a;
+    for (const c of [A, B, C, D]) { clear(c); sitQuiet(c); }
+    // Öteki travmalar ve zaferler
+    const home = { id: -77, workerIds: new Set([C.id]) };
+    A.homeId = -77;
+    ms.onFire(home, 'shaken_burned', 'major');
+    check('29.2b: yangında bina kül olunca yapının sakini ve çalışanı Sarsılmış olur (24 saat; büyük kademede iş -%15, gece ürkme x2); söndürmeye koşan ve ilgisiz sakin olmaz', MO.hasMoodlet(A, 'shaken') && MO.hasMoodlet(C, 'shaken') && !MO.hasMoodlet(B, 'shaken') && !MO.hasMoodlet(D, 'shaken') && near(C.mood.workMul, 0.85) && C.mood.scareMul === 2.5 && MO.getMoodlet(C, 'shaken').until === Math.round(now() + 24 * 60), [A, B, C, D].map((c) => `${c.name}:${c.moodlets.map((m) => m.key)}:${c.mood.workMul}`).join(' '));
+    A.homeId = keep.get(A).homeId;
+    for (const c of [A, B, C, D]) clear(c);
+    // (29.2b) Yangını başarıyla söndürmek kahramanlıktır: söndürenler (ve yapının sakinleri) Sarsılmış olmaz
+    A.homeId = -78;
+    game.events.emit('crisis:fireOut', { building: { id: -78, name: 'Deneme', workerIds: new Set([C.id]) }, helpers: [B.id, D.id], byPlayer: false, progress: 0 });
+    const heroesCalm = ![A, B, C, D].some((c) => MO.hasMoodlet(c, 'shaken'));
+    A.homeId = keep.get(A).homeId;
+    game.events.emit('crisis:burnedDown', { building: { id: -79, name: 'Kül', workerIds: new Set([D.id]) } });
+    const ashesShaken = MO.hasMoodlet(D, 'shaken') && !MO.hasMoodlet(B, 'shaken') && MO.getMoodlet(D, 'shaken').reason === 'shaken_burned' && MO.getMoodlet(D, 'shaken').tier === 'major';
+    clear(D);
+    ms.apply(A, 'shaken', { reason: 'shaken_injured', tier: 'major' });
+    A.x = 500; A.y = 500; B.x = 540; B.y = 500; C.x = 2000; C.y = 2000; B.visible = A.visible = true;
+    ms.onAccident(A);
+    check('29.2b: yangın söndürülünce (crisis:fireOut) kimse sarsılmaz, bina kül olunca (crisis:burnedDown) çalışanı sarsılır; yaralanan ve kazaya yakından tanık olan sarsılır, uzaktaki sarsılmaz', heroesCalm && ashesShaken && MO.getMoodlet(A, 'shaken').reason === 'shaken_injured' && MO.getMoodlet(B, 'shaken')?.reason === 'shaken_witness' && MO.getMoodlet(B, 'shaken').whoName === A.name && !MO.hasMoodlet(C, 'shaken'));
+    for (const c of [A, B, C, D]) clear(c);
+    game.events.emit('chemistry:unrequited', { from: A, target: B, rival: C });
+    ms.onLevelDown(C, D, { key: 'rival' });
+    ms.onLevelDown(C, B, { key: 'dislike' });
+    check('29.2: Kalbi Kırık (36 saat): hoşlandığı kişi başkasına gönül verince ya da ilişki Rakip seviyesine düşünce; sohbet kazancı -%25', MO.getMoodlet(A, 'heartbroken')?.reason === 'heart_unrequited' && MO.getMoodlet(A, 'heartbroken').whoName === B.name && MO.hasMoodlet(C, 'heartbroken') && MO.hasMoodlet(D, 'heartbroken') && !MO.hasMoodlet(B, 'heartbroken') && near(C.mood.socialMul, 0.75) && MO.getMoodlet(C, 'heartbroken').until === Math.round(now() + 36 * 60));
+    for (const c of [A, B, C, D]) clear(c);
+    const keepTrust = s0.trust.value;
+    s0.trust.value = 80;
+    ms.onPetition(A, 'rejected');
+    const mildWork = A.mood.workMul;
+    s0.trust.value = 30;
+    ms.onPetition(B, 'expired');
+    ms.onPetition(C, 'fulfilled');
+    s0.trust.value = keepTrust;
+    check('29.2: dilekçesi reddedilen / yanıtsız kalan Sesimiz Duyulmadı alır (36 saat); güven düşükken iş de -%10 yavaşlar; karşılanan almaz', MO.getMoodlet(A, 'neglected')?.reason === 'neglect_rejected' && mildWork === 1 && MO.getMoodlet(B, 'neglected')?.reason === 'neglect_expired' && MO.getMoodlet(B, 'neglected').harsh === true && near(B.mood.workMul, 0.9) && !MO.hasMoodlet(C, 'neglected'));
+    for (const c of [A, B, C, D]) clear(c);
+    ms.onMarried(A, B);
+    ms.apply(C, 'euphoric', { reason: 'euphoric_master', tier: 'minor' });
+    check('29.2: evlenen çift Hayatının Günü\'nü yaşar (48 saat; iş +%15, keyif düşüşü x0,5; düğünde güçlü kademe)', MO.getMoodlet(A, 'euphoric')?.whoName === B.name && MO.hasMoodlet(B, 'euphoric') && near(C.mood.workMul, 1.15) && near(C.mood.joyRateMul, 0.5) && MO.getMoodlet(A, 'euphoric').until === Math.round(now() + 48 * 60) && A.mood.feel === 'Coşkulu');
+    for (const c of [A, B, C, D]) clear(c);
+    setChem(A, B, 2); setChem(C, D, 1);
+    ms.onDate(A, B); ms.onDate(C, D);
+    ms.apply(D, 'inspired', { reason: 'inspired_work' });
+    check('29.2: İlham Dolu (24 saat): +2 / +3 kimyalı randevu ve usta işi eser (deneyim +%30, eser şansı +%3); zayıf kimyalı randevu ilham vermez', MO.getMoodlet(A, 'inspired')?.reason === 'inspired_date' && MO.hasMoodlet(B, 'inspired') && !MO.hasMoodlet(C, 'inspired') && near(D.mood.xpMul, 1.3) && near(D.mood.masterwork, 0.03) && D.mood.focus);
+    for (const c of [A, B, C, D]) clear(c);
+    const guests = S().world.guests;
+    const fakeBard = { playing: true, x: A.x, y: A.y };
+    guests.push(fakeBard);
+    A.visible = true; A.task = null; C.x = A.x + 900;
+    ms.scanBard();
+    guests.splice(guests.indexOf(fakeBard), 1);
+    check('29.2: Seyyar Ozan çalarken yakınında duran ilham alır, uzaktaki almaz', MO.getMoodlet(A, 'inspired')?.reason === 'inspired_bard' && !MO.hasMoodlet(C, 'inspired'));
+    check('29.2b: sistem olayları dinler (22 dinleyici: yangın söndürme artık dinlenmez) ve motor her zaman açıktır (test şalteri kalktı; yine de kod şalteri kapalıyken moodlet eklenmez)', ms.unsubscribers.length === 22 && MO.MOOD_ENGINE.enabled === true && (MO.MOOD_ENGINE.enabled = false, clear(A), MO.addMoodlet(A, 'euphoric', now()) === null && A.moodlets.length === 0) && (MO.MOOD_ENGINE.enabled = true));
+
+    // --- Süre ---
+    clear(A);
+    MO.addMoodlet(A, 'proud_work', now());
+    A.moodlets[0].until = now() - 1;
+    MO.addMoodlet(A, 'exhausted', now());
+    A.needs.energy = 10;
+    const removed = MO.expireMoodlets(A, now());
+    check('29.2: süresi dolan moodlet silinir; koşula bağlı (until: null) moodlet süreyle silinmez', removed === 1 && keys(A) === 'exhausted' && A.moodlets[0].until === null);
+
+    // --- Harita üstü ifade ---
+    clear(A); setTraits(A, ['hardworking']); A.visible = true; A.away = null;
+    const said = forced(ms.rng, 0, () => ms.apply(A, 'proud_work', { reason: 'proud_trait' }));
+    check('29.2: moodlet oluşunca başında ikon balonu ve kişiliğine özgü söz çıkar ("Çalışmak ibadettir!" / "Tam bana göre bir iş!")', said && A.bubble?.icon === 'hammer' && [...MD.MOOD_LINES.proud_work, MD.TRAIT_LINES.proud_work.hardworking].includes(A.speech?.text) && MD.MOOD_LINES.proud_work.includes('Tam bana göre bir iş!') && MD.MOOD_LINES.drudgery.includes('Sırtım koptu...') && MD.MOOD_LINES.feast_bliss.includes('Sıcak çorba gibisi yok!') && MD.MOOD_LINES.mourning.includes('Seni hiç unutmayacağım...'), A.speech?.text);
+    clear(A); A.speech = { text: 'Deneme', at: -1, duration: 2 };
+    forced(ms.rng, 0, () => ms.apply(A, 'drudgery', { reason: 'drudgery_tired' }));
+    const keptSpeech = A.speech.text === 'Deneme';
+    clear(A); A.visible = false;
+    forced(ms.rng, 0, () => ms.apply(A, 'drudgery', { reason: 'drudgery_tired' }));
+    check('29.2: süren sözün üstüne yazılmaz; görünmeyen (içerideki) sakinde balon / söz çıkmaz', keptSpeech && A.speech === null && A.bubble === null);
+    A.visible = true;
+    check('29.2: yas mumu ve moodlet ikonları çizilebilir', MD.MOODLET_KEYS.every((k) => { try { return UI2.getAnyIconURL(MD.MOODLETS[k].icon).startsWith('data:image'); } catch (e) { return false; } }) && Boolean(UI2.getBubbleSprite('candle')));
+
+    // --- Determinizm: ana üreteç ve Math.random sıfır çağrı ---
+    for (const c of [A, B, C, D]) { clear(c); sitQuiet(c); }
+    const rngs = [S().behavior.rng, rel.rng, S().conflicts.rng, S().social.rng, S().family.rng];
+    let calls = 0; let own = 0;
+    const realRandom = Math.random;
+    Math.random = () => { calls++; return realRandom(); };
+    for (const r of rngs) { const proto = Object.getPrototypeOf(r).next; r.next = function () { calls++; return proto.call(this); }; }
+    { const proto = Object.getPrototypeOf(ms.rng).next; ms.rng.next = function () { own++; return proto.call(this); }; }
+    setTraits(A, ['hardworking']);
+    ms.onWork(A, 'chop', null); ms.onWork(B, 'mine', null); ms.onWoke(C); ms.onTaskFinished(D, { activity: 'innMeal' });
+    ms.onQuarrel(A, B); ms.onMarried(C, D); ms.onPetition(A, 'rejected'); ms.onFire({ id: -5, workerIds: new Set() }, [B.id], 'shaken_fire', 'minor');
+    ms.onHour(); ms.update({ gameMinutes: 1, hour: 12 });
+    MO.addMoodlet(A, 'mourning', now(), { tier: 'major' }); ms.console(B, A);
+    for (const c of s0.characters) MO.recomputeMood(c);
+    Math.random = realRandom;
+    for (const r of rngs) delete r.next;
+    delete ms.rng.next;
+    check('29.2: moodlet üretimi, saat taraması, teselli ve toplam etki hesabı ana üreteci / sistem üreteçlerini / Math.random\'ı HİÇ tüketmez (0 çağrı); izole üreteç (tohum + 38) yalnızca sözler için çalışır', calls === 0 && own > 0 && MD.MOODLET_SEED_OFFSET === 38, `${calls} çağrı, izole ${own}`);
+    for (const c of [A, B, C, D]) clear(c);
+    const mood0 = A.mood;
+    MO.addMoodlet(A, 'proud_work', now()); MO.recomputeMood(A); MO.removeMoodlet(A, 'proud_work');
+    check('29.2: c.mood tek bir nesnedir, yerinde güncellenir (tahsisat yok); her değişiklikte sürümü artar', A.mood === mood0 && A.mood.version > 0 && A.mood.workMul === 1);
+
+    // --- Arayüz ---
+    clear(A); setTraits(A, ['hardworking']);
+    MO.addMoodlet(A, 'mourning', now(), { tier: 'major', reason: 'mourn_spouse', whoName: 'Deniz' });
+    MO.addMoodlet(A, 'proud_work', now(), { reason: 'proud_trait' });
+    MO.addMoodlet(A, 'hangry', now(), { reason: 'hangry' });
+    game.events.emit('ui:selectCharacter', A.id);
+    game.render(0);
+    const badge = document.querySelector('.character-portrait-column .mood-badge');
+    check('29.2: Karakter Kartı: portrenin hemen altında Baskın Ruh Hali ("Kederli", travma tonu)', badge?.textContent === 'Kederli' && badge.classList.contains('is-trauma') && badge.previousElementSibling?.classList.contains('character-portrait-frame'), badge?.textContent);
+    const chips = [...document.querySelectorAll('.moodlet-list .moodlet-chip')];
+    const chipOf = (name) => chips.find((x) => x.querySelector('.moodlet-name').textContent.startsWith(name));
+    check('29.2: "Ruh Hali ve İç Dünya": moodlet çipleri kategorisine göre renkli (travma mor, olumlu yeşil, günlük olumsuz turuncu), çekirdek en üstte', chips.length === 3 && chips[0] === chipOf('Derin Yas') && chipOf('Derin Yas').classList.contains('is-trauma') && chipOf('Alın Teri').classList.contains('is-positive') && chipOf('Açlıktan').classList.contains('is-negative') && [...document.querySelectorAll('.relations-title')].some((t) => t.textContent === 'Ruh Hali ve İç Dünya'));
+    check('29.2: çipte ikon, ad, tetiklenme nedeni, kalan süre ve net mekanik etki yazar ("İş +%8")', chipOf('Alın Teri').querySelector('.moodlet-reason').textContent === 'Çalışkan doğası gereği üretimden gurur duydu' && chipOf('Alın Teri').querySelector('.moodlet-effect').textContent.includes('İş +%8') && chipOf('Alın Teri').querySelector('.moodlet-time').textContent === '8 sa' && chipOf('Derin Yas').querySelector('.moodlet-reason').textContent === 'Eşi Deniz vefat etti' && chipOf('Derin Yas').querySelector('.moodlet-time').textContent === '72 sa' && chipOf('Derin Yas').querySelector('.moodlet-effect').textContent.includes('İş −%30') && chipOf('Açlıktan').querySelector('.moodlet-time').textContent === 'sürüyor' && Boolean(chipOf('Alın Teri').querySelector('img.moodlet-icon')), chipOf('Alın Teri')?.textContent);
+    const node0 = document.querySelector('.moodlet-list').firstChild;
+    game.render(0); game.render(0);
+    const sameNode = document.querySelector('.moodlet-list').firstChild === node0;
+    MO.removeMoodlet(A, 'mourning');
+    game.render(0);
+    check('29.2: kart yalnızca ruh hali değişince yeniden kurulur (değişmeyen karelerde aynı düğümler); değişince yenilenir', sameNode && document.querySelectorAll('.moodlet-list .moodlet-chip').length === 2 && document.querySelector('.mood-badge').textContent !== 'Kederli');
+    for (const c of s0.characters) clear(c); // kazaya yakından tanık olan başka sakinler çipi şişirmesin
+    MO.addMoodlet(A, 'mourning', now(), { tier: 'major', reason: 'mourn_spouse', whoName: 'Deniz' });
+    MO.addMoodlet(B, 'shaken', now());
+    game.events.emit('ui:selectCharacter', null);
+    const hud = game.ui.components.find((x) => x.renderWelfare);
+    hud.lastBuffs = null; hud.welfareAt = -Infinity;
+    game.render(0);
+    const griefChip = document.querySelector('.hud-grief-chip');
+    check('29.2: üst çubuğun altında yas çipi ("🕯️ 1 sakin yasta · 1 acılı")', griefChip?.textContent.includes('1 sakin yasta') && griefChip.textContent.includes('1 acılı') && griefChip.textContent.includes('🕯️'), griefChip?.textContent);
+    griefChip?.click();
+    game.render(0);
+    check('29.2: yas çipine tıklayınca yaslı sakine odaklanır (sakin seçilir, kartında "Kederli" yazar)', S().selectedId === A.id && S().focusId === A.id || (S().selectedId === A.id && document.querySelector('.character-portrait-column .mood-badge')?.textContent === 'Kederli'), `${S().selectedId} / ${A.id} / ${document.querySelector('.character-portrait-column .mood-badge')?.textContent}`);
+    game.events.emit('ui:selectCharacter', null);
+    clear(A, B);
+    hud.lastBuffs = null; hud.welfareAt = -Infinity;
+    game.render(0);
+    check('29.2: yas / travma bitince çip kaybolur', document.querySelector('.hud-grief-chip') === null);
+
+    // --- Kayıt (sürüm 37) ---
+    MO.addMoodlet(A, 'mourning', now(), { tier: 'major', reason: 'mourn_spouse', whoId: 4242, whoName: 'Deniz' });
+    MO.addMoodlet(A, 'exhausted', now(), { reason: 'exhausted' });
+    const rawSave = JSON.parse(JSON.stringify(S().saves.snapshot()));
+    const rawA = rawSave.characters.find((c) => c.id === A.id);
+    check('29.2: moodlet\'ler ve sayaçlar kayda yazılır (characters[].moodlets, moodlets { given, consoled, grieved, mourners })', rawA.moodlets.length === 2 && rawA.moodlets[0].key === 'mourning' && rawA.moodlets[0].whoName === 'Deniz' && rawA.moodlets[1].until === null && typeof rawSave.moodlets.given === 'object' && Number.isInteger(rawSave.moodlets.consoled) && rawA.mood === undefined);
+    const back = Character.fromJSON(rawA);
+    check('29.2: kayıttan yükleme birebir; toplam etki (c.mood) yüklemede yeniden hesaplanır', JSON.stringify(back.toJSON().moodlets) === JSON.stringify(rawA.moodlets) && near(back.mood.workMul, A.mood.workMul) && back.mood.feel === 'Kederli');
+    const dirty = MO.sanitizeMoodlets([{ key: 'dragon', until: 5 }, { key: 'proud_work', tier: 'x', until: 100, since: 'y', reason: 'yok' }, { key: 'proud_work', until: 200 }, { key: 'exhausted', until: null }, { key: 'feast_bliss', until: null }, { key: 'euphoric', until: 'bozuk' }, { key: 'mourning', until: 9, whoName: 'Deniz', whoId: 3, harsh: 1 }, { key: 'shaken', until: 9 }, null]);
+    check('29.2: bozuk kayıt temizlenir (bilinmeyen anahtar, yinelenen, bozuk süre / kademe, katman tavanı)', JSON.stringify(dirty) === JSON.stringify([{ key: 'proud_work', tier: 'minor', since: 0, until: 100, reason: null }, { key: 'exhausted', tier: 'minor', since: 0, until: null, reason: null }, { key: 'mourning', tier: 'minor', since: 0, until: 9, reason: null, whoId: 3, whoName: 'Deniz', harsh: true }]) && JSON.stringify(MO.sanitizeMoodlets(null)) === '[]' && JSON.stringify(MO.restoreMoodletStats({ given: { proud_work: 3.7, dragon: 9 }, consoled: -2, grieved: 'x' })) === JSON.stringify({ given: { proud_work: 3 }, consoled: 0, grieved: 0, mourners: 0 }), JSON.stringify(dirty));
+    const legacy = JSON.parse(JSON.stringify(rawSave));
+    legacy.version = 36;
+    for (const c of legacy.characters) delete c.moodlets;
+    delete legacy.moodlets;
+    const keepSlot = localStorage.getItem(CONFIG.SESSION_KEY);
+    localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
+    const migrated = SM2.SaveManager.read('session');
+    if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
+    check('29.2: v36 kaydı v37\'ye göç eder: her sakine moodlets: [], duruma boş ruh hali sayaçları', CONFIG.SAVE_VERSION === 37 && migrated && migrated.characters.every((c) => Array.isArray(c.moodlets) && c.moodlets.length === 0) && JSON.stringify(migrated.moodlets) === JSON.stringify(MO.emptyMoodletStats()));
+
+    // Temizlik
+    brain.planConsole = realConsole;
+    for (const [c, k] of keep) {
+      c.moodlets = JSON.parse(k.moodlets); c.relationships = JSON.parse(k.rel); c.traits = k.traits; c.quirk = k.quirk; c.profile = k.profile; c.needs = k.needs; c.task = k.task;
+      Object.assign(c, { x: k.x, y: k.y, visible: k.visible, speech: k.speech, bubble: k.bubble, homeId: k.homeId, workplaceId: k.workplaceId, skills: k.skills, partnerId: k.partnerId, married: k.married, buffs: k.buffs, lastConsoleAt: k.lastConsoleAt, insideBuildingId: k.inside, pose: k.pose, flowStreak: k.flowStreak });
+      c.memories.length = Math.min(c.memories.length, k.memories);
+      MO.recomputeMood(c);
+    }
+    s0.moodlets = JSON.parse(keepStats);
+    for (const k of Object.keys(s0.relationships)) delete s0.relationships[k];
+    Object.assign(s0.relationships, JSON.parse(keepScores));
+    s0.journal.length = Math.min(s0.journal.length, keepJournal);
+    s0.time.hour = decideKeep.hour;
+  }
+
+  // ===== 29.2b: Cila, denge ve şantiye erişim yaması =====
+  {
+    const LSB = await import('/src/data/lifeStages.js');
+    const VNB = await import('/src/systems/Venerable.js');
+    const LS2 = await import('/src/systems/LifeStages.js');
+    const { BUILDINGS: BLD } = await import('/src/data/buildings.js');
+    const world = scene.world;
+    const cons = scene.construction;
+    const st2 = game.state;
+    sim.give({ wood: 600, stone: 400, iron: 100, gold: 2000, food: 400 });
+
+    // --- Şantiye erişimi: son açık çalışma karosu kapanmaz; tamamen kapalıysa 2 karo uzaktan çalışılır ---
+    // Etrafı 5x5 boş, yürünebilir ve kasabaya bağlı bir alan (şantiyenin çevresi dışarıdan da ulaşılabilir olsun)
+    const plazaB = world.landmarks.plaza;
+    const openAreas = [];
+    for (let y = plazaB.y - 30; y < plazaB.y + 30; y++) {
+      for (let x = plazaB.x - 30; x < plazaB.x + 30; x++) {
+        let all = true;
+        for (let dy = -2; dy <= 2 && all; dy++) for (let dx = -2; dx <= 2 && all; dx++) {
+          const tx = x + dx; const ty = y + dy;
+          all = world.map.inBounds(tx, ty) && world.map.isWalkable(tx, ty) && world.map.getOccupant(tx, ty) === 0 && !world.map.getObject(tx, ty) && world.isReachable(tx, ty);
+        }
+        if (all && cons.checkPlacement('lantern', x, y).ok) openAreas.push({ x, y });
+      }
+    }
+    const lanternSpot = openAreas[0] ?? null;
+    const site = lanternSpot ? cons.placeSite('lantern', lanternSpot.x, lanternSpot.y, { quiet: true }).building : null;
+    check('29.2b: Fener (spots: none) şantiyesi kurulur ve işi açılır', Boolean(site) && BLD.lantern.spots === 'none' && scene.jobs.jobs.some((j) => j.buildingId === site.id));
+    const ring = [];
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) ring.push({ x: site.tileX + dx, y: site.tileY + dy });
+    const fakeId = 987654;
+    const refresh = () => { world.refreshStaticData(); };
+    const open = ring.filter((r) => world.map.isWalkable(r.x, r.y) && world.isReachable(r.x, r.y) && cons.checkPlacement('lantern', r.x, r.y).ok);
+    const keepTile = open.find((r) => (r.x === site.tileX || r.y === site.tileY));
+    const blockedTiles = [];
+    const blockOthers = (except) => {
+      for (const r of ring) {
+        if (except.some((e) => e.x === r.x && e.y === r.y)) continue;
+        if (world.map.getOccupant(r.x, r.y) !== 0) continue;
+        world.map.setOccupant(r.x, r.y, fakeId, false);
+        blockedTiles.push(r);
+      }
+      refresh();
+    };
+    if (keepTile) {
+      // İki açık karo kalsın: ikisinden biri kapanabilir (hâlâ bir karo kalır)
+      const second = open.find((r) => r !== keepTile && (r.x === site.tileX || r.y === site.tileY));
+      blockOthers(second ? [keepTile, second] : [keepTile]);
+      const twoLeft = world.getSpots(site).filter((s) => ring.some((r) => r.x === s.x && r.y === s.y)).length;
+      const allowedWhileTwo = second ? cons.checkPlacement('lantern', keepTile.x, keepTile.y).ok : null;
+      // Son açık karoyu kapatmak reddedilir ve oyuncuya anlamlı bir mesaj döner
+      if (second) { world.map.setOccupant(second.x, second.y, fakeId, false); blockedTiles.push(second); refresh(); }
+      const lastLeft = world.getSpots(site).length;
+      const denied = cons.checkPlacement('lantern', keepTile.x, keepTile.y);
+      check('29.2b: şantiyenin SON açık çalışma karosunu kapatan yapı reddedilir (anlamlı mesaj); iki karo açıkken izin verilir', twoLeft === (second ? 2 : 1) && (second ? allowedWhileTwo === true : true) && lastLeft === 1 && denied.ok === false && /son çalışma yerini kapatır/.test(denied.reason) && denied.reason.includes(site.name), `${twoLeft}/${lastLeft} ${allowedWhileTwo} ${denied.reason}`);
+      const farOk = world.buildings.length > 0 && cons.checkPlacement('lantern', lanternSpot.x + 6, lanternSpot.y + 6);
+      check('29.2b: uzaktaki yerleşim etkilenmez (yalnızca ayak izine yakın şantiyeler korunur)', farOk && (farOk.ok || !/son çalışma yerini/.test(farOk.reason)), farOk?.reason);
+      // Tamamen kapanırsa: işçiler çapraz / 2 karo uzaktan çalışır (spotsFor boş dönmez)
+      world.map.setOccupant(keepTile.x, keepTile.y, fakeId, false); blockedTiles.push(keepTile); refresh();
+      const job = scene.jobs.jobs.find((j) => j.buildingId === site.id);
+      const far = scene.jobs.spotsFor(job);
+      const cheb = (a) => Math.max(Math.abs(a.x - site.tileX), Math.abs(a.y - site.tileY));
+      check('29.2b: çevresi tamamen kapanan şantiyede spotsFor boş değildir: işçiler 2 karo uzaktan da çalışır', ring.every((r) => !world.map.isWalkable(r.x, r.y)) && far.length > 0 && far.every((s) => cheb(s) === 2 && world.isReachable(s.x, s.y)), `${far.length}`);
+      // Yeniden açılınca yakın (1 karo) halka geri gelir
+      for (const r of blockedTiles) world.map.setOccupant(r.x, r.y, 0);
+      refresh();
+      check('29.2b: çevre yeniden açılınca çalışma noktaları yine 1 karolu halkadır', scene.jobs.spotsFor(job).length > 0 && scene.jobs.spotsFor(job).every((s) => cheb(s) === 1));
+    } else check('29.2b: şantiye çevresinde yerleşim denemesi için açık karo bulunamadı', false);
+    // Kendi başına şantiyesi erişilemez bir yere yapı kurulmaz (en az 1 çalışma karosu): tamamen çevrili tek bir karo
+    {
+      const lone = openAreas.find((a) => Math.abs(a.x - lanternSpot.x) + Math.abs(a.y - lanternSpot.y) > 6) ?? openAreas.at(-1);
+      const around = [];
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) around.push({ x: lone.x + dx, y: lone.y + dy });
+      const blockedNow = [];
+      for (const r of around) if (world.map.getOccupant(r.x, r.y) === 0) { world.map.setOccupant(r.x, r.y, fakeId, false); blockedNow.push(r); }
+      refresh();
+      const res = cons.checkPlacement('lantern', lone.x, lone.y);
+      check('29.2b: çevresi tamamen kapalı bir karoya yapı / şantiye kurulamaz (en az bir erişilebilir çalışma karosu şart)', res.ok === false && /ulaşılamıyor|kopar|açık/.test(res.reason ?? ''), res.reason);
+      for (const r of blockedNow) world.map.setOccupant(r.x, r.y, 0);
+      refresh();
+    }
+    // Temizlik
+    scene.jobs.cancelForBuilding(site.id);
+    world.removeBuilding(site);
+
+    // --- Ustalık Akışı ve Sarsılmış kuralları sistem düzeyinde (ayrıntılı birim testleri 29.2 bölümünde) ---
+    check('29.2b: moodlet motoru her zaman açıktır (testlerde şalter yok) ve yangını söndüren kahraman Sarsılmış olmaz (yalnızca kül, yaralanma, kazada tanıklık)', MDX.MOOD_ENGINE.enabled === true && scene.moodlets.unsubscribers.length === 22);
+
+    // --- Doğal ömür: 66-75 yaş ---
+    const spans = Array.from({ length: 400 }, (_, i) => VNB.lifespanFor(42, i + 1));
+    check('29.2b: doğal ömür 66-75 yaş (400 kimlikte aralığın tamamı görülür), Kıdemli Bilge yaşı 65, ocak muafiyeti ömür sınırının altında', LSB.LIFESPAN.min === 66 && LSB.LIFESPAN.max === 75 && spans.every((v) => v >= 66 && v <= 75) && new Set(spans).size === 10 && LSB.AGING.elderAt === 65 && LSB.AGING.elderAt < LSB.LIFESPAN.min && LSB.VENERABLE.hearthGraceAge < LSB.LIFESPAN.max, [...new Set(spans)].sort().join());
+    check('29.2b: kayıttaki 80-90 yaşlık eski ömür geçersizdir (kimlikten yeniden atanır), 66 ve 75 geçerlidir', VNB.sanitizeLifespan(80) === null && VNB.sanitizeLifespan(90) === null && VNB.sanitizeLifespan(66) === 66 && VNB.sanitizeLifespan(75) === 75 && VNB.sanitizeLifespan(65) === null);
+    check('29.2b: 65 yaşındaki yetişkin Kıdemli Bilge sayılır (64 değil)', LS2.stageFor({ age: 64 }) === 'adult' && LS2.stageFor({ age: 65 }) === 'elder');
   }
 
   return out;

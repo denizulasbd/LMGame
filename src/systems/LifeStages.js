@@ -79,7 +79,7 @@ export function stageCounts(state) {
 
 /** Kayıttaki yaşam evresi sayaçları: bilgelerin verdiği nasihat dakikası, unvanı alan bilgeler, son günlük cümlesi. */
 export function emptyLifeStages() {
-  return { adviceMinutes: 0, elders: 0, adults: 0, lastElderLine: null };
+  return { adviceMinutes: 0, elders: 0, adults: 0, lastElderLine: null, venerables: 0, deaths: 0, accidents: 0, lastDeath: null }; // (28.3) Saygın Büyük, vefat ve kaza sayaçları
 }
 
 export function restoreLifeStages(data) {
@@ -89,5 +89,16 @@ export function restoreLifeStages(data) {
   out.elders = Math.max(0, Math.floor(Number(data.elders) || 0));
   out.adults = Math.max(0, Math.floor(Number(data.adults) || 0));
   out.lastElderLine = typeof data.lastElderLine === 'string' ? data.lastElderLine : null;
+  for (const k of ['venerables', 'deaths', 'accidents']) out[k] = Math.max(0, Math.floor(Number(data[k]) || 0));
+  const d = data.lastDeath;
+  out.lastDeath = d && typeof d === 'object' && typeof d.name === 'string' && Number.isFinite(d.day) ? { name: d.name, age: Math.max(0, Math.floor(Number(d.age) || 0)), day: d.day, cause: typeof d.cause === 'string' ? d.cause : 'age' } : null;
   return out;
 }
+
+/** Nüfus kotasına (yatak, göç, doğum sınırı) sayılan sakin sayısı: Saygın Büyükler sayılmaz. */
+export function activePopulation(state) {
+  let n = 0;
+  for (const c of state.characters) if (!c.isVenerable) n += 1;
+  return n;
+}
+

@@ -71,10 +71,10 @@ export const PROFESSIONS = {
 };
 export const PROFESSION_TYPES = Object.keys(PROFESSIONS);
 
-// İlerleme (0-100): ustası aynı yapıda çalışırken mesai dakikası başına perMinute (yaklaşık 60 mesai saatinde %100).
+// İlerleme (0-100): ustası aynı yapıda çalışırken mesai dakikası başına perMinute (28.2: yaklaşık 30 mesai saatinde %100; eskiden 60).
 // Çırak yarı yorulur (fatigue) ve keyfi yavaş düşer; çırak işine ancak craftFrom'dan sonra başlar.
 export const APPRENTICE = {
-  perMinute: 100 / 3600,
+  perMinute: 100 / 1800, // (28.2) 30 mesai saatinde %100 (eskiden 60 saat)
   fatigue: 0.5,
   funCost: 0.5,
   perBuilding: 1, // her zanaat yapısında en çok bu kadar çırak (Seviye 2 yapıda bir fazlası)
@@ -88,8 +88,8 @@ export const APPRENTICE = {
 };
 
 // Gururlu Usta: yanında çırağı çalışan ustanın keyfi %25 yavaş düşer (hours saat sürer, her birlikte mesaide yenilenir);
-// çırak %50'yi geçince getir-götür işleri ustanın tezgâhına +%5 verim katar.
-export const PROUD_MASTER = { hours: 6, funDecay: 0.75, workBoostFrom: 50, workBoost: 1.05 };
+// çırak %50'yi geçince getir-götür işleri ustanın tezgâhına verim katar (28.2: +%5 -> +%20, çırak bulundurmak hemen kârlı).
+export const PROUD_MASTER = { hours: 6, funDecay: 0.75, workBoostFrom: 50, workBoost: 1.2 };
 
 // Çırak İşi: ilerleme craftFrom'u geçince her mesai sonunda craftChance olasılıkla, hammadde tüketmeden mesleğin çırak
 // işinden bir tane çantasına koyar; çantada sellAt tane biriken çırak işi Pazar Yeri varsa satılır (kesesine değeri kadar).
@@ -98,3 +98,11 @@ export const APPRENTICE_CRAFT = { craftFrom: 50, craftChance: 0.35, sellAt: 3 };
 // Mezuniyet: Genç 21 yaşında Yetişkin olunca ilerleme master'ı geçtiyse o meslekte Yetkin Usta (Usta kademesi), journeyman'ı
 // geçtiyse Kıdemli Kalfa (Kalfa kademesinin üst ucu) olarak başlar; daha azsa ilerlemesi kadar deneyimle başlar.
 export const GRADUATION = { master: 100, journeyman: 60, masterXp: 1500, journeymanXp: 1200, partialXpPerPercent: 6 };
+
+// (28.2) Başusta: çıraklığı %100 ile bitiren Genç, 21 yaşında Yetişkin olunca Yetkin Usta'nın yanında kalıcı Başusta olur
+// (Character.isGrandmaster + grandmasterProfession = o çıraklığın zanaat yapısı). Yalnızca çıraklıktan tam mezunlara verilir; normal
+// çalışarak usta olanlar ASLA Başusta olamaz.
+//   masterworkMultiplier: kendi mesleğinin yapısında çalışırken usta işi eser şansı (taban + sabit iş yeri + Sağlam Alet) bu kat artar
+//                         (taban %4 -> %8; sabit iş yeri ve Sağlam Alet ile %16'ya kadar)
+//   saveEvery           : kendi mesleğinin işleme / zanaat yapısında her 5. üretim hiç hammadde harcamaz (deterministik sayaç; üreteç yok)
+export const GRANDMASTER = { masterworkMultiplier: 2, saveEvery: 5, title: 'Başusta' };

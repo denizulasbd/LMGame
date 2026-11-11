@@ -15,6 +15,7 @@
 // Yayınladığı olaylar: 'expedition:departed', 'adventure:opened', 'adventure:resolved' { scenario, option, success,
 // member, risk }, 'expedition:returned' { members, loot, route, finds, hurt, memories, ... }, 'exotic:found' { item },
 // 'inscription:found' { id, inscription, source }, 'inscription:decodeStarted', 'expedition:taleTold' { teller, listeners }.
+import { FATAL } from '../data/lifeStages.js';
 import { EXPLORATION, ADVENTURES, ADVENTURE_KEYS, EXOTIC_ITEMS, INSCRIPTIONS, INSCRIPTION_KEYS } from '../data/exploration.js';
 import { EXPEDITION } from '../data/dilemmas.js';
 import { TOWN_BUFFS } from '../data/town.js';
@@ -195,6 +196,10 @@ export class ExpeditionSystem {
     this.state.stats.adventures = (this.state.stats.adventures ?? 0) + 1;
     this.events.emit('adventure:resolved', { id, scenario: def, option, success: !mishap, member: victim, risk, found, auto });
     this.events.emit('toast', { text: `Maceracı Günlüğü · ${text}`, tone: mishap ? 'warn' : 'success', icon: def.icon });
+    // (28.3) Riskli maceranın başarısızlığında küçük bir ölüm ihtimali (kafilede ve kasabada yeterli sağlam sakin varsa)
+    if (mishap && members.length > 1 && this.state.characters.filter((c) => !c.isChild && !c.role && !c.away).length >= FATAL.minAble && this.rng.next() < FATAL.expedition) {
+      this.events.emit('life:fatalAccident', { character: victim, cause: 'expedition' });
+    }
   }
 
   // ---------------------------------------------------------------------------

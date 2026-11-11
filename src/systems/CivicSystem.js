@@ -12,6 +12,7 @@ import { TILE_TYPES } from '../data/tiles.js';
 import { formatCost } from '../data/resources.js';
 import { TOWN_BUFFS } from '../data/town.js';
 import { clamp } from '../utils/math.js';
+import { doctrineGate, chooseDoctrine } from './Doctrine.js';
 
 /**
  * Bir fermanın şimdiki durumu (arayüz ve sistem aynı hesabı kullanır):
@@ -29,9 +30,11 @@ export function civicStatus(state, id, hasHall = true) {
     maxed = level >= project.levels.length;
     if (!maxed) cost = project.levels[level].cost;
   }
-  if (project.once && civic.craftGuild) maxed = true;
+  if (project.once && civic[id]) maxed = true;
   const provisions = project.provisions ?? 0;
+  const gate = doctrineGate(state, project.doctrine ?? null); // (28.4)
   if (!hasHall) reason = 'Önce Belediye Konağı tamamlanmalı';
+  else if (!maxed && !gate.ok) reason = gate.reason;
   else if (maxed) reason = project.levels ? 'Bütün kademeler tamamlandı' : 'Zaten ilan edildi';
   else if (project.cooldownDays && state.time.day - civic.feastDay < project.cooldownDays) {
     reason = `${project.cooldownDays - (state.time.day - civic.feastDay)} gün sonra yeniden ilan edilebilir`;
@@ -105,7 +108,11 @@ export class CivicSystem {
     } else if (id === 'craftGuild') {
       civic.craftGuild = true;
       detail = 'Ustalar artık daha hızlı öğreniyor ve üretiyor.';
+    } else if (id === 'tradeCharter') {
+      civic.tradeCharter = true;
+      detail = 'Krallık Vergisi kalıcı olarak %10 düştü.';
     }
+    if (chooseDoctrine(this.state, project.doctrine ?? null)) this.events.emit('doctrine:chosen', { doctrine: this.state.doctrine.chosen, source: 'civic', id });
     this.events.emit('civic:decreed', { project, id, level: civic.storageLevel, detail });
     this.events.emit('toast', { text: `Ferman ilan edildi: ${project.name}. ${detail}`, tone: 'success', icon: project.icon });
     return { ok: true };

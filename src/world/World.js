@@ -264,19 +264,35 @@ export class World {
    */
   getSpots(building) {
     if (this.spotCache.has(building.id)) return this.spotCache.get(building.id);
+    const usable = (x, y) => this.map.isWalkable(x, y) && this.isReachable(x, y);
+    let spots = this.computeSpots(building, usable);
+    // (29.2b) Şantiyenin / yükseltmenin çevresi her yandan kapanmışsa işçiler iki karo uzaktan da çalışır (iş sonsuza dek beklemesin)
+    if (spots.length === 0 && this.usesRing(building)) spots = this.computeSpots(building, usable, 2);
+    this.spotCache.set(building.id, spots);
+    return spots;
+  }
+
+  /** Şantiyede, yükseltmede ve onarımda herkes yapının çevresinde (halkada) çalışır. */
+  usesRing(building) {
+    return Boolean(building.underConstruction || building.project);
+  }
+
+  /**
+   * Yapının kullanım noktaları; hangi karoların kullanılabilir sayılacağını `usable(x, y)` belirler (yerleşim kontrolü, yeni yapı
+   * kurulursa kalacak noktaları bununla ölçer). ringWidth: halka kalınlığı (varsayılan 1; çaprazlar dahil).
+   */
+  computeSpots(building, usable, ringWidth = 1) {
     const def = BUILDINGS[building.type];
     const { tileX, tileY } = building;
     const { w, h } = def.size;
-    const usable = (x, y) => this.map.isWalkable(x, y) && this.isReachable(x, y);
-    // Şantiyede, yükseltmede ve onarımda herkes yapının çevresinde çalışır
-    const kind = building.underConstruction || building.project ? 'ring' : def.spots;
+    const kind = this.usesRing(building) ? 'ring' : def.spots;
     let spots = [];
 
     if (kind === 'door') {
       spots = def.doorTiles.map(({ dx, dy }) => ({ x: tileX + dx, y: tileY + dy })).filter((s) => usable(s.x, s.y));
     } else if (kind === 'ring') {
-      for (let y = tileY - 1; y <= tileY + h; y++) {
-        for (let x = tileX - 1; x <= tileX + w; x++) {
+      for (let y = tileY - ringWidth; y <= tileY + h - 1 + ringWidth; y++) {
+        for (let x = tileX - ringWidth; x <= tileX + w - 1 + ringWidth; x++) {
           const inside = x >= tileX && x < tileX + w && y >= tileY && y < tileY + h;
           if (!inside && usable(x, y)) spots.push({ x, y });
         }
@@ -291,8 +307,6 @@ export class World {
       const approachable = CARDINALS.some(([dx, dy]) => usable(tileX + dx, tileY + dy));
       if (approachable) spots = [{ x: tileX, y: tileY }];
     }
-
-    this.spotCache.set(building.id, spots);
     return spots;
   }
 

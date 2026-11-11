@@ -1,7 +1,7 @@
 // Karakterleri yol noktaları boyunca yürütür. Hız; temel hız, kişilik (Çalışkan daha hızlı)
 // ve üzerinde yürünen karonun hız çarpanıyla (yolda daha hızlı, kumda daha yavaş) belirlenir.
 // Oyun duraklatıldığında (simDt = 0) kimse kıpırdamaz. (11. aşama) Üşüten sakin %35 yavaş, "Dinçlik"
-// bonusu olan %15 hızlı yürür.
+// bonusu olan %15 hızlı yürür. (29.2) Ruh hali (c.mood.moveMul) de çarpılır.
 import { CONFIG } from '../config.js';
 import { healthWalkMultiplier } from './HealthSystem.js';
 import { spiceWalkMultiplier } from './Luxury.js';
@@ -23,7 +23,8 @@ export class MovementSystem {
   step(list, tick, now) {
     for (const c of list) {
       c.animTime += tick.simDt;
-      if (c.waypoints && tick.simDt > 0) this.advance(c, tick.simDt * healthWalkMultiplier(c, now) * spiceWalkMultiplier(c, now));
+      // (29.2) ruh hali yürüme hızını da etkiler (tükenmiş / yaslı ağır, dinlenmiş çevik yürür; konuklarda mood yoktur)
+      if (c.waypoints && tick.simDt > 0) this.advance(c, tick.simDt * healthWalkMultiplier(c, now) * spiceWalkMultiplier(c, now) * (c.mood ? c.mood.moveMul : 1));
     }
   }
 

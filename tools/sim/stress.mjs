@@ -114,6 +114,12 @@ console.log(
     `unvanı alan bilge ${lf((l) => l.state.elders ?? 0)}, yetişkinliğe geçen genç ${lf((l) => l.state.adults ?? 0)} · nasihat ${Math.round(lf((l) => l.state.adviceMinutes ?? 0))} dk · ` +
     `işteki emekli ${lf((l) => l.retiredWorking)} · en yaşlı ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? Math.max(...r.data.monitor.life.ages) : '-'}`).join(' ')}`
 );
+console.log(
+  `(28.3) Saygın Büyük ${lf((l) => l.venerable.length)} (toplam olan ${lf((l) => l.state.venerables ?? 0)}) · vefat ${lf((l) => l.state.deaths ?? 0)} (kaza ${lf((l) => l.state.accidents ?? 0)}) · nüfus (toplam / kotaya sayılan) ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? `${r.data.monitor.life.population}/${r.data.monitor.life.active}` : '-'}`).join(' ')} · ömrü atanmamış ${lf((l) => l.lifespanMissing)} · yataklı Saygın Büyük ${lf((l) => l.venerableWithHome)}`
+);
+console.log(
+  `(28.4) vadi / doktrin ${results.map((r) => `${r.seed}:${r.data?.monitor.life ? `${r.data.monitor.life.valley}/${r.data.monitor.life.doctrine ?? '-'}` : '-'}`).join(' ')} · geç oyun refahı (ort / en düşük / %100 altı örnek) ${results.map((r) => { const l = r.data?.monitor.life?.late; return `${r.seed}:${l ? `%${(l.sum / l.n).toFixed(0)}/%${l.min.toFixed(0)}/${Math.round((100 * l.below100) / l.n)}%` : '-'}`; }).join(' ')}`
+);
 const hl = (f) => sum((d) => (d.monitor.heirloom ? f(d.monitor.heirloom) : 0));
 console.log(`(25.5) yadigâr: oluşan ${hl((h) => h.state.created)}, devredilen ${hl((h) => h.state.transfers)}, arşivde ${hl((h) => h.state.archive)} · ilk devir ${results.map((r) => `${r.seed}:${r.data?.monitor.heirloom?.first ? `G${r.data.monitor.heirloom.first.day}` : '-'}`).join(' ')}`);
 const lg = (f) => sum((d) => (d.monitor.lineage ? f(d.monitor.lineage) : 0));
@@ -130,7 +136,7 @@ console.log(
 const ap = (f) => sum((d) => (d.monitor.apprentice ? f(d.monitor.apprentice) : 0));
 console.log(
   `(25.2) çıraklık: açık kapı ${ap((p) => p.open)} · son gün çırak ${ap((p) => p.active)} (en çok toplam ${ap((p) => p.maxActive)}) · yazılan ${ap((p) => p.state.enrolled)}, mezun ${ap((p) => p.state.graduated)} · ` +
-    `Gururlu Usta ${ap((p) => p.state.masters)} · çırak mesaisi ${Math.round(ap((p) => p.state.minutes) / 60)} sa · çırak işi ${ap((p) => p.state.crafted)} (satılan ${ap((p) => p.state.sold)}) · yetişkin çırak ${ap((p) => p.adultApprentices)}`
+    `Gururlu Usta ${ap((p) => p.state.masters)} · çırak mesaisi ${Math.round(ap((p) => p.state.minutes) / 60)} sa · çırak işi ${ap((p) => p.state.crafted)} (satılan ${ap((p) => p.state.sold)}) · yetişkin çırak ${ap((p) => p.adultApprentices)} · (28.2) Başusta ${ap((p) => p.grandmasters.length)} (mezun %${Math.round((100 * ap((p) => p.grandmasters.length)) / Math.max(1, ap((p) => p.state.graduated)))}), hammaddesiz üretim ${ap((p) => p.state.grandmasterSaved ?? 0)}`
 );
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(results.map(({ data, ...r }) => ({ ...r, monitor: data?.monitor, errors: data?.errors })), null, 1));
 process.exit(results.every((r) => r.code === 0) ? 0 : 1);

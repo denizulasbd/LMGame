@@ -4,6 +4,7 @@
 //            yana çalışırken, aynı toplanma yerinde sohbet ederken ya da dar bir yerde karşılaşınca
 //            atışabilir: başlarında öfke şimşeği / somurtma bulutu belirir, keyifleri düşer, ilişki
 //            puanları azalır (eksiye inebilir: Hoşlanmıyor, Rakip). Sevgililer ve eşler atışmaz.
+//            (29.1) Kimyası eksi olan çift zıt özelliği olmasa da atışabilir (traits: null); eksi kimya riski artırır.
 //            'relationship:quarrel' { a, b, traits, kind: 'work' | 'chat' | 'encounter', place, firstToday }
 //   Barışma: küs (puanı RECONCILE.below altında) iki sakin aynı yerde sohbet ederken barışabilir; ilişkileri
 //            normale döner, başlarında el sıkışma balonu çıkar. (15. aşama) Kasaba Hanı, Ahşap Çardak, Kamp Ateşi ve
@@ -14,6 +15,8 @@ import { CONFLICT, RECONCILE } from '../data/family.js';
 import { clashingTraits } from '../ai/TraitProfile.js';
 import { pairKey, arePartners } from './RelationshipSystem.js';
 import { clamp } from '../utils/math.js';
+import { chemistryLevel, chemistryFor } from './Chemistry.js';
+import { CHEMISTRY_QUARREL_SHARE } from '../data/chemistry.js';
 
 const QUARREL_RATES = {
   work: CONFLICT.workChancePerMinute,
@@ -94,14 +97,19 @@ export class ConflictSystem {
   tryQuarrel(a, b, kind, minutes, building) {
     if (a.isChild || b.isChild || arePartners(a, b)) return;
     const clash = clashingTraits(a.traits, b.traits);
-    if (!clash) return;
+    // (29.1) kimya: eksi kimyada atışma riski artar (zıt özellik olmasa da, yarı olasılıkla); güçlü çekimde azalır
+    // (zıt özelliği olmayan çiftte yalnızca kayıtlı kimyaya bakılır: kayıt, sohbet etmiş / bağ kurmuş çiftlerde vardır)
+    const stored = a.relationships[b.id]?.chemistry;
+    if (!clash && !(stored < 0)) return;
+    const chemistry = chemistryLevel(stored ?? chemistryFor(this.state.seed, a, b)).quarrel * (clash ? 1 : CHEMISTRY_QUARREL_SHARE);
     const key = pairKey(a.id, b.id);
     const now = this.state.totalMinutes;
     if ((this.cooldowns.get(key) ?? -1) > now) return;
-    const temper = Math.max(a.profile.quarrelChance, b.profile.quarrelChance);
+    // (29.2) tatsız karşılaşma yaşamış ya da aç ve huysuz sakin daha çabuk parlar
+    const temper = Math.max(a.profile.quarrelChance, b.profile.quarrelChance) * Math.max(a.mood.quarrelMul, b.mood.quarrelMul);
     // (15. aşama) küsler birbirini görmezden gelir: aynı çiftin üst üste atışması seyrekleşir
     const feud = this.relationships.get(a, b) < RECONCILE.below ? CONFLICT.feudQuarrelMultiplier : 1;
-    if (this.rng.next() >= QUARREL_RATES[kind] * temper * feud * minutes) return;
+    if (this.rng.next() >= QUARREL_RATES[kind] * temper * feud * chemistry * minutes) return;
     this.quarrel(a, b, clash, kind, building);
   }
 

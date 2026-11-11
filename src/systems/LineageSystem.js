@@ -87,6 +87,7 @@ export class LineageSystem {
 
   /** Altın Çağ kuşağının yeni yuvası: boş kulübe > Geniş Aile > Yeni Konut Talebi. */
   settle(a, b) {
+    if (a.isVenerable || b.isVenerable) return null; // (28.3) Saygın Büyük yatağını bıraktı: yeni yuva aranmaz
     const lineage = this.lineage;
     const empty = this.world.getCompleted('cabin').filter((h) => h.functional && this.world.getResidents(h).length === 0);
     if (empty.length) {

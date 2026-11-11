@@ -2,6 +2,9 @@
 // Sistemler durumu burada değiştirir; çizim ve UI yalnızca okur.
 // Harita kaydedilmez: aynı tohumdan (seed) yeniden üretilir, yalnızca değişen karolar
 // kayda eklenir (bkz. world/TerrainSnapshot.js; kayıt dosyasını SaveManager yazar).
+import { emptyMoodletStats, restoreMoodletStats } from '../systems/Moodlets.js';
+import { valleyFor, sanitizeValley } from '../systems/Valley.js';
+import { emptyDoctrine, restoreDoctrine } from '../systems/Doctrine.js';
 import { emptyGoldenAge, emptyChronicle } from '../systems/GoldenAge.js';
 import { GOLDEN_AGE } from '../data/goldenAge.js';
 import { CONFIG } from '../config.js';
@@ -134,7 +137,7 @@ export class GameState {
     this.animalMeta = { wildlifeSeeded: false, lastPetDay: 0 };
     // Belediye fermanları (CivicSystem, 11. aşama): depo genişletme kademesi, lonca, son ziyafet günü,
     // keşif seferlerinden gelen kadim tılsımlar (refaha kalıcı katkı)
-    this.civic = { storageLevel: 0, craftGuild: false, feastDay: -99, decrees: 0, relics: 0, expeditionsSinceTalisman: 0 };
+    this.civic = { storageLevel: 0, craftGuild: false, tradeCharter: false, feastDay: -99, decrees: 0, relics: 0, expeditionsSinceTalisman: 0 };
     // İkilem olayları (DilemmaSystem, 11. aşama):
     //   nextDay   : bir sonraki olayın günü, history: { olay: son çıktığı gün }
     //   active    : açık karar penceresi { id, remaining (gerçek saniye), wasPaused }
@@ -144,6 +147,9 @@ export class GameState {
     // Bilgelik Evi (ResearchSystem, 12. aşama): süren araştırma { id, progress } ve biten araştırmalar
     // { id: { day, hour, minute } }
     this.research = { active: null, done: {} };
+    // (28.4) Vadi Karakteri (tohumdan; anahtar) ve Kasaba Doktrini { chosen, day }
+    this.valley = valleyFor(seed);
+    this.doctrine = emptyDoctrine();
     // Nehir ihracatı (HarborSystem, 12. aşama):
     //   boat      : nehirdeki ticaret teknesi { stage: arriving | docked | leaving, progress, cargo, dockUntil } ya da null
     //   nextBoatAt: sıradaki teknenin yola çıkacağı oyun dakikası
@@ -195,6 +201,7 @@ export class GameState {
     this.lifeStages = emptyLifeStages(); // (25.1) yaşam evresi sayaçları
     this.apprenticeship = emptyApprenticeshipState(); // (25.2) açık çırak kapıları ve sayaçlar
     this.temperament = emptyTemperament(); // (25.3) mizaç gelişimi sayaçları
+    this.moodlets = emptyMoodletStats(); // (29.2) ruh hali sayaçları: { given: { anahtar: adet }, consoled, grieved, mourners }
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
     this.heirloom = emptyHeirloomState(); // (25.5) aile yadigârları: sayaçlar, arşiv, Kuşak Şöleni
     this.activeGuest = null; // (26.3) geçici gezgin konuk (GuestSystem): null | { type, name, look, arrivalDay, departureDay, x, y, leaving, resting, barters, lastBarterDay, exit } (27.1: exit isteğe bağlı)
@@ -257,6 +264,8 @@ export class GameState {
       civic: this.civic,
       dilemma: this.dilemma,
       research: this.research,
+      valley: this.valley,
+      doctrine: this.doctrine,
       trade: this.trade,
       luxury: this.luxury,
       history: this.history,
@@ -279,6 +288,7 @@ export class GameState {
       lifeStages: this.lifeStages,
       apprenticeship: this.apprenticeship,
       temperament: this.temperament,
+      moodlets: this.moodlets,
       lineage: this.lineage,
       heirloom: this.heirloom,
       currentFestival: this.currentFestival,
@@ -347,6 +357,8 @@ export class GameState {
       active: RESEARCH[data.research?.active?.id] ? { id: data.research.active.id, progress: Math.max(0, Number(data.research.active.progress) || 0) } : null,
       done: Object.fromEntries(Object.entries(data.research?.done ?? {}).filter(([id]) => RESEARCH[id])),
     };
+    next.valley = sanitizeValley(data.valley, next.seed); // (28.4) eski kayıtlarda yok: tohumdan atanır
+    next.doctrine = restoreDoctrine(data.doctrine);
     next.trade = { ...next.trade, ...(data.trade ?? {}), exported: { ...(data.trade?.exported ?? {}) } };
     // 13. aşamadan eski kayıtlarda altın harcaması, yadigâr ve arşiv yoktur: boş başlar
     next.luxury = {
@@ -394,6 +406,7 @@ export class GameState {
     next.tradePost = restoreTradePost(data.tradePost);
     next.lifeStages = restoreLifeStages(data.lifeStages);
     next.temperament = restoreTemperament(data.temperament); // (25.3)
+    next.moodlets = restoreMoodletStats(data.moodlets); // (29.2)
     next.lineage = restoreLineage(data.lineage);
     next.activeGuest = sanitizeActiveGuest(data.activeGuest); // (26.3) v2-v30 kayıtlarında alan yoktur: null
     next.guestBook = restoreGuestBook(data.guestBook);
@@ -445,6 +458,7 @@ function restoreTax(data) {
   if (!data || typeof data !== 'object') return out;
   if (TAX_RATES[data.rate]) out.rate = data.rate;
   out.nextAt = NUM(data.nextAt);
+  out.lockedUntil = Math.max(0, NUM(data.lockedUntil) ?? 0); // (28.1) v2-v31 kayıtlarında alan yoktur: kilit yok
   out.collections = COUNT(data.collections);
   out.totalGold = COUNT(data.totalGold);
   out.totalGoods = COUNT(data.totalGoods);
@@ -711,7 +725,7 @@ function sanitizeReferences(next) {
   const residents = new Map();
   for (const c of next.characters) if (c.homeId !== null) residents.set(c.homeId, (residents.get(c.homeId) ?? 0) + 1);
   for (const c of next.characters) {
-    if (c.homeId !== null) continue;
+    if (c.homeId !== null || c.isVenerable) continue; // (28.3) Saygın Büyük yataksızdır
     const home = next.buildings.find((b) => b.functional && b.capacity > (residents.get(b.id) ?? 0));
     if (!home) continue;
     c.homeId = home.id;

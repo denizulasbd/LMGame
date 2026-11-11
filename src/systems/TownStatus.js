@@ -3,6 +3,7 @@
 // aynı hesabı kullansın diye tek yerde.
 // 10. aşama: kasabanın toplam yiyecek değeri (ekmek 2,5 sayılır), kasaba seviyesi (Mezra -> Gelişmiş
 // Şehir) ölçütleri ve unvanı, belediyenin iş verimi çarpanı.
+import { lateDiscontent } from './LateGame.js';
 import { goldenWelfareMultiplier, goldenWorkMultiplier } from './GoldenAge.js';
 import { silkPrestige } from './Luxury.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -13,7 +14,7 @@ import { masterworkHappiness } from './Masterworks.js';
 import { clothWelfare } from './Refinery.js';
 import { aestheticWelfareMultiplier } from './Landscape.js';
 import { taxWorkMultiplier, reputationForImmigration } from './Crown.js';
-import { elderWelfare } from './LifeStages.js';
+import { elderWelfare, activePopulation } from './LifeStages.js';
 
 /** Bir sakinin mutluluğu 0-100: ihtiyaçlarının ağırlıklı ortalaması. */
 export function happinessOf(character) {
@@ -32,7 +33,9 @@ export function townHappiness(state) {
   if (people.length === 0) return 0;
   const average = people.reduce((sum, c) => sum + happinessOf(c), 0) / people.length;
   // (20. aşama) Altın Çağ: kasaba refahına kalıcı +%10 çarpan
-  return Math.min(100, (average * aestheticWelfareMultiplier(state) + townHappinessBonus(state)) * goldenWelfareMultiplier(state));
+  const raw = Math.min(100, (average * aestheticWelfareMultiplier(state) + townHappinessBonus(state)) * goldenWelfareMultiplier(state));
+  // (28.4) Geç oyun beklentisi: lüks kalemleri (şerbet, kumaş, handa sıcak yemek) eksikse refah düşer
+  return Math.max(0, raw - lateDiscontent(state));
 }
 
 /**
@@ -108,7 +111,7 @@ export function landmarkBonus(state) {
  * Dönüş: { ok, freeBeds, checks: [{ key, ok, text }] }
  */
 export function immigrationStatus(state) {
-  const population = state.characters.length;
+  const population = activePopulation(state); // (28.3) Saygın Büyükler nüfus kotasına sayılmaz
   const beds = freeBeds(state);
   const maxPopulation = immigrationLimit(state);
   const freeBedCount = Math.max(0, Math.min(beds.open, maxPopulation - population));
@@ -191,7 +194,7 @@ export function isTownBuilding(building) {
 /** Kasaba seviyesi ölçütleri: { population, buildings, upgraded, welfare, townHall } */
 export function townMetrics(state) {
   return {
-    population: state.characters.length,
+    population: activePopulation(state),
     buildings: state.buildings.filter(isTownBuilding).length,
     upgraded: state.buildings.filter((b) => b.functional && b.upgraded).length,
     welfare: state.town?.welfare ?? townHappiness(state),

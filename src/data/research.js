@@ -16,6 +16,7 @@ export const RESEARCH = {
     cost: { wood: 160, stone: 80, iron: 90 },
     work: 600,
     effect: { production: { types: ['lumberHut', 'quarry', 'ironMine', 'mill'], multiplier: 1.2 } },
+    doctrine: 'industry', // (28.4) Zanaat ve Sanayi Doktrini'nin kapısı
   },
   architecture: {
     name: 'Mimarlık Loncası',
@@ -32,6 +33,7 @@ export const RESEARCH = {
     cost: { wood: 80, wool: 60, bread: 90 },
     work: 500,
     effect: { healSpeed: 2, vigorHours: 24 },
+    doctrine: 'agrarian', // (28.4) Tarım ve Doğa Doktrini'nin kapısı
   },
   insulation: {
     name: 'Kışlık Yalıtım Teknikleri',
@@ -40,6 +42,25 @@ export const RESEARCH = {
     cost: { wood: 140, stone: 90, wool: 120 },
     work: 550,
     effect: { heating: 0.75 },
+  },
+  // (28.4) Doktrin kapıları: kendi başına küçük bir etki + doktrinin seçilmesi
+  cropRotation: {
+    name: 'Münavebe ve Silo Düzeni',
+    icon: 'harvest',
+    description: 'Ekim nöbeti ve ambar düzeni: Sebze Bahçesi +%10 üretir. Tarım ve Doğa Doktrinini SEÇER (öteki doktrinlerin yolları kilitlenir).',
+    cost: { wood: 120, stone: 60, wool: 60 },
+    work: 500,
+    effect: { production: { types: ['garden'], multiplier: 1.1 } },
+    doctrine: 'agrarian',
+  },
+  tradeLaw: {
+    name: 'Ticaret Hukuku ve Kervan Yolları',
+    icon: 'boat',
+    description: 'Tartı, mühür ve konak düzeni: liman ihracatı +%10 değerli. Ticaret ve Diplomasi Doktrinini SEÇER (öteki doktrinlerin yolları kilitlenir).',
+    cost: { wood: 140, stone: 100, iron: 40 },
+    work: 550,
+    effect: { exportValue: 1.1 },
+    doctrine: 'commerce',
   },
 };
 export const RESEARCH_KEYS = Object.keys(RESEARCH);

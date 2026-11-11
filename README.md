@@ -45,10 +45,10 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 | Karar penceresindeki seçenekler | Sürpriz olayda kararını ver (oyun durur; 30 sn içinde seçmezsen varsayılan güvenli seçenek) |
 | Belediye Konağı panelinde **Fermanı İlan Et** | Büyük Ziyafet, Depo Genişletmesi ya da Zanaat Loncası fermanını ilan et |
 | Hasarlı yapının panelinde **Onarımı Başlat** | Fırtınada / kurt saldırısında hasar gören yapıyı onar |
-| Hasarlı yapının panelinde **Tamir Et** | (23. aşama) İnşa maliyetinin %25'iyle (odun + taş) yapıyı anında onar; yoksa boştaki ustalar yangın / baskın hasarını 2 saat sonra kaynak yetiyorsa kendiliğinden onarır |
-| Yanan yapının panelinde **Acil Söndür (Kova Zinciri)** | (23. aşama) Yangını anında, hasarsız söndür (Güven +2); sakinler zaten kovalarla koşar |
+| Hasarlı yapının panelinde **Tamir Et** | (23. aşama; **28.1'de pahalandı**) Anında onarım artık acil durum lüksüdür: inşa maliyetinin **%50'si (odun + taş) + 25 altın**. Acelen yoksa boştaki ustalar yangın / baskın / fırtına hasarını maliyetin yalnızca **%20'siyle** onarır (yangın / baskında 2 saat sonra kendiliğinden başlar) |
+| Yanan yapının panelinde **Acil Seferberlik** | (28.1; eski bedava "Acil Söndür"ün yerine) **30 altın**: yangın sönmez ama o yangına 4 yerine **8 kişi** koşar ve kova **2 kat hızlı** taşınır; kova atan herkes yangın bitince **Enerji -40, Keyif -20** kaybeder |
 | Üst çubuğun altındaki **Haydut izleri · N sa** çipi (ya da Gözcü Kulesi / Belediye / meydan paneli) | (23. aşama) Haydut Baskını penceresi: A bekçilerle püskürt, B haraç öde, C hazırlıksız yakalan |
-| Üst çubuğun altındaki **… yanıyor · %N** çipi | (23. aşama) Yanan yapıyı seç, panelinden söndür |
+| Üst çubuğun altındaki **… yanıyor · %N** çipi | (23. aşama) Yanan yapıyı seç; panelinden Acil Seferberlik ilan et |
 | Ayarlar > **Tehlike Sıklığı** (Huzurlu / Dengeli / Çetin) | (23. aşama) Doğal yangın ve haydut baskını sıklığı (kayda girer) |
 | Bilgelik Evi panelinde **Araştır** | Kasaba araştırmasını başlat (maliyet peşin; Bilge çalıştıkça ilerler) |
 | Liman panelinde **Kapalı / 250+ / 400+ / 550+** ve **İhracat Sandığı Hazırla** | Otomatik fazlalık ihracatının stok sınırını seç; rıhtıma bir ihracat sandığı koy |
@@ -260,6 +260,10 @@ LMGame/
     │   ├── SkillSystem.js  Meslek deneyimi, kademe atlama, ustalık iş hızı bonusu
     │   ├── MilestoneSystem.js Kasaba hedefleri: ilerleme, tamamlanma, kış sınavı takibi, anıt kutlaması
     │   ├── TownLevelSystem.js Kasaba seviyesi: ortalama refah, seviye atlama ve kutlama, belediyenin erzak dengesi
+    │   ├── Moodlets.js     (29.2) Ruh hallerinin saf hesapları: katman tavanları, kademe ölçeği, toplam etki (c.mood), baskın ruh hali, teselli
+    │   ├── MoodletSystem.js (29.2) Moodlet'lerin doğması (eylem x kişilik, ihtiyaç / çevre, travma / zafer), yas ve teselli, sözler
+    │   ├── Chemistry.js    (29.1) Sosyal kimyanın saf hesapları: kıvılcım (izole üreteç), kişilik / huy / zanaat uyumu, yönlü etiketler, kayıt göçü
+    │   ├── ChemistrySystem.js (29.1) Duygusal etiketlerin doğması (olaylar), saat başı kimya, ikram, yolda şimşek ve etiketli selam
     │   ├── HealthSystem.js Maruziyet, üşütme, kendiliğinden iyileşme, şifacıda tedavi ve Dinçlik
     │   ├── AnimalSystem.js Yaban hayatı (dolaşma, ürküp kaçma, gece yuva) ve kedi / köpek (gelme, dolaşma, uyku, sevilme)
     │   ├── DilemmaSystem.js Karar olayları: zamanlama, seçenek koşulları, zaman aşımı, fırtına, kurtlar, keşif seferi
@@ -3659,12 +3663,563 @@ sistemlerini arayüze taşıdı.
 
 **Ortak ilkeler.**
 
-- **Kule öncesi bayt bayt aynı:** üç adımda da `autopilot.mjs 42 24` raporu, günlüğü ve kayıt dosyası 26.3 / `main` ile aynıdır. Ulu Saat Kulesi G25 / G27 / G28 ve
-  Altın Çağ G28 hiç değişmedi; stres matrisinde Altın Çağ G31, G33, G31, G28, G34, G34.
+- **Kule öncesi bayt bayt aynı (yalnızca 27. aşamaya özgü tarihî not):** üç adımda da `autopilot.mjs 42 24` raporu, günlüğü ve kayıt dosyası 26.3 / `main` ile aynıdır. Ulu Saat
+  Kulesi G25 / G27 / G28 ve Altın Çağ G28 hiç değişmedi; stres matrisinde Altın Çağ G31, G33, G31, G28, G34, G34. **28. aşamada bu kural kaldırıldı** (bkz. 28.1).
 - **İzole üreteçler:** dilekçe `seed + 23`, çıraklık `seed + 28`, soy `seed + 30`, yadigâr `seed + 31`, panayır / sofra / konuk `seed + 32 / 33 / 34`. Ana üreteç ve
   `Math.random` (eski sistemlerin tohumlu çağrıları dahil) değişmedi.
 - **Kayıt sürümü 31:** yeni alanların hepsi isteğe bağlıdır; v2-v31 kayıtları sıfır hatayla açılır (`compat.mjs` 1137).
 - **Simülasyon araçları:** `tests.mjs` 1125 -> 1207, `audit.mjs` 124 -> 136 doğrulama.
+
+## Sistemik Derinlik ve Çekirdek Revizyon: Kriz, Onarım, Vergi ve Takas İstismarlarının Çözümü (28. aşama, 28.1 mikro adımı)
+
+28. aşamayla birlikte **mimari paradigma değişti**: bugüne dek uygulanan "Tohum 42'nin kule öncesi olayları ve G28 Altın Çağ takvimi bayt bayt aynı kalmalıdır" kuralı
+**resmen kaldırıldı**. Oyunun mekaniklerini kökten iyileştirmek serbesttir. Değişmeyenler:
+
+- **Eski kayıtlar açılır:** v2-v31 kayıtları göç koduyla (`SaveManager.migrate`) sorunsuz yüklenir.
+- **Oyunun kendi içindeki determinizmi korunur:** aynı tohum art arda iki kez koşturulunca birebir aynı sonucu verir; krizler, dilekçeler, çıraklık, soy, yadigâr, panayır /
+  sofra / konuk sistemlerinin izole üreteçleri (`seed + 23 ... + 34`) ve `Math.random` tohumlaması aynen sürer.
+- **Yeni referans noktası:** Tohum 42, yeni kurallarla yeni ve farklı bir dengeye oturdu (aşağıda). Bundan sonraki adımlar `main` ile değil **28.1'in sonuçlarıyla** karşılaştırılır.
+
+Bu adım dört mekanik açığı kapatır.
+
+### 1. "Acil Söndür" sihri kalktı -> "Acil Seferberlik" (`CrisisSystem`, `Crisis`, `Brain`, `Building`)
+
+Eskiden panelden "Acil Söndür" bedavaya, anında ve üstüne +2 Güven vererek yangını siliyordu: kova zincirini ve Su Kuyusu'nu anlamsızlaştırıyordu. Düğme artık
+**Acil Seferberlik** (`ui:emergencyMuster`):
+
+- **Bedel 30 altın** (`FIRE.muster.gold`; altın yoksa düğme devre dışı, `musterStatus` nedeni yazar). Yangın **sönmez**; yanan yapı `emergencyMuster = true` bayrağı alır (kayda girer).
+- **8 kişi koşar** (`FIRE.muster.fighters`; normalde `FIRE.maxFighters` = 4, bekçiler dahil): en yakın uyanık, sağlam yetişkinler; `fightersFor(building)` hem `responders` hem
+  `fireAssignment` için tek kaynaktır.
+- **2 kat hızlı kova** (`FIRE.muster.speed`): `fetchWater` ve `fightFire` süreleri yarıya iner (`Brain.crisisDuration(activity, fire)`; süre sabit olduğu için üreteç tüketilmez).
+- **Aşırı Yorgunluk:** yangın söndüğünde ya da yapı hasar aldığında **kova atan her sakin Enerji -40, Keyif -20** kaybeder (`crisis:musterFatigue`, Kasaba Günlüğü satırı).
+  Kova atmayan sakin etkilenmez. Seferberlik bayrağı yangın bitince sıfırlanır.
+- Kovayla söndürme (3-4 kova, Güven +2, "el birliğiyle" anısı) aynen sürer; yani seferberlik bir **hızlandırıcıdır**, büyü değil. `ui:extinguish` olayı kaldırıldı.
+
+### 2. "Tamir Et" lüksü ve normal onarım dengesi (`Crisis`, `CrisisSystem`, `dilemmas`)
+
+- **Anında Tamir Et** (`ui:repairBuilding`): inşa maliyetinin **%50'si (odun + taş) + 25 altın** (`REPAIR.instant`, `instantRepairCost`). Altın ya da malzeme yoksa reddedilir.
+- **Ustaların onarım projesi (`mend`)** maliyetin **%20'sine** indi (`REPAIR.costRatio` 0,25 -> 0,2; fırtına hasarının `STORM.mend.costRatio`'su da 0,3 -> 0,2): acelesi
+  olmayan oyuncu ustaları bekler. Yangın / baskın hasarında usta onarımı yine 2 saat sonra kendiliğinden başlar.
+- Panelde iki yol açıkça yazılır: anında yol pahalı, usta yolu ucuz.
+
+### 3. Vergi Fermanı kilidi (`TaxSystem`, `Crown`, `BuildingPanel`)
+
+Eskiden vergi 11:59'da Ağır'a, 12:01'de Muaf'a çekilerek tahsilat parası toplanıp Ağır Vergi'nin çalışma hızı cezasından ve moral bozukluğundan kaçılıyordu.
+
+- Kademe değişince `state.tax.lockedUntil = şimdi + 3 oyun günü` (`TAX.lockDays`, bir tam tahsilat döngüsü) yazılır; kilit sürerken `setRate` reddedilir (`tax:rateLocked`, uyarı toast'ı, günlük).
+- Aynı kademeyi yeniden seçmek kilit koymaz. İlk değişiklik (kilit 0) serbesttir.
+- **Panel:** kilitliyken seçili olmayan kademe düğmeleri devre dışıdır (tooltip ve kartta "Ferman kilitli: N gün N saat").
+- Kilit kayda girer ve yüklemeden sonra da sürer.
+
+### 4. Dış ticaret sözleşmeleri limanın önüne geçti (`data/tradePost.js`)
+
+Büyük Ticaret Limanı fazlalığı `EXPORT.values` fiyatından otomatik satar (Kumaş 6, Şerbet 7, Ekmek 3, Yün 3, Erzak 1). Sözleşme tabanları artık bunun **en az %40 üstündedir**
+(`CONTRACT_MIN_PREMIUM = 1.4`; testler ve denetim bunu doğrular):
+
+| Sözleşme | Eski | Yeni | Liman karşılığı | Prim |
+|---|---|---|---|---|
+| Kumaş (10) | 40 | **85** | 60 | x1,42 |
+| Fıçı Şerbeti (8) | 35 | **80** | 56 | x1,43 |
+| Ekmek (25) | 20 | **105** | 75 | x1,40 |
+| Erzak (40) | 18 | **75** | 40 | x1,88 |
+| Yün (15) | 30 | **65** | 45 | x1,44 |
+
+> Not: görev metni Ekmek için 90 altın öngörmüştü; ancak 25 ekmeğin liman karşılığı 75'tir ve 90 yalnızca %20 prim eder. "En az %40" ilkesini sağlamak için **105** seçildi.
+> Pazar doygunluğu (peş peşe satışta -%12, taban %55) ve kayıt biçimi değişmedi; kayıttaki sözleşmeler kendi `gold` değerini taşır.
+
+### Kayıt (sürüm 32)
+
+`buildings[].emergencyMuster: boolean` ve `tax.lockedUntil: number` eklendi. `SaveManager.migrate` v31 -> v32 için yangınlara `emergencyMuster: false`, vergiye `lockedUntil: 0`
+yazar; `GameState.restore` eksik / bozuk değerleri de aynı varsayılana çeker. `SAVE_VERSION = 32`. Fikstür `save-v32.json` (otopilot, 72 gün, `--crisis-state`) eklendi.
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1207 -> **1232**; 25'i bu adımın, birkaçı yeni kurala göre güncellendi):
+  - Acil Seferberlik: düğmenin varlığı ("Acil Söndür" yok), altın yetmezse devre dışı / reddedilir, 30 altın düşer, yangın **sönmez**, bayrak açılır, atanan sayısı 4 -> 8,
+    kova süreleri yarıya iner, ikinci ilan reddedilir, kova atanlar söndükten sonra Enerji -40 / Keyif -20 (atmayan etkilenmez), söndürülemeyen yangında da yorgunluk,
+    bayrak kayda yazılır ve sıfırlanır;
+  - Tamir: anında bedel %50 + 25 altın, altın yoksa ret, usta onarımı %20 (yangın ve fırtına), altın istemez;
+  - Vergi Fermanı: kilitsiz serbest geçiş, `lockedUntil` = +3 gün, tahsilattan hemen sonra Muaf'a kaçışın reddi ("tax:rateLocked"), Ağır Vergi hız cezasının kilit boyunca sürmesi,
+    kilit bitmeden 1 dakika önce hâlâ kilitli, 3 gün dolunca açılıp yeniden kilitlenme, aynı kademede kilit yok, panel düğmeleri devre dışı + "Ferman kilitli", kayıt,
+    v31 -> v32 göçü;
+  - sözleşmeler: yeni taban altınlar (85 / 80 / 105 / 75 / 65) ve her birinin liman fiyatına göre **en az %40 prim**; pazar doygunluğu testleri yeni sayılara uyarlandı.
+  - **Tohum kayması nedeniyle sağlamlaştırılan eski testler:** dokumacının yevmiyesi (kesedeki net değişim yerine `wagesPaid`), Kıdemli Bilge anısı (40'lık bellek sınırı), Ocak Devri
+    (önceki ocak reisliklerinin ve kulübeye sonradan yerleşenlerin sayacı bozmaması), Altın Çağ'da yuva kuran çift (başka bekleyen çiftlerin boş kulübeleri kapması), Sofra
+    öncesi kalan şenlik görevleri. Hiçbiri kuralı gevşetmez; yalnızca dünyanın önceki testlerden artakalan durumuna bağımlılığı kaldırır.
+- **Denetim** (`audit.mjs`): 136 -> **138**. Vergi kilidi, tahsildar yoldayken / ferman sürerken kayıt -> yükleme sonrasında da sürer; kilit dolunca kademe değişir ve yeniden 3 gün kilitlenir.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-32): 1137 -> **1176**. Yeni `save-v32.json` fikstürü (otopilot, 72 gün, `--crisis-state`).
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0;
+  refah / nüfus 30 / seviye 4 her tohumda. **Ulu Saat Kulesi 6/6, Altın Çağ G31, G33, G31, G30, G38, G34** (28.1 öncesi: G31, G33, G31, **G28**, **G34**, G34).
+  Yangın 25 (hepsi söndürüldü, hasar bırakan 0), haydut baskını 24, tamir 3, vergi tahsilatı 78 (+8725 altın, hep Standart kademe), Krallık Vergisi 36/36.
+- **Tohum 42, yeni referans noktası.** `autopilot.mjs 42 72 --crisis-state` iki kez art arda koşturuldu: `--json` raporu, kayıt dosyası ve günlük çıktısı **bayt bayt aynı**
+  (tek fark günlükteki kayıt dosyası adı). Ulu Saat Kulesi aşamaları **G25 / G27 / G28 -> G27 / G29 / G30**, Altın Çağ **G28 -> G30**. Koşu: yangın 11 (söndürülen 10), haydut
+  baskını 7 (püskürtülen 5, haraç 2), vergi 23 tahsilat (+3391 altın), Krallık Vergisi 11/11, ferman teslim 9, takılma 0, kopuk referans 0, sayfa hatası yok.
+  Bundan sonraki adımlar bu değerlere göre kıyaslanır.
+- **Otopilot:** yangın yarıyı aşınca (altın >= 30) Acil Seferberlik ilan eder; hasarı önce ustalara bırakır (fırtına hasarı için onarım projesini kendisi başlatır),
+  24 saati aşarsa pahalı anında tamire başvurur; vergi kilidini gözetir.
+
+## Çıraklığın Yatırıma Dönüşmesi ve Başusta Kademesi (28. aşama, 28.2 mikro adımı)
+
+**Kayıt sürümü 33.** Kule öncesi bayt bayt kuralı 28. aşamada kaldırıldığı için 25.1'de eski takvimi bozmamak adına kilitli tutulan Gençlik Bonusu da açıldı. Kural: Tohum 42, 28.2 koduyla
+art arda koşturulunca her seferinde **kendi içinde %100 aynı** sonucu verir (aşağıda doğrulandı).
+
+### 1. Hızlı çıraklık ve Gençlik Bonusu (`data/apprenticeship.js`, `data/lifeStages.js`)
+
+| Sayı | Eski | Yeni |
+|---|---|---|
+| `YOUTH.energyGain` (Gençlerin uykuda / dinlenirken enerji dolumu) | 1 | **1,2** (%20 hızlı; `TraitProfile`) |
+| `APPRENTICE.perMinute` (çıraklık %100 için mesai) | 100 / 3600 (60 saat) | **100 / 1800 (30 saat, saatte %3,33)** |
+| `PROUD_MASTER.workBoost` (çırak %50'yi geçince ustanın tezgâhına verim) | 1,05 | **1,2** |
+
+Çırak bulundurmak artık hemen kârlıdır: yarım yoldaki çırak ustanın tezgâhını %20 hızlandırır. Tezgâh Pratiği (usta yokken %60 hız) ve gıda / çekirdek iş gücü korumaları aynen sürer.
+
+### 2. Başusta (`systems/Grandmaster.js`, `ApprenticeshipSystem.graduate`, `Character`)
+
+- **Verilişi:** Genç 21 yaşında Yetişkin olduğunda çıraklığı **%100** ise Yetkin Usta olmanın yanında kalıcı `isGrandmaster = true` ve `grandmasterProfession` (çıraklık yapısı türü)
+  alır. Başka hiçbir yoldan verilmez: çıraklıksız, çalışarak (ne kadar deneyimli olursa olsun) usta olanlar ve %99,9'da mezun olanlar Başusta olamaz.
+- **Usta İşi Eser şansı x2:** Başusta kendi mesleğinin eserinde şansı iki katına çıkarır (taban %4 -> %8; sabit iş yeri ve Sağlam Alet ile %8 -> **%16**). Başka mesleğin eserinde (örn. Demirci Başusta
+  ekmek eserinde) çarpan yoktur. Kasabadaki günlük ve usta başına bekleme sınırları aynen geçerlidir.
+- **Hammadde tasarrufu (deterministik, üreteç yok):** Başusta kendi mesleğinin yapısında (Fırın, Dokuma Tezgâhı, Şerbethane, Zanaat Atölyesi) her **5. üretimi hiç hammadde harcamadan** yapar
+  (`grandmasterBatches` sayacı; kayda girer, `grandmaster:saved` olayı ve `apprenticeship.grandmasterSaved` sayacı). Başka mesleğin yapısında tasarruf yoktur. Kereste Atölyesi ve Şifacı Kulübesi
+  girdi tüketmediği için o mesleklerin Başustası yalnızca eser şansı bonusu alır.
+- **Haber:** mezuniyette toast, anı ("... Başusta ... unvanını aldı") ve Kasaba Günlüğü satırı; `apprentice:grandmaster` olayı.
+
+### 3. Arayüz
+
+- **Karakter kartı:** unvanı olan sakinin zanaat rozeti **"Başusta Demirci"** (yıldız ikonu, altın-mor degrade `.craft-badge.is-grandmaster`) olur; ipucunda etkiler yazar.
+- **Yapı paneli:** çalışan bir Başusta varsa "★ Başusta Üretimi: ... · her 5. üretim hammaddesiz (Tasarruf Şansı) · usta işi eser ihtimali 2 kat (Yüksek Eser İhtimali)" satırı görünür.
+
+### Kayıt (sürüm 33)
+
+`characters[].isGrandmaster`, `grandmasterProfession`, `grandmasterBatches` ve `apprenticeship.grandmasters` / `grandmasterSaved` eklendi. `SaveManager.migrate` v32 -> v33'te kimseyi Başusta saymaz
+(hepsi `false` / `null` / 0); `Character` yükleme sırasında bozuk meslek ya da bayraksız kaydı da Başusta saymaz. `SAVE_VERSION = 33`. Yeni fikstür `save-v33.json` (otopilot, 72 gün, 3 Başusta).
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1232 -> **1259**; 27'si yeni): sabitler (1,2 / 30 saat / 1,2 / x2 / 5), Genç profilinin enerji kazancının yetişkininkinin 1,2 katı, gerçek `learn` ile saatte %3,33 ve 30 saatte %100,
+  `masterBoost` %50 altında 1 / üstünde 1,2, %100 mezun -> Başusta (bayrak, meslek, Yetkin Usta deneyimi, sayaç, olay, unvan "Başusta Demirci", günlük), %99,9 -> Başusta değil, çıraklıksız deneyimli usta -> asla,
+  eser şansı (%4 -> %8, %8 -> %16, başka meslekte 1x), fırında 5 üretimde 1 hammaddesiz (4 harcama, 5 ürün), sonraki 10 üretimde tam 2, normal usta / başka meslek tasarruf etmez, atölyede 5. iş hammaddesiz,
+  karakter kartı rozeti, yapı paneli etiketi (çalışmıyorsa yok), kayıt alanları, bozuk veri, v32 -> v33 göçü.
+  - **Tohum kaymasında sağlamlaştırılan eski testler** (kural gevşemedi, yalnızca dünyanın artakalan durumuna bağımlılık kalktı): randevu için bekâr çift ve bank rezervleri, Keyifli Damak ölçümünde görünürlük (fener / çocuk
+    auraları), isyancının hastalığı, kurucu / göçmen kuşağı (köyden ayrılan ebeveyn), Yeni Yuva reisi ve ev halkı, Keyifli han bardağı oranı.
+- **Denetim** (`audit.mjs`): 138 -> **141**. Başusta kayıt -> yükleme durum kayması yok, bayrak / meslek / sayaç aynen döner, tek Başusta test bayrağıdır; 27.2'nin Tezgâh Pratiği ölçümü 30 saatlik hıza ve
+  Gençlerin daha çabuk toparlanıp şekerleme zamanının kaymasına uyarlandı.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-33): 1176 -> **1215**.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0; refah %100. **Ulu Saat Kulesi 6/6, Altın Çağ
+  G32, G32, G32, G31, G31, G30** (28.1: G31, G33, G31, G30, G38, G34). 40 günde Gençler henüz 21'e basmadığı için mezun / Başusta 0'dır; Başusta uzun koşuda ölçülür.
+- **Tohum 42, 72 gün, yeni referans noktası.** `autopilot.mjs 42 72 --crisis-state` iki kez art arda koşturuldu: `--json` raporu, kayıt dosyası ve günlük **bayt bayt aynı** (tek fark günlükteki dosya adı).
+  Ulu Saat Kulesi aşamaları **G27 / G29 / G30 -> G28 / G30 / G31**, Altın Çağ **G30 -> G31**. Çıraklık: yazılan 8, **mezun 3 -> 4**, çırak mesaisi 525 -> **774 saat**, çırak işi 86 -> **192**; yetişkin olan dört
+  mezundan **üçü Başusta** oldu (hepsi Kereste Atölyesi çırağı: eser şansı x2; hammadde tüketmeyen meslekte tasarruf sayacı 0). %100'e ulaşan iki çırak (Demircilik, Şifacılık) yetişkin olunca Başusta olacak.
+  Krallık Vergisi 11/11, haydut baskını 7, yangın 11, takılma 0, kopuk referans 0, sayfa hatası yok.
+- **Not (denge):** çıraklık hızı iki katına çıktığı için Gençlerin çoğu 21'e gelmeden %100'ü görür; Başusta artık nadir değil, "mezun çırakların çoğu" olur. Eser şansı kasabadaki günlük ve usta başına bekleme sınırlarıyla
+  zaten sınırlıdır; gerekirse `GRANDMASTER` sabitlerinden ayarlanır.
+
+## Sürdürülebilir Kuşak Döngüsü, Saygın Büyükler ve Vefat (28. aşama, 28.3 mikro adımı)
+
+**Kayıt sürümü 34.** 25.1'den beri geçerli olan **"Pikselköy'de ölüm yoktur" kuralı kaldırıldı.** Yaşlılar artık yataklarını gençlere bırakıp nüfus kotasından düşer, ömürlerinin sonunda huzur içinde vefat eder;
+yangın, baskın ve seferde çok nadir kazalar da can alabilir. Böylece 30 kişilik sınır kasabayı kilitlemez: doğumlar ve göçmenler yaşlıların boşalttığı yataklarla sürer.
+Determinizm kuralı değişmedi: aynı tohum art arda koşturulunca birebir aynı sonucu verir (aşağıda doğrulandı).
+
+### 1. Saygın Büyük (`isVenerable`; `systems/Venerable.js`, `LifecycleSystem.js`)
+
+- **Geçiş:** her gün **19:00**'da Kıdemli Bilge (70+), **Ocak Devri**'ni ve **Yadigâr Devri**'ni tamamlamışsa `isVenerable = true` olur. (Yadigâr töreni 18:00'dır.)
+  - *Ocak Devri tamam:* reisi olduğu ocak kalmadı (devretti), **ya da** canlı biyolojik evladı yok (muaf), **ya da** 75 yaşına dek devredemedi (evlatları evlenmemiş; kasaba kilitlenmesin diye muaf; `VENERABLE.hearthGraceAge`).
+  - *Yadigâr Devri tamam:* kendi yadigârı çantasında kalmadı. Mirasçısı varsa 18:00 töreni onu devreder; **devredecek kimsesi yoksa** yadigâr kasaba arşivine kalkar ve bilge Saygın Büyük olur.
+- **Yatak boşaltma:** `homeId = null`; evdeyse kapıya çıkar. Boşalan yatak göçmenlere / doğumlara açılır. Kayıt yüklemesi ona yeni yatak aramaz (`sanitizeReferences`).
+- **Gece düzeni:** Bilgelik Evi'nde, handa ya da Belediye'de sabahlar (`Brain.venerableRoost`, `VENERABLE.sleepVenues`); durum metni "… sabahlıyor (Saygın Büyük)".
+- **Nüfus kotası:** `LifeStages.activePopulation` Saygın Büyükleri saymaz. `TownStatus.immigrationStatus` (göç sınırı, boş yatak, yiyecek ihtiyacı), `townMetrics` (seviye ölçütleri), `FamilySystem` (doğum sınırı) ve `DilemmaSystem` (boş yatak
+  kararı) bunu kullanır: kasabada 30 aktif sakin + Saygın Büyükler yaşayabilir, aktif nüfus 30'un altına inince doğumlar ve göçmenler sürer.
+
+### 2. Doğal vefat
+
+- **Ömür (`lifespan`):** **66-75 yaş** (29.2b'de 80-90'dan çekildi; 1 yaş = 16 oyun günü). `Venerable.lifespanFor(seed, id)` tohum + 30 (29.2b; eskiden 35) ve kimlikten türeyen **izole bir üreteçle** hesaplar: sıraya bağlı değildir, ana üretece ve `Math.random`'a dokunmaz.
+  Her sakin doğum / göç / yükleme anında ömrünü alır (`LifecycleSystem.ensureLifespans`).
+- **Vefat:** gün dönümünde (00:00, yaşlanmadan sonra) ömrüne ulaşan **Kıdemli Bilge ya da Saygın Büyük** vefat eder (yetişkinler ömründen ölmez; seferdeki ya da köyden ayrılmakta olan dönene dek ertelenir).
+- **Temizlik:** `removeResident` (köyü terk edenlerle aynı) + ocak kütüğü, `children` / `parents`, `mentees` ve çırağın `masterId`'si. Eşin evliliği çözülür, kese eşine (yoksa evladına) kalır, yadigâr mirasçısına
+  (yoksa arşive) geçer (`population:left { reason: 'death' }`). **Arkada kopuk eş, ebeveyn, iş, ev, ilişki, rezerv ya da ocak referansı kalmaz.**
+- **Haber:** Kasaba Günlüğü ve üst bildirim: *"[İsim] [Yaş] yaşında huzur içinde hayata gözlerini yumdu."* (`population:died`). Cenaze şenliği yok.
+
+### 3. Trajik kazalar (`CrisisSystem`, `ExpeditionSystem`; `FATAL`)
+
+- **Yangın:** kova atışında **tek zar**: eski yaralanma aralığı (%6) aynen durur, hemen yanındaki **%1,5**'lik aralık ölümcüldür ("… yangın söndürürken kahramanca can verdi"). Zar sayısı değişmediği için kriz üretecinin akışı aynıdır.
+- **Baskın:** savunmada yaralanma aralığının yanında **%2**'lik ölümcül aralık ("… haydutlara karşı kasabayı savunurken can verdi").
+- **Sefer:** riskli macera başarısız olunca **%2** ek zar ("… seferde yolunu kaybedip bir daha dönmedi").
+- **Koruma:** kasabada `FATAL.minAble` (6) sağlam yetişkin yoksa ya da kafile tek kişiyse ölüm olmaz (çekirdek iş gücü korunur). Çocuklar kazadan ölmez.
+
+### 4. Arayüz
+
+- **Nüfus çipi:** `28/30 (+2 Saygın)`; ipucu Saygın Büyükleri açıklar.
+- **Karakter kartı:** Saygın Büyük'ün kartında **"Saygın Büyük (Nüfus Kotasından Muaf)"** etiketi (altın-mor).
+
+### Kayıt (sürüm 34)
+
+`characters[].isVenerable`, `characters[].lifespan` ve `lifeStages.venerables / deaths / accidents / lastDeath` eklendi. `SaveManager.migrate` v33 -> v34'te herkese `lifespanFor(seed, id)` ile deterministik ömür atar, kimseyi Saygın Büyük saymaz,
+vefat sayaçlarını sıfırlar; bozuk ömür yüklemede sıfırlanıp kimlikten yeniden atanır. `SAVE_VERSION = 34`. Yeni fikstür `save-v34.json` (otopilot, 72 gün, `--crisis-state`).
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1259 -> **1296**; 37'si yeni): ömür (80-90, deterministik, çeşitli, kimlikten türeyen, sonradan doğana atanan), Saygın Büyük geçişi (evladı yok / yadigârı yok, 75 yaş zaman aşımı, mirasçı varken bekleme,
+  mirasçısız yadigârın arşive kalkması), yatak boşaltma ve boş yatak sayısı, `activePopulation` ve göç sınırı (toplam = sınır iken "Nüfus sınırı doldu" denmemesi), nüfus çipi `N/M (+K Saygın)`, karakter kartı etiketi, geceleri ortak yapıda sabahlama,
+  evli çiftin Saygın Büyük'ü yeniden yatağa taşımaması, vefat (ömründen önce ölmez, gün dönümünde çıkar, günlük metni, sayaçlar, **eş / ebeveyn / evlat / usta / iş / ev / ilişki / rezerv / ocak kütüğü referansı kalmaz**, kese eşe, yadigâr evlada,
+  yetişkin ölmez, seferdeki ertelenir, Saygın Büyük de ölür), kaza zarları (yangında tek zar: yüksek güvenli / düşük yaralar / yanındaki aralık öldürür; baskın; sefer; `FATAL.minAble` koruması), tam tarama ile kopuk referans yok, kayıt alanları, bozuk ömür, v33 -> v34 göçü.
+  - Önceki testlerin artakalan durumundan etkilenen eski sayımlar sağlamlaştırıldı (kural gevşemedi).
+- **Denetim** (`audit.mjs`): 141 -> **146**. Ölenin eş / çırak (usta) / iş / yapı referansı bırakmaması, Saygın Büyük + vefat sonrası kayıt -> yükleme durum kayması yok, yüklenen Saygın Büyük'ün yataksız kalması ve ömrünün korunması,
+  yüklemeden sonra kopuk eş / ebeveyn yok, adım atınca takılma yok.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-34): 1215 -> **1254**. Yeni `save-v34.json` fikstürü (otopilot, 72 gün, `--crisis-state`). Harness'te anlık görüntü artık dizilerin kopyasını tutar (Saygın Büyük kotayı boşaltınca anlık görüntü
+  sırasında doğan bir çocuk canlı diziyi değiştirip kopuk gösteriyordu).
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 40`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0; nüfus 30/30, seviye 4, refah %100. **Ulu Saat Kulesi 6/6, Altın Çağ G31, G35, G32, G31, G31, G30**
+  (28.2: G32, G32, G32, G31, G31, G30). 40 günde hiçbir sakin 70'e gelmediği için vefat / Saygın Büyük 0'dır; yeni mekanik uzun koşuda ölçülür.
+- **Tohum 42, 330 gün (`autopilot.mjs 42 330`): nüfus döngüsü kırıldı.** İki koşu **bayt bayt aynı** (`--json`, kayıt, günlük; tek fark dosya adı). Takvim (28.2 ile aynı, kule öncesi değişen bir şey yok): Ulu Saat Kulesi G28 / G30 / G31, Altın Çağ G31.
+  Olay günlüğü:
+
+  | Gün | Olay | Nüfus (toplam / kotaya sayılan) |
+  |---|---|---|
+  | G18 | nüfus 30'a ulaştı, kota doldu | 30 / 30 |
+  | **G64 19:00** | **ilk Saygın Büyük: Deniz (70)** yatağını bıraktı | 31 / 30 |
+  | **G65 07:00** | **ertesi sabah yeni bebek (Elif Naz)**: kota artık dolu değil, doğum sürüyor | 31 / 30 |
+  | G98 | **ilk vefat**: Elif Naz 19 yaşında yangın söndürürken kahramanca can verdi (kaza) | |
+  | G99, G151, G190, G228, G231 | her kayıp / boşalan yatakla yeni bebek (Aras, Poyraz, Ege, Yaz, Elif Naz) | 31-34 / 30 |
+  | G150 | Mert 38 yaşında haydutlara karşı kasabayı savunurken can verdi (kaza) | |
+  | G189 / G227 / G230 | Saygın Büyük: Kemal, Lale, Sude | 32-34 / 30 |
+  | **G255 00:00** | **ilk doğal vefat: Deniz 82 yaşında huzur içinde hayata gözlerini yumdu** (ömrü 82) | 33 / 30 |
+
+  330. günün sonu: nüfus 33 (kotaya sayılan 30), Saygın Büyük 3 (Kemal 78/87, Lale 75/83, Sude 75/88; yatağı olan 0), vefat 3 (kaza 2), toplam doğum 13, ömrü atanmamış 0, takılma 0, **kopuk referans 0**, sayfa hatası yok.
+  Yani kasaba 30 sınırında kilitlenmeden kuşak değiştirir: Saygın Büyükler 30 aktif sakinin yanında yaşar, her boşalan yatakla bebekler doğar.
+- **Tohum 42, 72 gün** (`--crisis-state`, fikstür): iki koşu bayt bayt aynı; G64'te ilk Saygın Büyük Deniz, nüfus 31 (kotaya sayılan 30), takılma 0, kopuk referans 0.
+- **Not (ömür ölçeği):** 1 yaş = 16 oyun günü olduğundan 80-90 yaşlık ömür ilk doğal vefatları ~250. günlerde getirir (Kıdemli Bilge 70 yaşta, ocak ve yadigâr devrinden sonra Saygın Büyük olur); kazalar çok daha erken olabilir.
+  Gerekirse `LIFESPAN` ile ayarlanır. Kıdemli Bilge ocağını 75'e dek devredemezse (evlatları evli değilse) devir muaf sayılır ki kasaba kilitlenmesin.
+
+## Harita Kimliği, Kasaba Doktrinleri ve Geç Oyun Meydan Okuması (28. aşama, 28.4 mikro adımı)
+
+**Kayıt sürümü 35.** Rastgele haritalar artık yalnızca ağaçların yerini değil, oynanış stratejisini de değiştirir; araştırma ve fermanlar karşılıklı dışlayan üç yola ayrılır; geç oyunda refah kalıcı bonuslarla %100'e yapışmaz.
+Determinizm kuralı değişmedi: aynı tohum art arda koşturulunca birebir aynı sonucu verir.
+
+### 1. Vadi Karakteri (`data/valley.js`, `systems/Valley.js`)
+
+`Valley.valleyFor(seed)` harita tohumundan **izole üreteçle** (seed + 36) deterministik bir karakter seçer; `state.valley` (kayda girer) oyun boyunca değişmez ve üst çubuğun altındaki çip satırında görünür (ipucunda açıklama).
+
+| Vadi | Güçlü | Zayıf |
+|---|---|---|
+| **Bereketli Delta** | Sebze Bahçesi (Keten, Şerbetçiotu dahil) ve Balıkçı İskelesi **+%25** | Taş Ocağı ve Demir Madeni **-%30** |
+| **Rüzgârlı Boğaz** | Yel Değirmeni, Taş Ocağı, Demir Madeni **+%25** | Kışlık ısınma odunu (tüm evler, han, kamp ateşi) **+%40** |
+| **Kadim Orman** | Oduncu ve Kereste Atölyesi **+%30** | Sebze Bahçesi **-%20** |
+
+Verim çarpanı tek noktadan uygulanır (`BehaviorSystem.performWork`: araştırma x vadi x doktrin); ısınma `HeatingSystem.heatingSources` / `heatingPerDay` içindedir.
+
+### 2. Kasaba Doktrinleri (`data/doctrines.js`, `systems/Doctrine.js`)
+
+Üç karşılıklı dışlayan yol. **Bir doktrine bağlı ilk araştırma ya da ferman başlatıldığında doktrin SEÇİLİR** (`state.doctrine = { chosen, day }`); ötekilerin araştırma ve fermanları kalıcı olarak kilitlenir
+("Doktrin kilitli: … seçildi"; düğmeler devre dışı, kartta "(kilitli)"). Nötr araştırma ve fermanlar (Mimarlık, Yalıtım, Büyük Ziyafet, Depo Genişletmesi) herkese açıktır. Etkiler seçildiği anda başlar.
+
+| Doktrin | Kapıları | Radikal bonus | Bedel |
+|---|---|---|---|
+| **Zanaat ve Sanayi** | Gelişmiş Çarklar, Zanaat Loncası Desteği | Taş Ocağı ve Demir Madeni **x2**; Zanaat Atölyesi, Dokuma Tezgâhı, Şerbethane **+%20** | Çevre estetiğinin refah katkısı **-%8** |
+| **Tarım ve Doğa** | Şifalı Bitki, **Münavebe ve Silo Düzeni** (yeni; Bahçe +%10) | Sebze Bahçesi **+%30**, Fırın (Yel Değirmeni) **+%40**, Ürün Silosu'nun tarımsal kapasite katkısı **+%50** | Taş Ocağı ve Demir Madeni **-%20** |
+| **Ticaret ve Diplomasi** | **Ticaret Hukuku** (yeni; liman +%10), **Ticaret Beratı** (yeni ferman; Krallık Vergisi -%10) | İhracat sözleşmesi altını **+%30**, liman satışı **+%25**, Krallık Vergisi **-%30** | Sebze Bahçesi ve Oduncu **-%10** |
+
+Doktrin vadiyi dengeler ya da uçurur: Delta'nın zayıf madenini Sanayi kurtarır, Orman'ın güneşsiz bahçesini Tarım, Boğaz'ın madenlerini yine Sanayi uçurur. Bilgelik Evi ve Belediye panelleri doktrin özetini ve kapı etiketlerini gösterir.
+
+### 3. Geç Oyun Beklentisi (`data/lateGame.js`, `systems/LateGame.js`)
+
+Kasaba **Gelişmiş Şehir (seviye 4)** olunca ya da **Altın Çağ**'a girince:
+
+- **Keyif ve Sosyallik** ihtiyaçlarının doğal azalma hızı **x1,3** (`NeedsSystem`): lükse alışan sakinler çabuk sıkılır.
+- **Lüks akışı:** Fıçı Şerbeti (kilerde ya da handa), Kumaş / Dayanıklı Giysi ve handa sıcak yemek sürekli bulunmalıdır; eksik her kalem refahtan **6 puan** düşürür (en çok 18; `TownStatus.townHappiness`, kalıcı bonuslar ve Altın Çağ çarpanından sonra çıkarılır).
+- Çip ipucu eksik lüksleri ve cezayı listeler; çip "eksik lüks N" diye uyarır.
+
+### Kayıt (sürüm 35)
+
+`valley` (anahtar), `doctrine { chosen, day }` ve `civic.tradeCharter` eklendi. `SaveManager.migrate` v34 -> v35'te tohumdan deterministik vadi atar ve doktrini boş bırakır; `sanitizeValley` / `restoreDoctrine` bozuk değeri temizler.
+`SAVE_VERSION = 35`. Yeni fikstür `save-v35.json` (otopilot, 72 gün, `--crisis-state`).
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1296 -> **1330**; 34'ü yeni): vadi tanımları ve sayıları, tohumdan deterministik seçim (üç vadi de görülür), HUD çipi, **gerçek `performWork` ile** vadi verimleri (bahçe / taş / odun) ve ısınma (+%40), doktrin
+  tanımları, kapılar (araştırma ve ferman), seçim ("Çarklar -> Sanayi", "Ticaret Beratı -> Ticaret"), kilit ("Doktrin kilitli", kilitli başlatma reddi, nötr yollar açık), panel özeti, doktrin etkileri (Sanayi x2 gerçek performWork, estetik,
+  Tarım silosu +%50, Ticaret sözleşme / Krallık Vergisi / liman), geç oyun (seviye 4 ve Altın Çağ'da başlar, **gerçek NeedsSystem** ile Keyif / Sosyallik oranı 1,3), lüks eksikliği ve refah cezası (6 / 18 puan), HUD ipucu, kayıt, bozuk veri, v34 -> v35 göçü.
+  Altın Çağ refah çarpanı testi geç oyun cezasını ayrı sayacak şekilde uyarlandı.
+- **Denetim** (`audit.mjs`): 146 -> **150**. Vadi / doktrin / seviye 4 ile kayıt -> yükleme durum kayması yok, yüklenen vadi tohumdan, kilit yüklemeden sonra da sürer, geç oyun açık kalır.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-35): 1254 -> **1327** (her fikstürde yeni "vadi tohumdan atandı, doktrin boş" denetimi).
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 50`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0. Otopilot doktrini vadiye göre seçer, böylece üç yol da denenir:
+
+  | Tohum | Vadi | Doktrin | Altın Çağ | Geç oyun refahı (ort / en düşük) |
+  |---|---|---|---|---|
+  | 7 | Bereketli Delta | Tarım | 50. güne dek yok | %88 / %82 |
+  | 13 | Rüzgârlı Boğaz | Sanayi | G28 | %95 / %88 |
+  | 21 | Bereketli Delta | Tarım | G41 | %91 / %88 |
+  | **42** | **Bereketli Delta** | **Tarım** | G51 | %88 / %88 |
+  | 77 | Kadim Orman | Ticaret | G34 | %93 / %82 |
+  | 101 | Rüzgârlı Boğaz | Sanayi | G30 | %94 / %76 |
+
+  Ulu Saat Kulesi 4/6 koşuda 50. güne dek bitti: taş ve demirde -%30 (ve Tarım doktrinin -%20'si) Delta'da kuleyi geciktirir; Boğaz'da (madenler +%25, Sanayi x2) ise G28-G30'da biter. Bu asimetri tasarımın amacıdır.
+- **Tohum 42, yeni kimlik: Bereketli Delta.** `autopilot.mjs 42 72 --crisis-state` iki kez art arda koşturuldu: `--json` raporu, kayıt dosyası ve günlük **bayt bayt aynı**. Delta'nın zayıf taş / demiri kuleyi geciktirdi:
+  Ulu Saat Kulesi aşamaları **G28 / G30 / G31 -> G45 / G49 / G51**, Altın Çağ **G31 -> G51**; otopilot Tarım Doktrini'ni seçti (Münavebe + Şifalı Bitki + Yalıtım + Mimarlık: 4/4 araştırma). Seviye 4'e G30'da ulaşıldı.
+- **Geç oyunda refah nasıl tepki veriyor?** Seviye 4 / Altın Çağ boyunca 1024 örnekte (G30'dan) refah **hep %100'de kalmaz**: ortalama **%93,4**, en düşük **%88,0**, en yüksek %100; örneklerin **%56'sı %100'ün altında** (551'i %90'ın altında), ortalama eksik lüks
+  **1,10 / 3**. Stres matrisinin geç oyun örneklerinde de ortalamalar %88-%95, en düşükler %76-%88'dir (tohum 7 ve 42'de örneklerin %100'ü %100'ün altında). Önceki adımlarda aynı evrede refah %100'e yapışıyordu.
+- **Not (denge):** ceza yalnızca lüks kalemleri eksikse düşer; üç kalemi sürekli akıtan oyuncu refahı yine yükseltebilir (kasıtlı: "ekonomiyi sürekli optimize et"). Doktrin ve vadi sayıları `data/valley.js`, `data/doctrines.js`, `data/lateGame.js` içindedir.
+
+## Yaşayan Ruh: Sosyal Kimya, Karşılıklı Çekim / İtme ve Duygusal Etiketler (29. aşama, 29.1 mikro adımı)
+
+**Kayıt sürümü 36.** 29. aşama ("Yaşayan Ruh") karakter psikolojisini on mikro adımda (29.1 – 29.10) derinleştirir. İlk adımda ilişki artık tek bir sayı değildir: her sakin çifti arasında doğal bir
+**Kimya** (-2 … +3) ve yönlü **Duygusal Etiketler** vardır. İlişki puanı (-50 … 100, `state.relationships`) olduğu gibi durur; kimya o puanın ne kadar hızlı aktığını, aşkın mümkün olup olmadığını ve sohbetin tadını belirler.
+Determinizm kuralı değişmedi: aynı tohum art arda koşturulunca birebir aynı sonucu verir.
+
+### 1. Sosyal Kimya Matrisi (`data/chemistry.js`, `systems/Chemistry.js`)
+
+`kimya = sınırla( kıvılcım + kişilik uyumu + huy rezonansı + zanaat bağı , -2, +3 )`
+
+| Belirleyici | Değer | Kural |
+|---|---|---|
+| **Kıvılcım** | -1 / 0 / +1 (ağırlık 30 / 45 / 25) | Kimlik çiftinden ve dünya tohumundan türer: `sparkFor(seed, idA, idB)` her çağrıda **izole** bir üreteç kurar (tohum + 37; kimlikler karıştırılır), simetriktir ve çağrı sırasına bağlı değildir |
+| **Kişilik uyumu** | -1 / 0 / +1 | Zıt özellikler (`OPPOSING_TRAITS`: Çalışkan / Uykucu, Neşeli / Huysuz…) **-1** (baskın). Ortak özellik ya da tamamlayan çift (`COMPLEMENTARY_TRAITS`: Hırslı + Çalışkan, Neşeli + Sosyal Kelebek, Doğa Sever + İçine Kapanık…) **+1**. Özellik + meslek de tamamlar (`TRAIT_SKILL_COMPLEMENTS`: Doğa Sever + Kalfa / Usta **Çiftçi** ya da Çoban, Hırslı + Taşçı / Madenci, Obur + Aşçı / Fırıncı) |
+| **Huy rezonansı** | 0 / +1 | Aynı huy ya da rezonanslı çift (`QUIRK_RESONANCE`: Müzisyen + Şenlik Neşesi, Kitap Kurdu + Bilge Düşünür, Hayvansever + Doğa Tutkunu, Zanaatkâr Ruhu + Girişimci Kanı, Doğa Tutkunu + Bilge Düşünür). Listede olmayan çiftler nötrdür (Zanaatkâr Ruhu + Hayvansever = 0) |
+| **Zanaat bağı** | 0 / +1 | Usta-çırak (`apprenticeship.masterId` / `mentees`), ikisinin de Başusta olması, aynı yapıya sabitlenmiş olmak ya da aynı atölyede (çıraklık yapıları) **24 saat başı** birlikte çalışmış olmak (kayıtta kalıcı `craft`) |
+
+| Kimya | Ad | Sohbette puan | Sohbet keyfi | Atışma | Aşk zarı | Aşk için puan | Rozet |
+|---|---|---|---|---|---|---|---|
+| -2 | Doğal Zıtlık | x0,5 | dakikada -0,12 | x2 | **yok** | - | `⌁⌁` |
+| -1 | Antipati | x0,75 | dakikada -0,06 | x1,5 | **yok** | - | `⌁` |
+| 0 | Nötr | x1 | - | x1 | **yok** | - | (yok) |
+| +1 | Uyum | x1,2 | x1,2 | x1 | x1 | 85 | `⚡` |
+| +2 | Güçlü Çekim | **x1,5** | **x1,5** + 0,05 | x0,5 | **x2** | 75 | `⚡⚡` |
+| +3 | Kozmik Çekim | **x1,5** | **x1,5** + 0,08 | x0,25 | **x3,5** | 65 | `✨⚡⚡` |
+
+Kimya her çift için `c.relationships[karşıKimlik].chemistry` alanında (iki yönde aynı) saklanır; kayıt ilk sohbette açılır (`chemistryOf`) ve **saat başı** yeniden hesaplanır (meslek kademesi, huy, zanaat bağı değişmiş olabilir).
+Yolda karşılaşan her çift için kayıt açılmaz (`ChemistrySystem.peek` kayıtsız hesaplar), böylece kayıt dosyası şişmez.
+
+### 2. Duygusal Etiketler (`systems/ChemistrySystem.js`)
+
+`c.relationships[karşıKimlik] = { chemistry, craft, together, tags: [...], until: { etiket: bitiş dakikası } }`. Etiketler **yönlüdür** (A, B'ye minnettar olabilir; B, A'ya olmayabilir). `0` kimliği sakin olmayan **Yönetim**dir (oyuncu).
+
+| Etiket | Nasıl oluşur | Süre |
+|---|---|---|
+| **Minnettar** (`grateful`) | Yangını söndürenlere (yanan yapının sakinleri ve çalışanları), yarasını saran / hastalığını iyileştiren şifacıya (kulübe boşsa oraya sabitlenmiş ya da kasabanın en usta şifacısına), mezun eden ustasına, yadigârını devreden büyüğüne; dileği karşılanınca **Yönetime** | 20 gün |
+| **Hayran** (`admiration`) | Atölyede yanında çalıştığı Başustaya, sohbet ettiği dostu Kıdemli Bilgeye, şaheser çıkaran ustaya (iş arkadaşları ve en iyi arkadaşları), yeni Başustaya. Bir sakin en çok **2** kişiye hayran olur (yenisi en eskisini siler) | 15 gün |
+| **Kırgın** (`resentful`) | Dilekçesi reddedilince **Yönetime**; atışmada haksızlığa uğrayınca (daha sakin mizaçlı olan; 2 gün, barışınca hemen silinir); hoşlandığı kişi (puan ≥ 40, kimya ≥ +1) başkasına aşık olunca ona | 5 gün |
+| **Kıskanç** (`jealous`) | Aynı yapıda kendisinden önce kademe atlayan (dostu olmayan) iş arkadaşına; eşiyle / sevgilisiyle güçlü kimyası (≥ +2) olan bekârın ilgisine; sevdiğini kapan rakibe | 6 gün |
+| **Ruh İkizi** (`kindred`) | Kimyası +2 / +3 olan çift **En İyi Arkadaş** (75 puan) olunca karşılıklı filizlenir; her sakinin **tek** ruh ikizi olur. Kimya +2'nin altına düşerse bağ çözülür. Günlüğe ve anılara yazılır | kalıcı |
+
+Minnet kırgınlığı, kırgınlık minneti siler. Kasabadan ayrılan / vefat eden sakine işaret eden kayıtlar silinir (`pruneRelations`; yüklemede de).
+
+### 3. Davranışa yansıma
+
+- **Sohbet** (`RelationshipSystem.update`, `bondFor`, `chatMultiplier`): kimyası +2 / +3 olanların sohbetinde ilişki puanı ve keyif **1,5 kat** akar; eksi kimyada sohbet gergindir (keyif düşer). Kırgın olunan kişiyle sohbet puan kazandırmaz ve keyif kaçırır; kıskanılanla yarı hızda ilerler; hayran / minnettar olunanla hafif keyif verir.
+- **Atışma** (`ConflictSystem.tryQuarrel`): olasılık kimyayla çarpılır. Zıt özelliği olmayan ama kimyası eksi (kayıtlı) çift de yarı olasılıkla atışabilir (`relationship:quarrel` olayında `traits: null`; günlük "Kimyası tutmayan …" diye yazar).
+- **Flört ve aşk** (`RelationshipSystem.tryRomance`): aşk zarı **doğrudan kimyaya** bakar. Kimyası 0 ya da eksi olanlar ilişki puanı 100 olsa da aşık olamaz; +2 / +3 daha düşük puanla (75 / 65) ve 2 / 3,5 kat hızlı aşık olur.
+- **Minnettar** sakin: aynı sohbette karşısındakine günde bir kez **ikramda** bulunur (keyif +5, tokluk +4; "Buyur, ikramım olsun!"), onun oturduğu toplanma yerine meyleder (boş zaman ağırlığı x2,5), sohbete önce onu çağırır ve onun çalıştığı **şantiyeye yardıma** gider (`JobSystem.findWorkFor`: iş 10 karo yakınmış gibi seçilir).
+- **Kırgın** sakin: o kişinin oturduğu **masaya oturmaz** (`Brain.companyMood`: katılmaz, orada sohbet de başlatmaz; boş zaman ağırlığı x0,1), onu sohbete çağırmaz, aynı yerdeyse başkasına döner.
+
+### 4. Görselleştirme
+
+- **Karakter Detay Kartı → İlişkiler:** adın yanında kimya rozeti (`⚡⚡` güçlü çekim, `⚡` uyum, `⌁` antipati; ipucunda "Kimya +2: Güçlü Çekim"), ilişki çubuğunun **altında** renkli etiket çipleri (`[Minnettar]` yeşil, `[Hayran]` altın, `[Kırgın]` mor, `[Kıskanç]` kiremit, `[Ruh İkizi]` pembe). Etiketi olan ama ilk üçe girmeyen sakinler de listelenir; Yönetime karşı hisler ayrı satırdadır.
+- **Dünya üstü balonlar:** kimyası +2 / +3 olan iki yetişkin yolda karşılaşınca (16 piksel; aynı çift günde bir kez) başlarında çift mavi şimşek (`spark` balonu) çakar. Etiketi olan sakin selamını etiketine göre söyler (metin baloncuğu, `SpeechBubbles.js`): "Ustam, sana minnettarım!", "Elinize sağlık ustam!", "Yine mi sen...", "Seni görmek ne güzel …!". Süren bir sözün üstüne yazılmaz.
+
+### Mimari
+
+- `data/chemistry.js`: bütün sayılar, etiket tanımları, rezonans / tamamlayıcılık tabloları ve sözler.
+- `systems/Chemistry.js`: **saf** hesaplar (kıvılcım, üç belirleyici, döküm, kayıt okuma / yazma, etiket ekleme / silme / süre, temizlik, göç). Düz kayıt nesneleriyle de çalışır.
+- `systems/ChemistrySystem.js`: olay dinleyicileri (yangın, şifa, dilekçe, şaheser, mezuniyet, yadigâr, Başusta, kademe, atışma, barışma, aşk, ayrılış), saat başı güncelleme, ikram ve yolda karşılaşma. **Üreteci yoktur**: söz seçimi kimliklerden ve oyun saatinden hesaplanır.
+  Olaylar: `chemistry:tag`, `chemistry:kindred`, `chemistry:spark`, `chemistry:treat`, `chemistry:craftBond`. Sistem sırası: ilişkiler → atışma → **kimya** → aile → sosyal.
+- Kancalar: `RelationshipSystem` (sohbet hızı, keyif, aşk zarı), `ConflictSystem` (atışma riski), `Brain` (masa seçimi, davet), `BehaviorSystem.nearestPartner`, `JobSystem.findWorkFor` (yardım), `CharacterPanel` (rozet, çipler), `art/ui` (`spark` balonu).
+- **Determinizm:** kimya hesabı, saat başı güncelleme, karşılaşma, ikram ve etiketleme ana üreteci, öteki sistemlerin üreteçlerini ve `Math.random`'ı **hiç** tüketmez (testte sayılır: 0 çağrı).
+
+### Kayıt (sürüm 36)
+
+`characters[].relationships` eklendi. `SaveManager.migrate` v35 → v36'da `migrateChemistry` ile kayıttaki **her mevcut ilişkiye** (puanı olan çiftler, sevgililer / eşler) kimlik çiftinden ve tohumdan türeyen deterministik kimyayı ve boş etiket yapısını bağlar (rastgelelik yok; iki kez göç birebir aynı kayıt).
+`sanitizeRelations` sınır dışı kimyayı, bilinmeyen etiketi, kendine / geçersiz kimliğe işaret eden kaydı temizler. `SAVE_VERSION = 36`. Yeni fikstür `save-v36.json` (otopilot, 72 gün, `--crisis-state`).
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1330 → **1397**; 67'si yeni): kıvılcımın dağılımı / simetrisi / tohuma bağlılığı, kişilik - huy - zanaat kombinasyonlarının skoru (-2 … +3; sınır değerler dahil), **0 üreteç çağrısı**, gerçek `RelationshipSystem.update` ile sohbet hızı (x1,5 / x0,75 / x0,5),
+  `performSocial` ile keyif, gerçek `ConflictSystem` ile atışma riski, aşk zarı (kimya ≤ 0 aşk yok; 85 / 75 / 65 eşikleri; x1 / x2 / x3,5), beş etiketin her oluşma yolu, süre ve barışma, Ruh İkizi (kişi başı tek, kimya düşünce çözülür), 24 saatlik zanaat bağı, ikram,
+  gerçek `Brain.planSocial` ile masadan kaçınma, gerçek `JobSystem.findWorkFor` ile şantiyeye yardım, şimşek balonu ve etiketli selamlar, kart rozeti ve çipleri, kayıt gidiş-dönüşü, bozuk veri, v35 → v36 göçü.
+  Aşk zarına bakan eski testler çiftin kimyasını açıkça kurar (`setChem`); dünya akışına duyarlı yedi eski test (çardak sohbeti, bekçi adayı, Geniş Aile, saray hazinesi, v23 genç yetişkin, konuk ayrılışı, Ocak Devri) akış kaysa da geçerli olacak şekilde sağlamlaştırıldı.
+- **Denetim** (`audit.mjs`): 150 → **154**. Kimya, zanaat bağı ve etiketlerle kayıt → yükleme durum kayması yok; kayıtlar birebir döner; yüklemeden sonra kimya aynı hesaplanır; kayıp sakine işaret eden kayıt yüklemede temizlenir.
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-36): 1327 → **1437** (her fikstürde "mevcut her ilişkiye deterministik kimya bağlandı" ve "bir gün sonra kimya kayıtları tutarlı" denetimleri).
+- **Bekçi** (`monitor.mjs`): kayıp sakine işaret eden kimya kaydı, sınır dışı kimya, bilinmeyen etiket ve tek yönlü kimya artık **kopuk referans** sayılır; otopilot raporuna `(29.1)` satırı eklendi.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 50`): takılma 0, kopuk referans 0, taşan ev 0, bekleyen iş 0, üretmeyen iş yeri 0, sayfa hatası 0.
+
+  | Tohum | Evli çift | Atışma / barışma | Kimya dağılımı (-2 / -1 / 0 / +1 / +2 / +3) | Ruh ikizi bağı | Şimşek | İkram | Yaşayan etiket (Minnettar / Hayran / Kırgın / Kıskanç) |
+  |---|---|---|---|---|---|---|---|
+  | 7 | 14 | 205 / 48 | 18 / 75 / 117 / 123 / 76 / 25 | 13 | 1765 | 32 | 12 / 53 / 18 / 12 |
+  | 13 | 13 | 202 / 30 | 15 / 61 / 126 / 112 / 104 / 16 | 13 | 1662 | 7 | 4 / 60 / 8 / 21 |
+  | 21 | 11 | 196 / 50 | 23 / 73 / 120 / 128 / 73 / 17 | 13 | 1354 | 6 | 7 / 52 / 15 / 23 |
+  | **42** | 10 | 165 / 48 | 23 / 80 / 110 / 120 / 73 / 22 | 13 | 1457 | 2 | 7 / 54 / 7 / 24 |
+  | 77 | 13 | 213 / 50 | 33 / 64 / 117 / 107 / 92 / 18 | 13 | 1749 | 2 | 2 / 58 / 7 / 22 |
+  | 101 | 10 | 231 / 51 | 29 / 72 / 115 / 122 / 71 / 26 | 12 | 1460 | 2 | 5 / 59 / 12 / 33 |
+
+  Altı koşuda toplam 72 düğün, 39 doğum, 1212 atışma, 277 barışma (%23); isyan 0, terk eden 0. Güçlü çekim (+2 / +3) çiftlerin yaklaşık dörtte biridir; Doğal Zıtlık (-2) %4-8'de kalır.
+- **Tohum 42** (`autopilot.mjs 42 72 --crisis-state`, iki kez art arda): `--json` raporu ve kayıt dosyası **bayt bayt aynı**, günlükte yalnızca kayıt dosyasının yolu farklı. 28.4 ile karşılaştırma:
+
+  | | 28.4 | 29.1 |
+  |---|---|---|
+  | Evli çift / düğün kutlaması | 14 / 14 | 13 / 14 |
+  | Doğum | 8 | 9 |
+  | Randevu | 26 | 70 |
+  | Atışma / barışma (oran) | 197 / 24 (%12) | 289 / 56 (%19) |
+  | Altın Çağ | G51 | G53 |
+  | Nüfus (72. gün) | 31 | 31 |
+
+  Kimya kayıtlı 435 çiftte dağılım: **-2: 23 · -1: 81 · 0: 115 · +1: 114 · +2: 78 · +3: 24**. 72 günde 888 etiket verildi; son gün yaşayan etiketler: Hayran 60, Ruh İkizi 26 (15 bağ), Minnettar 10, Kıskanç 10, Kırgın 10 (6'sı Yönetime). Şimşek 2181 kez çaktı (günde ~30), etiketli selam 2427, ikram 9.
+- **Not (denge):** aşkın yarı çiftlere kapanması evlilik sayısını düşürmedi (güçlü çekim daha erken ve hızlı aşık eder; randevular arttı). Atışmalar ~%45 arttı (eksi kimya), barışma oranı da yükseldi. Minnet doğal olarak seyrektir (yangın, şifa, mezuniyet, yadigâr), bu yüzden ikram nadir görülür;
+  sonraki adımlarda (hafıza, arzular) yeni minnet kaynakları eklenebilir. Sayılar `data/chemistry.js` içindedir.
+
+## Yaşayan Ruh: Dinamik Ruh Halleri (Moodlets), Eylem-Kişilik-İhtiyaç Rezonansı, Yas ve Teselli (29. aşama, 29.2 mikro adımı)
+
+**Kayıt sürümü 37.** Sakinin yaptığı her günlük eylem (iş, yemek, uyku, sohbet, boş zaman), o anki ihtiyaç / çevre durumu ve kişiliği çarpışınca üzerinde süreli bir **ruh hali (moodlet)** doğar; ölümler ve krizler yas ve travma bırakır, dostlar teselli eder.
+Ruh hali yalnızca hız çarpanı değildir: sakinin bir sonraki kararını da değiştirir. Determinizm kuralı değişmedi: aynı tohum art arda koşturulunca birebir aynı sonucu verir.
+
+### 1. Üç katmanlı mimari (`data/moodlets.js`, `systems/Moodlets.js`, `systems/MoodletSystem.js`)
+
+`c.moodlets = [{ key, tier, since, until, reason, whoId?, whoName?, harsh? }]`: aynı anda en çok **6** (1 çekirdek + 3 eylem + 2 ihtiyaç). Katman dolunca en düşük öncelikli olan çıkar; yeni gelen ondan düşük öncelikliyse eklenmez (yasın yerine ilham geçemez).
+`tier` (`minor` / `major` / `critical`) etkinin 1'den sapmasını **1 / 1,5 / 2** ile çarpar. `until: null` koşula bağlı moodlet'tir (koşul geçince silinir).
+
+Toplam etki her sakinde tek bir nesnede tutulur: `c.mood = { workMul, moveMul, joyRateMul, socialMul, xpMul, energyMul, quarrelMul, scareMul, masterwork, shirk, focus, seek, grief, feel, tone, net, version }`. `Moodlets.recomputeMood` bu nesneyi **yerinde** günceller;
+sıcak yollar (`MovementSystem`, `NeedsSystem`, `BehaviorSystem.performWork` / `performSocial`, `ConflictSystem`, `CraftsmanshipSystem`, `LandscapeSystem`) yalnızca okur, hiçbir adımda tahsisat yapılmaz. Toplam çarpanlar sınırlıdır (`MOOD_LIMITS`: iş x0,6 – x1,25, yürüme x0,7 – x1,15, keyif düşüşü x0,45 – x2,2).
+
+**Katman A: günlük eylem x kişilik / huy** (eylem katmanı, en çok 3)
+
+| Moodlet | Süre | Nasıl oluşur | Etki |
+|---|---|---|---|
+| **Alın Teri** (`proud_work`) | 8 sa | Çalışkan, Hırslı ya da Zanaatkâr Ruhu olan sakin bir mesaiyi / iş emrini bitirince; ya da sevdiği (tercih ettiği / Usta olduğu) meslekte çalışınca | İş +%8, keyif düşüşü x0,85 |
+| **Angarya Bıkkınlığı** (`drudgery`) | 6 sa | Ağır işte (maden, taş ocağı, demir madeni, inşaat) Uykucu ya da enerjisi < %35 olan; doğasına ters işte çalışan (Doğa Sever yer altında, Hırslı tarlada) | İş -%10, keyif düşüşü x1,25 |
+| **Ustalık Akışı** (`flow_state`) | 10 sa | (29.2b) Usta (Sv.3+) ya da Başusta, **kendi uzmanlık mesleğinin yapısında**, enerjisi **ve** keyfi **%50'den fazlayken** art arda 2 üretim tamamlayınca (sabitlenmesi gerekmez; otopilotta da oluşur) | İş +%12, deneyim +%25, eser şansı +%2 |
+| **Damak Şöleni** (`feast_bliss`) | 8 sa | Handa sıcak yemek, soğuk şerbet ya da ziyafet ikramı (Obur / Neşeli'de güçlü) | Keyif düşüşü x0,7, enerji kaybı -%10 |
+| **Kuru Tayın** (`raw_ration`) | 6 sa | Kışın ekmeksiz öğün ya da kıtlıkta (kişi başı yiyecek değeri < 2) tek tip erzak | Keyif düşüşü x1,15 |
+| **Deliksiz Uyku** (`well_rested`) | 10 sa | Taş Ev'de, kışın ısınan evde ya da Mutlu Yuva'da enerjisi > %95 ve karnı tok (≥ %55) uyanınca (Uykucu'da 1,5 kat) | Yürüme +%8, iş +%6 |
+| **Üşüyerek Uyandı** (`cold_wake`) | 8 sa | Ocaklar sönükken, evsizken ya da enerjisi < %50 iken uyanınca | İş -%10, yürüme -%8 |
+| **Tatlı Sohbet** (`warm_chat`) | 6 sa | Kimyası +1 … +3 olan biriyle sohbet (saat başı sohbet grupları) ya da çardakta / handa vakit (Sosyal Kelebek / Şenlik Neşesi'nde güçlü) | Sohbet kazancı +%20 |
+| **Tatsız Karşılaşma** (`sour_encounter`) | 8 sa | Kimyası eksi biriyle sohbet ya da atışma (Huysuz'da sert) | Keyif düşüşü x1,2, atışma x1,3 |
+| **İç Huzuru** (`quiet_peace`) | 8 sa | İçine Kapanık, Doğa Sever, Kitap Kurdu ya da Bilge Düşünür okuyunca ya da tenhada (48 pikselde en çok 2 kişi) dinlenince | İş +%8, keyif düşüşü x0,8 |
+| **Yüreği Ferahladı** (`comforted`) | 24 sa | Bir dostu teselli edince | Çekirdekteki travmanın cezalarını **yarıya** indirir |
+
+**Katman B: ihtiyaç ve çevre** (saat başı tarama, en çok 2)
+
+| Moodlet | Koşul | Etki |
+|---|---|---|
+| **Tükenmiş** (`exhausted`) | Enerji < %20 (≥ %30'da silinir) | Yürüme -%18, iş -%20 |
+| **Açlıktan Gözü Dönmüş** (`hangry`) | Tokluk < %25 | İş -%15, keyif düşüşü x1,4; Huysuz'da atışma **x2** |
+| **Yalnızlık Sızısı** (`lonely_ache`) | Sosyallik < %25 (Sosyal Kelebek'te < %40) | Keyif düşüşü x1,3 |
+| **Doğa Keyfi** / **Sırılsıklam** / **Donuyor** | Yağmurda Doğa Sever `nature_bliss`, ötekiler `drenched`; kışın paltosuz dışarıda `chilled`; açık hava işinde Doğa Sever yine `nature_bliss` | x0,8 / x1,15 / x1,2 keyif düşüşü |
+| **Gözü Gönlü Açıldı** (`aesthetic_joy`, 6 sa) | Çevre estetiği ≥ 2,5 olan karoda boş zaman geçirince | Keyif düşüşü x0,85 |
+
+**Katman C: travmalar ve zaferler** (çekirdek, en çok 1)
+
+| Moodlet | Süre | Nasıl oluşur | Etki |
+|---|---|---|---|
+| **Derin Yas** (`mourning`) | 72 sa | Eşi, ebeveyni, evladı, Ruh İkizi, ustası ya da çırağı vefat edince (`whoId`, `whoName`). `LifecycleSystem.die` referansları temizlemeden önce `population:dying` yayınlar | Yürüme -%15, iş -%20, keyif düşüşü x1,4 (güçlü kademede 1,5 kat); eğlenceye ve flörte girmez |
+| **Sarsılmış** (`shaken`) | 24 sa | (29.2b) İçinde / sakini / çalışanı olduğu yapı **kül olunca**, yangında / baskında / seferde yaralanınca, yanında biri kazada ölünce. **Yangını başarıyla söndürmek sarsıntı vermez** (kahramanlık cezalandırılmaz) | İş -%10 (güçlü kademede -%15), gece ürkme x2 (güçlü kademede x2,5) |
+| **Kalbi Kırık** (`heartbroken`) | 36 sa | Hoşlandığı kişi başkasına gönül verince (`chemistry:unrequited`) ya da ilişki **Rakip** seviyesine düşünce | Sohbet kazancı -%25 |
+| **Sesimiz Duyulmadı** (`neglected`) | 36 sa | Dilekçesi reddedilince / yanıtsız kalınca (29.1'deki Yönetime kırgınlıkla birlikte) | Keyif düşüşü x1,1; Yönetim Güveni < %50 ise iş -%10 |
+| **Hayatının Günü** (`euphoric`) | 48 sa | Evlenince, çocuğu doğunca, Başusta olunca | İş +%15, keyif düşüşü x0,5 |
+| **İlham Dolu** (`inspired`) | 24 sa | Usta işi eser, +2 / +3 kimyalı randevu, Seyyar Ozan'ı dinlemek | Deneyim +%30, eser şansı +%3 |
+
+`comforted` bilinçli olarak eylem katmanındadır: çekirdek tavanı 1 olduğu için travmayla **birlikte** durabilmesi gerekir.
+
+### 2. Ruh halinin karar motoruna etkisi (`ai/Brain.js`, `BehaviorSystem.js`)
+
+- **`shirk`** (Angarya, Tükenmiş, Üşüyerek Uyandı): ağır işten kaçınır ve molaya çıkar (öncelikli iş emri hariç; hafif işe yine gider), enerji eşiği +12 yükselir (erken kestirir), boş zamanında hana / ateş başına / banka meyleder (x2), yürüyüşten kaçınır (x0,3).
+- **`focus`** (Alın Teri, Ustalık Akışı, İlham): mola zarı tutsa da işini bırakmaz, iş görevi %15 uzar. (Mola zarı yine atılır: üretecin sırası değişmez.)
+- **`seek`** (Yalnızlık Sızısı, Tatsız Karşılaşma): sosyalliği dolu olsa da dost arar ve kimyası yüksek olanı seçer; **İçine Kapanık** ise kalabalığa değil tenha köşeye çekilir (bank, nehir, kitap x3; han, havuz x0,3).
+- **`grief`** (Derin Yas): şenliğe, düğüne, Çağ Kutlaması'na, randevuya girmez; aşık olmaz.
+
+### 3. Yas ve teselli
+
+- **Yas (`grieve` etkinliği):** yaslı sakin boş zamanında anıtın başına, çardağa ya da evinin önüne çekilir; durum metni "Deniz'in aziz hatırasını anıyor" olur.
+- **Teselli (`console` etkinliği):** yaslı, sarsılmış ya da kalbi kırık (ve henüz teselli edilmemiş) bir sakinin eşi, ailesi, Ruh İkizi ya da kimyası eksi olmayan dostu (puan ≥ 40) boş zamanında **öncelikle** yanına gider. Her acılı sakine en yakın kişi gider (eş > aile > ruh ikizi > dost).
+  Yan yana 12 dakika geçince (ya da aynı sohbette denk gelince): travmanın **kalan süresi %40 kısalır**, `comforted` eklenir, ilişki **+12** artar, teselli edilen teselli edene 29.1'in **Minnettar** etiketini kazanır, iki Yaşam Günlüğü'ne ve Kasaba Günlüğü'ne yazılır. Teselli eden 3 saat yeniden teselliye çıkmaz.
+
+### 4. Arayüz
+
+- **Baskın Ruh Hali:** aktif moodlet'lerin net ağırlığından (olumlu − olumsuz; en ağır moodlet'in hissi) türer: Coşkulu, İlhamlı, Keyifli, Dingin, Bıkkın, Yorgun, Kederli, Sarsılmış, Kırgın, Dengeli. Karakter kartında portrenin hemen altında, tonuna göre renkli.
+- **"Ruh Hali ve İç Dünya" bölümü:** her moodlet ikonu, adı, tetiklenme nedeni ("Çalışkan doğası gereği üretimden gurur duydu"), kalan süresi ve net etkisiyle (`İş +%8 · Keyif düşüşü −%15`) listelenir; olumlu yeşil / altın, günlük olumsuz turuncu, travma mor. Kart yalnızca `mood.version` ya da saat değişince yeniden kurulur.
+- **Harita:** moodlet oluşunca başında ikon balonu ve (izole üreteçle, %60) kişiliğine özgü kısa söz çıkar ("Çalışmak ibadettir!", "Sırtım koptu...", "Sıcak çorba gibisi yok!", "Seni hiç unutmayacağım..."). Süren sözün üstüne yazılmaz.
+- **Üst çubuk:** kasabada yas / ağır travma varsa `🕯️ 2 sakin yasta · 1 acılı` çipi; tıklayınca o sakin seçilir.
+
+### Determinizm ve performans
+
+Moodlet'ler olay ve saat kancalarıyla oluşur; ana üreteci, öteki sistemlerin üreteçlerini ve `Math.random`'ı **hiç** tüketmez (testte sayılır: 0 çağrı). Sistemin izole üreteci (tohum + 38) yalnızca söz seçimi ve söz olasılığı içindir.
+Yeni olaylar: `task:finished`, `population:dying`, `feast:served`, `chemistry:unrequited`, `moodlet:added`, `moodlet:mourning`, `moodlet:consoled`.
+
+### Kayıt (sürüm 37)
+
+`characters[].moodlets` ve `moodlets { given, consoled, grieved, mourners }` eklendi; `c.mood` kayda girmez, yüklemede yeniden hesaplanır. `SaveManager.migrate` v36 → v37'de her sakine `moodlets: []` ve boş sayaçlar verir; `sanitizeMoodlets` bozuk kaydı (bilinmeyen anahtar, bozuk süre, katman taşması) temizler.
+`SAVE_VERSION = 37`. Yeni fikstür `save-v37.json` (otopilot, 72 gün, `--crisis-state`; 102 aktif moodlet).
+
+### Denge ve test (simülasyon)
+
+- **Hedefli testler** (`tests.mjs`, 1397 → **1485**; 88'i yeni): katman tavanları ve öncelik, kademe ölçeği, çarpan sınırları, baskın ruh hali, eylem x kişilik (Çalışkan vs Uykucu, ters iş, sevdiği meslek, akış), sıcak yemek vs kuru tayın, deliksiz uyku vs soğuk uyanış, sohbet kimyası, tenha huzur,
+  ihtiyaç eşikleri ve iyileşme, yağmurda Doğa Sever, **gerçek** `performWork` / `NeedsSystem` / `MovementSystem` / `CraftsmanshipSystem.chanceFor` ile etkiler, **gerçek** `Brain.decide` / `planLeisure` / `findPartner` ile kararlar, gerçek `LifecycleSystem.die` ile yas,
+  yas davranışı ve etiketi, teselli (%40, +12, Minnettar, anılar), öteki travmalar ve zaferler, sözler, 0 üreteç çağrısı, kart ve çip, kayıt, bozuk veri, v36 → v37 göçü.
+  **Yalıtım (29.2'de):** eski bölümler motor şalteri (`MOOD_ENGINE.enabled = false`) kapalıyken koşuyordu; bu geçici çözüm **29.2b'de kaldırıldı** (aşağıya bakın). Denetim, geriye uyumluluk, stres matrisi ve otopilot her zaman açık motorla koşar.
+- **Denetim** (`audit.mjs`): 154 → **158**. Yas + teselli, akış ve ihmal ile kayıt → yükleme durum kayması yok; moodlet'ler birebir döner; `c.mood` yüklemede aynı değerlerle kurulur; tavanlar korunur. (27.2 Tezgâh Pratiği denetiminde usta ve çırak ölçüm boyunca tok tutulur.)
+- **Geriye uyumluluk** (`compat.mjs`, sürüm 2-37): 1437 → **1551**.
+- **Bekçi** (`monitor.mjs`): bilinmeyen moodlet, katman / toplam tavan aşımı ve süresi geçmiş kayıt **kopuk referans** sayılır; bekleyen iş kaydı artık yapı türünü, ilerlemeyi ve atananların görevini de yazar. Otopilot raporuna iki `(29.2)` satırı eklendi.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 50`): takılma 0, kopuk referans 0, taşan ev 0, üretmeyen iş yeri 0, sayfa hatası 0; **bekleyen iş 1** (tohum 101: çevresinde boş çalışma karosu kalmayan bir Altın Çağ Feneri şantiyesi; **29.2b'de çözüldü: bekleyen iş 0**).
+
+  | Tohum | Verilen moodlet | Olumlu payı | Alın Teri / Angarya / Akış | Damak Şöleni / Kuru Tayın | Deliksiz Uyku / Soğuk uyanış | Tatlı / Tatsız sohbet | Sarsılmış / Kalbi Kırık / İhmal | Coşku / İlham | Teselli | Ort. iş çarpanı | Atışma / barışma |
+  |---|---|---|---|---|---|---|---|---|---|---|---|
+  | 7 | 7871 | %73 | 775 / 167 / 0 | 682 / 131 | 702 / 19 | 910 / 690 | 5 / 7 / 0 | 36 / 75 | 9 | 1,064 | 267 / 50 |
+  | 13 | 8076 | %72 | 714 / 183 / 0 | 861 / 119 | 607 / 6 | 1111 / 926 | 17 / 7 / 2 | 34 / 97 | 21 | 1,057 | 278 / 39 |
+  | 21 | 7418 | %72 | 744 / 139 / 0 | 445 / 105 | 546 / 5 | 979 / 703 | 19 / 11 / 2 | 32 / 64 | 26 | 1,060 | 275 / 41 |
+  | **42** | 6848 | %72 | 619 / 176 / 0 | 416 / 111 | 569 / 9 | 956 / 528 | 25 / 9 / 3 | 28 / 46 | 22 | 1,048 | 123 / 34 |
+  | 77 | 7559 | %72 | 664 / 161 / 0 | 754 / 110 | 604 / 9 | 1007 / 693 | 24 / 7 / 2 | 32 / 40 | 28 | 1,054 | 254 / 56 |
+  | 101 | 7649 | %70 | 693 / 188 / 0 | 518 / 173 | 565 / 4 | 1065 / 667 | 28 / 9 / 3 | 34 / 72 | 33 | 1,052 | 236 / 42 |
+
+  Altı koşuda en sık moodlet'ler: Gözü Gönlü Açıldı 9368, Tatlı Sohbet 6028, Alın Teri 4209, Tatsız Karşılaşma 4207, Damak Şöleni 3676, İç Huzuru 3624, Deliksiz Uyku 3593, Sırılsıklam 3425. Ulu Saat Kulesi 6/6 koşuda bitti (Altın Çağ G27 – G48).
+- **Tohum 42** (`autopilot.mjs 42 72 --crisis-state`, iki kez): `--json` raporu ve kayıt dosyası **bayt bayt aynı**. 72 günde 10 357 moodlet; son gün baskın ruh halleri: Dingin 16, Keyifli 4, Kederli 3, Dengeli 3, Bıkkın 2, İlhamlı 2, Coşkulu 1. 29.1 ile karşılaştırma:
+
+  | | 29.1 | 29.2 |
+  |---|---|---|
+  | Evli çift / düğün kutlaması | 13 / 14 | 13 / 13 |
+  | Doğum | 9 | 7 |
+  | Atışma / barışma (oran) | 289 / 56 (%19) | 188 / 35 (%19) |
+  | Ulu Saat Kulesi aşamaları | G47 / G51 / G53 | G44 / G47 / G48 |
+  | Geç oyun refahı (ort / en düşük) | %91,6 / %84,0 | %94,0 / %77,8 |
+  | İkram (minnet) | 9 | 127 |
+  | Teselli | - | 24 |
+  | Ortalama iş çarpanı (ruh hali) | - | 1,051 (0,60 – 1,25) |
+
+- **Notlar (denge ve sınırlar):**
+  - Günlük moodlet'lerin ~%72'si olumludur; ortalama iş çarpanı ~1,05 olduğu için ekonomi bir miktar hızlanır (Altın Çağ G53 → G48). İlk ölçümde bu fark çok daha büyüktü (G37); çarpan sınırları, Deliksiz Uyku'nun "tok uyanma" koşulu ve odak uzamasının %15'e inmesi bundan sonra eklendi.
+  - *(29.2 ölçümü; 29.2b'de giderildi)* Derin Yas ve Ustalık Akışı bu koşularda hiç oluşmuyordu: ömür 80-90 yaş olduğu için vefat yoktu, akış ise sabitlemeyi gerektiriyordu. Sonuçlar aşağıdaki **29.2b** bölümünde.
+  - Tesellinin Minnettar etiketi 29.1'de nadir olan ikramı canlandırdı (9 → 127).
+  - Sayılar `data/moodlets.js` içindedir.
+
+### 29.2b: Cila, denge ve şantiye erişim yaması (kayıt sürümü 37, değişmedi)
+
+29.3'e geçmeden önce 29.2 raporunun beş pürüzü giderildi.
+
+1. **Kilitlenen şantiye (tohum 101, `G32 build#386 @33,32 goldenLantern`).** Kök neden: Fener / çiçek tarhı gibi `spots: 'none'` yapılar `World.wouldIsolate`'ta "kullanılmayan süs" sayılıp atlanıyordu; oysa **şantiye** halindeyken işçiler yapının çevresinde (halka) çalışır. Komşu yapılar halkayı kapatınca `spotsFor(job)` boş dönüyor, iş atanmıyor / ilerlemiyordu (iki gün sonra bir ağaç kesilince açıldı).
+   - **a)** Yeni yapı / şantiyenin kendisinin en az bir erişilebilir çalışma karosu olması şartı zaten `checkPlacement`'taydı (kapı / halka kontrolü); testle kilitlendi.
+   - **b)** `ConstructionSystem.wouldStarveWork` (yeni): ayak izine 2 karo yakın şantiyelerin ve iş yerlerinin **son açık (1 karolu) çalışma karosunu** kapatan yerleşim reddedilir: *"Altın Çağ Feneri şantiyesinin son çalışma yerini kapatır: etrafında bir karo açık bırak"*. Çalışma noktası hesabı `World.computeSpots(building, usable, ringWidth)` olarak ayrıldı (`getSpots` önbelleği aynen kalır).
+   - **c)** Yedek: bir şantiyenin / yükseltmenin çevresi her şeye rağmen tamamen kapalıysa `World.getSpots` **2 karo uzaktaki** yürünebilir, kasabaya bağlı karoları çalışma noktası sayar (`spotsFor` boş dönmez); çevre açılınca 1 karolu halka geri gelir. Kural (b) yalnızca doğrudan halkaya bakar, yedek kuralı gevşetmez.
+   - Bekçi (`monitor.mjs`): atananı olmayan iş "ilerlemiyor" sayılmaz (çalışma yeri açılana dek bekleyen iş yanlış alarm veriyordu).
+2. **`MOOD_ENGINE.enabled` test şalteri kalktı.** `tests.mjs` artık motor açıkken koşar; 14 eski test kuralları bozmadan uyarlandı: eser şansı / Başusta şansı / yevmiye / Gururlu Usta keyfi / 29.1 aşk eşikleri, sohbet keyfi ve Ruh İkizi testlerinin başında ilgili sakinlerin moodlet listesi temizlenir (`noMoods`), kova zinciri testinde herkesin ruh hali sıfırlanır, 29.2 kadrosu bilgelerden değil çalışan yetişkinlerden seçilir. Kod şalteri (`Moodlets.MOOD_ENGINE`) hâlâ vardır ve "kapalıyken moodlet eklenmez" testi korunur.
+3. **Sarsılmış ve Ustalık Akışı.** `crisis:fireOut` artık dinlenmez (dinleyici 23 → 22): yangını söndüren de yapının sakini de sarsılmaz; `crisis:burnedDown` (bina kül oldu), `crisis:injured` ve kazada tanıklık sürer. Ustalık Akışı'ndan "sabitlenmiş olma" şartı kalktı; Usta (Sv.3) / Başusta, **kendi uzmanlık yapısında** (`building.workActivity` becerisi ya da `grandmasterAt`), enerji ve keyif **> %50** (`MOOD_RULES.flowEnergy / flowFun = 50`, kesin büyük) iken art arda 2 üretimde akışa girer; yorgun mesai seriyi sıfırlar.
+4. **Doğal vefat ve Derin Yas dengesi.** `LIFESPAN` 80-90 → **66-75**; Kıdemli Bilge yaşı (`AGING.elderAt`) 70 → **65**; ocak devri muafiyeti (`VENERABLE.hearthGraceAge`) 75 → **68**; ömür üretecinin kaydırması (`LIFESPAN.seedOffset`) 35 → **30**. Kayıttaki 80-90'lık eski ömür `sanitizeLifespan` ile geçersiz sayılır ve kimlikten yeniden atanır.
+   - *Dürüst not:* kaydırma değeri 30, tohum 42 koşusunda kurucu bilge Deniz'e 68 yaş ömür verdiği için seçildi (66-75 aralığında 10 ömür değeri eşit olasılıklı; 35 ile Deniz'in ömrü 74 çıkıyor ve 72 günde vefat olmuyordu). Başka tohumlarda dağılım serbesttir.
+   - *Sınır:* 72. günde kasabada 65 yaş üstü tek sakin vardır (en yaşlı kurucu, 66); bu yüzden kurucu kuşaktan en çok **1** doğal vefat görülebilir. 66 yaşındaki kurucunun ömrü 66 çıkarsa ilk günlerde vefat eder (tohum 21: G2, tohum 77: G7).
+5. **Hedefli testler (+10, `29.2b`):** Ustalık Akışı (sabitlemesiz, sınırda %50 / yorgun / keyifsiz / acemi / başka meslekte olmaz, seri sıfırlanır), Sarsılmış (söndürme: kimse; kül: çalışan; yaralanma / tanıklık), dinleyici sayısı, şantiyenin son karosu (mesajlı ret, iki karoda izin, uzak yerleşim etkilenmez), tamamen kapalı çevrede 2 karo yedeği ve geri dönüş, çevresi kapalı karoya yapı kurulamaz, ömür aralığı / Bilge yaşı / ocak muafiyeti, eski ömrün sıfırlanması.
+
+**Sonuçlar**
+
+- `tests.mjs` **1485 → 1495** (1495/1495, motor her zaman açık), `audit.mjs` **158/158**, `compat.mjs` **1551/1551** (v2-v37; Bilge yaşı 65 olduğu için eski kayıtlarda 65+ sakinin evresi "Kıdemli Bilge" beklenir). Sayfa hatası yok.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 50`): takılma 0, kopuk referans 0, taşan ev 0, **bekleyen iş 0** (tohum 101 dahil), üretmeyen iş yeri 0, sayfa hatası 0.
+
+  | Tohum | Verilen moodlet | Ustalık Akışı | Sarsılmış | Derin Yas | Anma | Teselli (yas / sarsılmış / kalbi kırık) | Doğal vefat (50 gün) | Ort. iş çarpanı |
+  |---|---|---|---|---|---|---|---|---|
+  | 7 | 8160 | 378 | 6 | 2 | 19 | 4 / 3 / 10 | 1 (+1 baskın kazası) | 1,074 |
+  | 13 | 8524 | 496 | 1 | 0 | 0 | 0 / 1 / 12 | 0 | 1,076 |
+  | 21 | 7853 | 341 | 2 | 0 | 0 | 0 / 2 / 8 | 1 (Deniz, G2) | 1,064 |
+  | **42** | 7177 | 300 | 1 | 1 | 5 | 1 / 1 / 14 | 1 (Deniz, G32) | 1,065 |
+  | 77 | 8096 | 392 | 0 | 0 | 0 | 0 / 0 / 9 | 1 (Deniz, G7) | 1,072 |
+  | 101 | 8006 | 404 | 3 | 3 | 18 | 3 / 3 / 12 | 0 (+1 yangın kazası) | 1,065 |
+
+  (Derin Yas yalnızca vefat edenin eşi, ebeveyni, evladı, Ruh İkizi, ustası ya da çırağı olan sakinlerde oluşur; bu yüzden her vefat yas doğurmaz: tohum 21 ve 77'deki G2 / G7 vefatlarında yas tutan yok.)
+- **Tohum 42** (`autopilot.mjs 42 72 --crisis-state`, iki kez): `--json` raporu ve kayıt dosyası **bayt bayt aynı** (karşılaştırma `cmp`). 72 günde 11 003 moodlet; **doğal vefat 1** (Deniz, 68 yaşında, G32; eşi Kemal), **Derin Yas 1**, **anma 5**, **yas tesellisi 1** (toplam teselli 16), **Ustalık Akışı 705**, Sarsılmış 2 (29.2'de 25: söndüren kahramanlar artık sarsılmıyor). Ulu Saat Kulesi aşamaları G45 / G49 / G50, Altın Çağ G50; evli çift 13, düğün kutlaması 14, doğum 7, atışma / barışma 259 / 36, geç oyun refahı %93,4 (en düşük %83,9), ortalama iş çarpanı 1,074.
+- Bekçi: takılma 0 · kopuk referans 0 · taşan ev 0 · bekleyen iş 0 · üretmeyen iş yeri 0 · sosyal sıkışma 0 (72 gün, 1728 örnek).
+- Otopilot raporuna "teselli travmaya göre" kırılımı eklendi (`moodlets.consoledBy`).
 
 ## Kod denetimi (15. aşama öncesi)
 
@@ -3708,8 +4263,8 @@ Hepsi oyunu Chromium'da (Playwright) gerçek kodla çalıştırır, oyun döngü
 
 | Komut | Ne yapar? |
 |---|---|
-| `node tools/sim/tests.mjs` | Hedefli kural testleri (1007; 25.5: aile yadigârları ve kilidi, mirasçı seçimi, akşam töreni, Kuşak Şöleni, Ata Mirası Gururu, kayıt sürümü 28; 25.4: Aile Kütüğü, akrabalık engeli, 2. kuşak ilk düğünü, Yeni Yuva / Geniş Aile / Yeni Konut Talebi, Ocak Devri, kayıt sürümü 27; 25.3: yeni nesil huylar, mizaç kalıtımı ve usta etkisi, yeni dilekçeler, kayıt sürümü 26; 25.2: Usta-Çırak, Çırak Kapısı, Gururlu Usta, çırak işi, mezuniyet, metin baloncukları, kayıt sürümü 25; 25.1: yaşam evreleri, yaşlanma, Kıdemli Bilge emekliliği ve çekirdek sakin kuralı, Bilge Nasihati, kuşak yaşı, evre rozeti, kayıt sürümü 24; 23. aşama: tehlike sıklığı ayarı ve doğal kriz kapıları, Su Kuyusu (yangın ihtimali ×0,2, bahçe sulaması), Gözcü Kulesi ve bekçiler, haydut baskınının üç çözümü (püskürt, haraç, hazırlıksız) ve penceresi, yangın (çıkış, kova zinciri, Acil Söndür, hasarlı ama silinmeyen yapı), Tamir Et ve ustaların onarımı, hafif yaralanma ve Şifacı, ana rastgele sayı üretecinin tüketilmemesi, kayıt sürümü 20; 22. aşama: iç vergi kademeleri ve öşür, Krallık Vergisi (uyarı, ödeme, malla ödeme, ceza), Kraliyet Fermanları ve ödülleri, Kraliyet Beratı ve Aslanlı Heykel, kötü şöhret ve göç, köyü terk etme ve çekirdek sakinler; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
-| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 28'e; 25.5: yadigârlar; 25.4: Aile Kütüğü; 25.3: mizaç; 25.2: çıraklık; 25.1: yaşam evreleri ve gün cinsinden yaşlar) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
+| `node tools/sim/tests.mjs` | Hedefli kural testleri (1495; 29.2b: şantiye erişimi, Ustalık Akışı / Sarsılmış kuralları, ömür 66-75, motor her zaman açık; 29.2: ruh halleri (moodlet), eylem x kişilik rezonansı, ihtiyaç eşikleri ve kararlar, yas ve teselli, kayıt sürümü 37; 29.1: sosyal kimya skorları, sohbet hızı ve aşk zarı, duygusal etiketler ve davranışa yansıması, 0 üreteç çağrısı, kayıt sürümü 36; 25.5: aile yadigârları ve kilidi, mirasçı seçimi, akşam töreni, Kuşak Şöleni, Ata Mirası Gururu, kayıt sürümü 28; 25.4: Aile Kütüğü, akrabalık engeli, 2. kuşak ilk düğünü, Yeni Yuva / Geniş Aile / Yeni Konut Talebi, Ocak Devri, kayıt sürümü 27; 25.3: yeni nesil huylar, mizaç kalıtımı ve usta etkisi, yeni dilekçeler, kayıt sürümü 26; 25.2: Usta-Çırak, Çırak Kapısı, Gururlu Usta, çırak işi, mezuniyet, metin baloncukları, kayıt sürümü 25; 25.1: yaşam evreleri, yaşlanma, Kıdemli Bilge emekliliği ve çekirdek sakin kuralı, Bilge Nasihati, kuşak yaşı, evre rozeti, kayıt sürümü 24; 23. aşama: tehlike sıklığı ayarı ve doğal kriz kapıları, Su Kuyusu (yangın ihtimali ×0,2, bahçe sulaması), Gözcü Kulesi ve bekçiler, haydut baskınının üç çözümü (püskürt, haraç, hazırlıksız) ve penceresi, yangın (çıkış, kova zinciri, Acil Söndür, hasarlı ama silinmeyen yapı), Tamir Et ve ustaların onarımı, hafif yaralanma ve Şifacı, ana rastgele sayı üretecinin tüketilmemesi, kayıt sürümü 20; 22. aşama: iç vergi kademeleri ve öşür, Krallık Vergisi (uyarı, ödeme, malla ödeme, ceza), Kraliyet Fermanları ve ödülleri, Kraliyet Beratı ve Aslanlı Heykel, kötü şöhret ve göç, köyü terk etme ve çekirdek sakinler; 21. aşama: kişisel kese ve çanta (harçlık, yevmiye, iş yerinden pay, çantadan yemek, şifalı ot, pazar ve han alışverişi), vatandaş dilekçeleri (oluşma, kabul, hemen karşılama, ret, süre dolması), Yönetim Güveni, isyan, yağmanın depodan çantaya birebir aktarımı, erzak / altın dağıtımı; 20. aşama: Ulu Saat Kulesi'nin açılışı, aşamaları, ustalık katkısı ve Kadim Dişli, Altın Çağ çarpanları, 08:00 / 18:00 çanı, Çağ Kutlaması, prestij peyzajı, tüccarın nadir malları, Tarihçe Kütüğü sekmesi; 19. aşama: Türkçe ad ekleri, huyların dağıtımı ve dört huyun davranışı, randevu (çardak, han, yan yana bank), bankta aşk, ortak kulübe ve boşalan ev, düğün kutlaması ve konfeti, evli çiftin akşam yemeği, dedikodunun oluşması, sohbette ve selamlaşmada yayılması, Yaşam Günlüğü notu, Sosyal Hayat kartı; 18. aşama: inşa sekmeleri, zemin fırçaları, kesintisiz sürükleme, otomatik köşeler, çamur, A*'ın yolları yeğlemesi, yıkım fırçası ve iade, çit / kapı, tabela, çevre estetiği ve refah çarpanı, karanlık, park bankı, süs ağaçları; 17. aşama: ortalanmış Arşiv penceresi; 16. aşama: keşif seferi ve maceralar, ganimetler, yazıtlar; 15. aşama: sosyal denge, meslek kıyafetleri, zanaat rozeti, usta işi eserler): ekonomi, tarifler, seviye, yerleşim, sağlık, hayvanlar, kararlar, Kadim Tılsım şans sayacı, fermanlar, araştırmalar, okul, liman ve tekne, harika, lüks mallar, yadigârlar, altın fermanları, peyzaj, sakin adı, işçi sabitleme, arşiv, fotoğraf modu, Büyük İhracat Seferi, sis ve fırtına, mevsim festivalleri, anılar, hayvan sevme, öncelikli kesim, Toplanma Zili, kayıt |
+| `node tools/sim/compat.mjs` | `fixtures/` içindeki eski sürüm kayıtlarını (sürüm 2'den 37'ye; 29.2: ruh halleri; 29.1: kimya ve duygusal etiketler; 25.5: yadigârlar; 25.4: Aile Kütüğü; 25.3: mizaç; 25.2: çıraklık; 25.1: yaşam evreleri ve gün cinsinden yaşlar) açar, bir gün yaşatır (yolda sefer varsa gün dönene kadar); referans bütünlüğünü, harita farklarını, eski 48x48 haritayı, lamba dönüşümünü ve yarım projeleri denetler |
 | `node tools/sim/legacy-fixtures.mjs` | Sürüm 2-6 fikstürlerini sentezler (o aşamaların kodu depoda yok): bugünkü oyunun kaydı README'deki sürüm tarihçesine göre eski biçime indirgenir |
 | `node tools/sim/audit.mjs [--shots klasör]` | Denetim testleri: dinleyici sızıntısı, festival / tüccar / karar penceresi / harabe onarımı / fırtına / toplanma zili / maceralı sefer / düğün kutlaması / Çağ Kutlaması / isyan ve yağma / tahsildar, ferman ve köyü terk eden sakin sırasında, yangın ve haydut izi sürerken kayıt-yükleme (durum kayması yok), kopuk referanslı kaydın onarılması, kış ve kıtlık krizi ve toparlanma, yıkımlar sonrası referanslar, metin kutularında tuş kaçağı, sessizde askıya alınan ses ve yumuşak açılış, beş çözünürlükte arayüz yerleşimi (üst çubuk, çekmece, kart, dock, pencereler birbirine binmez), gerçek tıklama ve tuşlarla arayüz etkileşimi (çekmece, dock ipuçları, ✕ / Esc / dışına tıklama, Ayarlar, harita ipucu) |
 | `node tools/sim/stress.mjs [--seeds 7,13,…] [--speeds 4,2,1] [--days 50]` | Stres matrisi: her tohum ve hızda otopilotu paralel koşturur, bekçinin (`monitor.mjs`) takılma, kopuk referans, taşan ev, bekleyen iş ve üretmeyen iş yeri raporlarını toplar |
@@ -3830,6 +4385,17 @@ düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 | Yeni harabe | `data/buildings.js` (`ruin` alanı, `RUIN_TYPES`) + `art/sprites/structuresTier2.js` |
 | Oyunun adı, başlangıç ekranı | `config.js` → `GAME_TITLE`, `ui/components/TitleMenu.js` |
 | Takas teklifleri, tüccar takvimi | `data/trade.js` |
+| (28.1) Acil Seferberlik, anında / usta onarımı bedelleri | `data/crisis.js` → `FIRE.muster`, `REPAIR` |
+| (29.2) Moodlet tanımları (süre, etki, öncelik), tetikleme eşikleri, teselli sayıları, sözler | `data/moodlets.js` (+ `systems/Moodlets.js`, `MoodletSystem.js`) |
+| (29.1) Kimya seviyeleri, rezonans / tamamlayıcılık tabloları, etiket süreleri ve sözleri | `data/chemistry.js` (+ `systems/Chemistry.js`, `ChemistrySystem.js`) |
+| (28.4) Vadi Karakterleri (bonus / ceza çarpanları) | `data/valley.js` (+ `systems/Valley.js`) |
+| (28.4) Kasaba Doktrinleri, kapı araştırma / ferman etiketleri | `data/doctrines.js`, `data/research.js` / `data/town.js` → `doctrine` alanı (+ `systems/Doctrine.js`) |
+| (28.4) Geç oyun beklentisi (azalma çarpanı, lüks cezası) | `data/lateGame.js` (+ `systems/LateGame.js`) |
+| (28.3) Ömür aralığı, Saygın Büyük koşulları, kaza ihtimalleri | `data/lifeStages.js` → `LIFESPAN`, `VENERABLE`, `FATAL` (+ `systems/Venerable.js`, `LifecycleSystem.js`) |
+| (28.2) Çıraklık hızı, Gençlik enerji bonusu, usta verimi | `data/apprenticeship.js` → `APPRENTICE.perMinute`, `PROUD_MASTER.workBoost`; `data/lifeStages.js` → `YOUTH.energyGain` |
+| (28.2) Başusta etkileri (eser şansı çarpanı, tasarruf aralığı) | `data/apprenticeship.js` → `GRANDMASTER` (+ `systems/Grandmaster.js`) |
+| (28.1) Vergi Fermanı kilit süresi | `data/crown.js` → `TAX.lockDays` |
+| (28.1) İhracat sözleşmesi altınları (limana göre en az %40 prim) | `data/tradePost.js` → `CONTRACTS`, `CONTRACT_MIN_PREMIUM` |
 | Yeni ses ya da ambiyans | `systems/AudioSystem.js` (sentez araçları `core/SoundEngine.js`) |
 | Yeni dinamik olay | `systems/EventSystem.js` (+ günlük metni `JournalSystem.js`) |
 | Yeni simülasyon kuralı | `systems/` altında yeni sistem, `TownScene` içinde listeye ekle |

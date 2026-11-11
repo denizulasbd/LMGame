@@ -291,6 +291,26 @@ export const ACTIVITIES = {
     travelEffects: { fun: 0.3 },
     bubbles: ['note'],
   },
+  // (29.2) Yas: anıtın, çardağın, bir ağacın ya da evinin önünde anılara dalar (etiket: "Deniz'in aziz hatırasını anıyor")
+  grieve: {
+    kind: 'leisure',
+    target: 'none',
+    travelLabel: 'Sessiz bir köşeye çekiliyor',
+    label: 'Anılara dalmış, sessizce duruyor',
+    duration: [40, 70],
+    effects: { fun: 0.05 },
+    bubbles: ['candle', 'memory'],
+  },
+  // (29.2) Teselli: acılı dostunun yanına gidip onu teselli eder ({name}: teselli edilen)
+  console: {
+    kind: 'leisure',
+    target: 'none',
+    travelLabel: '{name} adlı dostunu teselli etmeye gidiyor',
+    label: '{name} ile dertleşiyor, onu teselli ediyor',
+    duration: [25, 35],
+    effects: { social: 0.6 },
+    bubbles: ['heart', 'chat'],
+  },
   // --- Çalışma (mesai saatlerinde) ---
   build: {
     kind: 'work',

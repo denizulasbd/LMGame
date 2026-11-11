@@ -105,9 +105,9 @@ await page.evaluate((passive) => {
     window.__stats.gold.decrees += price;
     window.__stats.gold.items.push(decree.name);
   });
-  for (const name of ['research:completed', 'school:graduated', 'harbor:shipped', 'wonder:stageCompleted', 'wonder:completed', 'goldenAge:began', 'goldenAge:celebrationEnded']) {
+  for (const name of ['research:completed', 'school:graduated', 'harbor:shipped', 'wonder:stageCompleted', 'wonder:completed', 'goldenAge:began', 'goldenAge:celebrationEnded', 'population:died', 'venerable:became', 'family:childBorn', 'population:joined']) {
     game.events.on(name, (p) => {
-      const what = p?.research?.name ?? (p?.skill ? `${p.character.name} -> ${p.skill}` : '') ?? '';
+      const what = name === 'population:died' ? p.text : name === 'venerable:became' ? `${p.character.name} (${p.character.age})` : name === 'family:childBorn' || name === 'population:joined' ? `${p.child?.name ?? p.character?.name} (nüfus ${game.state.characters.length}, kotaya sayılan ${game.state.characters.filter((c) => !c.isVenerable).length})` : (p?.research?.name ?? (p?.skill ? `${p.character.name} -> ${p.skill}` : '') ?? '');
       const extra = name === 'harbor:shipped' ? `+${p.gold} altın (${Object.entries(p.cargo).map(([r, v]) => `${r}${v}`).join(' ')})` : p?.stage ? `${p.stage.name} (${p.index})` : '';
       sim.log.push(`${sim.stamp()} ${name} ${what} ${extra}`.trim());
     });
@@ -372,7 +372,7 @@ await page.evaluate((passive) => {
         const CR = window.__crown;
         const t = s.trust.value;
         const want = t < 40 ? 'exempt' : t < 62 ? 'low' : 'standard';
-        if (s.tax.rate !== want) game.events.emit('ui:setTaxRate', { rate: want });
+        if (s.tax.rate !== want && !((s.tax.lockedUntil ?? 0) > s.totalMinutes)) game.events.emit('ui:setTaxRate', { rate: want });
         const d = s.crown.decree;
         if (d && CR.decreeStatus(s, d).ok) {
           const margin = Object.entries(d.need ?? {}).every(([r, v]) => res[r] >= v + 25);
@@ -386,9 +386,17 @@ await page.evaluate((passive) => {
       // (23. aşama) Krizler: yangını söndür, hasarlıyı tamir et, haydut izine karşı püskürt / uzlaş
       if (!window.__noSafety) {
         const CRI = window.__crisis;
-        // Sakinler kovalarla uğraşır; yangın yarıyı aşarsa oyuncu "Acil Söndür" der
-        for (const b of s.buildings) if (b.isBurning && b.fireProgress >= 45) game.events.emit('ui:extinguish', { buildingId: b.id });
-        for (const b of s.buildings) if (b.damaged && !b.isBurning && !b.project) game.events.emit('ui:repairBuilding', { buildingId: b.id });
+        // Sakinler kovalarla uğraşır; yangın yarıyı aşarsa oyuncu 30 altına "Acil Seferberlik" ilan eder (28.1)
+        for (const b of s.buildings) if (b.isBurning && b.fireProgress >= 45 && !b.emergencyMuster && res.gold >= 30) game.events.emit('ui:emergencyMuster', { buildingId: b.id });
+        // (28.1) Anında "Tamir Et" pahalıdır: önce ustalara bırak (fırtına hasarı için projeyi başlat); 24 saatten uzun beklerse acil tamir
+        for (const b of s.buildings) {
+          if (!b.damaged || b.isBurning || b.project) continue;
+          if (b.damageKind === 'storm' || !b.damageKind) {
+            const check = scene.construction.checkProject(b);
+            if (check.ok) scene.construction.startProject(b);
+          }
+          if (Number.isFinite(b.damagedAt) && s.totalMinutes - b.damagedAt > 24 * 60) game.events.emit('ui:repairBuilding', { buildingId: b.id });
+        }
         const raid = s.crisis.raid;
         if (raid) {
           const choice = CRI.defenseStatus(s).ok ? 'defend' : CRI.tributeStatus(s, raid.tribute).ok ? 'tribute' : 'caught';
@@ -505,15 +513,20 @@ await page.evaluate((passive) => {
     const cap = s.storageCapacity;
     if (world.getCompleted('townHall').length) {
       if (res.wood > cap * 0.6 && res.stone > cap * 0.6 && res.iron > 60) game.events.emit('ui:civicProject', { id: 'storehouse' });
-      if (res.wool > 70 && res.iron > 70) game.events.emit('ui:civicProject', { id: 'craftGuild' });
+      // (28.4) doktrine bağlı fermanlar yalnızca kendi doktrini seçiliyse / seçilebiliyorsa (vadiye göre) ilan edilir
+      const dc = s.doctrine.chosen;
+      if (res.wool > 70 && res.iron > 70 && (dc === 'industry' || (dc === null && s.valley === 'windyGorge'))) game.events.emit('ui:civicProject', { id: 'craftGuild' });
+      if (res.wool > 90 && res.iron > 60 && res.wood > 100 && (dc === 'commerce' || (dc === null && s.valley === 'ancientWeald'))) game.events.emit('ui:civicProject', { id: 'tradeCharter' });
       if (res.bread + res.food > 200 && res.wood > 100) game.events.emit('ui:civicProject', { id: 'grandFeast' });
     }
 
     // (12. aşama) Bilgelik Evi: kaynak yedekte kalacak kadar varsa sıradaki araştırma
-    const ORDER = ['gears', 'architecture', 'insulation', 'herbalism'];
+    // (28.4) Doktrin vadiye göre seçilir (her vadide farklı yol denensin): Delta -> Tarım, Boğaz -> Sanayi, Orman -> Ticaret; kilitli olanlar atlanır
+    const ORDERS = { fertileDelta: ['cropRotation', 'architecture', 'insulation', 'herbalism'], windyGorge: ['gears', 'architecture', 'insulation'], ancientWeald: ['tradeLaw', 'architecture', 'insulation'] };
+    const ORDER = ORDERS[s.valley] ?? ['gears', 'architecture', 'insulation', 'herbalism'];
     if (scene.research.academies().length && !s.research.active) {
       // Sıradaki karşılanabilir araştırma (yedekte biraz kaynak kalsın)
-      const id = ORDER.find((k) => !s.research.done[k] && Object.entries(window.__research[k].cost).every(([r, v]) => res[r] >= v + 25));
+      const id = ORDER.find((k) => !s.research.done[k] && window.__researchStatus(s, k, true).ok && Object.entries(window.__research[k].cost).every(([r, v]) => res[r] >= v + 25));
       if (id) game.events.emit('ui:startResearch', { id });
     }
     // Liman: fazlalık ihracatı açık. Harika için biriktirirken sınır yüksek (taş, demir ve yün kalsın), önce düşük (250),
@@ -693,6 +706,7 @@ await page.evaluate(async () => {
   const { BUILDINGS } = await import('/src/data/buildings.js');
   window.__dilemmaDefs = DILEMMAS;
   window.__research = RESEARCH;
+  window.__researchStatus = (await import('/src/systems/ResearchSystem.js')).researchStatus;
   window.__wonder = BUILDINGS.wonder;
   window.__luxury = await import('/src/systems/Luxury.js');
   window.__relicKeys = (await import('/src/data/luxury.js')).RELIC_KEYS;
@@ -949,7 +963,7 @@ if (mon.apprentice) {
   console.log(
     `(25.2) çıraklık: açık kapı ${P.open} · çırak ${P.active} (en çok ${P.maxActive}; ${P.list.join(', ') || '-'}) · yazılan ${P.state.enrolled}, mezun ${P.state.graduated} · ` +
       `Gururlu Usta ${P.state.masters} · çırak mesaisi ${Math.round(P.state.minutes / 60)} sa · çırak işi ${P.state.crafted} (satılan ${P.state.sold}, +${P.state.coins} altın) · ` +
-      `ustasız çırak ${P.orphanSamples} örnek · yetişkin çırak ${P.adultApprentices}`
+      `ustasız çırak ${P.orphanSamples} örnek · yetişkin çırak ${P.adultApprentices} · (28.2) Başusta ${P.grandmasters.length} (${P.grandmasters.join(', ') || '-'}), hammaddesiz üretim ${P.state.grandmasterSaved ?? 0}`
   );
 }
 if (mon.life) {
@@ -959,6 +973,26 @@ if (mon.life) {
     `(25.1) yaşam evreleri: çocuk ${L.counts.child}, genç ${L.counts.youth}, yetişkin ${L.counts.adult}, Kıdemli Bilge ${L.counts.elder} (emekli ${L.retired}) · ` +
       `en çok bilge ${L.maxElders}, en çok genç ${L.maxYouth} · yaş aralığı ${ages} · unvanı alan bilge ${L.state.elders ?? 0}, yetişkinliğe geçen genç ${L.state.adults ?? 0} · ` +
       `nasihat ${Math.round(L.state.adviceMinutes ?? 0)} dk · işteki emekli ${L.retiredWorking} · emeklilik gecikmesi ${L.retireLag}`
+  );
+  // (28.3) Sürdürülebilir kuşak döngüsü
+  console.log(
+    `(28.3) nüfus ${L.population} (kotaya sayılan ${L.active}) · Saygın Büyük ${L.venerable.length} (${L.venerable.join(', ') || '-'}; toplam olan ${L.state.venerables ?? 0}) · vefat ${L.state.deaths ?? 0} (kaza ${L.state.accidents ?? 0}; son: ${L.state.lastDeath ? `${L.state.lastDeath.name} ${L.state.lastDeath.age} yaşında G${L.state.lastDeath.day} ${L.state.lastDeath.cause}` : '-'}) · ` +
+      `doğum ${L.births} · ömrü atanmamış ${L.lifespanMissing} · yataklı Saygın Büyük ${L.venerableWithHome}`
+  );
+  // (29.2) Ruh halleri
+  const md = L.moodlets;
+  if (md) {
+    const total = Object.values(md.given).reduce((x, y) => x + y, 0);
+    console.log(`(29.2) verilen moodlet ${total}: ${Object.entries(md.given).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(' · ')}`);
+    console.log(`(29.2) yas tutan ${md.mourners} · anma ${md.grieved} · teselli ${md.consoled} (travmaya göre ${JSON.stringify(md.consoledBy ?? {})}) · son gün ${JSON.stringify(md.now)} · baskın ruh hali ${JSON.stringify(md.feels)} · ortalama iş çarpanı ${md.work ? (md.work.sum / md.work.n).toFixed(3) : '-'} (en düşük ${md.work?.min.toFixed(2)}, en yüksek ${md.work?.max.toFixed(2)}) · en çok ${md.max} moodlet`);
+  }
+  // (29.1) Sosyal kimya ve duygusal etiketler
+  const ch = L.chemistry;
+  if (ch) console.log(`(29.1) kimya kaydı ${ch.records} çift ${JSON.stringify(ch.dist)} · şimdiki etiketler ${JSON.stringify(ch.tags)} (Yönetime ${ch.ruler}) · verilen etiket ${ch.given} · ruh ikizi bağı ${ch.kindred} · şimşek ${ch.sparks} · ikram ${ch.treats} · etiketli selam ${ch.greetings}`);
+  // (28.4) Vadi Karakteri, Doktrin ve geç oyun refahı
+  const lt = L.late;
+  console.log(
+    `(28.4) vadi ${L.valley} · doktrin ${L.doctrine ?? 'seçilmedi'} · geç oyun (seviye 4 / Altın Çağ) ${lt ? `${lt.n} örnek (G${lt.since}'den): refah ort %${(lt.sum / lt.n).toFixed(1)}, en düşük %${lt.min.toFixed(1)}, en yüksek %${lt.max.toFixed(1)}; %100'ün altında ${lt.below100} örnek (%${((100 * lt.below100) / lt.n).toFixed(0)}), %90'ın altında ${lt.below90}; ortalama eksik lüks ${(lt.missingSum / lt.n).toFixed(2)}/3` : 'hiç girilmedi'}`
   );
 }
 console.log(`bekçi: ${mon.samples} örnek · takılma ${mon.stuck.length} · kopuk referans ${mon.brokenCount} · taşan ev ${mon.overfullCount} · bekleyen iş ${mon.staleJobs.length} · üretmeyen iş yeri ${mon.stalledWorkplaces.length} · sosyal sıkışma ${mon.social.stuck.length}`);

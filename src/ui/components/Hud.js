@@ -10,6 +10,11 @@
 // çiplerinde açık dilekçeler (tıklayınca dilekçe sahibi seçilir) ve isyan alarmı (tıklayınca meydan havuzu / Belediye
 // Konağı paneli açılır: acil erzak ve altın dağıtımı).
 // Kaydet / Yükle / Yeni Harita Ayarlar penceresine, farenin altındaki karonun bilgisi harita ipucuna taşındı.
+import { VALLEYS } from '../../data/valley.js';
+import { DOCTRINES } from '../../data/doctrines.js';
+import { LATE_GAME } from '../../data/lateGame.js';
+import { lateGameActive, missingLuxuries } from '../../systems/LateGame.js';
+import { activePopulation } from '../../systems/LifeStages.js';
 import { CONFIG } from '../../config.js';
 import { getDayPhase } from '../../systems/TimeSystem.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
@@ -118,12 +123,13 @@ export class Hud {
   renderWelfare(state) {
     const happiness = Math.round(townHappiness(state));
     const level = happinessLevel(happiness);
-    const population = state.characters.length;
+    const population = activePopulation(state); // (28.3) Saygın Büyükler nüfus kotasına sayılmaz
+    const venerable = state.characters.length - population;
     const capacity = housingCapacity(state);
     const status = immigrationStatus(state);
     const trust = Math.round(trustValue(state));
     const revolt = state.trust?.revolt ?? null;
-    const key = `${happiness}|${population}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}|${trust}|${Boolean(revolt)}`;
+    const key = `${happiness}|${population}|${venerable}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}|${trust}|${Boolean(revolt)}`;
     if (key !== this.lastWelfare) {
       this.lastWelfare = key;
       this.welfareFill.style.width = `${happiness}%`;
@@ -143,11 +149,11 @@ export class Hud {
         ? `\nYönetim Güveni: %${trust} · İSYAN sürüyor! Güven %${REVOLT.endTrust}'in üstüne çıkınca yatışır (meydan havuzu / Belediye Konağı: erzak ve altın dağıt).`
         : `\nYönetim Güveni: %${trust} (${tl.name}). Dilekçeleri karşılamak ve yüksek refah güveni artırır; reddetmek, açlık, soğuk ve %35 altı refah eritir. %${REVOLT.critical} altında uzun kalırsa isyan çıkar.`;
       this.welfareRow.title = `Refah (ortalama mutluluk): ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.${beauty}${trustLine}`;
-      this.population.textContent = `${population}/${capacity}`;
+      this.population.textContent = `${population}/${capacity}${venerable ? ` (+${venerable} Saygın)` : ''}`; // (28.3) örn. 28/30 (+2 Saygın)
       this.populationWrap.classList.toggle('is-full', population >= capacity);
       this.population.classList.toggle('is-full', population >= capacity);
       const lines = status.checks.map((c) => `${c.ok ? '✓' : '✗'} ${c.text}`);
-      this.populationWrap.title = `${population} sakin / ${capacity} yatak. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
+      this.populationWrap.title = `${population} sakin / ${capacity} yatak${venerable ? ` (+${venerable} Saygın Büyük: yatağı olmayan, nüfus kotasına sayılmayan bilgeler)` : ''}. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
     }
     const buffs = activeBuffs(state);
     const heating = Math.round(heatingPerDay(state) * 10) / 10;
@@ -161,6 +167,23 @@ export class Hud {
     const burning = state.buildings.filter((b) => b.isBurning);
     const raidLeft = raidHoursLeft(state);
     const injured = state.characters.filter((c) => c.isInjured).map((c) => c.name);
+    // (29.2) yasta ve ağır travmada olan sakinler (sayılar; çip tıklanınca ilk sakin seçilir)
+    let mourners = 0;
+    let shaken = 0;
+    let griefId = -1;
+    let mournerId = -1;
+    for (const c of state.characters) {
+      for (const m of c.moodlets) {
+        if (m.key === 'mourning') {
+          mourners++;
+          if (mournerId < 0) mournerId = c.id;
+        } else if (m.key === 'shaken' || m.key === 'heartbroken') {
+          shaken++;
+          if (griefId < 0) griefId = c.id;
+        }
+      }
+    }
+    if (mournerId >= 0) griefId = mournerId;
     // 14. aşama: duyurulan / süren mevsim festivali ve toplanma zili
     const festival = currentSeasonFestival(state);
     const fairNow = currentFair(state);
@@ -169,9 +192,11 @@ export class Hud {
     // (21. aşama) açık dilekçeler ve isyan
     const petitions = state.petitions?.list ?? [];
     const revoltNow = state.trust?.revolt ?? null;
-    const buffKey = `${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${fairNow?.type}:${fairNow?.phase}|${guestNow?.type}:${guestNow?.guest.name}:${guestNow?.guest.leaving}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}`;
-    if (buffKey !== this.lastBuffs) {
+    const buffKey = `${state.valley}|${state.doctrine?.chosen}|${lateGameActive(state)}|${missingLuxuries(state).join(',')}|${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${fairNow?.type}:${fairNow?.phase}|${guestNow?.type}:${guestNow?.guest.name}:${guestNow?.guest.leaving}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}`;
+    const griefKey = mourners * 10000 + shaken * 100 + (griefId % 97);
+    if (buffKey !== this.lastBuffs || griefKey !== this.lastGrief) {
       this.lastBuffs = buffKey;
+      this.lastGrief = griefKey;
       const chips = buffs.map((b) =>
         el('span', { className: 'buff-chip', title: b.name }, [
           el('img', { src: getAnyIconURL(b.icon), alt: '' }),
@@ -189,6 +214,20 @@ export class Hud {
       }
       const chip = (icon, text, title, cls = '') =>
         el('span', { className: `buff-chip${cls}`, title }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
+      // (28.4) Vadi Karakteri (oyunun başından beri), Kasaba Doktrini ve geç oyun beklentisi: üst çubuğun altındaki çip satırında
+      {
+        const valley = VALLEYS[state.valley];
+        const doctrine = DOCTRINES[state.doctrine?.chosen];
+        const late = lateGameActive(state);
+        const missing = missingLuxuries(state).map((k) => LATE_GAME.luxuries[k].name);
+        const title = `Vadi Karakteri: ${valley?.name}. ${valley?.description ?? ''}\n${doctrine ? `Kasaba Doktrini: ${doctrine.name}. ${doctrine.description}` : 'Kasaba Doktrini: henüz seçilmedi (Bilgelik Evi araştırması ya da Belediye fermanıyla seçilir).'}${late ? `\nGeç oyun beklentisi: Keyif ve Sosyallik %${Math.round((LATE_GAME.decay - 1) * 100)} çabuk azalır; ${missing.length ? `EKSİK lüks: ${missing.join(', ')} (refah -${missing.length * LATE_GAME.perMissing})` : 'lüks kalemleri tam (şerbet, kumaş, sıcak yemek)'}.` : ''}`;
+        chips.unshift(
+          el('span', { className: `buff-chip hud-valley-chip${late && missing.length ? ' is-freezing' : ''}`, title }, [
+            el('img', { src: getAnyIconURL('map'), alt: '' }),
+            el('span', { className: 'hud-valley', text: `${valley?.name ?? '-'}${doctrine ? ` · ${doctrine.name.replace(' Doktrini', '')}` : ''}${late && missing.length ? ` · eksik lüks ${missing.length}` : ''}` }),
+          ])
+        );
+      }
       if (festival?.stage === 'announced') chips.unshift(chip(festival.festival.icon, `${festival.festival.name} · 15:00`, festival.festival.announce, ' is-festival'));
       if (fairNow?.phase === 'prep') chips.unshift(chip(fairNow.fair.icon, `${fairNow.fair.name} · 18:00`, fairNow.fair.start, ' is-festival'));
       if (guestNow) chips.push(chip(guestNow.def.icon, `${guestNow.def.name} · ${guestNow.guest.name}`, `${guestNow.def.name} ${guestNow.guest.name} kasabaya uğradı (${guestNow.guest.departureDay}. günün 09:00'una kadar). Geçici misafir: nüfusa ve konuta sayılmaz.`, ' is-festival'));
@@ -201,7 +240,7 @@ export class Hud {
       }
       if (damaged.length) {
         const crisisDamage = state.buildings.some((b) => b.damaged && !b.isBurning && (b.damageKind === 'fire' || b.damageKind === 'raid'));
-        chips.push(chip(crisisDamage ? 'repair' : 'storm', `${damaged.length} hasarlı yapı`, `Onarılmalı (panelden "Tamir Et" ya da ustalar kendiliğinden): ${damaged.join(', ')}`, ' is-freezing'));
+        chips.push(chip(crisisDamage ? 'repair' : 'storm', `${damaged.length} hasarlı yapı`, `Onarılmalı (ustalar kendiliğinden ya da panelden pahalı "Tamir Et"): ${damaged.join(', ')}`, ' is-freezing'));
       }
       if (injured.length) chips.push(chip('bandage', `${injured.length} hafif yaralı`, `Yürüme ve çalışma %20 yavaş: ${injured.join(', ')}. Şifacı Kulübesi'nde sarılırlar; yoksa 1,5 günde kendiliğinden geçer.`));
       // (21. aşama) İsyan alarmı ve açık dilekçeler (tıklanabilir)
@@ -211,6 +250,11 @@ export class Hud {
         b.addEventListener('click', onClick);
         return b;
       };
+      // (29.2) Kasabada yas / ağır travma: bilgi çipi, tıklayınca o sakine odaklanır
+      if (mourners + shaken > 0) {
+        const text = mourners > 0 ? `🕯️ ${mourners} sakin yasta${shaken ? ` · ${shaken} acılı` : ''}` : `${shaken} sakin acılı`;
+        chips.push(action('candle', text, 'Yas tutan, sarsılmış ya da kalbi kırık sakinler: daha yavaş çalışır, keyifleri çabuk kaçar. Dostları boş zamanlarında onları teselli eder. Tıkla: sakine odaklan', ' hud-grief-chip', () => this.game.events.emit('ui:selectCharacter', griefId)));
+      }
       if (revoltNow) {
         const venue = state.buildings.find((b) => b.functional && b.type === 'fountain') ?? state.buildings.find((b) => b.functional && BUILDINGS[b.type].civic);
         chips.unshift(
@@ -219,7 +263,7 @@ export class Hud {
       }
       // (23. aşama) Yangın alarmı (her yanan yapı için, tıklayınca yapı seçilir) ve haydut izi (tıklayınca karar penceresi)
       for (const b of burning) {
-        chips.unshift(action('fire', `${b.name} yanıyor · %${Math.round(b.fireProgress)}`, 'Sakinler kovalarla koşuyor. Tıkla: yapıyı seç, panelden "Acil Söndür (Kova Zinciri)" de. %100\'e varırsa yapı hasar alır (silinmez).', ' is-revolt', () => this.game.events.emit('ui:selectBuilding', b.id)));
+        chips.unshift(action('fire', `${b.name} yanıyor · %${Math.round(b.fireProgress)}`, 'Sakinler kovalarla koşuyor. Tıkla: yapıyı seç, panelden 30 altına "Acil Seferberlik" ilan et (8 kişi, 2 kat hız; sonra yorgunluk). %100\'e varırsa yapı hasar alır (silinmez).', ' is-revolt', () => this.game.events.emit('ui:selectBuilding', b.id)));
       }
       if (raidLeft !== null) {
         const ok = defenseStatus(state).ok;

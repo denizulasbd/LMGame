@@ -12,14 +12,14 @@
 //     altın fermanları; iş yerlerinde "İşçi Ata" ile sakini sabitleme (yalnızca orada çalışır) ve sabitlemeyi kaldırma
 //   - (12. aşama) Bilgelik Evi'nin araştırma kartları (Araştır düğmesi, ilerleme) ve okulu; limanın fazlalık
 //     ihracatı sınırı, ihracat sandığı, tekne durumu ve Kasaba Hazinesi; harikanın aşamaları
-//   - (23. aşama) kriz bölümü: yanan yapıda ilerleme ve "Acil Söndür (Kova Zinciri)", hasarlı yapıda "Tamir Et" (maliyetin %25'i,
+//   - (23. aşama) kriz bölümü: yanan yapıda ilerleme ve "Acil Seferberlik" (28.1), hasarlı yapıda "Tamir Et" (maliyetin %50'si + 25 altın,
 //     anında), Su Kuyusu'nun etkileri, Gözcü Kulesi'nde bekçiler ve bekleyen haydut baskınının üç çözüm yolu
 //   - (10. aşama) yan ürün (ağılda yiyecek, madende taş), değirmen-fırının işleme satırları (1 yiyecek -> 1
 //     ekmek), ekipmanın asıl (demir / yün) ve eski usul tarifi, ağıldaki koyunlar, belediyenin etkileri
 // Panel oyun durumunu yalnızca okur; istekleri olay olarak yayınlar (ui:startProject, ui:cancelProject,
 // ui:demolishBuilding, ui:selectCharacter, ui:dismissWorker, ui:rehireWorker, ui:setCraftMode, ui:civicProject,
 // ui:startResearch, ui:setExportThreshold, ui:prepareCrate, ui:buyLuxury, ui:buyRelic, ui:goldDecree, ui:pinWorker,
-// ui:unpinWorker, ui:extinguish, ui:repairBuilding, ui:raidChoice). Ne
+// ui:unpinWorker, ui:emergencyMuster, ui:repairBuilding, ui:raidChoice). Ne
 // değiştiğini anlamak için her karede kısa bir anahtar üretir; anahtar değişmedikçe DOM'a dokunmaz.
 import { CLOCK_GEAR } from '../../data/goldenAge.js';
 import { BUILDINGS, mendSpec, PROJECT_WORDS } from '../../data/buildings.js';
@@ -54,8 +54,8 @@ import { trustValue, trustLevel } from '../../systems/Citizens.js';
 import { reliefStatus, trustWelfare } from '../../systems/TrustSystem.js';
 import { formatRemaining } from '../../systems/Petitions.js';
 import { TAX_RATES, TAX_RATE_KEYS, TAX, LEVY, DECREES, DECREE_ITEMS } from '../../data/crown.js';
-import { estimateTax, levyAmount, levyPlan, decreeStatus, reputationLevel } from '../../systems/Crown.js';
-import { mendSpecFor, repairCost, wellNear, defenseStatus } from '../../systems/Crisis.js';
+import { estimateTax, levyAmount, levyPlan, decreeStatus, reputationLevel, taxLockLeft } from '../../systems/Crown.js';
+import { mendSpecFor, instantRepairCost, wellNear, defenseStatus } from '../../systems/Crisis.js';
 import { FIRE, WELL, GUARD, REPAIR } from '../../data/crisis.js';
 import { raidCard } from './crisisCards.js';
 import { productionOf, storageLimit, cropOf, hasGranary } from '../../systems/Granary.js';
@@ -64,7 +64,9 @@ import { INN_SHERBET, GARMENT, CLOTH_WELFARE } from '../../data/refinery.js';
 import { CONTRACTS, MARKET, IMPORTS, IMPORT_KEYS } from '../../data/tradePost.js';
 import { contractStatus, importStatus, priceMultiplier, shipDocked } from '../../systems/TradePost.js';
 import { clothWelfare } from '../../systems/Refinery.js';
-import { PROFESSIONS } from '../../data/apprenticeship.js';
+import { DOCTRINES, DOCTRINE_KEYS } from '../../data/doctrines.js';
+import { GRANDMASTER, PROFESSIONS } from '../../data/apprenticeship.js';
+import { grandmasterAt, grandmasterMasterworkMultiplier } from '../../systems/Grandmaster.js';
 import { doorOpen, apprenticesAt, pickMaster, acceptsApprentice, canApprentice, apprenticeSlots } from '../../systems/Apprenticeship.js';
 import { headOf } from '../../systems/Lineage.js';
 import { FEAST, TIERS as FEAST_TIERS } from '../../data/feast.js';
@@ -207,11 +209,12 @@ export class BuildingPanel {
       ? CIVIC_PROJECT_KEYS.map((id) => {
           const st = civicStatus(state, id, building.functional);
           return `${st.ok}:${st.reason}:${st.level}`;
-        }).join(',')
+        }).join(',') + `:${state.doctrine?.chosen}`
       : '';
     const researchKey = building.definition.academy
       ? [
           state.research.active?.id,
+          state.doctrine?.chosen,
           state.research.active ? Math.floor((state.research.active.progress / RESEARCH[state.research.active.id].work) * 100) : 0,
           RESEARCH_KEYS.map((id) => researchStatus(state, id, this.academyReady(building)).reason).join(','),
         ].join(':')
@@ -234,7 +237,7 @@ export class BuildingPanel {
         ? [JSON.stringify(state.luxury), state.resources.gold, Math.floor((state.buffs.spices ?? 0) / 60), Math.floor((state.buffs.goldBonus ?? 0) / 60), Math.floor((state.buffs.royalArchitects ?? 0) / 60), state.time.day, state.buildings.length].join(':')
         : '';
     const pickerKey = this.pickerFor === building.id ? this.workerCandidates(building, state).map((o) => `${o.character.id}:${o.character.name}:${o.level}:${o.pinnedTo}`).join(',') : '';
-    const crownKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.tax?.rate, state.tax?.last, Math.floor(((state.tax?.nextAt ?? 0) - state.totalMinutes) / 60), state.crown, Math.floor((state.crown?.nextLevyAt - state.totalMinutes) / 60), levyAmount(state), state.crown?.decree ? decreeStatus(state, state.crown.decree) : null, estimateTax(state), state.resources]) : '';
+    const crownKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.tax?.rate, state.tax?.lockedUntil, Math.floor(taxLockLeft(state) / 60), state.tax?.last, Math.floor(((state.tax?.nextAt ?? 0) - state.totalMinutes) / 60), state.crown, Math.floor((state.crown?.nextLevyAt - state.totalMinutes) / 60), levyAmount(state), state.crown?.decree ? decreeStatus(state, state.crown.decree) : null, estimateTax(state), state.resources]) : '';
     const bellKey = (building.type === 'fountain' || building.definition.civic ? crownKey : '') + (building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}:${Math.round(trustValue(state))}:${JSON.stringify(state.trust?.revolt?.rioters ?? null)}:${state.trust?.revolt?.raids?.length ?? 0}:${JSON.stringify(reliefStatus(state, 'food'))}:${JSON.stringify(reliefStatus(state, 'gold'))}:${(state.petitions?.list ?? []).map((p) => `${p.id}${p.status}${Math.floor((p.deadline - state.totalMinutes) / 60)}`).join(',')}` : '');
     // (16. aşama) keşif seferi (liman, belediye) ve kadim yazıtlar (Bilgelik Evi)
     const exploreKey =
@@ -551,11 +554,12 @@ export class BuildingPanel {
       return el('div', { className: `decree${done ? ' is-done' : ''}` }, [
         el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL(project.icon), alt: '' }), project.name, el('span', { className: 'decree-state', text: levelText })]),
         el('div', { className: 'upgrade-text', text: project.description }),
+        ...(project.doctrine ? [el('div', { className: `upgrade-text doctrine-tag${!st.ok && st.reason?.startsWith('Doktrin kilitli') ? '' : ' is-active'}`, text: `Doktrin: ${DOCTRINES[project.doctrine].name}${st.reason?.startsWith('Doktrin kilitli') ? ' (kilitli)' : ''}` })] : []),
         ...(done ? [] : [el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, costs), go])]),
         ...(!st.ok && !done ? [el('div', { className: 'upgrade-text is-active', text: st.reason })] : []),
       ]);
     });
-    this.decrees.replaceChildren(el('div', { className: 'building-section-title', text: 'Belediye Fermanları' }), ...cards);
+    this.decrees.replaceChildren(el('div', { className: 'building-section-title', text: 'Belediye Fermanları' }), this.doctrineSummary(state), ...cards);
   }
 
   /** İşçi Ata listesi: bu yapıya sabitli olmayan yetişkinler, bu işteki ustalığa göre (en usta önce). */
@@ -582,9 +586,12 @@ export class BuildingPanel {
     const tax = state.tax;
     const rate = TAX_RATES[tax.rate];
     const est = estimateTax(state);
+    const lockLeft = taxLockLeft(state);
     const buttons = TAX_RATE_KEYS.map((key) => {
       const def = TAX_RATES[key];
-      const b = this.button(def.short, `${def.name}: ${def.description}`, () => this.events.emit('ui:setTaxRate', { rate: key }));
+      const locked = lockLeft > 0 && key !== tax.rate;
+      const b = this.button(def.short, locked ? `Ferman kilitli: ${formatRemaining(lockLeft)}` : `${def.name}: ${def.description}`, () => this.events.emit('ui:setTaxRate', { rate: key }));
+      b.disabled = locked;
       b.classList.add('tax-rate-button', `is-${key}`);
       b.classList.toggle('is-active', key === tax.rate);
       b.dataset.rate = key;
@@ -627,6 +634,7 @@ export class BuildingPanel {
         el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL(rate.icon), alt: '' }), rate.name, el('span', { className: 'decree-state', text: `%${rate.percent}` })]),
         el('div', { className: 'tax-rates' }, buttons),
         el('div', { className: 'upgrade-text', text: rate.description }),
+        el('div', { className: `upgrade-text${lockLeft > 0 ? ' is-active' : ''}`, text: lockLeft > 0 ? `Ferman kilitli: ${formatRemaining(lockLeft)} (kademe ${TAX.lockDays} oyun günü boyunca değiştirilemez)` : `Kademeyi değiştirirsen ferman ${TAX.lockDays} gün kilitlenir (bir tam tahsilat döngüsü).` }),
         el('div', { className: 'upgrade-text', text: `Sıradaki tahsilat ${formatRemaining(tax.nextAt - state.totalMinutes)} sonra (${TAX.everyDays} günde bir, ${TAX.hour}:00): tahminen +${est.gold} altın${est.goods ? `, ${est.goods} birim öşür` : ''} (${est.payers} vergi veren)` }),
         el('div', { className: 'upgrade-text', text: last }),
       ]),
@@ -687,8 +695,9 @@ export class BuildingPanel {
   /** (23. aşama) Panelin kriz bölümünün değişim anahtarı (anahtar değişmedikçe DOM'a dokunulmaz). */
   crisisKeyOf(building, state) {
     const raid = state.crisis?.raid;
-    const parts = [building.isBurning, Math.floor(building.fireProgress / 5), building.fireWater, building.damaged, building.damageKind];
+    const parts = [building.isBurning, Math.floor(building.fireProgress / 5), building.fireWater, building.damaged, building.damageKind, building.emergencyMuster];
     if (building.damaged || building.type === 'well') parts.push(state.resources.wood, state.resources.stone);
+    if (building.damaged || building.isBurning) parts.push(state.resources.gold);
     if (building.type === 'guardTower' || building.type === 'well') {
       parts.push(Math.floor(state.totalMinutes / 60), building.workerIds.size, building.guardSlots);
     }
@@ -699,7 +708,7 @@ export class BuildingPanel {
   }
 
   /**
-   * (23. aşama) Kriz bölümü: yanan yapıda "Acil Söndür (Kova Zinciri)", hasarlı yapıda "Tamir Et" (maliyetin %25'i), Su Kuyusu'nun
+   * (23. aşama) Kriz bölümü: yanan yapıda "Acil Seferberlik", hasarlı yapıda "Tamir Et" (maliyetin %50'si + 25 altın), Su Kuyusu'nun
    * etkileri, Gözcü Kulesi'nin bekçileri ve bekleyen haydut baskınının üç çözüm yolu ('ui:raidChoice').
    */
   renderCrisis(building, state) {
@@ -708,23 +717,31 @@ export class BuildingPanel {
     if (building.isBurning) {
       const bar = el('span', { className: 'need-bar trust-bar' }, [el('span', { className: 'need-fill trust-fill is-revolt', style: `width: ${Math.round(building.fireProgress)}%` })]);
       const needed = wellNear(state, building) ? FIRE.bucketsNearWell : FIRE.buckets;
-      const go = this.button('Acil Söndür (Kova Zinciri)', 'Sakinler kova zinciri kurar: yangın hemen söner, yapı hasar almaz', () => this.events.emit('ui:extinguish', { buildingId: building.id }));
+      const mustered = building.emergencyMuster;
+      const canPay = (state.resources.gold ?? 0) >= FIRE.muster.gold;
+      const go = this.button(
+        mustered ? 'Seferberlik ilan edildi' : 'Acil Seferberlik',
+        mustered ? 'Kasabadan 8 kişi kovayla koşuyor' : canPay ? `${FIRE.muster.gold} altın: ${FIRE.muster.fighters} kişi, 2 kat hızlı kova taşır; kova atanlar sonra bitkin düşer (Enerji -${FIRE.muster.energy}, Keyif -${FIRE.muster.fun})` : `Yetersiz altın: ${FIRE.muster.gold} gerekir`,
+        () => this.events.emit('ui:emergencyMuster', { buildingId: building.id })
+      );
       go.classList.add('upgrade-button');
+      go.disabled = mustered || !canPay;
+      const musterCost = mustered ? [] : [el('span', { className: `build-cost${canPay ? '' : ' is-missing'}` }, [el('img', { src: getIconDataURL(RESOURCES.gold.icon), alt: RESOURCES.gold.name }), String(FIRE.muster.gold)])];
       children.push(
         el('div', { className: 'building-section-title', text: 'Yangın!' }),
         el('div', { className: 'decree luxury-card is-revolt' }, [
           el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('fire'), alt: '' }), `Yangın %${Math.round(building.fireProgress)}`, bar, el('span', { className: 'decree-state', text: `${building.fireWater}/${needed} kova` })]),
-          el('div', { className: 'upgrade-text is-active', text: `Yakındaki sakinler Su Kuyusu'ndan (yoksa nehirden) kova taşıyor. Yangın %100'e varırsa yapı hasar alır (haritadan silinmez); ${needed} kova atılırsa ya da aşağıdaki düğmeye basarsan hasarsız söner (Güven +${FIRE.trustOut}).` }),
-          el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, []), go]),
+          el('div', { className: 'upgrade-text is-active', text: `Yakındaki sakinler Su Kuyusu'ndan (yoksa nehirden) kova taşıyor. Yangın %100'e varırsa yapı hasar alır (haritadan silinmez); ${needed} kova atılırsa hasarsız söner (Güven +${FIRE.trustOut}). ${mustered ? `Acil Seferberlik sürüyor: ${FIRE.muster.fighters} kişi ${FIRE.muster.speed} kat hızla kova taşıyor; yangın bitince kova atanlar çok yorulur.` : `Acil Seferberlik yangını söndürmez: ${FIRE.muster.fighters} kişiyi ${FIRE.muster.speed} kat hızla koşturur, bedeli ${FIRE.muster.gold} altın ve halkın yorgunluğudur.`}` }),
+          el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, musterCost), go]),
         ])
       );
     } else if (building.damaged) {
-      const cost = repairCost(building.type);
+      const cost = instantRepairCost(building.type);
       const missing = Object.entries(cost).filter(([r, v]) => (state.resources[r] ?? 0) < v).map(([r]) => RESOURCES[r].name);
       const costs = Object.entries(cost).map(([r, v]) =>
         el('span', { className: `build-cost${(state.resources[r] ?? 0) < v ? ' is-missing' : ''}` }, [el('img', { src: getIconDataURL(RESOURCES[r].icon), alt: RESOURCES[r].name }), String(v)])
       );
-      const go = this.button('Tamir Et', missing.length ? `Yetersiz kaynak: ${missing.join(', ')}` : `İnşa maliyetinin %${Math.round(REPAIR.costRatio * 100)}'iyle yapıyı anında onar`, () => this.events.emit('ui:repairBuilding', { buildingId: building.id }));
+      const go = this.button('Tamir Et', missing.length ? `Yetersiz kaynak: ${missing.join(', ')}` : `Acil durum lüksü: inşa maliyetinin %${Math.round(REPAIR.instant.ratio * 100)}'i + ${REPAIR.instant.gold} altınla yapıyı anında onar (ustalar %${Math.round(REPAIR.costRatio * 100)}'ye onarır)`, () => this.events.emit('ui:repairBuilding', { buildingId: building.id }));
       go.classList.add('upgrade-button');
       go.disabled = missing.length > 0;
       const kindText = building.damageKind === 'fire' ? 'Yangında yanan kirişler' : building.damageKind === 'raid' ? 'Haydutların kırdığı yapı' : 'Fırtınanın kırdığı yapı';
@@ -732,7 +749,7 @@ export class BuildingPanel {
         el('div', { className: 'building-section-title', text: 'Hasar ve Tamir' }),
         el('div', { className: 'decree luxury-card' }, [
           el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('repair'), alt: '' }), 'Hasarlı yapı', el('span', { className: 'decree-state', text: building.project ? 'Onarılıyor' : 'Üretim durdu' })]),
-          el('div', { className: 'upgrade-text', text: `${kindText}: onarılana kadar kimse çalışamaz. "Tamir Et" anında düzeltir; yoksa boştaki ustalar kaynak yettikçe kendiliğinden onarmaya gelir.` }),
+          el('div', { className: 'upgrade-text', text: `${kindText}: onarılana kadar kimse çalışamaz. "Tamir Et" anında düzeltir ama pahalıdır (%${Math.round(REPAIR.instant.ratio * 100)} maliyet + ${REPAIR.instant.gold} altın); acelen yoksa boştaki ustalar maliyetin yalnızca %${Math.round(REPAIR.costRatio * 100)}'siyle kendiliğinden onarmaya gelir.` }),
           el('div', { className: 'upgrade-row' }, [el('span', { className: 'build-costs' }, costs), go]),
         ])
       );
@@ -829,6 +846,24 @@ export class BuildingPanel {
     return building.functional && !building.damaged;
   }
 
+  /** (28.4) Kasaba Doktrini özeti: seçilmişse etkileri, değilse üç yol ve "ilk araştırma / ferman seçer" uyarısı. */
+  doctrineSummary(state) {
+    const chosen = state.doctrine?.chosen;
+    if (chosen) {
+      const d = DOCTRINES[chosen];
+      return el('div', { className: 'decree doctrine-card is-done' }, [
+        el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL(d.icon), alt: '' }), `Kasaba Doktrini: ${d.name}`, el('span', { className: 'decree-state', text: `Gün ${state.doctrine.day}` })]),
+        el('div', { className: 'upgrade-text', text: d.description }),
+        el('div', { className: 'upgrade-text', text: 'Öteki iki doktrinin araştırma ve fermanları kilitlidir.' }),
+      ]);
+    }
+    return el('div', { className: 'decree doctrine-card' }, [
+      el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('book'), alt: '' }), 'Kasaba Doktrini: henüz seçilmedi']),
+      el('div', { className: 'upgrade-text is-active', text: 'Bir doktrine bağlı ilk araştırmayı ya da fermanı başlattığında o doktrin SEÇİLİR; ötekilerin yolları kalıcı olarak kilitlenir.' }),
+      ...DOCTRINE_KEYS.map((k) => el('div', { className: 'upgrade-text', text: `${DOCTRINES[k].name}: ${DOCTRINES[k].short}` })),
+    ]);
+  }
+
   /** Bilgelik Evi: dört araştırmanın kartları (durum, maliyet, Araştır düğmesi) ve süren araştırmanın ilerlemesi. */
   renderResearch(building, state) {
     const show = Boolean(building.definition.academy) && building.functional;
@@ -843,6 +878,7 @@ export class BuildingPanel {
       const children = [
         el('div', { className: 'decree-head' }, [el('img', { src: getIconDataURL(def.icon), alt: '' }), def.name, el('span', { className: 'decree-state', text: stateText })]),
         el('div', { className: 'upgrade-text', text: def.description }),
+        ...(def.doctrine ? [el('div', { className: `upgrade-text doctrine-tag${st.locked ? '' : ' is-active'}`, text: `Doktrin: ${DOCTRINES[def.doctrine].name}${st.locked ? ' (kilitli)' : ''}` })] : []),
       ];
       if (st.active) {
         children.push(el('div', { className: 'need-bar building-progress' }, [el('span', { className: 'need-fill need-fun', style: `width: ${Math.floor(Math.min(1, active.progress / def.work) * 100)}%` })]));
@@ -858,7 +894,7 @@ export class BuildingPanel {
       }
       return el('div', { className: `decree${st.done ? ' is-done' : ''}` }, children);
     });
-    this.research.replaceChildren(el('div', { className: 'building-section-title', text: 'Kasaba Araştırmaları' }), ...cards);
+    this.research.replaceChildren(el('div', { className: 'building-section-title', text: 'Kasaba Araştırmaları' }), this.doctrineSummary(state), ...cards);
   }
 
   /**
@@ -1174,6 +1210,14 @@ export class BuildingPanel {
     if (def.production && building.factors) lines.push(...this.productionLines(building, state));
     if (def.processing) lines.push(...this.processingLines(building, state));
 
+    // (28.2) Çalışan bir Başusta varsa: tasarruf şansı ve yüksek eser ihtimali
+    {
+      const gm = state.characters.filter((c) => grandmasterAt(c, building) && (building.workerIds?.has(c.id) || c.workplaceId === building.id));
+      if (gm.length) {
+        const mw = gm.some((c) => grandmasterMasterworkMultiplier(c, Object.keys(MASTERPIECES).find((k) => MASTERPIECES[k].skill === PROFESSIONS[building.type]?.skill) ?? '') > 1);
+        lines.push(`★ Başusta Üretimi: ${gm.map((c) => c.name).join(', ')} · her ${GRANDMASTER.saveEvery}. üretim hammaddesiz (Tasarruf Şansı)${mw ? ' · usta işi eser ihtimali 2 kat (Yüksek Eser İhtimali)' : ''}`);
+      }
+    }
     switch (building.type) {
       case 'cabin': {
         const people = state.characters.filter((c) => c.homeId === building.id);

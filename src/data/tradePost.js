@@ -23,12 +23,15 @@ export const VISIT = {
   stayHours: 24,
 };
 
+// (28.1) Sözleşme tabanları, Büyük Ticaret Limanı'nın otomatik satış fiyatının (data/trade.js -> EXPORT.values) EN AZ %40 üstündedir:
+// el ile imza atmak limana göre her zaman daha kârlıdır (tools/sim/audit.mjs ve tests.mjs bunu doğrular).
+export const CONTRACT_MIN_PREMIUM = 1.4;
 export const CONTRACTS = {
-  cloth: { qty: 10, gold: 40, title: 'Kumaş Talebi', buyer: 'Krallık dokuma loncası' },
-  sherbet: { qty: 8, gold: 35, title: 'Şerbet Talebi', buyer: 'Saray mahzeni' },
-  bread: { qty: 25, gold: 20, title: 'Ekmek Talebi', buyer: 'Garnizon fırını' },
-  food: { qty: 40, gold: 18, title: 'Erzak Talebi', buyer: 'Kervan kumanyası' },
-  wool: { qty: 15, gold: 30, title: 'Yün Talebi', buyer: 'Şehir terzileri' },
+  cloth: { qty: 10, gold: 85, title: 'Kumaş Talebi', buyer: 'Krallık dokuma loncası' },
+  sherbet: { qty: 8, gold: 80, title: 'Şerbet Talebi', buyer: 'Saray mahzeni' },
+  bread: { qty: 25, gold: 105, title: 'Ekmek Talebi', buyer: 'Garnizon fırını' },
+  food: { qty: 40, gold: 75, title: 'Erzak Talebi', buyer: 'Kervan kumanyası' },
+  wool: { qty: 15, gold: 65, title: 'Yün Talebi', buyer: 'Şehir terzileri' },
 };
 export const FIXED_CONTRACTS = ['cloth', 'sherbet'];
 export const ROTATING_CONTRACTS = ['bread', 'food', 'wool'];
