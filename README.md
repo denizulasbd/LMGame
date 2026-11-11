@@ -262,6 +262,8 @@ LMGame/
     │   ├── TownLevelSystem.js Kasaba seviyesi: ortalama refah, seviye atlama ve kutlama, belediyenin erzak dengesi
     │   ├── Moodlets.js     (29.2) Ruh hallerinin saf hesapları: katman tavanları, kademe ölçeği, toplam etki (c.mood), baskın ruh hali, teselli
     │   ├── MoodletSystem.js (29.2) Moodlet'lerin doğması (eylem x kişilik, ihtiyaç / çevre, travma / zafer), yas ve teselli, sözler
+    │   ├── Wants.js        (29.3) Arzu / korku / yaşam doyumunun saf hesapları: durumsuz günlük seçim, uygunluk, drive, kademeler, kayıt
+    │   ├── WantSystem.js   (29.3) Arzuların dolması, gerçekleşmesi, süre dolumu, korkular, doyum kayması, vefat / göç temizliği
     │   ├── Chemistry.js    (29.1) Sosyal kimyanın saf hesapları: kıvılcım (izole üreteç), kişilik / huy / zanaat uyumu, yönlü etiketler, kayıt göçü
     │   ├── ChemistrySystem.js (29.1) Duygusal etiketlerin doğması (olaylar), saat başı kimya, ikram, yolda şimşek ve etiketli selam
     │   ├── HealthSystem.js Maruziyet, üşütme, kendiliğinden iyileşme, şifacıda tedavi ve Dinçlik
@@ -4220,6 +4222,76 @@ Yeni olaylar: `task:finished`, `population:dying`, `feast:served`, `chemistry:un
 - **Tohum 42** (`autopilot.mjs 42 72 --crisis-state`, iki kez): `--json` raporu ve kayıt dosyası **bayt bayt aynı** (karşılaştırma `cmp`). 72 günde 11 003 moodlet; **doğal vefat 1** (Deniz, 68 yaşında, G32; eşi Kemal), **Derin Yas 1**, **anma 5**, **yas tesellisi 1** (toplam teselli 16), **Ustalık Akışı 705**, Sarsılmış 2 (29.2'de 25: söndüren kahramanlar artık sarsılmıyor). Ulu Saat Kulesi aşamaları G45 / G49 / G50, Altın Çağ G50; evli çift 13, düğün kutlaması 14, doğum 7, atışma / barışma 259 / 36, geç oyun refahı %93,4 (en düşük %83,9), ortalama iş çarpanı 1,074.
 - Bekçi: takılma 0 · kopuk referans 0 · taşan ev 0 · bekleyen iş 0 · üretmeyen iş yeri 0 · sosyal sıkışma 0 (72 gün, 1728 örnek).
 - Otopilot raporuna "teselli travmaya göre" kırılımı eklendi (`moodlets.consoledBy`).
+
+## Yaşayan Ruh: Arzular, Korkular ve Yaşam Doyumu (29. aşama, 29.3 mikro adımı)
+
+**Kayıt sürümü 38.** Her yetişkin sakinin içinde en çok **3 arzu** ve **2 korku** vardır. Arzu gerçekleşince **yaşam doyumu** artar ve "Dileği Oldu" moodlet'i doğar.
+Korku başına gelince doyum düşer ve "Korktuğu Başına Geldi" doğar. Süresi dolan arzu küçük bir hayal kırıklığıdır (-2); gerçekleşmeden geçen korku küçük bir ferahlıktır (+2).
+Doyum her gün 50'ye doğru kayar ve kademesi `c.mood` çarpanlarına katılır.
+
+### 1. Mimari (`data/wants.js`, `systems/Wants.js`, `systems/WantSystem.js`)
+
+- `c.wants` / `c.fears = [{ key, since, until, whoId?, whoName? }]`. `until: null` uzun soluklu kaydı gösterir. Kurallar: kategori başına 1 arzu, uzun soluklu en çok 1 arzu, son 2 günde görülen anahtar yeniden seçilmez.
+- `c.satisfaction` 0-100, `c.wantLog` son 8 sonuç, `c.fearStreak` / `c.wishCount` (29.4 kancaları). `c.drive` kaydedilmez; Brain ve JobSystem yalnızca okur.
+- **Seçim** her gün 06:00'da yapılır. Ana üreteç değil, (tohum + 39, kimlik, gün, salt) karmasından türeyen **durumsuz** bir üreteç kullanılır: kaydet-yükle sonrası aynı gün aynı seçim çıkar. Göç zar çekmez.
+- Ağırlık = temel x özellik / huy x evre (bilge: miras x2, zanaat x0,5) x moodlet bağlamı (yalnızlık -> dost x3, açlık -> ziyafet x3). Yastaki sakinde aşk ve keyif arzuları susar.
+- 18 arzu (miras, aile, aşk, zanaat, sosyal, keyif, sefer, dilekçe) ve 10 korku (yangın, kavga, soğuk, açlık, yakının yokluğu, yalnızlık, hastalık, kalp kırıklığı, duyulmamak, tükenmek) var. Tablolar ve puanlar `data/wants.js` içinde.
+- "Yokluğu" korkusu gerçekleşince Derin Yas yeterli sayılır; ayrıca "Korktuğu Başına Geldi" verilmez. İş yerinde yangın tutuşunca -10, kül olunca ek -6 (sayaç bir kez artar).
+- Hedef kişi vefat edince / göçünce ona bağlı bütün kayıtlar cezasız silinir (`void`); kayıtta yalnızca ad kalır.
+
+**Doyum kademeleri:** Hayal Kırıklığı (<20: iş x0,95, atışma x1,2) · Arayışta (<40) · Hâlinden Memnun (<65) · Doyumlu (<85: iş x1,03) · Gönlü Zengin (iş x1,05, deneyim x1,1).
+
+### 2. Davranış kancaları (ana üretece zar eklemeden)
+
+- "Kafamı dinleyeyim": tenha boş zaman etkinlikleri x2,5.
+- Ziyafet / handa şerbet arzusu: han x2,5. Alışveriş arzusu: Pazar zarı eşiği x2,5.
+- Dertleşmek / barışmak istenen kişi `findPartner`'da 60 piksel yakınmış gibi sayılır.
+- Kavgasından korkulan kişi kırgınlık gibi kaçınılır.
+- Eser / ilerleme arzusu: mola yok (zar yine atılır) ve kendi uzmanlık işi 4 karo yakın sayılır.
+- Açlık / tükenme korkusu: eşik +8 / +6. Soğuk korkusu: sonbahar / kışta han ve ateş başı x2.
+
+### 3. Arayüz
+
+Karakter kartında, moodlet listesinin altında **"Arzular, Korkular ve Yaşam Doyumu"** bölümü yer alır.
+İçinde kademe renkli doyum çubuğu ile arzu / korku çipleri bulunur; çiplerde kalan süre ve doyum etkisi yazar. Çocukta bölüm gizlidir.
+Toast / günlük yoktur; arzu sonuçları haritada balon ve söz olarak görünür.
+
+### Ön ince ayar
+
+`LIFESPAN.min` 66 -> **67**: 66 yaşında başlayan kurucu, ömrü 66 çıkınca tohum 21'de G2'de ölüyordu. Kayıttaki 66 artık geçersizdir; ömür kimlikten yeniden atanır.
+İlk doğal vefat: tohum 21 **G10** (Deniz, 67), tohum 42 **G31** (Deniz, 68).
+
+### Kayıt (sürüm 38)
+
+- `characters[].wants / fears / satisfaction / wantLog / fearStreak / wishCount` ve `wants { rolled, fulfilled, expired, fearsRolled, realized, passed }` eklendi.
+- v37 -> v38 göçünde listeler boş, doyum 50 başlar. Bozuk kayıt temizlenir; hayatta olmayan kişiye işaret eden kayıt atılır.
+- Yeni fikstür `save-v38.json` (otopilot, tohum 42, 72 gün, `--crisis-state`).
+
+### Denge ve test (simülasyon)
+
+- `tests.mjs` **1495 -> 1545**. Kapsam: her arzu ve korku için tetik testi, sızıntı (0 üreteç çağrısı), tavanlar, süre / void, doyum kademeleri, Brain kancaları, göç, panel, kaydet-yükle eşitliği.
+  Eski bölümler, 29.3 bölümüne kadar arzu dolumu kapalı bir dünyada koşar (Panayır / Konuk kalıbı).
+- `audit.mjs` **158 -> 162**; `compat.mjs` **1551 -> 1669** (v2-v38).
+- Bekçi: arzu / korku tavanı, bilinmeyen anahtar, kopuk hedef ve süresi geçmiş kayıt **kopuk referans** sayılır.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --speeds 4 --days 50`): takılma 0, kopuk referans 0, bekleyen iş 0, sayfa hatası 0.
+
+  | Tohum | Arzu dolan / gerçekleşen | Oran | Korku dolan / gerçekleşen | Oran | Ort. doyum | Kademeler (H.K. / Ar. / Mem. / Doy. / G.Z.) |
+  |---|---|---|---|---|---|---|
+  | 7 | 1309 / 513 | %39 | 779 / 143 | %18 | 56,2 | 0 / 2 / 20 / 6 / 2 |
+  | 13 | 1305 / 597 | %46 | 740 / 106 | %14 | 63,8 | 0 / 0 / 19 / 7 / 5 |
+  | 21 | 1306 / 560 | %43 | 749 / 127 | %17 | 58,5 | 1 / 1 / 19 / 7 / 3 |
+  | 42 | 1323 / 546 | %41 | 775 / 113 | %15 | 56,6 | 0 / 0 / 23 / 5 / 2 |
+  | 77 | 1277 / 551 | %43 | 802 / 160 | %20 | 54,6 | 0 / 2 / 21 / 5 / 2 |
+  | 101 | 1321 / 560 | %42 | 790 / 141 | %18 | 58,2 | 0 / 1 / 20 / 7 / 3 |
+
+- **Tohum 42** (`autopilot.mjs 42 72 --crisis-state`, iki kez): rapor ve kayıt dosyası **bayt bayt aynı**.
+  Sonuçlar: arzu %41, korku %15, son gün ortalama doyum 58,4. 29.2b sayaçları canlı: doğal vefat 1, yas tutan 2, teselli 24, Ustalık Akışı sürüyor.
+- **Denge ayarları:** dertleşmek 8 -> 4, kendime bir şey alayım 6 -> 3, kafamı dinleyeyim 6 -> 3, ziyafet 6 -> 3, ailece sofra 8 -> 6, handa şerbet ağırlık 1 -> 0,6 ve süre 2 -> 3 gün.
+  İlk ölçümde ortalama doyum 66-78'di ve "Gönlü Zengin" nüfusun yarısına varıyordu.
+- **Hiç gerçekleşmeyenler** (6 x 50 gün):
+  - `pass_heirloom` hiç dolmadı: 50 günde yadigâr oluşmuyor.
+  - `see_grandchild` (12 dolum) ve `see_pupil_master` (1 dolum) gerçekleşmedi: 50 günde torun ve çırak mezuniyeti çok nadir.
+  - Arzu anahtarlarının 15/18'i (%83), korkuların 10/10'u en az bir kez gerçekleşti.
 
 ## Kod denetimi (15. aşama öncesi)
 

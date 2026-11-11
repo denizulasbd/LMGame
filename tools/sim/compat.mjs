@@ -61,7 +61,8 @@
 //                  (sürüm 2-29) currentFeast yoktur: null ile açılır
 //   save-v38.json: 29.3'ün oyunu (kayıt sürümü 38, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin arzuları, korkuları, yaşam
 //                  doyumu, son sonuçları ve arzu / korku sayaçları. Eski kayıtlarda (sürüm 2-37) alanlar yoktur: boş listeler, 50 doyum ve boş
-//                  sayaçlarla açılır (göç zar çekmez; listeler yüklemeden sonraki ilk 06:00'da dolar)
+//                  sayaçlarla açılır (göç zar çekmez; listeler yüklemeden sonraki ilk 06:00'da dolar). Bu kayıtta kurucu bilge Deniz G31'de
+//                  vefat etmiştir: Kıdemli Bilge ve yadigâr yoktur (ilgili denetimler kayıtta öğe yoksa boş kalmayı doğrular)
 //   save-v37.json: 29.2'nin oyunu (kayıt sürümü 37): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin üzerindeki ruh halleri (moodlet'ler)
 //                  ve ruh hali sayaçları. Eski kayıtlarda (sürüm 2-36) moodlets yoktur: boş liste ve boş sayaçlarla açılır
 //   save-v36.json: 29.1'in oyunu (kayıt sürümü 36): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin kimya kayıtları, zanaat bağları ve
@@ -297,6 +298,8 @@ for (const { name, raw } of fixtures) {
       party: s.social.party !== null,
     };
     const startDay = s.time.day;
+    let sawRoll = false; // (29.3) yüklemeden sonra 06:00 dolumu gerçekleşti mi (karar pencereleri "bir günü" kısaltabilir)
+    offs.push(game.events.on('time:hour', (h) => { if (h === 6) sawRoll = true; }));
     window.sim.step(225 * 24); // bir gün
     // Yolda bir sefer varsa macera pencereleri oyunu (gerçek zamanda 30 sn) durdurur: gün dönene kadar biraz daha ilerlet
     for (let guard = 0; s.time.day === startDay && guard < 48; guard++) window.sim.step(225);
@@ -318,7 +321,7 @@ for (const { name, raw } of fixtures) {
       apprAfter: { ok: s.characters.every((c) => !c.apprenticeship || (c.lifeStage === 'youth' && s.buildings.some((b) => b.id === c.apprenticeship.buildingId) && c.apprenticeship.progress >= 0 && c.apprenticeship.progress <= 100)), n: s.characters.filter((c) => c.apprenticeship).length },
       lifeAfter: s.characters.map((c) => ({ id: c.id, days: c.ageInDays, stage: c.lifeStage, child: c.isChild })),
       moodletsAfter: (() => { const m = moodSnap(); delete m.json; return m; })(),
-      wantsAfter: (() => { const w = wantSnap(); delete w.json; return w; })(),
+      wantsAfter: (() => { const w = wantSnap(); delete w.json; w.sawRoll = sawRoll; return w; })(),
       chemistryAfter: (() => { const c = chemSnap(); delete c.json; return c; })(),
       tradeAfter: { visits: s.tradePost.visits, scheduled: s.tradePost.nextShipAt !== null || Boolean(s.tradePost.ship) },
       agriAfter: { crops: s.buildings.filter((b) => b.type === 'garden').map((b) => b.crop), capacity: s.granaryCapacity },
@@ -543,7 +546,7 @@ for (const { name, raw } of fixtures) {
     } else {
       results.push({ name: `${tag}: arzular, korkular, doyum, sonuç kaydı ve sayaçlar korundu (gidiş-dönüş birebir)`, ok: W.json === JSON.stringify(data.characters.map(fields)) && W.stats === JSON.stringify(data.wants) && r.loaded.wantsRoundtrip && W.over === 0 && W.dangling === 0 && W.range, detail: `${W.count} kayıt` });
     }
-    results.push({ name: `${tag}: bir gün sonra arzular / korkular yaşıyor (06:00 dolumu; tavanlar, kopuk referans yok, çocukta yok)`, ok: after.count > 0 && after.over === 0 && after.dangling === 0 && after.range && after.kids === 0, detail: `${after.count} kayıt` });
+    results.push({ name: `${tag}: bir gün sonra arzular / korkular yaşıyor (06:00 geçildiyse dolum; tavanlar, kopuk referans yok, çocukta yok)`, ok: (after.count > 0 || !after.sawRoll) && after.over === 0 && after.dangling === 0 && after.range && after.kids === 0, detail: `${after.count} kayıt · 06:00 ${after.sawRoll ? 'geçildi' : 'geçilmedi'}` });
   }
   // (29.1) Sosyal kimya ve duygusal etiketler
   {
@@ -587,7 +590,7 @@ for (const { name, raw } of fixtures) {
       });
       const elders = L.filter((x) => x.stage === 'elder');
       const core = L.filter((x) => !x.child && !x.role && x.stage !== 'elder').length;
-      results.push({ name: `${tag}: bilgeler emekli (çekirdek sakin kuralı), ölmedi`, ok: elders.length > 0 && elders.every((x) => x.retired === core >= 3), detail: `${elders.length} bilge, ${core} çekirdek sakin` });
+      results.push({ name: `${tag}: bilgeler emekli (çekirdek sakin kuralı), ölmedi`, ok: (elders.length > 0 || !data.characters.some((c) => c.lifeStage === 'elder')) && elders.every((x) => x.retired === core >= 3), detail: `${elders.length} bilge, ${core} çekirdek sakin` });
     }
     const before = new Map(L.map((x) => [x.id, x]));
     const grew = r.lifeAfter.filter((x) => before.has(x.id) && !before.get(x.id).role);
@@ -654,7 +657,7 @@ for (const { name, raw } of fixtures) {
       const saved = data.characters.flatMap((c) => (c.inventory ?? []).filter((x) => x.heirloom).map((x) => [c.id, x.kind, JSON.stringify(x.heirloom.chain), x.heirloom.story]));
       results.push({
         name: `${tag}: çantadaki yadigârlar (hikâye, zincir), sayaçlar ve Tarihçe'deki ilk kuşak mirası korundu`,
-        ok: H.carried.length > 0 && JSON.stringify(H.carried) === JSON.stringify(saved) && JSON.parse(H.state).transfers === data.heirloom.transfers && JSON.stringify(H.first) === JSON.stringify(data.chronicle.firstHeirloom),
+        ok: (H.carried.length > 0 || saved.length === 0) && JSON.stringify(H.carried) === JSON.stringify(saved) && JSON.parse(H.state).transfers === data.heirloom.transfers && JSON.stringify(H.first) === JSON.stringify(data.chronicle.firstHeirloom),
         detail: H.carried.map((x) => `${x[1]} ${x[2]}`).join(' · '),
       });
     }
