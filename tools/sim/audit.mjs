@@ -937,6 +937,47 @@ const PAGE_HELPERS = () => {
       for (const id of ids) { const c = s.characters.find((x) => x.id === id); const v = JSON.parse(before.get(id)); fields.forEach((f, i) => (c[f] = v[i])); WT.recomputeDrive(c); MO.recomputeMood(c); }
       s.wants = JSON.parse(stats0);
     }
+    // --- 2zb. (29.4) Kalıcı kişilik evrimi: kayıt -> yükleme birebir; değişmezler (deepTraits ⊆ traits, en çok 3 özellik, tekrar yok) ---
+    {
+      const EVX = await import('/src/systems/Evolution.js');
+      const ED = await import('/src/data/evolution.js');
+      const pick = () => s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((x, y) => x.id - y.id).slice(0, 3);
+      const [a, b, c3] = pick();
+      const ids = [a.id, b.id, c3.id];
+      const fields = ['traits', 'growth', 'growthToday', 'growthCause', 'deepTraits', 'evolutions', 'evolutionCount', 'acquiredCount'];
+      const before = new Map([a, b, c3].map((c) => [c.id, JSON.stringify(fields.map((f) => c[f]))]));
+      const stats0 = JSON.stringify(s.evolution);
+      const day = s.time.day;
+      a.traits = ['hardworking', 'cheerful', 'natureLover']; a.deepTraits = ['hardworking', 'cheerful']; a.growth = [-12, 40, -33, 8]; a.growthToday = [0, 7, -5, 0];
+      a.growthCause = [null, 'want:make_friend', 'moodlet:nature_bliss', 'tier:fulfilled'];
+      a.evolutions = [{ day: day - 20, kind: 'acquired', axis: 2, from: null, to: 'natureLover', cause: 'moodlet:nature_bliss' }, { day: day - 5, kind: 'deepened', axis: 0, from: null, to: 'hardworking', cause: 'masterwork' }];
+      a.evolutionCount = 2; a.acquiredCount = 1;
+      b.traits = ['grumpy', 'sleepyhead']; b.deepTraits = []; b.growth = [0, 0, 0, -100]; b.growthToday = [0, 0, 0, -20]; b.growthCause = [null, null, null, 'moodlet:mourning'];
+      b.evolutions = [{ day: day - 2, kind: 'turned', axis: 3, from: 'cheerful', to: 'grumpy', cause: 'moodlet:mourning' }]; b.evolutionCount = 1; b.acquiredCount = 0;
+      c3.traits = ['hardworking', 'sleepyhead']; c3.deepTraits = []; c3.growth = [0, 0, 0, 0]; c3.growthToday = [0, 0, 0, 0]; c3.growthCause = [null, null, null, null]; c3.evolutions = []; c3.evolutionCount = 0; c3.acquiredCount = 0;
+      for (const c of [a, b, c3]) { c.profile = c.buildProfile(); }
+      s.evolution.turned.grumpy = (s.evolution.turned.grumpy ?? 0) + 1; s.evolution.acquired.natureLover = (s.evolution.acquired.natureLover ?? 0) + 1; s.evolution.deepened.hardworking = (s.evolution.deepened.hardworking ?? 0) + 1; s.evolution.total += 3;
+      const want = JSON.stringify(s.characters.map((c) => [c.id, fields.map((f) => c[f])]));
+      const wantStats = JSON.stringify(s.evolution);
+      const diff = A.roundtrip();
+      check('(29.4) eksenler, derin özellikler, evrim kaydı, sayaçlar ve 3 özellikli sakin kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const loaded = ids.map((id) => s.characters.find((c) => c.id === id));
+      check('(29.4) yüklenen evrim alanları ve sayaçlar birebir aynı (traits dahil)', JSON.stringify(s.characters.map((c) => [c.id, fields.map((f) => c[f])])) === want && JSON.stringify(s.evolution) === wantStats, `${JSON.stringify(s.characters.map((c) => [c.id, fields.map((f) => c[f])])).slice(0, 300)} || ${want.slice(0, 300)} || ${JSON.stringify(s.evolution)} || ${wantStats}`);
+      check('(29.4) derin yama yüklemede profile yeniden uygulanır (Yorulmaz yorgunluğu 0,5; Gönül Ferahı x Doğa Sever keyif düşüşü 0,6 x 0,9; derinsiz Çalışkan x Uykucu 0,6 x 1,3)', Math.abs(loaded[0].profile.work.fatigue - 0.5) < 1e-9 && Math.abs(loaded[0].profile.decay.fun - 0.6 * 0.9) < 1e-9 && Math.abs(loaded[2].profile.work.fatigue - 0.6 * 1.3) < 1e-9, JSON.stringify([loaded[0].profile.work.fatigue, loaded[0].profile.decay.fun, loaded[2].profile.work.fatigue]));
+      const invariants = () => s.characters.every((c) => c.deepTraits.every((t) => c.traits.includes(t)) && c.traits.length <= 3 && new Set(c.traits).size === c.traits.length && c.growth.length === 4 && c.growth.every((v) => Number.isInteger(v) && Math.abs(v) <= 100) && c.evolutions.length <= ED.EVOLUTION_RULES.logMax && c.evolutionCount >= c.evolutions.length);
+      check('(29.4) değişmezler: deepTraits ⊆ traits, özellik sayısı ≤ 3, aynı özellik iki kez yok, 4 eksen, tam sayı ve ±100 içinde, log ≤ 4', invariants());
+      // bozuk veri: kayıttan geçerken temizlenir
+      loaded[2].growth = [250, 'x', -300, 1.6]; loaded[2].growthToday = [99, 0, 0, 0]; loaded[2].growthCause = ['bilinmeyen', 3, 'masterwork', null]; loaded[2].deepTraits = ['grumpy', 'hardworking', 'hardworking', 'obur']; loaded[2].evolutions = [{ day: 1, kind: 'x' }, { day: 3, kind: 'acquired', axis: 9, to: 'cheerful' }, { day: 4, kind: 'deepened', axis: 0, to: 'hardworking' }];
+      const diff2 = A.roundtrip();
+      const c2 = s.characters.find((c) => c.id === ids[2]);
+      check('(29.4) bozuk eksen / neden / derin özellik / kayıt yüklemede temizlenir (aralık, bilinmeyen anahtar, traits dışı derin özellik, bozuk kayıt)', JSON.stringify(c2.growth) === '[100,0,-100,2]' && JSON.stringify(c2.growthToday) === '[20,0,0,0]' && JSON.stringify(c2.growthCause) === '[null,null,"masterwork",null]' && JSON.stringify(c2.deepTraits) === '["hardworking"]' && c2.evolutions.length === 1 && c2.evolutions[0].kind === 'deepened', `${JSON.stringify([c2.growth, c2.growthCause, c2.deepTraits, c2.evolutions])} ${diff2.slice(0, 2).join(' | ')}`);
+      // yükleme sonrası 05:00 sınırı: eşiği aşan eksen sabaha karşı kesintisiz uygulanır
+      c2.growth = [0, 0, 0, 0]; c2.growthToday = [0, 0, 0, 0]; c2.evolutions = []; c2.evolutionCount = 0; c2.deepTraits = [];
+      const diff3 = A.roundtrip();
+      check('(29.4) yüklemeden sonra da değişmezler korunur', invariants() && diff3.length === 0, diff3.slice(0, 2).join(' | '));
+      for (const id of ids) { const c = s.characters.find((x) => x.id === id); const v = JSON.parse(before.get(id)); fields.forEach((f, i) => (c[f] = v[i])); c.profile = c.buildProfile(); }
+      s.evolution = JSON.parse(stats0);
+    }
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();

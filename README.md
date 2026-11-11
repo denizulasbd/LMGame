@@ -264,6 +264,8 @@ LMGame/
     │   ├── MoodletSystem.js (29.2) Moodlet'lerin doğması (eylem x kişilik, ihtiyaç / çevre, travma / zafer), yas ve teselli, sözler
     │   ├── Wants.js        (29.3) Arzu / korku / yaşam doyumunun saf hesapları: durumsuz günlük seçim, uygunluk, drive, kademeler, kayıt
     │   ├── WantSystem.js   (29.3) Arzuların dolması, gerçekleşmesi, süre dolumu, korkular, doyum kayması, vefat / göç temizliği
+    │   ├── Evolution.js    (29.4) Kişilik evriminin saf hesapları: eksenler, katkı (evre çarpanı, günlük sınır), bekleyen değişim, derin biçim, ipucu, kayıt
+    │   ├── EvolutionSystem.js (29.4) Eksen katkıları (olaylar, gün dönümü), 05:00 denetimi, evolve (profil, kimya, anı, günlük, söz), sayaçlar
     │   ├── Chemistry.js    (29.1) Sosyal kimyanın saf hesapları: kıvılcım (izole üreteç), kişilik / huy / zanaat uyumu, yönlü etiketler, kayıt göçü
     │   ├── ChemistrySystem.js (29.1) Duygusal etiketlerin doğması (olaylar), saat başı kimya, ikram, yolda şimşek ve etiketli selam
     │   ├── HealthSystem.js Maruziyet, üşütme, kendiliğinden iyileşme, şifacıda tedavi ve Dinçlik
@@ -4292,6 +4294,91 @@ Toast / günlük yoktur; arzu sonuçları haritada balon ve söz olarak görün�
   - `pass_heirloom` hiç dolmadı: 50 günde yadigâr oluşmuyor.
   - `see_grandchild` (12 dolum) ve `see_pupil_master` (1 dolum) gerçekleşmedi: 50 günde torun ve çırak mezuniyeti çok nadir.
   - Arzu anahtarlarının 15/18'i (%83), korkuların 10/10'u en az bir kez gerçekleşti.
+
+## Kalıcı Kişilik Evrimi (29. aşama, 29.4 mikro adımı)
+
+**Kayıt sürümü 39.** Bir sakinin özellikleri (`c.traits`) artık yaratıldıktan sonra sabit değildir: yaşadıkları dört **eksen**i iter, eşik aşılınca bir sabah
+**kalıcı** bir değişim olur ("bir sabah değişmiş uyandı"). Evrim **hiç zar çekmez**; tamamı eşik tabanlıdır.
+
+### 1. Mimari (`data/evolution.js`, `systems/Evolution.js`, `systems/EvolutionSystem.js`)
+
+- Dört eksen (-100..+100; sıra sabit): **drive** (Çalışkan / Uykucu), **company** (Sosyal Kelebek / İçine Kapanık), **calling** (Doğa Sever / Hırslı),
+  **spirit** (Neşeli / Huysuz). Bir test tablonun `OPPOSING_TRAITS` ile tutarlılığını doğrular. Obur ve Gece Kuşu'nun ekseni yoktur.
+- Yaşananlar ekseni iter (`push`: evre çarpanı x yuvarlama x günlük sınır x ±100). Her gün dönümünde eksen `decayPerDay` kadar 0'a söner.
+- **05:00'te** (06:00 arzu dolumundan önce) her sakin denetlenir; eksenler 0 -> 3 sırasıyla bakılır, eşiği aşan **ilk uygulanabilir** eksen kazanır. Günde en çok 1 değişim.
+- Üç sonuç: **dönüşüm** (zıt özelliğin yerine yön kutbu, dizideki yer korunur; eşik 75), **derinleşme** (yön kutbu zaten sakinde: `c.deepTraits`; eşik 60),
+  **edinim** (ikisi de yok, 3'ten az özellik, ömür boyu ilk edinim: üçüncü özellik; eşik 60). Hiçbiri uygulanamıyorsa eksen olduğu gibi kalır.
+- Sınırlar: iki değişim arası 12 gün, ömür boyu en çok 3 değişim, 1 edinim, en çok 3 özellik. Çocuklarda eksenler 0'da durur (çocuk mizacı 25.3'tür).
+  Genç x1,5, Bilge x0,6 katkı alır. Seferdeki (`c.away`) sakin sıradaki 05:00'e kalır.
+- `evolve` sırası: özellikler / sayaçlar / kayıt -> profil (`c.buildProfile`) -> kimya (`refreshChemistry` her ilişki kaydıyla) -> `recomputeDrive` + `recomputeMood`
+  -> anı -> Kasaba Günlüğü -> balon + söz -> `trait:evolved { character, kind, axis, from, to, cause }`. Sürmekte olan görev kesilmez. Toast yok.
+- Sözler (`EVOLUTION_LINES`) yalnızca görünür sakinde, izole üreteçle (tohum + 40) seçilir; ana üreteç, Brain / JobSystem üreteçleri ve `Math.random` hiç tüketilmez.
+
+### 2. Derin biçimler (`DEEP_TRAITS`)
+
+Yorulmaz (iş yorgunluğu 0,6 -> 0,5) · Bitkin (enerji düşüşü 1,35 -> 1,5) · Kasabanın Gülü (sosyal kazanç 1,3 -> 1,5) · Münzevi (sosyal düşüş 0,6 -> 0,45, çeşme 0,5 -> 0,3) ·
+Toprağın Dostu (doğa kazancı 1,6 -> 1,9) · Gözü Yükseklerde (iş hızı 1,15 -> 1,22, keyif düşüşü 1,15 -> 1,25) · Gönül Ferahı (keyif düşüşü 0,7 -> 0,6) · Aksi (atışma 1,5 -> 1,8).
+`buildTraitProfile(keys, { deep })` derin özellikte temel blok üzerine **yalnızca yamadaki alanları** koyar; `deep` boşken çıktı eskisiyle birebir aynıdır (testte denetlenir).
+
+### 3. Arayüz
+
+Karakter kartında özellik çipleri: derin özellik **derin ad + ★** ve derin açıklama; sonradan edinilen / dönüşen özellik **"sonradan"** işareti ve
+"G34 · Derin Yas'tan sonra · Neşeli -> Huysuz" başlığı. Çiplerin altında, eksen 30'u geçince soluk italik bir **eğilim ipucu** ("Giderek içine kapanıyor"). Çocukta ipucu yok.
+Kart yalnızca özellikler / derin biçim / ipucu değişince yeniden kurulur (`evolutionKey`).
+
+### 4. Ön temizlik (29.3 borçları)
+
+- **Arzu dolumu şalteri kaldırıldı.** Eski bölümler 29.3 bölümüne kadar `WantSystem.prototype.roll`'u kapalı koşuyordu; düzenek silindi. Hiçbir test kuralı değişmedi: 3 test kırıldı
+  (Güneş Saati Küresi oranı, yaralı yürüyüş çarpanı, "hoşlandığı kişi başkasına aşık olunca"), düzeltmelerin kaydırdığı dünyada 2 test daha ve çardak testi çöktü; hepsi fikstürü sağlamlaştırılarak düzeltildi (ruh hali / hastalık sıfırlama,
+  ruh ikizi etiketi, Çalışkan'da mola zarı, çardak yerleri, çocuk yoksa geçici çocuk). Toplam 6 fikstür düzeltmesi; sınır (30) çok altında.
+- `see_pupil_master.base` 1 -> **2,5**: 6 tohum x 50 günde dolum 1 -> 2 (gerçekleşme yine 0: 50 günde mezuniyet yok).
+- `pass_heirloom` **değişmedi**. Tohum 42, 72 gün: yadigâr oluşan **0**, devredilen 0; arzu hiç dolmadı.
+
+### 5. Kayıt (sürüm 39)
+
+- `characters[].growth / growthToday / growthCause / deepTraits / evolutions / evolutionCount / acquiredCount` ve `state.evolution { turned, deepened, acquired, total }` eklendi.
+- v38 -> v39 göçü: sıfır eksenler, boş listeler ve sayaçlar. **Göç zar çekmez, hiçbir özelliği değiştirmez.**
+- Sanitize: bilinmeyen anahtar, `traits`'te olmayan derin özellik, aralık dışı değer, 4'ten farklı uzunluk temizlenir; 3 özellikli sakin geçerlidir; birbirine zıt iki özellik taşıyan eski kayıt bozuk sayılmaz.
+- Yeni fikstür `save-v39.json` (otopilot, tohum 42, 72 gün, `--crisis-state`).
+
+### 6. Denge ve test (simülasyon)
+
+- `tests.mjs` **1545 -> 1614**, `audit.mjs` **162 -> 168**, `compat.mjs` **1669 -> 1791** (v2-v39). Bekçi: eksen aralığı, günlük sınır, özellik sayısı, tekrar, `deepTraits ⊆ traits`, çocukta birikim yok.
+- Denge denemeleri için `autopilot.mjs --evo "EVOLUTION_RULES.decayPerDay=3;..."` (bellekte geçersiz kılma) ve `--pushes` (katkı kaynağı dökümü, günlük net katkı yüzdelikleri) eklendi.
+- **Denge ayarları** (şartnamedeki başlangıç -> bugün): ilk ölçümde koşu başına 40-52 değişim ve sakinlerin %66-94'ü değişiyordu (İçine Kapanık nüfusun %67'si). Kaynak dökümü:
+  `company` ekseni herkes için sistematik eksiydi (atışma ve tatsız karşılaşma, tatlı sohbetten fazla), `calling` sistematik artıydı (Gözü Gönlü Açıldı günde ~1 kez).
+
+  | Ayar | Başlangıç | Bugün |
+  |---|---|---|
+  | `decayPerDay` | 1 | **3** |
+  | atışma (`relationship:quarrel`) company | -4 | **-2** |
+  | `sour_encounter` company | -2 | **-1** |
+  | `aesthetic_joy` calling | +1 | **0** |
+  | arzu gerçekleşince spirit | puan x 0,5 | **puan x 0,4** |
+  | gün dönümü doyum: Gönlü Zengin / Doyumlu | +4 / +2 | **+3 / +1** |
+
+  `shiftAt` (60) ve `turnAt` (75) şartnamedeki gibi kaldı. Doğrusal sönme eşik gibi çalışır: bir eksen ancak günde ortalama 3'ten fazla itilirse birikir.
+- **Stres matrisi** (`--seeds 7,13,21,42,77,101 --days 50`, 4x): takılma 0, kopuk referans 0, bekleyen iş 0, taşan ev 0, sayfa hatası 0.
+
+  | Tohum | Nüfus | Değişim (edinim / dönüşüm / derinleşme) | Etkilenen | En yaygın özellik | Arzu | Korku | Ort. doyum |
+  |---|---|---|---|---|---|---|---|
+  | 7 | 31 | 9 (1 / 1 / 7) | %26 | Çalışkan %35 | %37 | %17 | 50,5 |
+  | 13 | 31 | 9 (3 / 0 / 6) | %26 | Sosyal Kelebek %35 | %44 | %15 | 60,5 |
+  | 21 | 31 | 5 (0 / 2 / 3) | %16 | Çalışkan %32 | %44 | %16 | 61,1 |
+  | 42 | 30 | 4 (0 / 1 / 3) | %13 | Neşeli %33 | %42 | %13 | 60,9 |
+  | 77 | 30 | 8 (3 / 2 / 3) | %22 | Çalışkan %33 | %40 | %20 | 52,4 |
+  | 101 | 31 | 3 (1 / 1 / 1) | %10 | Doğa Sever %26 | %43 | %17 | 57,1 |
+
+  Toplam 38 değişim: 8 edinim, 7 dönüşüm, 23 derinleşme; 27 artı yönde, 11 eksi yönde. Hiçbir koşuda değişim 3-12 dışına çıkmadı.
+- **Tohum 42** (72 gün, `--crisis-state`, iki kez): kayıt ve rapor **bayt bayt aynı** (`cmp`); 22 değişim (7 / 3 / 12), 16 sakin.
+- Örnekler (tohum 42, 72 gün): G20 Leyla Neşeli -> Huysuz (başına gelen korkuların ardından); G52 Yağmur Çalışkan derinleşti, Yorulmaz (ustalığın verdiği güvenle);
+  G34 Defne Su Doğa Sever derinleşti, Toprağın Dostu (doğanın içinde keyif aldıkça).
+
+### 7. Bilinen eksikler
+
+- Çocuklar ebeveynin **güncel** özelliklerinden miras alır (`FamilySystem.inheritTraits`): evrim çocuğa da yansır (istenen davranış, değiştirilmedi).
+- Neden bazen "Zamanla": küçük katkılar (5'in altı) birikip eşiği aşarsa belirli bir kaynak yazılmaz.
+- Huy (`quirk`) değişimi, Obur / Gece Kuşu evrimi, iş arkadaşı tercihi (29.5), hafıza kancaları (29.6) ve panelin yeniden tasarımı (29.9) kapsam dışıdır.
 
 ## Kod denetimi (15. aşama öncesi)
 

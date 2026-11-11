@@ -54,7 +54,7 @@ export const SATISFACTION = {
 
 // Arzu kataloğu (sıra = seçim sırası; aynı olay bir sakinde en çok bir arzuyu, bu sırayla ilkini gerçekleştirir)
 export const WANTS = {
-  see_pupil_master: { name: 'Çırağım {who} ustalaşsın', cat: 'legacy', days: null, points: 14, grandmasterBonus: 8, base: 1, icon: 'masterpiece', traits: {}, quirks: { craftsman: 1.5 }, drive: {} },
+  see_pupil_master: { name: 'Çırağım {who} ustalaşsın', cat: 'legacy', days: null, points: 14, grandmasterBonus: 8, base: 2.5, icon: 'masterpiece', traits: {}, quirks: { craftsman: 1.5 }, drive: {} },
   pass_heirloom: { name: 'Yadigârımı devredeyim', cat: 'legacy', days: null, points: 18, base: 1, icon: 'treasure', traits: {}, quirks: {}, drive: {} },
   see_grandchild: { name: 'Torun seveyim', cat: 'family', days: null, points: 20, base: 1, icon: 'heart', traits: { cheerful: 1.3 }, quirks: {}, drive: {} },
   get_married: { name: '{who} ile evleneyim', cat: 'love', days: null, points: 20, base: 1.5, icon: 'ring', traits: {}, quirks: {}, drive: { seek: true } },

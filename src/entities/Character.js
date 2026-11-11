@@ -15,7 +15,7 @@
 // 25.4: Aile Kütüğü (generation, parents: doğum ebeveynleri, familyId: ocak, children; LineageSystem).
 // 29.2: ruh halleri (moodlets: en çok 6; mood: toplam etki ve baskın ruh hali; MoodletSystem).
 // 29.3: arzular (wants: en çok 3), korkular (fears: en çok 2), yaşam doyumu (satisfaction 0-100), son sonuçlar (wantLog: 8),
-// fearStreak / wishCount; drive: davranış kancaları (kaydedilmez; Wants.recomputeDrive; WantSystem).
+// fearStreak / wishCount; (29.4) growth / growthToday / growthCause / deepTraits / evolutions / evolutionCount / acquiredCount; drive: davranış kancaları (kaydedilmez; Wants.recomputeDrive; WantSystem).
 // 29.1: sosyal kimya ve duygusal etiketler (relationships: { karşıKimlik: { chemistry -2..+3, craft, tags, until } }; ChemistrySystem).
 // 22. aşama: köyü terk etmeye karar verdiyse yola çıktığı an ve çıkış karosu (emigrating: { since, exit }; DesertionSystem).
 import { PROFESSIONS } from '../data/apprenticeship.js';
@@ -45,6 +45,7 @@ import { sanitizeOrigin } from '../systems/Temperament.js';
 import { sanitizeMentees } from '../systems/Heirloom.js';
 import { sanitizeRelations } from '../systems/Chemistry.js';
 import { sanitizeMoodlets, neutralMood, recomputeMood } from '../systems/Moodlets.js';
+import { sanitizeGrowth, sanitizeGrowthToday, sanitizeGrowthCause, sanitizeDeepTraits, sanitizeEvolutions, sanitizeEvoCount } from '../systems/Evolution.js';
 import { sanitizeWants, sanitizeWantLog, clampSatisfaction, sanitizeCount, neutralDrive, recomputeDrive } from '../systems/Wants.js';
 import { WANTS, FEARS, WANT_CAPS } from '../data/wants.js';
 
@@ -135,6 +136,13 @@ export class Character extends Entity {
     wantLog = null,
     fearStreak = 0,
     wishCount = 0,
+    growth = null,
+    growthToday = null,
+    growthCause = null,
+    deepTraits = null,
+    evolutions = null,
+    evolutionCount = 0,
+    acquiredCount = 0,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -223,6 +231,14 @@ export class Character extends Entity {
     this.wantLog = sanitizeWantLog(wantLog);
     this.fearStreak = sanitizeCount(fearStreak);
     this.wishCount = sanitizeCount(wishCount);
+    // (29.4) Kalıcı kişilik evrimi (kayda girer; Evolution.js / EvolutionSystem). Çocukta eksenler 0'da durur; deepTraits yalnızca traits içindekiler
+    this.growth = child ? [0, 0, 0, 0] : sanitizeGrowth(growth);
+    this.growthToday = child ? [0, 0, 0, 0] : sanitizeGrowthToday(growthToday);
+    this.growthCause = child ? [null, null, null, null] : sanitizeGrowthCause(growthCause);
+    this.deepTraits = child ? [] : sanitizeDeepTraits(traits, deepTraits);
+    this.evolutions = child ? [] : sanitizeEvolutions(evolutions);
+    this.evolutionCount = child ? 0 : Math.max(sanitizeEvoCount(evolutionCount), this.evolutions.length);
+    this.acquiredCount = child ? 0 : sanitizeEvoCount(acquiredCount);
     this.drive = neutralDrive();
     recomputeDrive(this);
     this.mood = neutralMood();
@@ -278,7 +294,7 @@ export class Character extends Entity {
 
   /** Evreye göre davranış profili (çocuk / genç / yetişkin / bilge). */
   buildProfile() {
-    return buildTraitProfile(this.traits, { child: this.isChild, youth: this.lifeStage === 'youth', elder: this.lifeStage === 'elder' });
+    return buildTraitProfile(this.traits, { child: this.isChild, youth: this.lifeStage === 'youth', elder: this.lifeStage === 'elder', deep: this.deepTraits });
   }
 
   /**
@@ -645,6 +661,13 @@ export class Character extends Entity {
       wantLog: this.wantLog,
       fearStreak: this.fearStreak,
       wishCount: this.wishCount,
+      growth: this.growth,
+      growthToday: this.growthToday,
+      growthCause: this.growthCause,
+      deepTraits: this.deepTraits,
+      evolutions: this.evolutions,
+      evolutionCount: this.evolutionCount,
+      acquiredCount: this.acquiredCount,
     };
   }
 

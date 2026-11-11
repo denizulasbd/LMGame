@@ -411,6 +411,32 @@
   cursor: help;
 }
 
+/* (29.4) derin biçim, sonradan edinilen / dönüşen özellik ve eğilim ipucu */
+.trait-chip.is-deep {
+  background: #d9b64a;
+  border-color: #8a6b12;
+  box-shadow: inset -1px -1px 0 #a98618;
+}
+.trait-chip.is-evolved {
+  border-style: dashed;
+}
+.trait-mark {
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+.trait-mark.trait-star {
+  color: #7a4fc0;
+  opacity: 1;
+}
+.trait-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.65;
+}
+
 .character-status {
   margin: 10px 0 8px;
   padding: 6px 8px;

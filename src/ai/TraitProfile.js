@@ -13,6 +13,20 @@ import {
 } from '../data/characters.js';
 import { CHILD_SCHEDULE, CHILD_LEISURE, CHILD_SPEED } from '../data/family.js';
 import { YOUTH, ELDER } from '../data/lifeStages.js';
+import { DEEP_TRAITS } from '../data/evolution.js';
+
+/** (29.4) Derin biçim: temel özellik bloğu üzerine kısmi yama; iç içe gruplarda yalnızca yamadaki alanlar yerine geçer. */
+function deepBlock(key) {
+  const base = TRAITS[key];
+  const patch = DEEP_TRAITS[key];
+  if (!base || !patch) return base;
+  const out = { ...base };
+  for (const [field, value] of Object.entries(patch)) {
+    if (field === 'name' || field === 'description') continue;
+    out[field] = value !== null && typeof value === 'object' && !Array.isArray(value) ? { ...(base[field] ?? {}), ...value } : value;
+  }
+  return out;
+}
 
 /** İki özellik listesi arasındaki ilk çatışan çift ([a'nınki, b'ninki]) ya da null. */
 export function clashingTraits(traitsA, traitsB) {
@@ -37,10 +51,11 @@ export function clashesWithOwn(traitKeys, key) {
 
 /**
  * @param {string[]} traitKeys
- * @param {{ child?: boolean, youth?: boolean, elder?: boolean }} options child: çocuk profili (erken yatar, çalışmaz, oyun oynar);
+ * @param {{ child?: boolean, youth?: boolean, elder?: boolean, deep?: string[] }} options (29.4) deep: derinleşmiş özellik anahtarları (TRAITS yerine
+ *   birleştirilmiş DEEP_TRAITS bloğu kullanılır; boşken çıktı eskisiyle birebir aynıdır); child: çocuk profili (erken yatar, çalışmaz, oyun oynar);
  *   (25.1) youth: enerji dolum çarpanı (YOUTH.energyGain; 25.1'de 1); elder: ağır adımlarla yürür, bank / çardak / havuz / kütüphane sever
  */
-export function buildTraitProfile(traitKeys, { child = false, youth = false, elder = false } = {}) {
+export function buildTraitProfile(traitKeys, { child = false, youth = false, elder = false, deep = [] } = {}) {
   const profile = {
     decay: Object.fromEntries(NEED_KEYS.map((k) => [k, 1])),
     gain: { ...Object.fromEntries(NEED_KEYS.map((k) => [k, 1])), nature: 1 },
@@ -56,7 +71,7 @@ export function buildTraitProfile(traitKeys, { child = false, youth = false, eld
   };
 
   for (const key of traitKeys) {
-    const trait = TRAITS[key];
+    const trait = deep.length > 0 && deep.includes(key) ? deepBlock(key) : TRAITS[key];
     if (!trait) continue;
     for (const [need, m] of Object.entries(trait.decay ?? {})) profile.decay[need] *= m;
     for (const [need, m] of Object.entries(trait.gain ?? {})) profile.gain[need] = (profile.gain[need] ?? 1) * m;

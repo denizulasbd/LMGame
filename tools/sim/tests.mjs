@@ -133,8 +133,6 @@ const pageResults = await page.evaluate(async () => {
   // (29.3) Arzu / korku dolumu da 29.3 bölümüne kadar kapalıdır (aynı gerekçe: eski bölümlerin geçmişe bağımlı beklentileri arzu
   // kancalarının değiştirdiği kararlarla kaymasın). Sistem kurulur ve olayları dinler; yalnızca 06:00 dolumu yapılmaz.
   const { WantSystem: WantClass } = await import('/src/systems/WantSystem.js');
-  const realRoll = WantClass.prototype.roll;
-  WantClass.prototype.roll = () => false;
 
   // ===== 10. aşama =====
   // Yiyecek değeri
@@ -660,6 +658,7 @@ const pageResults = await page.evaluate(async () => {
     const worker = s.characters.find((c) => !c.isChild && !c.away && !c.illness);
     const run = () => {
       quarry.productionBuffer = 0;
+      noMoods(worker); // (29.4) arzu dolumu açıkken ruh hali / doyum çarpanı iki koşuyu da aynı tutsun
       worker.task = { activity: 'mine', workBuildingId: quarry.id, buildingId: quarry.id, phase: 'perform', elapsed: 0, duration: 999 };
       scene.behavior.performWork(worker, worker.task, 60);
       return quarry.productionBuffer + quarry.producedToday;
@@ -759,6 +758,7 @@ const pageResults = await page.evaluate(async () => {
     const brain = scene.behavior.brain;
     if (s.goldenAge.celebration) { s.goldenAge.celebration.until = s.totalMinutes; sim.step(5); } // (29.1) süren Çağ Kutlaması sakinleri meydana çekmesin
     noWants(a, b); // (29.3) mesleğinde ilerlemek isteyen (drive.focus) mesai saatinde çardaktan kalkıp işe gitmesin
+    for (const c of s.characters) if (c !== a && c !== b && c.task?.buildingId === gazebo.id) scene.behavior.endTask(c); // (29.4) arzu dolumu açıkken başkası da çardağa gidebilir
     for (const c of [a, b]) scene.behavior.endTask(c);
     const planA = brain.planGathering(a, gazebo);
     scene.behavior.startPlan(a, planA, s.time.hour);
@@ -2355,7 +2355,7 @@ const pageResults = await page.evaluate(async () => {
   game.events.emit('ui:load');
   const s2 = game.state;
   const ill2 = s2.characters.find((c) => c.id === ill.id);
-  check('kayıt sürümü 38', raw.version === 38);
+  check('kayıt sürümü 39', raw.version === 39);
   // (20. aşama) Altın Çağ, Tarihçe Kütüğü, prestij yapısı kaydı
   {
     const T = window.__s20;
@@ -2802,7 +2802,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:load');
     const s3 = game.state;
     const a3 = s3.characters.find((c) => c.id === T.id);
-    check('kayıt sürümü 38: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 38 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
+    check('kayıt sürümü 39: sakinlerin kesesi ve çantası kayda yazılır', raw18.version === 39 && raw18.characters.every((c) => Number.isFinite(c.coins) && Array.isArray(c.inventory)) && raw18.trust && raw18.petitions);
     check('kayıttan kişisel kese ve çanta (adlı hatıra dahil) döner', a3?.coins === T.coins && JSON.stringify(a3.inventory) === T.inv, `${a3?.coins} ${JSON.stringify(a3?.inventory)}`);
     check('kayıttan Yönetim Güveni ve isyan sayacı döner', Math.abs(s3.trust.value - T.trust) < 1e-9 && s3.trust.revolts === T.revolts && s3.stats.raids === T.raids);
     const pk3 = s3.petitions.list.find((p) => p.id === T.pid);
@@ -3178,7 +3178,7 @@ const pageResults = await page.evaluate(async () => {
     const raw19 = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     game.events.emit('ui:load');
     const s4 = game.state;
-    check('kayıt sürümü 38: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 38 && raw19.tax && raw19.crown && raw19.exodus);
+    check('kayıt sürümü 39: vergi, Krallık ve terk ediş kayda yazılır', raw19.version === 39 && raw19.tax && raw19.crown && raw19.exodus);
     check('kayıttan vergi kademesi ve tahsilat sayacı döner', s4.tax.rate === T.rate && s4.tax.collections === T.collections);
     check('kayıttan Krallık İtibarı, vergi sayaçları, süren ferman ve Kraliyet Beratı döner', s4.crown.reputation === T.rep && s4.crown.decree?.id === T.decree && s4.crown.decree.kind === T.kind && s4.crown.decree.deadline === T.deadline && s4.crown.statueRight === T.right && s4.crown.paid === T.paid && s4.crown.levies === T.levies);
     check('kayıttan göç istatistikleri ve yola çıkmış sakin döner', s4.exodus.left === T.left && s4.stats.emigrants === T.emigrants && s4.characters.find((c) => c.id === T.emig)?.emigrating?.exit?.x === 1);
@@ -3696,7 +3696,7 @@ const pageResults = await page.evaluate(async () => {
 
     // --- Hafif yaralanma ve Şifacı ---
     const victim = adults()[2];
-    victim.isInjured = false;
+    victim.isInjured = false; victim.illness = null; delete victim.buffs.vigor; // (29.4) arzu dolumu açıkken bu sakin hasta / dinç olabilir
     const popD = st.characters.length;
     crisis().injure(victim, 'fire');
     check('yaralanma: isInjured ve 1,5 günlük (2160 dk) injuryTimer; sakin ölmez', victim.isInjured && victim.injuryTimer === 36 * 60 && st.characters.includes(victim));
@@ -3708,8 +3708,14 @@ const pageResults = await page.evaluate(async () => {
     check('yaralılar üst çubukta "hafif yaralı" çipinde sayılır', [...document.querySelectorAll('.hud-buffs .buff-chip')].some((c) => c.textContent.includes('hafif yaralı')));
     game.events.emit('ui:selectCharacter', null);
     // Çocuklar yaralanmaz
-    const kid = st.characters.find((c) => c.isChild);
-    if (kid) check('çocuklar yaralanmaz', !crisis().injure(kid, 'raid') && !kid.isInjured);
+    let kid = st.characters.find((c) => c.isChild);
+    if (!kid) { // (29.4) arzu dolumu açıkken bu noktada çocuk bulunmayabilir: geçici bir çocuk sakin kasabaya konur ve geri alınır
+      const { Character: KidClass } = await import('/src/entities/Character.js');
+      kid = new KidClass({ id: 99991, name: 'Geçici Çocuk', age: 8, traits: [], growsUpAt: 18, appearance: st.characters[0].appearance, x: st.characters[0].x, y: st.characters[0].y });
+      st.characters.push(kid);
+    }
+    check('çocuklar yaralanmaz', !crisis().injure(kid, 'raid') && !kid.isInjured);
+    if (kid.id === 99991) st.characters.splice(st.characters.indexOf(kid), 1);
     // Şifacı yokken kendiliğinden iyileşme
     const healers = st.buildings.filter((b) => b.type === 'healerHut');
     const healerStates = healers.map((b) => b.damaged);
@@ -3848,7 +3854,7 @@ const pageResults = await page.evaluate(async () => {
       const b2 = s5.buildings.find((x) => x.id === T.b);
       const d2 = s5.buildings.find((x) => x.id === T.d);
       const h2 = s5.characters.find((c) => c.id === T.hurt);
-      check('kayıt sürümü 38: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 38 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
+      check('kayıt sürümü 39: kriz durumu, yanan / hasarlı yapı bayrakları ve yaralı sakin kayda yazılır', raw.version === 39 && raw.crisis && raw.buildings.find((x) => x.id === T.b).isBurning === true && raw.buildings.find((x) => x.id === T.d).isDamaged === true && raw.characters.find((c) => c.id === T.hurt).isInjured === true);
       check('kayıttan yanan yapı (ilerleme ve kova sayısı), hasarlı yapı ve hasar nedeni döner', b2.isBurning && b2.fireProgress === 42 && b2.fireWater === 2 && d2.isDamaged && d2.damageKind === 'raid');
       check('kayıttan yaralı sakin ve kalan iyileşme süresi döner', h2.isInjured && h2.injuryTimer === 1000);
       check('kayıttan tehlike sıklığı, bekleyen haydut baskını ve sayaçlar döner', s5.crisis.difficulty === 'cetin' && JSON.stringify(s5.crisis.raid) === T.raid && s5.crisis.fires === T.fires && s5.crisis.repairs === T.repairs && s5.crisis.extinguished === T.extinguished);
@@ -4129,7 +4135,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { g: garden.id, o: other.id, switches: st.granary.switches };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 38: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
+    check('kayıt sürümü 39: bahçelerin mahsulü, Keten / Şerbetçiotu stoğu ve silo sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && raw.buildings.find((b) => b.id === T.g).crop === 'flax' && raw.buildings.find((b) => b.id === T.o).crop === 'hops' && raw.resources.flax === 77 && raw.resources.hops === 33 && raw.granary.spoiled.food === 12);
     game.events.emit('ui:load');
     const s2 = game.state;
     const g2 = s2.buildings.find((b) => b.id === T.g);
@@ -4461,7 +4467,7 @@ const pageResults = await page.evaluate(async () => {
     const T = { inn: inn.id, loom: loom.id, brew: brewery.id, guest: guest.id, palate: guest.buffs.merryPalate };
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 38: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
+    check('kayıt sürümü 39: tezgâh, şerbethane, Kumaş / Fıçı Şerbeti, handaki fıçılar ve çanta eşyaları kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && raw.resources.cloth === 21 && raw.resources.sherbet === 13 && raw.buildings.find((b) => b.id === T.inn).sherbet === 6 && raw.buildings.some((b) => b.id === T.loom && b.type === 'loom') && raw.characters.find((c) => c.id === T.guest).inventory.some((x) => x.kind === 'garment'));
     game.events.emit('ui:load');
     const s2 = st();
     const inn2 = s2.buildings.find((b) => b.id === T.inn);
@@ -4738,7 +4744,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = JSON.stringify({ ship: tp.ship, next: tp.nextShipAt, visits: tp.visits, market: tp.market, streak: tp.streak, completed: tp.completed, earned: tp.goldEarned, spent: tp.goldSpent });
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 38: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
+    check('kayıt sürümü 39: gemi takvimi, aktif sözleşmeler ve pazar çarpanları kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && raw.tradePost && raw.tradePost.ship.contracts.length === 3 && raw.tradePost.ship.contracts[0].done === true && raw.tradePost.market.sherbet === 0.76);
     game.events.emit('ui:load');
     const t2 = st().tradePost;
     check('kayıttan yanaşmış gemi, tamamlanan sözleşme, ithalat stoğu, çarpanlar ve sayaçlar birebir döner', JSON.stringify({ ship: t2.ship, next: t2.nextShipAt, visits: t2.visits, market: t2.market, streak: t2.streak, completed: t2.completed, earned: t2.goldEarned, spent: t2.goldSpent }) === snap);
@@ -5024,7 +5030,7 @@ const pageResults = await page.evaluate(async () => {
     const snap = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 38: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
+    check('kayıt sürümü 39: yaşam evresi, gün cinsinden yaş ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && raw.characters.every((c) => LS.isLifeStage(c.lifeStage) && Number.isInteger(c.ageInDays) && Number.isInteger(c.agedDays)) && raw.lifeStages.adviceMinutes === 321 && raw.characters.every((c) => !('retired' in c)));
     game.events.emit('ui:load');
     const back = residents().map((c) => `${c.id}:${c.lifeStage}:${c.ageInDays}:${c.agedDays}`).join('|');
     const sage2 = st().characters.find((c) => c.id === sage.id);
@@ -5292,7 +5298,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const snap = JSON.stringify(youth.apprenticeship);
-    check('kayıt sürümü 38: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
+    check('kayıt sürümü 39: çıraklık, açık kapılar ve sayaçlar kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && JSON.stringify(raw.characters.find((c) => c.id === youth.id).apprenticeship) === snap && raw.apprenticeship.open.includes(hut.id) && raw.apprenticeship.enrolled >= 1);
     game.events.emit('ui:load');
     const y2 = st().characters.find((c) => c.id === youth.id);
     check('kayıttan çıraklık, kapı ve sayaçlar birebir döner', JSON.stringify(y2.apprenticeship) === snap && AP.doorOpen(st(), st().buildings.find((b) => b.id === hut.id)) && st().apprenticeship.crafted >= 1);
@@ -5679,7 +5685,7 @@ const pageResults = await page.evaluate(async () => {
     // --- Kayıt (sürüm 26) ---
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 38: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
+    check('kayıt sürümü 39: yeni huylar, huyun kaynağı ve mizaç sayaçları kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && raw.characters.find((c) => c.id === shown.id).quirk === 'festive' && raw.characters.find((c) => c.id === shown.id).quirkOrigin.kind === 'family' && raw.temperament.developed >= 200);
     const snapT = JSON.stringify(st().temperament);
     game.events.emit('ui:load');
     const sh2 = st().characters.find((c) => c.id === shown.id);
@@ -5875,7 +5881,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rc = raw.characters.find((c) => c.id === g2a.id);
-    check('kayıt sürümü 38: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
+    check('kayıt sürümü 39: kuşak, doğum ebeveynleri, ocak, çocuklar, ocak reisleri ve 2. kuşak ilk düğünü kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && rc.generation === 2 && rc.parents.includes(ma.id) && Number.isFinite(rc.familyId) && Array.isArray(rc.children) && raw.lineage.families[rc.familyId] && raw.chronicle.firstGen2Couple.a === ch.a);
     const snap = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
     game.events.emit('ui:load');
     const back = st().characters.map((c) => `${c.id}:${c.generation}:${c.familyId}:${c.parents.join('+')}:${c.children.join('+')}`).join('|');
@@ -6128,7 +6134,7 @@ const pageResults = await page.evaluate(async () => {
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
     const rk = raw.characters.find((c) => c.id === k1.id);
-    check('kayıt sürümü 38: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
+    check('kayıt sürümü 39: çantadaki yadigâr (hikâye, zincir), çırak geçmişi, yadigâr sayaçları, arşiv ve ilk devir kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && rk.inventory.some((x) => x.kind === slot.kind && x.heirloom.chain.length === 2) && Array.isArray(raw.characters.find((c) => c.id === m1.id)?.mentees ?? []) && raw.heirloom.transfers >= 2 && raw.heirloom.archive.length >= 1 && raw.chronicle.firstHeirloom.heir === k1.name);
     const snap = JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null));
     game.events.emit('ui:load');
     check('kayıttan yadigârlar, zincirleri, sayaçlar ve arşiv birebir döner', JSON.stringify(st().characters.map((c) => CI.heirloomSlot(c)?.heirloom ?? null)) === snap && st().heirloom.archive.length >= 1 && st().chronicle.firstHeirloom?.elder === e1.name);
@@ -6362,7 +6368,7 @@ const pageResults = await page.evaluate(async () => {
     goto(12, 18); fs().onHour(18);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 38: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
+    check('kayıt sürümü 39: currentFestival { type, day, phase } kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && JSON.stringify({ ...raw.currentFestival, participants: undefined }) === JSON.stringify({ type: 'autumn', day: 12, phase: 'party' }) && Array.isArray(raw.currentFestival.participants) && raw.chronicle.firstFair?.type === 'summer');
     st().currentFestival = null;
     game.events.emit('ui:load');
     check('kayıttan süren panayır birebir döner (şenlik kuralları ve Tarihçe\'deki ilk kayıt ile)', JSON.stringify(st().currentFestival) === JSON.stringify(raw.currentFestival) && st().currentFestival.phase === 'party' && st().events.festival.active && st().chronicle.firstFair?.name === fair.name && st().stats.fairs >= 5);
@@ -6647,7 +6653,7 @@ const pageResults = await page.evaluate(async () => {
     const liveFeast = JSON.stringify(st().currentFeast);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 38: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
+    check('kayıt sürümü 39: currentFeast { tier, contributions } kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && JSON.stringify(raw.currentFeast) === liveFeast && raw.currentFeast.tier === 'rich');
     st().currentFeast = null;
     game.events.emit('ui:load');
     check('kayıttan süren sofra birebir döner (ikram sayacı dahil)', JSON.stringify(st().currentFeast) === liveFeast && st().currentFestival?.phase === 'party');
@@ -6928,7 +6934,7 @@ const pageResults = await page.evaluate(async () => {
     const liveB = JSON.stringify(st().guestBook);
     game.events.emit('ui:save');
     const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('kayıt sürümü 38: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw.version === 38 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
+    check('kayıt sürümü 39: activeGuest ve guestBook kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw.version === 39 && JSON.stringify(raw.activeGuest) === liveG && JSON.stringify(raw.guestBook) === liveB);
     st().activeGuest = null;
     game.events.emit('ui:load');
     check('kayıttan konuk kaldığı yerde döner (haritada yeniden oluşur), defter birebir', JSON.stringify(st().activeGuest) === liveG && JSON.stringify(st().guestBook) === liveB && S().world.guests.length === 1 && S().world.guests[0].isGuest === true);
@@ -7017,7 +7023,7 @@ const pageResults = await page.evaluate(async () => {
     const eatenBefore = [...st().currentFeast.eatenIds];
     check('27.1: ikram alanlar sofrada kayda girer (currentFeast.eatenIds)', st().currentFeast.served === 3 && eatenBefore.length === 3 && eaters.every((c) => eatenBefore.includes(c.id)), JSON.stringify(st().currentFeast));
     const raw1 = save();
-    check('27.1: kayıt sürümü 38 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 38 && raw1.version === 38 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
+    check('27.1: kayıt sürümü 39 korunur; eatenIds kayda yazılır', CONFIG.SAVE_VERSION === 39 && raw1.version === 39 && JSON.stringify(raw1.currentFeast.eatenIds) === JSON.stringify(eatenBefore));
     load();
     const reloaded = st().characters.filter((c) => eatenBefore.includes(c.id));
     check('27.1: yüklemede eatenIds\'teki sakinlerin c.feasted işareti yeniden kurulur', reloaded.length === 3 && reloaded.every((c) => c.feasted === fairDay), reloaded.map((c) => c.feasted).join());
@@ -7543,7 +7549,7 @@ const pageResults = await page.evaluate(async () => {
     Math.random = realRandom;
     check('27.2: bu adımın sistemleri ana üreteçleri ve Math.random\'u tüketmez (dilekçe seed + 23, çıraklık + 28, soy + 30, yadigâr + 31)', mainRngs.length > 5 && isoCalls > 15 && rngViolations === 0, `${rngViolations}/${isoCalls}`);
     void rngBefore;
-    check('27.2: kayıt sürümü 38 korunur', CONFIG.SAVE_VERSION === 38);
+    check('27.2: kayıt sürümü 39 korunur', CONFIG.SAVE_VERSION === 39);
     restore(snap0);
     s0.lineage.heads = { ...keepHeads };
     Object.assign(s0.lineage, keepLineage);
@@ -7781,7 +7787,7 @@ const pageResults = await page.evaluate(async () => {
       game.events.emit('ui:selectCharacter', null);
     }
 
-    check('27.3: kayıt sürümü 38 korunur', CONFIG.SAVE_VERSION === 38);
+    check('27.3: kayıt sürümü 39 korunur', CONFIG.SAVE_VERSION === 39);
     if (st().activeGuest) gs().finish(false);
     S().world.guests = [];
     Object.assign(st().time, keepTime);
@@ -8489,7 +8495,7 @@ const pageResults = await page.evaluate(async () => {
     localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
     const migrated = SMX.SaveManager.read('session');
     if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
-    check('28.4: v34 kaydı v35\'e göç eder: tohumdan deterministik vadi, boş doktrin', CONFIG.SAVE_VERSION === 38 && migrated && migrated.valley === VY.valleyFor(legacy.seed) && migrated.doctrine.chosen === null && migrated.doctrine.day === null);
+    check('28.4: v34 kaydı v35\'e göç eder: tohumdan deterministik vadi, boş doktrin', CONFIG.SAVE_VERSION === 39 && migrated && migrated.valley === VY.valleyFor(legacy.seed) && migrated.doctrine.chosen === null && migrated.doctrine.day === null);
 
     // Temizlik
     for (const o of offs) o();
@@ -8943,7 +8949,7 @@ const pageResults = await page.evaluate(async () => {
     const mById = new Map((migrated?.characters ?? []).map((c) => [c.id, c]));
     const pairs = Object.keys(legacy.relationships).map((k) => k.split('-').map(Number)).filter(([a, b]) => mById.has(a) && mById.has(b));
     const boundOk = pairs.length > 0 && pairs.every(([a, b]) => { const ra = mById.get(a).relationships[b]; const rb = mById.get(b).relationships[a]; return ra && rb && ra.chemistry === rb.chemistry && ra.chemistry === CH.chemistryFor(legacy.seed, mById.get(a), mById.get(b)) && ra.tags.length === 0 && ra.craft === false; });
-    check('29.1: v35 kaydı v36\'ya göç eder: her mevcut ilişkiye deterministik kimya ve boş etiket yapısı bağlanır', CONFIG.SAVE_VERSION === 38 && migrated && boundOk && migrated.characters.every((c) => c.relationships && typeof c.relationships === 'object'), `${pairs.length} çift`);
+    check('29.1: v35 kaydı v36\'ya göç eder: her mevcut ilişkiye deterministik kimya ve boş etiket yapısı bağlanır', CONFIG.SAVE_VERSION === 39 && migrated && boundOk && migrated.characters.every((c) => c.relationships && typeof c.relationships === 'object'), `${pairs.length} çift`);
     const again = (() => { localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy)); const m = SMX.SaveManager.read('session'); if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot); return m; })();
     check('29.1: göç deterministiktir (iki kez göç birebir aynı kayıt)', JSON.stringify(again.characters.map((c) => c.relationships)) === JSON.stringify(migrated.characters.map((c) => c.relationships)));
 
@@ -9543,7 +9549,7 @@ const pageResults = await page.evaluate(async () => {
     localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
     const migrated = SM2.SaveManager.read('session');
     if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
-    check('29.2: v36 kaydı v37\'ye göç eder: her sakine moodlets: [], duruma boş ruh hali sayaçları', CONFIG.SAVE_VERSION === 38 && migrated && migrated.characters.every((c) => Array.isArray(c.moodlets) && c.moodlets.length === 0) && JSON.stringify(migrated.moodlets) === JSON.stringify(MO.emptyMoodletStats()));
+    check('29.2: v36 kaydı v37\'ye göç eder: her sakine moodlets: [], duruma boş ruh hali sayaçları', CONFIG.SAVE_VERSION === 39 && migrated && migrated.characters.every((c) => Array.isArray(c.moodlets) && c.moodlets.length === 0) && JSON.stringify(migrated.moodlets) === JSON.stringify(MO.emptyMoodletStats()));
 
     // Temizlik
     brain.planConsole = realConsole;
@@ -9657,7 +9663,6 @@ const pageResults = await page.evaluate(async () => {
 
   // ===== 29. aşama (29.3): Arzular, Korkular ve Yaşam Doyumu (kayıt sürümü 38) =====
   {
-    WantClass.prototype.roll = realRoll; // (29.3) dolum bu bölümden itibaren açık
     const S = () => game.scenes.current;
     const st = () => game.state;
     const s0 = game.state;
@@ -9698,7 +9703,7 @@ const pageResults = await page.evaluate(async () => {
     // --- Veri ve kurulum ---
     check('29.3: 18 arzu ve 10 korku tanımlı (sıra = seçim sırası); her girdinin adı, puanı, ikonu var; izole üreteç tohum + 39', WD.WANT_KEYS.length === 18 && WD.FEAR_KEYS.length === 10 && WD.WANT_KEYS[0] === 'see_pupil_master' && WD.WANT_KEYS.at(-1) === 'be_heard' && [...Object.values(WD.WANTS), ...Object.values(WD.FEARS)].every((d) => d.name && d.points > 0 && d.icon && d.base > 0) && WD.WANT_SEED_OFFSET === 39 && ws.rng !== S().moodlets.rng && ws.rng !== brain.rng);
     check('29.3: iki yeni moodlet (toplam 26): Dileği Oldu / Korktuğu Başına Geldi eylem katmanında (çekirdeği ezmez)', MD3.MOODLET_KEYS.length === 26 && MD3.MOODLETS.wish_come_true.layer === 'action' && MD3.MOODLETS.dread_realized.layer === 'action' && MD3.MOODLETS.dread_realized.seek === true && MD3.MOOD_REASONS.wish_get_married.includes('{who} ile evleneyim') && MD3.MOOD_LINES.wish_come_true.length >= 2);
-    check('29.3: WantSystem sahnede kurulur, olayları dinler; kayıt sürümü 38', ws && ws.unsubscribers.length >= 25 && CONFIG.SAVE_VERSION === 38 && S().disposables.includes(ws) && S().disposables.indexOf(ws) === S().disposables.indexOf(S().moodlets) + 1);
+    check('29.3: WantSystem sahnede kurulur, olayları dinler; kayıt sürümü 39', ws && ws.unsubscribers.length >= 25 && CONFIG.SAVE_VERSION === 39 && S().disposables.includes(ws) && S().disposables.indexOf(ws) === S().disposables.indexOf(S().moodlets) + 1);
 
     // --- Durumsuz seçim ---
     const r1 = WT.wantRng(42, 7, 10, 0).next();
@@ -9895,11 +9900,14 @@ const pageResults = await page.evaluate(async () => {
     check('29.3: süresi dolan arzu -2 (expired), gerçekleşmeden geçen korku +2 (passed)', expiredOk && A.fears.length === 0 && A.satisfaction === 50 && A.wantLog.at(-1).outcome === 'passed' && statOf('passed', 'go_hungry') === pass0 + 1);
     reset(A, 50);
     const keepPartner = A.partnerId;
+    const keepKindred = [CH3.hasTag(A, B.id, 'kindred'), CH3.hasTag(B, A.id, 'kindred')];
+    CH3.removeTag(A, B.id, 'kindred'); CH3.removeTag(B, A.id, 'kindred'); // (29.4) arzu dolumu açıkken A ile B ruh ikizi olmuş olabilir
     A.partnerId = null;
     give(A, 'want', 'get_married', B);
     give(A, 'want', 'chat_kindred', B);
     ws.sweep(A, now());
     A.partnerId = keepPartner;
+    if (keepKindred[0]) CH3.addTag(A, B.id, 'kindred', now()); if (keepKindred[1]) CH3.addTag(B, A.id, 'kindred', now());
     check('29.3: uygunluğu biten kayıt (partner yok, ruh ikizi değil) cezasız silinir (void)', A.wants.length === 0 && A.satisfaction === 50 && A.wantLog.slice(-2).every((e) => e.outcome === 'void'));
 
     // --- Vefat / göç: hedef gidince bütün referanslar temizlenir ---
@@ -9991,6 +9999,8 @@ const pageResults = await page.evaluate(async () => {
       brain.planConsole = () => null;
       brain.planWork = () => ({ activity: 'farm', workBuildingId: -1, duration: 60 });
       reset(A, 50); quiet(A);
+      const keepBreak = A.profile.work.breakChance;
+      if (!(keepBreak > 0)) A.profile.work.breakChance = 0.3; // (29.4) Çalışkan sakinde mola zarı hiç tutmaz
       const breakRoll = A.profile.work.breakChance / 2;
       let calls = 0;
       const count = (fn) => { const real = brain.rng.next; brain.rng.next = () => { calls++; return breakRoll; }; try { return fn(); } finally { brain.rng.next = real; delete brain.rng.next; } };
@@ -9998,6 +10008,7 @@ const pageResults = await page.evaluate(async () => {
       give(A, 'want', 'level_up_skill');
       calls = 0; const focused = count(() => brain.decide(A, 10)); const focusCalls = calls;
       check('29.3: "Mesleğimde ilerleyeyim" (drive.focus): mola zarı tutsa da işini bırakmaz; zar yine atılır (gerçek Brain.decide)', rest.activity !== 'farm' && focused.activity === 'farm' && focusCalls >= 1 && restCalls >= 1 && A.drive.focus, `${rest?.activity} ${focused?.activity} ${restCalls}/${focusCalls}`);
+      A.profile.work.breakChance = keepBreak;
       reset(A, 50); quiet(A);
       brain.planSnack = () => ({ activity: 'snack', marker: 'hunger', duration: 5 });
       brain.planSleep = () => ({ activity: 'sleep', marker: 'sleep', duration: 60 });
@@ -10115,6 +10126,408 @@ const pageResults = await page.evaluate(async () => {
       check('29.3: 05:xx\'te kaydet -> yükle -> 06:00 dolumu kesintisiz koşuyla birebir aynı (durumsuz seçim)', straight === reloaded && filled > 3, `${filled} sakin doldu ${diff}`);
     }
   }
+
+  // ===== 29. aşama (29.4): Kalıcı Kişilik Evrimi (kayıt sürümü 39) =====
+  {
+    const S = () => game.scenes.current;
+    const st = () => game.state;
+    const s0 = game.state;
+    const ED = await import('/src/data/evolution.js');
+    const EVX = await import('/src/systems/Evolution.js');
+    const TP = await import('/src/ai/TraitProfile.js');
+    const CD = await import('/src/data/characters.js');
+    const WT4 = await import('/src/systems/Wants.js');
+    const MO4 = await import('/src/systems/Moodlets.js');
+    const CH4 = await import('/src/systems/Chemistry.js');
+    const SM4 = await import('/src/state/SaveManager.js');
+    const { EvolutionSystem: EvoClass } = await import('/src/systems/EvolutionSystem.js');
+    const { EventBus } = await import('/src/core/EventBus.js');
+    const { Random } = await import('/src/utils/random.js');
+    const { Character } = await import('/src/entities/Character.js');
+    const { CONFIG } = await import('/src/config.js');
+    const R = ED.EVOLUTION_RULES;
+    const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
+    const adults = s0.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((a, b) => a.id - b.id);
+    const [A, B, C, D] = adults;
+    const keep = new Map(adults.slice(0, 4).map((c) => [c.id, structuredClone({ traits: c.traits, deepTraits: c.deepTraits, growth: c.growth, growthToday: c.growthToday, growthCause: c.growthCause, evolutions: c.evolutions, evolutionCount: c.evolutionCount, acquiredCount: c.acquiredCount, lifeStage: c.lifeStage, away: c.away, relationships: c.relationships, satisfaction: c.satisfaction, fearStreak: c.fearStreak, visible: c.visible, speech: c.speech })]));
+    const others = s0.characters.filter((c) => !c.role && !adults.slice(0, 4).includes(c)).map((c) => [c, structuredClone({ growth: c.growth, growthToday: c.growthToday, growthCause: c.growthCause })]);
+    for (const [c] of others) { c.growth = [0, 0, 0, 0]; c.growthToday = [0, 0, 0, 0]; c.growthCause = [null, null, null, null]; } // sayımlar yalnızca A-D'nin olaylarını ölçsün
+    const restore = () => {
+      for (const [c, v] of others) Object.assign(c, structuredClone(v));
+      for (const c of [A, B, C, D]) {
+        Object.assign(c, structuredClone(keep.get(c.id)));
+        c.profile = c.buildProfile();
+        WT4.recomputeDrive(c);
+        MO4.recomputeMood(c);
+      }
+    };
+    // olaylar ayrı bir yolda (EventBus) dinleyen ikinci bir EvolutionSystem: oyunun öteki sistemleri sahte olaylardan etkilenmez
+    const bus = new EventBus();
+    const probe = new EvoClass({ state: s0, events: bus }, S().world, new Random(1), { moodlets: S().moodlets, relationships: S().relationships });
+    const zero = (c, traits = ['grumpy', 'glutton'], stage = 'adult') => {
+      c.traits = [...traits]; c.deepTraits = []; c.growth = [0, 0, 0, 0]; c.growthToday = [0, 0, 0, 0]; c.growthCause = [null, null, null, null];
+      c.evolutions = []; c.evolutionCount = 0; c.acquiredCount = 0; c.lifeStage = stage; c.away = null; c.visible = true; c.speech = null; c.bubble = null; c.satisfaction = 50; c.fearStreak = 0;
+      c.profile = c.buildProfile();
+    };
+    const day = () => s0.time.day;
+    const emit = (name, payload) => bus.emit(name, payload);
+    const growthOf = (c) => c.growth.join(',');
+
+    // --- 1. Eksen tablosu ---
+    check('29.4: 4 eksen sabit sırada (drive, company, calling, spirit); tablo OPPOSING_TRAITS ile tutarlı; her eksenin iki kutbu TRAITS\'te var', ED.EVOLUTION_AXES.map((a) => a.key).join() === 'drive,company,calling,spirit' && EVX.axesMatchOpposing() && ED.EVOLUTION_AXES.every((a) => CD.TRAITS[a.plus] && CD.TRAITS[a.minus]) && ED.AXIS_COUNT === 4);
+    check('29.4: axisOf: artı kutup +1, eksi kutup -1; Obur, Gece Kuşu ve bilinmeyen özellik null', EVX.axisOf('hardworking').index === 0 && EVX.axisOf('hardworking').sign === 1 && EVX.axisOf('sleepyhead').sign === -1 && EVX.axisOf('introvert').index === 1 && EVX.axisOf('introvert').sign === -1 && EVX.axisOf('natureLover').index === 2 && EVX.axisOf('ambitious').sign === -1 && EVX.axisOf('cheerful').index === 3 && EVX.axisOf('grumpy').sign === -1 && EVX.axisOf('glutton') === null && EVX.axisOf('nightOwl') === null && EVX.axisOf('yok') === null);
+    check('29.4: EVOLUTION_RULES (eşikler, sınırlar, bekleme) ve 8 derin biçim tanımlı; derin adlar şartnameyle aynı', R.checkHour === 5 && R.shiftAt === 60 && R.turnAt === 75 && R.dailyCap === 20 && R.clamp === 100 && R.cooldownDays === 12 && R.lifetimeMax === 3 && R.acquiredMax === 1 && R.maxTraits === 3 && R.stageMul.youth === 1.5 && R.stageMul.elder === 0.6 && R.logMax === 4 && ED.DEEP_TRAIT_KEYS.length === 8 && ['Yorulmaz', 'Bitkin', 'Kasabanın Gülü', 'Münzevi', 'Toprağın Dostu', 'Gözü Yükseklerde', 'Gönül Ferahı', 'Aksi'].every((n) => Object.values(ED.DEEP_TRAITS).some((d) => d.name === n && d.description.length > 10)) && ED.EVOLUTION_SEED_OFFSET === 40, `decay ${R.decayPerDay}`);
+
+    // --- 2. Katkı: evre çarpanı, yuvarlama, günlük sınır, kırpma, sönme ---
+    zero(A);
+    check('29.4: katkı: yetişkin x1, genç x1,5, bilge x0,6 (tam sayıya yuvarlanır)', EVX.contribution(A, 3, 10) === 10 && (() => { A.lifeStage = 'youth'; const y = EVX.contribution(A, 3, 10); A.lifeStage = 'elder'; const e = EVX.contribution(A, 3, 10); A.lifeStage = 'adult'; return y === 15 && e === 6; })());
+    check('29.4: yuvarlama sıfırdan uzağa (artı ve eksi simetrik): 2,5 -> 3, -2,5 -> -3; 0,4 -> 0 (katkı yok)', EVX.contribution(A, 0, 2.5) === 3 && EVX.contribution(A, 0, -2.5) === -3 && EVX.contribution(A, 0, 0.4) === 0);
+    A.growthToday = [15, -15, 0, 0];
+    check('29.4: günlük sınır (dailyCap 20): bugün +15 iken +10 yalnızca +5, -15 iken -10 yalnızca -5; ters yönde sınıra kadar yer var', EVX.contribution(A, 0, 10) === 5 && EVX.contribution(A, 1, -10) === -5 && EVX.contribution(A, 0, -10) === -10);
+    A.growthToday = [0, 0, 0, 0]; A.growth = [95, -95, 0, 0];
+    check('29.4: ±100 kırpma: 95 iken +10 yalnızca +5; -95 iken -10 yalnızca -5', EVX.contribution(A, 0, 10) === 5 && EVX.contribution(A, 1, -10) === -5);
+    A.growthToday = [20, 0, 0, 0]; A.growth = [0, 0, 0, 0];
+    check('29.4: günlük sınır dolunca aynı yönde katkı 0; çocukta / ziyaretçide / geçersiz eksende katkı 0', EVX.contribution(A, 0, 5) === 0 && EVX.contribution({ role: 'merchant' }, 0, 5) === 0 && EVX.contribution(A, 9, 5) === 0 && EVX.contribution(A, 0, NaN) === 0);
+    zero(A);
+    const realDecay = R.decayPerDay;
+    probe.push(A, 0, 12, 'masterwork'); probe.push(A, 1, -7, 'quarrel');
+    check('29.4: push: growth ve growthToday birlikte güncellenir', growthOf(A) === '12,-7,0,0' && A.growthToday.join() === '12,-7,0,0');
+    emit('time:newDay', 5);
+    const expected = [Math.max(0, 12 - realDecay), Math.min(0, -7 + realDecay), 0, 0];
+    check(`29.4: gün dönümü: her eksen ${realDecay} kadar 0'a yaklaşır (aşmaz), growthToday sıfırlanır`, growthOf(A) === expected.join() && A.growthToday.join() === '0,0,0,0', growthOf(A));
+    zero(A); A.growth = [1, -1, 0, 0]; emit('time:newDay', 5);
+    check('29.4: sönme 0\'ı aşmaz (1 ve -1 en çok 0 olur)', growthOf(A) === '0,0,0,0');
+
+    // --- 3. Üç sonuç, eşik sınırları ---
+    zero(A, ['grumpy', 'glutton']); A.growth = [59, 0, 0, 0];
+    check('29.4: edinim eşiği 59 -> yok, 60 -> var (2 özellik, ikisi de yok)', EVX.pendingShift(A, day()) === null && (() => { A.growth = [60, 0, 0, 0]; const p = EVX.pendingShift(A, day()); return p && p.kind === 'acquired' && p.axis === 0 && p.to === 'hardworking' && p.from === null; })());
+    A.growth = [-60, 0, 0, 0];
+    const negAcq = EVX.pendingShift(A, day());
+    const acqApplied = EVX.applyShift(A, negAcq);
+    check('29.4: eksi yönde edinim eksi kutbu verir (Uykucu); applyShift yeni dizi üretir, eskiyi değiştirmez', negAcq.kind === 'acquired' && negAcq.to === 'sleepyhead' && acqApplied.traits.join() === 'grumpy,glutton,sleepyhead' && A.traits.join() === 'grumpy,glutton' && acqApplied.traits !== A.traits);
+    zero(A, ['sleepyhead', 'glutton']); A.deepTraits = ['sleepyhead']; A.growth = [74, 0, 0, 0];
+    check('29.4: dönüşüm eşiği 74 -> yok, 75 -> var; zıt özellik (Uykucu) varken derinleşme / edinim olmaz', EVX.pendingShift(A, day()) === null && (() => { A.growth = [75, 0, 0, 0]; const p = EVX.pendingShift(A, day()); return p && p.kind === 'turned' && p.from === 'sleepyhead' && p.to === 'hardworking'; })());
+    const turned = EVX.applyShift(A, EVX.pendingShift(A, day()));
+    check('29.4: dönüşüm: yeni özellik dizideki yeri korur (Uykucu, Obur -> Çalışkan, Obur); derinleşmiş özellik düşer', turned.traits.join() === 'hardworking,glutton' && turned.deepTraits.length === 0);
+    zero(A, ['hardworking', 'glutton']); A.growth = [59, 0, 0, 0];
+    check('29.4: derinleşme eşiği 59 -> yok, 60 -> var (yön kutbu zaten sakinde)', EVX.pendingShift(A, day()) === null && (() => { A.growth = [60, 0, 0, 0]; const p = EVX.pendingShift(A, day()); return p && p.kind === 'deepened' && p.to === 'hardworking' && p.from === null; })());
+    const deepApplied = EVX.applyShift(A, EVX.pendingShift(A, day()));
+    A.deepTraits = deepApplied.deepTraits; A.growth = [90, 0, 0, 0];
+    check('29.4: derinleşme özelliği deepTraits\'e ekler; derinleşmiş özellik tekrar derinleşmez (hiçbiri uygulanamıyorsa değer olduğu gibi kalır)', deepApplied.deepTraits.join() === 'hardworking' && deepApplied.traits.join() === 'hardworking,glutton' && EVX.pendingShift(A, day()) === null && A.growth[0] === 90);
+    zero(A, ['hardworking', 'sleepyhead']); A.growth = [80, 0, 0, 0];
+    check('29.4: eski kayıttaki iki zıt özellik birlikte: yön kutbu varsa özellik iki kez yazılmaz (derinleşme)', EVX.pendingShift(A, day())?.kind === 'deepened' && new Set(EVX.applyShift(A, EVX.pendingShift(A, day())).traits).size === 2);
+
+    // --- 4. Sınırlar ---
+    zero(A, ['grumpy', 'glutton']); A.growth = [70, 0, 0, 0];
+    A.evolutions = [{ day: day() - (R.cooldownDays - 1), kind: 'acquired', axis: 0, from: null, to: 'cheerful', cause: null }];
+    const c11 = EVX.pendingShift(A, day());
+    A.evolutions[0].day = day() - R.cooldownDays;
+    const c12 = EVX.pendingShift(A, day());
+    check('29.4: bekleme süresi: son değişimden 11 gün sonra yok, 12 gün sonra var', c11 === null && c12 !== null);
+    A.evolutions = []; A.evolutionCount = R.lifetimeMax;
+    check('29.4: ömür boyu en çok 3 değişim: sayaç 3 iken eşik aşılsa da değişim yok', EVX.pendingShift(A, day()) === null);
+    A.evolutionCount = 0; A.acquiredCount = 1;
+    const noAcq = EVX.pendingShift(A, day());
+    A.acquiredCount = 0; A.traits = ['grumpy', 'glutton', 'nightOwl'];
+    const noThird = EVX.pendingShift(A, day());
+    check('29.4: edinim ömür boyu 1 ve özellik sayısı en çok 3: daha önce edinim varsa da 3 özellik varsa da edinim yok', noAcq === null && noThird === null);
+    zero(A, ['sleepyhead', 'introvert']); A.growth = [80, 0, 0, 0]; A.growth[1] = -90;
+    const first = EVX.pendingShift(A, day());
+    check('29.4: eksen sırası önceliği: iki eksen eşiği aşarsa küçük indeksli (drive) kazanır', first.axis === 0 && first.kind === 'turned');
+    zero(A, ['sleepyhead', 'introvert']); A.growth = [80, -90, 0, 0];
+    probe.onHour(R.checkHour);
+    check('29.4: günde en çok 1 değişim: iki eksen eşiği aştığında yalnızca ilki uygulanır, ikincisi (bekleme nedeniyle) sonra', A.evolutionCount === 1 && A.evolutions.length === 1 && A.growth[0] === 0 && A.growth[1] === -90 && A.traits.join() === 'hardworking,introvert');
+    probe.onHour(R.checkHour);
+    check('29.4: ertesi denetimde bekleme süresi dolmadıkça ikinci değişim olmaz', A.evolutionCount === 1);
+    zero(A, ['grumpy', 'glutton']); A.growth = [80, 0, 0, 0]; A.away = { stage: 'away' };
+    probe.onHour(R.checkHour);
+    const awaySkipped = A.evolutionCount === 0;
+    A.away = null;
+    probe.onHour(R.checkHour - 1);
+    const wrongHour = A.evolutionCount === 0;
+    probe.onHour(R.checkHour);
+    check('29.4: seferde (c.away) olan sakin atlanır, dönünce sıradaki 05:00\'te değişir; yalnızca 05:00 denetlenir', awaySkipped && wrongHour && A.evolutionCount === 1);
+    const kid = new Character({ id: 99981, name: 'Geçici Çocuk', age: 8, traits: ['cheerful', 'grumpy'], growsUpAt: 18, appearance: A.appearance, x: A.x, y: A.y, growth: [90, 90, 90, 90], deepTraits: ['cheerful'], evolutions: [{ day: 1, kind: 'acquired', axis: 0, from: null, to: 'hardworking', cause: null }] });
+    s0.characters.push(kid);
+    probe.push(kid, 0, 30, 'masterwork'); emit('masterwork:created', { character: kid }); probe.onHour(R.checkHour); emit('time:newDay', 9);
+    s0.characters.splice(s0.characters.indexOf(kid), 1);
+    check('29.4: çocukta eksenler 0\'da durur (kayıttaki değerler de sıfırlanır), katkı ve değişim olmaz; hintOf null', kid.growth.join() === '0,0,0,0' && kid.evolutionCount === 0 && kid.traits.join() === 'cheerful,grumpy' && EVX.hintOf(kid) === null);
+
+    // --- 5. evolve sonrası ---
+    zero(A, ['hardworking', 'glutton']); A.growth = [R.shiftAt, 0, 0, 0]; A.growthCause = ['moodlet:flow_state', null, null, null];
+    CH4.refreshChemistry(s0, A, B);
+    A.relationships[B.id].chemistry = 99; B.relationships[A.id].chemistry = 99; // bozuk: evolve yeniden hesaplamalı
+    const stat0 = JSON.stringify(s0.evolution);
+    const seen = []; const off = bus.on('trait:evolved', (p) => seen.push(p));
+    const jEv = []; const offJ = bus.on('journal:added', (p) => jEv.push(p));
+    probe.onHour(R.checkHour);
+    off(); offJ();
+    const entry = A.evolutions.at(-1);
+    check('29.4: evolve: profil yeniden kuruldu (Yorulmaz yaması: iş yorgunluğu 0,6 -> 0,5; hız ve mola aynen), eksen 0\'a çekildi, sayaç ve kayıt güncel', near(A.profile.work.fatigue, 0.5) && near(A.profile.work.speed, CD.DEFAULT_WORK.speed * 1.4) && A.profile.work.breakChance === 0 && A.growth[0] === 0 && A.growthCause[0] === null && A.evolutionCount === 1 && A.acquiredCount === 0 && A.deepTraits.join() === 'hardworking' && entry.kind === 'deepened' && entry.to === 'hardworking' && entry.from === null && entry.cause === 'moodlet:flow_state' && entry.day === day(), JSON.stringify(entry));
+    check('29.4: evolve: kimya tazelendi (iki yönde chemistryFor ile aynı)', A.relationships[B.id].chemistry === CH4.chemistryFor(s0.seed, A, B) && B.relationships[A.id].chemistry === A.relationships[B.id].chemistry);
+    const mem = (A.memories ?? []).at(-1);
+    check('29.4: evolve: anı (yaşam, nedenli, artı kutupta "fond"), Kasaba Günlüğü kaydı (ad + neden + derin ad), trait:evolved olayı ve evrim sayaçları', mem && mem.kind === 'life' && mem.fond === true && mem.text.includes('Çalışkan') && jEv[0] === s0.journal.at(-1) && s0.journal.at(-1).text.includes(A.name) && s0.journal.at(-1).text.includes('Yorulmaz') && s0.journal.at(-1).text.includes(ED.CAUSE_TEXT['moodlet:flow_state']) && jEv.length === 1 && seen.length === 1 && seen[0].character === A && seen[0].kind === 'deepened' && seen[0].axis === 0 && seen[0].to === 'hardworking' && seen[0].from === null && seen[0].cause === 'moodlet:flow_state' && s0.evolution.deepened.hardworking === (JSON.parse(stat0).deepened.hardworking ?? 0) + 1 && s0.evolution.total === JSON.parse(stat0).total + 1, s0.journal.at(-1).text);
+    zero(A, ['sleepyhead', 'glutton']); A.growth = [0, 0, 0, -80]; A.growthCause = [null, null, null, 'moodlet:mourning']; A.traits = ['cheerful', 'glutton'];
+    A.deepTraits = ['cheerful']; A.profile = A.buildProfile();
+    const decayBefore = A.profile.decay.fun;
+    probe.onHour(R.checkHour);
+    const turnedMem = (A.memories ?? []).at(-1);
+    check('29.4: dönüşüm (Neşeli -> Huysuz, Derin Yas\'tan sonra): yer korunur, derin Gönül Ferahı düşer, profil Huysuz\'a döner, günlük nedeni içerir, anı "fond: false"', A.traits.join() === 'grumpy,glutton' && A.deepTraits.length === 0 && decayBefore < 1 && near(A.profile.decay.fun, 1) && near(A.profile.quarrelChance, 1.5) && s0.journal.at(-1).text === `${A.name} artık eskisi gibi değil: Derin Yas'tan sonra Neşeli yanı söndü, Huysuz oldu.` && turnedMem.fond === false && A.evolutions.at(-1).from === 'cheerful', s0.journal.at(-1).text);
+    zero(A, ['grumpy', 'glutton']); A.growth = [0, 70, 0, 0]; A.growthCause = [null, 'want:make_friend', null, null];
+    probe.onHour(R.checkHour);
+    check('29.4: edinim: üçüncü özellik eklenir (Sosyal Kelebek), acquiredCount 1, günlük "ortaya çıktı"; sürmekte olan görev kesilmez', A.traits.join() === 'grumpy,glutton,socialButterfly' && A.acquiredCount === 1 && s0.journal.at(-1).text.includes('Sosyal Kelebek yanı ortaya çıktı') && s0.evolution.acquired.socialButterfly >= 1);
+    // sürmekte olan görev
+    zero(A, ['grumpy', 'glutton']); A.growth = [0, 0, 70, 0]; const keepTask = { activity: 'farm', phase: 'perform', elapsed: 3 }; A.task = keepTask;
+    probe.onHour(R.checkHour);
+    const taskKept = A.task === keepTask;
+    A.task = null;
+    check('29.4: değişim sakinin sürmekte olan görevini kesmez (yeni profil sonraki karardan itibaren)', taskKept && A.evolutionCount === 1);
+
+    // --- 6. buildTraitProfile ve derin biçimler ---
+    const combos = [['hardworking', 'glutton'], ['sleepyhead', 'nightOwl'], ['socialButterfly', 'cheerful', 'natureLover'], ['introvert', 'grumpy'], ['ambitious', 'glutton']];
+    const optsList = [{}, { child: true }, { youth: true }, { elder: true }];
+    check('29.4: deep boşken (verilmeyen / boş dizi / derinsiz özellik) çıktı bugünkü ile birebir aynı', combos.every((k) => optsList.every((o) => JSON.stringify(TP.buildTraitProfile(k, o)) === JSON.stringify(TP.buildTraitProfile(k, { ...o, deep: [] })) && JSON.stringify(TP.buildTraitProfile(k, o)) === JSON.stringify(TP.buildTraitProfile(k, { ...o, deep: ['glutton'] })))) && JSON.stringify(TP.buildTraitProfile(['hardworking'])) === JSON.stringify(TP.buildTraitProfile(['hardworking'], { deep: [] })));
+    const p = (k, deep = []) => TP.buildTraitProfile([k], { deep });
+    const dl = CD.DEFAULT_LEISURE;
+    const ok = [
+      near(p('hardworking').work.fatigue, 0.6) && near(p('hardworking', ['hardworking']).work.fatigue, 0.5) && near(p('hardworking', ['hardworking']).work.speed, p('hardworking').work.speed) && p('hardworking', ['hardworking']).work.breakChance === 0 && p('hardworking', ['hardworking']).speed === p('hardworking').speed,
+      near(p('sleepyhead').decay.energy, 1.35) && near(p('sleepyhead', ['sleepyhead']).decay.energy, 1.5) && near(p('sleepyhead', ['sleepyhead']).work.fatigue, 1.3) && near(p('sleepyhead', ['sleepyhead']).work.speed, p('sleepyhead').work.speed),
+      near(p('socialButterfly').gain.social, 1.3) && near(p('socialButterfly', ['socialButterfly']).gain.social, 1.5) && near(p('socialButterfly', ['socialButterfly']).decay.social, 1.5),
+      near(p('introvert').decay.social, 0.6) && near(p('introvert', ['introvert']).decay.social, 0.45) && near(p('introvert').leisure.fountain, (dl.fountain ?? 1) * 0.5) && near(p('introvert', ['introvert']).leisure.fountain, (dl.fountain ?? 1) * 0.3) && near(p('introvert', ['introvert']).gain.social, 0.8),
+      near(p('natureLover').gain.nature, 1.6) && near(p('natureLover', ['natureLover']).gain.nature, 1.9) && p('natureLover', ['natureLover']).rainLover === true,
+      near(p('ambitious').work.speed, CD.DEFAULT_WORK.speed * 1.15) && near(p('ambitious', ['ambitious']).work.speed, CD.DEFAULT_WORK.speed * 1.22) && near(p('ambitious').decay.fun, 1.15) && near(p('ambitious', ['ambitious']).decay.fun, 1.25),
+      near(p('cheerful').decay.fun, 0.7) && near(p('cheerful', ['cheerful']).decay.fun, 0.6) && near(p('cheerful', ['cheerful']).bubbleRate, 1.6),
+      near(p('grumpy').quarrelChance, 1.5) && near(p('grumpy', ['grumpy']).quarrelChance, 1.8) && near(p('grumpy', ['grumpy']).bubbleRate, 0.6),
+    ];
+    check('29.4: her derin biçimin yaması profile uygulanır (8/8); yamada olmayan alanlar temel özellikten aynen sürer', ok.every(Boolean), ok.join());
+    check('29.4: derin yama yalnızca derin listedeki özelliğe uygulanır (Çalışkan derin, Uykucu değil)', near(TP.buildTraitProfile(['hardworking', 'sleepyhead'], { deep: ['hardworking'] }).work.fatigue, 0.5 * 1.3) && near(TP.buildTraitProfile(['hardworking', 'sleepyhead'], { deep: ['hardworking'] }).decay.energy, 1.35));
+    check('29.4: Character.buildProfile deepTraits\'i geçirir; Obur / Gece Kuşu için derin biçim yok', (() => { zero(A, ['hardworking', 'glutton']); A.deepTraits = ['hardworking']; return near(A.buildProfile().work.fatigue, 0.5); })() && !ED.DEEP_TRAITS.glutton && !ED.DEEP_TRAITS.nightOwl);
+
+    // --- 7. Katkı kaynakları (her satır) ---
+    R.decayPerDay = 0; // gün dönümü satırları sönmeden ölçülsün (bölüm sonunda geri alınır)
+    const delta = (name, fn, expectA, expectB = null) => {
+      zero(A, ['glutton', 'nightOwl']); zero(B, ['glutton', 'nightOwl']);
+      fn();
+      const a = growthOf(A); const b = growthOf(B);
+      const good = a === expectA.join() && (expectB === null || b === expectB.join());
+      return { name, good, a, b };
+    };
+    const ES = ED.EVOLUTION_SOURCES;
+    const ra = (x) => Math.sign(x) * Math.round(Math.abs(x)); // sıfırdan uzağa yuvarlama
+    const wp = (points) => ra(points * ES.wantFulfilled.spiritPerPoint); // arzu: spirit = puan x çarpan
+    const rows = [
+      delta('want:fulfilled genel (find_love, 10 puan): spirit +puan x çarpan', () => emit('want:fulfilled', { character: A, want: { key: 'find_love' }, points: 10 }), [0, 0, 0, wp(10)]),
+      delta('make_friend (12 puan): spirit +genel, company +10', () => emit('want:fulfilled', { character: A, want: { key: 'make_friend' }, points: 12 }), [0, 10, 0, wp(12)]),
+      delta('quiet_day (3 puan): spirit +genel, calling +4', () => emit('want:fulfilled', { character: A, want: { key: 'quiet_day' }, points: 3 }), [0, 0, 4, wp(3)]),
+      delta('craft_masterwork (20 puan): spirit +genel, calling -5', () => emit('want:fulfilled', { character: A, want: { key: 'craft_masterwork' }, points: 20 }), [0, 0, -5, wp(20)]),
+      delta('level_up_skill (10 puan): spirit +genel, calling -5', () => emit('want:fulfilled', { character: A, want: { key: 'level_up_skill' }, points: 10 }), [0, 0, -5, wp(10)]),
+      delta('fear:realized genel (go_hungry, 8 puan): spirit -10 (-9,6)', () => emit('fear:realized', { character: A, fear: { key: 'go_hungry' }, points: 8 }), [0, 0, 0, -10]),
+      delta('burnout (6 puan): spirit -7, drive -8', () => emit('fear:realized', { character: A, fear: { key: 'burnout' }, points: 6 }), [-8, 0, 0, -7]),
+      delta('moodlet:consoled: teselli edilen spirit +8, eden company +6', () => emit('moodlet:consoled', { by: B, character: A }), [0, 0, 0, 8], [0, 6, 0, 0]),
+      delta('masterwork:created: drive +10, calling -8', () => emit('masterwork:created', { character: A }), [10, 0, -8, 0]),
+      delta('skill:levelUp: drive +5, calling -4', () => emit('skill:levelUp', { character: A }), [5, 0, -4, 0]),
+      delta('apprentice:graduated: drive +12', () => emit('apprentice:graduated', { character: A }), [12, 0, 0, 0]),
+      delta('apprentice:grandmaster: calling -15', () => emit('apprentice:grandmaster', { character: A }), [0, 0, -15, 0]),
+      delta('expedition:memberReturned: calling -8', () => emit('expedition:memberReturned', { character: A }), [0, 0, -8, 0]),
+      delta('relationship:married: ikisi company +12', () => emit('relationship:married', { a: A, b: B }), [0, 12, 0, 0], [0, 12, 0, 0]),
+      delta('chemistry:kindred: ikisi company +12', () => emit('chemistry:kindred', { a: A, b: B }), [0, 12, 0, 0], [0, 12, 0, 0]),
+      delta(`relationship:quarrel: ikisi company ${ES.quarrel[0][1]}`, () => emit('relationship:quarrel', { a: A, b: B }), [0, ES.quarrel[0][1], 0, 0], [0, ES.quarrel[0][1], 0, 0]),
+    ];
+    check(`29.4: katkı kaynakları (olaylar): ${rows.filter((r) => r.good).length}/${rows.length} satır şartnamedeki miktarı verir`, rows.every((r) => r.good), rows.filter((r) => !r.good).map((r) => `${r.name} -> ${r.a} | ${r.b}`).join(' ; '));
+    const mood = [
+      ['mourning', 'minor', [0, 0, 0, -15]], ['neglected', 'minor', [0, 0, 0, -8]], ['heartbroken', 'minor', [0, -8, 0, -8]], ['euphoric', 'minor', [0, 0, 0, 10]],
+      ['flow_state', 'minor', [3, 0, 0, 0]], ['proud_work', 'minor', [1, 0, 0, 0]], ['exhausted', 'minor', [-4, 0, 0, 0]], ['drudgery', 'minor', [-2, 0, 0, 0]], ['cold_wake', 'minor', [-1, 0, 0, 0]],
+      ['warm_chat', 'minor', [0, 1, 0, 0]], ['warm_chat', 'major', [0, 2, 0, 0]], ['sour_encounter', 'minor', [0, ES.moodlets.sour_encounter[0][1], 0, 0]], ['lonely_ache', 'minor', [0, -2, 0, 0]],
+      ['quiet_peace', 'minor', [0, -1, 2, 0]], ['nature_bliss', 'minor', [0, 0, 3, 0]], ['aesthetic_joy', 'minor', [0, 0, (ES.moodlets.aesthetic_joy[0]?.[1] ?? 0), 0]],
+      ['wish_come_true', 'major', [0, 0, 0, 0]], ['dread_realized', 'major', [0, 0, 0, 0]], ['chilled', 'minor', [0, 0, 0, 0]], ['comforted', 'minor', [0, 0, 0, 0]],
+    ];
+    const moodRows = mood.map(([key, tier, want]) => delta(`moodlet ${key} (${tier})`, () => emit('moodlet:added', { character: A, moodlet: { key, tier } }), want));
+    check(`29.4: katkı kaynakları (moodlet:added): ${moodRows.filter((r) => r.good).length}/${moodRows.length}; wish_come_true / dread_realized yok sayılır (çifte sayım yok), tabloda olmayan moodlet etkisiz`, moodRows.every((r) => r.good), moodRows.filter((r) => !r.good).map((r) => `${r.name} -> ${r.a}`).join(' ; '));
+    const tiers = [[90, ES.dailyTier.radiant], [70, ES.dailyTier.fulfilled], [50, 0], [30, -2], [10, -5]].map(([sat, spirit]) => delta(`doyum ${sat}`, () => { A.satisfaction = sat; emit('time:newDay', 3); }, [0, 0, 0, spirit]));
+    const streak = delta('fearStreak 3', () => { A.satisfaction = 50; A.fearStreak = 3; emit('time:newDay', 3); }, [0, 0, 0, -3]);
+    const streak2 = delta('fearStreak 2', () => { A.satisfaction = 50; A.fearStreak = 2; emit('time:newDay', 3); }, [0, 0, 0, 0]);
+    const streak4 = delta('doyum 10 + fearStreak 4', () => { A.satisfaction = 10; A.fearStreak = 4; emit('time:newDay', 3); }, [0, 0, 0, -8]);
+    check('29.4: gün dönümü: doyum kademesi (radiant, fulfilled, content 0, restless -2, crushed -5) ve fearStreak >= 3 ise ek -3 (gün dönümü katkısı dailyCap\'e takılmaz)', [...tiers, streak, streak2, streak4].every((r) => r.good), [...tiers, streak, streak2, streak4].filter((r) => !r.good).map((r) => `${r.name} -> ${r.a}`).join(' ; '));
+    zero(A, ['glutton', 'nightOwl'], 'youth'); emit('masterwork:created', { character: A }); const youthG = growthOf(A);
+    zero(A, ['glutton', 'nightOwl'], 'elder'); emit('masterwork:created', { character: A }); const elderG = growthOf(A);
+    zero(A, ['glutton', 'nightOwl']); A.growthToday = [18, 0, -18, 0]; emit('masterwork:created', { character: A });
+    check('29.4: olay katkısında evre çarpanı (genç x1,5: 15 / -12; bilge x0,6: 6 / -5) ve dailyCap (18 iken +10 yalnızca +2; -18 iken -8 yalnızca -2) uygulanır', youthG === '15,0,-12,0' && elderG === '6,0,-5,0' && growthOf(A) === '2,0,-2,0', `${youthG} ${elderG} ${growthOf(A)}`);
+    zero(A, ['glutton', 'nightOwl']); emit('masterwork:created', { character: { ...A, isChild: true } }); emit('masterwork:created', { character: { role: 'merchant' } }); emit('masterwork:created', { character: null }); emit('moodlet:added', { character: A, moodlet: null }); emit('want:fulfilled', {}); emit('fear:realized', undefined);
+    check('29.4: geçersiz / çocuk / ziyaretçi olayı hatasız yok sayılır', growthOf(A) === '0,0,0,0');
+    R.decayPerDay = realDecay;
+
+    // --- 8. Neden kaydı ---
+    zero(A, ['glutton', 'nightOwl']);
+    probe.push(A, 3, 10, 'want:fulfilled');
+    const c1 = A.growthCause[3];
+    probe.push(A, 3, 2, 'moodlet:warm_chat');
+    const c2 = A.growthCause[3];
+    zero(A, ['glutton', 'nightOwl']); A.growth[3] = 3;
+    probe.push(A, 3, -10, 'moodlet:mourning');
+    const c3 = A.growthCause[3];
+    probe.push(A, 3, 6, 'want:fulfilled');
+    const c4 = A.growthCause[3];
+    zero(A, ['glutton', 'nightOwl']); A.growth[3] = -20; A.growthCause[3] = 'moodlet:mourning';
+    probe.push(A, 3, 8, 'want:fulfilled');
+    check('29.4: growthCause: |katkı| >= 5 ve işareti eksenin yeni işaretiyle aynıysa yazılır; küçük katkı (2) ve ters yönlü katkı nedeni ezmez; işaret dönünce yeni neden', c1 === 'want:fulfilled' && c2 === 'want:fulfilled' && c3 === 'moodlet:mourning' && c4 === 'moodlet:mourning' && A.growthCause[3] === 'moodlet:mourning', `${c1} ${c2} ${c3} ${c4} ${A.growthCause[3]}`);
+    zero(A, ['glutton', 'nightOwl']); A.growth[3] = -4; probe.push(A, 3, 12, 'want:fulfilled');
+    check('29.4: işaret çevirince (−4 + 12 = +8) yeni neden yazılır', A.growth[3] === 8 && A.growthCause[3] === 'want:fulfilled');
+    check('29.4: her neden anahtarı için okunur metin var; günlük metni nedeni içerir (Zamanla: neden yoksa)', ED.CAUSE_KEYS.length >= 30 && ED.CAUSE_KEYS.every((k) => ED.CAUSE_TEXT[k].length > 5) && probe.describe(A, { kind: 'acquired', axis: 3, from: null, to: 'cheerful' }, 'tier:crushed').journal.includes(ED.CAUSE_TEXT['tier:crushed']) && probe.describe(A, { kind: 'acquired', axis: 3, from: null, to: 'cheerful' }, null).journal.startsWith(`${A.name} artık eskisi gibi değil: Zamanla`));
+    check('29.4: eğilim ipucu: 29 -> yok, 30 -> var (en büyük mutlak eksen; yönü artı / eksi); çocukta yok', (() => { zero(A); A.growth = [10, -29, 5, 0]; const none = EVX.hintOf(A); A.growth = [10, -30, 5, 0]; const h = EVX.hintOf(A); A.growth = [-45, 45, 0, 0]; const tie = EVX.hintOf(A); return none === null && h.axis === 1 && h.sign === -1 && h.text === ED.HINT_TEXT.company.minus && tie.axis === 0 && tie.sign === -1; })());
+
+    // --- 9. Sızıntı: ana üreteç, öteki üreteçler ve Math.random HİÇ tüketilmez ---
+    const rngs = [S().behavior.rng, S().behavior.brain.rng, S().jobs?.rng, S().relationships.rng, S().conflicts.rng, S().social.rng, S().family.rng, S().moodlets.rng, S().wants.rng].filter(Boolean);
+    let calls = 0; let own = 0;
+    const realRandom = Math.random;
+    Math.random = () => { calls++; return realRandom(); };
+    for (const r of rngs) { const proto = Object.getPrototypeOf(r).next; r.next = function () { calls++; return proto.call(this); }; }
+    { const proto = Object.getPrototypeOf(probe.rng).next; probe.rng.next = function () { own++; return proto.call(this); }; }
+    zero(A, ['grumpy', 'glutton']); zero(B, ['grumpy', 'glutton']);
+    emit('masterwork:created', { character: A }); emit('want:fulfilled', { character: A, want: { key: 'make_friend' }, points: 12 }); emit('moodlet:added', { character: A, moodlet: { key: 'mourning', tier: 'major' } });
+    emit('time:newDay', 3);
+    A.growth = [0, 0, 0, -70]; B.visible = false; A.visible = true;
+    probe.onHour(R.checkHour); // A (görünür) değişir, söz üretir
+    const ownVisible = own;
+    own = 0; B.growth = [0, 0, 0, -70]; B.visible = false;
+    probe.onHour(R.checkHour); // B (görünmez) değişir: söz üreteci ilerlemez
+    const ownHidden = own;
+    for (const r of rngs) delete r.next;
+    delete probe.rng.next;
+    Math.random = realRandom;
+    check('29.4: katkı + sönme + 05:00 denetimi + değişim ana üreteci / öteki sistem üreteçlerini / Math.random\'ı HİÇ tüketmez (0 çağrı); izole üreteç (tohum + 40) yalnızca görünür sakinin sözü için ilerler', calls === 0 && ownVisible >= 1 && ownHidden === 0 && ED.EVOLUTION_SEED_OFFSET === 40 && A.evolutionCount === 1 && B.evolutionCount === 1, `${calls} çağrı, görünür ${ownVisible}, görünmez ${ownHidden}, ${A.evolutionCount}/${B.evolutionCount}`);
+    check('29.4: söz ve balon: görünür sakinde ikon balonu + (speechChance) söz; söz kataloğu 3 tür x 8 özellik x 2 söz', A.bubble !== null && ['turned', 'deepened', 'acquired'].every((k) => Object.keys(ED.EVOLUTION_LINES[k]).length === 8 && Object.values(ED.EVOLUTION_LINES[k]).every((l) => l.length === 2 && l.every((t) => t.length > 5))) && B.bubble === null);
+    check('29.4: evrim sistemi sahnede WantSystem\'den hemen sonra kurulur, olayları dinler; destroy zincirinde', (() => { const e = S().evolution; const d = S().disposables; return e && e.unsubscribers.length >= 14 && d.includes(e) && d.indexOf(e) === d.indexOf(S().wants) + 1; })());
+
+    // --- 11. Göç ve sanitize ---
+    {
+      const dirtyG = EVX.sanitizeGrowth([250, 'x', -300, 1.6, 7]);
+      check('29.4: sanitizeGrowth: aralık dışı kırpılır, bozuk 0, uzunluk 4\'e getirilir; dizi olmayan sıfırlanır', JSON.stringify(dirtyG) === '[100,0,-100,2]' && JSON.stringify(EVX.sanitizeGrowth([5])) === '[5,0,0,0]' && JSON.stringify(EVX.sanitizeGrowth(null)) === '[0,0,0,0]' && JSON.stringify(EVX.sanitizeGrowthToday([99, -99, 3, 0])) === '[20,-20,3,0]');
+      check('29.4: sanitizeGrowthCause: bilinmeyen anahtar ve bozuk tür null olur', JSON.stringify(EVX.sanitizeGrowthCause(['masterwork', 'yok', 5, null, 'x'])) === '["masterwork",null,null,null]');
+      check('29.4: sanitizeDeepTraits: bilinmeyen anahtar, traits\'te olmayan, tekrar ve derin biçimi olmayan (Obur) atılır', JSON.stringify(EVX.sanitizeDeepTraits(['hardworking', 'grumpy', 'glutton'], ['hardworking', 'hardworking', 'cheerful', 'yok', 'glutton', 'grumpy'])) === '["hardworking","grumpy"]' && JSON.stringify(EVX.sanitizeDeepTraits(null, ['grumpy'])) === '[]');
+      const dirtyE = EVX.sanitizeEvolutions([{ day: 1, kind: 'x', axis: 0, to: 'cheerful' }, { day: 2, kind: 'turned', axis: 3, to: 'grumpy' }, { day: 3, kind: 'acquired', axis: 9, to: 'cheerful' }, { day: 4, kind: 'acquired', axis: 0, to: 'yok' }, ...Array.from({ length: 6 }, (_, i) => ({ day: 10 + i, kind: 'deepened', axis: 3, from: 'cheerful', to: 'cheerful', cause: i === 5 ? 'bozuk' : 'masterwork' }))]);
+      check('29.4: sanitizeEvolutions: bozuk tür / eksen / özellik ve eski özelliği olmayan dönüşüm atılır; en son 4 kalır; derinleşmede from null; bilinmeyen neden null', dirtyE.length === 4 && dirtyE[0].day === 12 && dirtyE.every((e) => e.from === null) && dirtyE[3].cause === null && dirtyE[0].cause === 'masterwork');
+      const E = EVX.restoreEvolutionStats({ turned: { grumpy: 2.7, dragon: 5 }, deepened: { cheerful: -1 }, acquired: { introvert: 1 }, total: 4.9 });
+      check('29.4: restoreEvolutionStats: bilinmeyen özellik ve sıfır / eksi atılır, sayılar tam sayıya iner', JSON.stringify(E) === '{"turned":{"grumpy":2},"deepened":{},"acquired":{"introvert":1},"total":4}' && JSON.stringify(EVX.restoreEvolutionStats(null)) === JSON.stringify(EVX.emptyEvolutionStats()));
+      zero(A, ['hardworking', 'cheerful', 'natureLover']); A.deepTraits = ['hardworking']; A.growth = [3, -4, 5, 6]; A.growthToday = [1, 0, 0, -2]; A.growthCause = ['masterwork', null, null, 'tier:crushed'];
+      A.evolutions = [{ day: 5, kind: 'acquired', axis: 2, from: null, to: 'natureLover', cause: 'moodlet:nature_bliss' }]; A.evolutionCount = 1; A.acquiredCount = 1;
+      const rawSave = JSON.parse(JSON.stringify(S().saves.snapshot()));
+      const rawA = rawSave.characters.find((c) => c.id === A.id);
+      check('29.4: evrim alanları ve sayaçları kayda yazılır (3 özellikli sakin geçerli); kayıt sürümü 39', CONFIG.SAVE_VERSION === 39 && rawA.traits.length === 3 && JSON.stringify([rawA.growth, rawA.growthToday, rawA.growthCause, rawA.deepTraits, rawA.evolutionCount, rawA.acquiredCount]) === JSON.stringify([[3, -4, 5, 6], [1, 0, 0, -2], ['masterwork', null, null, 'tier:crushed'], ['hardworking'], 1, 1]) && rawA.evolutions.length === 1 && typeof rawSave.evolution.turned === 'object' && rawSave.evolution.total === s0.evolution.total);
+      const back = Character.fromJSON(rawA);
+      check('29.4: kayıttan yükleme birebir (özellikler dahil); derin yama profile yeniden uygulanır; üç özellikli sakin yüklenir', JSON.stringify([back.traits, back.growth, back.growthToday, back.growthCause, back.deepTraits, back.evolutions, back.evolutionCount, back.acquiredCount]) === JSON.stringify([A.traits, A.growth, A.growthToday, A.growthCause, A.deepTraits, A.evolutions, A.evolutionCount, A.acquiredCount]) && near(back.profile.work.fatigue, 0.5));
+      const dirtyChar = Character.fromJSON({ ...rawA, growth: [500, 'a'], growthToday: 'x', growthCause: ['yok'], deepTraits: ['cheerful', 'ambitious', 'grumpy'], evolutions: 'bozuk', evolutionCount: -3 });
+      check('29.4: bozuk karakter kaydı yüklemede temizlenir (eksen 4 tam sayı, derin ⊆ traits, kayıt boş, sayaç 0)', JSON.stringify(dirtyChar.growth) === '[100,0,0,0]' && dirtyChar.growthToday.join() === '0,0,0,0' && dirtyChar.growthCause.every((x) => x === null) && JSON.stringify(dirtyChar.deepTraits) === '["cheerful"]' && dirtyChar.evolutions.length === 0 && dirtyChar.evolutionCount === 0);
+      const opposed = Character.fromJSON({ ...rawA, traits: ['hardworking', 'sleepyhead'], deepTraits: ['sleepyhead'] });
+      check('29.4: birbirine zıt iki özellik taşıyan eski kayıt bozuk sayılmaz, dokunulmaz', opposed.traits.join() === 'hardworking,sleepyhead' && opposed.deepTraits.join() === 'sleepyhead');
+      const legacy = JSON.parse(JSON.stringify(rawSave));
+      legacy.version = 38;
+      for (const c of legacy.characters) for (const k of ['growth', 'growthToday', 'growthCause', 'deepTraits', 'evolutions', 'evolutionCount', 'acquiredCount']) delete c[k];
+      delete legacy.evolution;
+      const traitsBefore = JSON.stringify(legacy.characters.map((c) => c.traits));
+      const keepSlot = localStorage.getItem(CONFIG.SESSION_KEY);
+      localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(legacy));
+      let randomCalls = 0;
+      const rr = Math.random;
+      Math.random = () => { randomCalls++; return rr(); };
+      const migrated = SM4.SaveManager.read('session');
+      Math.random = rr;
+      if (keepSlot === null) localStorage.removeItem(CONFIG.SESSION_KEY); else localStorage.setItem(CONFIG.SESSION_KEY, keepSlot);
+      check('29.4: v38 kaydı v39\'a göç eder: sıfır eksenler, boş listeler ve sayaçlar, boş evrim sayaçları; hiçbir özellik değişmez; göç zar çekmez', migrated && migrated.characters.every((c) => c.growth.join() === '0,0,0,0' && c.growthToday.join() === '0,0,0,0' && c.growthCause.every((x) => x === null) && Array.isArray(c.deepTraits) && c.deepTraits.length === 0 && c.evolutions.length === 0 && c.evolutionCount === 0 && c.acquiredCount === 0) && JSON.stringify(migrated.evolution) === JSON.stringify({ turned: {}, deepened: {}, acquired: {}, total: 0 }) && JSON.stringify(migrated.characters.map((c) => c.traits)) === traitsBefore && randomCalls === 0, `${randomCalls} zar`);
+      check('29.4: göç (düz veri) iki kez uygulanınca aynı sonucu verir (yan etkisiz)', JSON.stringify(EVX.migrateEvolution(JSON.parse(JSON.stringify(legacy)))) === JSON.stringify(EVX.migrateEvolution(EVX.migrateEvolution(JSON.parse(JSON.stringify(legacy))))));
+    }
+
+    // --- 12. Panel ---
+    {
+      // Çalışkan: sonradan dönüşmüş; Neşeli: özgün ama derinleşmiş; Doğa Sever: sonradan edinilmiş
+      zero(A, ['hardworking', 'cheerful', 'natureLover']); A.deepTraits = ['cheerful'];
+      A.evolutions = [{ day: 34, kind: 'turned', axis: 0, from: 'sleepyhead', to: 'hardworking', cause: 'moodlet:mourning' }, { day: 40, kind: 'acquired', axis: 2, from: null, to: 'natureLover', cause: null }];
+      A.evolutionCount = 2; A.acquiredCount = 1; A.growth = [0, 0, 0, 0]; A.profile = A.buildProfile();
+      game.events.emit('ui:selectCharacter', A.id);
+      game.render(0);
+      const chips = [...document.querySelectorAll('.character-traits .trait-chip:not(.quirk-chip)')];
+      const deepChip = chips.find((c) => c.classList.contains('is-deep'));
+      const laterChip = chips.find((c) => c.title.startsWith('G34'));
+      check('29.4: panel: 3 özellik çipi; derin özellik derin ad + yıldız (is-deep, derin açıklama); sonradan dönüşen "sonradan" işareti (is-evolved) ve "G34 · Derin Yas\'tan sonra · Uykucu → Çalışkan" başlığı', chips.length === 3 && deepChip && deepChip.textContent.startsWith('Gönül Ferahı') && deepChip.querySelector('.trait-star') && deepChip.title === `${ED.DEEP_TRAITS.cheerful.description} · Zıddı: ${CD.TRAITS.grumpy.name} (atışabilirler)` && laterChip && laterChip.classList.contains('is-evolved') && laterChip.textContent.includes('sonradan') && laterChip.title === `G34 · ${ED.CAUSE_TEXT['moodlet:mourning']} · Uykucu → Çalışkan`, chips.map((c) => `${c.textContent}|${c.title}`).join(' ; '));
+      check('29.4: panel: edinilen özellik "sonradan" işaretlidir ve başlığı "ortaya çıktı"; derinleşmemiş çipte yıldız yok', chips.some((c) => c.title.startsWith('G40') && c.title.includes('ortaya çıktı') && c.querySelector('.trait-later')) && chips.filter((c) => c.querySelector('.trait-star')).length === 1);
+      const hintEl = () => document.querySelector('.trait-hint');
+      check('29.4: panel: eğilim ipucu satırı değer 30\'a varmadıkça gizli', hintEl() && hintEl().hidden === true);
+      A.growth = [0, -35, 0, 0];
+      game.render(0);
+      check('29.4: panel: ipucu görünür ("Giderek içine kapanıyor"), eksen değişince DOM yenilenir', hintEl().hidden === false && hintEl().textContent === ED.HINT_TEXT.company.minus);
+      const node0 = document.querySelector('.character-traits').firstChild;
+      const hint0 = hintEl().textContent;
+      game.render(0); game.render(0); A.growth = [0, -36, 0, 0]; game.render(0);
+      const same = document.querySelector('.character-traits').firstChild === node0;
+      A.growth = [0, 0, 0, 40]; game.render(0);
+      check('29.4: panel yalnızca özellikler / derin biçim / ipucu değişince yeniden kurulur (aynı karelerde ve ipucu metni aynı kalırken aynı düğüm; ipucu metni değişince yeni)', same && hint0 === ED.HINT_TEXT.company.minus && hintEl().textContent === ED.HINT_TEXT.spirit.plus && document.querySelector('.character-traits').firstChild !== node0);
+      const keepGrow = D.growsUpAt;
+      D.growsUpAt = s0.totalMinutes + 5000; D.growth = [80, 0, 0, 0];
+      game.events.emit('ui:selectCharacter', D.id);
+      game.render(0);
+      const kidHint = hintEl()?.hidden === true;
+      D.growsUpAt = keepGrow; D.growth = structuredClone(keep.get(D.id).growth);
+      game.events.emit('ui:selectCharacter', null);
+      game.render(0);
+      check('29.4: çocuğun kartında eğilim ipucu yok', kidHint);
+      const styled = (cls) => { const e = document.createElement('span'); e.className = cls; document.body.appendChild(e); const cs = getComputedStyle(e); const r = { fs: cs.fontStyle, bg: cs.backgroundColor, bs: cs.borderStyle }; e.remove(); return r; };
+      const plainStyle = styled('trait-chip'); const deepStyle = styled('trait-chip is-deep'); const evoStyle = styled('trait-chip is-evolved'); const hintStyle = styled('trait-hint');
+      check('29.4: stil sınıfları tanımlı: is-deep (farklı zemin), is-evolved (kesik çizgili kenar), trait-hint (italik)', deepStyle.bg !== plainStyle.bg && evoStyle.bs === 'dashed' && plainStyle.bs !== 'dashed' && hintStyle.fs === 'italic', JSON.stringify([plainStyle, deepStyle, evoStyle, hintStyle]));
+    }
+
+    // --- 13. Üç özellikli sakinle bir gün: atışma, kimya, arzu, panel hatasız ---
+    {
+      const pass = () => { if (st().dilemma.active) game.events.emit('ui:chooseDilemma', { optionId: st().dilemma.active.defaultId }); };
+      let thrown = null;
+      zero(A, ['hardworking', 'introvert', 'grumpy']);
+      zero(B, ['sleepyhead', 'socialButterfly']); // A ile her eksende zıt
+      A.lifeStage = keep.get(A.id).lifeStage; B.lifeStage = keep.get(B.id).lifeStage; A.visible = keep.get(A.id).visible; B.visible = keep.get(B.id).visible;
+      A.profile = A.buildProfile(); B.profile = B.buildProfile();
+      try {
+        const chem = CH4.chemistryFor(s0.seed, A, B);
+        const clash = TP.clashingTraits(A.traits, B.traits);
+        const wants = WT4.eligibleWants(s0, S().world, A);
+        const fears = WT4.eligibleFears(s0, S().world, A);
+        game.events.emit('ui:selectCharacter', A.id);
+        for (let h = 0; h < 24; h++) { pass(); sim.step(225); game.render(0); }
+        game.events.emit('ui:selectCharacter', null);
+        check('29.4: 3 özellikli sakinle bir gün: kimya (-2..+3), çatışma tespiti, arzu / korku uygunluğu, atışma ve panel hatasız; profil 3 özelliği birleştirir', chem >= -2 && chem <= 3 && clash !== null && Array.isArray(wants) && Array.isArray(fears) && A.traits.length >= 3 && Number.isFinite(A.profile.speed) && A.profile.quarrelChance === 1.5, `${chem} ${A.traits.join()}`);
+      } catch (e) { thrown = e; check('29.4: 3 özellikli sakinle bir gün hatasız yaşanır', false, String(e?.stack ?? e).slice(0, 300)); }
+      check('29.4: 3 özellikli sakin günün sonunda da değişmezleri korur (özellik <= 3, tekrar yok, derin ⊆ traits)', thrown === null && A.traits.length === 3 && s0.characters.every((c) => c.traits.length <= 3 && new Set(c.traits).size === c.traits.length && c.deepTraits.every((t) => c.traits.includes(t))));
+    }
+    probe.destroy();
+    restore();
+    R.decayPerDay = realDecay;
+
+    // --- 10. Kaydet-yükle: 04:50'de kaydet -> yükle -> 05:00 değişimi kesintisiz koşuyla birebir aynı ---
+    {
+      const pass = () => { if (st().dilemma.active) game.events.emit('ui:chooseDilemma', { optionId: st().dilemma.active.defaultId }); };
+      let guard = 0;
+      while (!(st().time.hour === 4 && st().time.minute >= 50) && guard++ < 6000) { pass(); sim.step(5); }
+      const pool = st().characters.filter((c) => !c.role && !c.isChild && !c.away && !c.emigrating).sort((x, y) => x.id - y.id);
+      const [P, Q] = pool;
+      for (const [c, traits, growth] of [[P, ['grumpy', 'glutton'], [0, 66, 0, 0]], [Q, ['sleepyhead', 'glutton'], [88, 0, 0, 0]]]) {
+        c.traits = [...traits]; c.deepTraits = []; c.growth = [...growth]; c.growthToday = [0, 0, 0, 0]; c.growthCause = [null, null, null, null]; c.evolutions = []; c.evolutionCount = 0; c.acquiredCount = 0; c.profile = c.buildProfile();
+        c.growthCause[growth.findIndex((v) => v !== 0)] = 'masterwork';
+      }
+      game.events.emit('ui:save');
+      game.events.emit('ui:load');
+      game.events.emit('ui:save');
+      const raw = localStorage.getItem('lmgame.save.v2');
+      const pick = () => JSON.stringify([st().characters.filter((c) => !c.role).map((c) => [c.id, c.traits, c.deepTraits, c.growth, c.growthToday, c.growthCause, c.evolutions, c.evolutionCount, c.acquiredCount, c.profile.work.fatigue, c.profile.quarrelChance, c.memories?.length ?? 0]), st().evolution, st().journal.length]);
+      guard = 0;
+      while (st().time.hour !== 6 && guard++ < 2000) { pass(); sim.step(3); }
+      const straight = pick();
+      const evolvedStraight = st().characters.filter((c) => c.evolutionCount > 0).length;
+      localStorage.setItem('lmgame.save.v2', raw);
+      game.events.emit('ui:load');
+      guard = 0;
+      while (st().time.hour !== 6 && guard++ < 2000) { pass(); sim.step(3); }
+      const reloaded = pick();
+      const gotP = st().characters.find((c) => c.id === P.id);
+      check('29.4: 04:50\'de kaydet -> yükle -> 05:00 değişimi kesintisiz koşuyla birebir aynı (edinim + dönüşüm gerçekten oldu)', straight === reloaded && evolvedStraight >= 2 && gotP.traits.includes('socialButterfly') && st().characters.find((c) => c.id === Q.id).traits[0] === 'hardworking', `${evolvedStraight} sakin değişti`);
+    }
+  }
+
 
   return out;
 });

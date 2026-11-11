@@ -45,6 +45,8 @@
 //   --crisis  : (23. aşama) tehlike sıklığı (varsayılan dengeli); huzurlu + --no-safety, 22. aşamayla bire bir aynı koşuyu verir
 //   --crisis-state : (23. aşama) kayıttan hemen önce bir yangın, bir hasarlı yapı, bir yaralı ve bekleyen bir haydut baskını oluşturur
 //               (save-v20.json fikstürü bu bayrakla üretilir: kriz alanlarının hepsi kayda girer)
+//   --evo     : (29.4) evrim verisini bellekte geçersiz kılar (denge denemesi): "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
+//   --pushes  : (29.4) katkı kaynağı dökümü ve karakter başına günlük net katkı yüzdelikleri
 //   --no-agri : (24. aşama) Ürün Silosu kurulmaz ve bahçeler hep Buğday ekili kalır (mahsul bozulması yine işler)
 //   --no-apprentice : (25.2) Çırak Kapısı hiç açılmaz (çıraklık katmanının kapalıyken oyunu hiç değiştirmediğini göstermek için)
 //   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
@@ -63,6 +65,21 @@ const speed = Number(options.speed ?? 4);
 const { browser, page, errors } = await openGame({ seed });
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
+// (29.4) --evo "rules.decayPerDay=3;sources.moodlets.quarrel=..." : denge denemeleri için evrim verisini bellekte geçersiz kılar (dosyaya yazmaz).
+// Yol: evolution.js dışa aktarımı.alan...; değer JSON. Örn: --evo "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
+if (options.evo) {
+  await page.evaluate(async (spec) => {
+    const mod = await import('/src/data/evolution.js');
+    for (const part of String(spec).split(';')) {
+      const [path, raw] = part.split('=');
+      if (!path || raw === undefined) continue;
+      const keys = path.trim().split('.');
+      let obj = mod;
+      for (const k of keys.slice(0, -1)) obj = obj[k];
+      obj[keys[keys.length - 1]] = JSON.parse(raw);
+    }
+  }, options.evo);
+}
 await page.evaluate((o) => {
   window.__noSafety = o.noSafety;
   window.__noAgri = o.noAgri; // (24. aşama)
@@ -998,6 +1015,22 @@ if (mon.life) {
     console.log(`(29.3) korku: dolan ${sum(W.fearsRolled)} · gerçekleşen ${sum(W.realized)} (${pct(sum(W.realized), sum(W.fearsRolled))}) · geçen ${sum(W.passed)} · aktif ${wd.activeFears}`);
     console.log(`(29.3) korku anahtarları (dolan/gerçekleşen/geçen): ${keys(W.fearsRolled, W.realized).map((k) => `${k} ${W.fearsRolled[k] ?? 0}/${W.realized[k] ?? 0}/${W.passed[k] ?? 0}`).join(' · ')}`);
     console.log(`(29.3) son gün doyum: ortalama ${wd.avg?.toFixed(1)} (en düşük ${wd.min}, en yüksek ${wd.max}; ${wd.n} yetişkin) · kademeler ${JSON.stringify(wd.tiers)} · ortalama fearStreak ${wd.fearStreak.toFixed(2)}`);
+  }
+  // (29.4) Kalıcı kişilik evrimi
+  const ev = L.evolution;
+  if (ev) {
+    const E = ev.stats;
+    const sum = (o) => Object.values(o ?? {}).reduce((x, y) => x + y, 0);
+    const pct = (a, b) => (b ? `%${Math.round((100 * a) / b)}` : '-');
+    const list = (o) => Object.entries(o ?? {}).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(' · ') || '-';
+    console.log(`(29.4) değişim ${E.total} (edinim ${sum(E.acquired)} · dönüşüm ${sum(E.turned)} · derinleşme ${sum(E.deepened)}) · artı yön ${ev.dir.plus} / eksi yön ${ev.dir.minus} · değişim yaşayan sakin ${ev.evolved}/${ev.ever} (${pct(ev.evolved, ev.ever)})`);
+    console.log(`(29.4) türe ve özelliğe göre: edinim { ${list(E.acquired)} } · dönüşüm { ${list(E.turned)} } · derinleşme { ${list(E.deepened)} }`);
+    console.log(`(29.4) son gün özellik dağılımı (${ev.n} yetişkin): ${list(ev.traitDist)} · en yaygın %${Math.round((100 * Math.max(0, ...Object.values(ev.traitDist))) / Math.max(1, ev.n))} · derin ${ev.deepNow} · üç özellikli ${ev.threeNow}`);
+    console.log(`(29.4) eksen değerleri: ortalama ${ev.avg?.toFixed(2)} (mutlak ${ev.avgAbs?.toFixed(2)}) · en düşük ${ev.min} · en yüksek ${ev.max} · eğilim ipucu gösteren ${ev.hinted}`);
+    console.log(`(29.4) değişim nedenleri: ${list(ev.causes)}`);
+    if (options.pushes) console.log(`(29.4) karakter başına günlük net katkı (eksen: n min/p10/p25/p50/p75/p90/max): ${(ev.perDay ?? []).map((d, i) => `#${i} ${d.n} ${d.min}/${d.p10}/${d.p25}/${d.p50}/${d.p75}/${d.p90}/${d.max}`).join(' | ')}`);
+    if (options.pushes) console.log(`(29.4) katkı dökümü (eksen:kaynak n / net / mutlak): ${Object.entries(ev.pushes ?? {}).sort((x, y) => y[1].abs - x[1].abs).slice(0, 40).map(([k, v]) => `${k} ${v.n}/${v.sum}/${v.abs}`).join(' · ')}`);
+    for (const e of ev.log.slice(0, 12)) console.log(`  G${e.day} ${e.name} (${e.stage}) ${e.kind} ${e.from ? `${e.from} -> ` : ''}${e.to} [${e.cause ?? '-'}]${e.journal ? ` · "${e.journal}"` : ''}`);
   }
   // (29.1) Sosyal kimya ve duygusal etiketler
   const ch = L.chemistry;

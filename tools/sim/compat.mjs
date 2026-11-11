@@ -59,7 +59,11 @@
 //   save-v30.json: 26.2'nin oyunu (kayıt sürümü 30, bugünkü): otopilotla 73 gün (--crisis-state); 72. gün (Yaz Güneşi Şenliği panayırı) hazırlık evresinde kurulmuş Zengin Şölen Sofrası
 //                  (currentFeast: 5 fıçı şerbet, 9 ekmek, 22 yiyecek, 1 kumaş bağışı, 32 ikram), daha önce 10 sofra ve 171 ikram. Eski kayıtlarda
 //                  (sürüm 2-29) currentFeast yoktur: null ile açılır
-//   save-v38.json: 29.3'ün oyunu (kayıt sürümü 38, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin arzuları, korkuları, yaşam
+//   save-v39.json: 29.4'ün oyunu (kayıt sürümü 39, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin kişilik eksenleri (growth /
+//                  growthToday / growthCause), derin özellikleri (deepTraits), evrim kayıtları (evolutions) ve sayaçları, 3 özellikli sakinler ve evrim
+//                  sayaçları (state.evolution). Eski kayıtlarda (sürüm 2-38) alanlar yoktur: sıfır eksenler, boş listeler ve boş sayaçlarla açılır
+//                  (göç zar çekmez, hiçbir özelliği değiştirmez)
+//   save-v38.json: 29.3'ün oyunu (kayıt sürümü 38): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin arzuları, korkuları, yaşam
 //                  doyumu, son sonuçları ve arzu / korku sayaçları. Eski kayıtlarda (sürüm 2-37) alanlar yoktur: boş listeler, 50 doyum ve boş
 //                  sayaçlarla açılır (göç zar çekmez; listeler yüklemeden sonraki ilk 06:00'da dolar). Bu kayıtta kurucu bilge Deniz G31'de
 //                  vefat etmiştir: Kıdemli Bilge ve yadigâr yoktur (ilgili denetimler kayıtta öğe yoksa boş kalmayı doğrular)
@@ -79,7 +83,7 @@
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -238,6 +242,25 @@ for (const { name, raw } of fixtures) {
       };
     };
     loaded.wants = wantSnap();
+    // (29.4) Kişilik evrimi (yüklendiği an; gidiş-dönüş: yeniden kaydedilen biçim aynı mı)
+    const evoFields = (c) => [c.id, c.traits, c.growth, c.growthToday, c.growthCause, c.deepTraits, c.evolutions, c.evolutionCount, c.acquiredCount];
+    const evoSnap = () => {
+      const kinds = ['turned', 'deepened', 'acquired'];
+      return {
+        json: JSON.stringify(s.characters.map(evoFields)),
+        stats: JSON.stringify(s.evolution),
+        traits: JSON.stringify(s.characters.map((c) => [c.id, c.traits])),
+        invariants: s.characters.every((c) => c.deepTraits.every((t) => c.traits.includes(t)) && c.traits.length <= 3 && new Set(c.traits).size === c.traits.length && c.growth.length === 4 && c.growth.every((v) => Number.isInteger(v) && Math.abs(v) <= 100) && c.growthToday.length === 4 && c.growthCause.length === 4 && c.evolutions.length <= 4 && c.evolutionCount >= c.evolutions.length && c.evolutionCount <= 3 && c.acquiredCount <= 1),
+        kids: s.characters.filter((c) => c.isChild && (c.growth.some((v) => v !== 0) || c.evolutionCount || c.deepTraits.length)).length,
+        three: s.characters.filter((c) => c.traits.length === 3).length,
+        deep: s.characters.reduce((n, c) => n + c.deepTraits.length, 0),
+        evolved: s.characters.filter((c) => c.evolutionCount > 0).length,
+        statsOk: kinds.every((k) => Object.values(s.evolution[k]).every((n) => Number.isInteger(n) && n > 0)) && Number.isInteger(s.evolution.total),
+        profileOk: s.characters.every((c) => c.deepTraits.length === 0 || (c.deepTraits.includes('hardworking') ? Math.abs(c.profile.work.fatigue - (c.traits.includes('sleepyhead') ? 0.5 * 1.3 : 0.5)) < 1e-9 : true)),
+      };
+    };
+    loaded.evolution = evoSnap();
+    loaded.evolutionRoundtrip = JSON.stringify(scene.saves.snapshot().characters.map(evoFields)) === loaded.evolution.json && JSON.stringify(scene.saves.snapshot().evolution) === loaded.evolution.stats;
     loaded.wantsRoundtrip = JSON.stringify(scene.saves.snapshot().characters.map(wantFields)) === loaded.wants.json;
     // (29.1) Sosyal kimya ve duygusal etiketler (yüklendiği an)
     const chemSnap = () => (() => {
@@ -321,6 +344,7 @@ for (const { name, raw } of fixtures) {
       apprAfter: { ok: s.characters.every((c) => !c.apprenticeship || (c.lifeStage === 'youth' && s.buildings.some((b) => b.id === c.apprenticeship.buildingId) && c.apprenticeship.progress >= 0 && c.apprenticeship.progress <= 100)), n: s.characters.filter((c) => c.apprenticeship).length },
       lifeAfter: s.characters.map((c) => ({ id: c.id, days: c.ageInDays, stage: c.lifeStage, child: c.isChild })),
       moodletsAfter: (() => { const m = moodSnap(); delete m.json; return m; })(),
+      evolutionAfter: (() => { const e = evoSnap(); delete e.json; return e; })(),
       wantsAfter: (() => { const w = wantSnap(); delete w.json; w.sawRoll = sawRoll; return w; })(),
       chemistryAfter: (() => { const c = chemSnap(); delete c.json; return c; })(),
       tradeAfter: { visits: s.tradePost.visits, scheduled: s.tradePost.nextShipAt !== null || Boolean(s.tradePost.ship) },
@@ -535,6 +559,18 @@ for (const { name, raw } of fixtures) {
       results.push({ name: `${tag}: ruh halleri (moodlet'ler) ve sayaçları korundu`, ok: M.json === JSON.stringify(data.characters.map((c) => [c.id, c.moodlets])) && M.stats === JSON.stringify(data.moodlets) && M.moods && M.over === 0, detail: `${M.count} moodlet` });
     }
     results.push({ name: `${tag}: bir gün sonra ruh halleri yaşıyor (tavanlar ve çarpan sınırları içinde)`, ok: after.over === 0 && after.moods && after.count > 0, detail: `${after.count} moodlet` });
+  }
+  // (29.4) Kalıcı kişilik evrimi
+  {
+    const E = r.loaded.evolution;
+    const after = r.evolutionAfter;
+    const fields = (c) => [c.id, c.traits, c.growth, c.growthToday, c.growthCause, c.deepTraits, c.evolutions, c.evolutionCount, c.acquiredCount];
+    if (data.version < 39) {
+      results.push({ name: `${tag}: her sakine sıfır eksenler, boş listeler ve sayaçlar, boş evrim sayaçları; hiçbir özellik değişmedi (göç zar çekmez)`, ok: E.json === JSON.stringify(data.characters.map((c) => [c.id, c.traits, [0, 0, 0, 0], [0, 0, 0, 0], [null, null, null, null], [], [], 0, 0])) && E.stats === JSON.stringify({ turned: {}, deepened: {}, acquired: {}, total: 0 }) && E.invariants && r.loaded.evolutionRoundtrip, detail: `${data.characters.length} sakin` });
+    } else {
+      results.push({ name: `${tag}: eksenler, derin özellikler, evrim kayıtları ve sayaçlar korundu (özellikler dahil; gidiş-dönüş birebir)`, ok: E.json === JSON.stringify(data.characters.map(fields)) && E.stats === JSON.stringify(data.evolution) && r.loaded.evolutionRoundtrip && E.invariants && E.kids === 0 && E.statsOk && E.profileOk, detail: `${E.evolved} değişim yaşayan · ${E.deep} derin · ${E.three} üç özellikli · toplam ${data.evolution.total}` });
+    }
+    results.push({ name: `${tag}: bir gün sonra evrim değişmezleri korunuyor (özellik <= 3, tekrar yok, derin ⊆ özellik, 4 tam sayı eksen, çocukta birikim yok)`, ok: after.invariants && after.kids === 0 && after.statsOk && after.profileOk, detail: `${after.evolved} değişim yaşayan` });
   }
   // (29.3) Arzular, korkular ve yaşam doyumu
   {
