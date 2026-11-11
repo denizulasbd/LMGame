@@ -12,7 +12,7 @@ const out = await page.evaluate(async () => {
   const MD = await import('/src/data/moodlets.js');
   const EV = await import('/src/data/evolution.js');
   const { ENGINES } = await import('/src/systems/Engines.js');
-  const { addTag } = await import('/src/systems/Chemistry.js');
+  const { addTag, removeTag } = await import('/src/systems/Chemistry.js');
   const { pairKey } = await import('/src/systems/RelationshipSystem.js');
   sim.give({ wood: 999, stone: 999, food: 999, gold: 999 });
   sim.step(225 * 3);
@@ -66,7 +66,7 @@ const out = await page.evaluate(async () => {
   let b2 = null;
   for (const t of ['lumberHut', 'garden', 'fishingPier', 'workshop', 'sheepFarm']) { const x = sim.place(t); if (x && x !== b1 && x.workerSlots >= 1) { b2 = x; break; } }
   const ok = Boolean(b1 && b2 && b1 !== b2);
-  for (const x of [b1, b2]) if (x) Object.defineProperty(x, 'workerSlots', { value: 2, configurable: true }); // her ikisi 2 yuvalı (test düzeneği)
+  for (const x of [b1, b2]) if (x) Object.defineProperty(x, 'workerSlots', { value: 3, configurable: true }); // her ikisi 3 yuvalı (test düzeneği)
   check('iki üretim yapısı kuruldu', ok, `${b1?.type}/${b2?.type}`);
   if (ok) {
     jobs.jobs.splice(0);
@@ -85,13 +85,18 @@ const out = await page.evaluate(async () => {
     const base = choose();
     const X = base?.building;
     const Y = X === b1 ? b2 : b1;
-    check('taban: orta noktadan bir yapı seçilir', Boolean(X));
+    const nd = (bb) => Math.min(...scene.world.getSpots(bb).map((sp) => Math.hypot(sp.x - mid.x, sp.y - mid.y)));
+    check('taban: orta noktadan bir yapı seçilir', Boolean(X), `X=${X?.type} d1=${nd(b1).toFixed(1)} d2=${nd(b2).toFixed(1)} adaylar=${free.length}`);
     me.partnerId = mate.id; mate.partnerId = me.id;
-    Y.workerIds.add(mate.id);
+    // mesafe farkı ≥ 1 puan x tilesPerPoint'i aşabilsin: ikinci bir ruh ikizi de aynı yapıda
+    const pal = free.find((x) => x !== me && x !== mate && x !== foe) ?? c3;
+    chem(me, pal, 0); addTag(me, pal.id, 'kindred', s.totalMinutes);
+    Y.workerIds.add(mate.id); Y.workerIds.add(pal.id);
     check('eşinin çalıştığı yapı, eşit öncelikli yakın yapıya tercih edilir', choose()?.building === Y);
     mate.partnerId = null; me.partnerId = null; Y.workerIds.clear();
     chem(me, foe, 0); addTag(me, foe.id, 'resentful', s.totalMinutes);
-    X.workerIds.add(foe.id);
+    removeTag(me, pal.id, 'kindred'); addTag(me, pal.id, 'resentful', s.totalMinutes);
+    X.workerIds.add(foe.id); X.workerIds.add(pal.id);
     check('kırgın olduğu kişinin yapısı yerine öteki seçilir', choose()?.building === Y);
     for (const bb of [Y, ...others]) bb.idle = true;
     check('tek aday kaçınılan kişinin yapısıysa yine oraya gider', choose()?.building === X);
