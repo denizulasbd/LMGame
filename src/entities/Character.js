@@ -13,6 +13,7 @@
 // 25.2: çıraklık (apprenticeship: { masterId, profession, buildingId, progress 0-100, since, crafted }; ApprenticeshipSystem)
 // ve konuşma baloncuğu (speech: { text, at, duration }; kaydedilmez, ikon balonundan ayrı bir katmandır).
 // 25.4: Aile Kütüğü (generation, parents: doğum ebeveynleri, familyId: ocak, children; LineageSystem).
+// 29.2: ruh halleri (moodlets: en çok 6; mood: toplam etki ve baskın ruh hali; MoodletSystem).
 // 29.1: sosyal kimya ve duygusal etiketler (relationships: { karşıKimlik: { chemistry -2..+3, craft, tags, until } }; ChemistrySystem).
 // 22. aşama: köyü terk etmeye karar verdiyse yola çıktığı an ve çıkış karosu (emigrating: { since, exit }; DesertionSystem).
 import { PROFESSIONS } from '../data/apprenticeship.js';
@@ -41,6 +42,7 @@ import {
 import { sanitizeOrigin } from '../systems/Temperament.js';
 import { sanitizeMentees } from '../systems/Heirloom.js';
 import { sanitizeRelations } from '../systems/Chemistry.js';
+import { sanitizeMoodlets, neutralMood, recomputeMood } from '../systems/Moodlets.js';
 
 const HALF_WIDTH = CHARACTER_WIDTH / 2;
 const BUBBLE_POP_TIME = 0.15;
@@ -122,6 +124,7 @@ export class Character extends Entity {
     children = null,
     mentees = null,
     relationships = null,
+    moodlets = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -199,11 +202,18 @@ export class Character extends Entity {
     this.mentees = sanitizeMentees(mentees);
     // (29.1) Sosyal kimya ve duygusal etiketler: { karşıKimlik: { chemistry, craft, tags, until } } (kayda girer; systems/Chemistry.js)
     this.relationships = sanitizeRelations(relationships, this.id);
+    // (29.2) Ruh halleri: [{ key, tier, since, until, reason, whoId?, whoName? }] (kayda girer); mood: toplam çarpanlar ve baskın ruh hali
+    // (kaydedilmez; Moodlets.recomputeMood yerinde günceller, sıcak yollar yalnızca okur)
+    this.moodlets = sanitizeMoodlets(moodlets);
+    this.mood = neutralMood();
+    this.flowStreak = 0; // kendi tezgâhında art arda verimli mesai (kaydedilmez)
+    this.lastConsoleAt = null; // son teselli ettiği oyun dakikası (kaydedilmez)
     this.retired = false; // emekli bilge mi (kaydedilmez; LifeStageSystem çekirdek sakin kuralıyla hesaplar)
     this.waterBucket = false; // yangında kovası dolu mu (kaydedilmez)
     this.recall = null;
     this.flowerCrown = false;
     this.profile = this.buildProfile();
+    recomputeMood(this);
 
     // Anlık durum (kaydedilmez, yapay zekâ yeniden kurar)
     this.facing = 'down';
@@ -608,6 +618,7 @@ export class Character extends Entity {
       children: this.children,
       mentees: this.mentees,
       relationships: this.relationships,
+      moodlets: this.moodlets,
     };
   }
 

@@ -105,7 +105,8 @@ export class ConflictSystem {
     const key = pairKey(a.id, b.id);
     const now = this.state.totalMinutes;
     if ((this.cooldowns.get(key) ?? -1) > now) return;
-    const temper = Math.max(a.profile.quarrelChance, b.profile.quarrelChance);
+    // (29.2) tatsız karşılaşma yaşamış ya da aç ve huysuz sakin daha çabuk parlar
+    const temper = Math.max(a.profile.quarrelChance, b.profile.quarrelChance) * Math.max(a.mood.quarrelMul, b.mood.quarrelMul);
     // (15. aşama) küsler birbirini görmezden gelir: aynı çiftin üst üste atışması seyrekleşir
     const feud = this.relationships.get(a, b) < RECONCILE.below ? CONFLICT.feudQuarrelMultiplier : 1;
     if (this.rng.next() >= QUARREL_RATES[kind] * temper * feud * chemistry * minutes) return;

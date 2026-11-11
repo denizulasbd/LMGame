@@ -1430,6 +1430,8 @@ const BUBBLE_ICONS = {
   // (24.2) bir bardak fıçı şerbeti ve dikilen Dayanıklı Giysi
   sherbet: ['..Y....', '.KKKKK.', 'KYYYYYK', 'KYOYOYK', '.KYYYK.', '..KKK..'],
   cloth: ['.......', 'KKKKKKK', 'KSSSSSK', 'KcccccK', 'KSSSSSK', 'KKKKKKK'],
+  // (29.2) yas mumu
+  candle: ['...O...', '..OPO..', '...O...', '..SSS..', '..SsS..', '.KSSSK.'],
   // (29.1) sosyal kimya: çift mavi şimşek (güçlü çekim)
   spark: ['..bc.bc', '.bc.bc.', 'bcabca.', '.bc.bc.', 'bc.bc..', 'c..c...'],
 };

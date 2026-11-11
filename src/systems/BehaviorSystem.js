@@ -67,6 +67,8 @@ import { doctrineProductionMultiplier } from './Doctrine.js';
 import { INN_SHERBET } from '../data/refinery.js';
 import { PROFESSIONS } from '../data/apprenticeship.js';
 import { hasTag } from './Chemistry.js';
+import { MOOD_RULES, GRIEVE_LABEL, GRIEVE_FALLBACK } from '../data/moodlets.js';
+import { genitive } from '../utils/turkish.js';
 import { TEMPERAMENT } from '../data/temperament.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
@@ -394,6 +396,7 @@ export class BehaviorSystem {
       if (partner) return `${partner.name} ile ${task.dateWithId !== undefined ? 'randevuya' : 'buluşmaya'} gidiyor`;
     }
     let label = activity.travelLabel ?? activity.label;
+    if (task.consoleName) label = label.replace('{name}', task.consoleName); // (29.2)
     // (19. aşama) huyların etkinlikleri: hayvanın adı ve çalınan yer
     if (task.petName) label = label.replace('{pet}', task.petName);
     if (task.placeTo) label = label.replace('{place}', task.placeTo);
@@ -420,6 +423,9 @@ export class BehaviorSystem {
     if (building) label = label.replace('{target}', building.name);
     // (19. aşama) huyların etkinlikleri
     if (task.activity === 'viewpoint' && task.view === 'tree') label = activity.treeLabel;
+    // (29.2) yas ve teselli
+    if (task.grieve) label = task.grieveFor ? GRIEVE_LABEL.replace('{who}', genitive(task.grieveFor)) : GRIEVE_FALLBACK;
+    if (task.consoleName) label = label.replace('{name}', task.consoleName);
     if (task.petName) label = label.replace('{pet}', task.petName);
     if (task.placeAt) label = label.replace('{place}', task.placeAt);
     if (task.bagItem) label = label.replace('{bag}', ITEMS[task.bagItem].name.toLocaleLowerCase('tr'));
@@ -560,6 +566,7 @@ export class BehaviorSystem {
       if (activity.kind === 'work') {
         this.events.emit('work:shiftEnded', { character: c, activity: task.activity, building: task.workBuildingId ? this.world.getBuilding(task.workBuildingId) : null });
       }
+      this.events.emit('task:finished', { character: c, task }); // (29.2) eylem x kişilik moodlet'leri
       if (activity.finishEvent) this.events.emit(activity.finishEvent, { character: c, task, building: task.buildingId ? this.world.getBuilding(task.buildingId) : null });
       // Sıcak yemek bir süre tok tutar (NeedsSystem acıkmayı yavaşlatır)
       if (task.activity === 'innMeal') {
@@ -598,8 +605,9 @@ export class BehaviorSystem {
     if (partner) {
       // Yakın arkadaşla sohbet sosyalliği daha hızlı doldurur ve keyif de verir
       const bond = this.relationships.bondFor(c, partner);
-      gain *= bond.socialBonus;
-      c.needs.fun = clamp(c.needs.fun + bond.funBonus * minutes, 0, 100);
+      // (29.2) Tatlı Sohbet kazancı artırır, Kalbi Kırık azaltır (yalnızca olumlu keyif kazancı çarpılır)
+      gain *= bond.socialBonus * c.mood.socialMul;
+      c.needs.fun = clamp(c.needs.fun + (bond.funBonus > 0 ? bond.funBonus * c.mood.socialMul : bond.funBonus) * minutes, 0, 100);
     }
     if (task.sherbet) gain *= INN_SHERBET.multiplier; // (24.2) fıçı şerbetiyle sohbet iki kat
     c.needs.social = clamp(c.needs.social + gain * minutes, 0, 100);
@@ -648,7 +656,8 @@ export class BehaviorSystem {
       workBonus(c, task.activity) *
       equipmentWorkSpeed(c) *
       healthWorkMultiplier(c, this.state.totalMinutes) *
-      spiceWorkMultiplier(c, this.state.totalMinutes);
+      spiceWorkMultiplier(c, this.state.totalMinutes) *
+      c.mood.workMul; // (29.2) ruh hali: gurur / akış hızlandırır, angarya / yas / açlık yavaşlatır
     // Zanaat Loncası fermanı üretim yapılarında (inşaat ve toplama emirleri hariç) verimi artırır
     if (task.workBuildingId) amount *= civicProductionMultiplier(this.state);
     if (crafty) amount *= TEMPERAMENT.craftWorkSpeed;
@@ -663,7 +672,7 @@ export class BehaviorSystem {
       amount *= towerMasteryMultiplier(c, tower, skillLevel);
       recordTowerWork(this.state, c, amount);
     }
-    addExperience(this.events, c, task.activity, minutes, civicXpMultiplier(this.state) * relicXpMultiplier(this.state));
+    addExperience(this.events, c, task.activity, minutes, civicXpMultiplier(this.state) * relicXpMultiplier(this.state) * c.mood.xpMul);
 
     if (task.jobId) {
       const job = this.jobs.getJob(task.jobId);
@@ -866,7 +875,9 @@ export class BehaviorSystem {
     // Şenlik bitince herkes dağılır
     if (activity.kind === 'festival' && !this.world.state.events.festival.active) return true;
     if (INTERRUPTIBLE_KINDS.has(activity.kind) && this.shouldStop(c, activity, hour)) return true;
-    return task.elapsed >= (task.duration ?? 0);
+    // (29.2) gururlu / akıştaki / ilhamlı sakin tezgâh başında daha uzun kalır
+    const stretch = activity.kind === 'work' && c.mood.focus ? MOOD_RULES.focusDuration : 1;
+    return task.elapsed >= (task.duration ?? 0) * stretch;
   }
 
   /** Aynı toplanma yerinde etkinliğini sürdüren diğer karakter: yakın olan, ama arkadaşlar öne geçer. */

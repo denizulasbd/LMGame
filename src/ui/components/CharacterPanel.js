@@ -49,6 +49,8 @@ import { apprenticesOf, graduationFor, acceptsApprentice, apprenticeStatus } fro
 import { ORIGIN_NAMES } from '../../data/temperament.js';
 import { generationName } from '../../systems/Lineage.js';
 import { heirloomSlot } from '../../systems/Citizens.js';
+import { MOODLETS, TIER_NAMES } from '../../data/moodlets.js';
+import { effectText, reasonText, remainingHours, soothingOf } from '../../systems/Moodlets.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -125,6 +127,12 @@ export class CharacterPanel {
       return row;
     });
 
+    // (29.2) Baskın ruh hali (portrenin altında) ve "Ruh Hali ve İç Dünya" listesi
+    this.moodBadge = el('div', { className: 'mood-badge is-neutral', text: 'Dengeli' });
+    this.moodList = el('div', { className: 'moodlet-list' });
+    this.lastMoodVersion = -1;
+    this.lastMoodHour = -1;
+    this.lastMoodId = null;
     this.familyList = el('div', { className: 'family-list' });
     this.relationsList = el('div', { className: 'relations-list' });
     this.equipmentList = el('div', { className: 'equipment-slots' });
@@ -153,12 +161,13 @@ export class CharacterPanel {
     this.element = el('div', { className: 'panel character-panel ui-interactive', hidden: true }, [
       closeButton,
       el('div', { className: 'character-header' }, [
-        el('div', { className: 'character-portrait-frame' }, [this.portrait]),
+        el('div', { className: 'character-portrait-column' }, [el('div', { className: 'character-portrait-frame' }, [this.portrait]), this.moodBadge]),
         el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.stageBadge, this.meta, this.craftBadge, this.traits]),
       ]),
       el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
       this.petitionBox,
       el('div', { className: 'character-needs' }, needs),
+      section('Ruh Hali ve İç Dünya', this.moodList),
       section('Aile', this.familyList),
       section('İlişkiler', this.relationsList),
       section('Sosyal Hayat', this.socialList),
@@ -305,6 +314,7 @@ export class CharacterPanel {
       label.textContent = String(value);
       row.classList.toggle('is-low', value < LOW_NEED);
     }
+    this.renderMood(character, game.state);
     this.renderFamily(character, game.state);
     this.renderRelations(character, game.state);
     this.renderEquipment(character);
@@ -316,6 +326,46 @@ export class CharacterPanel {
     this.renderPurse(character, game.state);
     this.renderApprenticeship(character, game.state);
     this.renderPetition(character, game.state);
+  }
+
+  /**
+   * (29.2) Baskın ruh hali ve aktif moodlet çipleri. Yalnızca sakinin ruh hali değişince (mood.version) ya da saat dönünce
+   * (kalan süre) yeniden kurulur; öteki karelerde üç sayı karşılaştırılır, hiçbir şey tahsis edilmez.
+   */
+  renderMood(character, state) {
+    const mood = character.mood;
+    const hour = Math.floor(state.totalMinutes / 60);
+    if (this.lastMoodId === character.id && this.lastMoodVersion === mood.version && this.lastMoodHour === hour) return;
+    this.lastMoodId = character.id;
+    this.lastMoodVersion = mood.version;
+    this.lastMoodHour = hour;
+    this.moodBadge.textContent = mood.feel;
+    this.moodBadge.className = `mood-badge is-${mood.tone}`;
+    this.moodBadge.title = `Baskın ruh hali: ${mood.feel} (aktif ruh hallerinin net ağırlığı ${mood.net > 0 ? '+' : ''}${Math.round(mood.net * 10) / 10})`;
+    const list = character.moodlets;
+    if (list.length === 0) {
+      this.moodList.replaceChildren(el('div', { className: 'relations-empty', text: 'Şu an içinde fırtına kopmuyor: gündelik hayatına dengeyle devam ediyor.' }));
+      return;
+    }
+    const soothing = soothingOf(character);
+    const order = { core: 0, action: 1, need: 2 };
+    const rows = [...list]
+      .sort((a, b) => order[MOODLETS[a.key].layer] - order[MOODLETS[b.key].layer] || MOODLETS[b.key].weight - MOODLETS[a.key].weight)
+      .map((m) => {
+        const def = MOODLETS[m.key];
+        const left = remainingHours(m, state.totalMinutes);
+        const effect = effectText(m, soothing);
+        return el('div', { className: `moodlet-chip is-${def.tone} layer-${def.layer}`, title: `${def.name} (${TIER_NAMES[m.tier]})${effect ? `: ${effect}` : ''}` }, [
+          el('img', { className: 'moodlet-icon', src: getAnyIconURL(def.icon), alt: '' }),
+          el('div', { className: 'moodlet-text' }, [
+            el('span', { className: 'moodlet-name', text: `${def.name}${m.tier !== 'minor' ? ` · ${TIER_NAMES[m.tier]}` : ''}` }),
+            el('span', { className: 'moodlet-reason', text: reasonText(m) }),
+            ...(effect ? [el('span', { className: 'moodlet-effect', text: effect })] : []),
+          ]),
+          el('span', { className: 'moodlet-time', text: left === null ? 'sürüyor' : `${left} sa` }),
+        ]);
+      });
+    this.moodList.replaceChildren(...rows);
   }
 
   /** (25.2) Çıraklık: çırağın ustası, dalı ve ilerlemesi; ustanın çırakları; Genç için "Çıraklığa Yaz". */

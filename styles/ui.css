@@ -1045,6 +1045,93 @@ button.relation-row:hover {
 .relation-fill.is-dislike { background: #d98a5a; }
 .relation-fill.is-rival { background: var(--ui-bad); }
 
+/* ---------- Ruh halleri (29.2): baskın ruh hali ve moodlet çipleri ---------- */
+.character-portrait-column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.mood-badge {
+  padding: 1px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: #fff8e7;
+  background: #7a6a58;
+  border: 2px solid rgba(27, 20, 35, 0.6);
+}
+
+.mood-badge.is-positive { background: #3f8f4d; }
+.mood-badge.is-negative { background: #c9782c; }
+.mood-badge.is-trauma { background: #7d3f8f; }
+
+.moodlet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.moodlet-chip {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  background: var(--ui-card);
+  border: 2px solid var(--ui-wood);
+  border-left-width: 5px;
+}
+
+.moodlet-chip.is-positive { border-left-color: #3f8f4d; }
+.moodlet-chip.is-positive.layer-core { border-left-color: #d9a520; }
+.moodlet-chip.is-negative { border-left-color: #d98a2c; }
+.moodlet-chip.is-trauma { border-left-color: #8a3fa0; background: var(--ui-card-bad); }
+
+.moodlet-icon {
+  width: 14px;
+  height: 12px;
+  image-rendering: pixelated;
+}
+
+.moodlet-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.moodlet-name {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.moodlet-reason {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.moodlet-effect {
+  font-size: 10px;
+  font-weight: 600;
+  color: #f2c078;
+}
+
+.moodlet-chip.is-positive .moodlet-effect { color: #9be28a; }
+.moodlet-chip.is-trauma .moodlet-effect { color: #e6a8ee; }
+
+.moodlet-time {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.buff-chip.hud-grief-chip {
+  border-color: #8a3fa0;
+}
+
 /* ---------- Sosyal kimya ve duygusal etiketler (29.1) ---------- */
 .chemistry-badge {
   margin-left: 4px;

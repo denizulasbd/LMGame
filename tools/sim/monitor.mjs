@@ -43,6 +43,7 @@ export async function installMonitor(page) {
     window.__granaryMod = await import('/src/systems/Granary.js').catch(() => null);
     window.__refineryMod = await import('/src/systems/Refinery.js').catch(() => null); // (24.2)
     window.__tradeMod = await import('/src/systems/TradePost.js').catch(() => null); // (24.3)
+    window.__moodDefs = (await import('/src/data/moodlets.js').catch(() => null))?.MOODLETS ?? null; // (29.2)
     window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
     window.__lateMod = await import('/src/systems/LateGame.js').catch(() => null); // (28.4)
     window.__tsMod = await import('/src/systems/TownStatus.js').catch(() => null);
@@ -135,6 +136,27 @@ export async function installMonitor(page) {
         const ids = new Set(s.characters.map((c) => c.id));
         const byId = new Map(s.characters.map((c) => [c.id, c]));
         const buildings = new Map(s.buildings.map((b) => [b.id, b]));
+
+        // ---- (29.2) Ruh halleri: katman tavanları, bilinmeyen anahtar, süresi geçmiş kayıt; yetişkinlerin ortalama iş çarpanı ----
+        {
+          const caps = { core: 1, action: 3, need: 2 };
+          const defs = window.__moodDefs;
+          let sum = 0; let n = 0; let lo = Infinity; let hi = 0;
+          for (const c of s.characters) {
+            const count = { core: 0, action: 0, need: 0 };
+            for (const x of c.moodlets) {
+              const d = defs?.[x.key];
+              if (!d) { broke(`${c.name}: bilinmeyen moodlet ${x.key}`); continue; }
+              count[d.layer]++;
+              if (x.until !== null && x.until < now - 61) broke(`${c.name}: süresi geçmiş moodlet ${x.key}`);
+            }
+            for (const k of Object.keys(caps)) if (count[k] > caps[k]) broke(`${c.name}: ${k} katmanında ${count[k]} moodlet (tavan ${caps[k]})`);
+            if (c.moodlets.length > 6) broke(`${c.name}: 6'dan fazla moodlet`);
+            m.moodMax = Math.max(m.moodMax ?? 0, c.moodlets.length);
+            if (!c.isChild && !c.role) { sum += c.mood.workMul; n++; lo = Math.min(lo, c.mood.workMul); hi = Math.max(hi, c.mood.workMul); }
+          }
+          if (n) { const w = (m.moodWork ??= { n: 0, sum: 0, min: Infinity, max: 0 }); w.n++; w.sum += sum / n; w.min = Math.min(w.min, lo); w.max = Math.max(w.max, hi); }
+        }
 
         // ---- (29.1) Sosyal kimya: kayıp sakine işaret eden ilişki kaydı, sınır dışı kimya, bilinmeyen etiket, tek yönlü kimya ----
         for (const c of s.characters) {
@@ -498,7 +520,9 @@ export async function installMonitor(page) {
           if (!jt || jt.progress !== job.progress) m.jobTrack.set(job.id, { progress: job.progress, since: now, flagged: false, type: job.type });
           else if (!jt.flagged && (job.assignees?.length ?? 0) > 0 && now - jt.since > JOB_STALE_DAYS * 1440) {
             jt.flagged = true;
-            m.staleJobs.push(`G${s.time.day} ${job.type}#${job.id} @${job.x},${job.y} atanan ${job.assignees.length}`);
+            const jb = job.buildingId ? buildings.get(job.buildingId) : null;
+            // (29.2) teşhis: yapı türü, ilerleme ve atananların o anki görevi / ruh hali
+            m.staleJobs.push(`G${s.time.day} ${job.type}#${job.id} @${job.x},${job.y} atanan ${job.assignees.length}${jb ? ` · ${jb.type}${job.project ? ` (${job.project})` : ''}` : ''} · ilerleme ${Math.round(job.progress ?? 0)}/${Math.round(job.work ?? 0)} · ${job.assignees.map((id) => { const c = byId.get(id); return c ? `${c.name}:${c.task?.activity ?? '-'}/${c.task?.phase ?? '-'}${c.task?.jobId === job.id ? '*' : ''}:${c.mood?.feel}${c.mood?.shirk ? '!' : ''}` : id; }).join(', ')}`);
           }
         }
 
@@ -649,6 +673,17 @@ export async function installMonitor(page) {
                 // (28.3) Saygın Büyükler, nüfus (toplam / kotaya sayılan), en yaşlı sakin ve vefatın kopuk referans bırakmadığı (yukarıdaki referans denetimi) örnekleri
                 venerable: s.characters.filter((c) => c.isVenerable).map((c) => `${c.name}:${c.age}/${c.lifespan}`),
                 births: s.stats?.births ?? 0,
+                // (29.2) ruh halleri: verilen moodlet sayıları, son günün dağılımı, baskın ruh halleri, örneklerdeki ortalama iş çarpanı
+                moodlets: {
+                  given: { ...(s.moodlets?.given ?? {}) },
+                  consoled: s.moodlets?.consoled ?? 0,
+                  grieved: s.moodlets?.grieved ?? 0,
+                  mourners: s.moodlets?.mourners ?? 0,
+                  now: s.characters.reduce((o, c) => { for (const x of c.moodlets) o[x.key] = (o[x.key] ?? 0) + 1; return o; }, {}),
+                  feels: s.characters.reduce((o, c) => { o[c.mood.feel] = (o[c.mood.feel] ?? 0) + 1; return o; }, {}),
+                  work: m.moodWork ?? null,
+                  max: m.moodMax ?? 0,
+                },
                 // (29.1) sosyal kimya ve duygusal etiketler
                 chemistry: (() => {
                   const dist = {}; const tags = {}; let records = 0; let ruler = 0;

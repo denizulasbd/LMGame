@@ -979,6 +979,13 @@ if (mon.life) {
     `(28.3) nüfus ${L.population} (kotaya sayılan ${L.active}) · Saygın Büyük ${L.venerable.length} (${L.venerable.join(', ') || '-'}; toplam olan ${L.state.venerables ?? 0}) · vefat ${L.state.deaths ?? 0} (kaza ${L.state.accidents ?? 0}; son: ${L.state.lastDeath ? `${L.state.lastDeath.name} ${L.state.lastDeath.age} yaşında G${L.state.lastDeath.day} ${L.state.lastDeath.cause}` : '-'}) · ` +
       `doğum ${L.births} · ömrü atanmamış ${L.lifespanMissing} · yataklı Saygın Büyük ${L.venerableWithHome}`
   );
+  // (29.2) Ruh halleri
+  const md = L.moodlets;
+  if (md) {
+    const total = Object.values(md.given).reduce((x, y) => x + y, 0);
+    console.log(`(29.2) verilen moodlet ${total}: ${Object.entries(md.given).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(' · ')}`);
+    console.log(`(29.2) yas tutan ${md.mourners} · anma ${md.grieved} · teselli ${md.consoled} · son gün ${JSON.stringify(md.now)} · baskın ruh hali ${JSON.stringify(md.feels)} · ortalama iş çarpanı ${md.work ? (md.work.sum / md.work.n).toFixed(3) : '-'} (en düşük ${md.work?.min.toFixed(2)}, en yüksek ${md.work?.max.toFixed(2)}) · en çok ${md.max} moodlet`);
+  }
   // (29.1) Sosyal kimya ve duygusal etiketler
   const ch = L.chemistry;
   if (ch) console.log(`(29.1) kimya kaydı ${ch.records} çift ${JSON.stringify(ch.dist)} · şimdiki etiketler ${JSON.stringify(ch.tags)} (Yönetime ${ch.ruler}) · verilen etiket ${ch.given} · ruh ikizi bağı ${ch.kindred} · şimşek ${ch.sparks} · ikram ${ch.treats} · etiketli selam ${ch.greetings}`);

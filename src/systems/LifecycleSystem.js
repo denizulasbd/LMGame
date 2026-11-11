@@ -135,6 +135,8 @@ export class LifecycleSystem {
     if (!c || c.role || !s.characters.includes(c)) return false;
     const age = c.age;
     const name = c.name;
+    // (29.2) referanslar temizlenmeden önce: geride kalanlar (eş, aile, ruh ikizi, usta / çırak) yasa girer
+    this.events.emit('population:dying', { character: c, cause });
     // Kese: eşine, yoksa ilk yaşayan evladına
     const kin = [c.partnerId, ...(c.children ?? [])].map((id) => this.world.getCharacter(id)).filter((x) => x && x !== c && !x.role);
     const coins = c.coins ?? 0;

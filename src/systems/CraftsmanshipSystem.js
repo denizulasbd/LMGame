@@ -75,6 +75,7 @@ export class CraftsmanshipSystem {
     let chance = MASTERWORK.baseChance;
     if (c.workplaceId !== null && c.workplaceId === building?.id) chance += MASTERWORK.pinnedBonus;
     if (c.equipment?.tool === 'sturdyTool') chance += MASTERWORK.toolBonus;
+    chance += c.mood?.masterwork ?? 0; // (29.2) Ustalık Akışı +%2, İlham Dolu +%3
     return chance * grandmasterMasterworkMultiplier(c, type); // (28.2) Başusta kendi mesleğinin eserinde 2 kat
   }
 

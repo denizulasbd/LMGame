@@ -85,7 +85,9 @@ export class NeedsSystem {
         if (pride && need === 'fun') multiplier *= HEIRLOOM.prideFunDecay;
         // (24.2) Handa fıçı şerbeti içen güne "Keyifli Damak"la başlar: keyfi yavaş düşer
         if (need === 'fun' && hasPalate(c, now)) multiplier *= INN_SHERBET.palate.funDecay;
-        if (need === 'energy') multiplier *= healthEnergy;
+        if (need === 'energy') multiplier *= healthEnergy * c.mood.energyMul;
+        // (29.2) ruh hali keyfin azalma hızını değiştirir (Damak Şöleni yavaşlatır, yas ve açlık hızlandırır)
+        if (need === 'fun') multiplier *= c.mood.joyRateMul;
         c.needs[need] = clamp(c.needs[need] - perMinute * multiplier * tick.gameMinutes, 0, 100);
       }
       if (rainy && c.profile.rainLover) {

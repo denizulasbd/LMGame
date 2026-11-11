@@ -9,6 +9,7 @@ import { LEGACY_BUILDING_TYPES } from '../data/buildings.js';
 import { lifespanFor } from '../systems/Venerable.js';
 import { valleyFor } from '../systems/Valley.js';
 import { migrateChemistry } from '../systems/Chemistry.js';
+import { migrateMoodlets } from '../systems/Moodlets.js';
 
 const SLOT_KEYS = {
   main: CONFIG.SAVE_KEY,
@@ -24,6 +25,8 @@ function migrate(data) {
   // kimya ve boş duygusal etiket yapısı bağlanır (rastgelelik tüketmez). Daha eski sürümlerin aşağıdaki göçleri sakin alanlarını
   // değiştirmediği için (kimya yalnızca özellik, huy, çıraklık ve Başusta bilgisine bakar) sıra önemli değildir.
   const bindChemistry = data.version < 36;
+  // (29.2) v36 -> v37: her sakine boş ruh hali listesi (moodlets: []), duruma boş ruh hali sayaçları (state.moodlets)
+  if (data.version < 37) migrateMoodlets(data);
   // (28.4) v34 -> v35: tohumdan deterministik Vadi Karakteri, boş Kasaba Doktrini
   if (data.version < 35) {
     data.valley = valleyFor(data.seed);

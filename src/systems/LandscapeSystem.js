@@ -137,7 +137,7 @@ export class LandscapeSystem {
       // Karanlık sokak: gece ışıksız yerde yürüyen ürker
       if (dark && walking && !isLitPoint(lights, c.x, c.y)) {
         c.inDark = true;
-        c.needs.fun = clamp(c.needs.fun - DARKNESS.funPerMinute * minutes, 0, 100);
+        c.needs.fun = clamp(c.needs.fun - DARKNESS.funPerMinute * c.mood.scareMul * minutes, 0, 100); // (29.2) sarsılmış sakin iki kat ürker
       }
     }
   }

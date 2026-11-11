@@ -283,7 +283,7 @@ export class RelationshipSystem {
 
   /** Yakın iki bekâr sohbet ederken / dans ederken aşık olabilir. */
   tryRomance(a, b, group, minutes) {
-    if (!canRomance(a, b)) return;
+    if (!canRomance(a, b) || a.mood.grief || b.mood.grief) return; // (29.2) yastaki sakin flörte girmez
     // (29.1) Aşk zarı kimyaya bakar: kimya 0 ya da eksiyse aşk yok; güçlü çekim daha düşük puanla ve daha hızlı aşık eder
     const chem = chemistryLevel(chemistryOf(this.state, a, b));
     if (chem.romance <= 0 || this.get(a, b) < chem.romanceScore) return;

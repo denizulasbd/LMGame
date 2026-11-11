@@ -55,6 +55,9 @@ import { foodItemOf, countItem, roomFor, isRioter, raidOf } from '../systems/Cit
 import { ELDER } from '../data/lifeStages.js';
 import { hasTag } from '../systems/Chemistry.js';
 import { EMOTION_RULES } from '../data/chemistry.js';
+import { MOOD_RULES, CONSOLE } from '../data/moodlets.js';
+import { getMoodlet } from '../systems/Moodlets.js';
+import { findSufferer } from '../systems/MoodletSystem.js';
 import { TEMPERAMENT } from '../data/temperament.js';
 
 // Çocukların oyun oynadığı yerler: bu yapıların çevresi ve meydan
@@ -123,12 +126,14 @@ export class Brain {
       if (plan) return plan;
     }
     // (20. aşama) Çağ Kutlaması: Ulu Saat Kulesi tamamlanınca uyanık herkes meydanda kutlar
-    if (this.world.state.goldenAge?.celebration && needs.energy > FESTIVAL_MIN_ENERGY && !this.world.state.events.festival.active) {
+    // (29.2) Yastaki sakin kutlamaya, düğüne, şenliğe katılmaz
+    const grieving = c.mood.grief;
+    if (!grieving && this.world.state.goldenAge?.celebration && needs.energy > FESTIVAL_MIN_ENERGY && !this.world.state.events.festival.active) {
       const plan = this.planAgeCelebration(c);
       if (plan) return plan;
     }
     // (19. aşama) Düğün kutlaması: çift ve davetli dostları meydanda konfetiler arasında kutlar
-    if (this.world.state.social?.party && needs.energy > FESTIVAL_MIN_ENERGY && !this.world.state.events.festival.active) {
+    if (!grieving && this.world.state.social?.party && needs.energy > FESTIVAL_MIN_ENERGY && !this.world.state.events.festival.active) {
       const plan = this.planWeddingParty(c);
       if (plan) return plan;
     }
@@ -154,7 +159,7 @@ export class Brain {
         if (nap) return nap;
       }
     }
-    if (this.world.state.events.festival.active && needs.energy > FESTIVAL_MIN_ENERGY) {
+    if (!grieving && this.world.state.events.festival.active && needs.energy > FESTIVAL_MIN_ENERGY) {
       const plan = this.planFestival(c);
       if (plan) return plan;
     }
@@ -163,7 +168,8 @@ export class Brain {
       const plan = this.planRally(c);
       if (plan) return plan;
     }
-    if (bedtime || needs.energy < profile.thresholds.energy) {
+    // (29.2) bıkkın, tükenmiş ya da üşüyerek uyanmış sakin dinlenmeye çok daha erken yönelir
+    if (bedtime || needs.energy < profile.thresholds.energy + (c.mood.shirk ? MOOD_RULES.shirkEnergyBonus : 0)) {
       const plan = this.planSleep(c, !bedtime);
       if (plan) return plan;
     }
@@ -194,10 +200,13 @@ export class Brain {
 
     let onBreak = false;
     if (isWorkHours(hour) && !c.isChild) {
-      if (this.rng.next() >= profile.work.breakChance) {
+      // (29.2) gururlu / akıştaki / ilhamlı sakin mola vermez (zar yine atılır: üretecin sırası değişmez)
+      if (this.rng.next() >= profile.work.breakChance || c.mood.focus) {
         // (25.2) Çırak: ustası tezgâhtaysa onun yanına (mola zarı her zamanki gibi atıldı; çırak planı kendi üretecini kullanır)
         const plan = (c.apprenticeship && this.apprenticeship?.planFor(c)) || this.planWork(c);
-        if (plan) return plan;
+        // (29.2) bıkkın / tükenmiş / üşümüş sakin ağır işten (maden, taş ocağı, inşaat) kaçınır; öncelikli iş emri hariç
+        if (plan && c.mood.shirk && MOOD_RULES.heavyWork.includes(plan.activity) && !(plan.jobId && this.jobs.getJob(plan.jobId)?.urgent)) onBreak = true;
+        else if (plan) return plan;
       } else {
         onBreak = true;
       }
@@ -207,12 +216,24 @@ export class Brain {
       const plan = this.planTreatInjury(c);
       if (plan) return { ...plan, onBreak };
     }
+    // (29.2) Acılı (yaslı, sarsılmış, kalbi kırık) bir yakını varsa boş zamanında önce onu teselli etmeye gider
+    if (!c.isChild && (!isWorkHours(hour) || onBreak)) {
+      const plan = this.planConsole(c);
+      if (plan) return { ...plan, onBreak };
+    }
+    // (29.2) Yastaki sakin eğlenceye ve flörte girmez: anıtın, çardağın ya da evinin önünde anılara dalar
+    if (grieving && (!isWorkHours(hour) || onBreak)) {
+      const plan = this.planGrieve(c);
+      if (plan) return { ...plan, onBreak };
+    }
     // (19. aşama) Bekâr ve ilişkisi yüksek sakinler boş zamanlarında birbirleriyle vakit geçirmeye öncelik verir
-    if (!c.isChild && !c.married && (!isWorkHours(hour) || onBreak)) {
+    if (!c.isChild && !c.married && !grieving && (!isWorkHours(hour) || onBreak)) {
       const plan = this.planDate(c, hour);
       if (plan) return { ...plan, onBreak };
     }
-    if (needs.social < profile.thresholds.social && !c.isChild) {
+    // (29.2) yalnızlık sızısı / tatsız karşılaşma: dost arar (İçine Kapanık ise kalabalığa değil tenha köşeye çekilir: planLeisure)
+    const seeking = c.mood.seek && !c.traits.includes('introvert');
+    if ((needs.social < profile.thresholds.social || seeking) && !c.isChild) {
       const plan = this.planSocial(c, hour);
       if (plan) return { ...plan, onBreak };
     }
@@ -418,6 +439,47 @@ export class Brain {
 
   planWait() {
     return { activity: 'wait', duration: this.durationFor('wait') };
+  }
+
+  /**
+   * (29.2) Yas: anıtın başında, çardakta ya da evinin önünde anılara dalar ("Deniz'in aziz hatırasını anıyor").
+   * Hiçbiri yoksa null (olağan boş zaman; şenlik ve flört zaten kapalıdır).
+   */
+  planGrieve(c) {
+    const who = getMoodlet(c, 'mourning')?.whoName ?? null;
+    const base = () => ({ activity: 'grieve', grieve: true, grieveFor: who, duration: this.durationFor('grieve') }); // süre yalnızca yer bulununca çekilir
+    for (const type of ['monument', 'gazebo']) {
+      for (const b of this.world.getCompleted(type)) {
+        const spots = this.world.freeGatherSpots(b, c.id);
+        if (spots.length === 0) continue;
+        const spot = this.nearest(spots, c);
+        return { ...base(), buildingId: b.id, spot, reserve: true };
+      }
+    }
+    const home = c.homeId !== null ? this.world.getBuilding(c.homeId) : null;
+    const doors = home ? this.world.getSpots(home) : [];
+    if (doors.length > 0) return { ...base(), spot: this.nearest(doors, c) };
+    return null;
+  }
+
+  /**
+   * (29.2) Teselli: acılı bir yakını (eşi, ailesi, ruh ikizi, kimyası eksi olmayan dostu) varsa yanına gider. Teselli
+   * MoodletSystem'de, yan yana CONSOLE.minutes dakika durunca gerçekleşir. Aynı sakin cooldownMinutes ara verir.
+   */
+  planConsole(c) {
+    if (c.away || c.emigrating) return null;
+    const state = this.world.state;
+    if (c.lastConsoleAt !== null && c.lastConsoleAt !== undefined && state.totalMinutes - c.lastConsoleAt < CONSOLE.cooldownMinutes) return null;
+    const s = findSufferer(state, this.world.characters, c);
+    if (!s) return null;
+    const tx = s.tileX;
+    const ty = s.tileY;
+    let spot = null;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (!spot && this.world.map.isWalkable(tx + dx, ty + dy)) spot = { x: tx + dx, y: ty + dy };
+    }
+    spot ??= { x: tx, y: ty };
+    return { activity: 'console', spot, consoleId: s.id, consoleName: s.name, duration: this.durationFor('console') };
   }
 
   planSleep(c, nap) {
@@ -853,6 +915,16 @@ export class Brain {
       weights.shade = ((weights.bench ?? 1) + (weights.flowers ?? 1)) * (winter ? 0.15 : 0.5);
     }
     this.addQuirkLeisure(c, hour, weights);
+    // (29.2) ruh hali: bıkkın / tükenmiş / üşümüş sakin hana, ateş başına ve banka (dinlenme, ısınma) yönelir; yalnızlık ya da
+    // tatsız karşılaşma yaşamış İçine Kapanık kalabalık han yerine tenha bir köşede huzur arar
+    if (c.mood.shirk) {
+      for (const k of ['inn', 'campfire', 'bench', 'shade']) if (weights[k]) weights[k] *= 2;
+      if (weights.stroll) weights.stroll *= 0.3;
+    }
+    if (c.mood.seek && c.traits.includes('introvert')) {
+      for (const k of ['bench', 'river', 'readBench', 'readLibrary', 'viewpoint', 'shade', 'flowers']) if (weights[k]) weights[k] *= 3;
+      for (const k of ['inn', 'fountain', 'campfire', 'gazebo']) if (weights[k]) weights[k] *= 0.3;
+    }
     // (25.1) Kıdemli Bilge: çardak ve gölge (yukarıda yeniden hesaplanır) ile Bilgelik Evi'nde kitap okumak daha cazip
     if (c.profile.elder) {
       if (weights.gazebo) weights.gazebo *= ELDER.leisure.gazebo;
@@ -1188,6 +1260,7 @@ export class Brain {
    */
   isAvailableForDate(o, c, hour) {
     if (o.isChild || o.insideBuildingId || !o.visible || o.away || isBedtime(o.profile, hour)) return false;
+    if (o.mood.grief) return false; // (29.2) yastaki sakin randevuya gelmez
     if (isWorkHours(hour) && !o.task?.onBreak) return false;
     if (!o.task) return true;
     if (o.task.dateWithId !== undefined && o.task.dateWithId !== c.id) return false;
@@ -1287,7 +1360,9 @@ export class Brain {
     for (const other of this.world.characters) {
       if (other === c || !this.isAvailableForChat(other, hour)) continue;
       if (hasTag(c, other.id, 'resentful')) continue; // (29.1) kırgın olduğu kişiyi sohbete çağırmaz
-      const rank = Math.sqrt(distanceSq(other, c)) - this.relationships.get(c, other) * 0.8 - (hasTag(c, other.id, 'grateful') ? 40 : 0);
+      // (29.2) dost arayan (yalnız / keyfi kaçmış) sakin kimyası yüksek olanı seçer
+      const pull = c.mood.seek ? (c.relationships[other.id]?.chemistry ?? 0) * MOOD_RULES.seekChemistry : 0;
+      const rank = Math.sqrt(distanceSq(other, c)) - this.relationships.get(c, other) * 0.8 - (hasTag(c, other.id, 'grateful') ? 40 : 0) - pull;
       if (!best || rank < best.rank) best = { other, rank };
     }
     return best?.other ?? null;

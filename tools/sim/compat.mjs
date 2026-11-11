@@ -59,7 +59,9 @@
 //   save-v30.json: 26.2'nin oyunu (kayıt sürümü 30, bugünkü): otopilotla 73 gün (--crisis-state); 72. gün (Yaz Güneşi Şenliği panayırı) hazırlık evresinde kurulmuş Zengin Şölen Sofrası
 //                  (currentFeast: 5 fıçı şerbet, 9 ekmek, 22 yiyecek, 1 kumaş bağışı, 32 ikram), daha önce 10 sofra ve 171 ikram. Eski kayıtlarda
 //                  (sürüm 2-29) currentFeast yoktur: null ile açılır
-//   save-v36.json: 29.1'in oyunu (kayıt sürümü 36, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin kimya kayıtları, zanaat bağları ve
+//   save-v37.json: 29.2'nin oyunu (kayıt sürümü 37, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin üzerindeki ruh halleri (moodlet'ler)
+//                  ve ruh hali sayaçları. Eski kayıtlarda (sürüm 2-36) moodlets yoktur: boş liste ve boş sayaçlarla açılır
+//   save-v36.json: 29.1'in oyunu (kayıt sürümü 36): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin kimya kayıtları, zanaat bağları ve
 //                  duygusal etiketleri (Minnettar, Hayran, Kırgın, Kıskanç, Ruh İkizi; Yönetime karşı hisler). Eski kayıtlarda (sürüm 2-35)
 //                  characters[].relationships yoktur: her mevcut ilişkiye deterministik kimya ve boş etiket yapısı bağlanır
 //   save-v35.json: 28.4'ün oyunu (kayıt sürümü 35): otopilotla 72 gün (--crisis-state; tohum 42: Bereketli Delta, Tarım Doktrini, seviye 4 G30, Altın Çağ G51).
@@ -73,7 +75,7 @@
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -214,6 +216,9 @@ for (const { name, raw } of fixtures) {
     loaded.fair = { cf: JSON.parse(JSON.stringify(s.currentFestival)), first: JSON.parse(JSON.stringify(s.chronicle.firstFair)), fairs: s.stats.fairs ?? 0, time: { day: s.time.day, hour: s.time.hour } };
     // (28.4) Vadi Karakteri ve Kasaba Doktrini (yüklendiği an)
     loaded.valley = { key: s.valley, expected: (await import('/src/systems/Valley.js')).valleyFor(s.seed), doctrine: JSON.stringify(s.doctrine), tradeCharter: s.civic.tradeCharter };
+    // (29.2) Ruh halleri (yüklendiği an)
+    const moodSnap = () => ({ json: JSON.stringify(s.characters.map((c) => [c.id, c.moodlets])), stats: JSON.stringify(s.moodlets), count: s.characters.reduce((n, c) => n + c.moodlets.length, 0), over: s.characters.filter((c) => c.moodlets.length > 6).length, moods: s.characters.every((c) => c.mood && c.mood.workMul >= 0.6 && c.mood.workMul <= 1.25 && typeof c.mood.feel === 'string') });
+    loaded.moodlets = moodSnap();
     // (29.1) Sosyal kimya ve duygusal etiketler (yüklendiği an)
     const chemSnap = () => (() => {
       const byId = new Map(s.characters.map((c) => [c.id, c]));
@@ -293,6 +298,7 @@ for (const { name, raw } of fixtures) {
       crownAfter: { pop: s.characters.length, left: s.exodus.left, active: Boolean(s.exodus.active), rate: s.tax.rate },
       apprAfter: { ok: s.characters.every((c) => !c.apprenticeship || (c.lifeStage === 'youth' && s.buildings.some((b) => b.id === c.apprenticeship.buildingId) && c.apprenticeship.progress >= 0 && c.apprenticeship.progress <= 100)), n: s.characters.filter((c) => c.apprenticeship).length },
       lifeAfter: s.characters.map((c) => ({ id: c.id, days: c.ageInDays, stage: c.lifeStage, child: c.isChild })),
+      moodletsAfter: (() => { const m = moodSnap(); delete m.json; return m; })(),
       chemistryAfter: (() => { const c = chemSnap(); delete c.json; return c; })(),
       tradeAfter: { visits: s.tradePost.visits, scheduled: s.tradePost.nextShipAt !== null || Boolean(s.tradePost.ship) },
       agriAfter: { crops: s.buildings.filter((b) => b.type === 'garden').map((b) => b.crop), capacity: s.granaryCapacity },
@@ -496,6 +502,17 @@ for (const { name, raw } of fixtures) {
       results.push({ name: `${tag}: bir gün sonra takvim sürüyor`, ok: r.tradeAfter.scheduled && r.tradeAfter.visits >= t.visits });
     }
   }
+  // (29.2) Ruh halleri
+  {
+    const M = r.loaded.moodlets;
+    const after = r.moodletsAfter;
+    if (data.version < 37) {
+      results.push({ name: `${tag}: her sakine boş ruh hali listesi (moodlets: []), boş sayaçlar; ruh hali nötr`, ok: M.count === 0 && M.stats === JSON.stringify({ given: {}, consoled: 0, grieved: 0, mourners: 0 }) && M.moods });
+    } else {
+      results.push({ name: `${tag}: ruh halleri (moodlet'ler) ve sayaçları korundu`, ok: M.json === JSON.stringify(data.characters.map((c) => [c.id, c.moodlets])) && M.stats === JSON.stringify(data.moodlets) && M.moods && M.over === 0, detail: `${M.count} moodlet` });
+    }
+    results.push({ name: `${tag}: bir gün sonra ruh halleri yaşıyor (tavanlar ve çarpan sınırları içinde)`, ok: after.over === 0 && after.moods && after.count > 0, detail: `${after.count} moodlet` });
+  }
   // (29.1) Sosyal kimya ve duygusal etiketler
   {
     const C = r.loaded.chemistry;
@@ -648,7 +665,7 @@ for (const { name, raw } of fixtures) {
       const savedO = new Map(data.characters.filter((c) => c.quirkOrigin).map((c) => [c.id, JSON.stringify(c.quirkOrigin, ['kind', 'fromId', 'fromName', 'day'])]));
       results.push({
         name: `${tag}: yeni nesil huylar, huy kaynakları ve mizaç sayaçları korundu`,
-        ok: T.valid && kept && T.generation > 0 && T.origins.length === savedO.size && T.origins.every(([id, o]) => savedO.get(id) === o) && JSON.parse(T.state).developed === data.temperament.developed && JSON.parse(T.state).family === data.temperament.family,
+        ok: T.valid && kept && T.generation === data.characters.filter((c) => ['craftsman', 'entrepreneur', 'philosopher', 'festive'].includes(c.quirk)).length && (data.version >= 37 || T.generation > 0) && T.origins.length === savedO.size && T.origins.every(([id, o]) => savedO.get(id) === o) && JSON.parse(T.state).developed === data.temperament.developed && JSON.parse(T.state).family === data.temperament.family,
         detail: `${T.generation} yeni nesil huylu · ${T.origins.length} kaynaklı · ${T.state}`,
       });
     }

@@ -2,6 +2,7 @@
 // Sistemler durumu burada değiştirir; çizim ve UI yalnızca okur.
 // Harita kaydedilmez: aynı tohumdan (seed) yeniden üretilir, yalnızca değişen karolar
 // kayda eklenir (bkz. world/TerrainSnapshot.js; kayıt dosyasını SaveManager yazar).
+import { emptyMoodletStats, restoreMoodletStats } from '../systems/Moodlets.js';
 import { valleyFor, sanitizeValley } from '../systems/Valley.js';
 import { emptyDoctrine, restoreDoctrine } from '../systems/Doctrine.js';
 import { emptyGoldenAge, emptyChronicle } from '../systems/GoldenAge.js';
@@ -200,6 +201,7 @@ export class GameState {
     this.lifeStages = emptyLifeStages(); // (25.1) yaşam evresi sayaçları
     this.apprenticeship = emptyApprenticeshipState(); // (25.2) açık çırak kapıları ve sayaçlar
     this.temperament = emptyTemperament(); // (25.3) mizaç gelişimi sayaçları
+    this.moodlets = emptyMoodletStats(); // (29.2) ruh hali sayaçları: { given: { anahtar: adet }, consoled, grieved, mourners }
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
     this.heirloom = emptyHeirloomState(); // (25.5) aile yadigârları: sayaçlar, arşiv, Kuşak Şöleni
     this.activeGuest = null; // (26.3) geçici gezgin konuk (GuestSystem): null | { type, name, look, arrivalDay, departureDay, x, y, leaving, resting, barters, lastBarterDay, exit } (27.1: exit isteğe bağlı)
@@ -286,6 +288,7 @@ export class GameState {
       lifeStages: this.lifeStages,
       apprenticeship: this.apprenticeship,
       temperament: this.temperament,
+      moodlets: this.moodlets,
       lineage: this.lineage,
       heirloom: this.heirloom,
       currentFestival: this.currentFestival,
@@ -403,6 +406,7 @@ export class GameState {
     next.tradePost = restoreTradePost(data.tradePost);
     next.lifeStages = restoreLifeStages(data.lifeStages);
     next.temperament = restoreTemperament(data.temperament); // (25.3)
+    next.moodlets = restoreMoodletStats(data.moodlets); // (29.2)
     next.lineage = restoreLineage(data.lineage);
     next.activeGuest = sanitizeActiveGuest(data.activeGuest); // (26.3) v2-v30 kayıtlarında alan yoktur: null
     next.guestBook = restoreGuestBook(data.guestBook);

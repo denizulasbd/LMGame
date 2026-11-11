@@ -786,11 +786,14 @@ const PAGE_HELPERS = () => {
       rich();
       const hut = sim.scene().world.getCompleted('healerHut').find((b) => !b.damaged) ?? sim.place('healerHut');
       const spec = hut.definition.apothecary;
-      const fill = () => { const h = sim.scene().world.getBuilding(hut.id); if (h) { h.remedies = spec.maxRemedies; h.herbs = spec.maxHerbs; } }; // yüklemeden sonra yapı yeni nesnedir
+      let lessonIds = [];
+      // (29.2) usta ve çırak ölçüm boyunca tok ve dinç tutulur: açlık / ruh hali dersi bölüp ölçümü kaydırmasın
+      const fill = () => { const h = sim.scene().world.getBuilding(hut.id); if (h) { h.remedies = spec.maxRemedies; h.herbs = spec.maxHerbs; } for (const id of lessonIds) { const c = s.characters.find((x) => x.id === id); if (c) { c.needs.hunger = Math.max(c.needs.hunger, 85); c.needs.energy = Math.max(c.needs.energy, 85); c.needs.social = Math.max(c.needs.social, 85); c.needs.fun = Math.max(c.needs.fun, 70); } } }; // yüklemeden sonra yapı yeni nesnedir
       fill();
       const pool = s.characters.filter((c) => !c.role && !c.isChild && !c.away && !c.emigrating && c.lifeStage !== 'elder' && !c.apprenticeship).sort((a, b) => a.id - b.id);
       const master = pool[0];
       const youth = pool[pool.length - 1];
+      lessonIds = [master.id, youth.id];
       const keep = { m: { workplaceId: master.workplaceId, herb: master.skills.herbalism }, y: { lifeStage: youth.lifeStage, ageInDays: youth.ageInDays, age: youth.age, workplaceId: youth.workplaceId } };
       master.workplaceId = hut.id;
       master.skills.herbalism = Math.max(master.skills.herbalism ?? 0, 1600);
@@ -862,6 +865,36 @@ const PAGE_HELPERS = () => {
       for (const c of s.characters) for (const id of ids) { const r = c.relationships[id]; const back = s.characters.find((x) => x.id === id).relationships[c.id]; if (r && !back) delete c.relationships[id]; }
     }
 
+    // --- 2z. (29.2) Ruh halleri, yas ve teselli: kayıt -> yükleme durum kayması yok; toplam etki yüklemede yeniden kurulur ---
+    {
+      const MO = await import('/src/systems/Moodlets.js');
+      const pick = () => s.characters.filter((c) => !c.isChild && !c.role && !c.away && !c.emigrating).sort((x, y) => x.id - y.id).slice(0, 3);
+      const [a, b, c3] = pick();
+      const ids = [a.id, b.id, c3.id];
+      const before = new Map([a, b, c3].map((c) => [c.id, JSON.stringify(c.moodlets)]));
+      const stats0 = JSON.stringify(s.moodlets);
+      for (const c of [a, b, c3]) { c.moodlets.length = 0; MO.recomputeMood(c); }
+      const now = s.totalMinutes;
+      MO.addMoodlet(a, 'mourning', now, { tier: 'major', reason: 'mourn_spouse', whoId: 987654, whoName: 'Deniz' });
+      MO.addMoodlet(a, 'comforted', now, { reason: 'comforted', whoId: b.id, whoName: b.name });
+      MO.addMoodlet(a, 'exhausted', now, { reason: 'exhausted' });
+      MO.addMoodlet(b, 'proud_work', now, { reason: 'proud_trait' });
+      MO.addMoodlet(b, 'flow_state', now, { reason: 'flow', tier: 'major' });
+      MO.addMoodlet(c3, 'neglected', now, { reason: 'neglect_rejected', tier: 'major', harsh: true });
+      s.moodlets.consoled += 1; s.moodlets.given.mourning = (s.moodlets.given.mourning ?? 0) + 1;
+      const want = JSON.stringify(s.characters.map((c) => [c.id, c.moodlets]));
+      const wantStats = JSON.stringify(s.moodlets);
+      const moods = [a, b, c3].map((c) => [c.mood.workMul, c.mood.moveMul, c.mood.joyRateMul, c.mood.xpMul, c.mood.feel].join());
+      const diff = A.roundtrip();
+      check('(29.2) ruh halleri (yas + teselli, akış, ihmal) ve sayaçlar kayıt -> yükleme durum kayması yok', diff.length === 0, diff.join(' | '));
+      const loaded = ids.map((id) => s.characters.find((c) => c.id === id));
+      check('(29.2) yüklenen moodlet\'ler ve sayaçlar birebir aynı (kişi adı, kademe, süre, koşula bağlı moodlet)', JSON.stringify(s.characters.map((c) => [c.id, c.moodlets])) === want && JSON.stringify(s.moodlets) === wantStats && MO.getMoodlet(loaded[0], 'mourning').whoName === 'Deniz' && MO.getMoodlet(loaded[0], 'exhausted').until === null);
+      check('(29.2) toplam etki (c.mood) kayda girmez, yüklemede aynı değerlerle yeniden hesaplanır; teselli yüklemeden sonra da travmayı yarılar', loaded.map((c) => [c.mood.workMul, c.mood.moveMul, c.mood.joyRateMul, c.mood.xpMul, c.mood.feel].join()).join('|') === moods.join('|') && loaded[0].mood.grief === true && MO.traumaOf(loaded[0]) === null && Math.abs(loaded[2].mood.workMul - 0.85) < 1e-9, moods.join('|'));
+      scene().moodlets.onHour();
+      check('(29.2) yüklemeden sonra saat taraması katman tavanlarını korur (en çok 6; 1 çekirdek + 3 eylem + 2 ihtiyaç)', s.characters.every((c) => c.moodlets.length <= 6 && c.moodlets.filter((m) => m.key === 'mourning' || m.key === 'neglected' || m.key === 'shaken' || m.key === 'heartbroken' || m.key === 'euphoric' || m.key === 'inspired').length <= 1));
+      for (const id of ids) { const c = s.characters.find((x) => x.id === id); c.moodlets = JSON.parse(before.get(id)); MO.recomputeMood(c); }
+      s.moodlets = JSON.parse(stats0);
+    }
     // --- 2g. (16. aşama) Sefer yoldayken ve Maceracı Günlüğü penceresi açıkken ---
     {
       rich();

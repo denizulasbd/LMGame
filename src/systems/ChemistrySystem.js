@@ -238,6 +238,7 @@ export class ChemistrySystem {
       if (!best) continue;
       this.tag(x, best.target.id, 'resentful');
       this.tag(x, best.rival.id, 'jealous');
+      this.events.emit('chemistry:unrequited', { from: x, target: best.target, rival: best.rival }); // (29.2) Kalbi Kırık
     }
   }
 

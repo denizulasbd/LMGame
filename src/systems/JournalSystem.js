@@ -111,6 +111,9 @@ export class JournalSystem {
         const why = traits ? `${TRAITS[traits[0]].name} ${a.name}, ${TRAITS[traits[1]].name.toLocaleLowerCase('tr')} ${b.name} ile` : `Kimyası tutmayan ${a.name}, ${b.name} ile`;
         this.log(`${why} atıştı${place ? ` (${place})` : ''}`, 'angry');
       }),
+      // (29.2) yas ve teselli
+      on('moodlet:mourning', ({ character, whoName }) => this.log(`${character.name}, ${genitive(whoName)} yasını tutuyor`, 'candle')),
+      on('moodlet:consoled', ({ by, character, trauma }) => this.log(`${by.name}, ${trauma.key === 'mourning' ? 'yaslı' : trauma.key === 'shaken' ? 'sarsılmış' : 'kalbi kırık'} ${character.name} adlı dostunu teselli etti`, 'handshake')),
       on('chemistry:kindred', ({ a, b }) => this.log(`${a.name} ile ${b.name} arasında ruh ikizi bağı filizlendi`, 'love')),
       on('relationship:reconciled', ({ a, b, place }) => this.log(`${a.name} ile ${b.name} ${RECONCILE_PLACES[place] ?? ''}barıştı`, 'handshake')),
       // (15. aşama) usta işi eserler
