@@ -986,6 +986,19 @@ if (mon.life) {
     console.log(`(29.2) verilen moodlet ${total}: ${Object.entries(md.given).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(' · ')}`);
     console.log(`(29.2) yas tutan ${md.mourners} · anma ${md.grieved} · teselli ${md.consoled} (travmaya göre ${JSON.stringify(md.consoledBy ?? {})}) · son gün ${JSON.stringify(md.now)} · baskın ruh hali ${JSON.stringify(md.feels)} · ortalama iş çarpanı ${md.work ? (md.work.sum / md.work.n).toFixed(3) : '-'} (en düşük ${md.work?.min.toFixed(2)}, en yüksek ${md.work?.max.toFixed(2)}) · en çok ${md.max} moodlet`);
   }
+  // (29.3) Arzular, korkular ve yaşam doyumu
+  const wd = L.wants;
+  if (wd) {
+    const W = wd.stats;
+    const sum = (o) => Object.values(o ?? {}).reduce((x, y) => x + y, 0);
+    const keys = (a, b) => [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])];
+    const pct = (a, b) => (b ? `%${Math.round((100 * a) / b)}` : '-');
+    console.log(`(29.3) arzu: dolan ${sum(W.rolled)} · gerçekleşen ${sum(W.fulfilled)} (${pct(sum(W.fulfilled), sum(W.rolled))}) · süresi dolan ${sum(W.expired)} · aktif ${wd.active} · ömür boyu dilek ${wd.wishes}`);
+    console.log(`(29.3) arzu anahtarları (dolan/gerçekleşen/süresi dolan): ${keys(W.rolled, W.fulfilled).map((k) => `${k} ${W.rolled[k] ?? 0}/${W.fulfilled[k] ?? 0}/${W.expired[k] ?? 0}`).join(' · ')}`);
+    console.log(`(29.3) korku: dolan ${sum(W.fearsRolled)} · gerçekleşen ${sum(W.realized)} (${pct(sum(W.realized), sum(W.fearsRolled))}) · geçen ${sum(W.passed)} · aktif ${wd.activeFears}`);
+    console.log(`(29.3) korku anahtarları (dolan/gerçekleşen/geçen): ${keys(W.fearsRolled, W.realized).map((k) => `${k} ${W.fearsRolled[k] ?? 0}/${W.realized[k] ?? 0}/${W.passed[k] ?? 0}`).join(' · ')}`);
+    console.log(`(29.3) son gün doyum: ortalama ${wd.avg?.toFixed(1)} (en düşük ${wd.min}, en yüksek ${wd.max}; ${wd.n} yetişkin) · kademeler ${JSON.stringify(wd.tiers)} · ortalama fearStreak ${wd.fearStreak.toFixed(2)}`);
+  }
   // (29.1) Sosyal kimya ve duygusal etiketler
   const ch = L.chemistry;
   if (ch) console.log(`(29.1) kimya kaydı ${ch.records} çift ${JSON.stringify(ch.dist)} · şimdiki etiketler ${JSON.stringify(ch.tags)} (Yönetime ${ch.ruler}) · verilen etiket ${ch.given} · ruh ikizi bağı ${ch.kindred} · şimşek ${ch.sparks} · ikram ${ch.treats} · etiketli selam ${ch.greetings}`);

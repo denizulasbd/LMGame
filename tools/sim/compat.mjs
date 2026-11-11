@@ -59,7 +59,10 @@
 //   save-v30.json: 26.2'nin oyunu (kayıt sürümü 30, bugünkü): otopilotla 73 gün (--crisis-state); 72. gün (Yaz Güneşi Şenliği panayırı) hazırlık evresinde kurulmuş Zengin Şölen Sofrası
 //                  (currentFeast: 5 fıçı şerbet, 9 ekmek, 22 yiyecek, 1 kumaş bağışı, 32 ikram), daha önce 10 sofra ve 171 ikram. Eski kayıtlarda
 //                  (sürüm 2-29) currentFeast yoktur: null ile açılır
-//   save-v37.json: 29.2'nin oyunu (kayıt sürümü 37, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin üzerindeki ruh halleri (moodlet'ler)
+//   save-v38.json: 29.3'ün oyunu (kayıt sürümü 38, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin arzuları, korkuları, yaşam
+//                  doyumu, son sonuçları ve arzu / korku sayaçları. Eski kayıtlarda (sürüm 2-37) alanlar yoktur: boş listeler, 50 doyum ve boş
+//                  sayaçlarla açılır (göç zar çekmez; listeler yüklemeden sonraki ilk 06:00'da dolar)
+//   save-v37.json: 29.2'nin oyunu (kayıt sürümü 37): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin üzerindeki ruh halleri (moodlet'ler)
 //                  ve ruh hali sayaçları. Eski kayıtlarda (sürüm 2-36) moodlets yoktur: boş liste ve boş sayaçlarla açılır
 //   save-v36.json: 29.1'in oyunu (kayıt sürümü 36): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin kimya kayıtları, zanaat bağları ve
 //                  duygusal etiketleri (Minnettar, Hayran, Kırgın, Kıskanç, Ruh İkizi; Yönetime karşı hisler). Eski kayıtlarda (sürüm 2-35)
@@ -75,7 +78,7 @@
 import fs from 'fs';
 import { openGame, createChecks } from './lib.mjs';
 
-const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
+const fixtures = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38].map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
   name,
   raw: fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
 }));
@@ -219,6 +222,22 @@ for (const { name, raw } of fixtures) {
     // (29.2) Ruh halleri (yüklendiği an)
     const moodSnap = () => ({ json: JSON.stringify(s.characters.map((c) => [c.id, c.moodlets])), stats: JSON.stringify(s.moodlets), count: s.characters.reduce((n, c) => n + c.moodlets.length, 0), over: s.characters.filter((c) => c.moodlets.length > 6).length, moods: s.characters.every((c) => c.mood && c.mood.workMul >= 0.6 && c.mood.workMul <= 1.25 && typeof c.mood.feel === 'string') });
     loaded.moodlets = moodSnap();
+    // (29.3) Arzular, korkular ve yaşam doyumu (yüklendiği an; gidiş-dönüş: yeniden kaydedilen biçim aynı mı)
+    const wantFields = (c) => [c.id, c.wants, c.fears, c.satisfaction, c.wantLog, c.fearStreak, c.wishCount];
+    const wantSnap = () => {
+      const ids = new Set(s.characters.map((c) => c.id));
+      return {
+        json: JSON.stringify(s.characters.map(wantFields)),
+        stats: JSON.stringify(s.wants),
+        count: s.characters.reduce((n, c) => n + c.wants.length + c.fears.length, 0),
+        over: s.characters.filter((c) => c.wants.length > 3 || c.fears.length > 2 || c.wantLog.length > 8).length,
+        dangling: s.characters.reduce((n, c) => n + [...c.wants, ...c.fears].filter((e) => Number.isFinite(e.whoId) && (!ids.has(e.whoId) || e.whoId === c.id)).length, 0),
+        range: s.characters.every((c) => Number.isInteger(c.satisfaction) && c.satisfaction >= 0 && c.satisfaction <= 100 && c.drive && Array.isArray(c.drive.seekIds)),
+        kids: s.characters.filter((c) => c.isChild && (c.wants.length || c.fears.length)).length,
+      };
+    };
+    loaded.wants = wantSnap();
+    loaded.wantsRoundtrip = JSON.stringify(scene.saves.snapshot().characters.map(wantFields)) === loaded.wants.json;
     // (29.1) Sosyal kimya ve duygusal etiketler (yüklendiği an)
     const chemSnap = () => (() => {
       const byId = new Map(s.characters.map((c) => [c.id, c]));
@@ -299,6 +318,7 @@ for (const { name, raw } of fixtures) {
       apprAfter: { ok: s.characters.every((c) => !c.apprenticeship || (c.lifeStage === 'youth' && s.buildings.some((b) => b.id === c.apprenticeship.buildingId) && c.apprenticeship.progress >= 0 && c.apprenticeship.progress <= 100)), n: s.characters.filter((c) => c.apprenticeship).length },
       lifeAfter: s.characters.map((c) => ({ id: c.id, days: c.ageInDays, stage: c.lifeStage, child: c.isChild })),
       moodletsAfter: (() => { const m = moodSnap(); delete m.json; return m; })(),
+      wantsAfter: (() => { const w = wantSnap(); delete w.json; return w; })(),
       chemistryAfter: (() => { const c = chemSnap(); delete c.json; return c; })(),
       tradeAfter: { visits: s.tradePost.visits, scheduled: s.tradePost.nextShipAt !== null || Boolean(s.tradePost.ship) },
       agriAfter: { crops: s.buildings.filter((b) => b.type === 'garden').map((b) => b.crop), capacity: s.granaryCapacity },
@@ -512,6 +532,18 @@ for (const { name, raw } of fixtures) {
       results.push({ name: `${tag}: ruh halleri (moodlet'ler) ve sayaçları korundu`, ok: M.json === JSON.stringify(data.characters.map((c) => [c.id, c.moodlets])) && M.stats === JSON.stringify(data.moodlets) && M.moods && M.over === 0, detail: `${M.count} moodlet` });
     }
     results.push({ name: `${tag}: bir gün sonra ruh halleri yaşıyor (tavanlar ve çarpan sınırları içinde)`, ok: after.over === 0 && after.moods && after.count > 0, detail: `${after.count} moodlet` });
+  }
+  // (29.3) Arzular, korkular ve yaşam doyumu
+  {
+    const W = r.loaded.wants;
+    const after = r.wantsAfter;
+    const fields = (c) => [c.id, c.wants, c.fears, c.satisfaction, c.wantLog, c.fearStreak, c.wishCount];
+    if (data.version < 38) {
+      results.push({ name: `${tag}: her sakine boş arzu / korku listesi, 50 doyum, boş sonuç kaydı; boş sayaçlar (göç zar çekmez)`, ok: W.count === 0 && W.stats === JSON.stringify({ rolled: {}, fulfilled: {}, expired: {}, fearsRolled: {}, realized: {}, passed: {} }) && W.range && JSON.parse(W.json).every((x) => x[3] === 50 && x[4].length === 0 && x[5] === 0 && x[6] === 0) });
+    } else {
+      results.push({ name: `${tag}: arzular, korkular, doyum, sonuç kaydı ve sayaçlar korundu (gidiş-dönüş birebir)`, ok: W.json === JSON.stringify(data.characters.map(fields)) && W.stats === JSON.stringify(data.wants) && r.loaded.wantsRoundtrip && W.over === 0 && W.dangling === 0 && W.range, detail: `${W.count} kayıt` });
+    }
+    results.push({ name: `${tag}: bir gün sonra arzular / korkular yaşıyor (06:00 dolumu; tavanlar, kopuk referans yok, çocukta yok)`, ok: after.count > 0 && after.over === 0 && after.dangling === 0 && after.range && after.kids === 0, detail: `${after.count} kayıt` });
   }
   // (29.1) Sosyal kimya ve duygusal etiketler
   {

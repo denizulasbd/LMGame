@@ -47,6 +47,8 @@ export async function installMonitor(page) {
     // (29.2b) teselli hangi travmaya yapıldı (Derin Yas / Sarsılmış / Kalbi Kırık): yalnızca sayar, oyunun durumuna ve üretecine dokunmaz
     window.__consoledBy = {};
     window.game?.events.on('moodlet:consoled', (p) => { const k = p?.trauma?.key ?? '?'; window.__consoledBy[k] = (window.__consoledBy[k] ?? 0) + 1; });
+    window.__wantData = await import('/src/data/wants.js').catch(() => null); // (29.3)
+    // (29.3) "Ne kadar tatmin edildi": doyum örnekleri (yalnızca okur)
     window.__lifeMod = await import('/src/systems/LifeStages.js').catch(() => null); // (25.1)
     window.__lateMod = await import('/src/systems/LateGame.js').catch(() => null); // (28.4)
     window.__tsMod = await import('/src/systems/TownStatus.js').catch(() => null);
@@ -159,6 +161,26 @@ export async function installMonitor(page) {
             if (!c.isChild && !c.role) { sum += c.mood.workMul; n++; lo = Math.min(lo, c.mood.workMul); hi = Math.max(hi, c.mood.workMul); }
           }
           if (n) { const w = (m.moodWork ??= { n: 0, sum: 0, min: Infinity, max: 0 }); w.n++; w.sum += sum / n; w.min = Math.min(w.min, lo); w.max = Math.max(w.max, hi); }
+        }
+        // ---- (29.3) Arzular / korkular: tavanlar, bilinmeyen anahtar, kopuk / kendine işaret eden hedef, süresi geçmiş kayıt, doyum aralığı ----
+        if (window.__wantData) {
+          const WD = window.__wantData;
+          for (const c of s.characters) {
+            if (!Array.isArray(c.wants)) continue;
+            if (c.wants.length > WD.WANT_CAPS.wants || c.fears.length > WD.WANT_CAPS.fears) broke(`${c.name}: ${c.wants.length} arzu / ${c.fears.length} korku (tavan 3 / 2)`);
+            if ((c.isChild || c.role) && (c.wants.length || c.fears.length)) broke(`${c.name}: çocukta / ziyaretçide arzu`);
+            const cats = new Set();
+            for (const [kind, list] of [['want', c.wants], ['fear', c.fears]]) {
+              for (const e of list) {
+                const d = (kind === 'want' ? WD.WANTS : WD.FEARS)[e.key];
+                if (!d) { broke(`${c.name}: bilinmeyen ${kind} ${e.key}`); continue; }
+                if (kind === 'want') { if (cats.has(d.cat)) broke(`${c.name}: aynı kategoride iki arzu (${d.cat})`); cats.add(d.cat); }
+                if (Number.isFinite(e.whoId) && (!byId.has(e.whoId) || e.whoId === c.id)) broke(`${c.name}: ${e.key} kopuk kişiye işaret ediyor (${e.whoId})`);
+                if (e.until !== null && e.until < now - 61) broke(`${c.name}: süresi geçmiş ${kind} ${e.key}`);
+              }
+            }
+            if (!(c.satisfaction >= 0 && c.satisfaction <= 100)) broke(`${c.name}: doyum ${c.satisfaction}`);
+          }
         }
 
         // ---- (29.1) Sosyal kimya: kayıp sakine işaret eden ilişki kaydı, sınır dışı kimya, bilinmeyen etiket, tek yönlü kimya ----
@@ -689,6 +711,26 @@ export async function installMonitor(page) {
                   work: m.moodWork ?? null,
                   max: m.moodMax ?? 0,
                 },
+                // (29.3) arzular / korkular: dolan / gerçekleşen / süresi dolan / geçen sayaçları, son gün doyum dağılımı ve kademeler
+                wants: s.wants ? (() => {
+                  const adults = s.characters.filter((c) => !c.role && !c.isChild);
+                  const sat = adults.map((c) => c.satisfaction);
+                  const tiers = {};
+                  const tierOf = (v) => (window.__wantData?.SATISFACTION.tiers.find((t) => v < t.below) ?? { key: '?' }).key;
+                  for (const v of sat) tiers[tierOf(v)] = (tiers[tierOf(v)] ?? 0) + 1;
+                  return {
+                    stats: JSON.parse(JSON.stringify(s.wants)),
+                    n: adults.length,
+                    avg: sat.length ? sat.reduce((x, y) => x + y, 0) / sat.length : null,
+                    min: sat.length ? Math.min(...sat) : null,
+                    max: sat.length ? Math.max(...sat) : null,
+                    tiers,
+                    fearStreak: adults.length ? adults.reduce((x, c) => x + (c.fearStreak ?? 0), 0) / adults.length : 0,
+                    wishes: adults.reduce((x, c) => x + (c.wishCount ?? 0), 0),
+                    active: adults.reduce((x, c) => x + c.wants.length, 0),
+                    activeFears: adults.reduce((x, c) => x + c.fears.length, 0),
+                  };
+                })() : null,
                 // (29.1) sosyal kimya ve duygusal etiketler
                 chemistry: (() => {
                   const dist = {}; const tags = {}; let records = 0; let ruler = 0;
