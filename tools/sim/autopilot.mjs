@@ -37,11 +37,12 @@
 // (25.1) Yaşam evrelerini raporlar: evre sayıları, emekli bilgeler, yaş aralığı, unvanı alan bilgeler, nasihat dakikası ve
 // emekliyken işte görülen bilge (bekçi: evre / yaş sayacı tutarlılığı ve çekirdek sakin güvencesi kopuk referans sayılır).
 //
+// (29.10b) careless: Standart Vergi, dilekçelerin yarısı reddedilir, dağıtım / taziye / armağan yok; repent: 20. güne kadar tyrant, sonra benevolent.
 // (29.10) --profile tyrant|benevolent : yönetim senaryosu. tyrant: açıldığı andan Ağır Vergi, bütün dilekçeler reddedilir, erzak / altın
 // dağıtılmaz (taziye, armağan yok). benevolent: Muaf / Düşük Vergi, karşılanabilen her dilekçe karşılanır, her törende Taziye Sofrası,
 // her özel günde (altın yetiyorsa) armağan. Varsayılan (profil yok): eski otopilot. Raporda (29.10) satırı: günlük Sadık / Kırgın oranı,
 // isyanlar (elebaşı ve sadakati, isyancıların en düşüğü), terk edenler (sadakat kademesiyle).
-// Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet] [--profile tyrant|benevolent]
+// Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet] [--profile tyrant|benevolent|careless|repent]
 //                                         [--crisis huzurlu|dengeli|cetin] [--no-safety] [--crisis-state]
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
 //   --speed   : oyun hızı (varsayılan 4); 1x'te aynı oyun günü dört kat çok, daha küçük adımla geçer
@@ -94,8 +95,8 @@ await page.evaluate((o) => {
   if (o.crisis) window.game.state.crisis.difficulty = o.crisis; // doğrudan durumdan (bildirim / ses tüketmesin: huzurlu + --no-safety koşusu 22. aşamayla bire bir aynı olmalı)
   window.__profile = o.profile; // (29.10)
 }, { noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null });
-if (options.profile && !['tyrant', 'benevolent'].includes(options.profile)) {
-  console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent)`);
+if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent'].includes(options.profile)) {
+  console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent)`);
   process.exit(2);
 }
 
@@ -123,7 +124,7 @@ await page.evaluate(async (off) => {
     const s = window.game.state;
     const L = s.characters.filter((c) => !c.isChild && !c.role).map((c) => c.loyalty ?? 0);
     const n = Math.max(1, L.length);
-    P.daily.push({ day: s.time.day, loyal: L.filter((v) => v >= 40).length / n, bitter: L.filter((v) => v <= -40).length / n, avg: L.reduce((a, b) => a + b, 0) / n });
+    P.daily.push({ day: s.time.day, loyal: L.filter((v) => v >= 40).length / n, bitter: L.filter((v) => v <= -40).length / n, avg: L.reduce((a, b) => a + b, 0) / n, pop: s.characters.length, trust: s.trust.value });
   });
   ev.on('revolt:started', ({ rioters, leaderId }) => {
     const s = window.game.state;
@@ -419,7 +420,9 @@ await page.evaluate((passive) => {
     const cy = plaza.centerY;
     const res = s.resources;
     window.__decide();
-    const profile = window.__profile; // (29.10) yönetim senaryosu
+    // (29.10b) careless: Standart Vergi, dilekçelerin yarısı (sırayla bir kabul, bir ret) reddedilir, kıtlıkta dağıtım / taziye / armağan yok.
+    // repent: 20. güne kadar tyrant, sonra benevolent.
+    const profile = window.__profile === 'repent' ? (s.time.day < 20 ? 'tyrant' : 'benevolent') : window.__profile; // (29.10) yönetim senaryosu
     window.__stats.minWelfare = Math.min(window.__stats.minWelfare, s.town.welfare ?? 100);
     // (21. aşama) Vatandaş dilekçeleri ve Yönetim Güveni
     {
@@ -429,6 +432,13 @@ await page.evaluate((passive) => {
         if (profile === 'tyrant') {
           game.events.emit('ui:rejectPetition', { id: p.id });
           continue;
+        }
+        if (profile === 'careless' && p.status !== 'accepted') {
+          window.__carelessN = (window.__carelessN ?? 0) + 1;
+          if (window.__carelessN % 2 === 0) {
+            game.events.emit('ui:rejectPetition', { id: p.id });
+            continue;
+          }
         }
         const grant = PT.grantStatus(s, p, s.equipment.sturdyTool ?? 0);
         const spare = p.kind !== 'tool' || (s.equipment.sturdyTool ?? 0) > 0 || (res.iron >= 12 && res.wood >= 30);
@@ -458,7 +468,7 @@ await page.evaluate((passive) => {
       {
         const CR = window.__crown;
         const t = s.trust.value;
-        const want = profile === 'tyrant' ? 'heavy' : profile === 'benevolent' ? (t < 62 || res.gold >= 200 ? 'exempt' : 'low') : t < 40 ? 'exempt' : t < 62 ? 'low' : 'standard';
+        const want = profile === 'tyrant' ? 'heavy' : profile === 'careless' ? 'standard' : profile === 'benevolent' ? (t < 62 || res.gold >= 200 ? 'exempt' : 'low') : t < 40 ? 'exempt' : t < 62 ? 'low' : 'standard';
         if (s.tax.rate !== want && !((s.tax.lockedUntil ?? 0) > s.totalMinutes)) game.events.emit('ui:setTaxRate', { rate: want });
         const d = s.crown.decree;
         if (d && CR.decreeStatus(s, d).ok) {
@@ -556,7 +566,7 @@ await page.evaluate((passive) => {
       }
       // Güven düşerse (ya da isyan çıkarsa) acil dağıtım
       const T = window.__trust;
-      if (profile !== 'tyrant' && (s.trust.revolt || s.trust.value < 40)) {
+      if (profile !== 'tyrant' && profile !== 'careless' && (s.trust.revolt || s.trust.value < 40)) {
         for (const kind of ['food', 'gold']) if (T.reliefStatus(s, kind).ok) game.events.emit('ui:relief', { kind });
       }
       // (29.10) benevolent: her törende Taziye Sofrası, her özel günde (altın yetiyorsa) armağan
@@ -1080,6 +1090,7 @@ if (options.profile || options['profile-report']) {
   const last = P.daily.at(-1) ?? { loyal: 0, bitter: 0, avg: 0 };
   const pct = (v) => `%${Math.round(100 * v)}`;
   console.log(`(29.10) profil ${options.profile ?? 'normal'}: Kırgın en çok ${pct(maxBitter)} · son gün Sadık ${pct(last.loyal)} / Kırgın ${pct(last.bitter)} (ortalama ${last.avg.toFixed(1)}) · isyan ${P.revolts.length} ${P.revolts.map((r) => `[G${r.day} ${r.n} kişi, elebaşı ${r.leader ?? '-'} ${r.leaderLoyalty} / en düşük ${r.minLoyalty}]`).join(' ')} · terk eden ${P.left.length} ${P.left.map((l) => `${l.name}:${l.tier}`).join(', ')} · taziye ${P.condolences} · armağan ${P.gifts}`);
+  { const d = P.daily; const at = (k) => d.find((x) => x.day === k) ?? d.at(-1); const lastDay = d.at(-1)?.day ?? 0; console.log(`(29.10b) profil ${options.profile ?? 'normal'}: nüfus başlangıç ${d[0]?.pop} · G20 ${at(20)?.pop} · son ${d.at(-1)?.pop} · güven G20 ${at(20)?.trust} · G30 ${at(30)?.trust} · son ${d.at(-1)?.trust} · son 10 günde yeni isyan ${P.revolts.filter((r) => r.day > lastDay - 10).length} · isyan günleri ${P.revolts.map((r) => r.day)}`); }
   riteStats.profile = { maxBitter, lastLoyal: last.loyal, lastBitter: last.bitter, revolts: P.revolts, left: P.left, condolences: P.condolences, gifts: P.gifts };
 }
 console.log(`(29.7) anma töreni ${riteStats.held} (vefat günü ${riteStats.deathDays}, töreni gelmiş ${riteStats.dueDeathDays}) · ortalama katılım ${riteStats.attendance.toFixed(1)} · 20:00'de süren tören görevi ${riteStats.late} · özel gün kutlanan ${riteStats.celebrated} / unutulan ${riteStats.forgotten} (%${Math.round((100 * riteStats.celebrated) / Math.max(1, riteStats.celebrated + riteStats.forgotten))})`);

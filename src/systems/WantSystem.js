@@ -200,7 +200,7 @@ export class WantSystem {
     for (const c of this.state.characters) {
       if (!wantsEnabled(c)) continue;
       const v = c.satisfaction;
-      if (v > WANT_RULES.driftCenter) this.adjust(c, -Math.min(WANT_RULES.driftAbove, v - WANT_RULES.driftCenter));
+      if (v > WANT_RULES.driftCenter) this.adjust(c, -Math.min(WANT_RULES.driftAbove + Math.floor((v - WANT_RULES.driftCenter) / WANT_RULES.driftStep), v - WANT_RULES.driftCenter));
       else if (v < WANT_RULES.driftCenter) this.adjust(c, Math.min(WANT_RULES.driftBelow, WANT_RULES.driftCenter - v));
     }
   }
