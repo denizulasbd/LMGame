@@ -86,7 +86,9 @@ const out = await page.evaluate(async () => {
   {
     const st = { characters: [] };
     const t = LS.lifeStory({ ...base, evolutions: [{ day: 3, kind: 'turned', axis: 1, from: 'socialButterfly', to: 'introvert', cause: null }] }, st, { dead: true });
-    check('29.10: nedeni boş kişilik değişimi "Zamanla" demeden anlatılır', !t.includes('Zamanla') && t.includes('İçine Kapanık yanı ağır bastı'), t);
+    const twice = LS.lifeStory({ ...base, evolutions: [{ day: 3, kind: 'acquired', axis: 2, from: null, to: 'ambitious', cause: 'expedition' }, { day: 30, kind: 'deepened', axis: 2, from: null, to: 'ambitious', cause: 'expedition' }] }, st, { dead: true });
+    const n = twice.toLocaleLowerCase('tr').split('seferlerden').length - 1;
+    check('29.10: nedeni boş kişilik değişimi "Zamanla" demeden anlatılır; iki değişimin nedeni aynıysa yinelenmez', !t.includes('Zamanla') && t.includes('İçine Kapanık yanı ağır bastı') && n === 1 && twice.includes('yıllar geçtikçe Hırslı yanı derinleşti'), `${t} | ${twice}`);
   }
 
   // 7. küçük katkılar birikince değişimin nedeni boş kalmaz (en son katkının kaynağı)

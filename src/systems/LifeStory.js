@@ -94,16 +94,16 @@ function familySentence(c, state, dead) {
 function evolutionSentence(c, dead) {
   const log = (c.evolutions ?? []).filter((e) => TRAITS[e.to] || e.kind === 'deepened');
   if (!log.length) return null;
-  const clause = (e) => {
-    // (29.10) nedeni boş değişim "Zamanla" yerine nedensiz cümleyle anlatılır
-    const cause = CAUSE_TEXT[e.cause] ? `${CAUSE_TEXT[e.cause]} ` : '';
+  const clause = (e, skipCause = false) => {
+    // (29.10) nedeni boş değişim "Zamanla" yerine nedensiz cümleyle anlatılır; ikinci değişimin nedeni ilkiyle aynıysa yinelenmez
+    const cause = !skipCause && CAUSE_TEXT[e.cause] ? `${CAUSE_TEXT[e.cause]} ` : '';
     const trait = TRAITS[e.to]?.name ?? 'kişiliği';
     return e.kind === 'turned' ? `${cause}${trait} yanı ${EVO_VERB.turned}` : e.kind === 'acquired' ? `${cause}içinde ${trait} bir yan belirdi` : `${cause}${trait} yanı ${EVO_VERB.deepened}`;
   };
   const first = log[0];
   const last = log.length > 1 ? log[log.length - 1] : null;
   const head = upper(clause(first));
-  return last ? `${head}, yıllar geçtikçe ${clause(last)}` : head;
+  return last ? `${head}, yıllar geçtikçe ${clause(last, last.cause === first.cause)}` : head;
 }
 
 // (29.10) dilek sayısı yerine doyum kademesinden tek ifade (Hâlinden Memnun kademesinde cümle yok)
