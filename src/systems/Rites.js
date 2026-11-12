@@ -6,11 +6,17 @@ import { ACTIVITIES } from '../data/activities.js';
 import { getFriendship, arePartners } from './RelationshipSystem.js';
 import { hasTag } from './Chemistry.js';
 import { getMoodlet } from './Moodlets.js';
+import { STORY_MAX } from './LifeStory.js';
 
 const COUNT = (n) => Math.max(0, Math.floor(Number(n) || 0));
 const ID = (n) => (Number.isFinite(n) ? n : null);
 const IDS = (list) => (Array.isArray(list) ? [...new Set(list.filter(Number.isFinite))] : []);
 const NAME = (s) => (typeof s === 'string' ? s.slice(0, 40) : null);
+// (29.9) isteğe bağlı Yaşam Öyküsü (kitabe): en çok STORY_MAX karakter; yoksa alan hiç yazılmaz (eski kayıt birebir aynı kalır)
+const withStory = (out, raw) => {
+  if (typeof raw?.story === 'string' && raw.story.trim()) out.story = raw.story.slice(0, STORY_MAX);
+  return out;
+};
 
 export function emptyRites() {
   return { pending: [], active: null, names: [], held: 0, condolences: 0, celebrated: 0, forgotten: 0 };
@@ -21,9 +27,9 @@ export function restoreRites(data) {
   const out = emptyRites();
   if (!data || typeof data !== 'object') return out;
   for (const k of ['held', 'condolences', 'celebrated', 'forgotten']) out[k] = COUNT(data[k]);
-  const dead = (x) => ({ name: NAME(x.name), day: COUNT(x.day), age: COUNT(x.age), id: ID(x.id), friends: IDS(x.friends), closestId: ID(x.closestId) });
+  const dead = (x) => withStory({ name: NAME(x.name), day: COUNT(x.day), age: COUNT(x.age), id: ID(x.id), friends: IDS(x.friends), closestId: ID(x.closestId) }, x);
   out.pending = (Array.isArray(data.pending) ? data.pending : []).filter((x) => x && NAME(x.name) && Number.isFinite(x.day)).map(dead).slice(-R.namesMax);
-  out.names = (Array.isArray(data.names) ? data.names : []).filter((x) => x && NAME(x.name)).map((x) => ({ name: NAME(x.name), day: COUNT(x.day), age: COUNT(x.age) })).slice(-R.namesMax);
+  out.names = (Array.isArray(data.names) ? data.names : []).filter((x) => x && NAME(x.name)).map((x) => withStory({ name: NAME(x.name), day: COUNT(x.day), age: COUNT(x.age) }, x)).slice(-R.namesMax);
   const a = data.active;
   if (a && typeof a === 'object' && Number.isFinite(a.day) && Array.isArray(a.names)) {
     out.active = {

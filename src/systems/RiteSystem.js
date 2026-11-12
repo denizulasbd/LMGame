@@ -38,6 +38,7 @@ import { addMoodlet, hasMoodlet, getMoodlet, emptyMoodletStats } from './Moodlet
 import { recomputeDrive, clampSatisfaction } from './Wants.js';
 import { foodSupply } from './TownStatus.js';
 import { genitive } from '../utils/turkish.js';
+import { epitaphStory } from './LifeStory.js';
 
 const on = () => engineOn('rites');
 
@@ -60,7 +61,7 @@ export class RiteSystem {
     this.dying = new Map(); // vefat eden kimlik -> { friends, closestId } (kaydedilmez; 'population:died'e dek)
     const sub = (name, fn) => game.events.on(name, (p = {}) => on() && fn(p));
     this.unsubscribers = [
-      sub('population:dying', ({ character }) => character && this.dying.set(character.id, { friends: friendsOfDead(this.state, character), closestId: closestToDead(this.state, character) })),
+      sub('population:dying', ({ character }) => character && this.dying.set(character.id, { friends: friendsOfDead(this.state, character), closestId: closestToDead(this.state, character), story: epitaphStory(character, this.state) })), // (29.9) öykü, referanslar silinmeden önce
       sub('population:died', ({ character, age }) => this.onDied(character, age)),
       sub('relationship:married', ({ a, b }) => this.onMarried(a, b)),
       sub('time:hour', (hour) => this.onHour(Number.isFinite(hour) ? hour : this.state.time.hour)),
@@ -108,10 +109,12 @@ export class RiteSystem {
 
   onDied(c, age) {
     if (!c) return;
-    const snap = this.dying.get(c.id) ?? { friends: [], closestId: null };
+    const snap = this.dying.get(c.id) ?? { friends: [], closestId: null, story: null };
     this.dying.delete(c.id);
     const alive = (id) => this.state.characters.some((o) => o.id === id);
-    this.rites.pending.push({ name: c.name, day: this.state.time.day, age: Math.max(0, Math.floor(Number(age ?? c.age) || 0)), id: c.id, friends: snap.friends.filter(alive), closestId: alive(snap.closestId) ? snap.closestId : null });
+    const entry = { name: c.name, day: this.state.time.day, age: Math.max(0, Math.floor(Number(age ?? c.age) || 0)), id: c.id, friends: snap.friends.filter(alive), closestId: alive(snap.closestId) ? snap.closestId : null };
+    if (snap.story) entry.story = snap.story;
+    this.rites.pending.push(entry);
     for (const a of [this.rites.active, ...this.rites.pending]) {
       if (!a?.ids) continue;
       a.ids = a.ids.filter(alive);
@@ -185,7 +188,11 @@ export class RiteSystem {
       const speaker = this.world.getCharacter(d.closestId);
       if (speaker && attendees.includes(speaker)) this.say(speaker, FAREWELL_LINES, d.name);
     }
-    for (const d of a.dead) r.names.push({ name: d.name, day: d.day, age: d.age });
+    for (const d of a.dead) {
+      const row = { name: d.name, day: d.day, age: d.age };
+      if (d.story) row.story = d.story;
+      r.names.push(row);
+    }
     if (r.names.length > R.namesMax) r.names.splice(0, r.names.length - R.namesMax);
     r.held += 1;
     const place = this.world.getBuilding(a.place);

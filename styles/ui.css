@@ -1199,7 +1199,8 @@ button.relation-row:hover {
   margin-top: 2px;
 }
 
-.want-list {
+.want-list,
+.desire-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -3733,8 +3734,8 @@ kbd {
 
 @media (max-width: 420px) {
   .dock-btn {
-    min-width: 38px;
-    padding: 3px 3px;
+    min-width: 34px;
+    padding: 3px 2px;
   }
 
   .dock-divider {
@@ -4875,3 +4876,146 @@ kbd {
   font-weight: 700;
 }
 
+
+/* ---------- (29.9) Karakter kartı sekmeleri ---------- */
+.card-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 28px 8px 0;
+}
+
+.card-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 3px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ui-ink-soft);
+  background: var(--ui-card);
+  border: 2px solid var(--ui-wood-dark);
+  cursor: pointer;
+}
+
+.card-tab img {
+  width: 12px;
+  height: 12px;
+  image-rendering: pixelated;
+}
+
+.card-tab:hover {
+  color: var(--ui-ink);
+}
+
+.card-tab.is-active {
+  color: var(--ui-ink-dark);
+  background: var(--ui-highlight);
+  border-color: var(--ui-line);
+}
+
+.card-mini-name {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.card-tab-body[hidden] {
+  display: none;
+}
+
+.summary-line {
+  font-size: 12px;
+  margin: 6px 0 0;
+  padding: 3px 6px;
+  background: var(--ui-card);
+  border-left: 3px solid var(--ui-wood-light);
+}
+
+.summary-line.is-positive { border-left-color: #3f8f4d; }
+.summary-line.is-negative { border-left-color: #d98a2c; }
+.summary-line.is-trauma { border-left-color: #8a3fa0; }
+
+.axis-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.axis-row {
+  display: grid;
+  grid-template-columns: 1fr 64px 1fr;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.axis-row .axis-minus { text-align: right; opacity: 0.75; }
+.axis-row .axis-plus { opacity: 0.75; }
+.axis-row .axis-track {
+  position: relative;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--ui-line);
+}
+.axis-row .axis-mid {
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: var(--ui-ink-soft);
+}
+.axis-row .axis-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--ui-highlight);
+}
+
+.story-box {
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 6px 8px;
+  background: var(--ui-card);
+  border-left: 3px solid var(--ui-highlight);
+}
+
+.bond-top {
+  font-size: 12px;
+  padding: 3px 6px;
+  background: var(--ui-card);
+}
+
+.resident-mark {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  image-rendering: pixelated;
+}
+
+.resident-mark.is-trauma { filter: drop-shadow(0 0 2px #8a3fa0); }
+.resident-mark.is-positive { filter: drop-shadow(0 0 2px #d9a520); }
+.resident-mark.is-negative { filter: drop-shadow(0 0 2px #d98a2c); }
+
+.epitaph-row {
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.epitaph-story {
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 2px 0 4px;
+  padding: 4px 6px;
+  background: var(--ui-card);
+  border-left: 3px solid var(--ui-highlight);
+}
+
+@media (max-width: 620px) {
+  .card-tab .card-tab-label { display: none; }
+  .card-tab img { width: 18px; height: 18px; }
+}
