@@ -190,7 +190,7 @@ const out = await page.evaluate(async () => {
   const wed = p1.memories.find((m) => m.kind === 'wedding' && m.whoId === p2.id);
   check('teselli ve düğün anıları kişinin kimliğiyle (whoId) yazılır', Boolean(consoled) && Boolean(wed), `${consoled?.text} · ${wed?.text}`);
 
-  // 13. hatırlama -> seek / avoid ve süre dolumu
+  // 13. hatırlama -> seek ve süre dolumu (29.10: kaçınma dalı ölü yoldu, silindi)
   const rc = adults().find((c) => c !== b);
   rc.recall = null;
   const saved = rc.memories.map((m) => m.fond);
@@ -201,12 +201,9 @@ const out = await page.evaluate(async () => {
   rc.recall.whoUntil = s.totalMinutes - 1;
   game.events.emit('time:hour', s.time.hour);
   const expired = !rc.drive.seekIds.includes(b.id);
-  rc.recall = { at: s.totalMinutes, until: s.totalMinutes + 90, text: 'x' };
-  game.events.emit('memory:recalled', { character: rc, memory: { text: 'x', whoId: b.id, fond: false } });
-  const avoidOk = rc.drive.avoidIds.includes(b.id) && !rc.drive.seekIds.includes(b.id);
   rc.memories.pop(); rc.memories.forEach((m, i) => (m.fond = saved[i]));
   rc.recall = null; game.events.emit('time:hour', s.time.hour);
-  check('hatırlanan anının kişisi aranır (güzel) / kaçınılır, 240 dk sonra silinir', seekOk && expired && avoidOk, `${seekOk} ${expired} ${avoidOk}`);
+  check('hatırlanan güzel anının kişisi aranır, 240 dk sonra silinir', seekOk && expired, `${seekOk} ${expired}`);
 
   // 14. şalter kapalı: eski davranış
   zero();

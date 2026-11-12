@@ -224,7 +224,7 @@ export class CharacterPanel {
     this.evolutionSection = section('Kişilik Değişim Günlüğü', this.evolutionList);
     this.storyBox = el('div', { className: 'story-box' });
     this.bondTop = el('div', { className: 'bond-top' });
-    this.bondTopSection = section('En Çok Kiminle Omuz Omuza', this.bondTop);
+    this.bondTopSection = section('Bu Oturumda En Çok Kiminle Omuz Omuza', this.bondTop); // (29.10) sayaç kayda girmez, yüklemede sıfırlanır
 
     const body = (id, children) => el('div', { className: 'card-tab-body', dataset: { tab: id } }, children);
     this.bodies = {
@@ -605,7 +605,7 @@ export class CharacterPanel {
     this.bondTop.replaceChildren(
       ...(other
         ? [this.personChip(other), el('span', { className: 'social-value', text: ` ${best.hours} saat omuz omuza çalıştılar` })]
-        : [el('span', { className: 'social-value social-muted', text: 'Henüz yan yana uzun süre çalıştığı biri yok' })])
+        : [el('span', { className: 'social-value social-muted', text: 'Bu oturumda henüz yan yana uzun süre çalıştığı biri yok' })])
     );
   }
 

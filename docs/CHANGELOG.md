@@ -41,3 +41,32 @@ Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 20 sat�
 - `gate.mjs --full` iki evreli: önce hafif araçlar (tests, tests/*, audit, compat), bitince ağır olanlar (stress, determinizm); audit'in ses zamanlama testi artık yük altında kırılmaz.
 - Dondurulmuş `tests.mjs`: yalnızca başında `setAllTabs(true)` (dört sekme birden = eski tek kart düzeni). `audit.mjs`: dock beklentisine "Duygular (M)" eklendi; telefon dock'u için düğme genişliği 38 → 34 px.
 - Testler: tools/sim/tests/29.8-expression.mjs (14), 29.9-card.mjs (14).
+
+## Aşama 29.10 — Büyük entegrasyon, uzun koşu dengesi ve final denetimi (kayıt sürümü 40 kalır, yeni kayıt alanı yok)
+- Durum satırı: neden metni moodlet adıyla başlıyorsa yinelenmez ("Dileği Oldu: Kafamı dinleyeyim").
+- Yaşam Öyküsü: geliş biçimi Tarihçe kurucularından / ilk anıdan okunur (kurucu artık "göçmen" değil); dilek sayısı cümlesi yerine doyum kademesinden tek ifade; anılar tırnaksız cümle (öncelik düğün, evlat, usta işi eser, yas, yangından kurtarılma, teselli; arzu / korku anıları girmez); nedensiz değişim "Zamanla" demez; aynı neden iki kez yazılmaz.
+- Evrim: küçük katkılar birikince değişimin nedeni boş kalmaz (en son aynı yönlü katkının kaynağı, `c.growthLast`, kaydedilmez).
+- Ölü yol: hatırlama yalnızca güzel anıyı seçtiği için `c.recall` kaçınma dalı ve onun testi silindi; arama kaldı.
+- `story` tutarsızlığı: tohum 42 x 50 gün kaydındaki 41 alanın 40'ı eski dedikodu yapısı (`social.gossip[].story` 10, `characters[].lastNews.story` 30); kitabede 1 öykü (305 bayt). Boş öykü yazılmaz, `rites.pending` tören sonrası boşalır (testli).
+- Çekmece: işaretlere `title` / `alt` (özel gün türüyle); dengeli ruh halinde işaret yok. Kart: "Bu Oturumda En Çok Kiminle Omuz Omuza".
+- Sadakat isyana bağlandı: Kırgın yetişkin payı ≥ %25 iken Güven saat başı `-2 x pay` erir (`LOYALTY.bitterTrust`, `ENGINES.loyalty`). 29.6'da Ağır Vergi + bütün dilekçeler reddinde bile güven %100'de kalıyor, isyan çıkmıyordu.
+- Ayarlar (`data/loyalty.js`): vergi tahsilatı exempt 2→6, low 0→2, heavy -4→-7; Ağır Vergi'ye geçiş -6→-10; armağan 6→10; Taziye 3→5.
+- `autopilot.mjs --profile tyrant|benevolent` (ve `--profile-report`): günlük Sadık / Kırgın oranı, isyanlar (elebaşı, en düşük sadakat), terk edenler. `--checkpoints 50,120`: kayıt boyutu, doyum, değişim, kuşak, gün süresi.
+- `tests.mjs --engines-on`: 4 test kalır, hepsi (b): Ağır Vergi keyfi (fikstürde sadakat 40'a çıkınca 29.6'nın Sadık x0,5 kuralı), panayır ikon balonu ve minnettar yardımı (bonds: dünya tarihi / bağ puanı), karşılıksız aşk etiketi (loyalty açıkken seçilen sakin değişiyor). (a) gerçek hata yok.
+- Uzun koşu (42 / 77 x 120 gün): kayıt x1,09 / x1,08; son 20 gün / 20-40. gün süresi x0,65-0,90 / x1,12-1,23; takılma, kopuk referans, sayfa hatası 0. Yadigâr 42'de oluşur (2, devir 1), 77'de 0-1 (Kıdemli Bilge + Altın Çağ geç).
+- Açık: 120. günde değişim yaşayan %75-81 (> %70). `decayPerDay` 4: %31-34 ama 50. günde tohum 42'de 1 değişim (bant 3-14); `shiftAt` 64 etkisiz; usta işi eser katkısı [7,-5] %77/%75. Hepsi geri alındı.
+- Testler: tools/sim/tests/29.10-integration.mjs (12). 29.6 / 29.7 / 29.9 testlerinde yalnızca sayılar ve silinen kaçınma dalı.
+
+### 29. aşama referans tablosu (son `gate --full`, 6 tohum x 50 gün x 4x)
+| Ölçüt (bant) | 7 | 13 | 21 | 42 | 77 | 101 |
+|---|---|---|---|---|---|---|
+| Arzu gerçekleşme (%35-65) | 43 | 48 | 44 | 43 | 42 | 39 |
+| Korku gerçekleşme (%10-35) | 15 | 16 | 17 | 15 | 20 | 19 |
+| Ortalama doyum (45-70) | 58,2 | 66,5 | 58,6 | 62,6 | 55,3 | 52,6 |
+| Uç doyum kademeleri (≤ %25) | 0 | **29** | 13 | 17 | 3 | 0 |
+| Kişilik değişimi (3-14) | 6 | 8 | 12 | 3 | 7 | 14 |
+| `side_by_side` (≥ 30) | 254 | 422 | 343 | 331 | 372 | 311 |
+| Özel günde kutlanma (%50-85) | 69 | 77 | 75 | 80 | 68 | 67 |
+| Tören = vefat günü | 0=0 | 0=0 | 2=2 | 1=1 | 0=0 | 1=1 |
+| Sadık / Kırgın (≤ %40) | 0/0 | 3/0 | 0/0 | 0/0 | 0/0 | 0/0 |
+`compat --all`: 1917/1917. Tohum 13'te uç kademe %29 (31 kişide 9; kademe sınırları dondurulmuş testte sabit), sapma olarak bırakıldı.

@@ -213,14 +213,14 @@ const out = await page.evaluate(async () => {
       evolutions: [{ day: 12, kind: 'turned', axis: 1, from: 'socialButterfly', to: 'introvert', cause: 'moodlet:mourning' }, { day: 60, kind: 'turned', axis: 1, from: 'introvert', to: 'socialButterfly', cause: 'consoled' }],
     };
     const t = LS.lifeStory(c, st, { dead: true });
-    check('29.9: öykü eşi, çocukları, kişilik değişimini ("Derin Yas\'tan sonra İçine Kapanık yanı ağır bastı"), Başusta unvanını, dileklerini ve yaşı yazıyla ("Altmış sekiz") söyler', t.includes('Elif ile evlendi') && t.includes('iki evlat büyüttü') && t.includes('İçine Kapanık yanı ağır bastı') && t.includes('Başusta') && t.includes('Beş dileğinin') && t.includes('Altmış sekiz yaşında') && t.includes('gönlü zengin göçtü') && LS.numberWords(68) === 'altmış sekiz', t);
+    check('29.9: öykü eşi, çocukları, kişilik değişimini ("Derin Yas\'tan sonra İçine Kapanık yanı ağır bastı"), Başusta unvanını, doyum ifadesini ve yaşı yazıyla ("Altmış sekiz") söyler', t.includes('Elif ile evlendi') && t.includes('iki evlat büyüttü') && t.includes('İçine Kapanık yanı ağır bastı') && t.includes('Başusta') && t.includes('Hayattan umduğunu fazlasıyla buldu') && !t.includes('dileğinin') && t.includes('Altmış sekiz yaşında') && t.includes('gönlü zengin göçtü') && LS.numberWords(68) === 'altmış sekiz', t);
   }
 
   // 12. 400 karakter sınırı
   {
     const long = 'u'.repeat(300);
     const c = { name: 'Deniz', id: 1, age: 70, children: [1, 2, 3, 4, 5, 6], parentIds: [], parents: [], skills: { baking: 3000 }, satisfaction: 90, wishCount: 0, loyalty: 90, partnerId: null, isVenerable: true, isChild: false, role: null, generation: 1,
-      memories: [{ kind: 'life', text: long, day: 1 }, { kind: 'life', text: long, day: 2 }, { kind: 'life', text: long, day: 3 }],
+      memories: [{ kind: 'masterwork', text: `Usta işi bir eser yaptı: ${long}`, day: 1 }, { kind: 'life', text: `${long} yasını tuttu`, day: 2 }, { kind: 'life', text: long, day: 3 }],
       evolutions: [] };
     const full = LS.lifeStory(c, { characters: [] }, { dead: true });
     const cut = LS.epitaphStory(c, { characters: [] });

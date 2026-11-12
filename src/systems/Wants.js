@@ -383,12 +383,10 @@ export function recomputeDrive(c) {
     if (drive.energy) d.energyBonus = WANT_RULES.energyBonus;
     if (drive.warmth) d.warmth = true;
   }
-  // (29.6) hatırlanan anının kişisi (c.recall.whoId; LoyaltySystem süresini yönetir), (29.7) özel günde birbirini arayanlar (c.specialSeek)
+  // (29.6) hatırlanan güzel anının kişisi (c.recall.whoId; LoyaltySystem süresini yönetir), (29.7) özel günde birbirini arayanlar (c.specialSeek)
   const r = c.recall;
-  if (r && Number.isFinite(r.whoId)) {
-    const list = r.fond ? d.seekIds : d.avoidIds;
-    if (!list.includes(r.whoId)) list.push(r.whoId);
-  }
+  // (29.10) yalnızca güzel anılar hatırlandığı için (MemorySystem.recall) hatırlanan kişi her zaman aranır; kaçınma dalı yoktur
+  if (r && Number.isFinite(r.whoId) && !d.seekIds.includes(r.whoId)) d.seekIds.push(r.whoId);
   for (const id of c.specialSeek ?? []) if (!d.seekIds.includes(id)) d.seekIds.push(id);
   d.leisure = leisure;
   d.version = (d.version | 0) + 1;

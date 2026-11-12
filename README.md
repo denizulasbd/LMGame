@@ -4380,6 +4380,36 @@ Kart yalnızca özellikler / derin biçim / ipucu değişince yeniden kurulur (`
 - Neden bazen "Zamanla": küçük katkılar (5'in altı) birikip eşiği aşarsa belirli bir kaynak yazılmaz.
 - Huy (`quirk`) değişimi, Obur / Gece Kuşu evrimi, iş arkadaşı tercihi (29.5), hafıza kancaları (29.6) ve panelin yeniden tasarımı (29.9) kapsam dışıdır.
 
+## 29. aşama özeti: Yaşayan Ruh
+
+On adımda sakinler duygu, bağ, arzu, kişilik ve hafıza kazandı. Ayrıntılar yukarıdaki 29.1-29.4 bölümlerinde ve `docs/CHANGELOG.md`'de.
+
+- **29.1 Sosyal Kimya:** çift başına kimya (-2..+3) ve süreli duygusal etiketler (minnettar, kırgın, kıskanç, hayran, ruh ikizi).
+- **29.2 Ruh Halleri:** katmanlı moodlet'ler (eylem, kişilik, ihtiyaç rezonansı), yas ve teselli; baskın his kartta ve haritada.
+- **29.3 Arzular / Korkular:** sakin başına dilek ve kaygı, gerçekleşme ya da başa gelme; yaşam doyumu ve beş kademe.
+- **29.4 Kişilik Evrimi:** dört eksende birikim; edinim, dönüşüm, derinleşme (ömür boyu en çok 3); günlük ve neden metni.
+- **29.4b Test altyapısı:** `gate.mjs`, aşama başına test dosyası, dondurulmuş `tests.mjs`, `ENGINES` şalterleri.
+- **29.5 Omuz Omuza:** bağ puanlı iş seçimi; yan yana çalışma ve "Diken Üstünde" moodlet'leri.
+- **29.6 Vefa ve Husumet:** Yönetime sadakat (Sadık / Kırgın), isyan elebaşı, yangın minneti, yağma kırgınlığı, anının kişisi.
+- **29.7 Anma Töreni ve Özel Günler:** vefatın ertesi akşamı tören, Taziye Sofrası; doğum günü ve evlilik yıl dönümü, armağan.
+- **29.8-29.9 İfade ve Kart:** Duygu Katmanı, beden dili, düşünce balonu; dört sekmeli kart, Sakinler çekmecesi işaretleri, Yaşam Öyküsü ve kitabe.
+- **29.10 Büyük Entegrasyon:** bilinen kusurların kapanışı, yönetim senaryoları (`--profile`), Kırgın kasabanın güveni eritmesi, uzun koşu ve final denetimi.
+
+**Şalterler** (`src/systems/Engines.js`): `bonds` (29.5), `loyalty` (29.6, 29.10'daki Kırgın-güven bağı dahil), `rites` (29.7). Oyunda, aşama
+testlerinde, audit, compat, autopilot ve stress'te hepsi açıktır; dondurulmuş `tests.mjs` hepsini kapatır (`--engines-on` yalnızca teşhis için).
+
+**Kapı komutları:**
+- `node tools/sim/gate.mjs --quick --only 29.10` — aşama testleri, duman koşusu (autopilot 42 12), audit.
+- `node tools/sim/gate.mjs --full` — dondurulmuş testler, tests/*, audit, `compat --sample`, stress 6 tohum x 50 gün x 4x, determinizm 42x50.
+- `node tools/sim/compat.mjs --all` — bütün kayıt fikstürleri (sürüm 40).
+- `node tools/sim/autopilot.mjs 42 40 --profile tyrant|benevolent` — yönetim senaryoları; `--checkpoints 50,120` uzun koşu ölçümü.
+
+**Bilinen sınırlamalar:**
+- "Bu oturumda en çok kiminle omuz omuza" sayacı kayda girmez; yüklemede sıfırlanır.
+- Kişilik değişiminin yedek nedeni (`growthLast`) kaydedilmez; yüklemeden hemen sonraki değişimde neden boş kalabilir (öykü nedensiz cümle kurar).
+- Zorba yönetimde (Ağır Vergi + bütün dilekçeler reddi) kasaba birkaç isyandan sonra hızla boşalır; bu bilinçli bir sonuçtur.
+- Dondurulmuş testlerin 4'ü şalterler açıkken geçmez (gerçek hata değil; ayrıntı CHANGELOG 29.10).
+
 ## Kod denetimi (15. aşama öncesi)
 
 Yeni özellikten önce bütün katmanlar denetlendi; bulunan her sorun kökünden düzeltildi ve bir testle kilitlendi.

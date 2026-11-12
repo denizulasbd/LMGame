@@ -20,7 +20,8 @@ import { townHappiness, happinessOf, foodSupply } from './TownStatus.js';
 import { addMemory } from './MemorySystem.js';
 import { clamp } from '../utils/math.js';
 import { engineOn } from './Engines.js';
-import { unrestKey, pickLeader, hungryNow } from './Loyalty.js';
+import { unrestKey, pickLeader, hungryNow, loyaltyTier } from './Loyalty.js';
+import { LOYALTY } from '../data/loyalty.js';
 
 export const LOOT_ITEMS = { food: 'ration', bread: 'bread', wood: 'firewood' };
 
@@ -113,6 +114,12 @@ export class TrustSystem {
     const starving = s.characters.filter((c) => !c.away && !c.role && c.needs.hunger < TRUST.starvingBelow).length;
     delta += Math.max(TRUST.starvingMaxPerHour, starving * TRUST.starvingPerHour);
     if (s.heating?.cold) delta += TRUST.coldPerHour;
+    // (29.10) Kırgın kasaba güveni eritir (yalnızca Kırgın payı eşiği aşınca; zar çekmez)
+    if (engineOn('loyalty')) {
+      const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away);
+      const share = adults.length ? adults.filter((c) => loyaltyTier(c) === 'bitter').length / adults.length : 0;
+      if (share >= LOYALTY.bitterTrust.share) delta += LOYALTY.bitterTrust.perHour * share;
+    }
     this.adjust(delta);
 
     const t = this.trust;

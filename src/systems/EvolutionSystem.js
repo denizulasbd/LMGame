@@ -91,7 +91,11 @@ export class EvolutionSystem {
     if (delta === 0) return 0;
     c.growth[axisIndex] += delta;
     if (!daily) c.growthToday[axisIndex] += delta;
-    if (Math.abs(delta) >= EVOLUTION_RULES.causeMin && Math.sign(delta) === Math.sign(c.growth[axisIndex])) c.growthCause[axisIndex] = sourceKey;
+    const sameSign = Math.sign(delta) === Math.sign(c.growth[axisIndex]);
+    if (Math.abs(delta) >= EVOLUTION_RULES.causeMin && sameSign) c.growthCause[axisIndex] = sourceKey;
+    // (29.10) küçük katkılar birikince growthCause boş kalıyordu: eksenin en son (aynı yönlü) katkısının kaynağı yedek olarak tutulur.
+    // Kaydedilmez (Character.toJSON listesinde yok); yüklemeden sonraki ilk değişimde yedek yoksa neden yine boş kalabilir.
+    else if (sameSign) (c.growthLast ??= [null, null, null, null])[axisIndex] = sourceKey;
     return delta;
   }
 
@@ -139,7 +143,10 @@ export class EvolutionSystem {
         const v = c.growth[i];
         if (v === 0) continue;
         c.growth[i] = v > 0 ? Math.max(0, v - EVOLUTION_RULES.decayPerDay) : Math.min(0, v + EVOLUTION_RULES.decayPerDay);
-        if (c.growth[i] === 0) c.growthCause[i] = null;
+        if (c.growth[i] === 0) {
+          c.growthCause[i] = null;
+          if (c.growthLast) c.growthLast[i] = null;
+        }
       }
       c.growthToday.fill(0);
     }
@@ -162,13 +169,14 @@ export class EvolutionSystem {
   evolve(c, shift) {
     const state = this.state;
     const { traits, deepTraits } = applyShift(c, shift);
-    const cause = c.growthCause[shift.axis] ?? null;
+    const cause = c.growthCause[shift.axis] ?? c.growthLast?.[shift.axis] ?? null;
     const fond = Math.sign(c.growth[shift.axis]) > 0;
     // a) özellikler, eksen, sayaçlar, kayıt
     c.traits = traits;
     c.deepTraits = deepTraits;
     c.growth[shift.axis] = 0;
     c.growthCause[shift.axis] = null;
+    if (c.growthLast) c.growthLast[shift.axis] = null;
     c.evolutionCount += 1;
     if (shift.kind === 'acquired') c.acquiredCount += 1;
     c.evolutions.push({ day: state.time.day, kind: shift.kind, axis: shift.axis, from: shift.from, to: shift.to, cause });

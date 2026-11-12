@@ -1,6 +1,7 @@
 // (29.9) Yaşam Öyküsü: bir sakinin hayatını 3-6 cümlelik Türkçe bir metne döker. SAF ve şablon tabanlıdır: zar çekmez, durum yazmaz,
 // aynı durum her zaman aynı metni verir. Kaynaklar: geliş biçimi ve yaş, meslek / unvan, eş ve çocuklar, kişilik değişim günlüğü
-// (c.evolutions), dilek sayısı ve doyum kademesi, sadakat rozeti, en önemli 2 anı (kind: 'life').
+// (c.evolutions), doyum kademesi, sadakat rozeti, en önemli 2 anı (düğün, evlat, usta işi eser, yas, yangından kurtarılma, teselli;
+// tırnaksız cümleye çevrilir, arzu / korku kaynaklı anılar öyküye girmez).
 // Vefatta (population:dying) RiteSystem öyküyü üretip kitabeye (rites.names[].story, en çok STORY_MAX karakter) yazar.
 import { TRAITS } from '../data/characters.js';
 import { CAUSE_TEXT } from '../data/evolution.js';
@@ -14,7 +15,7 @@ import { genitive } from '../utils/turkish.js';
 export const STORY_MAX = 400;
 const MIN_SENTENCES = 3;
 const MAX_SENTENCES = 6;
-const WISH_MIN = 3; // bu kadar dilek gerçekleştiyse öyküye girer
+const WISH_MIN = 3; // (29.10) bu kadar dilek gerçekleştiyse doyum kademesinden türeyen cümle öyküye girer
 
 const ONES = ['', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz'];
 const TENS = ['', 'on', 'yirmi', 'otuz', 'kırk', 'elli', 'altmış', 'yetmiş', 'seksen', 'doksan'];
@@ -39,16 +40,28 @@ const CLOSING = {
 
 const EVO_VERB = { turned: 'ağır bastı', deepened: 'derinleşti', acquired: 'ortaya çıktı' };
 
-/** Geliş biçimi: 'founder' | 'immigrant' | 'born'. */
-export function originOf(c) {
+const IMMIGRANT_MEMORY = 'Kasabaya göçmen olarak katıldı'; // MemorySystem: population:joined
+const FOUNDER_MEMORY = 'Kasabanın ilk sakinlerinden biri oldu'; // MemorySystem: yeni oyunun ilk sakinleri
+const CHILD_MEMORY = 'Kasabada doğup büyüyor'; // MemorySystem: ilk sakinlerin çocukları
+
+/**
+ * Geliş biçimi: 'founder' | 'immigrant' | 'born'. (29.10) Kurucular da 'arrival' türünde ilk anıyla başladığı için tür değil kaynak
+ * okunur: anne / baba ya da 2+. kuşak -> doğan; Tarihçe'nin kurucu listesi (state.chronicle.founders) ya da kurucu ilk anısı -> kurucu;
+ * göçmen anısı ("Kasabaya göçmen olarak katıldı") -> göçmen. Hiçbiri yoksa (çok eski kayıt) kurucu sayılır.
+ */
+export function originOf(c, state = null) {
   const hasParents = (c.parentIds?.length ?? 0) > 0 || (c.parents?.length ?? 0) > 0;
   if (hasParents || (c.generation ?? 1) > 1) return 'born';
-  if ((c.memories ?? []).some((m) => m.kind === 'arrival')) return 'immigrant';
+  if ((state?.chronicle?.founders ?? []).some((f) => f.id === c.id)) return 'founder';
+  const mem = c.memories ?? [];
+  if (mem[0]?.text === FOUNDER_MEMORY) return 'founder';
+  if (mem[0]?.text === CHILD_MEMORY) return 'born';
+  if (mem.some((m) => m.kind === 'arrival' && m.text === IMMIGRANT_MEMORY)) return 'immigrant';
   return 'founder';
 }
 
-function originSentence(c, dead) {
-  const kind = originOf(c);
+function originSentence(c, state, dead) {
+  const kind = originOf(c, state);
   if (kind === 'born') return `${c.name} bu kasabada dünyaya geldi`;
   if (kind === 'immigrant') return `${c.name} kasabaya göçmen olarak geldi`;
   return dead ? `${c.name} kasabanın kurucularındandı` : `${c.name} kasabanın kurucularından`;
@@ -81,21 +94,30 @@ function familySentence(c, state, dead) {
 function evolutionSentence(c, dead) {
   const log = (c.evolutions ?? []).filter((e) => TRAITS[e.to] || e.kind === 'deepened');
   if (!log.length) return null;
-  const clause = (e) => {
-    const cause = CAUSE_TEXT[e.cause] ?? 'Zamanla';
+  const clause = (e, skipCause = false) => {
+    // (29.10) nedeni boş değişim "Zamanla" yerine nedensiz cümleyle anlatılır; ikinci değişimin nedeni ilkiyle aynıysa yinelenmez
+    const cause = !skipCause && CAUSE_TEXT[e.cause] ? `${CAUSE_TEXT[e.cause]} ` : '';
     const trait = TRAITS[e.to]?.name ?? 'kişiliği';
-    return e.kind === 'turned' ? `${cause} ${trait} yanı ${EVO_VERB.turned}` : e.kind === 'acquired' ? `${cause} içinde ${trait} bir yan belirdi` : `${cause} ${trait} yanı ${EVO_VERB.deepened}`;
+    return e.kind === 'turned' ? `${cause}${trait} yanı ${EVO_VERB.turned}` : e.kind === 'acquired' ? `${cause}içinde ${trait} bir yan belirdi` : `${cause}${trait} yanı ${EVO_VERB.deepened}`;
   };
   const first = log[0];
   const last = log.length > 1 ? log[log.length - 1] : null;
   const head = upper(clause(first));
-  return last ? `${head}, yıllar geçtikçe ${clause(last)}` : head;
+  return last ? `${head}, yıllar geçtikçe ${clause(last, last.cause === first.cause)}` : head;
 }
 
+// (29.10) dilek sayısı yerine doyum kademesinden tek ifade (Hâlinden Memnun kademesinde cümle yok)
+const WISH_TEXT = {
+  radiant: ['Hayattan umduğunu fazlasıyla buldu', 'Hayattan umduğunu fazlasıyla buluyor'],
+  fulfilled: ['Dileklerinin çoğuna kavuştu', 'Dileklerinin çoğuna kavuşuyor'],
+  restless: ['Aradığını pek bulamadı', 'Aradığını henüz bulamadı'],
+  crushed: ['Umduklarının azını gördü', 'Umduklarının azını görüyor'],
+};
+
 function wishSentence(c, dead) {
-  const n = c.wishCount ?? 0;
-  if (n < WISH_MIN) return null;
-  return dead ? `${numberWords(n)} dileğinin gerçek olduğunu gördü` : `${numberWords(n)} dileğinin gerçek olduğunu gördü`;
+  if (c.isChild || (c.wishCount ?? 0) < WISH_MIN) return null;
+  const pair = WISH_TEXT[satisfactionTier(c.satisfaction).key];
+  return pair ? pair[dead ? 0 : 1] : null;
 }
 
 function loyaltySentence(c, dead) {
@@ -105,11 +127,40 @@ function loyaltySentence(c, dead) {
   return null;
 }
 
-function memorySentence(c) {
-  const life = (c.memories ?? []).filter((m) => m.kind === 'life' && typeof m.text === 'string');
-  if (!life.length) return null;
-  const picks = life.slice(-2);
-  return picks.length > 1 ? `Anılarında “${picks[0].text}” ve “${picks[1].text}” öne çıkıyor` : `Anılarında “${picks[0].text}” öne çıkıyor`;
+// (29.10) Anılar tırnaksız cümleye çevrilir. Yalnızca bu türler öyküye girer (öncelik sırasıyla); arzu / korku kaynaklı anılar
+// ("Dileği oldu: …", "Korktuğu başına geldi: …") ve diğerleri girmez. Düğün ve evlat anısı aile cümlesi zaten anlatıyorsa atlanır.
+const MEMORY_RULES = [
+  { key: 'wedding', named: true, test: (m) => m.kind === 'wedding', re: /^(.+) ile (.+) evlendi$/, text: (x) => `${x[1]} ile ${x[2]} evlendiği günü hiç unutmadı`, skipIfPartner: true },
+  { key: 'child', test: (m) => m.kind === 'child', re: /^Çocuğu (.+) dünyaya geldi$/, text: (x) => `Evladı ${x[1]} dünyaya geldiğinde gözleri doldu`, skipIfChildren: true },
+  { key: 'masterwork', test: (m) => m.kind === 'masterwork', re: /^Usta işi bir eser yaptı: (.+)$/, text: (x) => `Elinden ${x[1]} adlı usta işi bir eser çıktı` },
+  { key: 'mourning', named: true, test: (m) => m.kind === 'life', re: /^(.+) yasını tuttu$/, text: (x) => `${x[1]} yasını tuttu` },
+  { key: 'fire', test: (m) => m.kind === 'life', re: /^(.+) yangında (evini|iş yerini) kurtardı$/, text: (x) => `Bir yangında ${x[2] === 'evini' ? 'evini' : 'iş yerini'} ${x[1]} kurtardı` },
+  { key: 'consoled', test: (m) => m.kind === 'life', re: /^(.+) (yasında|korkusunda|kederinde) onu teselli etti$/, text: (x) => `${x[2] === 'yasında' ? 'Yasında' : x[2] === 'korkusunda' ? 'Korkusunda' : 'Kederinde'} ${x[1]} onu teselli etti` },
+];
+
+function memorySentence(c, state) {
+  const mem = (c.memories ?? []).filter((m) => typeof m.text === 'string');
+  if (!mem.length) return null;
+  const hasPartner = Boolean(partnerOf(state, c));
+  const hasChildren = (c.children?.length ?? 0) > 0 || childrenOf(state, c).length > 0;
+  const picks = [];
+  for (const rule of MEMORY_RULES) {
+    if (picks.length >= 2) break;
+    if ((rule.skipIfPartner && hasPartner) || (rule.skipIfChildren && hasChildren)) continue;
+    // aynı türün en yeni anısı
+    for (let i = mem.length - 1; i >= 0; i--) {
+      const m = mem[i];
+      if (!rule.test(m)) continue;
+      const x = rule.re.exec(m.text);
+      if (!x) continue;
+      picks.push({ text: rule.text(x), named: Boolean(rule.named) });
+      break;
+    }
+  }
+  if (!picks.length) return null;
+  // ikinci cümle noktalı virgülle bağlanır; özel adla başlıyorsa (düğün, yas) baş harfi küçültülmez
+  const second = (p) => (p.named ? p.text : p.text.charAt(0).toLocaleLowerCase('tr') + p.text.slice(1));
+  return picks.length > 1 ? `${picks[0].text}; ${second(picks[1])}` : picks[0].text;
 }
 
 function closingSentence(c, dead) {
@@ -129,8 +180,8 @@ export function lifeStory(c, state, opts = {}) {
   const dead = Boolean(opts.dead);
   const max = opts.max === undefined ? 0 : opts.max;
   // görünüm sırası: meslek, aile, kişilik değişimi, dilek, sadakat, anılar; yer kısıtlıysa öncelik: anılar sadakatten önce gelir
-  const parts = [professionSentence(c, dead), familySentence(c, state, dead), evolutionSentence(c, dead), wishSentence(c, dead), loyaltySentence(c, dead), memorySentence(c)];
-  const head = originSentence(c, dead);
+  const parts = [professionSentence(c, dead), familySentence(c, state, dead), evolutionSentence(c, dead), wishSentence(c, dead), loyaltySentence(c, dead), memorySentence(c, state)];
+  const head = originSentence(c, state, dead);
   const tail = closingSentence(c, dead);
   const room = MAX_SENTENCES - 2;
   const chosen = new Set();
@@ -170,6 +221,10 @@ export function statusSentence(c, state, MOODLETS, reasonText) {
   }
   if (!top) return `${feel} · gündelik hayatına dengeyle devam ediyor`;
   if (top.key === 'mourning' && top.whoName) return `${feel} · ${genitive(top.whoName)} yasını tutuyor`;
-  const why = reasonText(top);
-  return why ? `${feel} · ${MOODLETS[top.key].name}: ${why}` : `${feel} · ${MOODLETS[top.key].name}`;
+  const name = MOODLETS[top.key].name;
+  let why = reasonText(top);
+  // (29.10) neden metni moodlet adıyla başlıyorsa (wish_come_true: "Dileği oldu: …", dread_realized: "Korktuğu başına geldi: …") yinelenmesin
+  const lead = name.toLocaleLowerCase('tr');
+  if (why && why.toLocaleLowerCase('tr').startsWith(lead)) why = why.slice(name.length).replace(/^\s*[:·-]\s*/, '');
+  return why ? `${feel} · ${name}: ${why}` : `${feel} · ${name}`;
 }

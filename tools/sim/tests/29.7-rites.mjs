@@ -75,7 +75,7 @@ const out = await page.evaluate(async (fixture) => {
   mm = setRite(true);
   scene().rites.finish();
   const r05 = mm.until === now() + 300;
-  check('yasın kalan süresi x0,7, Taziye Sofrası\'yla x0,5 (Helalleşti major, sadakat +3); evrim spirit +3', r07 && r05 && getMoodlet(m1, 'farewell')?.tier === 'major' && m1.loyalty === 3 && fw?.tier === 'minor' && EV.EVOLUTION_SOURCES.moodlets.farewell[0].join() === '3,3' && Math.abs(spirit - 3 * (EV.EVOLUTION_RULES.stageMul[m1.lifeStage] ?? 1)) <= 0.5, `${r07} ${r05} ${m1.loyalty} · spirit ${spirit}`);
+  check('yasın kalan süresi x0,7, Taziye Sofrası\'yla x0,5 (Helalleşti major, sadakat +condolence); evrim spirit +3', r07 && r05 && getMoodlet(m1, 'farewell')?.tier === 'major' && m1.loyalty === (await import('/src/data/loyalty.js')).LOYALTY_SOURCES.condolence && fw?.tier === 'minor' && EV.EVOLUTION_SOURCES.moodlets.farewell[0].join() === '3,3' && Math.abs(spirit - 3 * (EV.EVOLUTION_RULES.stageMul[m1.lifeStage] ?? 1)) <= 0.5, `${r07} ${r05} ${m1.loyalty} · spirit ${spirit}`);
   const day = s().time.day;
   rites().active = { names: ['Y'], day, place: null, condolence: false, attendees: [], ids: [], dead: [] };
   const hourBack = s().time.hour; s().time.hour = 10;
@@ -151,7 +151,7 @@ const out = await page.evaluate(async (fixture) => {
   const gsat = gifted.satisfaction; const ggold = S2().resources.gold;
   game.events.emit('ui:giftSpecialDay', { id: gifted.id });
   game.events.emit('ui:giftSpecialDay', { id: gifted.id });
-  const giftOk = gifted.specialDay.gifted && gifted.loyalty === 6 && gifted.satisfaction === Math.min(100, gsat + 4) && S2().resources.gold === ggold - 5;
+  const giftOk = gifted.specialDay.gifted && gifted.loyalty === (await import('/src/data/loyalty.js')).LOYALTY_SOURCES.gift && gifted.satisfaction === Math.min(100, gsat + 4) && S2().resources.gold === ggold - 5;
   const f0 = S2().rites.forgotten;
   S2().time.hour = 22;
   sc.rites.closeSpecialDays();
