@@ -3,7 +3,7 @@
 // Bu dosya bütün ENGINES şalterlerini kapatıp (src/systems/Engines.js) eski dünyanın tarihini sabit tutar.
 //
 // Hedefli testler: oyunun kurallarını tarayıcıda, gerçek sistemlerle tek tek dener.
-// Kullanım: node tools/sim/tests.mjs   (sunucu: python3 tools/serve.py)
+// Kullanım: node tools/sim/tests.mjs [--engines-on]   (sunucu: python3 tools/serve.py)
 //   10. aşama: yiyecek değeri, seviye kilitleri, eski usul / asıl tarif, tüccar malları, belediye, unvan, yerleşim
 //   11. aşama: hastalık ve şifacı, kasaba hayvanları ve sevme, yaban hayatının ürkmesi, karar olayları (zaman aşımı,
 //              fırtına hasarı ve onarım, keşif seferi), belediye fermanları, kayıt gidiş-dönüşü
@@ -105,8 +105,10 @@ capOutput('tests');
 
 const { browser, page, errors } = await openGame({ seed: 5 });
 const { results, report } = createChecks();
-// Dondurulmuş dünya: sonradan eklenen mekanik şalterlerinin hepsi kapalı (bugün liste boş)
-await page.evaluate(async () => { const { ENGINES } = await import('/src/systems/Engines.js'); for (const k of Object.keys(ENGINES)) ENGINES[k] = false; });
+// Dondurulmuş dünya: sonradan eklenen mekanik şalterlerinin hepsi kapalı. (29.10) --engines-on: şalterler kapatılmaz (yalnızca teşhis
+// koşusu; kalan testler gerçek hata / kırılgan fikstür diye sınıflandırılır). Varsayılan koşu yine şalterler kapalıdır.
+const enginesOn = process.argv.includes('--engines-on');
+if (!enginesOn) await page.evaluate(async () => { const { ENGINES } = await import('/src/systems/Engines.js'); for (const k of Object.keys(ENGINES)) ENGINES[k] = false; });
 await page.evaluate(() => { window.game.ui.components.find((x) => x.setAllTabs)?.setAllTabs(true); }); // 29.9: kart sekmeleri — dondurulmuş testler eski tek kart düzenini okur (dört gövde birden takılı)
 
 const pageResults = await page.evaluate(async () => {
