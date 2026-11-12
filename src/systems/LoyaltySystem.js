@@ -4,8 +4,8 @@
 //               ikramı, "Sesimiz Duyulmadı", evin yanması, isyanın yardımla yatışması (elebaşı / isyancı) sakinin c.loyalty'sini
 //               değiştirir; gün dönümünde 0'a doğru söner. Eşik (Sadık / Kırgın) geçilince 'loyalty:changed' { character, from, to, reason }.
 //   Husumet   : isyanda yağmalanan yapının sakinleri ve çalışanları yağmacıya kırgın olur (ChemistrySystem.tag; anı "{who} isyanda ...").
-//   Hatırlama : 'memory:recalled' ile hatırlanan anının kişisi hayattaysa c.recall'a { whoId, fond, whoUntil } yazılır (kaydedilmez);
-//               Wants.recomputeDrive onu seekIds (güzel anı) ya da avoidIds'e ekler, süre dolunca silinir. Hatırlamanın zarı MemorySystem'de.
+//   Hatırlama : 'memory:recalled' ile hatırlanan anının kişisi hayattaysa c.recall'a { whoId, whoUntil } yazılır (kaydedilmez);
+//               Wants.recomputeDrive onu seekIds'e ekler (yalnızca güzel anılar hatırlanır), süre dolunca silinir. Hatırlamanın zarı MemorySystem'de.
 // Kancaların hepsi ENGINES.loyalty ile sarılıdır. HİÇ ZAR ÇEKMEZ; üreteci yoktur.
 import { LOYALTY, LOYALTY_SOURCES as SRC, DEBT_MEMORIES, DEBT_RULES } from '../data/loyalty.js';
 import { engineOn } from './Engines.js';
@@ -112,13 +112,12 @@ export class LoyaltySystem {
     }
   }
 
-  /** Hatırlanan anının kişisi hayattaysa bir süre aranır (güzel anı) ya da kaçınılır. */
+  /** Hatırlanan (güzel) anının kişisi hayattaysa bir süre aranır. */
   onRecalled(c, memory) {
     if (!c?.recall || !Number.isFinite(memory?.whoId)) return;
     const who = this.world.getCharacter(memory.whoId);
     if (!who || who === c) return;
     c.recall.whoId = who.id;
-    c.recall.fond = memory.fond !== false;
     c.recall.whoUntil = this.state.totalMinutes + DEBT_RULES.recallMinutes;
     recomputeDrive(c);
   }
@@ -130,7 +129,6 @@ export class LoyaltySystem {
       if (!r || !Number.isFinite(r.whoId)) continue;
       if (r.whoUntil > now && this.world.getCharacter(r.whoId)) continue;
       delete r.whoId;
-      delete r.fond;
       delete r.whoUntil;
       recomputeDrive(c);
     }

@@ -153,7 +153,8 @@ export class ResidentList {
         entry.status.textContent = c.activityLabel;
       }
       // (29.8) ruh hali işareti ve özel gün simgesi (yalnızca değişince yazılır)
-      const markKey = moodMarkOf(c);
+      // (29.10) dengeli ruh halinde işaret gösterilmez (moodMarkOf zaten null döner; açıkça da denetlenir)
+      const markKey = c.mood?.feel === 'Dengeli' ? null : moodMarkOf(c);
       if (entry.lastMark !== markKey) {
         entry.lastMark = markKey;
         const spec = markKey ? MARK_ICONS[markKey] : null;
@@ -162,12 +163,15 @@ export class ResidentList {
           entry.mark.src = getAnyIconURL(spec[0]);
           entry.mark.className = `resident-mark resident-mood-mark ${spec[1]}`;
           entry.mark.title = spec[2];
+          entry.mark.alt = spec[2];
         }
       }
-      const special = Boolean(c.specialDay && c.specialDay.day === game.state.time.day);
+      const special = c.specialDay && c.specialDay.day === game.state.time.day ? c.specialDay.kind ?? 'birthday' : false;
       if (entry.lastSpecial !== special) {
         entry.lastSpecial = special;
         entry.special.hidden = !special;
+        // (29.10) özel gün işaretinin açıklaması türüne göre
+        if (special) entry.special.title = entry.special.alt = special === 'anniversary' ? 'Özel gün: bugün evlilik yıl dönümü' : 'Özel gün: bugün doğum günü';
       }
       const mood = moodClass(c);
       if (entry.lastMood !== mood) {
