@@ -8,6 +8,7 @@
 // (20. aşama) Pencerenin üstünde iki sekme: "Kasaba Arşivi" (grafikler, tarih, eserler) ve "Tarihçe Kütüğü": kasabanın
 // gurur tablosu (berat): kurucu sakinler, ilk evlenen çift, ilk usta işi eser, Ulu Saat Kulesi'nin aşamaları ve baş
 // ustası (altın harflerle), Altın Çağ. Veriyi GoldenAgeSystem (state.chronicle, state.goldenAge) yazar.
+import { readEmotionPref } from '../../rendering/ExpressionLayer.js';
 import { towerOf, towerMasterOf, isGoldenAge } from '../../systems/GoldenAge.js';
 import { BUILDINGS } from '../../data/buildings.js';
 import { CONFIG } from '../../config.js';
@@ -42,7 +43,11 @@ export class StatsPanel {
     // (17. aşama) Arşiv ve Fotoğraf düğmeleri alt dock'ta
     this.toggle = dockButton({ icon: 'chart', label: 'Arşiv', key: 'I', tip: 'Kasaba Arşivi: grafikler, tarih ve usta işi eserler', onClick: () => this.setOpen(!this.open), className: 'archive-toggle' });
     this.photo = dockButton({ icon: 'camera', label: 'Fotoğraf', key: 'F', tip: 'Fotoğraf modu: arayüzü gizle, kasabayı seyret', onClick: () => this.events.emit('ui:toggleCinematic'), className: 'photo-toggle' });
-    this.dockButtons = [this.toggle, this.photo];
+    // (29.8) Duygu Katmanı: ruh hali işaretleri ve bağ çizgileri (M); tercih tarayıcıda hatırlanır
+    this.emotions = dockButton({ icon: 'heart', label: 'Duygular', key: 'M', tip: 'Duygu Katmanı: sakinlerin ruh hali işaretleri; seçili sakinin bağ çizgileri', onClick: () => this.events.emit('ui:toggleEmotions'), className: 'emotion-toggle' });
+    this.emotions.classList.toggle('is-active', readEmotionPref());
+    this.events.on('ui:emotionsChanged', (on) => this.emotions.classList.toggle('is-active', Boolean(on)));
+    this.dockButtons = [this.toggle, this.emotions, this.photo];
 
     // Pencere: ekranın ortasında (ModalHost)
     this.subtitle = el('div', { className: 'archive-subtitle' });
@@ -286,7 +291,7 @@ export class StatsPanel {
         entry('wonder', 'Ulu Saat Kulesi', towerBody),
         el('ul', { className: 'chronicle-stages' }, stageRows),
         // (29.7) Anma törenleri ve kitabe
-        ...(state.rites?.names?.length ? [entry('candle', 'Kitabe: Anılanlar', [gold(state.rites.names.slice(-12).map((n) => `${n.name} (${n.age})`).join(', '))], `${state.rites.held} anma töreni · son: ${when(state.rites.names.at(-1))}`)] : []),
+        ...(state.rites?.names?.length ? [entry('candle', 'Kitabe: Anılanlar', [gold(state.rites.names.slice(-12).map((n) => `${n.name} (${n.age})`).join(', ')), ...(state.rites.names.at(-1).story ? [` · ${state.rites.names.at(-1).name}: ${state.rites.names.at(-1).story}`] : [])], `${state.rites.held} anma töreni · son: ${when(state.rites.names.at(-1))}`)] : []),
         entry('bell', 'Altın Çağ', isGoldenAge(state) ? [gold(`${when(ch.goldenAge ?? ga.since)}`), ' · çalışma şevki +%10, refah +%10', ...(ga.books ? [` · kitaplıkta ${ga.books} antik kitap`] : [])] : [pending('Kule tamamlanınca başlar')]),
       ])
     );

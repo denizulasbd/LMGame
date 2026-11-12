@@ -1447,6 +1447,13 @@ export function getAnyIconURL(name) {
   return iconUrlCache.get(key);
 }
 
+/** (29.8) Çerçevesiz simge (HUD ya da balon simgesi) canvas'ı: düşünce / konuşma balonlarının içine çizilir. */
+export function getAnyIconSprite(name) {
+  if (ICONS[name]) return getIconSprite(name);
+  if (!BUBBLE_ICONS[name]) return null;
+  return getSprite(`ui:bubbleIcon:${name}`, BUBBLE_ICONS[name]);
+}
+
 export function getBubbleSprite(icon) {
   return getSprite(`ui:bubble:${icon}`, () => composeRows(BUBBLE, [[BUBBLE_ICONS[icon], 2, 2]]));
 }

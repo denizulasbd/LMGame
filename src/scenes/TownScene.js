@@ -93,6 +93,8 @@ import { LifecycleSystem } from '../systems/LifecycleSystem.js';
 import { LifeStageSystem } from '../systems/LifeStageSystem.js';
 import { ApprenticeshipSystem } from '../systems/ApprenticeshipSystem.js';
 import { drawSpeechBubbles, updateSpeechBubbles } from '../rendering/SpeechBubbles.js';
+import { ExpressionLayer, drawThoughtBubbles } from '../rendering/ExpressionLayer.js';
+import { setExpressionContext } from '../rendering/BodyLanguage.js';
 import { TemperamentSystem } from '../systems/TemperamentSystem.js';
 import { LineageSystem } from '../systems/LineageSystem.js';
 import { HeirloomSystem } from '../systems/HeirloomSystem.js';
@@ -387,10 +389,12 @@ export class TownScene extends Scene {
     this.guestSelected = false; // (27.3) gezgin konuk kartı açık mı (konuğun kimliği sabittir: GUEST_ID)
     this.followId = null;
     this.focusId = null;
+    this.expression = new ExpressionLayer(events); // (29.8) Duygu Katmanı (M) ve düşünce balonları
     this.cinematic = false; // (13. aşama) fotoğraf modu: arayüz gizli, haritada imleç ve seçim çizilmez
 
     this.unsubscribers = [
       events.on('goldenAge:chime', () => this.chimeWaves.ring()),
+      events.on('ui:toggleEmotions', () => this.expression.setEnabled(!this.expression.enabled)), // (29.8)
       events.on('ui:setCinematic', (on) => {
         this.cinematic = Boolean(on);
         if (this.cinematic) this.tools.setTool('select');
@@ -627,6 +631,7 @@ export class TownScene extends Scene {
     if (input.wasPressed('toggleGoals')) events.emit('ui:toggleGoals');
     if (input.wasPressed('toggleStats')) events.emit('ui:toggleStats');
     if (input.wasPressed('toggleCinematic')) events.emit('ui:toggleCinematic');
+    if (input.wasPressed('toggleEmotions') && !this.cinematic) events.emit('ui:toggleEmotions'); // (29.8)
     ['speed1', 'speed2', 'speed3'].forEach((action, i) => {
       if (input.wasPressed(action)) events.emit('time:setSpeed', CONFIG.TIME_SPEEDS[i]);
     });
@@ -795,6 +800,7 @@ export class TownScene extends Scene {
     const freezing = this.game.state.heating.cold; // kışın odun bitti: ocaklar söndü
     // Çizim ortamı kareler arasında yeniden kullanılır (her karede yeni nesne ve küme üretilmez)
     const env = this.renderEnv ?? (this.renderEnv = { sleepingHomes: new Set(), smokingHomes: new Set() });
+    setExpressionContext(this.game.state); // (29.8) beden dili çizim bağlamı (oyun durumu değil)
     env.time = this.animationTime;
     env.hour = hour;
     env.season = season.key;
@@ -876,8 +882,16 @@ export class TownScene extends Scene {
     for (const animal of this.game.state.animals) animal.drawOverlay(renderer);
     // (25.2) Usta / çırak / bilge konuşma baloncukları (ekran koordinatında, net yazı)
     renderer.resetCamera();
-    drawSpeechBubbles(renderer, this.camera, this.world.characters);
-    drawSpeechBubbles(renderer, this.camera, this.world.guests); // (26.3) ozanın şarkıları, seyyahın masalları
+    // (29.8) balon sınırı 12: öncelik seçili sakin (konuşma, düşünce), sonra konuşmalar, sonra düşünceler
+    const budget = this.expression.beginFrame();
+    const sel = this.selectedId;
+    const minutes = this.game.state.totalMinutes;
+    drawSpeechBubbles(renderer, this.camera, this.world.characters, budget, sel, 1);
+    drawThoughtBubbles(renderer, this.camera, this.world.characters, minutes, budget, sel, 1);
+    drawSpeechBubbles(renderer, this.camera, this.world.characters, budget, sel, 2);
+    drawSpeechBubbles(renderer, this.camera, this.world.guests, budget, sel, 2); // (26.3) ozanın şarkıları, seyyahın masalları
+    drawThoughtBubbles(renderer, this.camera, this.world.characters, minutes, budget, sel, 2);
+    if (!this.cinematic) this.expression.draw(renderer, this.camera, this.game.state, this.animationTime, sel, this.hoveredCharacterId);
     renderer.applyCamera(this.camera);
     if (this.cinematic) {
       renderer.resetCamera();

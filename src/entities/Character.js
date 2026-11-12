@@ -22,6 +22,7 @@ import { PROFESSIONS } from '../data/apprenticeship.js';
 import { sanitizeLifespan } from '../data/lifeStages.js';
 import { CONFIG } from '../config.js';
 import { Entity } from './Entity.js';
+import { bodyKind, walkPeriod, computeBodyOffset, displayFacing, drawBodyDecor } from '../rendering/BodyLanguage.js';
 import { NEED_KEYS } from '../data/characters.js';
 import { CHILDREN } from '../data/family.js';
 import { buildTraitProfile } from '../ai/TraitProfile.js';
@@ -412,8 +413,12 @@ export class Character extends Entity {
   currentFrame() {
     const t = this.animTime;
     switch (this.pose) {
-      case 'walk':
-        return Math.floor(t / 0.16) % 2 === 0 ? 'walk0' : 'walk1';
+      case 'walk': {
+        // (29.8) beden dili: yaslı sakin sallanmadan yürür, tükenmiş sakinde sallanma yarı hızdadır
+        const kind = bodyKind(this);
+        if (kind === 'grief') return 'walk0';
+        return Math.floor(t / walkPeriod(kind)) % 2 === 0 ? 'walk0' : 'walk1';
+      }
       case 'sit':
         return t % 2.2 > 1.6 ? 'sit1' : 'sit0';
       case 'gather':
@@ -435,45 +440,50 @@ export class Character extends Entity {
 
   queueDraw(queue) {
     if (!this.visible) return;
-    const sprite = this.currentSprite();
-    const x = Math.round(this.x);
-    const y = Math.round(this.y);
+    // (29.8) beden dili: yalnızca çizim kaydırması (durum yazılmaz); kırgın çalışanlar birbirine sırt döner
+    const kind = bodyKind(this);
+    const offset = computeBodyOffset(this, kind);
+    const facing = displayFacing(this, kind);
+    const frame = this.currentFrame();
+    const sprite = getCharacterSprite(this.appearance, frame.startsWith('sit') ? 'down' : facing, frame, this.look);
+    const x = Math.round(this.x) + offset.x;
+    const y = Math.round(this.y) + offset.y;
     // (25.2) Çırak ustasının yanında küçük bir taburede oturur
     if (this.task?.activity === 'apprentice' && this.pose === 'sit') queue.addImage(this.sortY - 0.01, getStoolSprite(), x - 4, y - 1); // ayakları taburenin önünde, bacakları altından görünür
     queue.addImage(this.sortY, sprite, x - HALF_WIDTH, y - sprite.height + 1);
     // (14. aşama) Çiçek Şenliği: saçta küçük bir çiçek
     if (this.flowerCrown) {
-      const side = this.facing === 'left' ? -4 : this.facing === 'right' ? 1 : this.id % 2 === 0 ? -4 : 1;
+      const side = facing === 'left' ? -4 : facing === 'right' ? 1 : this.id % 2 === 0 ? -4 : 1;
       queue.addImage(this.sortY + 0.02, getFlowerCrownSprite(this.id % 3), x + side, y - sprite.height + 1);
     }
 
     // Gezgin tüccarın sırt çantası: yukarı bakarken önde (sırtı görünür), diğer yönlerde arkada
     if (this.backpack) {
-      const view = this.facing === 'up' ? 'back' : this.facing === 'down' ? 'front' : this.facing;
+      const view = facing === 'up' ? 'back' : facing === 'down' ? 'front' : facing;
       const sprite = getBackpackSprite(view);
       const bob = this.pose === 'walk' && Math.floor(this.animTime / 0.16) % 2 === 0 ? 1 : 0;
-      const offsetX = this.facing === 'left' ? 1 : this.facing === 'right' ? -7 : -5;
-      queue.addImage(this.sortY + (this.facing === 'up' ? 0.01 : -0.01), sprite, x + offsetX, y - CHARACTER_HEIGHT - 3 + bob);
+      const offsetX = facing === 'left' ? 1 : facing === 'right' ? -7 : -5;
+      queue.addImage(this.sortY + (facing === 'up' ? 0.01 : -0.01), sprite, x + offsetX, y - CHARACTER_HEIGHT - 3 + bob);
     }
     // Olta: karakterin önünde, uzun süre sabit durur
     if (this.tool === 'rod' && this.pose === 'fish') {
-      const side = this.facing === 'left' ? 'left' : 'right';
+      const side = facing === 'left' ? 'left' : 'right';
       const [dx, dy] = ROD_OFFSETS[side];
       const lift = this.animTime % 2.6 > 2.3 ? -1 : 0; // ara sıra oltayı kaldırıp indirir
       queue.addImage(this.sortY + 0.01, getHeldToolSprite('rod', side === 'left', this.hasSturdyTool), x + dx, y + dy + lift);
     }
     // Çoban değneği: yere dayalı, dik tutulur; elinin olduğu yanda, gövdenin önünde görünür
     else if (this.tool && this.pose === 'tend') {
-      const sprite = getHeldToolSprite(this.tool, this.facing === 'left', false);
-      const dx = this.facing === 'left' ? -8 : 3;
+      const sprite = getHeldToolSprite(this.tool, facing === 'left', false);
+      const dx = facing === 'left' ? -8 : 3;
       queue.addImage(this.sortY + 0.01, sprite, x + dx, y - sprite.height + 1);
     }
     // Alet: yukarı bakarken karakterin arkasında, diğer yönlerde önünde
     else if (this.tool && this.pose === 'work') {
       const raised = Math.floor(this.animTime / SWING_SECONDS) % 2 === 0;
-      const [dx, dy] = TOOL_OFFSETS[this.facing][raised ? 0 : 1];
-      const order = this.facing === 'up' ? -0.01 : 0.01;
-      queue.addImage(this.sortY + order, getHeldToolSprite(this.tool, this.facing === 'left', this.hasSturdyTool), x + dx, y + dy);
+      const [dx, dy] = TOOL_OFFSETS[facing][raised ? 0 : 1];
+      const order = facing === 'up' ? -0.01 : 0.01;
+      queue.addImage(this.sortY + order, getHeldToolSprite(this.tool, facing === 'left', this.hasSturdyTool), x + dx, y + dy);
     }
     // Taşınan yük başın üstünde
     if (this.carrying) {
@@ -586,7 +596,12 @@ export class Character extends Entity {
 
   /** Başın üstündeki ifade balonu (her şeyin üstünde çizilir). */
   drawOverlay(renderer) {
-    if (!this.visible || !this.bubble) return;
+    if (!this.visible) return;
+    // (29.8) beden dili kaplamaları: gözyaşı, özel gün kurdelesi, yan yana çalışanların pırıltısı
+    drawBodyDecor(renderer, this, bodyKind(this));
+    if (!this.bubble) return;
+    // (29.8) konuşma balonu da varsa ikon, metin balonunun sol ucunda tek balon olarak çizilir (SpeechBubbles)
+    if (this.speech && this.speech.remaining !== 0) return;
     const pop = this.bubble.time < BUBBLE_POP_TIME ? 2 : 0;
     const top = Math.round(this.y) - this.spriteHeight + (this.pose === 'sit' ? 2 : 0) - (this.carrying ? 5 : 0);
     renderer.drawImage(

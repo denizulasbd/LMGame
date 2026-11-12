@@ -92,11 +92,17 @@ if (!(await serverUp())) {
 }
 
 const t0 = Date.now();
-const queue = [...jobs];
+// (29.8) İki evre: önce hafif araçlar (tests, tests/*, audit, compat) kendi aralarında; bitince ağır olanlar (stress, determinizm).
+// Ağır işler ayrı çalışınca audit'in ses zamanlama testi paralel yük altında kırılmaz.
+const heavy = (j) => Boolean(j.det) || /stress/.test(j.name);
 // En uzun işler önce başlasın
 const weight = (j) => (j.det ? 5 : /stress/.test(j.name) ? 6 : /audit|compat|tests \(/.test(j.name) ? 4 : 1);
-queue.sort((a, b) => weight(b) - weight(a));
-await Promise.all(Array.from({ length: Math.min(jobsMax, queue.length || 1) }, async () => { while (queue.length) await run(queue.shift()); }));
+const runPhase = async (list) => {
+  const queue = [...list].sort((a, b) => weight(b) - weight(a));
+  await Promise.all(Array.from({ length: Math.min(jobsMax, queue.length || 1) }, async () => { while (queue.length) await run(queue.shift()); }));
+};
+await runPhase(jobs.filter((j) => !heavy(j)));
+await runPhase(jobs.filter(heavy));
 server?.kill();
 
 const lines = [];

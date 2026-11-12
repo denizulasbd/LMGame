@@ -28,6 +28,7 @@ const KEY_BINDINGS = {
   toggleGoals: ['KeyO', 'KeyG'], // O; eski kısayol G de çalışır
   toggleStats: ['KeyI'],
   toggleCinematic: ['KeyF'],
+  toggleEmotions: ['KeyM'], // (29.8) Duygu Katmanı
 };
 
 const BOUND_CODES = new Set(Object.values(KEY_BINDINGS).flat());

@@ -60,6 +60,39 @@ import { loyaltyTier } from '../../systems/Loyalty.js';
 import { LOYALTY_TIERS } from '../../data/loyalty.js';
 import { giftStatus } from '../../systems/Rites.js';
 import { SPECIAL_KIND_NAMES, SPECIAL_RULES } from '../../data/rites.js';
+import { EVOLUTION_AXES } from '../../data/evolution.js';
+import { lifeStory, statusSentence } from '../../systems/LifeStory.js';
+import { grandmasterTitle as gmTitleOf } from '../../systems/Grandmaster.js';
+import { engineOn } from '../../systems/Engines.js';
+
+// (29.9) Kartın dört sekmesi; seçim tarayıcıda hatırlanır. Yalnızca etkin sekmenin gövdesi DOM'a takılır ve yalnızca o sekmenin bölümleri yenilenir.
+const TAB_KEY = 'lmgame.ui.cardTab';
+const TABS = [
+  { id: 'summary', label: 'Özet', icon: 'star' },
+  { id: 'inner', label: 'İç Dünya', icon: 'sparkle' },
+  { id: 'bonds', label: 'Bağlar', icon: 'handshake' },
+  { id: 'life', label: 'Hayat', icon: 'book' },
+];
+const TAB_IDS = TABS.map((t) => t.id);
+
+function readTab() {
+  try {
+    const v = localStorage.getItem(TAB_KEY);
+    return TAB_IDS.includes(v) ? v : 'summary';
+  } catch {
+    return 'summary';
+  }
+}
+
+function writeTab(id) {
+  try {
+    localStorage.setItem(TAB_KEY, id);
+  } catch {
+    /* depolama erişilemez: seçim yalnızca bu oturumda geçerli */
+  }
+}
+
+const upperFirst = (t) => (t ? t.charAt(0).toLocaleUpperCase('tr') + t.slice(1) : t);
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -70,10 +103,13 @@ export class CharacterPanel {
   constructor(game) {
     this.slot = 'cards'; // (17. aşama) sağ alt köşedeki bağımsız bilgi kartı
     this.events = game.events;
+    this.game = game;
     this.characterId = null;
     this.editingId = null; // adı düzenlenen sakin (düzenleme başladığı andaki seçim)
     this.followingId = null;
     this.builtFor = null;
+    this.tab = readTab();
+    this.allTabs = false; // yalnızca dondurulmuş testler için: dört sekmenin gövdesi birden takılı ve canlı (eski tek kart düzeni)
     this.resetCaches();
 
     this.build();
@@ -85,6 +121,7 @@ export class CharacterPanel {
       this.characterId = id;
       this.element.hidden = id === null;
       this.builtFor = null;
+      this.resetCaches();
       this.updateFollowButton();
     });
     game.events.on('camera:followChanged', (id) => {
@@ -177,28 +214,85 @@ export class CharacterPanel {
     this.followButton.classList.add('character-follow');
 
     const section = (title, body) => el('div', { className: 'relations' }, [el('div', { className: 'relations-title', text: title }), body]);
-    this.element = el('div', { className: 'panel character-panel ui-interactive', hidden: true }, [
-      closeButton,
-      el('div', { className: 'character-header' }, [
-        el('div', { className: 'character-portrait-column' }, [el('div', { className: 'character-portrait-frame' }, [this.portrait]), this.moodBadge]),
-        el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.stageBadge, this.meta, this.craftBadge, this.traits, this.traitHint]),
+    // (29.9) yeni sunumlar: tek cümlelik durum, en önemli arzu / korku, kişilik ekseni çubukları, değişim günlüğü, yaşam öyküsü, omuz omuza
+    this.summaryLine = el('div', { className: 'summary-line' });
+    this.desireBox = el('div', { className: 'desire-list' });
+    this.desireSection = section('Öne Çıkan Arzu ve Korku', this.desireBox);
+    this.axisList = el('div', { className: 'axis-list' });
+    this.axisSection = section('Kişilik Eksenleri', this.axisList);
+    this.evolutionList = el('div', { className: 'relations-list evolution-log' });
+    this.evolutionSection = section('Kişilik Değişim Günlüğü', this.evolutionList);
+    this.storyBox = el('div', { className: 'story-box' });
+    this.bondTop = el('div', { className: 'bond-top' });
+    this.bondTopSection = section('En Çok Kiminle Omuz Omuza', this.bondTop);
+
+    const body = (id, children) => el('div', { className: 'card-tab-body', dataset: { tab: id } }, children);
+    this.bodies = {
+      summary: body('summary', [
+        el('div', { className: 'character-header' }, [
+          el('div', { className: 'character-portrait-column' }, [el('div', { className: 'character-portrait-frame' }, [this.portrait]), this.moodBadge]),
+          el('div', { className: 'character-identity' }, [this.name, this.nameInput, this.stageBadge, this.meta, this.craftBadge, this.traits, this.traitHint]),
+        ]),
+        this.summaryLine,
+        el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
+        this.petitionBox,
+        this.loyaltyBox,
+        el('div', { className: 'character-needs' }, needs),
+        this.desireSection,
+        this.followButton,
       ]),
-      el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
-      this.petitionBox,
-      this.loyaltyBox,
-      el('div', { className: 'character-needs' }, needs),
-      section('Ruh Hali ve İç Dünya', this.moodList),
-      (this.wantSection = section('Arzular, Korkular ve Yaşam Doyumu', this.wantBox)),
-      section('Aile', this.familyList),
-      section('İlişkiler', this.relationsList),
-      section('Sosyal Hayat', this.socialList),
-      (this.apprenticeSection = section('Çıraklık', this.apprenticeBox)),
-      section('Ekipman', this.equipmentList),
-      section('Kişisel Kese & Çanta', this.purseBox),
-      section('Meslekler', this.skillsList),
-      section('Anılar ve Hatıralar', this.memoryBox),
-      this.followButton,
-    ]);
+      inner: body('inner', [
+        section('Ruh Hali ve İç Dünya', this.moodList),
+        (this.wantSection = section('Arzular, Korkular ve Yaşam Doyumu', this.wantBox)),
+        this.axisSection,
+        this.evolutionSection,
+      ]),
+      bonds: body('bonds', [section('Aile', this.familyList), section('İlişkiler', this.relationsList), section('Sosyal Hayat', this.socialList), (this.apprenticeSection = section('Çıraklık', this.apprenticeBox)), this.bondTopSection]),
+      life: body('life', [section('Yaşam Öyküsü', this.storyBox), section('Anılar ve Hatıralar', this.memoryBox), section('Meslekler', this.skillsList), section('Ekipman', this.equipmentList), section('Kişisel Kese & Çanta', this.purseBox)]),
+    };
+    this.miniName = el('h3', { className: 'card-mini-name', hidden: true });
+    this.tabButtons = {};
+    this.tabBar = el('div', { className: 'card-tabs', role: 'tablist' }, TABS.map((t) => {
+      const b = el('button', { className: 'card-tab', type: 'button', tabIndex: -1, title: t.label, dataset: { tab: t.id } }, [el('img', { src: getAnyIconURL(t.icon), alt: '' }), el('span', { className: 'card-tab-label', text: t.label })]);
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-label', t.label);
+      b.addEventListener('mousedown', (e) => e.preventDefault());
+      b.addEventListener('click', () => this.setTab(t.id));
+      this.tabButtons[t.id] = b;
+      return b;
+    }));
+    this.tabContent = el('div', { className: 'card-tab-content' });
+    this.element = el('div', { className: 'panel character-panel ui-interactive', hidden: true }, [closeButton, this.tabBar, this.miniName, this.tabContent]);
+    this.attachTab();
+  }
+
+  /** (29.9) Etkin sekmeyi seçer (tercih hatırlanır); yalnızca o sekmenin gövdesi DOM'a takılır, önbellekler sıfırlanır. */
+  setTab(id, remember = true) {
+    if (!TAB_IDS.includes(id) || id === this.tab) return;
+    this.tab = id;
+    if (remember) writeTab(id);
+    this.builtFor = null;
+    this.resetCaches();
+    this.attachTab();
+    if (this.characterId !== null) this.render(this.game); // yeni sekme bir kare boş görünmesin
+  }
+
+  /** Test anahtarı: dört sekme birden (eski tek kart düzeni). */
+  setAllTabs(on) {
+    this.allTabs = Boolean(on);
+    this.builtFor = null;
+    this.resetCaches();
+    this.attachTab();
+  }
+
+  attachTab() {
+    this.tabContent.replaceChildren(...(this.allTabs ? TAB_IDS.map((id) => this.bodies[id]) : [this.bodies[this.tab]]));
+    this.tabBar.hidden = this.allTabs;
+    this.miniName.hidden = this.allTabs || this.tab === 'summary';
+    for (const id of TAB_IDS) {
+      this.tabButtons[id].classList.toggle('is-active', id === this.tab);
+      this.tabButtons[id].setAttribute('aria-selected', String(id === this.tab));
+    }
   }
 
   /** Sakinin adını düzenlemeye başlar / bitirir (commit: yazılanı kaydet). */
@@ -316,6 +410,18 @@ export class CharacterPanel {
     this.lastApprentice = null;
     this.lastPetition = null;
     this.lastWantKey = null;
+    this.lastLoyalty = null;
+    this.lastMoodId = null;
+    this.lastMoodVersion = -1;
+    this.lastMoodHour = -1;
+    this.lastBadgeMood = null;
+    this.lastSummary = null;
+    this.lastDesire = null;
+    this.lastAxes = null;
+    this.lastEvolutions = null;
+    this.lastStory = null;
+    this.lastBondTop = null;
+    this.lastMiniName = null;
   }
 
   render(game) {
@@ -325,42 +431,191 @@ export class CharacterPanel {
       this.element.hidden = true;
       return;
     }
-    const identity = this.identityKey(character);
-    if (this.builtFor !== identity) {
-      this.buildIdentity(character, game.state);
-      this.builtFor = identity;
+    const on = (id) => this.allTabs || this.tab === id;
+    const state = game.state;
+    if (this.lastMiniName !== character.name) {
+      this.lastMiniName = character.name;
+      this.miniName.textContent = character.name;
     }
-
-    this.renderPortrait(character);
-
-    if (character.activityLabel !== this.lastStatus) {
-      this.lastStatus = character.activityLabel;
-      this.status.textContent = character.activityLabel;
+    if (on('summary')) {
+      const identity = this.identityKey(character);
+      if (this.builtFor !== identity) {
+        this.buildIdentity(character, state);
+        this.builtFor = identity;
+      }
+      this.renderPortrait(character);
+      if (character.activityLabel !== this.lastStatus) {
+        this.lastStatus = character.activityLabel;
+        this.status.textContent = character.activityLabel;
+      }
+      for (const key of NEED_KEYS) {
+        const value = Math.round(character.needs[key]);
+        if (this.lastNeeds[key] === value) continue;
+        this.lastNeeds[key] = value;
+        const { row, fill, value: label } = this.needRows[key];
+        fill.style.width = `${value}%`;
+        label.textContent = String(value);
+        row.classList.toggle('is-low', value < LOW_NEED);
+      }
+      this.renderMoodBadge(character);
+      this.renderSummaryLine(character, state);
+      this.renderDesire(character, state);
+      this.renderBadge(character);
+      this.renderConditions(character, state);
+      this.renderPetition(character, state);
+      this.renderLoyalty(character, state);
     }
-
-    for (const key of NEED_KEYS) {
-      const value = Math.round(character.needs[key]);
-      if (this.lastNeeds[key] === value) continue;
-      this.lastNeeds[key] = value;
-      const { row, fill, value: label } = this.needRows[key];
-      fill.style.width = `${value}%`;
-      label.textContent = String(value);
-      row.classList.toggle('is-low', value < LOW_NEED);
+    if (on('inner')) {
+      this.renderMood(character, state);
+      this.renderWants(character, state);
+      this.renderAxes(character);
+      this.renderEvolutions(character);
     }
-    this.renderMood(character, game.state);
-    this.renderWants(character, game.state);
-    this.renderFamily(character, game.state);
-    this.renderRelations(character, game.state);
-    this.renderEquipment(character);
-    this.renderSkills(character);
-    this.renderBadge(character);
-    this.renderConditions(character, game.state);
-    this.renderMemories(character, game.state);
-    this.renderSocial(character, game.state);
-    this.renderPurse(character, game.state);
-    this.renderApprenticeship(character, game.state);
-    this.renderPetition(character, game.state);
-    this.renderLoyalty(character, game.state);
+    if (on('bonds')) {
+      this.renderFamily(character, state);
+      this.renderRelations(character, state);
+      this.renderSocial(character, state);
+      this.renderApprenticeship(character, state);
+      this.renderBondTop(character, state, game);
+    }
+    if (on('life')) {
+      this.renderStory(character, state);
+      this.renderMemories(character, state);
+      this.renderSkills(character);
+      this.renderEquipment(character);
+      this.renderPurse(character, state);
+    }
+  }
+
+  /** (29.9) Baskın ruh hali rozeti (Özet sekmesi): yalnızca ruh hali sürümü değişince yazılır. */
+  renderMoodBadge(character) {
+    const mood = character.mood;
+    const key = `${character.id}:${mood.version}`;
+    if (key === this.lastBadgeMood) return;
+    this.lastBadgeMood = key;
+    this.moodBadge.textContent = mood.feel;
+    this.moodBadge.className = `mood-badge is-${mood.tone}`;
+    this.moodBadge.title = `Baskın ruh hali: ${mood.feel} (aktif ruh hallerinin net ağırlığı ${mood.net > 0 ? '+' : ''}${Math.round(mood.net * 10) / 10})`;
+  }
+
+  /** (29.9) Tek cümlelik durum: "Kederli · Deniz'in yasını tutuyor" (baskın his + en ağır moodlet'in nedeni). */
+  renderSummaryLine(character, state) {
+    const hour = Math.floor(state.totalMinutes / 60);
+    const key = `${character.id}:${character.mood.version}:${hour}`;
+    if (key === this.lastSummary) return;
+    this.lastSummary = key;
+    this.summaryLine.textContent = statusSentence(character, state, MOODLETS, reasonText);
+    this.summaryLine.className = `summary-line is-${character.mood.tone}`;
+  }
+
+  /** Arzu / korku çipi (Özet ve İç Dünya sekmelerinde aynı görünüm). */
+  desireChip(kind, e, now) {
+    const def = (kind === 'fear' ? FEARS : WANTS)[e.key];
+    return el('div', { className: kind === 'fear' ? 'fear-chip' : 'want-chip', title: kind === 'fear' ? `−${def.points} doyum (başına gelirse)` : `+${def.points} doyum (gerçekleşirse)` }, [
+      el('img', { className: 'moodlet-icon', src: getAnyIconURL(def.icon), alt: '' }),
+      el('span', { className: 'want-name', text: wantName(kind, e) }),
+      el('span', { className: 'moodlet-time', text: remainingText(e, now) }),
+    ]);
+  }
+
+  /** (29.9) Özet: en önemli 1 arzu ve 1 korku (puanı en yüksek olanlar; çocukta gizli). */
+  renderDesire(character, state) {
+    const hidden = character.isChild || Boolean(character.role);
+    const hour = Math.floor(state.totalMinutes / 60);
+    const key = hidden ? `${character.id}:hidden` : `${character.id}:${character.drive.version}:${hour}`;
+    if (key === this.lastDesire) return;
+    this.lastDesire = key;
+    this.desireSection.hidden = hidden;
+    if (hidden) return;
+    const top = (list, catalog) => [...list].sort((a, b) => (catalog[b.key]?.points ?? 0) - (catalog[a.key]?.points ?? 0))[0] ?? null;
+    const want = top(character.wants, WANTS);
+    const fear = top(character.fears, FEARS);
+    const now = state.totalMinutes;
+    const rows = [];
+    if (want) rows.push(this.desireChip('want', want, now));
+    if (fear) rows.push(this.desireChip('fear', fear, now));
+    if (!rows.length) rows.push(el('div', { className: 'want-empty', text: '— yeni bir heves bekliyor' }));
+    this.desireBox.replaceChildren(...rows);
+  }
+
+  /** (29.9) Dört kişilik ekseni: iki kutup adı ve ortadan taşan küçük iki yönlü çubuk (çocukta gizli). */
+  renderAxes(character) {
+    const hidden = character.isChild || Boolean(character.role);
+    const key = hidden ? 'hidden' : `${character.id}:${(character.growth ?? []).join(',')}`;
+    if (key === this.lastAxes) return;
+    this.lastAxes = key;
+    this.axisSection.hidden = hidden;
+    if (hidden) return;
+    this.axisList.replaceChildren(
+      ...EVOLUTION_AXES.map((axis, i) => {
+        const v = Math.max(-100, Math.min(100, Math.round(character.growth?.[i] ?? 0)));
+        const half = Math.abs(v) / 2;
+        const fill = el('span', { className: 'axis-fill', style: v >= 0 ? `left: 50%; width: ${half}%` : `left: ${50 - half}%; width: ${half}%` });
+        return el('div', { className: 'axis-row', title: `${TRAITS[axis.minus].name} ↔ ${TRAITS[axis.plus].name}: ${v > 0 ? '+' : ''}${v}` }, [
+          el('span', { className: 'axis-minus', text: TRAITS[axis.minus].name }),
+          el('span', { className: 'axis-track' }, [el('span', { className: 'axis-mid' }), fill]),
+          el('span', { className: 'axis-plus', text: TRAITS[axis.plus].name }),
+        ]);
+      })
+    );
+  }
+
+  /** (29.9) Kişilik değişim günlüğü (c.evolutions): "G12 · Tükenmişliğin ardından: Çalışkan yanı söndü, Uykucu oldu". */
+  renderEvolutions(character) {
+    const hidden = character.isChild || Boolean(character.role);
+    const log = character.evolutions ?? [];
+    const key = hidden ? 'hidden' : `${character.id}:${log.map((e) => `${e.day}${e.kind}${e.to}`).join(',')}`;
+    if (key === this.lastEvolutions) return;
+    this.lastEvolutions = key;
+    this.evolutionSection.hidden = hidden;
+    if (hidden) return;
+    if (!log.length) {
+      this.evolutionList.replaceChildren(el('div', { className: 'relations-empty', text: 'Kişiliği henüz değişmedi: hayat onu şimdilik olduğu gibi bırakıyor.' }));
+      return;
+    }
+    this.evolutionList.replaceChildren(
+      ...[...log].reverse().map((e) => {
+        const text = EVOLUTION_TEXT.memory[e.kind]
+          .replace('{cause}', upperFirst(CAUSE_TEXT[e.cause] ?? EVOLUTION_TEXT.noCause))
+          .replace('{from}', TRAITS[e.from]?.name ?? '')
+          .replace('{to}', TRAITS[e.to]?.name ?? e.to)
+          .replace('{deep}', DEEP_TRAITS[e.to]?.name ?? '');
+        return el('div', { className: 'memory-row' }, [el('img', { src: getAnyIconURL('sparkle'), alt: '' }), el('span', { className: 'memory-day', text: `Gün ${e.day}` }), el('span', { text })]);
+      })
+    );
+  }
+
+  /** (29.9) Bağlar: BondSystem'in saydığı en çok yan yana çalışılan kişi (bu oturumdaki iş saatleri). */
+  renderBondTop(character, state, game) {
+    const hour = Math.floor(state.totalMinutes / 60);
+    const key = `${character.id}:${hour}`;
+    if (key === this.lastBondTop) return;
+    this.lastBondTop = key;
+    const pairs = engineOn('bonds') ? game.scenes?.current?.bonds?.pairs : null;
+    let best = null;
+    if (pairs) {
+      for (const [pair, hours] of pairs) {
+        const [a, b] = pair.split('-').map(Number);
+        const otherId = a === character.id ? b : b === character.id ? a : null;
+        if (otherId === null) continue;
+        if (!best || hours > best.hours || (hours === best.hours && otherId < best.id)) best = { id: otherId, hours };
+      }
+    }
+    const other = best ? state.characters.find((c) => c.id === best.id) : null;
+    this.bondTop.replaceChildren(
+      ...(other
+        ? [this.personChip(other), el('span', { className: 'social-value', text: ` ${best.hours} saat omuz omuza çalıştılar` })]
+        : [el('span', { className: 'social-value social-muted', text: 'Henüz yan yana uzun süre çalıştığı biri yok' })])
+    );
+  }
+
+  /** (29.9) Hayat: Yaşam Öyküsü (3-6 cümle; şablon tabanlı). Yalnızca öyküyü etkileyen alanlar değişince yeniden yazılır. */
+  renderStory(character, state) {
+    const kids = character.children?.length ?? 0;
+    const key = [character.id, character.name, character.age, character.partnerId, character.married, kids, character.wishCount, satisfactionTier(character.satisfaction).key, loyaltyTier(character), evolutionKey(character), gmTitleOf(character), character.isVenerable, character.memories?.length, primarySkill(character)?.level.level].join('/');
+    if (key === this.lastStory) return;
+    this.lastStory = key;
+    this.storyBox.textContent = lifeStory(character, state);
   }
 
   /**
@@ -374,9 +629,6 @@ export class CharacterPanel {
     this.lastMoodId = character.id;
     this.lastMoodVersion = mood.version;
     this.lastMoodHour = hour;
-    this.moodBadge.textContent = mood.feel;
-    this.moodBadge.className = `mood-badge is-${mood.tone}`;
-    this.moodBadge.title = `Baskın ruh hali: ${mood.feel} (aktif ruh hallerinin net ağırlığı ${mood.net > 0 ? '+' : ''}${Math.round(mood.net * 10) / 10})`;
     const list = character.moodlets;
     if (list.length === 0) {
       this.moodList.replaceChildren(el('div', { className: 'relations-empty', text: 'Şu an içinde fırtına kopmuyor: gündelik hayatına dengeyle devam ediyor.' }));

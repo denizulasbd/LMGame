@@ -263,7 +263,7 @@ export class BuildingPanel {
     // (27.3) Büyük Ziyafet Sofrası (meydan havuzu, Belediye Konağı): sofra, evre, ikram sayacı ve bonus bitişleri (saat)
     const feastKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.currentFeast, currentFair(state)?.phase ?? null, ...FEAST.buffs.rich.map((k) => Math.ceil(((state.buffs[k] ?? 0) - state.totalMinutes) / 60))]) : '';
     // (29.7) anma töreni ve kitabe (anıt, meydan havuzu, Belediye Konağı)
-    const riteKey = ['monument', 'fountain', 'townHall'].includes(building.type) || building.definition.civic ? JSON.stringify([state.rites?.active, state.rites?.names?.length, state.rites?.held, Math.floor(state.totalMinutes / 60), state.resources.gold, state.resources.food]) : '';
+    const riteKey = ['monument', 'fountain', 'townHall'].includes(building.type) || building.definition.civic ? JSON.stringify([state.rites?.active, state.rites?.names?.length, state.rites?.held, Math.floor(state.totalMinutes / 60), state.resources.gold, state.resources.food, [...(this.openStories ?? [])].join('|')]) : '';
     const key = [
       riteKey,
       feastKey,
@@ -728,7 +728,21 @@ export class BuildingPanel {
       );
     }
     if (names.length) {
-      nodes.push(el('div', { className: 'upgrade-text', text: 'Kitabe:' }), ...[...names].reverse().slice(0, 12).map((n) => el('div', { className: 'upgrade-text', text: `${n.name} (${n.age} yaş) · ${n.day}. gün` })));
+      // (29.9) Kitabede ada tıklayınca yaşam öyküsü açılır / kapanır (öykü vefat anında yazılır; eski kayıtlarda yoktur)
+      const open = (this.openStories ??= new Set());
+      const rows = [...names].reverse().slice(0, 12).flatMap((n) => {
+        const id = `${n.name}:${n.day}`;
+        const row = el('div', { className: `upgrade-text${n.story ? ' epitaph-row' : ''}`, text: `${n.name} (${n.age} yaş) · ${n.day}. gün`, title: n.story ? 'Yaşam öyküsünü aç / kapat' : '' });
+        if (n.story) {
+          row.addEventListener('click', () => {
+            if (open.has(id)) open.delete(id);
+            else open.add(id);
+            this.lastKey = ''; // bölüm yeniden kurulsun
+          });
+        }
+        return n.story && open.has(id) ? [row, el('div', { className: 'epitaph-story', text: n.story })] : [row];
+      });
+      nodes.push(el('div', { className: 'upgrade-text', text: 'Kitabe:' }), ...rows);
       if (names.length > 12) nodes.push(el('div', { className: 'upgrade-text', text: `... ve ${names.length - 12} ad daha` }));
     }
     this.riteBox.replaceChildren(...nodes);

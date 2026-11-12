@@ -1560,8 +1560,8 @@ const PAGE_HELPERS = () => {
     [...document.querySelectorAll('.dock .dock-btn')].map((b) => ({ label: b.querySelector('.dock-label').textContent, key: b.querySelector('.dock-key')?.textContent ?? '' }))
   );
   pass(
-    'dock tek çubukta: İnşa Et, Topla, Yık | Hedefler, Günlük, Arşiv, Fotoğraf, Ayarlar',
-    dock.map((d) => d.label).join(',') === 'İnşa Et,Topla,Yık,Hedefler,Günlük,Arşiv,Fotoğraf,Ayarlar' && dock.map((d) => d.key).join(',') === 'B,H,X,O,J,I,F,',
+    'dock tek çubukta: İnşa Et, Topla, Yık | Hedefler, Günlük, Arşiv, Duygular, Fotoğraf, Ayarlar',
+    dock.map((d) => d.label).join(',') === 'İnşa Et,Topla,Yık,Hedefler,Günlük,Arşiv,Duygular,Fotoğraf,Ayarlar' && dock.map((d) => d.key).join(',') === 'B,H,X,O,J,I,M,F,',
     dock.map((d) => `${d.label}(${d.key})`).join(' ')
   );
   await page.hover('.dock .journal-toggle');

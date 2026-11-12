@@ -107,6 +107,7 @@ const { browser, page, errors } = await openGame({ seed: 5 });
 const { results, report } = createChecks();
 // Dondurulmuş dünya: sonradan eklenen mekanik şalterlerinin hepsi kapalı (bugün liste boş)
 await page.evaluate(async () => { const { ENGINES } = await import('/src/systems/Engines.js'); for (const k of Object.keys(ENGINES)) ENGINES[k] = false; });
+await page.evaluate(() => { window.game.ui.components.find((x) => x.setAllTabs)?.setAllTabs(true); }); // 29.9: kart sekmeleri — dondurulmuş testler eski tek kart düzenini okur (dört gövde birden takılı)
 
 const pageResults = await page.evaluate(async () => {
   const game = window.game;

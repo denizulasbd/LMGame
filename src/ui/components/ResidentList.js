@@ -7,6 +7,10 @@ import { getCharacterPortraitURL, lookKey } from '../../art/sprites/index.js';
 import { NEED_KEYS } from '../../data/characters.js';
 import { getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
+import { moodMarkOf } from '../../rendering/ExpressionLayer.js';
+
+// (29.8) çekmecedeki ruh hali işareti: bulut / pırıltı / ter damlası (Duygu Katmanı ile aynı eşleme) ve özel gün simgesi
+const MARK_ICONS = { cloud: ['sulk', 'is-trauma', 'Ruh hali: ağır bir yük taşıyor'], sparkle: ['sparkle', 'is-positive', 'Ruh hali: coşkulu'], sweat: ['sweat', 'is-negative', 'Ruh hali: yorgun / bıkkın'] };
 
 const COLLAPSED_KEY = 'lmgame.ui.residentsCollapsed';
 
@@ -114,16 +118,20 @@ export class ResidentList {
     for (const c of characters) {
       const status = el('span', { className: 'resident-status' });
       const mood = el('span', { className: 'status-dot resident-mood' });
+      const mark = el('img', { className: 'resident-mark resident-mood-mark', alt: '', hidden: true });
+      const special = el('img', { className: 'resident-mark resident-special', src: getAnyIconURL('flower'), alt: '', title: 'Bugün onun özel günü', hidden: true });
       const row = el('button', { className: 'resident-row', type: 'button', tabIndex: -1 }, [
         el('img', { className: `resident-portrait${c.isChild ? ' is-child' : ''}`, src: getCharacterPortraitURL(c.appearance, c.look), alt: '' }),
         el('span', { className: 'resident-text' }, [el('span', { className: 'resident-name', text: c.name }), status]),
+        special,
+        mark,
         mood,
       ]);
       row.addEventListener('mousedown', (e) => e.preventDefault());
       row.addEventListener('click', () => this.events.emit('ui:selectCharacter', c.id));
       row.classList.toggle('is-selected', c.id === this.selectedId);
       this.list.append(row);
-      this.rows.set(c.id, { row, status, mood, lastStatus: '', lastMood: '' });
+      this.rows.set(c.id, { row, status, mood, mark, special, lastStatus: '', lastMood: '', lastMark: undefined, lastSpecial: undefined });
     }
   }
 
@@ -143,6 +151,23 @@ export class ResidentList {
       if (entry.lastStatus !== c.activityLabel) {
         entry.lastStatus = c.activityLabel;
         entry.status.textContent = c.activityLabel;
+      }
+      // (29.8) ruh hali işareti ve özel gün simgesi (yalnızca değişince yazılır)
+      const markKey = moodMarkOf(c);
+      if (entry.lastMark !== markKey) {
+        entry.lastMark = markKey;
+        const spec = markKey ? MARK_ICONS[markKey] : null;
+        entry.mark.hidden = !spec;
+        if (spec) {
+          entry.mark.src = getAnyIconURL(spec[0]);
+          entry.mark.className = `resident-mark resident-mood-mark ${spec[1]}`;
+          entry.mark.title = spec[2];
+        }
+      }
+      const special = Boolean(c.specialDay && c.specialDay.day === game.state.time.day);
+      if (entry.lastSpecial !== special) {
+        entry.lastSpecial = special;
+        entry.special.hidden = !special;
       }
       const mood = moodClass(c);
       if (entry.lastMood !== mood) {
