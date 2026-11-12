@@ -17,6 +17,9 @@ export const LOYALTY = {
   taxJoy: { loyal: 0.5, bitter: 2 }, // ağır verginin keyif etkisi çarpanı
   appease: { leader: 10, rioter: 5 }, // isyan yardımla yatışınca
   hungryBelow: 25, // dağıtım anında tokluğu bunun altındaki sakin "aç" sayılır (reliefHungry; Açlıktan Gözü Dönmüş eşiği)
+  // (29.10) Kırgın kasaba: Kırgın yetişkinlerin payı share'i aşınca Yönetim Güveni saat başı perHour x pay kadar erir (TrustSystem.hourly).
+  // 29.6'da sadakatin isyanın tetiklenmesine hiçbir yolu yoktu: iyi beslenen kasabada Ağır Vergi ve reddedilen dilekçelerle bile güven %100'de kalıyordu.
+  bitterTrust: { share: 0.25, perHour: -2 },
 };
 
 export const LOYALTY_SOURCES = {
@@ -26,14 +29,14 @@ export const LOYALTY_SOURCES = {
   bitterFulfilledBonus: 2, // Kırgın sakinin dileği karşılanınca kazanç bu kat ("gönlünü aldın")
   relief: 4,
   reliefHungry: 8, // erzak / altın dağıtımı (o an aç olana)
-  taxCollected: { exempt: 2, low: 0, standard: -1, heavy: -4 },
-  taxRaisedToHeavy: -6,
+  taxCollected: { exempt: 6, low: 2, standard: -1, heavy: -7 }, // 29.10: exempt 2 -> 6, low 0 -> 2, heavy -4 -> -7
+  taxRaisedToHeavy: -10, // 29.10: -6 -> -10
   musterFatigue: -3,
   feastServed: 2,
   neglected: -5,
   homeBurned: -6,
-  condolence: 3, // (29.7) Taziye Sofrası: törene katılanlara
-  gift: 6, // (29.7) özel günde armağan
+  condolence: 5, // (29.7) Taziye Sofrası: törene katılanlara (29.10: 3 -> 5)
+  gift: 10, // (29.7) özel günde armağan (29.10: 6 -> 10)
 };
 
 // Vefa / husumet (29.6): etiket kuralları ve anı metinleri ({who}: kişinin adı)

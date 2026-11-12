@@ -1,5 +1,5 @@
 // Aşama 29.10: büyük entegrasyon — bilinen kusurların kapanışı (durum satırı, Yaşam Öyküsü, boş evrim nedeni, kitabe alanı,
-// çekmece işaretleri, "Bu oturumda" başlığı). En çok 20 test. Uzun koşu / profil ölçümleri autopilot --profile ve stress'tedir.
+// çekmece işaretleri, "Bu oturumda" başlığı) ve Kırgın kasabanın güveni eritmesi. En çok 20 test. Uzun koşu / profil ölçümleri autopilot --profile ve stress'tedir.
 // Çalıştır: node tools/sim/tests/29.10-integration.mjs [--verbose]   ya da   node tools/sim/gate.mjs --quick --only 29.10
 import { openGame, createChecks } from '../lib.mjs';
 
@@ -156,6 +156,25 @@ const out = await page.evaluate(async () => {
     const titles = [...document.querySelectorAll('h3, .panel-section-title, .section-title')].map((h) => h.textContent);
     const src = await (await fetch('/src/ui/components/CharacterPanel.js')).text();
     check('29.10: "En çok kiminle omuz omuza" bölümü "Bu Oturumda" diye nitelenir (sayaç kayda girmez)', src.includes("'Bu Oturumda En Çok Kiminle Omuz Omuza'") && !src.includes("section('En Çok Kiminle Omuz Omuza'"), titles.filter((t) => /Omuz/.test(t)).join(','));
+  }
+
+  // 12. Kırgın kasaba güveni eritir (eşik altı etkisiz)
+  {
+    const { LOYALTY } = await import('/src/data/loyalty.js');
+    const trust = scene().trust;
+    const ad = adults();
+    const saved = ad.map((c) => c.loyalty);
+    const run = (n) => {
+      ad.forEach((c, i) => (c.loyalty = i < n ? -80 : 0));
+      s().trust.value = 60;
+      trust.hourly();
+      return s().trust.value;
+    };
+    const none = run(0);
+    const few = run(Math.floor(ad.length * LOYALTY.bitterTrust.share) - 1);
+    const many = run(ad.length);
+    ad.forEach((c, i) => (c.loyalty = saved[i]));
+    check('29.10: Kırgın payı eşiği aşınca Yönetim Güveni saat başı erir; eşik altında etkisiz', few === none && none - many >= Math.abs(LOYALTY.bitterTrust.perHour) - 0.01, `${none} ${few} ${many}`);
   }
   return out;
 });
