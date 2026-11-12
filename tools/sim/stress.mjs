@@ -1,7 +1,8 @@
 // Stres matrisi: birkaç tohumda ve hızda otopilotlu uzun simülasyonları paralel koşturur, bekçi raporlarını toplar.
 // Her koşu ayrı bir tarayıcıdır (autopilot.mjs --json); sonunda tablo ve toplam basılır.
 //
-// Kullanım: node tools/sim/stress.mjs [--seeds 7,13,21,42,77,101] [--speeds 4,2,1] [--days 50] [--jobs 4] [--out klasör]
+// Kullanım: node tools/sim/stress.mjs [--seeds 7,13,21,42,77,101] [--speeds 4,2,1] [--days 50] [--jobs 4] [--out klasör] [--engines-off anahtar,...]
+// (29.6) --engines-off: A/B karşılaştırması için mekanik şalterlerini kapatır (autopilot'a aktarılır); sonda hazine altını ortalaması basılır.
 // Çıkış kodu: herhangi bir koşuda sayfa hatası, takılan sakin, kopuk referans ya da taşan ev varsa 1.
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -20,6 +21,7 @@ const jobs = Number(options.jobs ?? Math.max(1, Math.min(4, os.cpus().length)));
 const out = options.out ?? fs.mkdtempSync(path.join(os.tmpdir(), 'lmgame-stress-'));
 fs.mkdirSync(out, { recursive: true });
 const here = path.dirname(fileURLToPath(import.meta.url));
+const enginesOff = typeof options['engines-off'] === 'string' ? options['engines-off'] : '';
 
 const queue = [];
 // En uzun koşular (1x) önce başlasın ki sona tek başına kalmasın
@@ -34,7 +36,7 @@ async function worker() {
     const log = path.join(out, `s${seed}-x${speed}.log`);
     const t0 = Date.now();
     const code = await new Promise((resolve) => {
-      const child = spawn(process.execPath, [path.join(here, 'autopilot.mjs'), String(seed), String(days), '--speed', String(speed), '--quiet', '--json', json], {
+      const child = spawn(process.execPath, [path.join(here, 'autopilot.mjs'), String(seed), String(days), '--speed', String(speed), '--quiet', '--json', json, ...(enginesOff ? ['--engines-off', enginesOff] : [])], {
         stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')],
       });
       child.on('exit', resolve);
@@ -60,6 +62,8 @@ const sum = (f) => results.reduce((a, r) => a + (r.data ? f(r.data) : 0), 0);
 const q = sum((d) => d.monitor.quarrels ?? 0);
 const rc = sum((d) => d.monitor.reconciliations ?? 0);
 console.log(`\n${results.length} koşu, ${((Date.now() - started) / 60000).toFixed(1)} dk · raporlar: ${out}`);
+const golds = results.filter((r) => Number.isFinite(r.data?.gold)).map((r) => r.data.gold);
+console.log(`hazine altını (son gün)${enginesOff ? ` [kapalı: ${enginesOff}]` : ''}: ort ${golds.length ? Math.round(golds.reduce((a, b) => a + b, 0) / golds.length) : '-'} · ${results.map((r) => `${r.seed}:${r.data?.gold ?? '-'}`).join(' ')}`);
 console.log(
   `toplam: takılma ${sum((d) => d.monitor.stuck.length)}, kopuk referans ${sum((d) => d.monitor.brokenCount)}, taşan ev ${sum((d) => d.monitor.overfullCount)}, ` +
     `bekleyen iş ${sum((d) => d.monitor.staleJobs.length)}, üretmeyen iş yeri ${sum((d) => d.monitor.stalledWorkplaces.length)}, sayfa hatası ${sum((d) => d.errors.length)}`

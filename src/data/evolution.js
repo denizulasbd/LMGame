@@ -98,6 +98,8 @@ export const EVOLUTION_SOURCES = {
     lonely_ache: [[COMPANY, -2]],
     quiet_peace: [[COMPANY, -1], [CALLING, 2]],
     nature_bliss: [[CALLING, 3]],
+    farewell: [[SPIRIT, 3]], // (29.7) anma töreninde helalleşti
+    forgotten: [[SPIRIT, -3], [COMPANY, -2]], // (29.7) özel günü unutuldu
     aesthetic_joy: [], // şartname başlangıcı calling +1: günde ~1 kez, herkesin calling eksenini sürekli artıya itiyordu; ayarla kapatıldı
   },
   moodletMajor: { warm_chat: [[COMPANY, 2]] }, // major / critical kademede bu katkı (üstteki yerine) geçerlidir
@@ -196,6 +198,8 @@ export const CAUSE_TEXT = {
   'moodlet:quiet_peace': 'iç huzurunu buldukça',
   'moodlet:nature_bliss': 'doğanın içinde keyif aldıkça',
   'moodlet:aesthetic_joy': 'güzelliklerle gönlü açıldıkça',
+  'moodlet:farewell': 'anma töreninde helalleştikçe',
+  'moodlet:forgotten': 'özel günü unutulunca',
 };
 export const CAUSE_KEYS = Object.keys(CAUSE_TEXT);
 

@@ -14,6 +14,8 @@ import { emptyTax, nextOnSchedule, taxRateOf, coinTax, titheOf, taxLockLeft } fr
 import { takeItem } from './Citizens.js';
 import { clamp } from '../utils/math.js';
 import { formatRemaining } from './Petitions.js';
+import { engineOn } from './Engines.js';
+import { taxJoyMul } from './Loyalty.js';
 
 export class TaxSystem {
   /**
@@ -88,7 +90,8 @@ export class TaxSystem {
         }
       }
       if (paid) payers += 1;
-      if (def.fun) c.needs.fun = clamp(c.needs.fun + def.fun, 0, 100);
+      // (29.6) ağır verginin (eksi) keyif etkisi: Sadık x0,5, Kırgın x2 (tahsil edilen altın değişmez)
+      if (def.fun) c.needs.fun = clamp(c.needs.fun + (def.fun < 0 && engineOn('loyalty') ? def.fun * taxJoyMul(c) : def.fun), 0, 100);
       if (c.visible && !c.bubble) c.showBubble(def.trust < 0 ? 'angry' : def.trust > 0 ? 'heart' : 'purse', 2);
     }
     if (def.trust) this.trust?.adjust(def.trust, `tax:${s.tax.rate}`);

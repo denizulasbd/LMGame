@@ -37,6 +37,9 @@ import { MoodletSystem } from '../systems/MoodletSystem.js';
 import { WantSystem } from '../systems/WantSystem.js';
 import { EvolutionSystem } from '../systems/EvolutionSystem.js';
 import { BondSystem } from '../systems/BondSystem.js';
+import { LoyaltySystem } from '../systems/LoyaltySystem.js';
+import { RiteSystem } from '../systems/RiteSystem.js';
+import { LOYALTY_SEED_OFFSET } from '../data/loyalty.js';
 import { ConflictSystem } from '../systems/ConflictSystem.js';
 import { FamilySystem } from '../systems/FamilySystem.js';
 import { CraftingSystem } from '../systems/CraftingSystem.js';
@@ -175,6 +178,10 @@ export class TownScene extends Scene {
     this.evolution = new EvolutionSystem(this.game, this.world, new Random(state.seed + 40), { moodlets: this.moodlets, relationships: this.relationships });
     // (29.5) Omuz Omuza: yan yana çalışma moodlet'leri (üreteci yok)
     this.bonds = new BondSystem(this.game, this.world, { moodlets: this.moodlets, relationships: this.relationships });
+    // (29.6) Vefa ve Husumet: sadakat, isyan elebaşı, yağma kırgınlığı, anının kişisi (üreteci yok)
+    this.loyalty = new LoyaltySystem(this.game, this.world, { chemistry: this.chemistry });
+    // (29.7) Anma Töreni ve özel günler (izole üreteç seed + 41: yalnızca sözler; tören ve özel günler zar çekmez)
+    this.rites = new RiteSystem(this.game, this.world, new Random(state.seed + LOYALTY_SEED_OFFSET), { economy: this.economy, relationships: this.relationships, loyalty: this.loyalty });
     this.social = new SocialSystem(this.game, this.world, new Random(state.seed + 19), { relationships: this.relationships });
     this.crafting = new CraftingSystem(this.game, this.world, this.economy);
     this.health = new HealthSystem(this.game, this.world, new Random(state.seed + 8));
@@ -275,6 +282,7 @@ export class TownScene extends Scene {
       this.townEvents,
       this.seasonFestivals,
       this.memories,
+      this.rites,
       this.goldenAge,
       this.rally,
       this.petitions,
@@ -313,6 +321,8 @@ export class TownScene extends Scene {
       this.wants,
       this.evolution,
       this.bonds,
+      this.loyalty,
+      this.rites,
       this.family,
       this.social,
       this.crafting,

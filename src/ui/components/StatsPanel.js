@@ -244,7 +244,7 @@ export class StatsPanel {
     const ga = state.goldenAge ?? {};
     const tower = towerOf(state);
     const leader = towerMasterOf(state);
-    const key = JSON.stringify([ch, ga.since, ga.chimes, ga.books, tower?.wonderStage, tower?.underConstruction, leader, state.townName, state.heirloom?.archive?.length]);
+    const key = JSON.stringify([ch, ga.since, ga.chimes, ga.books, tower?.wonderStage, tower?.underConstruction, leader, state.townName, state.heirloom?.archive?.length, state.rites?.held, state.rites?.names?.length]);
     if (key === this.lastChronicle) return;
     this.lastChronicle = key;
     const when = (v) => (v && Number.isFinite(v.day) ? `Gün ${v.day}${Number.isFinite(v.hour) ? `, ${String(v.hour).padStart(2, '0')}:00` : ''}` : '');
@@ -285,6 +285,8 @@ export class StatsPanel {
         entry('masterpiece', 'İlk Usta Eseri', ch.firstMasterwork ? [gold(ch.firstMasterwork.maker), ` · ${ch.firstMasterwork.piece}`] : [pending('Henüz bir usta eser vermedi')], when(ch.firstMasterwork)),
         entry('wonder', 'Ulu Saat Kulesi', towerBody),
         el('ul', { className: 'chronicle-stages' }, stageRows),
+        // (29.7) Anma törenleri ve kitabe
+        ...(state.rites?.names?.length ? [entry('candle', 'Kitabe: Anılanlar', [gold(state.rites.names.slice(-12).map((n) => `${n.name} (${n.age})`).join(', '))], `${state.rites.held} anma töreni · son: ${when(state.rites.names.at(-1))}`)] : []),
         entry('bell', 'Altın Çağ', isGoldenAge(state) ? [gold(`${when(ch.goldenAge ?? ga.since)}`), ' · çalışma şevki +%10, refah +%10', ...(ga.books ? [` · kitaplıkta ${ga.books} antik kitap`] : [])] : [pending('Kule tamamlanınca başlar')]),
       ])
     );

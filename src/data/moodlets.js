@@ -44,6 +44,11 @@ export const MOODLETS = {
   // (29.5) Yan yana çalışma: dostla Omuz Omuza, kırgınla Diken Üstünde
   side_by_side: { name: 'Omuz Omuza', layer: 'action', tone: 'positive', icon: 'handshake', hours: 4, weight: 2, priority: 3, feel: 'Keyifli', effects: { workMul: 1.06, joyRateMul: 0.85 } },
   rubbing_wrong: { name: 'Diken Üstünde', layer: 'action', tone: 'negative', icon: 'angry', hours: 4, weight: 2, priority: 3, feel: 'Bıkkın', effects: { workMul: 0.95, quarrelMul: 1.3 } },
+  // (29.7) Anma Töreni ve özel günler (eylem katmanı: çekirdekteki yası ezmez)
+  farewell: { name: 'Helalleşti', layer: 'action', tone: 'positive', icon: 'candle', hours: 24, weight: 2, priority: 5, feel: 'Dingin', effects: { joyRateMul: 0.9 } },
+  special_day: { name: 'Bugün Onun Günü', layer: 'action', tone: 'positive', icon: 'sparkle', hours: 16, weight: 2, priority: 4, feel: 'Keyifli', effects: { joyRateMul: 0.85 } },
+  celebrated: { name: 'Hatırlandı', layer: 'action', tone: 'positive', icon: 'heart', hours: 12, weight: 2, priority: 4, feel: 'Keyifli', effects: { joyRateMul: 0.85 } },
+  forgotten: { name: 'Unutuldu', layer: 'action', tone: 'negative', icon: 'sulk', hours: 12, weight: 2, priority: 4, feel: 'Kırgın', effects: { joyRateMul: 1.15 } },
   dread_realized: { name: 'Korktuğu Başına Geldi', layer: 'action', tone: 'negative', icon: 'sulk', hours: 12, weight: 3, priority: 5, feel: 'Sarsılmış', effects: { joyRateMul: 1.2, scareMul: 1.5 }, seek: true },
 
   // --- Katman B: ihtiyaç ve çevre ---
@@ -186,6 +191,14 @@ export const MOOD_REASONS = {
   side_by_side: '{who} ile omuz omuza çalıştı',
   rubbing_wrong: '{who} ile aynı tezgâhta',
   inspired_bard: 'Seyyar Ozan\'ın ezgisini dinledi',
+  // (29.7) Anma Töreni ve özel günler
+  farewell_rite: '{who} için anma töreninde helalleşti',
+  special_birthday: 'Bugün doğum günü',
+  special_anniversary: 'Bugün evlilik yıl dönümü',
+  celebrated_birthday: '{who} doğum gününü kutladı',
+  celebrated_anniversary: 'Eşi {who} ile yıl dönümünü kutladı',
+  forgotten_birthday: 'Doğum günü unutuldu',
+  forgotten_anniversary: 'Evlilik yıl dönümü unutuldu',
   // (29.3) arzu / korku sonuçları: wish_<arzu> ve dread_<korku> (adı data/wants.js'ten; {who} hedef kişinin adı)
   ...Object.fromEntries(Object.entries(WANTS).map(([k, w]) => [`wish_${k}`, `Dileği oldu: ${w.name}`])),
   ...Object.fromEntries(Object.entries(FEARS).map(([k, f]) => [`dread_${k}`, `Korktuğu başına geldi: ${f.name}`])),
@@ -221,6 +234,10 @@ export const MOOD_LINES = {
   side_by_side: ['Böyle ekip olur!', 'Seninle çalışmak keyif.'],
   rubbing_wrong: ['Yine aynı tezgâh...', 'Şu yüzü görmesem.'],
   dread_realized: ['Korktuğum başıma geldi...', 'Bunu hiç istememiştim.'],
+  farewell: ['Hakkını helal et {who}.', 'Yolun açık olsun {who}.'],
+  special_day: ['Bugün benim günüm!', 'Ne güzel bir sabah!'],
+  celebrated: ['Beni unutmadınız!', 'İyi ki varsınız!'],
+  forgotten: ['Kimse hatırlamadı...', 'Demek unuttular.'],
 };
 // Kişiliğe özgü söz: moodlet -> özellik / huy -> söz
 export const TRAIT_LINES = {

@@ -11,6 +11,7 @@ import { SKILLS } from '../data/skills.js';
 import { getSeason } from '../data/seasons.js';
 import { clamp } from '../utils/math.js';
 import { RECONCILE_PLACES } from '../data/family.js';
+import { engineOn } from './Engines.js';
 
 export const MEMORY = {
   max: 40,
@@ -35,7 +36,7 @@ const MINOR_KINDS = new Set(['friend', 'town', 'pet', 'festival', 'name', 'recon
  * festivallerde yalnızca tarihi güncellenir). Defter MEMORY.max'ı aşınca ilk anı korunur, önce en eski küçük anı
  * (dostluk, kasaba olayı, festival...) silinir; böylece aşk, düğün, çocuk ve unvanlar kalır.
  */
-export function addMemory(state, c, text, icon = 'heart', { kind = 'life', fond = true } = {}) {
+export function addMemory(state, c, text, icon = 'heart', { kind = 'life', fond = true, whoId = null } = {}) {
   const { day, hour } = state.time;
   c.memories ??= [];
   const same = c.memories.findIndex((m, i) => i > 0 && m.text === text);
@@ -43,7 +44,8 @@ export function addMemory(state, c, text, icon = 'heart', { kind = 'life', fond 
     if (kind !== 'festival') return c.memories[same];
     c.memories.splice(same, 1); // festival her yıl kutlanır: en yeni tarihiyle sona taşınır
   }
-  c.memories.push({ day, hour, text, icon, kind, fond });
+  // (29.6) whoId: anının kişisi (isteğe bağlı; eski kayıtlarda yok). Hatırlanınca o kişi aranır / kaçınılır (LoyaltySystem)
+  c.memories.push(Number.isFinite(whoId) && engineOn('loyalty') ? { day, hour, text, icon, kind, fond, whoId } : { day, hour, text, icon, kind, fond });
   while (c.memories.length > MEMORY.max) {
     const minor = c.memories.findIndex((m, i) => i > 0 && i < c.memories.length - 1 && MINOR_KINDS.has(m.kind));
     c.memories.splice(minor > 0 ? minor : 1, 1);
@@ -84,7 +86,8 @@ export class MemorySystem {
       }),
       on('relationship:married', ({ a, b, venue, festival }) => {
         const where = festival ? 'şenlikte' : venue ? `${venue.name} başında` : 'meydanda';
-        both(a, b, `${b.name} ile ${where} evlendi`, `${a.name} ile ${where} evlendi`, 'ring', { kind: 'wedding' });
+        remember(a, `${b.name} ile ${where} evlendi`, 'ring', { kind: 'wedding', whoId: b.id });
+        remember(b, `${a.name} ile ${where} evlendi`, 'ring', { kind: 'wedding', whoId: a.id });
       }),
       on('family:childBorn', ({ child, parents }) => {
         for (const p of parents) remember(p, `Çocuğu ${child.name} dünyaya geldi`, 'love', { kind: 'child' });

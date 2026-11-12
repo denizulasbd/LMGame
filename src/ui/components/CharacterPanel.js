@@ -56,6 +56,10 @@ import { WANTS, FEARS, WANT_CAPS } from '../../data/wants.js';
 import { satisfactionTier, tierEffectText, wantName, remainingText } from '../../systems/Wants.js';
 import { hintOf, evolutionKey } from '../../systems/Evolution.js';
 import { DEEP_TRAITS, CAUSE_TEXT, EVOLUTION_TEXT } from '../../data/evolution.js';
+import { loyaltyTier } from '../../systems/Loyalty.js';
+import { LOYALTY_TIERS } from '../../data/loyalty.js';
+import { giftStatus } from '../../systems/Rites.js';
+import { SPECIAL_KIND_NAMES, SPECIAL_RULES } from '../../data/rites.js';
 
 const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
@@ -156,6 +160,7 @@ export class CharacterPanel {
     this.purseBox = el('div', { className: 'purse-box' });
     this.apprenticeBox = el('div', { className: 'apprentice-box' });
     this.petitionBox = el('div', { className: 'petition-box', hidden: true });
+    this.loyaltyBox = el('div', { className: 'petition-box loyalty-box', hidden: true }); // (29.6-29.7) sadakat rozeti ve özel gün armağanı
     this.memoryList = el('div', { className: 'memory-list' });
     this.memoryToggle = this.button('Tümünü Göster', 'Sakinin bütün anılarını göster / gizle', () => {
       this.showAllMemories = !this.showAllMemories;
@@ -180,6 +185,7 @@ export class CharacterPanel {
       ]),
       el('div', { className: 'character-status' }, [el('span', { className: 'character-status-label', text: 'Durum' }), this.status, this.conditions]),
       this.petitionBox,
+      this.loyaltyBox,
       el('div', { className: 'character-needs' }, needs),
       section('Ruh Hali ve İç Dünya', this.moodList),
       (this.wantSection = section('Arzular, Korkular ve Yaşam Doyumu', this.wantBox)),
@@ -354,6 +360,7 @@ export class CharacterPanel {
     this.renderPurse(character, game.state);
     this.renderApprenticeship(character, game.state);
     this.renderPetition(character, game.state);
+    this.renderLoyalty(character, game.state);
   }
 
   /**
@@ -526,6 +533,32 @@ export class CharacterPanel {
         ]
       : [];
     this.purseBox.replaceChildren(coins, el('div', { className: 'bag-slots' }, slots), el('div', { className: 'bag-summary', text: summary }), ...chain);
+  }
+
+  /** (29.6) Sadakat satırı (Sadık / Kırgın rozeti; eşik dışında gizli) ve (29.7) özel günde "Armağan Gönder". */
+  renderLoyalty(character, state) {
+    const tier = !character.isChild && !character.role ? loyaltyTier(character) : null;
+    const d = character.specialDay && character.specialDay.day === state.time.day ? character.specialDay : null;
+    const gift = d ? giftStatus(state, character) : null;
+    const key = `${character.id}:${tier}:${d ? `${d.kind}${d.celebrated}${d.gifted}` : ''}:${gift?.ok}:${gift?.reason}`;
+    if (key === this.lastLoyalty) return;
+    this.lastLoyalty = key;
+    const rows = [];
+    if (tier) {
+      const def = LOYALTY_TIERS[tier];
+      rows.push(el('div', { className: 'petition-head', title: def.hint }, [el('img', { src: getAnyIconURL(def.icon), alt: '' }), el('span', { className: 'petition-title', text: `Sadakat · ${def.name}` }), el('span', { className: 'petition-state', text: `${character.loyalty > 0 ? '+' : ''}${character.loyalty}` })]));
+    }
+    if (d) {
+      const b = this.button(`Armağan Gönder (${SPECIAL_RULES.giftCost} altın)`, gift.ok ? 'Yönetimden armağan: sadakat ve yaşam doyumu artar, bugün unutulmuş hissetmez' : gift.reason, () => this.events.emit('ui:giftSpecialDay', { id: character.id }));
+      b.disabled = !gift.ok;
+      b.classList.add('is-grant');
+      rows.push(
+        el('div', { className: 'petition-head' }, [el('img', { src: getAnyIconURL('sparkle'), alt: '' }), el('span', { className: 'petition-title', text: `Bugün: ${SPECIAL_KIND_NAMES[d.kind]}` }), el('span', { className: `petition-state${d.celebrated ? ' is-accepted' : ''}`, text: d.celebrated ? 'Kutlandı' : d.gifted ? 'Armağan gitti' : 'Henüz kutlanmadı' })]),
+        el('div', { className: 'petition-buttons' }, [b])
+      );
+    }
+    this.loyaltyBox.hidden = rows.length === 0;
+    this.loyaltyBox.replaceChildren(...rows);
   }
 
   /** (21. aşama) Açık dilekçe: isteği, ne yapılmalı, kalan süre ve yanıt düğmeleri. */

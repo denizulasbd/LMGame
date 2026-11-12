@@ -365,7 +365,7 @@ export class SocialSystem {
         this.events.emit('social:date', { a: c, b: other, activity: task.activity });
         const text = DATE_MEMORIES[task.activity] ?? ((name) => `${name} ile ilk randevusuna çıktı`);
         for (const [x, y] of [[c, other], [other, c]]) {
-          if (!x.memories?.some((m) => m.kind === 'date' && m.text.includes(y.name))) addMemory(this.state, x, text(y.name), 'love', { kind: 'date' });
+          if (!x.memories?.some((m) => m.kind === 'date' && m.text.includes(y.name))) addMemory(this.state, x, text(y.name), 'love', { kind: 'date', whoId: y.id });
         }
       }
     }

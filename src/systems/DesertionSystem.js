@@ -15,6 +15,8 @@ import { emptyExodus } from './Crown.js';
 import { trustValue } from './Citizens.js';
 import { trustWelfare } from './TrustSystem.js';
 import { happinessOf } from './TownStatus.js';
+import { engineOn } from './Engines.js';
+import { unrestKey, loyaltyTier } from './Loyalty.js';
 
 export class DesertionSystem {
   /**
@@ -99,7 +101,12 @@ export class DesertionSystem {
   /** En mutsuz yetişkini (ve ailesini) yola çıkarır; çekirdek sakinler kalır. Dönüş: yola çıkanlar ya da null. */
   leaveNext() {
     const staying = this.residents().filter((c) => !c.emigrating);
-    const candidates = staying.filter((c) => !c.isChild && !c.away && !c.newcomer).sort((a, b) => happinessOf(a) - happinessOf(b) || a.id - b.id);
+    let candidates = staying.filter((c) => !c.isChild && !c.away && !c.newcomer);
+    if (engineOn('loyalty')) {
+      // (29.6) sadakati düşük olan önce gider; Sadık sakin ancak başka aday kalmazsa (sıranın sonunda)
+      const loyal = (c) => (loyaltyTier(c) === 'loyal' ? 1 : 0);
+      candidates = candidates.map((c) => ({ c, k: unrestKey(happinessOf(c), c) })).sort((a, b) => loyal(a.c) - loyal(b.c) || a.k - b.k || a.c.id - b.c.id).map((x) => x.c);
+    } else candidates.sort((a, b) => happinessOf(a) - happinessOf(b) || a.id - b.id);
     for (const c of candidates) {
       let group = this.familyOf(c);
       if (staying.length - group.length < EXODUS.core) group = c.married ? [] : [c];
@@ -190,10 +197,16 @@ export function removeResident(state, world, jobs, c) {
   const revolt = state.trust?.revolt;
   if (revolt) {
     revolt.rioters = revolt.rioters.filter((x) => x !== id);
+    if (revolt.leaderId === id) revolt.leaderId = null; // (29.6)
     for (const r of revolt.raids) {
       r.members = r.members.filter((x) => x !== id);
       r.done = r.done.filter((x) => x !== id);
     }
+  }
+  const rite = state.rites?.active; // (29.7) anma töreni katılımcıları
+  if (rite) {
+    rite.attendees = rite.attendees.filter((x) => x !== id);
+    rite.ids = rite.ids.filter((x) => x !== id);
   }
   if (state.dilemma?.expedition) state.dilemma.expedition.members = state.dilemma.expedition.members.filter((x) => x !== id);
   for (const a of state.animals) if (a.followId === id) a.followId = null;
