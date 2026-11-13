@@ -1,0 +1,29 @@
+# Oyuncu günlüğü 2: uzun oynanış incelemesi
+
+> TASLAK — Gün 15'e kadar olan kısım. Oturum sürüyor; bu dosya parça parça güncelleniyor.
+> Kurallara uydum: `src/`, `README.md`, `docs/` (kendi yazdıklarım hariç), `tools/sim/`, `styles/` içini hiç açmadım; yalnızca `tools/serve.py` okudum. Oyun içinde kod çalıştırmadım; yalnızca fare/klavye gönderdim ve ekran görüntüsü aldım.
+
+## 2. Oynama günlüğü (ham notlar)
+
+Saatler gerçek saat (UTC). Oyunu `?seed=42` ile açtım. Başlangıçta 1x/2x/4x hız düğmeleri var; ben çoğu zaman 4x'te oynadım.
+
+- **10:26 · Gün 1.** Açılış ekranı: hemen oyun başlıyor, "Hedefler" penceresi 8 hedef gösteriyor. Hedefler gerçekten yol gösteriyor: "İlk Yuva", "Sıcak Sofra", "Ticaret Yolları" gibi. Arkadaşımın notundaki gibi alttan **Topla**'yı seçip ağaç/kaya üstünde sürükledim; odun ve taş geldi. Sebze bahçesi, odun kulübesi, taş ocağı ve kiler kurdum. Kiler kurmadan depo 100'de kalıyor (kiler sonrası 200).
+- **10:27–10:31.** Yapı yerleştirmek zahmetli: "Kapının önü yola bağlı ve açık olmalı", "Toprak Patika üzerine kurulamaz", "Önce çam ağacı temizlenmeli", "Başka bir yapının üstüne kurulamaz". Yapı seçince menü haritanın alt yarısını kapatıyor, o yüzden kamerayı kaydırıp (W/A/S/D'yi basılı tutarak) üst yarıya yerleştirdim. Fare tekerleği uzaklaştırma yapmadı; sürükleyerek de kaydırılmıyor.
+- **10:32 · Gün 4 (yaklaşık).** İlk olay: **Sığınmacı Kafilesi**. Oyun duruyor, üç seçenek çıkıyor, bir geri sayım var. Boş yatağım yoktu, "kasabaya al" seçeneği kapalıydı; yemek verip yolcu ettim (bundan emin değilim, süre kısaydı).
+- **10:33.** Ayarlar: Kaydet/Yükle var. Sayfayı yeniledim, oyun **Gün 1'den yeni oyun** olarak açıldı; kaydı Ayarlar → Yükle ile geri getirdim. Yani yenilemek kaydı kendiliğinden yüklemiyor.
+- **10:34 · Gün 5–6.** **(5. gün ara notu, geriye dönük; 4x'te gün çabuk geçti, durup yazamadım.)** Şu an inşaat yapıyorum, sakinlerin ev/yemek ihtiyacı için uğraşıyorum. Sıkılmıyorum, çünkü hep bir şey çıkıyor. Kasaba 10 gün önceki halinden değil, 5 gün öncekinden bile farklı: nüfus 8'den 10'a çıktı. Mert'in dilekçesi (Bank koy) çıktı, "Kabul Et"e bastım. Kraliyet Tahsildarı 53 altın istedi; hazinede 23 vardı. Gün 6'da vergi ödendi, hazine 7'ye düştü. Mert–Mehmet ve Emre–Elif sevgili olmuş, günlükte yazıyor.
+- **10:37 · Gün 7.** **Gezgin Ozanlar** olayı: 30 saniyelik karar süresini ekran görüntüsü alırken kaçırdım, "Süre doldu" dedi. Gerçek zamanlı akan bir kararı, düşünürken kaçırabiliyorsun.
+- **10:39 · Gün 8.** *Güneş ve Nehir Panayırı* festivali. Ayşe ve Nilay katıldı. Nüfus 10.
+- **10:40 · Gün 9.** Mevsim sonbahara döndü. **Zeynep'i takip etmeye başladım** (aşağıda hikâyesi). Gezgin tüccar Gülsüm geldi; pazar yerinden takas: 10 yiyecek → 10 odun, 10 yiyecek → 8 taş. Bir de **Sert Fırtına Uyarısı**; taş ve kalasla güçlendirmeyi seçtim, fırtına hasarsız geçti (tahminim; sonra hasar yazısı görmedim).
+- **10:42 · Gün 10.** **Haydut Baskını** uyarısı. Seçenekler: bekçilerle püskürt (alet yok, kapalı), haraç öde (34 altın) ya da hazırlıksız yakalan. Altınım azdı; hazırlıksız yakalanmayı seçtim. Sonuç: bir yapı hasar gördü, bir miktar altın/yiyecek çalındı. Ayrıca yiyecek deposu doldu uyarısı geldi.
+- **10:44 · Gün 11.** **Köy** oldum ("Kasabanız büyüdü: Köy!"). Şartı "Seviye 2 yapı 0/1" idi; bunun bir evi Taş Ev'e yükseltmek olduğunu, bir ev panelini açınca tesadüfen buldum. Yel değirmeni ve fırın açıldı.
+- **10:45 · Gün 12.** Süs Havuzu'na (meydandaki çeşme) tıklayınca **vergi ayarı** (Muaf/Düşük/Standart/Ağır), "Yönetim Güveni", "Erzak Dağıt/Altın Dağıt" ve "Toplanma Çanı" çıktı. Bunlar yönetici olarak elimdeki asıl araçlar.
+- **10:46 · Gün 13.** **Kış** başladı. "Isınma −38,6 odun/gün" çıktı. Odun 108'e düşmüştü; güneybatı ormanını işaretledim, 161→280'e çıktı.
+- **10:49 · Gün 14.** **Yel Değirmeni ve Fırın yangını.** Üst şeritte bir çip çıktı ("yanıyor %10"); bir şey yapmama gerek kalmadan söndü. Zeynep'in eşi Ayşe ile Kasaba Hanı'nda evlendiğini sonradan öğrendim.
+- **10:50 · Gün 15, 03:09.** **(15. gün ara notu.)** Odun 235, taş 169, yiyecek 194, altın 36, nüfus 17/18, refah %88. Şu an: evleri yükseltiyorum, kış için odun topluyorum, yeni ev yerleştirmeye uğraşıyorum ve başaramıyorum (bkz. §4). Bekleyen: Ferman "Saray Hazinesi İçin Usta İşi Eser" (4 saat kalmıştı), Defne dilekçesi. Sıkılıyor muyum? Hayır, ama ikinci yarımda (Gün 9'dan sonra) aynı döngüyü yaptığımı fark ettim: yer bul → inşa et → bekle. Kasaba 10 gün öncekinden (Gün 5) çok farklı: 8 yerine 18 kişi, meydan, değirmen, ağıl, kış.
+
+## 8. İzlediğim sakinin hikâyesi (şimdilik)
+
+**Zeynep**, 34 yaşında (Gün 14'te doğum günü, 35), kasabanın kurucularından, Kalfa Oduncu. Gün 9'da "Aradığını henüz bulamadı. Kederinde Mehmet onu teselli etti. İçi huzursuz" yazıyordu; korkuları "işyerinde yangın çıkması" ve "kalbimin kırılması". Gün 13'te **Ayşe ile Kasaba Hanı'nda evlendi** (günlük: "Dileği oldu: Ayşe ile evleneyim"); Gün 14'te yaşam öyküsü "Dileklerinin çoğuna kavuşuyor… otuz beş yaşında: gönül hoş" olarak değişti. Oyun bunu bana kendisi **anlatmadı**; ben Zeynep'in panelini açıp "Hayat" sekmesine bakınca buldum. Ekranda tek ipucu üst şeritteki çip ve "Meydanda düğün" yazan satırlardı.
+
+(Devamı final sürümde.)
