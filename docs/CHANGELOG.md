@@ -2,6 +2,16 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 20 satır. README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 30.1 — İlk saat (kayıt sürümü 40 kalır; yeni simülasyon sistemi yok)
+- Rehber: `data/guide.js` (9 adım, tablo sürümü 1), `systems/Guide.js` (saf görünme / tamamlanma koşulları), `GuideSystem` (yalnızca olay dinler, güncelleme listesinde değil), `GuideCard` (araç çubuğunun üstünde tek kart, "Anladım", düğme yanıp söner). İsteğe bağlı kayıt alanı `guide { done, off, at? }`; eski kayıtta nüfus > 8 ise kapalı. Ayarlar: Rehber Açık / Kapalı / baştan başlat.
+- Karar süresi: yalnızca `state.settings.dilemmaTimer === true` iken işler (isteğe bağlı alan; Ayarlar "Kapalı / 30 saniye"). `tools/sim/lib.mjs` bayrağı açar (yükleme / sıfırlamadan sonra da).
+- Yerleştirme: önizleme yalnızca fare karosu / tür / harita sürümü / karşılanabilirlik değişince hesaplanır; kurulamama nedeni haritada; kamera içindeki uygun karolar soluk yeşil (kare başına 24 deneme, önbellekli); ekranda yer yoksa mesaj + en yakın yerin oku; liste seçimden sonra tek satırlık şeride iner (Esc / "Listeyi aç"). `ConstructionSystem.globalBlock`, `demolishRefund`, "Yetersiz kaynak: Taş · Topla aracıyla kayalardan." ipucu.
+- Kaçan tıklama nedeni: ipucu satırı uzun metinde (dekor türleri: "Çevre estetiği … (burası: …)") iki satıra sarılıp dock yığınını 15 px yükseltiyor, fare altındaki harita menünün altında kalıyordu. İpucu / şerit sabit yükseklik.
+- Yıkım onayı: tamamlanmış yapıda ilk tık işaretler, 4 sn içinde ikinci tık yıkar (fırça süsleri, yollar, şantiyeler tek tık).
+- Hatalar: üst şerit bölgeleri sarılıyor (adın üstüne binme); "N hasta" çipi tıklanır; Hedefler çubuğu tam dolu + "Seviye 2 yapı" açıklaması; yapı listesi ilk sıra adları (panel kayıyor, ızgara değil); 1024×640 sakin kartı kendi içinde kayar; yenileme: aynı tohumlu `?seed=` adresi oturum kaydını Gün 1'e sıfırlıyordu (artık sürdürür), oturum kaydı her 06:00'da da tazelenir.
+- Okunurluk: sayılar ≥ 13 px, `tabular-nums`, sayı öğelerinde okunaklı sistem yazı tipi.
+- Ölçüm: `autopilot 42 50` raporu tabanla bayt bayt aynı; kayıt `guide` ve `settings.dilemmaTimer` çıkarılınca aynı. Testler: tools/sim/tests/30.1-first-hour.mjs (22).
+
 ## Aşama 29.10b — Doyum sönmesi ve sadakat sarmalı yaması (kayıt sürümü 40 kalır)
 - `WANT_RULES.driftStep` (11): 50'nin üstünde günlük sönme `driftAbove + floor((doyum − 50) / driftStep)`; altı aynı. Başlangıç 10 idi; dondurulmuş 29.3 testi (60 → 58) 10'da kırıldığı için 11'e çekildi.
 - Ölçüm (6 tohum × 50 gün): ortalama doyum 47.7–58.9, uç kademe ≤ %10, arzu gerçekleşme %41–48. Tohum 42 / 77 × 120 gün: G50 → G120 doyum 56.0 → 54.5 / 47.7 → 51.5.

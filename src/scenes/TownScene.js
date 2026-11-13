@@ -45,6 +45,7 @@ import { FamilySystem } from '../systems/FamilySystem.js';
 import { CraftingSystem } from '../systems/CraftingSystem.js';
 import { JournalSystem } from '../systems/JournalSystem.js';
 import { SaveSystem } from '../systems/SaveSystem.js';
+import { GuideSystem } from '../systems/GuideSystem.js'; // (30.1) rehber kartları
 import { EventSystem } from '../systems/EventSystem.js';
 import { HeatingSystem } from '../systems/HeatingSystem.js';
 import { MilestoneSystem } from '../systems/MilestoneSystem.js';
@@ -303,7 +304,9 @@ export class TownScene extends Scene {
     ];
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
+    this.guideSystem = new GuideSystem(this.game, { attract: this.attract }); // (30.1) güncelleme listesinde değil: yalnızca olay dinler
     this.disposables = [
+      this.guideSystem,
       this.timeSystem,
       this.construction,
       this.nature,
@@ -362,6 +365,8 @@ export class TownScene extends Scene {
     ];
 
     this.camera = new Camera();
+    // (30.1) araçlar için görünen alan (boyama taraması): kamera ve çizim yüzeyinin güncel boyutu
+    this.toolView = { camera: this.camera, get width() { return renderer.width; }, get height() { return renderer.height; } };
     const size = CONFIG.TILE_SIZE;
     this.camera.centerOn(landmarks.plaza.centerX * size, landmarks.plaza.centerY * size, renderer.width, renderer.height);
     this.camera.clamp(map.pixelWidth, map.pixelHeight, renderer.width, renderer.height);
@@ -592,7 +597,7 @@ export class TownScene extends Scene {
     }
     const hovered = this.hoveredTile();
     const escapeUsed = this.tools.handleKeys();
-    this.tools.update(hovered);
+    this.tools.update(hovered, this.toolView);
     if (!this.tools.isActive) this.handleSelectionInput(escapeUsed);
 
     this.updateCameraTarget(dt);
@@ -662,6 +667,7 @@ export class TownScene extends Scene {
     if (manual) {
       this.setFollow(null);
       this.focusId = null;
+      this.game.events.emit('camera:moved', {}); // (30.1) rehber: kamera elle gezildi
     }
 
     // Tekerlek imleç etrafında, klavye ekran merkezinde yakınlaştırır
@@ -673,6 +679,7 @@ export class TownScene extends Scene {
       const anchorY = input.mouse.inside && !this.followId ? input.mouse.y : renderer.height / 2;
       if (camera.zoomAt(anchorX, anchorY, camera.zoom + zoomSteps)) {
         this.game.events.emit('camera:zoom', camera.zoom);
+        this.game.events.emit('camera:moved', {}); // (30.1)
       }
     }
 
@@ -900,7 +907,7 @@ export class TownScene extends Scene {
     this.drawSelectedBuilding(renderer);
 
     if (this.tools.isActive) {
-      this.tools.render(renderer, env);
+      this.tools.render(renderer, env, this.camera);
     } else if (this.hovered && this.hoveredCharacterId === null) {
       const { tileX, tileY } = this.hovered;
       drawTileCursor(renderer, tileX, tileY, this.animationTime, this.map.isBuildable(tileX, tileY));

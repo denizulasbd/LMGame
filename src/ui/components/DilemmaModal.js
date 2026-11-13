@@ -25,12 +25,13 @@ export class DilemmaModal {
     this.options = el('div', { className: 'dilemma-options' });
     this.timerFill = el('span', { className: 'dilemma-timer-fill' });
     this.timerText = el('span', { className: 'dilemma-timer-text' });
+    this.timerBar = el('span', { className: 'dilemma-timer-bar' }, [this.timerFill]);
     this.element = el('div', { className: 'dilemma ui-interactive', hidden: true }, [
       el('div', { className: 'panel dilemma-panel' }, [
         el('div', { className: 'dilemma-head' }, [el('div', { className: 'dilemma-icon-frame' }, [this.icon]), this.title]),
         this.text,
         this.options,
-        el('div', { className: 'dilemma-timer' }, [el('span', { className: 'dilemma-timer-bar' }, [this.timerFill]), this.timerText]),
+        el('div', { className: 'dilemma-timer' }, [this.timerBar, this.timerText]),
       ]),
     ]);
   }
@@ -54,6 +55,14 @@ export class DilemmaModal {
       this.title.textContent = adventure ? `Maceracı Günlüğü · ${def.title}` : active.title ?? def.title;
       this.text.textContent = active.text ?? def.text;
       this.options.replaceChildren(...def.options.map((option, i) => this.optionButton(option, statuses[i], resources)));
+    }
+    // (30.1) Süre yalnızca Ayarlar'da "30 saniye" seçiliyse işler; yoksa çubuk gizlenir ve pencere seçim yapılana dek bekler
+    const timed = game.state.settings?.dilemmaTimer === true;
+    this.timerBar.hidden = !timed;
+    this.element.classList.toggle('is-untimed', !timed);
+    if (!timed) {
+      this.timerText.textContent = 'Oyun duraklatıldı · süre yok, hazır olunca seç';
+      return;
     }
     const left = Math.max(0, active.remaining);
     this.timerFill.style.width = `${(left / DILEMMA_SCHEDULE.timeoutSeconds) * 100}%`;

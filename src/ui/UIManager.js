@@ -30,6 +30,7 @@ import { StatsPanel } from './components/StatsPanel.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
 import { CrisisModal } from './components/CrisisModal.js';
 import { MapTooltip } from './components/MapTooltip.js';
+import { GuideCard } from './components/GuideCard.js';
 
 const BOTTOM_GAP = 10; // dock ile pencere kenarı / sağ sütun arasındaki boşluk (piksel)
 
@@ -68,6 +69,7 @@ export class UIManager {
       new DilemmaModal(game),
       new TitleMenu(game),
       new MapTooltip(game),
+      new GuideCard(game), // (30.1)
     ];
     for (const component of this.components) {
       if (component.element) (this.slots[component.slot] ?? root).appendChild(component.element);

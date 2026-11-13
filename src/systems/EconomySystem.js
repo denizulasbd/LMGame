@@ -10,7 +10,7 @@
 //     kullanır. Bir ekmek dilimlenince artan yiyecek değeri pay olarak saklanır, hiçbir şey kaybolmaz.
 //   - Üretim yapıları produce() ile ekler: işlenmiş malların toplam üretimi state.stats.goods'a yazılır,
 //     kasabanın ilk yünü / demiri / ekmeği için 'goods:firstProduced' { resource, building } yayınlanır
-import { RESOURCES, BASE_STORAGE_CAPACITY } from '../data/resources.js';
+import { RESOURCES, BASE_STORAGE_CAPACITY, sourceHint } from '../data/resources.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { foodSupply } from './TownStatus.js';
 import { civicStorageBonus } from './CivicSystem.js';
@@ -81,6 +81,12 @@ export class EconomySystem {
     return Object.entries(cost)
       .filter(([r, v]) => this.amount(r) < v)
       .map(([r]) => RESOURCES[r].name);
+  }
+
+  /** (30.1) "Yetersiz kaynak: Taş · Topla aracıyla kayalardan." biçiminde eksik kaynak bildirimi. */
+  shortfall(cost = {}) {
+    const keys = Object.entries(cost).filter(([r, v]) => this.amount(r) < v).map(([r]) => r);
+    return `Yetersiz kaynak: ${keys.map((r) => RESOURCES[r].name).join(', ')}${sourceHint(keys)}`;
   }
 
   /** Maliyeti öder; yetmiyorsa hiçbir şey harcamaz ve false döner. */

@@ -3,6 +3,9 @@
 // yeniden basmak ya da Esc aracı bırakır (Seç). İnşa aracı seçiliyken dock'un üstünde yapı listesi (küçük resimler ve
 // maliyetler), bir araç seçiliyken fare altındaki duruma göre kısa bir ipucu satırı belirir. Düğmelerin üzerine
 // gelince kısayol ve açıklama küçük bir ipucunda (.dock-tip) görünür; ipucu pencere kenarından taşmaz.
+// (30.1) Bir yapı seçilince liste, yapının adını, bedelini ve "Listeyi aç" düğmesini gösteren tek satırlık ince bir şeride iner
+// (haritayı örtmesin); Esc ya da düğme listeyi geri açar ('ui:buildList'). İpucu satırı tek satırdır ve yüksekliği sabittir: metin
+// uzunluğu yığının boyunu değiştirip fare altındaki haritayı örtmesin (kaçan tıklama). Kurulamama nedeni haritada çizilir.
 // Araç değişikliği 'ui:setTool' olarak istenir; asıl mantık scenes/ToolController.js'te.
 // (18. aşama) Yapı listesi üç sekmeye ayrılır: Yapılar, Yol & Zemin (fırçalar), Peyzaj & Dekorasyon. Sekme seçimi
 // tarayıcıda hatırlanır; bir öğe seçilince (ör. kısayolla) onun sekmesine geçilir.
@@ -110,13 +113,21 @@ export class BuildMenu {
     this.itemRow = el('div', { className: 'panel build-items ui-interactive', hidden: true }, [this.tabRow, this.itemList]);
     this.setTab(this.tab);
     this.hint = el('div', { className: 'build-hint', hidden: true });
+    // (30.1) ince yapı şeridi: seçili yapının küçük resmi, adı, bedeli, durum metni ve "Listeyi aç"
+    this.stripThumb = el('img', { className: 'build-strip-thumb', alt: '' });
+    this.stripName = el('span', { className: 'build-strip-name' });
+    this.stripCosts = el('span', { className: 'build-costs build-strip-costs' });
+    this.stripInfo = el('span', { className: 'build-strip-info' });
+    this.stripOpen = this.button([el('span', { text: 'Listeyi aç' }), el('kbd', { text: 'Esc' })], 'Yapı listesini aç (Esc)', () => this.events.emit('ui:buildList', { open: true }));
+    this.stripOpen.classList.add('hud-btn', 'build-strip-open');
+    this.strip = el('div', { className: 'panel build-strip ui-interactive', hidden: true }, [this.stripThumb, this.stripName, this.stripCosts, this.stripInfo, this.stripOpen]);
     this.extras = el('div', { className: 'dock-group dock-windows' });
     this.bar = el('div', { className: 'panel dock build-bar ui-interactive' }, [
       el('div', { className: 'dock-group dock-tools tool-row' }, this.toolButtons),
       el('span', { className: 'dock-divider' }),
       this.extras,
     ]);
-    this.element = el('div', { className: 'dock-wrap' }, [this.itemRow, this.hint, this.bar]);
+    this.element = el('div', { className: 'dock-wrap' }, [this.itemRow, this.strip, this.hint, this.bar]);
     // Dock düğmesi ipucu: kısayol ve açıklama düğmenin üstünde, ekran kenarına taşmadan (UIManager serbest katmana ekler)
     this.tipTitle = el('div', { className: 'dock-tip-title' });
     this.tipText = el('div', { className: 'dock-tip-text' });
@@ -126,20 +137,44 @@ export class BuildMenu {
     this.bar.addEventListener('mouseleave', () => this.showTip(null));
     this.bar.addEventListener('click', () => this.showTip(null));
 
-    game.events.on('tool:changed', ({ tool, buildType }) => {
+    game.events.on('tool:changed', ({ tool, buildType, listOpen = true }) => {
       this.tool = tool;
       this.buildType = buildType;
       for (const b of this.toolButtons) b.classList.toggle('is-active', b.dataset.tool === tool);
       for (const item of this.items) item.button.classList.toggle('is-active', item.type === buildType);
       if (tool === 'build' && buildType && buildTabFor(buildType) !== this.tab) this.setTab(buildTabFor(buildType), false);
-      this.itemRow.hidden = tool !== 'build';
-      this.hint.hidden = tool === 'select';
+      const stripped = tool === 'build' && Boolean(buildType) && !listOpen;
+      this.itemRow.hidden = tool !== 'build' || stripped;
+      this.strip.hidden = !stripped;
+      this.hint.hidden = tool === 'select' || stripped;
+      if (stripped) this.fillStrip(buildType);
       this.setHint(TOOLS.find((t) => t.tool === tool).hint, null);
     });
     game.events.on('tool:preview', ({ ok, text }) => {
       if (this.tool === 'select') return;
       this.setHint(text || TOOLS.find((t) => t.tool === this.tool).hint, text ? ok : null);
+      if (!this.strip.hidden) {
+        this.stripInfo.textContent = text ?? '';
+        this.stripInfo.title = text ?? '';
+        this.stripInfo.classList.toggle('is-bad', Boolean(text) && !ok);
+      }
     });
+  }
+
+  /** (30.1) Şeridi seçili yapıyla doldurur (ad, küçük resim, bedel). */
+  fillStrip(type) {
+    const def = getBuildDefinition(type);
+    const tileDef = TILE_BUILDS[type];
+    const cost = (tileDef ?? def).cost ?? {};
+    this.stripThumb.src = thumbnailURL(type);
+    this.stripName.textContent = (tileDef ?? def).name;
+    this.stripCosts.replaceChildren(
+      ...(Object.keys(cost).length
+        ? Object.entries(cost).map(([r, v]) => el('span', { className: 'build-cost', dataset: { resource: r } }, [el('img', { src: getIconDataURL(RESOURCES[r].icon), alt: RESOURCES[r].name }), String(v)]))
+        : [el('span', { className: 'build-cost', text: 'Ücretsiz' })])
+    );
+    this.stripInfo.textContent = '';
+    this.stripInfo.classList.remove('is-bad');
   }
 
   /** (18. aşama) Görünen sekmeyi seçer; remember: tarayıcıda hatırla. */

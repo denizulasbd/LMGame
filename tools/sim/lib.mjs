@@ -93,6 +93,17 @@ async function installHelpers(page, stopLoop) {
     const game = window.game;
     if (stopLoop) game.loop.stop();
     game.state.time.speed = 4;
+    // (30.1) Başsız araçlarda karar penceresinin 30 sn'lik süresi işler (oyuncu için varsayılan: süre yok); yükleme / sıfırlama
+    // tercihi silerse yeniden açılır, böylece otopilot, stres ve dondurulmuş testler eskisi gibi çalışır
+    game.state.settings.dilemmaTimer = true;
+    for (const method of ['restore', 'reset']) {
+      const original = game.state[method].bind(game.state);
+      game.state[method] = (...args) => {
+        const out = original(...args);
+        game.state.settings.dilemmaTimer = true;
+        return out;
+      };
+    }
     const stamp = () => {
       const t = game.state.time;
       return `G${t.day} ${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}`;

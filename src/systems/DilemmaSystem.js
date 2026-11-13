@@ -55,6 +55,8 @@ export class DilemmaSystem {
         if (hour === DILEMMA_SCHEDULE.hour) this.maybeStart();
       }),
       game.events.on('ui:chooseDilemma', ({ optionId }) => this.choose(optionId, false)),
+      // (30.1) Ayarlar: "Kararlarda süre sınırı" Kapalı / 30 saniye (açıkken açık pencerenin sayacı kaldığı yerden işler)
+      game.events.on('ui:setDilemmaTimer', ({ on }) => (this.state.settings.dilemmaTimer = Boolean(on))),
     ];
     if (this.dilemma.nextDay === null) this.scheduleNext(DILEMMA_SCHEDULE.firstDay);
     // Kayıtta açık bir karar penceresi varsa oyun yine durur ve pencere açılır
@@ -81,7 +83,9 @@ export class DilemmaSystem {
   update(tick) {
     const d = this.dilemma;
     if (d.active) {
-      d.active.remaining -= tick.realDt;
+      // (30.1) Oyuncu için süre yok: pencere seçim yapılana dek bekler. Süre yalnızca Ayarlar'da "30 saniye" seçiliyken
+      // (state.settings.dilemmaTimer) ve başsız araçlarda işler (bkz. tools/sim/lib.mjs)
+      if (this.state.settings?.dilemmaTimer === true) d.active.remaining -= tick.realDt;
       if (d.active.remaining <= 0) this.choose(null, true);
       else this.publishOptions();
     }

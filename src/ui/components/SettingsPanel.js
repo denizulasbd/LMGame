@@ -74,6 +74,16 @@ export class SettingsPanel {
       return b;
     });
     this.crisisNote = el('div', { className: 'settings-note' });
+    // (30.1) Rehber ve karar süresi
+    const toggleButtons = (labels, onPick, cls) =>
+      labels.map(([value, label, title]) => {
+        const b = button(label, title, () => onPick(value), cls);
+        b.dataset.value = String(value);
+        return b;
+      });
+    this.guideButtons = toggleButtons([[true, 'Açık', 'İlk saatte ipucu kartları çıkar'], [false, 'Kapalı', 'İpucu kartları çıkmaz']], (on) => this.events.emit('ui:guideSetOff', { off: !on }), 'settings-guide');
+    this.guideRestart = button('Rehberi baştan başlat', 'Tamamlanan ipuçları silinir, kartlar ilk adımdan çıkar', () => this.events.emit('ui:guideRestart'), 'settings-guide-restart');
+    this.timerButtons = toggleButtons([[false, 'Kapalı', 'Karar penceresi sen seçene dek bekler'], [true, '30 saniye', 'Seçilmezse 30 saniye sonra güvenli seçenek uygulanır']], (on) => this.events.emit('ui:setDilemmaTimer', { on }), 'settings-timer');
 
     const keys = CONTROLS.map(([ks, label]) =>
       el('div', { className: 'settings-key' }, [el('span', { className: 'settings-keys' }, ks.map((k) => el('kbd', { text: k }))), el('span', { text: label })])
@@ -83,6 +93,8 @@ export class SettingsPanel {
       modalHeader('Ayarlar', () => this.setOpen(false), { icon: 'gear' }),
       section('Oyun', this.saveRow, this.confirmRow, this.saveInfo),
       section('Tehlike Sıklığı', el('div', { className: 'settings-row' }, this.crisisButtons), this.crisisNote),
+      section('Rehber', el('div', { className: 'settings-row settings-guide-row' }, [el('span', { className: 'settings-label', text: 'Rehber:' }), ...this.guideButtons, this.guideRestart])),
+      section('Kararlar', el('div', { className: 'settings-row settings-timer-row' }, [el('span', { className: 'settings-label', text: 'Kararlarda süre sınırı:' }), ...this.timerButtons])),
       section('Ses ve görünüm', el('div', { className: 'settings-row' }, [this.muteButton]), this.info),
       section('Kontroller', el('div', { className: 'settings-keys-list' }, keys)),
     ]);
@@ -123,6 +135,10 @@ export class SettingsPanel {
     if (!this.open) return;
     const current = game.state.crisis?.difficulty ?? 'dengeli';
     for (const b of this.crisisButtons) b.classList.toggle('is-active', b.dataset.difficulty === current);
+    const guideOn = game.state.guide?.off !== true;
+    for (const b of this.guideButtons) b.classList.toggle('is-active', (b.dataset.value === 'true') === guideOn);
+    const timed = game.state.settings?.dilemmaTimer === true;
+    for (const b of this.timerButtons) b.classList.toggle('is-active', (b.dataset.value === 'true') === timed);
     const note = `${CRISIS_DIFFICULTY[current]?.description ?? ''} Yanan yapılar haritadan silinmez, yaralanan sakin ölmez.`;
     if (this.crisisNote.textContent !== note) this.crisisNote.textContent = note;
     const text = `Harita tohumu ${game.state.seed} · yakınlık ${this.zoom ?? '-'}x · ${game.state.map.width}x${game.state.map.height} harita`;

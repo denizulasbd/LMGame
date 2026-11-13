@@ -13,6 +13,8 @@ import { el } from '../dom.js';
 import { dockButton, modalHeader } from '../dockButton.js';
 
 const pad = (n) => String(n).padStart(2, '0');
+// (30.1) Koşulların nasıl sağlanacağını söyleyen kısa açıklamalar ("Seviye 2 yapı" oyuncunun bulamadığı koşuldu)
+const TIER_CHECK_HINTS = { upgraded: 'Bir yapının panelindeki Yükselt düğmesiyle' };
 const REFRESH_MS = 600;
 
 export class MilestonePanel {
@@ -97,12 +99,18 @@ export class MilestonePanel {
     if (next) {
       children.push(el('div', { className: 'building-section-title', text: `Sonraki seviye: ${next.name}` }));
       for (const c of checks) {
-        const ratio = Math.min(1, c.current / c.target);
+        // (30.1) Sayı tamamlandıysa (ok) çubuk her zaman tam dolu çizilir; yarım kalan çubuk en az bir dilim gösterir
+        const ratio = c.ok ? 1 : Math.min(0.99, Math.max(0, c.current / c.target));
+        const percent = c.ok ? 100 : Math.floor(ratio * 100);
+        const hint = TIER_CHECK_HINTS[c.key];
         children.push(
-          el('div', { className: `tier-check${c.ok ? ' is-ok' : ''}` }, [
+          el('div', { className: `tier-check${c.ok ? ' is-ok' : ''}`, dataset: { check: c.key } }, [
             el('img', { src: getAnyIconURL(c.icon), alt: '' }),
-            el('span', { className: 'tier-check-name', text: c.text }),
-            el('span', { className: 'need-bar goal-bar' }, [el('span', { className: 'need-fill goal-fill', style: `width: ${Math.round(ratio * 100)}%` })]),
+            el('span', { className: 'tier-check-text' }, [
+              el('span', { className: 'tier-check-name', text: c.ok ? `✓ ${c.text}` : c.text }),
+              ...(hint ? [el('span', { className: 'tier-check-hint', text: hint })] : []),
+            ]),
+            el('span', { className: `need-bar goal-bar${c.ok ? ' is-full' : ''}` }, [el('span', { className: 'need-fill goal-fill', style: `width: ${percent}%` })]),
           ])
         );
       }

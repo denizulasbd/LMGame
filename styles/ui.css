@@ -5019,3 +5019,260 @@ kbd {
   .card-tab .card-tab-label { display: none; }
   .card-tab img { width: 18px; height: 18px; }
 }
+
+/* ---------------------------------------------------------------------------
+   (30.1) Rehber kartı ve yanıp sönen düğme
+   --------------------------------------------------------------------------- */
+.guide-card {
+  position: absolute;
+  left: 50%;
+  bottom: var(--ui-bottom-reserve, 96px);
+  transform: translateX(-50%);
+  z-index: 39;
+  width: min(380px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'badge badge' 'text ok';
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+  padding: 6px 10px 8px;
+}
+
+.guide-card[hidden] { display: none; }
+
+.guide-badge {
+  grid-area: badge;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-highlight);
+}
+
+.guide-text {
+  grid-area: text;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.guide-text strong { color: var(--ui-highlight); font-weight: 600; }
+
+.guide-ok { grid-area: ok; white-space: nowrap; }
+
+@keyframes guide-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 214, 102, 0); filter: none; }
+  50% { box-shadow: 0 0 0 3px rgba(255, 214, 102, 0.95), 0 0 12px 2px rgba(255, 214, 102, 0.55); filter: brightness(1.18); }
+}
+
+.guide-glow {
+  animation: guide-glow 1.4s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-glow { animation: none; box-shadow: 0 0 0 3px rgba(255, 214, 102, 0.95); }
+}
+
+.dilemma.is-untimed .dilemma-timer-text { opacity: 0.9; }
+
+/* ---------------------------------------------------------------------------
+   (30.1) İnce yapı şeridi ve sabit yükseklikli ipucu satırı (kaçan tıklama: yığının boyu metne göre değişmesin)
+   --------------------------------------------------------------------------- */
+.build-hint {
+  box-sizing: border-box;
+  height: 24px;
+  line-height: 18px;
+  width: min(560px, calc(100vw - 24px));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.build-strip {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  width: min(720px, calc(100vw - 16px));
+  padding: 2px 8px;
+  overflow: hidden;
+}
+
+.build-strip[hidden] { display: none; }
+
+.build-strip-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.build-strip-name {
+  flex: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.build-strip-costs {
+  flex: none;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.build-strip-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #a8ef9c;
+}
+
+.build-strip-info.is-bad { color: #ff9f93; }
+
+.build-strip-open {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.build-strip-open kbd {
+  font-size: 10px;
+  padding: 0 4px;
+  border: 1px solid var(--ui-frame);
+  border-radius: 3px;
+  opacity: 0.8;
+}
+
+/* (30.1) Yapı listesi: sekme çubuğu sabit, yalnızca kart ızgarası kayar. (Eskiden panelin tamamı kayıyor, yapışkan sekme çubuğu ilk sıradaki
+   kartların üstüne biniyor ve kart adları kesiliyordu.) */
+.build-items.panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.build-items.panel[hidden] { display: none; }
+
+.build-items.panel > .build-tabs {
+  position: static;
+  flex: none;
+}
+
+.build-items.panel > .build-item-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  align-content: flex-start;
+  padding: 2px 0;
+}
+
+/* (30.1) Üst şerit: bölgeler her genişlikte sarılır; sığmayan bölge ikinci satıra iner (eskiden 1241-1440 px arasında 1fr sütunda
+   ortalanan zaman bölgesi taşıp kasaba adının / unvan çipinin üstüne biniyordu). */
+.hud.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+
+.hud-zone-town,
+.hud-zone-time {
+  flex: 0 0 auto;
+}
+
+.hud-zone-res {
+  flex: 0 1 auto;
+  margin-left: auto;
+}
+
+@media (max-width: 1240px) {
+  .hud-zone-res { margin-left: 0; }
+}
+
+/* (30.1) Küçük pencerede (en çok 720 px yükseklik) sakin kartı açıkken sakin listesi çekmecesi yer açar: kartın alt yarısı araç
+   çubuğunun altında / kaydırma gerektiren bölgede kalmaz. Kart kapanınca (✕ / Esc) liste geri gelir. */
+@media (max-height: 720px) {
+  .ui-right:has(.ui-cards > .panel:not([hidden])) .ui-drawer {
+    display: none;
+  }
+}
+
+/* (30.1) Hedefler: koşul açıklaması ve tam dolu çubuk */
+.tier-check-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tier-check-hint {
+  font-size: 11px;
+  opacity: 0.75;
+  line-height: 1.2;
+}
+
+.goal-bar.is-full .goal-fill { width: 100% !important; }
+
+/* ---------------------------------------------------------------------------
+   (30.1) Okunurluk: sayılar en az 13 px, sabit genişlikli rakamlarla (8 ile S, 0 ile O karışmasın)
+   Piksel yazı tipi başlıklarda kalır; yalnızca sayı taşıyan öğeler okunaklı sistem yazı tipine geçer.
+   --------------------------------------------------------------------------- */
+:root {
+  --ui-num-font: 'DejaVu Sans Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+#ui-layer {
+  font-variant-numeric: tabular-nums;
+}
+
+#ui-layer .resource-amount,
+#ui-layer .resource-detail,
+#ui-layer .hud-season,
+#ui-layer .hud-day,
+#ui-layer .hud-clock,
+#ui-layer .hud-speed .hud-btn,
+#ui-layer .goods-summary,
+#ui-layer .welfare-value,
+#ui-layer .hud-population,
+#ui-layer .dock-badge,
+#ui-layer .need-value,
+#ui-layer .build-cost,
+#ui-layer .build-tab-count,
+#ui-layer .goal-detail,
+#ui-layer .goal-done,
+#ui-layer .tier-check-name,
+#ui-layer .building-badge,
+#ui-layer .life-stage-age {
+  font-family: var(--ui-num-font);
+  font-variant-numeric: tabular-nums;
+  font-size: max(13px, 1em);
+  letter-spacing: 0;
+}
+
+#ui-layer .hud-clock { font-size: 17px; min-width: 52px; }
+#ui-layer .hud-day { font-size: 13px; }
+#ui-layer .dock-badge { min-width: 18px; line-height: 1.25; padding: 0 4px; }
+#ui-layer .build-items .build-cost { font-size: 13px; }
+#ui-layer .build-tab-count { font-size: 13px; }
+#ui-layer .goal-detail { font-size: 13px; }
+#ui-layer .character-meta,
+#ui-layer .goal-description,
+#ui-layer .upgrade-text { font-size: 13px; }
+
+/* (30.1) Çip yazıları (ısınma, vadi, vergi...) sayı taşır: en az 13 px */
+#ui-layer .buff-chip,
+#ui-layer .hud-valley { font-size: 13px; }
+
+/* Küçük pencerede kart kendi içinde kayar: alt yarısı araç çubuğunun altına taşmaz */
+@media (max-height: 720px) {
+  .ui-cards > .panel { max-height: 100%; overflow-y: auto; }
+}

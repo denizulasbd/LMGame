@@ -43,6 +43,7 @@ import { sanitizeCurrentFestival } from '../systems/Fair.js';
 import { sanitizeCurrentFeast } from '../systems/Feast.js';
 import { emptyGuestBook, restoreGuestBook, sanitizeActiveGuest } from '../systems/Guest.js';
 import { emptyRites, restoreRites, pruneRites } from '../systems/Rites.js';
+import { emptyGuide, restoreGuide } from '../systems/Guide.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
 
@@ -207,6 +208,8 @@ export class GameState {
     this.moodlets = emptyMoodletStats(); // (29.2) ruh hali sayaçları: { given: { anahtar: adet }, consoled, grieved, mourners }
     this.wants = emptyWantStats(); // (29.3) arzu / korku sayaçları: { rolled, fulfilled, expired, fearsRolled, realized, passed } (anahtar -> adet)
     this.rites = emptyRites(); // (29.7) anma törenleri (bekleyen, süren, kitabe) ve özel gün sayaçları
+    this.settings = {}; // (30.1) oyuncu tercihleri (isteğe bağlı alanlar): { dilemmaTimer?: boolean } — yoksa kapalı
+    this.guide = emptyGuide(); // (30.1) rehber kartları: { done: [adım kimlikleri], off: bool, at?: { adım: oyun dakikası } }
     this.evolution = emptyEvolutionStats(); // (29.4) kişilik evrimi sayaçları: { turned, deepened, acquired (özellik -> adet), total }
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
     this.heirloom = emptyHeirloomState(); // (25.5) aile yadigârları: sayaçlar, arşiv, Kuşak Şöleni
@@ -321,6 +324,9 @@ export class GameState {
       season: getSeason(this.time.day).key, // bilgi amaçlı: mevsim yüklenirken günden yeniden hesaplanır
       characters: this.characters.map((c) => c.toJSON()),
       buildings: this.buildings.map((b) => b.toJSON()),
+      // (30.1) isteğe bağlı alanlar: anahtar sırası hep sonda; boş tercih yazılmaz
+      ...(Object.keys(this.settings).length ? { settings: { ...this.settings } } : {}),
+      guide: this.guide,
     };
   }
 
@@ -419,6 +425,7 @@ export class GameState {
     next.wants = restoreWantStats(data.wants); // (29.3)
     next.evolution = restoreEvolutionStats(data.evolution); // (29.4)
     next.rites = restoreRites(data.rites); // (29.7) v2-v39 kayıtlarında yoktur: boş
+    next.settings = restoreSettings(data.settings); // (30.1) eski kayıtlarda yok: hepsi varsayılan
     next.lineage = restoreLineage(data.lineage);
     next.activeGuest = sanitizeActiveGuest(data.activeGuest); // (26.3) v2-v30 kayıtlarında alan yoktur: null
     next.guestBook = restoreGuestBook(data.guestBook);
@@ -456,9 +463,18 @@ export class GameState {
       else if (c.apprenticeship.masterId !== null && !cIds.has(c.apprenticeship.masterId)) c.apprenticeship.masterId = null;
     }
     sanitizeReferences(next);
+    // (30.1) rehber: kayıtta yoksa nüfusu 8'den fazla olan oyun için kapalı, yoksa açık başlar
+    next.guide = restoreGuide(data.guide, next.characters.length);
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
+}
+
+/** (30.1) Kayıttaki oyuncu tercihleri: yalnızca bilinen alanlar, doğru türde. */
+function restoreSettings(data) {
+  const out = {};
+  if (data && typeof data === 'object' && typeof data.dilemmaTimer === 'boolean') out.dilemmaTimer = data.dilemmaTimer;
+  return out;
 }
 
 const NUM = (v) => (Number.isFinite(v) ? v : null);

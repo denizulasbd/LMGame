@@ -232,7 +232,18 @@ export class Hud {
       if (fairNow?.phase === 'prep') chips.unshift(chip(fairNow.fair.icon, `${fairNow.fair.name} · 18:00`, fairNow.fair.start, ' is-festival'));
       if (guestNow) chips.push(chip(guestNow.def.icon, `${guestNow.def.name} · ${guestNow.guest.name}`, `${guestNow.def.name} ${guestNow.guest.name} kasabaya uğradı (${guestNow.guest.departureDay}. günün 09:00'una kadar). Geçici misafir: nüfusa ve konuta sayılmaz.`, ' is-festival'));
       if (rally) chips.push(chip('bell', 'Meydanda toplanma', 'Toplanma Zili çaldı: sakinler bir saatliğine meydanda'));
-      if (sick.length) chips.push(chip('sneeze', `${sick.length} hasta`, `Üşütenler: ${sick.join(', ')}. Şifacı Kulübesi'nde iksirle hemen iyileşirler.`, ' is-freezing'));
+      // (21. aşama) İsyan alarmı ve açık dilekçeler (tıklanabilir)
+      const action = (icon, text, title, cls, onClick) => {
+        const b = el('button', { className: `buff-chip is-action${cls}`, type: 'button', title, tabIndex: -1 }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
+        b.addEventListener('mousedown', (e) => e.preventDefault());
+        b.addEventListener('click', onClick);
+        return b;
+      };
+      // (30.1) Tıklayınca ilk hasta sakin seçilir ve kamera ona kayar (eskiden çip tıklamaya yanıt vermiyordu)
+      if (sick.length) {
+        const firstSick = state.characters.find((c) => c.illness);
+        chips.push(action('sneeze', `${sick.length} hasta`, `Üşütenler: ${sick.join(', ')}. Şifacı Kulübesi'nde iksirle hemen iyileşirler. Tıkla: ilk hasta sakine odaklan`, ' is-freezing', () => firstSick && this.game.events.emit('ui:selectCharacter', firstSick.id)));
+      }
       if (away.length) chips.push(chip('map', `Seferde: ${away.length}`, `Keşif seferindekiler: ${away.join(', ')}`));
       if (storm) {
         const label = storm.kind === 'wolves' ? 'Kurt tehlikesi' : 'Fırtına yaklaşıyor';
@@ -243,13 +254,6 @@ export class Hud {
         chips.push(chip(crisisDamage ? 'repair' : 'storm', `${damaged.length} hasarlı yapı`, `Onarılmalı (ustalar kendiliğinden ya da panelden pahalı "Tamir Et"): ${damaged.join(', ')}`, ' is-freezing'));
       }
       if (injured.length) chips.push(chip('bandage', `${injured.length} hafif yaralı`, `Yürüme ve çalışma %20 yavaş: ${injured.join(', ')}. Şifacı Kulübesi'nde sarılırlar; yoksa 1,5 günde kendiliğinden geçer.`));
-      // (21. aşama) İsyan alarmı ve açık dilekçeler (tıklanabilir)
-      const action = (icon, text, title, cls, onClick) => {
-        const b = el('button', { className: `buff-chip is-action${cls}`, type: 'button', title, tabIndex: -1 }, [el('img', { src: getAnyIconURL(icon), alt: '' }), text]);
-        b.addEventListener('mousedown', (e) => e.preventDefault());
-        b.addEventListener('click', onClick);
-        return b;
-      };
       // (29.2) Kasabada yas / ağır travma: bilgi çipi, tıklayınca o sakine odaklanır
       if (mourners + shaken > 0) {
         const text = mourners > 0 ? `🕯️ ${mourners} sakin yasta${shaken ? ` · ${shaken} acılı` : ''}` : `${shaken} sakin acılı`;
