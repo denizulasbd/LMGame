@@ -1355,6 +1355,11 @@ const PAGE_HELPERS = () => {
           items: visible(q('.build-items')) ? rect(q('.build-items')) : null,
           hint: visible(q('.build-hint')) ? rect(q('.build-hint')) : null,
           modals: shown('.modal-window'),
+          // (30.2) sol alt sütun: Duygu açıklaması, hikâye kartları, rehber kartı; izlenenler ve çipler üst şeridin altında
+          legend: visible(q('.emotion-legend')) ? rect(q('.emotion-legend')) : null,
+          story: shown('.story-card').map(rect),
+          guide: visible(q('.guide-card')) ? rect(q('.guide-card')) : null,
+          chips: visible(q('.hud-under')) ? rect(q('.hud-under')) : null,
         };
       };
       const inspect = (label) => {
@@ -1385,6 +1390,25 @@ const PAGE_HELPERS = () => {
           ['kart', g.card, 'yapı listesi', g.items],
           ['kart', g.card, 'araç ipucu', g.hint],
           ['yapı listesi', g.items, 'dock', g.dock],
+          // (30.2) sol alt sütun birbirine, dock'a, üst şeride, çiplere, sakinlere ve karta binmez
+          ['açıklama', g.legend, 'dock', g.dock],
+          ['açıklama', g.legend, 'üst çubuk', g.top],
+          ['açıklama', g.legend, 'çipler', g.chips],
+          ['açıklama', g.legend, 'sakinler', g.collapsed ? null : g.drawer],
+          ['açıklama', g.legend, 'kart', g.card],
+          ['rehber', g.guide, 'dock', g.dock],
+          ['rehber', g.guide, 'açıklama', g.legend],
+          ['rehber', g.guide, 'sakinler', g.collapsed ? null : g.drawer],
+          ['rehber', g.guide, 'kart', g.card],
+          ...g.story.flatMap((sc, i) => [
+            [`hikâye kartı ${i + 1}`, sc, 'dock', g.dock],
+            [`hikâye kartı ${i + 1}`, sc, 'üst çubuk', g.top],
+            [`hikâye kartı ${i + 1}`, sc, 'açıklama', g.legend],
+            [`hikâye kartı ${i + 1}`, sc, 'rehber', g.guide],
+            [`hikâye kartı ${i + 1}`, sc, 'çipler', g.chips],
+            [`hikâye kartı ${i + 1}`, sc, 'sakinler', g.collapsed ? null : g.drawer],
+            [`hikâye kartı ${i + 1}`, sc, 'kart', g.card],
+          ]),
         ];
         for (const [an, a, bn, b] of pairs) if (area(a, b) > 4) problems.push(`${label}: ${an} ile ${bn} üst üste biniyor (${px(a)} / ${px(b)})`);
         // Üst çubuk: geniş ekranda tek satır, dar ekranda bile ince
@@ -1422,6 +1446,35 @@ const PAGE_HELPERS = () => {
       const select = (id) => {
         E.emit('ui:selectCharacter', id);
       };
+      // 0. (30.2) sol alt sütun: iki hikâye kartı + Duygu açıklaması + rehber kartı + izlenenler, hepsi aynı anda
+      {
+        const dir = scene.storyDirector;
+        const people = s.characters.filter((x) => !x.role);
+        s.guide = { done: ['move', 'meet'], off: false };
+        s.watched = people.slice(0, 3).map((x) => x.id);
+        dir.queue = [];
+        dir.visible = [];
+        dir.paused = false;
+        E.emit('relationship:married', { a: people[0], b: people[1] });
+        E.emit('population:died', { character: people[2], age: 70, cause: 'age', text: 'Uzun bir hayat sürdü ve herkesin sevgisini kazandı' });
+        scene.expression.setEnabled(true);
+        if (window.innerWidth <= 620 && !q('.resident-drawer').classList.contains('is-collapsed')) q('.resident-toggle').click();
+        await wait(320);
+        game.render(0);
+        await frame();
+        game.render(0);
+        if (shown('.story-card').length !== 2) problems.push(`hikâye kartı sayısı ${shown('.story-card').length} (2 bekleniyordu)`);
+        if (!visible(q('.emotion-legend'))) problems.push('Duygu açıklaması görünmüyor');
+        if (!visible(q('.guide-card'))) problems.push('rehber kartı görünmüyor');
+        inspect('sol alt sütun (kartlar + açıklama + rehber)');
+        scene.expression.setEnabled(false);
+        dir.queue = [];
+        dir.visible = [];
+        game.render(0);
+        s.watched = [];
+        if (window.innerWidth <= 620 && q('.resident-drawer').classList.contains('is-collapsed')) q('.resident-tab').click();
+        await wait(320);
+      }
       // 1. Yapı kartı (han) ve sakin kartı
       E.emit('ui:selectBuilding', s.buildings.find((b) => b.type === 'inn').id);
       await frame();

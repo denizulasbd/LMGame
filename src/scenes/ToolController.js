@@ -40,7 +40,8 @@ const T = CONFIG.TILE_SIZE;
 const SCAN_BUDGET = 24; // kare başına en çok bu kadar checkPlacement (boyama taraması)
 const NEAREST_RADIUS = 60; // "uygun yer yok" okunun arayacağı en büyük halka (karo)
 const CONFIRM_MS = 4000; // yıkım onayı süresi
-const PAINT_COLOR = 'rgba(126, 224, 110, 0.26)';
+const PAINT_COLOR = 'rgba(126, 224, 110, 0.34)';
+const PAINT_EDGE = 'rgba(206, 255, 160, 0.5)'; // (30.2) her uygun karonun içinde ince (1 px) çerçeve: soluk dolguyu seçilir kılar
 // Önbelleği düşüren olaylar (harita, yapılar, seviye, nüfus); saatlik yenileme geri kalanını yakalar
 const INVALIDATE_EVENTS = ['building:placed', 'building:removed', 'building:completed', 'building:upgraded', 'building:damaged', 'world:blocked', 'terrain:painted', 'job:completed', 'town:tierUp', 'population:joined', 'population:died', 'time:hour', 'exploration:itemGained'];
 
@@ -559,7 +560,14 @@ export class ToolController {
     const r = p.rect;
     for (let y = r.y0; y <= r.y1; y++) {
       for (let x = r.x0; x <= r.x1; x++) {
-        if (p.results.get(y * w + x)) renderer.fillRect(x * T, y * T, T, T, PAINT_COLOR);
+        if (!p.results.get(y * w + x)) continue;
+        const px = x * T;
+        const py = y * T;
+        renderer.fillRect(px, py, T, T, PAINT_COLOR);
+        renderer.fillRect(px, py, T, 1, PAINT_EDGE);
+        renderer.fillRect(px, py + T - 1, T, 1, PAINT_EDGE);
+        renderer.fillRect(px, py + 1, 1, T - 2, PAINT_EDGE);
+        renderer.fillRect(px + T - 1, py + 1, 1, T - 2, PAINT_EDGE);
       }
     }
   }

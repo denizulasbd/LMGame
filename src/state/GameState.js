@@ -44,6 +44,8 @@ import { sanitizeCurrentFeast } from '../systems/Feast.js';
 import { emptyGuestBook, restoreGuestBook, sanitizeActiveGuest } from '../systems/Guest.js';
 import { emptyRites, restoreRites, pruneRites } from '../systems/Rites.js';
 import { emptyGuide, restoreGuide } from '../systems/Guide.js';
+import { restoreWatched } from '../systems/StoryCards.js'; // (30.2)
+import { STORY_FILTERS } from '../data/storyCards.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
 
@@ -209,6 +211,7 @@ export class GameState {
     this.wants = emptyWantStats(); // (29.3) arzu / korku sayaçları: { rolled, fulfilled, expired, fearsRolled, realized, passed } (anahtar -> adet)
     this.rites = emptyRites(); // (29.7) anma törenleri (bekleyen, süren, kitabe) ve özel gün sayaçları
     this.settings = {}; // (30.1) oyuncu tercihleri (isteğe bağlı alanlar): { dilemmaTimer?: boolean } — yoksa kapalı
+    this.watched = []; // (30.2) "Yakından izle" sakin kimlikleri (isteğe bağlı alan; boşsa kayda yazılmaz)
     this.guide = emptyGuide(); // (30.1) rehber kartları: { done: [adım kimlikleri], off: bool, at?: { adım: oyun dakikası } }
     this.evolution = emptyEvolutionStats(); // (29.4) kişilik evrimi sayaçları: { turned, deepened, acquired (özellik -> adet), total }
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
@@ -327,6 +330,7 @@ export class GameState {
       // (30.1) isteğe bağlı alanlar: anahtar sırası hep sonda; boş tercih yazılmaz
       ...(Object.keys(this.settings).length ? { settings: { ...this.settings } } : {}),
       guide: this.guide,
+      ...(this.watched.length ? { watched: [...this.watched] } : {}),
     };
   }
 
@@ -465,6 +469,7 @@ export class GameState {
     sanitizeReferences(next);
     // (30.1) rehber: kayıtta yoksa nüfusu 8'den fazla olan oyun için kapalı, yoksa açık başlar
     next.guide = restoreGuide(data.guide, next.characters.length);
+    next.watched = restoreWatched(data.watched).filter((id) => next.characters.some((c) => c.id === id)); // (30.2)
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
@@ -474,6 +479,7 @@ export class GameState {
 function restoreSettings(data) {
   const out = {};
   if (data && typeof data === 'object' && typeof data.dilemmaTimer === 'boolean') out.dilemmaTimer = data.dilemmaTimer;
+  if (data && typeof data === 'object' && STORY_FILTERS[data.storyCards]) out.storyCards = data.storyCards; // (30.2)
   return out;
 }
 

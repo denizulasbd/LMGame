@@ -5024,12 +5024,11 @@ kbd {
    (30.1) Rehber kartı ve yanıp sönen düğme
    --------------------------------------------------------------------------- */
 .guide-card {
-  position: absolute;
-  left: 50%;
-  bottom: var(--ui-bottom-reserve, 96px);
-  transform: translateX(-50%);
+  position: relative; /* (30.2) sol alt sütunun en altı: hikâye kartlarının altında, dock'un üstünde */
   z-index: 39;
-  width: min(380px, calc(100vw - 32px));
+  width: 100%;
+  pointer-events: auto;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas: 'badge badge' 'text ok';
@@ -5283,3 +5282,114 @@ kbd {
 
 /* (30.1) Kasaba adı daha dar: 1366 px'te tek satır kalsın; sığmayan uzun ad + büyük sayılar yine ikinci satıra iner */
 #ui-layer .hud.topbar .hud-town-name { max-width: 170px; }
+
+
+/* ---------------------------------------------------------------------------
+   (30.2) Sol alt sütun: Duygu Katmanı açıklaması, hikâye kartları, rehber kartı (yukarıdan aşağı).
+   Dock'un hemen üstünde biter; haritayı ve araç çubuğunu örtmez.
+   --------------------------------------------------------------------------- */
+.ui-left {
+  position: absolute;
+  left: 8px;
+  bottom: var(--ui-bottom-reserve, 96px);
+  z-index: 38;
+  width: min(300px, calc(100vw - 16px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}
+
+.ui-left > *, .story-feed > * { pointer-events: auto; }
+.story-feed { display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.story-feed[hidden] { display: none; }
+.story-cards { display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.story-cards > * { pointer-events: auto; }
+
+.emotion-legend { box-sizing: border-box; padding: 4px 8px 6px; font-size: 11px; }
+.emotion-legend[hidden] { display: none; }
+.legend-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.legend-title { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ui-highlight); }
+.legend-close { padding: 0 6px; min-width: 0; line-height: 16px; font-size: 11px; }
+.legend-list { list-style: none; margin: 2px 0 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 1px 8px; }
+.legend-row { display: flex; align-items: center; gap: 6px; line-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.legend-row span { overflow: hidden; text-overflow: ellipsis; }
+.legend-mark { width: 20px; height: 14px; image-rendering: pixelated; flex: none; }
+.legend-line { display: inline-block; width: 20px; height: 3px; flex: none; border-radius: 1px; }
+
+.story-card { box-sizing: border-box; padding: 6px 8px 8px; overflow: hidden; animation: story-in 0.25s ease-out; }
+@keyframes story-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .story-card { animation: none; } }
+.story-card.is-p5 { border-color: #b56ad0; }
+.story-card.is-p4 { border-color: var(--ui-highlight); }
+.story-main { display: flex; gap: 6px; align-items: flex-start; }
+.story-portraits { display: flex; flex: none; }
+.story-portrait { width: 32px; height: 32px; image-rendering: pixelated; object-fit: cover; background: var(--ui-card); border: 2px solid var(--ui-line); }
+.story-portrait + .story-portrait { margin-left: -8px; }
+.story-body { flex: 1; min-width: 0; }
+.story-text { margin: 0; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+.story-long { margin: 4px 0 0; font-size: 11px; line-height: 1.3; color: var(--ui-ink-soft); max-height: 110px; overflow-y: auto; }
+.story-long[hidden], .story-watched[hidden] { display: none; }
+.story-watched { width: 14px; height: 14px; image-rendering: pixelated; flex: none; }
+.story-close { flex: none; background: none; border: 0; color: var(--ui-ink-soft); font-size: 12px; line-height: 12px; padding: 0 2px; cursor: pointer; }
+.story-buttons { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
+.story-buttons:empty { display: none; }
+.story-btn { padding: 1px 8px; font-size: 11px; }
+.story-btn[hidden] { display: none; }
+.story-btn.is-used { opacity: 0.6; }
+.story-timer { display: block; height: 2px; margin-top: 4px; background: var(--ui-highlight); opacity: 0.55; transition: width 0.2s linear; }
+
+.guide-card { max-width: 100%; }
+
+/* Üst şeridin altı: çipler ve izlenen sakinlerin portreleri */
+.hud-under { position: absolute; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: min(640px, 60vw); pointer-events: none; }
+.hud-under > * { pointer-events: auto; }
+.hud.topbar .hud-under .hud-buffs { position: static; max-width: none; }
+.hud-more { position: relative; }
+.hud-more-list { position: absolute; top: calc(100% + 3px); left: 0; z-index: 45; display: flex; flex-direction: column; gap: 3px; padding: 4px; min-width: 220px; max-width: min(360px, 90vw); }
+.hud-more-list[hidden] { display: none; }
+.hud-more-list .buff-chip { white-space: normal; }
+.buff-chip.is-more { cursor: pointer; border-color: var(--ui-ink-soft); }
+.buff-chip { cursor: default; }
+.buff-chip.is-action, .buff-chip.is-click { cursor: pointer; }
+.watch-strip { display: flex; gap: 4px; align-items: center; }
+.watch-strip[hidden] { display: none; }
+.watch-item { position: relative; padding: 0; width: 34px; height: 34px; background: var(--ui-paper); border: 2px solid var(--ui-highlight); cursor: pointer; }
+.watch-item img.watch-portrait { width: 100%; height: 100%; image-rendering: pixelated; object-fit: cover; display: block; }
+.watch-item img.watch-mark { position: absolute; right: -2px; top: -4px; width: 20px; height: 14px; image-rendering: pixelated; }
+.watch-item img.watch-star { position: absolute; left: -3px; bottom: -3px; width: 12px; height: 12px; image-rendering: pixelated; }
+
+/* Üst şerit: uzun kasaba adı kısalır (tam ad ipucunda); mevsim çipiyle çakışmaz */
+.hud-town-name { max-width: min(34vw, 320px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hud-pop, .hud-pop * { cursor: help; }
+
+/* Sakinler çekmecesi: izlenenler, dilek simgesi ve "?" ipucu */
+.resident-row.is-watched { box-shadow: inset 3px 0 0 var(--ui-highlight); }
+.resident-watch { flex: none; width: 16px; height: 16px; padding: 0; border: 0; background: none; cursor: pointer; opacity: 0.35; }
+.resident-watch img { width: 14px; height: 14px; image-rendering: pixelated; display: block; }
+.resident-row.is-watched .resident-watch, .resident-row:hover .resident-watch { opacity: 1; }
+.resident-wish { width: 14px; height: 14px; image-rendering: pixelated; flex: none; }
+.resident-mark.resident-mood-mark { width: 20px; height: 14px; }
+.resident-help { position: relative; flex: none; margin-left: 4px; }
+.resident-help-btn { padding: 0 6px; min-width: 0; line-height: 16px; font-size: 11px; cursor: help; }
+.resident-help-tip { position: absolute; top: calc(100% + 4px); right: 0; z-index: 46; width: 230px; padding: 6px 8px; font-size: 11px; line-height: 1.35; }
+.resident-help-tip[hidden] { display: none; }
+.resident-help-tip div { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+.resident-help-tip img { width: 20px; height: 14px; image-rendering: pixelated; flex: none; }
+
+/* Sakin kartındaki "Yakından izle" yıldızı */
+.watch-toggle { display: inline-flex; align-items: center; gap: 4px; }
+.watch-toggle img { width: 14px; height: 14px; image-rendering: pixelated; }
+.watch-toggle.is-active { border-color: var(--ui-highlight); background: var(--ui-card-hi); }
+
+.settings-story-row { flex-wrap: wrap; }
+
+.map-hint { position: absolute; left: 50%; top: 26%; transform: translateX(-50%); z-index: 36; padding: 4px 12px; font-size: 13px; color: var(--ui-ink); background: var(--ui-paper); border: 2px solid var(--ui-line); pointer-events: none; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4); white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
+.map-hint[hidden] { display: none; }
+
+/* Telefon genişliğinde sakinler çekmecesi açıkken sol alt sütun gizlenir (kartlar çekmece kapanınca sürer) */
+@media (max-width: 620px) {
+  #ui-layer:has(.resident-drawer:not(.is-collapsed)) .ui-left { visibility: hidden; }
+  .hud-under { max-width: calc(100vw - 16px); }
+}

@@ -57,9 +57,9 @@ export class StoryFeed {
     this.legendOn = readEmotionPref();
     game.events.on('ui:emotionsChanged', (on) => {
       this.legendOn = Boolean(on);
-      if (on) this.legendHidden = false; // açılınca yeniden görünür; ✕ ile kapatılınca bu oturum için hatırlanır
-      writeLegendHidden(this.legendHidden);
     });
+    // Ayarlar > Hikâye: açıklamayı yeniden aç / kapat (✕ ile kapatılan açıklama kalıcı olarak hatırlanır)
+    game.events.on('ui:setEmotionLegend', ({ hidden } = {}) => this.setLegendHidden(Boolean(hidden)));
 
     // --- Kartlar
     this.cards = el('div', { className: 'story-cards' });
@@ -67,6 +67,9 @@ export class StoryFeed {
     this.cards.addEventListener('mouseover', () => (this.hover = true));
     this.cards.addEventListener('mouseleave', () => (this.hover = false));
     this.hover = false;
+    // (30.2) Duygu Katmanı açıkken seçili sakin yoksa haritada ipucu (seçim yapılınca kaybolur)
+    this.mapHint = el('div', { className: 'map-hint', hidden: true, role: 'note', text: 'Bir sakine tıkla, bağlarını gör.' });
+    this.floating = [this.mapHint];
   }
 
   get director() {
@@ -76,6 +79,7 @@ export class StoryFeed {
   setLegendHidden(hidden) {
     this.legendHidden = hidden;
     writeLegendHidden(hidden);
+    this.events.emit('story:legendChanged', hidden);
   }
 
   buildCard(card) {
@@ -114,6 +118,7 @@ export class StoryFeed {
     const hidden = !dir || root?.classList.contains('is-title') || root?.classList.contains('is-cinematic');
     this.element.hidden = Boolean(hidden);
     this.legend.hidden = hidden || !this.legendOn || this.legendHidden;
+    this.mapHint.hidden = Boolean(hidden) || !this.legendOn || (game.scenes.current?.selectedId ?? null) !== null;
     if (hidden) return;
     dir.tick(dt, { paused: game.state.time.paused, hovered: this.hover });
     const state = game.state;

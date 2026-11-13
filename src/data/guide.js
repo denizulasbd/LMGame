@@ -2,7 +2,7 @@
 // söyler; görünme ve tamamlanma koşulları systems/Guide.js'te (saf işlevler, oyun durumundan okunur).
 // Her kart en çok iki kısa cümle; **kalın** sözcükler arayüzdeki düğme adlarıdır. target: karta eşlik eden düğmenin
 // CSS seçicisi (GuideCard yanıp söndürür; seçici hiçbir öğeye uymuyorsa kart yine görünür).
-export const GUIDE_TABLE_VERSION = 1;
+export const GUIDE_TABLE_VERSION = 2; // (30.2) hikâye kartı ve Yakından izle adımları eklendi
 
 export const GUIDE_STEPS = [
   { id: 'move', text: 'Haritayı WASD ya da sağ tıkla sürükleyerek gez. Tekerlek yakınlaştırır.', target: null },
@@ -14,7 +14,13 @@ export const GUIDE_STEPS = [
   { id: 'goals', text: 'Sırada ne var? **Hedefler** penceresi yol gösterir.', target: '.goals-toggle' },
   { id: 'upgrade', text: 'Bir kulübeye tıkla, panelindeki **Yükselt**\'e bas.', target: '.upgrade-button' },
   { id: 'petition', text: 'Bir sakinin senden isteği var. Üstteki çipe tıkla.', target: '.hud-buffs .is-petition' },
+  // (30.2)
+  { id: 'cards', text: 'Sol alttaki kartlar kasabada olup biteni anlatır. **Git** seni oraya götürür.', target: '.story-card .story-go' },
+  { id: 'cardAction', text: 'Bazı kartlarda yapabileceğin bir şey vardır.', target: '.story-card .story-action' },
+  { id: 'watch', text: 'Bir sakini **Yakından izle**; başına gelenleri kaçırmazsın.', target: '.resident-watch, .watch-toggle' },
 ];
+/** Nüfus bu sayıya ulaşınca "Yakından izle" adımı çıkar. */
+export const GUIDE_WATCH_POPULATION = 8;
 
 /** Depo sınırının bu oranına gelen kaynak için "Kiler kur" kartı çıkar. */
 export const GUIDE_STORAGE_RATIO = 0.9;

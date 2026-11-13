@@ -212,6 +212,12 @@ export class CharacterPanel {
       this.events.emit('ui:followCharacter', next);
     });
     this.followButton.classList.add('character-follow');
+    // (30.2) Yakından izle (yıldız): en çok 3 sakin; izlenenin her olayı hikâye kartı olur
+    this.watchButton = this.button('Yakından izle', 'Başına gelen her şey (küçük olaylar dahil) hikâye kartı olur; en çok 3 sakin', () => this.events.emit('ui:toggleWatch', { id: this.characterId }));
+    this.watchButton.classList.add('watch-toggle');
+    this.watchButton.prepend(el('img', { src: getAnyIconURL('star'), alt: '' }));
+    this.watchLabel = this.watchButton.childNodes[1];
+    this.game.events.on('story:watchChanged', () => this.updateFollowButton());
 
     const section = (title, body) => el('div', { className: 'relations' }, [el('div', { className: 'relations-title', text: title }), body]);
     // (29.9) yeni sunumlar: tek cümlelik durum, en önemli arzu / korku, kişilik ekseni çubukları, değişim günlüğü, yaşam öyküsü, omuz omuza
@@ -240,6 +246,7 @@ export class CharacterPanel {
         el('div', { className: 'character-needs' }, needs),
         this.desireSection,
         this.followButton,
+        this.watchButton,
       ]),
       inner: body('inner', [
         section('Ruh Hali ve İç Dünya', this.moodList),
@@ -332,6 +339,9 @@ export class CharacterPanel {
     const following = this.characterId !== null && this.followingId === this.characterId;
     this.followButton.textContent = following ? 'Takibi Bırak' : 'Kamerayla Takip Et';
     this.followButton.classList.toggle('is-active', following);
+    const watching = this.characterId !== null && (this.game.state.watched ?? []).includes(this.characterId);
+    if (this.watchLabel) this.watchLabel.textContent = watching ? 'Yakından izleniyor' : 'Yakından izle';
+    this.watchButton.classList.toggle('is-active', watching);
   }
 
   /** Kimlik bilgisi değişince yeniden kurulur (karakter, ev, çocukluk, aile durumu). */

@@ -2,7 +2,7 @@
 // değiştirir), zar çekmez. Bağlam: { state, facts }; facts bu oturumda gözlenen eylemlerdir ({ moved, selected, speedChanged,
 // goalsOpened, upgraded, placed, petitionSelected }) ve kaydedilmez; kalıcı olan yalnızca state.guide.done'dır.
 //   state.guide = { done: [adım kimlikleri], off: bool, at?: { adım: oyun dakikası } }   (isteğe bağlı alanlar)
-import { GUIDE_STEPS, GUIDE_STORAGE_RATIO, GUIDE_SPEED_DELAY_MINUTES, GUIDE_OLD_SAVE_POPULATION } from '../data/guide.js';
+import { GUIDE_STEPS, GUIDE_STORAGE_RATIO, GUIDE_SPEED_DELAY_MINUTES, GUIDE_OLD_SAVE_POPULATION, GUIDE_WATCH_POPULATION } from '../data/guide.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { RESOURCES } from '../data/resources.js';
 import { storageLimit } from './Granary.js';
@@ -74,6 +74,10 @@ export const CONDITIONS = {
     when: ({ state }) => (state.petitions?.list ?? []).length > 0,
     done: ({ facts }) => Boolean(facts.petitionSelected),
   },
+  // (30.2) ilk hikâye kartı çıkınca; "Git"e basınca ya da kart kaybolunca tamam
+  cards: { when: ({ facts }) => Boolean(facts.storyShown), done: ({ facts }) => Boolean(facts.storyGo) },
+  cardAction: { when: ({ facts, guide }) => Boolean(facts.storyActionShown) && isDone(guide, 'cards'), done: ({ facts }) => Boolean(facts.storyActed) },
+  watch: { when: ({ state }) => state.characters.length >= GUIDE_WATCH_POPULATION, done: ({ state }) => (state.watched?.length ?? 0) > 0 },
 };
 
 /** Koşulu kendiliğinden sağlanmış (görünmeden bitmiş) adımlar: oyuncu sırayı beklemeden yaptıysa kart çıkmaz. */

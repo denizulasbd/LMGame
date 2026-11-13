@@ -46,6 +46,7 @@ import { CraftingSystem } from '../systems/CraftingSystem.js';
 import { JournalSystem } from '../systems/JournalSystem.js';
 import { SaveSystem } from '../systems/SaveSystem.js';
 import { GuideSystem } from '../systems/GuideSystem.js'; // (30.1) rehber kartları
+import { StoryDirector } from '../systems/StoryDirector.js'; // (30.2) hikâye kartları
 import { EventSystem } from '../systems/EventSystem.js';
 import { HeatingSystem } from '../systems/HeatingSystem.js';
 import { MilestoneSystem } from '../systems/MilestoneSystem.js';
@@ -305,8 +306,10 @@ export class TownScene extends Scene {
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
     this.guideSystem = new GuideSystem(this.game, { attract: this.attract }); // (30.1) güncelleme listesinde değil: yalnızca olay dinler
+    this.storyDirector = new StoryDirector(this.game, { attract: this.attract }); // (30.2) güncelleme listesinde değil: yalnızca olay dinler
     this.disposables = [
       this.guideSystem,
+      this.storyDirector,
       this.timeSystem,
       this.construction,
       this.nature,
@@ -582,6 +585,7 @@ export class TownScene extends Scene {
     this.fireflies.update(dt, this.map);
     this.audio.update(dt, tick.hour);
 
+    this.storyDirector.sync(); // (30.2) hikâye kartı kuyruğu (oyun saati işleri); zar çekmez, simülasyona yazmaz
     if (this.attract) {
       this.drainInput();
       return;

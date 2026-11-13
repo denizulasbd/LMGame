@@ -30,6 +30,12 @@ export class GuideSystem {
       on('time:setSpeed', () => (this.facts.speedChanged = true)),
       on('time:togglePause', () => (this.facts.speedChanged = true)),
       on('ui:modalChanged', ({ id } = {}) => id === 'goals' && (this.facts.goalsOpened = true)),
+      on('story:shown', ({ action } = {}) => {
+        this.facts.storyShown = true;
+        if (action) this.facts.storyActionShown = true;
+      }),
+      on('ui:storyGo', () => (this.facts.storyGo = true)),
+      on('ui:storyAction', () => (this.facts.storyActed = true)),
       on('ui:guideDismiss', ({ id }) => this.complete(id)),
       on('ui:guideSetOff', ({ off }) => this.setOff(off)),
       on('ui:guideRestart', () => this.restart()),

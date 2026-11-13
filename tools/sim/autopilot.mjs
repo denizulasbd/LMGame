@@ -46,6 +46,7 @@
 //                                         [--crisis huzurlu|dengeli|cetin] [--no-safety] [--crisis-state]
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
 //   --speed   : oyun hızı (varsayılan 4); 1x'te aynı oyun günü dört kat çok, daha küçük adımla geçer
+//   --stories : (30.2) hikâye kartı günlüğünü dosyaya yazar (gün başına kart sayımı)
 //   --save    : simülasyon sonunda oyunu kayıt dosyasına yazar (uyumluluk testinin fikstürü için)
 //   --crisis  : (23. aşama) tehlike sıklığı (varsayılan dengeli); huzurlu + --no-safety, 22. aşamayla bire bir aynı koşuyu verir
 //   --crisis-state : (23. aşama) kayıttan hemen önce bir yangın, bir hasarlı yapı, bir yaralı ve bekleyen bir haydut baskını oluşturur
@@ -73,6 +74,7 @@ const speed = Number(options.speed ?? 4);
 const { browser, page, errors } = await openGame({ seed });
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
+if (options.stories) await page.evaluate(() => (window.game.scenes.current.storyDirector.autoTick = true)); // (30.2)
 // (29.4) --evo "rules.decayPerDay=3;sources.moodlets.quarrel=..." : denge denemeleri için evrim verisini bellekte geçersiz kılar (dosyaya yazmaz).
 // Yol: evolution.js dışa aktarımı.alan...; değer JSON. Örn: --evo "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
 if (options.evo) {
@@ -1046,6 +1048,12 @@ if (options.save) {
   });
   fs.writeFileSync(options.save, snapshot);
   console.log('kayıt yazıldı:', options.save);
+}
+if (options.stories) {
+  // (30.2) --stories dosya.json : hikâye kartı günlüğü (gün başına kart sayısı, metinler); raporu ve kaydı etkilemez
+  const out = await page.evaluate(() => ({ log: window.game.scenes.current.storyDirector?.log ?? [], shown: window.game.scenes.current.storyDirector?.shownLog ?? [] }));
+  fs.writeFileSync(options.stories, JSON.stringify(out, null, 1));
+  console.log('hikâye günlüğü yazıldı:', options.stories, `(${out.log.length} olay, ${out.shown.length} gösterilen kart)`);
 }
 const mon = await monitorReport(page);
 const bondStats = await page.evaluate(() => {

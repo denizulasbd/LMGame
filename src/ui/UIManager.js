@@ -9,6 +9,7 @@
 //   cards   : sağ altta bağımsız bilgi kartı (sakin, yapı, takas); çekmeceyle aynı sütunda, üst üste binmez
 //   bottom  : alt ortada birleşik araç çubuğu (dock): araçlar ve pencere düğmeleri
 //   modal   : ekranın ortasında açılan pencereler (Günlük, Hedefler, Arşiv, Ayarlar); bkz. ModalHost
+//   left    : (30.2) sol altta dock'un üstünde: Duygu Katmanı açıklaması, hikâye kartları, rehber kartı
 //   free    : kendi konumunu CSS ile belirleyenler (karar penceresi, kutlama, başlangıç ekranı, harita ipucu)
 // Dock'un yüksekliği ölçülüp --ui-bottom-reserve olarak verilir; sağ sütun ve pencereler onun üstünde biter.
 import { el } from './dom.js';
@@ -31,6 +32,7 @@ import { SettingsPanel } from './components/SettingsPanel.js';
 import { CrisisModal } from './components/CrisisModal.js';
 import { MapTooltip } from './components/MapTooltip.js';
 import { GuideCard } from './components/GuideCard.js';
+import { StoryFeed } from './components/StoryFeed.js';
 
 const BOTTOM_GAP = 10; // dock ile pencere kenarı / sağ sütun arasındaki boşluk (piksel)
 
@@ -44,10 +46,11 @@ export class UIManager {
       drawer: el('div', { className: 'ui-drawer' }),
       cards: el('div', { className: 'ui-cards' }),
       bottom: el('div', { className: 'ui-bottom' }),
+      left: el('div', { className: 'ui-left' }), // (30.2) sol alt sütun: Duygu Katmanı açıklaması, hikâye kartları, rehber kartı
       free: root,
     };
     const right = el('div', { className: 'ui-right' }, [this.slots.drawer, this.slots.cards]);
-    root.append(this.slots.top, this.slots.toasts, right, this.slots.bottom);
+    root.append(this.slots.top, this.slots.toasts, right, this.slots.bottom, this.slots.left);
     this.modals = new ModalHost(root, game);
 
     this.dock = new BuildMenu(game);
@@ -69,6 +72,7 @@ export class UIManager {
       new DilemmaModal(game),
       new TitleMenu(game),
       new MapTooltip(game),
+      new StoryFeed(game), // (30.2)
       new GuideCard(game), // (30.1)
     ];
     for (const component of this.components) {

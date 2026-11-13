@@ -28,7 +28,9 @@ export class StoryDirector {
     this.missed = [];
     this.nextUid = 1;
     this.created = 0; // kuyruğa ya da ekrana giren kart sayısı (denetim)
-    this.log = []; // { day, event, priority, text, shown }  (denetim: gün başına kart sayısı)
+    this.log = []; // { day, event, priority, text, shown }  (denetim: kuyruğa girişler; shown: kuyruğa girdi / false: süzgeç ya da kuyruk taştı)
+    this.shownLog = []; // { day, event, priority, text }  (denetim: ekranda gösterilen kartlar)
+    this.autoTick = false; // başsız denetim: her sync'te 1/60 gerçek saniye ilerler (4x oyunu taklit eder)
     this.stories = new Map(); // ölmek üzere olan sakin -> yaşam öyküsünün ilk cümlesi
     this.lastJournal = '';
     this.scanDay = -1;
@@ -168,6 +170,7 @@ export class StoryDirector {
       }
     }
     if (t.hour >= L.specialStartHour && t.hour < L.summaryHour) this.scanSpecial();
+    if (this.autoTick) this.tick(1 / 60, { paused: t.paused });
   }
 
   /** 06:00'dan sonra bugün özel günü olan sakinler için (günde bir kez) sabah kartı. */
@@ -209,6 +212,9 @@ export class StoryDirector {
       card.used = false;
       card.open = false;
       this.visible.push(card);
+      this.shownLog.push({ day: this.state.time.day, event: card.event, priority: card.priority, text: card.text });
+      if (this.shownLog.length > 4000) this.shownLog.splice(0, 1000);
+      this.events.emit('story:shown', { uid: card.uid, action: Boolean(card.action && card.action.type !== 'story') });
     }
   }
 

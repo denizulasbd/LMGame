@@ -9,6 +9,8 @@ import { el } from '../dom.js';
 import { dockButton, modalHeader } from '../dockButton.js';
 import { getIconDataURL } from '../../art/ui/index.js';
 import { CRISIS_DIFFICULTY } from '../../data/crisis.js';
+import { STORY_FILTERS } from '../../data/storyCards.js';
+import { readLegendHidden } from './StoryFeed.js';
 
 const CONFIRM_TIMEOUT_MS = 6000;
 
@@ -83,6 +85,9 @@ export class SettingsPanel {
       });
     this.guideButtons = toggleButtons([[true, 'Açık', 'İlk saatte ipucu kartları çıkar'], [false, 'Kapalı', 'İpucu kartları çıkmaz']], (on) => this.events.emit('ui:guideSetOff', { off: !on }), 'settings-guide');
     this.guideRestart = button('Rehberi baştan başlat', 'Tamamlanan ipuçları silinir, kartlar ilk adımdan çıkar', () => this.events.emit('ui:guideRestart'), 'settings-guide-restart');
+    // (30.2) Hikâye kartları: Hepsi / Yalnızca önemli / Kapalı
+    this.storyButtons = toggleButtons(Object.entries(STORY_FILTERS).map(([key, def]) => [key, def.name, def.hint]), (key) => this.events.emit('ui:setStoryFilter', { filter: key }), 'settings-story');
+    this.legendButtons = toggleButtons([[false, 'Göster', 'Duygular açıkken sol altta işaret ve çizgi renklerinin açıklaması görünür'], [true, 'Gizle', 'Açıklama kutusu görünmez']], (hidden) => this.events.emit('ui:setEmotionLegend', { hidden }), 'settings-legend');
     this.timerButtons = toggleButtons([[false, 'Kapalı', 'Karar penceresi sen seçene dek bekler'], [true, '30 saniye', 'Seçilmezse 30 saniye sonra güvenli seçenek uygulanır']], (on) => this.events.emit('ui:setDilemmaTimer', { on }), 'settings-timer');
 
     const keys = CONTROLS.map(([ks, label]) =>
@@ -94,6 +99,7 @@ export class SettingsPanel {
       section('Oyun', this.saveRow, this.confirmRow, this.saveInfo),
       section('Tehlike Sıklığı', el('div', { className: 'settings-row' }, this.crisisButtons), this.crisisNote),
       section('Rehber', el('div', { className: 'settings-row settings-guide-row' }, [el('span', { className: 'settings-label', text: 'Rehber:' }), ...this.guideButtons, this.guideRestart])),
+      section('Hikâye', el('div', { className: 'settings-row settings-story-row' }, [el('span', { className: 'settings-label', text: 'Hikâye kartları:' }), ...this.storyButtons]), el('div', { className: 'settings-row' }, [el('span', { className: 'settings-label', text: 'Duygu Katmanı açıklaması:' }), ...this.legendButtons])),
       section('Kararlar', el('div', { className: 'settings-row settings-timer-row' }, [el('span', { className: 'settings-label', text: 'Kararlarda süre sınırı:' }), ...this.timerButtons])),
       section('Ses ve görünüm', el('div', { className: 'settings-row' }, [this.muteButton]), this.info),
       section('Kontroller', el('div', { className: 'settings-keys-list' }, keys)),
@@ -137,6 +143,10 @@ export class SettingsPanel {
     for (const b of this.crisisButtons) b.classList.toggle('is-active', b.dataset.difficulty === current);
     const guideOn = game.state.guide?.off !== true;
     for (const b of this.guideButtons) b.classList.toggle('is-active', (b.dataset.value === 'true') === guideOn);
+    const storyMode = game.state.settings?.storyCards ?? 'important';
+    for (const b of this.storyButtons) b.classList.toggle('is-active', b.dataset.value === storyMode);
+    const legendHidden = readLegendHidden();
+    for (const b of this.legendButtons) b.classList.toggle('is-active', (b.dataset.value === 'true') === legendHidden);
     const timed = game.state.settings?.dilemmaTimer === true;
     for (const b of this.timerButtons) b.classList.toggle('is-active', (b.dataset.value === 'true') === timed);
     const note = `${CRISIS_DIFFICULTY[current]?.description ?? ''} Yanan yapılar haritadan silinmez, yaralanan sakin ölmez.`;
