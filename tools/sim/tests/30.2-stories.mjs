@@ -415,7 +415,7 @@ const open = async (opts) => {
     hud.renderTitle(st);
     st.characters.push(...[]);
     const nameTip = hud.townName.title;
-    c('vadi ve doktrin bilgisi kasaba adının ipucunda; nüfus yanındaki "Saygın" ibaresinin kendi ipucu var', /Vadi Karakteri: /.test(nameTip) && /Kasaba Doktrini/.test(nameTip) && !document.querySelector('.hud-valley-chip'), nameTip.slice(0, 60));
+    c('vadi ve doktrin bilgisi kasaba adının ipucunda; nüfus yanındaki "Saygın" ibaresinin kendi ipucu var', /Vadi Karakteri: /.test(nameTip) && /Kasaba Doktrini/.test(nameTip) && (document.querySelector('.hud-valley-chip')?.offsetWidth ?? 0) <= 1, nameTip.slice(0, 60));
     const v = people[3];
     v.isVenerable = true; v.homeId = null;
     hud.lastWelfare = ''; hud.renderWelfare(st);

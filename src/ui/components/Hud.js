@@ -61,6 +61,16 @@ function chipTip({ what, why, left, effect }) {
   return `Ne: ${what}\nNeden: ${why}\nSüre: ${left}\nEtki: ${effect}`;
 }
 
+/** Vadi Karakteri, Doktrin ve geç oyun beklentisi: kasaba adının ipucu metni (ve görünmez not). */
+function valleyInfo(state) {
+  const valley = VALLEYS[state.valley];
+  const doctrine = DOCTRINES[state.doctrine?.chosen];
+  const late = lateGameActive(state);
+  const missing = missingLuxuries(state).map((k) => LATE_GAME.luxuries[k].name);
+  const title = `Vadi Karakteri: ${valley?.name}. ${valley?.description ?? ''}\n${doctrine ? `Kasaba Doktrini: ${doctrine.name}. ${doctrine.description}` : 'Kasaba Doktrini: henüz seçilmedi (Bilgelik Evi araştırması ya da Belediye fermanıyla seçilir).'}${late ? `\nGeç oyun beklentisi: Keyif ve Sosyallik %${Math.round((LATE_GAME.decay - 1) * 100)} çabuk azalır; ${missing.length ? `EKSİK lüks: ${missing.join(', ')} (refah -${missing.length * LATE_GAME.perMissing})` : 'lüks kalemleri tam (şerbet, kumaş, sıcak yemek)'}.` : ''}`;
+  return { title, text: `${valley?.name ?? '-'}${doctrine ? ` · ${doctrine.name.replace(' Doktrini', '')}` : ''}${late && missing.length ? ` · eksik lüks ${missing.length}` : ''}` };
+}
+
 /** Kasaba bonusunun etkisi (data/town.js alanlarından). */
 function buffEffect(b) {
   const def = TOWN_BUFFS[b.key] ?? {};
@@ -172,7 +182,7 @@ export class Hud {
         ? `\nYönetim Güveni: %${trust} · İSYAN sürüyor! Güven %${REVOLT.endTrust}'in üstüne çıkınca yatışır (meydan havuzu / Belediye Konağı: erzak ve altın dağıt).`
         : `\nYönetim Güveni: %${trust} (${tl.name}). Dilekçeleri karşılamak ve yüksek refah güveni artırır; reddetmek, açlık, soğuk ve %35 altı refah eritir. %${REVOLT.critical} altında uzun kalırsa isyan çıkar.`;
       this.welfareRow.title = `Refah (ortalama mutluluk): ${level.name}. Göç için en az %${IMMIGRATION.minHappiness} gerekir.${beauty}${trustLine}`;
-      this.population.textContent = `${population}/${capacity}`; // (28.3) örn. 28/30 (+2 Saygın)
+      this.populationCount.textContent = `${population}/${capacity}`; // (28.3) örn. 28/30 (+2 Saygın)
       this.venerable.textContent = venerable ? ` (+${venerable} Saygın)` : '';
       this.venerable.title = venerable ? `Saygın (+${venerable}): yatağı olmayan, nüfus kotasına sayılmayan bilgeler. Kasabanın büyükleri; nasihat verirler.` : '';
       this.populationWrap.classList.toggle('is-full', population >= capacity);
@@ -311,6 +321,11 @@ export class Hud {
       if (state.tax?.rate === 'heavy') add(2, 'torch', 'Ağır Vergi · verim -%15', { what: 'İç vergi Ağır.', why: 'Belediyede Ağır Vergi seçili.', left: 'Sen değiştirene kadar sürer.', effect: TAX_RATES.heavy.description }, ' is-freezing', openHall);
       const trustNow = Math.round(trustValue(state));
       if (!revoltNow && trustNow < 50) add(2, 'trust', `Güven %${trustNow}`, { what: `Yönetim Güveni düşük (${trustLevel(trustNow).name}).`, why: 'Reddedilen dilekçeler, açlık, soğuk ve düşük refah güveni eritir.', left: `%${REVOLT.critical} altında ${REVOLT.graceHours} saat kalırsa isyan çıkar.`, effect: 'Dilekleri karşıla, erzak / altın dağıt. Tıkla: Belediye.' }, ' is-freezing', openHall);
+      {
+        const v = valleyInfo(state);
+        this.valleyText.textContent = v.text;
+        this.valleyNote.title = v.title;
+      }
       // Krizler (grup 0)
       if (revoltNow) {
         const venue = state.buildings.find((x) => x.functional && x.type === 'fountain') ?? hallB;
@@ -408,7 +423,7 @@ export class Hud {
     const tier = townTier(state);
     const next = nextTownTier(state);
     const checks = next ? tierChecks(state, next) : [];
-    const key = `${state.townName}|${tier.tier}|${checks.map((c) => `${c.current}:${c.ok}`).join(',')}|${state.valley}|${state.doctrine?.chosen}`;
+    const key = `${state.townName}|${tier.tier}|${checks.map((c) => `${c.current}:${c.ok}`).join(',')}|${state.valley}|${state.doctrine?.chosen}|${lateGameActive(state)}|${missingLuxuries(state).join()}`;
     if (key === this.lastTitle) return;
     this.lastTitle = key;
     this.townName.textContent = formatTownTitle(state.townName, tier);
@@ -423,9 +438,7 @@ export class Hud {
       lines.push('En yüksek seviye: kasaban artık gelişmiş bir şehir!');
     }
     lines.push('', 'Adı değiştirmek için tıkla · Ayrıntılar: Hedefler (O)');
-    const valley = VALLEYS[state.valley];
-    const doctrine = DOCTRINES[state.doctrine?.chosen];
-    const place = `${formatTownTitle(state.townName, tier)}\nVadi Karakteri: ${valley?.name ?? '-'}. ${valley?.description ?? ''}\n${doctrine ? `Kasaba Doktrini: ${doctrine.name}. ${doctrine.description}` : 'Kasaba Doktrini: henüz seçilmedi (Bilgelik Evi araştırması ya da Belediye fermanıyla seçilir).'}\n\n`;
+    const place = `${formatTownTitle(state.townName, tier)}\n${valleyInfo(state).title}\n\n`;
     this.townName.title = place + lines.join('\n');
     this.tierBadge.title = lines.slice(0, -2).join('\n');
     this.tierBadge.classList.toggle('is-ready', Boolean(next) && checks.every((c) => c.ok));
@@ -525,9 +538,11 @@ export class Hud {
       return b;
     });
     this.pausedBadge = el('span', { className: 'hud-paused', text: 'DURDU' });
-    this.population = el('span', { className: 'hud-population' });
+    this.populationCount = document.createTextNode('');
     this.venerable = el('span', { className: 'hud-venerable' }); // (30.2) kendi ipucu var
-    this.populationWrap = el('span', { className: 'hud-chip hud-pop' }, [el('img', { className: 'hud-icon', src: getAnyIconURL('people'), alt: '' }), this.population, this.venerable]);
+    this.population = el('span', { className: 'hud-population' }, [this.venerable]);
+    this.population.prepend(this.populationCount);
+    this.populationWrap = el('span', { className: 'hud-chip hud-pop' }, [el('img', { className: 'hud-icon', src: getAnyIconURL('people'), alt: '' }), this.population]);
     this.muteButton = button('', 'Sesi kapat / aç', () => game.events.emit('ui:toggleMute'));
     this.muteIcon = el('img', { className: 'hud-btn-icon', alt: '' });
     this.muteButton.append(this.muteIcon);
@@ -560,6 +575,9 @@ export class Hud {
     this.watchKey = '';
     this.under = el('div', { className: 'hud-under' }, [this.buffs, this.watch]);
     this.chipList = [];
+    // (30.2) Vadi Karakteri çipi kaldırıldı: bilgi kasaba adının ipucunda. Aynı bilgi ekran okuyucular için görünmez bir öğede de durur.
+    this.valleyText = el('span', { className: 'hud-valley' });
+    this.valleyNote = el('span', { className: 'hud-valley-chip sr-only' }, [this.valleyText]);
     this.lastWelfare = '';
     this.lastBuffs = '';
     this.welfareAt = -Infinity; // ilk karede hemen çizilsin
@@ -592,7 +610,7 @@ export class Hud {
 
     const zone = (cls, children) => el('div', { className: `hud-zone ${cls}` }, children);
     this.element = el('div', { className: 'panel hud topbar ui-interactive' }, [
-      zone('hud-zone-town', [this.tierIcon, this.townName, this.townInput, this.tierBadge]),
+      zone('hud-zone-town', [this.tierIcon, this.townName, this.townInput, this.tierBadge, this.valleyNote]),
       zone('hud-zone-time', [
         el('span', { className: 'hud-chip hud-season-chip' }, [this.seasonIcon, this.seasonText]),
         el('span', { className: 'hud-chip hud-clock-chip' }, [this.icon, this.day, this.clock, this.weatherIcon]),
