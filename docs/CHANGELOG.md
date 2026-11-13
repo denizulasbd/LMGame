@@ -2,6 +2,16 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 20 satır. README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 30.2 — Görünen Hikâye (kayıt sürümü 40 kalır; yeni simülasyon sistemi yok)
+- Hikâye kartları: `data/storyCards.js` (öncelik tablosu sürüm 1, sınırlar, süzgeçler), `systems/StoryCards.js` (saf: olay yükünden metin, süzgeç, kuyruk, gün özeti), `systems/StoryDirector.js` (olay dinler; güncelleme listesinde değil; zar çekmez; kartlar gerçek zamanla işler), `ui/components/StoryFeed.js` (sol alt sütun: Duygu açıklaması, kartlar, rehber; UIManager `left` yuvası).
+- Süzgeç: Ayarlar > Hikâye (Hepsi / Yalnızca önemli [varsayılan] / Kapalı) = `state.settings.storyCards` (isteğe bağlı). Elenen / kuyruktan düşen olaylar 22:00 gün özetine girer. Özel gün sabahı kartı oyun-saati işidir (`sync()`, RiteSystem'den sonra).
+- Yakından izle: `state.watched` (isteğe bağlı, boşsa kayda yazılmaz; en çok 3; ölen / ayrılan düşer). İzlenenin her olayı kart olur; sol üstte portre şeridi; çekmecede en üstte; sakin kartında yıldız.
+- Duygu Katmanı: açıklama kutusu (3 işaret + 4 çizgi rengi; ✕ ile kapatma tercihi ve Ayarlar'dan geri alma kalıcı), seçim yokken harita ipucu. Çekmece işaretleri katmanla aynı simge (`ExpressionLayer.markIconURL`), dilek simgesi, "?" ipucu.
+- Çipler: en çok 4 (kriz → karar bekleyen → süreli etki), fazlası "Olaylar ▾ (N)"; her ipucu ne / neden / süre / etki; her çip tıklanınca bir şey yapar; vadi bilgisi kasaba adı ipucunda; uzun ad kısalır; harita ipucu üst şeride binmez; yeni "Anma töreni" çipi.
+- Rehber 12 adım (tablo sürümü 2): `cards`, `cardAction`, `watch`. 30.1 testi bu sayıya güncellendi. Boyama: uygun karolara 1 px çerçeve. Telefon genişliğinde çekmece / sağ alt kart açıkken sol sütun gizlenir.
+- Araçlar: `gate.mjs` audit'i tek başına koşar (ses zamanlama testi yük altında kırılıyordu); `autopilot.mjs --stories dosya [--story-filter]` kart günlüğü (rapor / kayıt değişmez). Testler: `tools/sim/tests/30.2-stories.mjs` (28).
+- Ölçüm (tohum 42, 20 gün, 4x taklidi): "Yalnızca önemli" süzgecinde gün başına 4,8 kart (öncelik / eşik ayarı gerekmedi).
+
 ## Aşama 30.1 — İlk saat (kayıt sürümü 40 kalır; yeni simülasyon sistemi yok)
 - Rehber: `data/guide.js` (9 adım, tablo sürümü 1), `systems/Guide.js` (saf görünme / tamamlanma koşulları), `GuideSystem` (yalnızca olay dinler, güncelleme listesinde değil), `GuideCard` (araç çubuğunun üstünde tek kart, "Anladım", düğme yanıp söner). İsteğe bağlı kayıt alanı `guide { done, off, at? }`; eski kayıtta nüfus > 8 ise kapalı. Ayarlar: Rehber Açık / Kapalı / baştan başlat.
 - Karar süresi: yalnızca `state.settings.dilemmaTimer === true` iken işler (isteğe bağlı alan; Ayarlar "Kapalı / 30 saniye"). `tools/sim/lib.mjs` bayrağı açar (yükleme / sıfırlamadan sonra da).
