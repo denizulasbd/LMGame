@@ -1,6 +1,6 @@
 # Oyuncu günlüğü 2: uzun oynanış incelemesi
 
-> TASLAK — Gün 15'e kadar olan kısım. Oturum sürüyor; bu dosya parça parça güncelleniyor.
+> TASLAK — Gün 30'a kadar olan kısım. Oturum sürüyor; bu dosya parça parça güncelleniyor.
 > Kurallara uydum: `src/`, `README.md`, `docs/` (kendi yazdıklarım hariç), `tools/sim/`, `styles/` içini hiç açmadım; yalnızca `tools/serve.py` okudum. Oyun içinde kod çalıştırmadım; yalnızca fare/klavye gönderdim ve ekran görüntüsü aldım.
 
 ## 2. Oynama günlüğü (ham notlar)
@@ -21,6 +21,13 @@ Saatler gerçek saat (UTC). Oyunu `?seed=42` ile açtım. Başlangıçta 1x/2x/4
 - **10:46 · Gün 13.** **Kış** başladı. "Isınma −38,6 odun/gün" çıktı. Odun 108'e düşmüştü; güneybatı ormanını işaretledim, 161→280'e çıktı.
 - **10:49 · Gün 14.** **Yel Değirmeni ve Fırın yangını.** Üst şeritte bir çip çıktı ("yanıyor %10"); bir şey yapmama gerek kalmadan söndü. Zeynep'in eşi Ayşe ile Kasaba Hanı'nda evlendiğini sonradan öğrendim.
 - **10:50 · Gün 15, 03:09.** **(15. gün ara notu.)** Odun 235, taş 169, yiyecek 194, altın 36, nüfus 17/18, refah %88. Şu an: evleri yükseltiyorum, kış için odun topluyorum, yeni ev yerleştirmeye uğraşıyorum ve başaramıyorum (bkz. §4). Bekleyen: Ferman "Saray Hazinesi İçin Usta İşi Eser" (4 saat kalmıştı), Defne dilekçesi. Sıkılıyor muyum? Hayır, ama ikinci yarımda (Gün 9'dan sonra) aynı döngüyü yaptığımı fark ettim: yer bul → inşa et → bekle. Kasaba 10 gün öncekinden (Gün 5) çok farklı: 8 yerine 18 kişi, meydan, değirmen, ağıl, kış.
+
+- **10:51–10:56 · Gün 15–19.** Taş eve yükseltme, kışın bahçe üretiminin durması (bahçe paneli: "donmuş"), cam sera. Belediye Konağı için demir madeni gerekti; madeni yerleştirmek **8 deneme** sürdü: "Kayalık Tepe biyomuna ya da kayaların yanına kurulmalı (6 karo içinde en az 3 kaya / çakıl)", "Önce meşe ağacı temizlenmeli". Balıkçı iskelesini 7 denemede kuramadım, vazgeçtim.
+- **10:59–11:03 · Gün 20–25. Kötü yönetim deneyi.** Süs Havuzu'ndan vergiyi **Ağır**'a çektim ("güven −8, keyif −10, çalışma hızı −%18; 3 gün boyunca değiştirilemez"). Sığınmacıları "kibarca geri çevirdim" (keyif −3). Ozan'ın Fener/Bank dilekçesini reddettim. Sonuç: bir tahsilatta +160 altın (Standart +68); Ozan'ın keyfi 100 → 88, Ozan'ın paneline "Sadakat · Kırgın −40" ve "Dilekçesi reddedildi" yazıldı; ama genel refah %86–%94 arasında kaldı, güven %94–100. Kasaba çökmedi, kimse isyan etmedi.
+- **11:06 · Gün 25.** Ferman "Kraliyet Şöleni İçin Balık ve Şerbet"i teslim edemedim (balık/şerbet yok); Krallık İtibarı %88'den %46'ya düştü (nedenini ekrandan okuyamadım; Ferman'dan mı, vergiden mi bilmiyorum).
+- **11:09 · Gün 27.** Belediye Konağı için 4 farklı yere denedim; "Toprak Patika üzerine kurulamaz", "Başka bir yapının üstüne kurulamaz". Sonunda kuruldu.
+- **11:13 · Gün 29.** Belediye bitti, Gelişmiş Şehir için hedefler: nüfus 22/28, yapı 19/28; "3 hasta" çipi çıktı (tıklayınca bir şey olmadı), Şifacı tedavi ediyor.
+- **11:14 · Gün 30. (30. gün ara notu.)** Arşiv ekranı: nüfus 23 (en düşük 6), ortalama refah %90, stok 1.138, hazine 149 altın; fırından çıkan ekmek 449, demir 183, pişen sıcak yemek 236, doğan çocuk 4, kıyılan düğün 9, tamamlanan yapı 20, verilen karar 11, araştırma 0/6, sergilenen yadigâr 0/8. Şu an: evleri çoğaltıp Gelişmiş Şehir'e ulaşmaya çalışıyorum. Sıkılıyor muyum? Evet, kısmen: son 10 günde (Gün 20–30) yeni bir şey görmedim; olaylar (sığınmacı, fırtına, kurt, haydut) **aynı kartlarla tekrar geldi**. Kasaba 10 gün öncekinden farklı mı? Sadece daha kalabalık ve karlı; yapısal olarak aynı. Üçüncü sığınmacı kafilesinde bu kez "misafir et"i seçtim (40 yiyecek, 20 odun): refah +5.
 
 ## 8. İzlediğim sakinin hikâyesi (şimdilik)
 
