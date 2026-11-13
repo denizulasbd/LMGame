@@ -13,6 +13,7 @@ export class GuideSystem {
     this.events = game.events;
     this.attract = attract;
     this.facts = {};
+    this.current = null; // sync() sonucu: GuideCard çizimde yalnızca bunu okur (çizim durumu değiştirmez)
     if (attract) return;
     const on = (name, fn) => game.events.on(name, fn);
     this.unsubscribers = [
@@ -67,6 +68,7 @@ export class GuideSystem {
     if (this.attract) return null;
     const guide = this.guide;
     for (const id of newlyDone(this.state, guide, this.facts)) this.complete(id);
-    return currentStep(this.state, guide, this.facts);
+    this.current = currentStep(this.state, guide, this.facts);
+    return this.current;
   }
 }

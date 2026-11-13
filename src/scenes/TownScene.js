@@ -595,6 +595,7 @@ export class TownScene extends Scene {
       this.updateCameraTarget(dt);
       return;
     }
+    this.guideSystem.sync(); // (30.1) yalnızca state.guide'ı günceller; zar çekmez
     const hovered = this.hoveredTile();
     const escapeUsed = this.tools.handleKeys();
     this.tools.update(hovered, this.toolView);

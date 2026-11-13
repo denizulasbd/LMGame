@@ -32,7 +32,7 @@ export class GuideCard {
 
   render(game) {
     const system = game.scenes.current?.guideSystem;
-    const step = system?.sync() ?? null;
+    const step = system?.current ?? null; // sync() sahnenin güncelleme adımında yapılır: çizim salt okunur
     const root = this.element.parentElement;
     const suppressed = !step || game.state.dilemma?.active || root?.classList.contains('is-title') || root?.classList.contains('is-cinematic') || root?.classList.contains('has-modal');
     const id = suppressed ? null : step.id;

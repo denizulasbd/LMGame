@@ -5174,27 +5174,31 @@ kbd {
   padding: 2px 0;
 }
 
-/* (30.1) Üst şerit: bölgeler her genişlikte sarılır; sığmayan bölge ikinci satıra iner (eskiden 1241-1440 px arasında 1fr sütunda
+/* (30.1) Üst şerit: 1366 px altında bölgeler sarılır; sığmayan bölge ikinci satıra iner (eskiden 1241-1440 px arasında 1fr sütunda
    ortalanan zaman bölgesi taşıp kasaba adının / unvan çipinin üstüne biniyordu). */
-.hud.topbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  column-gap: 12px;
-  row-gap: 4px;
-}
+@media (max-width: 1365px) {
+  .hud.topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    column-gap: 12px;
+    row-gap: 4px;
+  }
 
-.hud-zone-town,
-.hud-zone-time {
-  flex: 0 0 auto;
-}
+  .hud-zone-town,
+  .hud-zone-time {
+    flex: 0 0 auto;
+  }
 
-.hud-zone-res {
-  flex: 0 1 auto;
-  margin-left: auto;
-}
+  .hud-zone-res {
+    flex: 0 1 auto;
+    margin-left: auto;
+  }
 
+
+  .hud-zone-res { margin-left: auto; }
+}
 @media (max-width: 1240px) {
   .hud-zone-res { margin-left: 0; }
 }
@@ -5276,3 +5280,6 @@ kbd {
 @media (max-height: 720px) {
   .ui-cards > .panel { max-height: 100%; overflow-y: auto; }
 }
+
+/* (30.1) Kasaba adı daha dar: 1366 px'te tek satır kalsın; sığmayan uzun ad + büyük sayılar yine ikinci satıra iner */
+#ui-layer .hud.topbar .hud-town-name { max-width: 170px; }
