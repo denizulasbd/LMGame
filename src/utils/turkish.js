@@ -36,3 +36,10 @@ export function ablative(name) {
   const vowel = BACK.includes(v) || 'âû'.includes(v) ? 'a' : 'e';
   return `${name}'${endsWithHard(name) ? 't' : 'd'}${vowel}n`;
 }
+
+/** Belirtme eki: "Kemal'i", "Zeynep'i", "Ozan'ı", "Duru'yu", "Elif'i". */
+export function accusative(name) {
+  const v = lastVowel(name);
+  const vowel = 'aı'.includes(v) || v === 'â' ? 'ı' : 'ou'.includes(v) || v === 'û' ? 'u' : 'öü'.includes(v) ? 'ü' : 'i';
+  return `${name}'${endsWithVowel(name) ? 'y' : ''}${vowel}`;
+}
