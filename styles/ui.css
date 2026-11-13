@@ -5388,8 +5388,11 @@ kbd {
 .map-hint { position: absolute; left: 50%; top: 26%; transform: translateX(-50%); z-index: 36; padding: 4px 12px; font-size: 13px; color: var(--ui-ink); background: var(--ui-paper); border: 2px solid var(--ui-line); pointer-events: none; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4); white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
 .map-hint[hidden] { display: none; }
 
-/* Telefon genişliğinde sakinler çekmecesi açıkken sol alt sütun gizlenir (kartlar çekmece kapanınca sürer) */
+/* Telefon genişliğinde sakinler çekmecesi ya da sağ alt kart açıkken sol alt sütun gizlenir (kartlar çekmece kapanınca sürer) */
 @media (max-width: 620px) {
-  #ui-layer:has(.resident-drawer:not(.is-collapsed)) .ui-left { visibility: hidden; }
+  #ui-layer:has(.resident-drawer:not(.is-collapsed)) .ui-left,
+  #ui-layer:has(.ui-cards > .panel:not([hidden])) .ui-left { display: none; }
   .hud-under { max-width: calc(100vw - 16px); }
 }
+
+.buff-chip { font-variant-numeric: tabular-nums; }
