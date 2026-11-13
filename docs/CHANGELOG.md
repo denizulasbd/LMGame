@@ -2,6 +2,14 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 20 satır. README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 29.10b — Doyum sönmesi ve sadakat sarmalı yaması (kayıt sürümü 40 kalır)
+- `WANT_RULES.driftStep` (11): 50'nin üstünde günlük sönme `driftAbove + floor((doyum − 50) / driftStep)`; altı aynı. Başlangıç 10 idi; dondurulmuş 29.3 testi (60 → 58) 10'da kırıldığı için 11'e çekildi.
+- Ölçüm (6 tohum × 50 gün): ortalama doyum 47.7–58.9, uç kademe ≤ %10, arzu gerçekleşme %41–48. Tohum 42 / 77 × 120 gün: G50 → G120 doyum 56.0 → 54.5 / 47.7 → 51.5.
+- `LOYALTY.bitterTrust.perHour` −2 → −1,7: tyrant 40. günde tohum 42'de 8, 77'de 30 sakin bırakır, her ikisinde 1 isyan (−2'de 3 sakin kalıyordu; −1,6'da 77'de isyan çıkmadı: dar aralık).
+- `autopilot --profile careless|repent` eklendi; careless ve repent hedefleri ayarsız tuttu (isyan 0, terk 0). `(29.10b)` satırı: nüfus / güven / son 10 günde isyan.
+- §3 (yalnızca rapor): 120. günde en yaygın özellik hardworking %63–66 (>%45; ayar yapılmadı).
+- Testler: 29.10-integration.mjs'e 2 test (kademeli sönme, sadakat ayarı).
+
 ## Aşama 29.4b — Test altyapısının hafifletilmesi (kayıt sürümü 39 kalır, oyun davranışı değişmedi)
 - `tools/sim/lib.mjs`: `createChecks().report()` varsayılan olarak yalnızca kalan testleri, toplamı ve sayfa hatalarını basar; `--verbose` / `LMGAME_VERBOSE=1` eski çıktıyı verir. `capOutput`: 60 satırı aşan çıktı son 40 satıra kısaltılır, tam günlük `tools/sim/out/<ad>.log` dosyasına yazılır (autopilot, stress, audit, compat, tests).
 - `tools/sim/tests/`: aşama başına bir test dosyası (`_template.mjs` iskeleti); taze `openGame`, bütün mekanikler açık. `tests.mjs` DONDURULDU, yeni test eklenmez.

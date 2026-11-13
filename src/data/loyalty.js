@@ -19,7 +19,7 @@ export const LOYALTY = {
   hungryBelow: 25, // dağıtım anında tokluğu bunun altındaki sakin "aç" sayılır (reliefHungry; Açlıktan Gözü Dönmüş eşiği)
   // (29.10) Kırgın kasaba: Kırgın yetişkinlerin payı share'i aşınca Yönetim Güveni saat başı perHour x pay kadar erir (TrustSystem.hourly).
   // 29.6'da sadakatin isyanın tetiklenmesine hiçbir yolu yoktu: iyi beslenen kasabada Ağır Vergi ve reddedilen dilekçelerle bile güven %100'de kalıyordu.
-  bitterTrust: { share: 0.25, perHour: -2 },
+  bitterTrust: { share: 0.25, perHour: -1.7 },
 };
 
 export const LOYALTY_SOURCES = {

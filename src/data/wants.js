@@ -24,7 +24,7 @@ export const WANT_RULES = {
   repeatDays: 2, // wantLog'da son 2 günde görülen anahtar yeniden seçilmez
   expirePenalty: 2, // süresi dolan arzu: doyum -2
   passReward: 2, // gerçekleşmeden süresi dolan korku: doyum +2
-  driftAbove: 2, driftBelow: 1, driftCenter: 50, // her gün dönümünde 50'ye doğru kayma
+  driftAbove: 2, driftStep: 11, driftBelow: 1, driftCenter: 50, // her gün dönümünde 50'ye doğru kayma; 50'nin üstünde sönme driftAbove + floor((doyum - 50) / driftStep) (29.10b)
   tierAt: { minor: 0, major: 10, critical: 18 }, // puana göre moodlet kademesi
   memoryAt: 12, // bu puan ve üstü anı bırakır
   partnerPull: 60, // findPartner: aranan kişi bu kadar piksel yakınmış gibi

@@ -178,6 +178,26 @@ const out = await page.evaluate(async () => {
     ad.forEach((c, i) => (c.loyalty = saved[i]));
     check('29.10: Kırgın payı eşiği aşınca Yönetim Güveni saat başı erir; eşik altında etkisiz', few === none && none - many >= Math.abs(LOYALTY.bitterTrust.perHour) - 0.01, `${none} ${few} ${many}`);
   }
+  // 13. doyum sönmesi kademeli (29.10b): 50'nin üstünde driftAbove + floor((doyum - 50) / driftStep); altında kayma aynı
+  {
+    const { WANT_RULES } = await import('/src/data/wants.js');
+    const ad = adults();
+    const saved = ad.map((c) => c.satisfaction);
+    const probe = [95, 75, 63, 52, 50, 45, 10];
+    const expect = (v) => (v > 50 ? v - Math.min(WANT_RULES.driftAbove + Math.floor((v - 50) / WANT_RULES.driftStep), v - 50) : v < 50 ? v + Math.min(WANT_RULES.driftBelow, 50 - v) : v);
+    ad.forEach((c, i) => (c.satisfaction = probe[i % probe.length]));
+    const start = ad.map((c) => c.satisfaction);
+    scene().wants.onNewDay();
+    const bad = ad.filter((c, i) => c.satisfaction !== expect(start[i]));
+    ad.forEach((c, i) => (c.satisfaction = saved[i]));
+    check('29.10b: doyum 50\'nin üstünde kademeli söner (95 -> -6, 75 -> -4, 63 -> -3, 52 -> 50), 50 ve altında eski kayma', WANT_RULES.driftStep === 11 && expect(95) === 89 && expect(75) === 71 && expect(63) === 60 && expect(52) === 50 && expect(45) === 46 && bad.length === 0, `${bad.length} sapma / ${ad.length}`);
+  }
+
+  // 14. sadakat ayarı (29.10b): Kırgın kasaba erimesi yumuşatıldı, kasabayı bir günde boşaltmaz
+  {
+    const { LOYALTY } = await import('/src/data/loyalty.js');
+    check('29.10b: Kırgın kasaba erimesi saat başı -1,7 (günde en çok ~38 puan), eşik %25', LOYALTY.bitterTrust.perHour === -1.7 && LOYALTY.bitterTrust.share === 0.25, JSON.stringify(LOYALTY.bitterTrust));
+  }
   return out;
 });
 results.push(...out);
