@@ -8,6 +8,8 @@ import { RESOURCES } from '../data/resources.js';
 import { storageLimit } from './Granary.js';
 import { nextTownTier, tierChecks } from './TownStatus.js';
 
+import { engineOn } from './Engines.js';
+import { chosenDoctrine } from './Doctrine.js';
 export const emptyGuide = () => ({ done: [], off: false });
 
 /** Kayıttaki rehber durumu. Yoksa: nüfusu 8'den fazla olan kayıtta kapalı, yoksa açık. */
@@ -82,6 +84,11 @@ export const CONDITIONS = {
   // (30.2) ilk hikâye kartı çıkınca; "Git"e basınca ya da kart kaybolunca tamam
   cards: { when: ({ facts }) => Boolean(facts.storyShown), done: ({ facts }) => Boolean(facts.storyGo) },
   cardAction: { when: ({ facts, guide }) => Boolean(facts.storyActionShown) && isDone(guide, 'cards'), done: ({ facts }) => Boolean(facts.storyActed) },
+  // (30.4b) Kasaba Doktrini ilk kez mümkün olduğunda (Belediye Konağı hazır, doktrin seçilmemiş); seçilince ya da "Anladım" ile biter
+  doctrine: {
+    when: ({ state }) => engineOn('midgame') && !chosenDoctrine(state) && state.buildings.some((b) => b.type === 'townHall' && b.functional),
+    done: ({ state }) => engineOn('midgame') && Boolean(chosenDoctrine(state)),
+  },
   watch: { when: ({ state }) => state.characters.length >= GUIDE_WATCH_POPULATION, done: ({ state }) => (state.watched?.length ?? 0) > 0 },
 };
 

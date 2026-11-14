@@ -248,7 +248,7 @@ export class JournalSystem {
       on('health:cured', ({ character, wasIll }) =>
         this.log(wasIll ? `${character.name} şifacının iksiriyle iyileşti ve dinçleşti` : `${character.name} şifacıdan dinç çıktı`, 'herb')
       ),
-      on('dilemma:resolved', ({ title, option, auto }) => this.log(`${title}: ${option.label}${auto ? ' (süre doldu)' : ''}`, 'map')),
+      on('dilemma:resolved', ({ title, option, auto, label }) => this.log(`${title}: ${label ?? option.label}${auto ? ' (süre doldu)' : ''}`, 'map')),
       on('dilemma:recruited', ({ character, skill }) => this.log(`Kafilenin en becerikli üyesi ${character.name}, usta bir ${SKILLS[skill].title}, kasabaya katıldı`, 'heart')),
       on('storm:struck', ({ kind, damaged, safe, winter }) => {
         if (kind === 'wolves') this.log(safe ? 'Kurt sürüsü ağıla yaklaşamadan kovuldu' : 'Kurtlar Koyun Ağılı\'na daldı, ağıl hasar gördü', 'wolf');

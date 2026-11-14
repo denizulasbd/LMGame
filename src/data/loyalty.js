@@ -106,6 +106,15 @@ export const PULSE_REASONS = {
   appeased: 'yatışan isyan',
   condolence: 'Taziye Sofrası',
   gift: 'özel gün armağanı',
+  // (30.4b) karar olayları (reasonKey: 'dilemma:<id>')
+  'dilemma:masterOffer': 'şehirden iş teklifi',
+  'dilemma:neighborFeud': 'komşu husumeti',
+  'dilemma:drought': 'kuraklık',
+  'dilemma:census': 'kraliyet sayımı',
+  'dilemma:plagueRumor': 'salgın söylentisi',
+  'dilemma:travelingTheater': 'seyyar tiyatro',
+  'dilemma:lostChild': 'kayıp çocuk',
+  'dilemma:bumperHarvest': 'bereketli hasat',
   other: 'öteki',
 };
 

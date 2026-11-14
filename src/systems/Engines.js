@@ -8,6 +8,7 @@ export const ENGINES = {
   discontent: true, // (30.3) Kararın Ağırlığı: günlük sadakat kaynakları, beş kademe, iş bırakma, Halkın Nabzı, anında geri bildirim
   gentleExodus: true, // (30.4a) terk ediş sınırı: günde ve isyan başına en çok kaç sakin ayrılır (aile tek birim)
   swiftAging: true, // (30.4a) kuşaklar: her mevsim bir yaş (AGING.daysPerAge); takvim yılı 16 gün kalır
+  midgame: true, // (30.4b) orta oyun: sekiz yeni karar olayı (kişili olaylar, yeni etki türleri, tekrar kuralları) ve beş ara hedef
   traitScarcity: true, // (30.4a) kişilik çeşitliliği: yaygın özelliğe doğru evrim katkısı küçülür, nadire doğru büyür
 };
 // (30.4a) Açılıştan ÖNCE bilinmesi gereken şalterler (kurucuların ageInDays değeri sahne kurulurken hesaplanır): modül yüklenirken

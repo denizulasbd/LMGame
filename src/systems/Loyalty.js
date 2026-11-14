@@ -173,6 +173,7 @@ export function reasonKey(reason) {
   if (r === 'petition:fulfilled' || r === 'friend:fulfilled') return 'petitionFulfilled';
   if (r === 'petition:expired') return 'petitionExpired';
   if (r === 'relief') return 'relief:food';
+  if (r.startsWith('dilemma:')) return PULSE_REASONS[r] ? r : 'other'; // (30.4b)
   return PULSE_REASONS[r] ? r : 'other';
 }
 

@@ -257,7 +257,7 @@ export class TownScene extends Scene {
     });
     this.milestones = new MilestoneSystem(this.game, this.world, TILE_TYPES.cobble.id);
     this.townLevel = new TownLevelSystem(this.game, this.world, this.economy, { attract: this.attract });
-    this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population }, { attract: this.attract });
+    this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population, loyalty: this.loyalty, chemistry: this.chemistry, moodlets: this.moodlets, health: this.health, desertion: this.desertion, relationships: this.relationships }, { attract: this.attract });
     this.expeditions = new ExpeditionSystem(this.game, this.world, { economy: this.economy, health: this.health, dilemmas: this.dilemmas }, new Random(state.seed + 17));
     // (26.3) Gezgin Konuklar: Seyyar Ozan, Nadir Takasçı, Yaşlı Seyyah (kendi üreteci seed + 34; Altın Çağ'dan sonra)
     this.guestSystem = new GuestSystem(this.game, this.world, new Random(state.seed + 34), { expeditions: this.expeditions, attract: this.attract });

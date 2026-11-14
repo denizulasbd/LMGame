@@ -10,6 +10,7 @@ import { DILEMMAS, DILEMMA_SCHEDULE } from '../../data/dilemmas.js';
 import { ADVENTURES } from '../../data/exploration.js';
 import { RESOURCES } from '../../data/resources.js';
 import { getAnyIconURL, getIconDataURL } from '../../art/ui/index.js';
+import { getCharacterPortraitURL } from '../../art/sprites/index.js';
 import { el } from '../dom.js';
 
 export class DilemmaModal {
@@ -22,6 +23,7 @@ export class DilemmaModal {
     this.icon = el('img', { className: 'dilemma-icon', alt: '' });
     this.title = el('h2', { className: 'dilemma-title' });
     this.text = el('p', { className: 'dilemma-text' });
+    this.portraits = el('div', { className: 'dilemma-portraits' }); // (30.4b) kişili olayda konu sakinlerin portresi
     this.options = el('div', { className: 'dilemma-options' });
     this.timerFill = el('span', { className: 'dilemma-timer-fill' });
     this.timerText = el('span', { className: 'dilemma-timer-text' });
@@ -30,6 +32,7 @@ export class DilemmaModal {
       el('div', { className: 'panel dilemma-panel' }, [
         el('div', { className: 'dilemma-head' }, [el('div', { className: 'dilemma-icon-frame' }, [this.icon]), this.title]),
         this.text,
+        this.portraits,
         this.options,
         el('div', { className: 'dilemma-timer' }, [this.timerBar, this.timerText]),
       ]),
@@ -48,12 +51,13 @@ export class DilemmaModal {
     this.element.classList.toggle('is-adventure', adventure);
     const resources = game.state.resources;
     const statuses = def.options.map((o) => active.options?.find((x) => x.id === o.id) ?? { ok: true, reason: null });
-    const key = `${active.kind ?? ''}|${active.id}|${active.text ?? ''}|${statuses.map((s) => `${s.ok}${s.detail ?? ''}`).join(',')}|${Object.values(resources).join(',')}`;
+    const key = `${active.kind ?? ''}|${active.id}|${active.text ?? ''}|${statuses.map((s) => `${s.ok}${s.label ?? ''}${s.detail ?? ''}`).join(',')}|${Object.values(resources).join(',')}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       this.icon.src = getAnyIconURL(def.icon);
       this.title.textContent = adventure ? `Maceracı Günlüğü · ${def.title}` : active.title ?? def.title;
       this.text.textContent = active.text ?? def.text;
+      this.portraits.replaceChildren(...(active.portraits ?? []).map((c) => this.portrait(c)));
       this.options.replaceChildren(...def.options.map((option, i) => this.optionButton(option, statuses[i], resources)));
     }
     // (30.1) Süre yalnızca Ayarlar'da "30 saniye" seçiliyse işler; yoksa çubuk gizlenir ve pencere seçim yapılana dek bekler
@@ -70,6 +74,14 @@ export class DilemmaModal {
     this.timerText.textContent = `Oyun duraklatıldı · ${Math.ceil(left)} sn içinde seçilmezse: ${fallback?.label ?? '—'}`;
   }
 
+  /** (30.4b) Kişili olayın konu sakini: portre ve ad. */
+  portrait(c) {
+    return el('span', { className: 'dilemma-portrait' }, [
+      el('img', { className: `dilemma-portrait-img${c.isChild ? ' is-child' : ''}`, src: getCharacterPortraitURL(c.appearance, c.look), alt: c.name }),
+      el('span', { className: 'dilemma-portrait-name', text: c.name }),
+    ]);
+  }
+
   optionButton(option, status, resources) {
     const costs = Object.entries(option.cost ?? {}).map(([r, v]) =>
       el('span', { className: `build-cost${(resources[r] ?? 0) < v ? ' is-missing' : ''}` }, [
@@ -78,8 +90,8 @@ export class DilemmaModal {
       ])
     );
     const button = el('button', { className: `dilemma-option${option.default ? ' is-default' : ''}`, type: 'button', tabIndex: -1 }, [
-      el('span', { className: 'dilemma-option-label', text: option.label }),
-      el('span', { className: 'dilemma-option-detail', text: status.ok ? status.detail ?? option.detail : `${option.detail} · ${status.reason}` }),
+      el('span', { className: 'dilemma-option-label', text: status.label ?? option.label }),
+      el('span', { className: 'dilemma-option-detail', text: status.ok ? status.detail ?? option.detail : `${status.detail ?? option.detail} · ${status.reason}` }),
       el('span', { className: 'build-costs' }, costs.length ? costs : [el('span', { className: 'build-cost', text: 'Bedelsiz' })]),
     ]);
     button.disabled = !status.ok;

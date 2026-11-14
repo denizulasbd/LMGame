@@ -39,6 +39,7 @@ export const STORY_PRIORITY = {
   'relationship:quarrel': 1,
   'relationship:reconciled': 1,
   'pantry:low': 4, // (30.3) kiler bir günden az yeter
+  'dilemma:resolved': 4, // (30.4b) orta oyun kararının sonucu (yalnızca yeni kartlar)
   'story:summary': 2,
 };
 

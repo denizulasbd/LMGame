@@ -5453,3 +5453,14 @@ kbd {
   .hud-pulse .trust-mini-bar { grid-column: 1 / 3; grid-row: 2; width: 100%; min-width: 26px; }
   .hud.topbar .hud-zone-res { gap: 3px; }
 }
+
+/* (30.4b) Kişili karar olayı: konu sakinlerin portresi */
+.dilemma-portraits { display: flex; justify-content: center; gap: 14px; margin: 6px 0 4px; }
+.dilemma-portraits:empty { display: none; }
+.dilemma-portrait { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.dilemma-portrait-img { width: 56px; height: 56px; image-rendering: pixelated; object-fit: cover; background: var(--ui-card); border: 2px solid var(--ui-line); }
+.dilemma-portrait-name { font-size: 13px; }
+
+/* (30.4b) Hedefler penceresi: tamamlanmamış ilk hedef "Sıradaki" etiketiyle öne çıkar */
+.goal-row.is-next { border-color: var(--ui-accent, #e0b04a); box-shadow: inset 3px 0 0 var(--ui-accent, #e0b04a); }
+.goal-next { margin-left: 8px; padding: 1px 6px; font-size: 12px; background: var(--ui-accent, #e0b04a); color: #1b1408; border-radius: 3px; vertical-align: middle; }

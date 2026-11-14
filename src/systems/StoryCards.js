@@ -124,6 +124,13 @@ export function makeCard(event, p = {}, ctx = {}) {
       // (30.3) kiler bir günden az yeter ("Git" kileri seçer)
       card = base(event, 'Kiler boşalıyor: yiyecek bir günden az yeter.', [], { go: Number.isFinite(p.buildingId) ? { kind: 'building', id: p.buildingId } : null, key: `pantry:${day}` });
       break;
+    case 'dilemma:resolved': {
+      // (30.4b) karar sonrası: sonucu anlatan kart (kişili olayda konu sakinin portresi)
+      if (!p.dilemma?.midgame || !p.result) return null;
+      const chars = (p.targetIds ?? []).map((id) => state?.characters.find((c) => c.id === id)).filter(Boolean);
+      card = base(event, p.result, chars, { key: `dilemma:${p.id}:${day}` });
+      break;
+    }
     case 'apprentice:grandmaster':
       if (!p.character) return null;
       card = base(event, `${p.character.name} Başusta oldu.`, [p.character]);

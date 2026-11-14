@@ -9,6 +9,19 @@ import { MILESTONES, WINTER_TRIAL_MIN_HAPPINESS } from '../data/milestones.js';
 import { townHappiness } from './TownStatus.js';
 import { skillLevel } from './SkillSystem.js';
 import { SKILL_KEYS } from '../data/skills.js';
+import { engineOn } from './Engines.js';
+import { chosenDoctrine } from './Doctrine.js';
+import { pulseStats, pulseFace } from './Loyalty.js';
+
+/** (30.4b) Şu an geçerli hedef listesi: ENGINES.midgame kapalıyken eski dokuz hedef. */
+export function activeMilestones() {
+  return engineOn('midgame') ? MILESTONES : MILESTONES.filter((m) => !m.midgame);
+}
+
+/** (30.4b) Tamamlanmamış ilk hedef ("Sıradaki") ya da null. */
+export function nextMilestone(state) {
+  return activeMilestones().find((m) => !state.milestones[m.id]) ?? null;
+}
 
 const CHECK_EVERY_MINUTES = 10;
 
@@ -49,6 +62,17 @@ export function milestoneProgress(milestone, state) {
       const detail = stage > 0 && stage < milestone.target ? `Tamamlanan: ${names.slice(0, stage).join(', ')} · sıradaki: ${names[stage]}` : undefined;
       return { current: Math.min(stage, milestone.target), target: milestone.target, detail };
     }
+    // (30.4b) ara hedefler; sayaçlar isteğe bağlı kayıt alanlarıdır (stats.pleasedStreak, stats.condolences)
+    case 'petitionsMet':
+      return { current: state.petitions?.fulfilled ?? 0, target: milestone.target };
+    case 'pulseStreak':
+      return { current: state.stats.pleasedStreak ?? 0, target: milestone.target };
+    case 'condolences':
+      return { current: state.stats.condolences ?? 0, target: milestone.target };
+    case 'doctrine':
+      return { current: chosenDoctrine(state) ? 1 : 0, target: milestone.target };
+    case 'heirloomPassed':
+      return { current: state.chronicle?.firstHeirloom ? 1 : 0, target: milestone.target };
     default:
       return { current: 0, target: milestone.target };
   }
@@ -83,6 +107,21 @@ export class MilestoneSystem {
         this.check();
       }),
       on('wonder:stageCompleted', () => this.check()),
+      on('petition:resolved', () => engineOn('midgame') && this.check()),
+      on('doctrine:chosen', () => engineOn('midgame') && this.check()),
+      on('heirloom:passed', () => engineOn('midgame') && this.check()),
+      on('rite:held', ({ condolence } = {}) => {
+        if (!engineOn('midgame') || !condolence) return;
+        stats.condolences = (stats.condolences ?? 0) + 1;
+        this.check();
+      }),
+      // Halkın Nabzı art arda kaç gündür Memnun / Minnettar: gün dönümünde bakılır (ortalama sadakat; Nabız ile aynı hesap)
+      on('time:newDay', () => {
+        if (!engineOn('midgame')) return;
+        const face = pulseFace(pulseStats(this.state).avg);
+        stats.pleasedStreak = face === 'pleased' || face === 'grateful' ? (stats.pleasedStreak ?? 0) + 1 : 0;
+        this.check();
+      }),
       on('wonder:completed', () => this.check()),
       on('time:seasonChanged', ({ season, previous }) => this.onSeasonChanged(season, previous)),
     ];
@@ -138,7 +177,7 @@ export class MilestoneSystem {
   /** Tamamlanmamış hedefleri kontrol eder; tamamlananları kaydedip duyurur. */
   check() {
     this.countCobbles();
-    for (const milestone of MILESTONES) {
+    for (const milestone of activeMilestones()) {
       if (this.state.milestones[milestone.id]) continue;
       const { current, target } = milestoneProgress(milestone, this.state);
       if (current < target) continue;

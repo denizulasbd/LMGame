@@ -288,6 +288,8 @@ await page.evaluate((passive) => {
     wolves: ['fence', 'dogs', 'risk'],
     expedition: ['bigParty', 'scout', 'ignore'],
   };
+  window.__midLog = []; // (30.4b) karar günlüğü: { day, id, midgame, option }
+  game.events.on('dilemma:resolved', ({ id, option, dilemma }) => window.__midLog.push({ day: game.state.time.day, id, midgame: Boolean(dilemma?.midgame), option: option.id }));
   window.__decide = () => {
     const scene = game.scenes.current;
     const active = game.state.dilemma.active;
@@ -312,6 +314,11 @@ await page.evaluate((passive) => {
       return;
     }
     const def = window.__dilemmaDefs?.[active.id];
+    // (30.4b) yeni kartlar: otopilot varsayılan ("orta yol") seçeneği seçer; uygulanamıyorsa DilemmaSystem'in varsayılanı
+    if (def?.midgame) {
+      game.events.emit('ui:chooseDilemma', { optionId: active.defaultId });
+      return;
+    }
     for (const id of PREFER[active.id] ?? []) {
       const option = def?.options.find((o) => o.id === id);
       if (option && system.optionStatus(option).ok) {
@@ -1119,6 +1126,22 @@ const bondStats = await page.evaluate(() => {
   const pop = window.game.state.characters.filter((c) => !c.isChild && !c.role).length;
   return { side: given.side_by_side ?? 0, rub: given.rubbing_wrong ?? 0, ever: ever.side.size, everRub: ever.rub.size, pop, pairs };
 });
+const midStats = await page.evaluate(() => {
+  const s = window.game.state;
+  const log = window.__midLog ?? [];
+  const after = log.filter((e) => e.day > 20);
+  return {
+    log: log.map((e) => `${e.day}:${e.id}`),
+    distinct: new Set(log.map((e) => e.id)).size,
+    after20: after.length,
+    freshAfter20: after.filter((e) => e.midgame).length,
+    milestones: Object.keys(s.milestones).length,
+    doneIds: Object.keys(s.milestones),
+    goldenSince: s.goldenAge?.since?.day ?? null,
+    gold: s.resources.gold,
+    pop: s.characters.length,
+  };
+});
 const riteStats = await page.evaluate(() => {
   const s = window.game.state;
   const R = window.__riteStats;
@@ -1183,6 +1206,7 @@ if (options.profile || options['profile-report']) {
   riteStats.weight = { heavyDay: W.heavyDay, firstGrum, strikeDays, revolts: W.revolts, left: W.left, g30, lastPop: last.pop, last, switchDay: W.switchDay, switchPop: W.switchPop, daily: d };
 }
 console.log(`(29.7) anma töreni ${riteStats.held} (vefat günü ${riteStats.deathDays}, töreni gelmiş ${riteStats.dueDeathDays}) · ortalama katılım ${riteStats.attendance.toFixed(1)} · 20:00'de süren tören görevi ${riteStats.late} · özel gün kutlanan ${riteStats.celebrated} / unutulan ${riteStats.forgotten} (%${Math.round((100 * riteStats.celebrated) / Math.max(1, riteStats.celebrated + riteStats.forgotten))})`);
+console.log(`(30.4b) olay: ${midStats.distinct} farklı (${midStats.log.length} karar; G20 sonrası ${midStats.freshAfter20}/${midStats.after20} yeni) · hedef ${midStats.milestones}/14 (${midStats.doneIds.join(',')}) · ${midStats.log.join(' ')}`);
 console.log(`(29.5) Omuz Omuza ${bondStats.side} · Diken Üstünde ${bondStats.rub} · en az bir kez Omuz Omuza alan ${bondStats.ever}/${bondStats.pop} (%${Math.round((100 * bondStats.ever) / Math.max(1, bondStats.pop))}) · Diken Üstünde alan ${bondStats.everRub} · en çok birlikte çalışan çiftler: ${bondStats.pairs.join(', ') || '-'}`);
 const so = mon.social;
 console.log(
@@ -1324,7 +1348,7 @@ for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}
 const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0 && mon.social.stuck.length === 0;
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, gold: report.gold, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, gold: report.gold, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();

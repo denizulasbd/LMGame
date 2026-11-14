@@ -22,7 +22,7 @@ import { MERCHANT, offersFor, offerStock } from '../data/trade.js';
 import { getSeason } from '../data/seasons.js';
 import { RESOURCES } from '../data/resources.js';
 import { isRainActive } from '../data/weather.js';
-import { immigrationStatus, townFun, townTier } from './TownStatus.js';
+import { immigrationStatus, townFun, townTier, quarantined } from './TownStatus.js';
 import { Random } from '../utils/random.js';
 import { clamp } from '../utils/math.js';
 import { merchantIntervalMultiplier } from './Exploration.js';
@@ -109,7 +109,7 @@ export class EventSystem {
     const day = this.state.time.day;
     if (status.freeBeds > 0 && this.state.events.immigration.lastNoticeDay !== day) {
       this.state.events.immigration.lastNoticeDay = day;
-      const reason = blocker.key === 'food' ? 'yiyecek stoğu yetersiz' : 'kasabanın refahı düşük';
+      const reason = blocker.key === 'quarantine' ? 'kapılar kapalı (salgın söylentisi)' : blocker.key === 'food' ? 'yiyecek stoğu yetersiz' : 'kasabanın refahı düşük';
       this.events.emit('immigration:blocked', { reason, detail: blocker.text });
       this.events.emit('toast', { text: `Göçmenler bu sabah gelmedi: ${reason} (${blocker.text})`, tone: 'warn', icon: 'heart' });
     }
@@ -137,6 +137,7 @@ export class EventSystem {
     const m = this.merchantState;
     const market = this.findMarket();
     if (!market || m.present || m.nextVisitDay === null || this.state.time.day < m.nextVisitDay) return;
+    if (quarantined(this.state)) return; // (30.4b) kapılar kapalı: tüccar da gelmez (ertesi gün yeniden denenir)
     const entry = this.world.findEntryTile(this.rngFor(1));
     if (!entry) return;
 
