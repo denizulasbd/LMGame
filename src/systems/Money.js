@@ -119,7 +119,7 @@ export function easiestGoldWay(state) {
 /** Taşın kalıcı kaynağı: kayalar tükenince ya da taş 2 gün 0'da kalınca. */
 export function stoneSource(state) {
   const a = buildingAccess(state, 'quarry');
-  return a.have ? 'Taş Ocağı var; işçisi çalıştırıyor mu bak.' : a.open ? 'Taş için bir **Taş Ocağı** kur: kayalar bitse de taş akar.' : `Taş için ${a.text}.`;
+  return a.have ? 'Taş Ocağı var; işçisi çalıştırıyor mu bak.' : a.open ? `Taş için bir **Taş Ocağı** kur (${costText(BUILDINGS.quarry)}; kayalık bir alanın yanına): kayalar bitse de taş akar.` : `Taş için ${a.text}.`;
 }
 
 const costText = (def) => Object.entries(def.cost ?? {}).map(([r, v]) => `${v} ${RESOURCES[r].name.toLocaleLowerCase('tr')}`).join(', ');

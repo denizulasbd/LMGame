@@ -10,7 +10,8 @@ import { emptyDoctrine, restoreDoctrine } from '../systems/Doctrine.js';
 import { emptyGoldenAge, emptyChronicle } from '../systems/GoldenAge.js';
 import { GOLDEN_AGE } from '../data/goldenAge.js';
 import { CONFIG } from '../config.js';
-import { STARTING_RESOURCES, BASE_STORAGE_CAPACITY } from '../data/resources.js';
+import { STARTING_RESOURCES, NOVICE_START, BASE_STORAGE_CAPACITY } from '../data/resources.js';
+import { engineOn } from '../systems/Engines.js';
 import { STARTING_WEATHER } from '../data/weather.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { getSeason } from '../data/seasons.js';
@@ -74,7 +75,7 @@ export class GameState {
       paused: false,
       speed: CONFIG.TIME_SPEEDS[0],
     };
-    this.resources = { ...STARTING_RESOURCES };
+    this.resources = { ...STARTING_RESOURCES, ...(engineOn('novicePath') ? NOVICE_START : {}) }; // (30.6)
     // Dilimlenmiş ekmekten artan yiyecek değeri (EconomySystem.consumeFood; ekmek 2,5 yiyecek sayılır)
     this.pantry = { credit: 0 };
     this.storageCapacity = BASE_STORAGE_CAPACITY; // EconomySystem yapılara göre günceller

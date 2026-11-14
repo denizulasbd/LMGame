@@ -2,6 +2,7 @@
 // (8. aşamanın Seviye 2 yapıları ve harabeleri: src/art/sprites/structuresTier2.js; 10. aşamanın ağılı,
 // değirmeni, madeni ve belediyesi: structuresFarm.js, structuresIndustry.js, structuresCivic.js)
 import { GROUND_TILES } from './tiles.js';
+import { engineOn } from '../systems/Engines.js';
 //
 //   size        : kapladığı karo sayısı (bu karolar yürünemez ve inşa edilemez)
 //   spots       : karakterlerin yapıyı kullanırken durduğu yerler
@@ -1134,6 +1135,14 @@ export function getBuildDefinition(type) {
 
 // Fırtınada / kurt saldırısında hasar alabilen yapılar (11. aşama; data/dilemmas.js -> STORM)
 export const DAMAGEABLE_TYPES = ['lumberHut', 'garden', 'quarry', 'fishingPier', 'sheepFarm', 'mill', 'ironMine', 'workshop', 'market', 'healerHut'];
+
+// (30.6, ENGINES.novicePath) Taş Ocağı taşın KALICI kaynağıdır ama bedelinde taş vardı: kayalar tükenip taş 0'a inince hiç kurulamıyordu
+// (acemi oyuncu tıkandı). Şalter açıkken ocak yalnızca odunla kurulur.
+{
+  const own = BUILDINGS.quarry.cost;
+  Object.defineProperty(BUILDINGS.quarry, 'cost', { enumerable: true, configurable: true, get: () => (engineOn('novicePath') ? NOVICE_QUARRY_COST : own) });
+}
+export const NOVICE_QUARRY_COST = { wood: 50 };
 
 // Yapı projelerinin metinleri (yükseltme, harabe onarımı, fırtına onarımı, harika aşaması)
 export const PROJECT_WORDS = {

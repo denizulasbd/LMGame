@@ -61,7 +61,9 @@ export function taxLockLeft(state) {
 /** Bir sakinden bu oranla kesilecek altın (kesesi azsa 0). */
 export function coinTax(c, percent) {
   if (c.isChild || c.role || (c.coins ?? 0) < TAX.minCoins) return 0;
-  return Math.floor((c.coins * percent) / 100);
+  // (30.6) acemi kasada küçük keseler (4 altın x %20 = 0,8) hiç vergi vermiyordu; en yakın tam sayıya yuvarlanır
+  const raw = (c.coins * percent) / 100;
+  return engineOn('novicePath') ? Math.round(raw) : Math.floor(raw);
 }
 
 /** Bir sakinin çantasından alınacak öşür: { eşya: miktar } (her türden TAX.titheKeep kadarı bırakılır). */

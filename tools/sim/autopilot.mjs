@@ -926,9 +926,20 @@ await page.evaluate((passive) => {
         if (b && scene.construction.startProject(b).ok) { window.__novLast = s.time.day; return; }
       }
     }
+    // (30.6) acemi, Rehber'in yiyecek kartını izler: "Yiyecek ≈ N gün yeter" 5 günün altındaysa ve kişi başına bahçe azsa sıradaki yapı bahçe olur
+    if (profile === 'novice') {
+      const pop = Math.max(1, s.characters.filter((c) => !c.role).length);
+      const days = window.__foodSupply(s) / (pop * 3.5);
+      if (days < 5 && (counts.garden ?? 0) < Math.ceil(pop / 4)) { next = 'garden'; nextSpot = null; }
+      // ... ve taş kartını: taş 15'in altına inip Taş Ocağı yoksa sıradaki yapı Taş Ocağı olur (kalıcı kaynak)
+      if (res.stone < 15 && !(counts.quarry ?? 0)) { next = 'quarry'; nextSpot = null; }
+      // ... ve Hedefler'in engel satırını: "Han gerekir" (Sıcak Sofra hedefi) 10. günden sonra Han kurulur
+      if (s.time.day >= 10 && !(counts.inn ?? 0) && next !== 'garden' && next !== 'quarry') { next = 'inn'; nextSpot = null; }
+    }
     if (!next) return;
     if (!ESSENTIAL.includes(next) && res.wood - (WOOD[next] ?? 0) < (autumn ? 50 : 15)) return;
-    const spot = nextSpot ?? safetySpot(next) ?? (SAFETY.includes(next) ? null : sim.findSpot(next));
+    const spot = nextSpot ?? safetySpot(next) ?? (SAFETY.includes(next) ? null : sim.findSpot(next, next === 'quarry' ? 45 : 30));
+    if (profile === 'novice' && window.__nov) { const d = (window.__nov.dbg ??= []); if (d.length < 400 && (!d.length || d.at(-1).next !== next || d.at(-1).day !== s.time.day)) d.push({ day: s.time.day, next, spot: Boolean(spot), wood: res.wood, stone: res.stone }); }
     if (spot && scene.construction.placeSite(next, spot.x, spot.y)?.ok) window.__novLast = s.time.day;
   };
 }, Boolean(options.passive));
@@ -1250,6 +1261,7 @@ if (options.profile === 'novice') {
   console.log(`(30.6) acemi: Köy G${N.tiers[2] ?? '-'} · Kasaba G${N.tiers[3] ?? '-'} · hedef ${N.doneGoals}/14 · 0'da en uzun gün ${JSON.stringify(N.zeroLongest)} · ilk 5 günde yiyecek en düşük ${Number.isFinite(N.foodMin5) ? Math.round(N.foodMin5) : '-'}`);
   console.log(`(30.6) altın gelir ${tot(N.gold.in)}: ${sum(N.gold.in)} · gider ${tot(N.gold.out)}: ${sum(N.gold.out)}`);
   console.log(`(30.6) Krallık Vergisi: ${N.levy.map((l) => `G${l.day}${l.ok ? (l.goods ? '+malla' : '✓') : '✗'}(${l.amount})`).join(' ') || '-'} · ceza ${N.levy.filter((l) => !l.ok).length}`);
+  console.log(`(30.6) karar günlüğü (gün:sıradaki:yer:odun/taş): ${(N.dbg ?? []).filter((d, i, a) => i === 0 || d.next !== a[i - 1].next || !d.spot).slice(0, 60).map((d) => `${d.day}:${d.next}:${d.spot ? 'y' : 'N'}:${d.wood}/${d.stone}`).join(' ')}`);
   console.log(`(30.6) gün gün altın: ${N.daily.map((d) => `${d.day}:${d.gold}`).join(' ')}`);
   console.log(`(30.6) gün gün nüfus/yapı/yük/refah: ${N.daily.filter((d) => d.day % 4 === 0).map((d) => `${d.day}:${d.m.population}/${d.m.buildings}/${d.m.upgraded}/${Math.round(d.m.welfare)}`).join(' ')}`);
   console.log(`(30.6) gün gün yiyecek: ${N.daily.map((d) => `${d.day}:${d.food}`).join(' ')}`);
