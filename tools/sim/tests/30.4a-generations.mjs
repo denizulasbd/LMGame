@@ -234,8 +234,9 @@ const open = async (opts) => {
     sim.step(225);
     const S = EVOLUTION_RULES.scarcity;
     const curve = [0, 0.1, 0.2, 0.4, 0.5, 1, NaN].map((p) => EV.scarcityMul(p));
-    c('çarpan eğrisi clamp(1,75 − 2,5 × pay, 0,25, 1,5) (30.4a ayarı): sınırlarda (pay 0 / %10 -> 1,5, %60+ -> 0,25), arada doğrusal; şalter ENGINES.traitScarcity',
-      S.base === 1.75 && S.slope === 2.5 && S.min === 0.25 && S.max === 1.5 && curve.join() === '1.5,1.5,1.25,0.75,0.5,0.25,1.5' && ENGINES.traitScarcity === true, curve.join());
+    const r2 = (v) => Math.round(v * 100) / 100;
+    c('çarpan eğrisi clamp(1,75 − 3 × pay, 0,1, 1,5) (30.4a ayarı): sınırlarda (pay 0 -> 1,5, %55+ -> 0,1), arada doğrusal; şalter ENGINES.traitScarcity',
+      S.base === 1.75 && S.slope === 3 && S.min === 0.1 && S.max === 1.5 && curve.map(r2).join() === '1.5,1.45,1.15,0.55,0.25,0.1,1.5' && ENGINES.traitScarcity === true, curve.map(r2).join());
     const a = st.characters.find((x) => !x.role && !x.isChild && x.lifeStage === 'adult') ?? st.characters.find((x) => !x.role && !x.isChild);
     const keep = { lifeStage: a.lifeStage, growth: [...a.growth], growthToday: [...a.growthToday] };
     a.lifeStage = 'adult';
@@ -243,7 +244,7 @@ const open = async (opts) => {
     a.growthToday = [0, 0, 0, 0];
     const sh = { hardworking: 0.5, sleepyhead: 0.1 };
     const got = [EV.contribution(a, 0, 10, { shares: sh }), EV.contribution(a, 0, -10, { shares: sh }), EV.contribution(a, 0, 10, { shares: {} }), EV.contribution(a, 0, 10)];
-    c('katkı yöneldiği kutbun payına göre ölçeklenir (Çalışkan %50: 10 -> 5; Uykucu %10: −10 -> −15; payı yok: 15; pay verilmezse 10)', got.join() === '5,-15,15,10', got.join());
+    c('katkı yöneldiği kutbun payına göre ölçeklenir (Çalışkan %50: 10 -> 3; Uykucu %10: −10 -> −15; payı yok: 15; pay verilmezse 10)', got.join() === '3,-15,15,10', got.join());
     // pay günde bir kez: gün içindeki olaylarda yeniden sayılmaz, gün dönümünde güncellenir
     const s0 = JSON.stringify(sc.evolution.shares);
     const d0 = sc.evolution.sharesDay;

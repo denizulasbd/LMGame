@@ -43,8 +43,9 @@ export const EVOLUTION_RULES = {
   // (30.4a, ENGINES.traitScarcity) kişilik çeşitliliği: bir kutba doğru katkı, o özelliğin yetişkinler arasındaki payına göre ölçeklenir:
   // çarpan = clamp(base - slope x pay, min, max). Pay gün dönümünde bir kez hesaplanır (EvolutionSystem.refreshShares). Zar yok.
   // Şartname başlangıcı { base: 1,5, slope: 2,5, min: 0,25, max: 1,25 }: 120. günde en yaygın özellik %57-61 -> %42 / %37, ama 50 günde
-  // tohum 21'de değişim 2'ye indi (bant 3-14). base 1,5 -> 1,75, max 1,25 -> 1,5: pay %10 -> 1,5 · %20 -> 1,25 · %30 -> 1 · %40 -> 0,75 · %60+ -> 0,25.
-  scarcity: { base: 1.75, slope: 2.5, min: 0.25, max: 1.5 },
+  // tohum 21'de değişim 2'ye indi (bant 3-14). base 1,75 / max 1,5 değişimi artırdı ama 120. günde tohum 42'de Çalışkan %48 oldu; slope 2,5 -> 3,
+  // min 0,25 -> 0,1: pay %10 -> 1,45 · %20 -> 1,15 · %30 -> 0,85 · %40 -> 0,55 · %50 -> 0,25 · %55+ -> 0,1.
+  scarcity: { base: 1.75, slope: 3, min: 0.1, max: 1.5 },
   causeMin: 5, // neden olarak kaydedilecek en küçük katkı (mutlak)
   hintAt: 30, // panelde "eğilim" ipucu bu mutlak değerden sonra görünür
   logMax: 4,
