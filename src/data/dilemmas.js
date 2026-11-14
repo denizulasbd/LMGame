@@ -27,7 +27,7 @@ export const MIDGAME = {
   repeatGapDays: 8, // aynı olay en az bu kadar gün sonra
   noRepeatLast: 2, // seçilen kart son iki karttan biri olamaz (havuzda başka uygun kart varsa)
   lateDay: 20, // bu günden sonra yeni kartların toplam ağırlığı eski kartlarınkinin en az lateRatio katı
-  lateRatio: 2,
+  lateRatio: 3, // (başlangıç 2: tohum 42 / 13'te yeni kart payı %50-56 sınırdaydı)
 };
 
 export const DILEMMAS = {
