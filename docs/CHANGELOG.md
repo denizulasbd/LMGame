@@ -2,6 +2,16 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 20 satır. README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 30.4b — Orta oyun (kayıt sürümü 41 kalır; şalter `ENGINES.midgame`)
+- Karar olayları 5 → 13: `masterOffer`, `neighborFeud`, `drought`, `census`, `plagueRumor`, `travelingTheater`, `lostChild`, `bumperHarvest` (`data/dilemmas.js`, `midgame: true`). Kişili olaylar: `target` kuralı (`systems/Midgame.js`, saf, zar yok; usta / en kötü ilişkili çift / en küçük çocuk), metinde `{who}` / `{who2}`, pencerede portre; hedef yoksa olay uygun değil.
+- Yeni etki türleri `DilemmaSystem.applyMidgame` (var olan sistemleri çağırır): `gold`, `resources`, `loyalty` (all / target / target2 / both / friendsOfTarget / parentsOfTarget / elders / lowest; neden `dilemma:<id>`), `trust`, `satisfaction`, `relation`, `tag`, `moodlet`, `energy`, `sick`, `reputation`, `quarantine`, `leave`. Seçenek düğmelerinde otomatik "Bedel: … · Etki: …" (sadakat dahil); bedelsiz seçenek yok.
+- Tekrar: aralık 6 → 8 gün (`MIDGAME`), son iki kart çıkarılır (`dilemma.recent`, isteğe bağlı), 20. günden sonra yeni kartların ağırlığı eskilerin ≥ 3 katı (başlangıç 2). Çekiş sayısı aynı (bir `weighted`). Karar sonrası hikâye kartı (`dilemma:resolved`, öncelik 4) ve "Halk:" satırı (`PULSE_REASONS['dilemma:*']`).
+- Beş ara hedef `artisans`'tan sonra (`heardVoices`, `peoplesHeart`, `firstFarewell`, `chosenPath`, `legacy`; sayaçlar `stats.pleasedStreak` / `stats.condolences`), Hedefler penceresinde "Sıradaki" etiketi, rehberte `doctrine` kartı (tablo sürümü 4, 14 adım).
+- Kapılar kapalı (`quarantineUntil`, isteğe bağlı): göç ve tüccar bir gün durur (`TownStatus.quarantined`).
+- Bağlanamayan: `away` (sefer düzeneği ganimet / macera akışına bağlı) → `census` "iki genci gönder" yerine "Gönüllüleri azıklandır" (altın −60, yiyecek −30, enerji −15, itibar +8). `leave` `DesertionSystem.startLeaving` ile bağlandı.
+- Araçlar: autopilot yeni kartlarda varsayılan seçeneği seçer, `(30.4b)` satırı ve JSON `mid`. Testler `tools/sim/tests/30.4b-midgame.mjs` (29); 30.1 testi 14 adım / tablo sürümü 4.
+- Çıraklık ölçümü: 30.3'te 50 günde mezun 0 / 1 / 0 / 0 (tohum 7 / 13 / 42 / 77), 30.4a'da 1 / 6 / 1 / 5; ayar gerekmedi. Ekran görüntüleri `docs/playtest/img30.4b/`.
+
 ## Aşama 30.4a — Kuşaklar (kayıt sürümü 41; şalterler `gentleExodus`, `swiftAging`, `traitScarcity`)
 - Terk ediş sınırı (`DesertionSystem.capped`, `EXODUS.maxPerDay` 2 / `maxPerRevolt` 4): aile tek birim, sayaç sınırın altındayken sınırı bir kez aşabilir; isyan bittikten sonraki terk edişler son isyana sayılır. Sayaçlar `exodus.cap` (isteğe bağlı).
 - `bitterTrust.perHour` −0,4 → −0,6 (`DISCONTENT_TABLE_VERSION` 3). Zorba 42 / 77 × 40 gün: −0,3 isyan yok (iki tohum), −0,35 77'de yok; −0,4 … −1,0 her değerde ≥ 1 isyan ve 40. günde 30 sakin (eskiden −0,42'de çöküş). careless / benevolent değişmedi; repent2 artık isyana gidiyor, 6–7 günde Kırgın < %25.

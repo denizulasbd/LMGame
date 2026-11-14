@@ -92,7 +92,8 @@ export class DilemmaModal {
     const button = el('button', { className: `dilemma-option${option.default ? ' is-default' : ''}`, type: 'button', tabIndex: -1 }, [
       el('span', { className: 'dilemma-option-label', text: status.label ?? option.label }),
       el('span', { className: 'dilemma-option-detail', text: status.ok ? status.detail ?? option.detail : `${status.detail ?? option.detail} · ${status.reason}` }),
-      el('span', { className: 'build-costs' }, costs.length ? costs : [el('span', { className: 'build-cost', text: 'Bedelsiz' })]),
+      // (30.4b) yeni kartlarda bedel metni (Bedel: ...) açıklamada yazılı; kaynak bedeli yoksa "Bedelsiz" etiketi çıkmaz
+      el('span', { className: 'build-costs' }, costs.length ? costs : status.label ? [] : [el('span', { className: 'build-cost', text: 'Bedelsiz' })]),
     ]);
     button.disabled = !status.ok;
     button.addEventListener('mousedown', (e) => e.preventDefault());
