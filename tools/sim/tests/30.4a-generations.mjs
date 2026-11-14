@@ -218,6 +218,61 @@ const open = async (opts) => {
   await browser.close();
 }
 
+// ---------------------------------------------------------------- §3 Kişilik çeşitliliği
+{
+  const { browser, page } = await open({ seed: 5 });
+  results.push(...(await page.evaluate(async () => {
+    const out = [];
+    const c = (name, ok, detail = '') => out.push({ name, ok: Boolean(ok), detail });
+    const EV = await import('/src/systems/Evolution.js');
+    const { EVOLUTION_RULES } = await import('/src/data/evolution.js');
+    const { ENGINES } = await import('/src/systems/Engines.js');
+    const { sim } = window;
+    const st = game.state;
+    const sc = game.scenes.current;
+    sim.give({ wood: 500, stone: 500, food: 500, gold: 500 });
+    sim.step(225);
+    const S = EVOLUTION_RULES.scarcity;
+    const curve = [0, 0.1, 0.2, 0.4, 0.5, 1, NaN].map((p) => EV.scarcityMul(p));
+    c('çarpan eğrisi clamp(1,75 − 2,5 × pay, 0,25, 1,5) (30.4a ayarı): sınırlarda (pay 0 / %10 -> 1,5, %60+ -> 0,25), arada doğrusal; şalter ENGINES.traitScarcity',
+      S.base === 1.75 && S.slope === 2.5 && S.min === 0.25 && S.max === 1.5 && curve.join() === '1.5,1.5,1.25,0.75,0.5,0.25,1.5' && ENGINES.traitScarcity === true, curve.join());
+    const a = st.characters.find((x) => !x.role && !x.isChild && x.lifeStage === 'adult') ?? st.characters.find((x) => !x.role && !x.isChild);
+    const keep = { lifeStage: a.lifeStage, growth: [...a.growth], growthToday: [...a.growthToday] };
+    a.lifeStage = 'adult';
+    a.growth = [0, 0, 0, 0];
+    a.growthToday = [0, 0, 0, 0];
+    const sh = { hardworking: 0.5, sleepyhead: 0.1 };
+    const got = [EV.contribution(a, 0, 10, { shares: sh }), EV.contribution(a, 0, -10, { shares: sh }), EV.contribution(a, 0, 10, { shares: {} }), EV.contribution(a, 0, 10)];
+    c('katkı yöneldiği kutbun payına göre ölçeklenir (Çalışkan %50: 10 -> 5; Uykucu %10: −10 -> −15; payı yok: 15; pay verilmezse 10)', got.join() === '5,-15,15,10', got.join());
+    // pay günde bir kez: gün içindeki olaylarda yeniden sayılmaz, gün dönümünde güncellenir
+    const s0 = JSON.stringify(sc.evolution.shares);
+    const d0 = sc.evolution.sharesDay;
+    const traitsWas = st.characters.map((x) => [x, [...x.traits]]);
+    for (const x of st.characters) if (!x.role && !x.isChild && !x.traits.includes('hardworking')) x.traits = ['hardworking', ...x.traits.filter((t) => t !== 'sleepyhead')].slice(0, 3);
+    sc.evolution.push(a, 1, 4, 'test');
+    sc.evolution.onHour(12);
+    const mid = JSON.stringify(sc.evolution.shares) === s0 && sc.evolution.sharesDay === d0;
+    sc.evolution.onNewDay();
+    const after = sc.evolution.shares?.hardworking;
+    for (const [x, t] of traitsWas) x.traits = t;
+    sc.evolution.refreshShares();
+    const restored = JSON.stringify(sc.evolution.shares) === s0;
+    c('pay gün dönümünde bir kez hesaplanır (gün içindeki olaylarda önbellekten; gün dönümünde Çalışkan payı 1)', mid && after === 1 && restored, `${s0.slice(0, 60)} -> ${after}`);
+    // şalter kapalı: çarpan 1
+    ENGINES.traitScarcity = false;
+    const offShares = sc.evolution.refreshShares();
+    a.growth = [0, 0, 0, 0];
+    a.growthToday = [0, 0, 0, 0];
+    const pushed = sc.evolution.push(a, 0, 10, 'test');
+    ENGINES.traitScarcity = true;
+    sc.evolution.refreshShares();
+    Object.assign(a, keep);
+    c('şalter kapalıyken pay hesaplanmaz, çarpan 1 (katkı 10 -> 10)', offShares === null && pushed === 10, `${pushed}`);
+    return out;
+  })));
+  await browser.close();
+}
+
 // ---------------------------------------------------------------- §2.4 Oyuncuya anlatım + sızıntı
 {
   const { browser, page } = await open({ seed: 5 });
@@ -278,11 +333,12 @@ const open = async (opts) => {
     const mr = Math.random;
     Math.random = () => { mathCalls++; return mr(); };
     sc.lifeStages.ageEveryone();
+    sc.evolution.refreshShares?.();
     sc.desertion.capped();
     const RI = await import('/src/systems/Rites.js');
     for (const x of st.characters) { RI.isBirthday(x); RI.daysToBirthday(x); lifeNoteOf(x); }
     Math.random = mr;
-    c('sızıntı: gün dönümü (yaşlanma, terk ediş sınırı, doğum günü, notlar) bütün üreteçleri aynı bırakır; Math.random çağrılmaz', rngs.length > 5 && r0 === JSON.stringify(rngs.map((r) => r.state)) && mathCalls === 0, `${rngs.length} üreteç · Math.random ${mathCalls}`);
+    c('sızıntı: gün dönümü (yaşlanma, özellik payı, terk ediş sınırı, doğum günü, notlar) bütün üreteçleri aynı bırakır; Math.random çağrılmaz', rngs.length > 5 && r0 === JSON.stringify(rngs.map((r) => r.state)) && mathCalls === 0, `${rngs.length} üreteç · Math.random ${mathCalls}`);
     return out;
   })));
   await browser.close();

@@ -14,7 +14,8 @@
 // Olay: 'trait:evolved' { character, kind, axis, from, to, cause }
 import { TRAITS } from '../data/characters.js';
 import { EVOLUTION_RULES, EVOLUTION_SOURCES, EVOLUTION_LINES, EVOLUTION_TEXT, CAUSE_TEXT, DEEP_TRAITS } from '../data/evolution.js';
-import { contribution, pendingShift, applyShift, evolves, emptyEvolutionStats } from './Evolution.js';
+import { contribution, pendingShift, applyShift, evolves, emptyEvolutionStats, traitShares } from './Evolution.js';
+import { engineOn } from './Engines.js';
 import { satisfactionTier, recomputeDrive } from './Wants.js';
 import { recomputeMood } from './Moodlets.js';
 import { refreshChemistry } from './Chemistry.js';
@@ -38,6 +39,10 @@ export class EvolutionSystem {
     this.moodlets = moodlets;
     this.relationships = relationships;
     this.state.evolution ??= emptyEvolutionStats();
+    // (30.4a) kişilik çeşitliliği: özellik payları gün dönümünde bir kez hesaplanır (kaydedilmez; yüklemede / açılışta yeniden)
+    this.shares = null;
+    this.sharesDay = null;
+    this.refreshShares();
     const on = (name, fn) => game.events.on(name, fn);
     // iki taraflı olaylar: tablo olay anında okunur (denge denemelerinde bellekte değiştirilebilsin)
     const both = (table, source) => ({ a, b } = {}) => {
@@ -87,7 +92,7 @@ export class EvolutionSystem {
    */
   push(c, axisIndex, amount, sourceKey, { daily = false } = {}) {
     if (!this.eligible(c)) return 0;
-    const delta = contribution(c, axisIndex, amount, { daily });
+    const delta = contribution(c, axisIndex, amount, { daily, shares: engineOn('traitScarcity') ? this.shares : null });
     if (delta === 0) return 0;
     c.growth[axisIndex] += delta;
     if (!daily) c.growthToday[axisIndex] += delta;
@@ -130,7 +135,15 @@ export class EvolutionSystem {
   // -------------------------------------------------------------------------------------------------------------------
   // Gün dönümü ve sabah denetimi
 
+  /** (30.4a) Yetişkinler arasında özellik payları (ENGINES.traitScarcity kapalıyken null: çarpan 1). Zar yok. */
+  refreshShares() {
+    this.shares = engineOn('traitScarcity') ? traitShares(this.state) : null;
+    this.sharesDay = this.state.time?.day ?? null;
+    return this.shares;
+  }
+
   onNewDay() {
+    this.refreshShares();
     for (const c of this.state.characters) {
       if (!this.eligible(c)) continue;
       // doyum kademesi ve üst üste gerçekleşen korku (gün dönümü katkıları dailyCap'e takılmaz)
