@@ -1,6 +1,7 @@
 // (30.4b, ENGINES.midgame) Orta oyun karar olaylarının SAF yardımcıları: kişili olayların hedef seçimi, metin yer tutucuları ve
 // seçenek açıklamaları. Hiçbiri zar çekmez; eşitlikte küçük kimlik kazanır. Durum değiştiren kısım DilemmaSystem'dedir.
 import { SKILL_KEYS } from '../data/skills.js';
+import { COST_SCALE } from '../data/dilemmas.js';
 import { RESOURCES } from '../data/resources.js';
 import { skillLevel } from './SkillSystem.js';
 import { getFriendship } from './RelationshipSystem.js';
@@ -107,4 +108,27 @@ export function describeOption(option, names = {}) {
   parts.push(`Bedel: ${bad.length ? bad.join(', ') : '—'}`);
   if (good.length) parts.push(`Etki: ${good.join(', ')}`);
   return parts.join(' · ');
+}
+
+/** (30.6) Kasaba seviyesine göre ölçek (1 = yazılı sayı). */
+export const costScaleFor = (tier) => COST_SCALE.byTier[Math.max(1, Math.min(4, tier || 1))] ?? 1;
+
+const scaleNum = (v, k) => Math.max(1, Math.round(v * k));
+
+/**
+ * (30.6) Seçeneğin kasaba seviyesine göre ölçeklenmiş kopyası: cost'taki altın / erzak ve etkideki altın / erzak EKSİLTMELERİ
+ * (resources: { food: -35 }) ölçeklenir; kazançlar, odun / taş bedelleri ve ötesi aynen kalır. Girdiyi değiştirmez.
+ */
+export function scaledOption(option, tier) {
+  const k = costScaleFor(tier);
+  if (k === 1) return option;
+  const cost = {};
+  for (const [r, v] of Object.entries(option.cost ?? {})) cost[r] = COST_SCALE.resources.includes(r) ? scaleNum(v, k) : v;
+  const out = { ...option, cost };
+  if (option.effect?.resources) {
+    const resources = {};
+    for (const [r, v] of Object.entries(option.effect.resources)) resources[r] = v < 0 && COST_SCALE.resources.includes(r) ? -scaleNum(-v, k) : v;
+    out.effect = { ...option.effect, resources };
+  }
+  return out;
 }

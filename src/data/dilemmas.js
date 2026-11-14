@@ -30,6 +30,11 @@ export const MIDGAME = {
   lateRatio: 3, // (başlangıç 2: tohum 42 / 13'te yeni kart payı %50-56 sınırdaydı)
 };
 
+// (30.6, ENGINES.novicePath) Olay bedelleri kasaya göre: orta oyun kartlarında altın ve erzak (yiyecek, ekmek) bedelleri kasaba
+// seviyesiyle ölçeklenir (seviye 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir). Kasaba (x1) kartların yazılı sayılarıdır.
+// minAffordable: bir kartın en az bu kadar seçeneği karşılanabilir değilse o gün çıkmaz.
+export const COST_SCALE = { byTier: { 1: 0.4, 2: 0.6, 3: 1, 4: 1.3 }, resources: ['gold', 'food', 'bread'], minAffordable: 2 };
+
 export const DILEMMAS = {
   refugees: {
     title: 'Sığınmacı Kafilesi',
@@ -308,7 +313,7 @@ const MID = {
 };
 for (const def of Object.values(MID)) {
   def.midgame = true;
-  for (const o of def.options) o.detail = '';
+  for (const o of def.options) { o.detail = ''; o.midgame = true; } // (30.6) o.midgame: bedel ölçeği bu seçeneğe uygulanır
 }
 Object.assign(DILEMMAS, MID);
 export const DILEMMA_KEYS = Object.keys(DILEMMAS);

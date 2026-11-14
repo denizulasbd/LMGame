@@ -142,7 +142,7 @@ export class CraftsmanshipSystem {
     item.price = status.price;
     this.masterworks.sold += 1;
     this.masterworks.goldEarned += status.price;
-    this.economy.add('gold', status.price);
+    this.economy.add('gold', status.price, 'sale');
     const piece = MASTERPIECES[item.type];
     this.events.emit('masterwork:sold', { item, piece, price: status.price, source });
     this.events.emit('toast', {

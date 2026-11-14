@@ -7,6 +7,8 @@ const errors = [];
 const open = async (opts) => {
   const g = await openGame(opts);
   g.page.on('pageerror', (e) => errors.push(String(e)));
+  // (30.6) 30.4b'nin yazılı bedelleri Kasaba (x1) sayılarıdır: bedel ölçeği şalteri kapalı sınanır (ölçeğin kendisi 30.6 testlerinde)
+  await g.page.evaluate(async () => { (await import('/src/systems/Engines.js')).ENGINES.novicePath = false; });
   return g;
 };
 

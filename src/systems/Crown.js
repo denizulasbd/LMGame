@@ -3,7 +3,8 @@
 // burada TownStatus içe aktarılmaz.
 import { doctrineLevyMultiplier } from './Doctrine.js';
 import { CIVIC_PROJECTS } from '../data/town.js';
-import { TAX, TAX_RATES, LEVY, REPUTATION, DECREES, DECREE, EXODUS } from '../data/crown.js';
+import { TAX, TAX_RATES, LEVY, LEVY_EASE, REPUTATION, DECREES, DECREE, EXODUS } from '../data/crown.js';
+import { engineOn } from './Engines.js';
 import { RESOURCES } from '../data/resources.js';
 import { trustValue } from './Citizens.js';
 import { isGoldenAge } from './GoldenAge.js';
@@ -103,7 +104,8 @@ export function levyAmount(state) {
   const golden = isGoldenAge(state) ? LEVY.goldenAge : 1;
   const rep = reputationLevel(state.crown?.reputation ?? REPUTATION.start).levy;
   const trade = doctrineLevyMultiplier(state) * (state.civic?.tradeCharter ? CIVIC_PROJECTS.tradeCharter.levyMultiplier : 1); // (28.4) Ticaret Doktrini ve Beratı
-  return Math.round((LEVY.base + LEVY.perTier * tier + LEVY.perResident * pop) * golden * rep * trade);
+  const L = engineOn('novicePath') ? LEVY_EASE : LEVY; // (30.6) acemi kasaya göre yumuşak tutar
+  return Math.round((L.base + L.perTier * tier + L.perResident * pop) * golden * rep * trade);
 }
 
 /**

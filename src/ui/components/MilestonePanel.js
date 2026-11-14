@@ -10,6 +10,8 @@ import { milestoneProgress, activeMilestones, nextMilestone } from '../../system
 import { townTier, nextTownTier, tierChecks, formatTownTitle } from '../../systems/TownStatus.js';
 import { getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
+import { milestoneBlocker } from '../../systems/Money.js';
+import { engineOn } from '../../systems/Engines.js';
 import { dockButton, modalHeader } from '../dockButton.js';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -79,6 +81,7 @@ export class MilestonePanel {
     const key = `${tierKey}|${rows.map((r) => `${r.m.id}:${r.progress.current}:${r.progress.detail ?? ''}:${Boolean(r.completed)}:${r.isNext}`).join('|')}`;
     if (key === this.lastKey) return;
     this.lastKey = key;
+    this.state = state;
     this.list.replaceChildren(this.tierCard(state, tier, next, checks), ...rows.map((r) => this.row(r)));
   }
 
@@ -129,12 +132,15 @@ export class MilestonePanel {
       ? el('span', { className: 'goal-done', text: `✓ Gün ${completed.day}, ${pad(completed.hour)}:${pad(completed.minute)}` })
       : el('span', { className: 'need-bar goal-bar' }, [el('span', { className: 'need-fill goal-fill', style: `width: ${Math.round(ratio * 100)}%` })]);
     const detail = progress.detail ?? `${Math.min(progress.current, progress.target)}/${progress.target}`;
+    const blocker = isNext && this.state ? milestoneBlocker(this.state, m, progress) : null;
     return el('div', { className: `goal-row${completed ? ' is-done' : ''}${isNext ? ' is-next' : ''}`, dataset: { goal: m.id } }, [
       el('img', { className: 'goal-icon', src: getAnyIconURL(m.icon), alt: '' }),
       el('div', { className: 'goal-text' }, [
         el('span', { className: 'goal-name', text: m.name }, isNext ? [el('span', { className: 'goal-next', text: 'Sıradaki' })] : []),
         el('span', { className: 'goal-description', text: m.description }),
         el('div', { className: 'goal-status' }, [status, ...(completed ? [] : [el('span', { className: 'goal-detail', text: detail })])]),
+        // (30.6) "Sıradaki" hedefi engelleyen şey tek satırda ("Pazar Yeri gerekir · 40 odun, 15 taş")
+        ...(isNext && !completed && engineOn('novicePath') && blocker ? [el('span', { className: 'goal-blocker', text: blocker })] : []),
       ]),
     ]);
   }

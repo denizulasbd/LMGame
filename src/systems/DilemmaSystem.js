@@ -18,9 +18,9 @@
 //               { id, optionId, auto } olarak ExpeditionSystem'e gider (olay takvimini ve geçmişini etkilemez).
 // Durum state.dilemma'dadır (kayda girer: açık pencere, yaklaşan fırtına, süren sefer).
 import { activePopulation } from './LifeStages.js';
-import { DILEMMAS, DILEMMA_KEYS, DILEMMA_SCHEDULE, STORM, MIDGAME } from '../data/dilemmas.js';
+import { DILEMMAS, DILEMMA_KEYS, DILEMMA_SCHEDULE, STORM, MIDGAME, COST_SCALE } from '../data/dilemmas.js';
 import { engineOn } from './Engines.js';
-import { pickTargets, fillNames, describeOption } from './Midgame.js';
+import { pickTargets, fillNames, describeOption, scaledOption } from './Midgame.js';
 import { loyaltyScope, loyaltyOf } from './Loyalty.js';
 import { townTier } from './TownStatus.js';
 import { riteVenue } from './Rites.js';
@@ -166,6 +166,8 @@ export class DilemmaSystem {
     if (req.child && !state.characters.some((c) => c.isChild)) return false;
     if (req.foodRatio && (state.resources.food ?? 0) < this.economy.limit('food') * req.foodRatio) return false;
     if (def.target && !pickTargets(state, def.target)) return false;
+    // (30.6) en az iki seçeneği karşılanamayan kart o gün çıkmaz
+    if (def.midgame && engineOn('novicePath') && def.options.filter((o) => this.optionStatus(o).ok).length < COST_SCALE.minAffordable) return false;
     return true;
   }
 
@@ -253,9 +255,15 @@ export class DilemmaSystem {
   /**
    * Bir seçeneğin şimdi seçilip seçilemeyeceği: { ok, reason }. Arayüz de aynı sonucu gösterir.
    */
-  optionStatus(option) {
+  /** (30.6) Orta oyun seçeneğinin bugünkü (kasaba seviyesine göre ölçeklenmiş) hâli; şalter kapalıyken aynen. */
+  priced(option) {
+    return option.midgame && engineOn('novicePath') ? scaledOption(option, townTier(this.state).tier) : option;
+  }
+
+  optionStatus(raw) {
+    const option = this.priced(raw);
     for (const [r, v] of Object.entries(option.cost ?? {})) {
-      if ((this.state.resources[r] ?? 0) < v) return { ok: false, reason: `Yetersiz ${RESOURCES[r].name.toLocaleLowerCase('tr')}` };
+      if ((this.state.resources[r] ?? 0) < v) return { ok: false, reason: `Yetersiz ${RESOURCES[r].name.toLocaleLowerCase('tr')}${engineOn('novicePath') ? ` (${v} gerekir, ${Math.floor(this.state.resources[r] ?? 0)} var)` : ''}` };
     }
     for (const req of (option.requires ?? '').split(',').filter(Boolean)) {
       const [key, n] = req.split(':');
@@ -290,7 +298,7 @@ export class DilemmaSystem {
       active.title = def.title;
       return;
     }
-    active.options = def.options.map((o) => ({ id: o.id, ...this.optionStatus(o) }));
+    active.options = def.options.map((o) => ({ id: o.id, ...this.optionStatus(o), ...(o.midgame && engineOn('novicePath') ? { cost: { ...this.priced(o).cost } } : {}) }));
     active.defaultId = this.defaultOption(def).id;
     active.title = dilemmaTitle(def, this.state);
     if (def.midgame) {
@@ -299,7 +307,7 @@ export class DilemmaSystem {
       active.text = fillNames(def.text, names);
       active.portraits = [active.who, active.who2].map((id) => this.state.characters.find((c) => c.id === id)).filter(Boolean).map((c) => ({ id: c.id, name: c.name, appearance: c.appearance, look: c.look, isChild: Boolean(c.isChild) }));
       active.options.forEach((st, i) => {
-        const o = def.options[i];
+        const o = this.priced(def.options[i]);
         st.label = fillNames(o.label, names);
         st.detail = describeOption(o, names);
       });
@@ -333,8 +341,9 @@ export class DilemmaSystem {
     const names = def.midgame ? this.namesOf(d.active) : {};
     const ctx = def.midgame ? { who: this.state.characters.find((c) => c.id === d.active.who) ?? null, who2: this.state.characters.find((c) => c.id === d.active.who2) ?? null } : {};
     d.active = null;
-    this.economy.spend(option.cost ?? {});
-    this.apply(id, option.effect ?? {}, ctx);
+    const priced = this.priced(option);
+    this.economy.spend(priced.cost ?? {});
+    this.apply(id, priced.effect ?? {}, ctx);
     d.history[id] = this.state.time.day;
     if (engineOn('midgame')) d.recent = [...(d.recent ?? []), id].slice(-MIDGAME.noRepeatLast);
     this.state.stats.dilemmas = (this.state.stats.dilemmas ?? 0) + 1;
@@ -400,7 +409,7 @@ export class DilemmaSystem {
         default: return [];
       }
     };
-    if (e.gold) this.economy.add('gold', e.gold);
+    if (e.gold) this.economy.add('gold', e.gold, 'event');
     for (const [r, v] of Object.entries(e.resources ?? {})) {
       if (v > 0) this.economy.add(r, v);
       else if (v < 0) this.economy.spend({ [r]: Math.min(-v, this.economy.amount(r)) });

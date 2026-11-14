@@ -531,7 +531,7 @@ export class CrisisSystem {
     const pool = ablePeople(s).sort((a, b) => a.id - b.id);
     const defenders = [...new Set([...guards, ...pool])].slice(0, Math.max(BANDIT.defenders, guards.length));
     const loot = this.rng.int(BANDIT.loot.min, BANDIT.loot.max);
-    this.economy.add('gold', loot);
+    this.economy.add('gold', loot, 'raid');
     this.trust.adjust(BANDIT.repelTrust, 'raidRepelled');
     s.buffs[BANDIT.buff] = s.totalMinutes + 24 * 60;
     this.crisis.repelled += 1;

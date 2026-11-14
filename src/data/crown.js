@@ -47,6 +47,11 @@ export const LEVY = {
   failed: { trust: -12, reputation: -20, goodsShare: 0.4, goodsPerGold: 3 }, // ödenemezse hazineye el konur, depodan mal çekilir
 };
 
+// (30.6, ENGINES.novicePath) Acemi kasaya göre Krallık Vergisi: ilk tahsilat en erken firstDay'de (hazine ilk günlerde boştur),
+// tutar daha yumuşak (acemi profilin 40 günlük altın geliri ~650: vergi hazinenin en çok yarısını almalı) ve süresi dolan
+// fermanın cezası altın yerine yarı yarıya.
+export const LEVY_EASE = { firstDay: 9, base: 10, perTier: 10, perResident: 2, decreeFailedGoldPerTier: 20 };
+
 // Krallık İtibarı (0-100, başlangıç 50): vergiyi ve ferman ödüllerini etkiler
 export const REPUTATION = {
   start: 50,

@@ -32,6 +32,7 @@ export class EconomySystem {
     this.world = world;
     this.fullWarned = new Set();
     this.hungerWarned = false;
+    this.ledger = {}; // (30.6) altın gelir kalemleri { gün: { kaynak: miktar } }; yalnızca son günler, KAYDEDİLMEZ (üst çubuk ipucu)
     this.recalculateCapacity();
   }
 
@@ -107,13 +108,22 @@ export class EconomySystem {
     return true;
   }
 
+  /** (30.6) Altın gelir kalemi kaydı (yalnızca son 6 gün tutulur). */
+  record(source, amount) {
+    const day = this.state.time.day;
+    const today = (this.ledger[day] ??= {});
+    today[source] = (today[source] ?? 0) + amount;
+    for (const d of Object.keys(this.ledger)) if (Number(d) < day - 5) delete this.ledger[d];
+  }
+
   /** Kaynak ekler (depo kapasitesine kadar). Gerçekten eklenen miktarı döndürür. */
-  add(resource, amount) {
+  add(resource, amount, source = null) {
     const current = this.amount(resource);
     const limit = this.limit(resource); // hazinenin (altın) sınırı yok; tarımsal kaynaklara silo eklenir
     const added = Math.max(0, Math.min(Math.floor(amount), limit - current));
     if (added > 0) {
       this.state.resources[resource] = current + added;
+      if (resource === 'gold' && source) this.record(source, added);
       this.emitChange(resource, added);
     }
     const now = this.amount(resource);

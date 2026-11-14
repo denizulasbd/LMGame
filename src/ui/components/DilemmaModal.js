@@ -28,7 +28,10 @@ export class DilemmaModal {
     this.timerFill = el('span', { className: 'dilemma-timer-fill' });
     this.timerText = el('span', { className: 'dilemma-timer-text' });
     this.timerBar = el('span', { className: 'dilemma-timer-bar' }, [this.timerFill]);
+    // (30.6) Pencerenin üstünde: oyunun durduğu belli olsun (ekranın geri kalanı da belirgin biçimde kararır)
+    this.banner = el('div', { className: 'dilemma-paused', role: 'status', text: 'Oyun durdu · kararını bekliyor' });
     this.element = el('div', { className: 'dilemma ui-interactive', hidden: true }, [
+      this.banner,
       el('div', { className: 'panel dilemma-panel' }, [
         el('div', { className: 'dilemma-head' }, [el('div', { className: 'dilemma-icon-frame' }, [this.icon]), this.title]),
         this.text,
@@ -83,7 +86,7 @@ export class DilemmaModal {
   }
 
   optionButton(option, status, resources) {
-    const costs = Object.entries(option.cost ?? {}).map(([r, v]) =>
+    const costs = Object.entries(status.cost ?? option.cost ?? {}).map(([r, v]) =>
       el('span', { className: `build-cost${(resources[r] ?? 0) < v ? ' is-missing' : ''}` }, [
         el('img', { src: getIconDataURL(RESOURCES[r].icon), alt: RESOURCES[r].name }),
         String(v),
