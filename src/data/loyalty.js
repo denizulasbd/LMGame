@@ -21,7 +21,9 @@ export const LOYALTY = {
   // (29.10) Kırgın kasaba: Kırgın yetişkinlerin payı share'i aşınca Yönetim Güveni saat başı perHour x pay kadar erir (TrustSystem.hourly).
   // 29.6'da sadakatin isyanın tetiklenmesine hiçbir yolu yoktu: iyi beslenen kasabada Ağır Vergi ve reddedilen dilekçelerle bile güven %100'de kalıyordu.
   // (30.3) -1,7 -> -0,4: sadakat artık günler içinde Kırgın'a iniyor (eskiden ~30 gün); -1,7'de Zorba kasaba 15. günde 3 sakine iniyordu
-  bitterTrust: { share: 0.25, perHour: -0.4 },
+  // (30.4a) -0,4 -> -0,6: terk ediş sınırıyla (ENGINES.gentleExodus) çöküş kalktı; Zorba kasabada -0,4..-1,0 aralığının her değerinde isyan
+  // çıkıyor ve 40. günde 30 sakin kalıyor (-0,35'te tohum 77'de, -0,3'te ikisinde de isyan yok). Denenen pencerenin (-0,3..-0,8) çalışan kısmının ortası.
+  bitterTrust: { share: 0.25, perHour: -0.6 },
 };
 
 export const LOYALTY_SOURCES = {
@@ -52,7 +54,7 @@ export const LOYALTY_SOURCES = {
 // ---------------------------------------------------------------------------------------------------------------------
 // (30.3) Kararın Ağırlığı: hoşnutsuzluk basamakları, iş bırakma, Halkın Nabzı ve anında geri bildirim (ENGINES.discontent).
 // Saf hesaplar src/systems/Loyalty.js'te, olaylar src/systems/DiscontentSystem.js'te. HİÇ ZAR ÇEKMEZ (sözler tohum + 41).
-export const DISCONTENT_TABLE_VERSION = 2; // 2: denge ayarı (taxDaily 6/2/1/-3, Kırgın iş x0,85, bitterTrust -0,4)
+export const DISCONTENT_TABLE_VERSION = 3; // 2: denge ayarı (taxDaily 6/2/1/-3, Kırgın iş x0,85, bitterTrust -0,4); 3 (30.4a): bitterTrust -0,6
 
 export const DISCONTENT = {
   friendAt: 40, // dilekçe sahibinin "dostu": ilişki puanı bu ve üstü

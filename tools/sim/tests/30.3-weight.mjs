@@ -31,7 +31,7 @@ const open = async (opts) => {
     const adults = () => st.characters.filter((x) => !x.role && !x.isChild);
     const zero = () => { for (const x of st.characters) { x.loyalty = 0; M.recomputeMood(x); } };
     const S = D.LOYALTY_SOURCES;
-    c('tablo: yeni kaynaklar şartnameyle aynı (sürüm 2: taxDaily 6/2/1/−3, Kırgın iş x0,85, bitterTrust −0,4); mevcut kaynaklar duruyor', D.DISCONTENT_TABLE_VERSION === 2 && D.LOYALTY.bitterTrust.perHour === -0.4 && JSON.stringify(S.taxDaily) === JSON.stringify({ exempt: 6, low: 2, standard: 1, heavy: -3 }) && S.hungryDaily === -4 && S.coldDaily === -3 && S.friendRejected === -4 && S.friendFulfilled === 2 && D.DISCONTENT.friendAt === 40 && S.petitionRejected === -15 && S.taxCollected.heavy === -7 && S.gift === 10 && ENGINES.discontent === true);
+    c('tablo: yeni kaynaklar şartnameyle aynı (sürüm 2: taxDaily 6/2/1/−3, Kırgın iş x0,85, bitterTrust −0,4 → 30.4a: −0,6); mevcut kaynaklar duruyor', D.DISCONTENT_TABLE_VERSION === 3 && D.LOYALTY.bitterTrust.perHour === -0.6 && JSON.stringify(S.taxDaily) === JSON.stringify({ exempt: 6, low: 2, standard: 1, heavy: -3 }) && S.hungryDaily === -4 && S.coldDaily === -3 && S.friendRejected === -4 && S.friendFulfilled === 2 && D.DISCONTENT.friendAt === 40 && S.petitionRejected === -15 && S.taxCollected.heavy === -7 && S.gift === 10 && ENGINES.discontent === true);
     // günlük vergi kaynağı
     const [a, b, k, d] = adults();
     const rows = [];

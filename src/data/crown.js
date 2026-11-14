@@ -138,6 +138,11 @@ export const EXODUS = {
   graceHours: 24, // ... bu kadar saat kalırsa ve isyan yağmaya varmışsa (ya da bir gündür sürüyorsa) terk ediş başlar
   revoltHours: 24,
   everyMinutes: 360, // 6 saatte bir bir sakin (ya da bir aile) ayrılır
+  // (30.4a, ENGINES.gentleExodus) terk ediş sınırı: bir oyun gününde en çok maxPerDay, bir isyan boyunca (isyan bittikten sonraki
+  // terk edişler de son isyana sayılır; yeni isyan sayacı sıfırlar) en çok maxPerRevolt sakin ayrılır. Aile tek birimdir: sayaç
+  // sınırın altındayken yola çıkan aile sınırı bir kez aşabilir.
+  maxPerDay: 2,
+  maxPerRevolt: 4,
   core: 3, // kasabada her koşulda en az bu kadar sakin kalır
   leaveTimeoutMinutes: 720, // harita kenarına bu kadar sürede varamayan doğrudan ayrılmış sayılır
   // Kötü şöhret: göç koşullarına eklenen şart

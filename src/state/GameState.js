@@ -552,6 +552,9 @@ function restoreExodus(data) {
   out.startedAt = NUM(data.startedAt);
   for (const k of ['left', 'coins', 'items']) out[k] = COUNT(data[k]);
   out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && typeof l.name === 'string').slice(-12);
+  // (30.4a) terk ediş sınırı sayaçları (isteğe bağlı; şalter kapalı dünyada hiç yazılmaz)
+  const cap = data.cap;
+  if (cap && typeof cap === 'object') out.cap = { day: NUM(cap.day), today: COUNT(cap.today), revoltSince: NUM(cap.revoltSince), revolt: COUNT(cap.revolt) };
   return out;
 }
 

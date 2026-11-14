@@ -6,5 +6,6 @@ export const ENGINES = {
   loyalty: true, // (29.6) Vefa ve Husumet: sadakat, isyan elebaşı, yangın minneti, yağma kırgınlığı, anının kişisi
   rites: true, // (29.7) Anma Töreni ve özel günler (doğum günü, evlilik yıl dönümü)
   discontent: true, // (30.3) Kararın Ağırlığı: günlük sadakat kaynakları, beş kademe, iş bırakma, Halkın Nabzı, anında geri bildirim
+  gentleExodus: true, // (30.4a) terk ediş sınırı: günde ve isyan başına en çok kaç sakin ayrılır (aile tek birim)
 };
 export const engineOn = (key) => ENGINES[key] !== false;
