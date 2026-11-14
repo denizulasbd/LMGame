@@ -2,13 +2,19 @@
 // değiştirir), zar çekmez. Bağlam: { state, facts }; facts bu oturumda gözlenen eylemlerdir ({ moved, selected, speedChanged,
 // goalsOpened, upgraded, placed, petitionSelected }) ve kaydedilmez; kalıcı olan yalnızca state.guide.done'dır.
 //   state.guide = { done: [adım kimlikleri], off: bool, at?: { adım: oyun dakikası } }   (isteğe bağlı alanlar)
-import { GUIDE_STEPS, GUIDE_STORAGE_RATIO, GUIDE_SPEED_DELAY_MINUTES, GUIDE_OLD_SAVE_POPULATION, GUIDE_WATCH_POPULATION } from '../data/guide.js';
+import { GUIDE_STEPS, GUIDE_GOLD_DRY_DAYS, GUIDE_STONE_DRY_DAYS, GUIDE_STORAGE_RATIO, GUIDE_SPEED_DELAY_MINUTES, GUIDE_OLD_SAVE_POPULATION, GUIDE_WATCH_POPULATION } from '../data/guide.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { RESOURCES } from '../data/resources.js';
 import { storageLimit } from './Granary.js';
 import { nextTownTier, tierChecks } from './TownStatus.js';
 
 import { engineOn } from './Engines.js';
+import { foodSupply } from './TownStatus.js';
+import { foodDaysLeft } from './Loyalty.js';
+import { levyAmount } from './Crown.js';
+import { easiestGoldWay, stoneSource } from './Money.js';
+import { LEVY } from '../data/crown.js';
+import { DISCONTENT } from '../data/loyalty.js';
 import { chosenDoctrine } from './Doctrine.js';
 export const emptyGuide = () => ({ done: [], off: false });
 
@@ -89,6 +95,26 @@ export const CONDITIONS = {
     when: ({ state }) => engineOn('midgame') && !chosenDoctrine(state) && state.buildings.some((b) => b.type === 'townHall' && b.functional),
     done: ({ state }) => engineOn('midgame') && Boolean(chosenDoctrine(state)),
   },
+  // (30.6) yapı adımından hemen sonra: yiyecek üreten bir yapı (bahçe, balıkçı, ağıl) yerleştirilene dek
+  food: {
+    when: ({ state, guide }) => engineOn('novicePath') && isDone(guide, 'build') && !hasFoodProducer(state),
+    done: ({ state }) => engineOn('novicePath') && hasFoodProducer(state),
+  },
+  // (30.6) Kraliyet Tahsildarı ilk duyurulduğunda; ilk tahsilat gerçekleşince biter
+  levy: {
+    when: ({ state }) => engineOn('novicePath') && Boolean(state.crown?.notice) && (state.crown.levies ?? 0) === 0,
+    done: ({ state }) => engineOn('novicePath') && (state.crown?.levies ?? 0) >= 1,
+  },
+  // (30.6) hazine ilk kez 3 gün 0'da kalınca; biraz altın girince biter
+  gold: {
+    when: ({ facts }) => engineOn('novicePath') && (facts.goldDry ?? 0) >= GUIDE_GOLD_DRY_DAYS,
+    done: ({ state, facts }) => engineOn('novicePath') && (state.resources.gold ?? 0) >= 20 && (facts.goldDry ?? 0) === 0,
+  },
+  // (30.6) çevredeki kayalar tükenince ya da taş 2 gün 0'da kalınca; bir taş üreten yapı kurulunca biter
+  stone: {
+    when: ({ facts }) => engineOn('novicePath') && (facts.rocksGone === true || (facts.stoneDry ?? 0) >= GUIDE_STONE_DRY_DAYS),
+    done: ({ state }) => engineOn('novicePath') && state.buildings.some((b) => b.type === 'quarry'),
+  },
   watch: { when: ({ state }) => state.characters.length >= GUIDE_WATCH_POPULATION, done: ({ state }) => (state.watched?.length ?? 0) > 0 },
 };
 
@@ -103,4 +129,29 @@ export function currentStep(state, guide, facts) {
   if (guide.off) return null;
   const ctx = { state, facts, guide };
   return GUIDE_STEPS.find((s) => !isDone(guide, s.id) && CONDITIONS[s.id].when(ctx)) ?? null;
+}
+
+/** (30.6) Yiyecek üreten bir yapı (bahçe, iskele, ağıl: şantiyesi dahil) yerleştirilmiş mi? Çalılar (doğal) sayılmaz. */
+export function hasFoodProducer(state) {
+  return state.buildings.some((b) => {
+    const def = BUILDINGS[b.type];
+    return def?.buildable && (def.production?.resource === 'food' || def.production?.extra?.food !== undefined);
+  });
+}
+
+/** (30.6) Kartların değişken metni için sayılar: { days, amount, inKind, way, source }. */
+export function guideVars(state) {
+  const supply = foodSupply(state);
+  const pop = state.characters.filter((c) => !c.role).length;
+  const days = foodDaysLeft(supply, state.pulse?.eaten, pop);
+  const notice = state.crown?.notice;
+  const dayLeft = notice ? Math.max(0, Math.ceil((notice.at - state.totalMinutes) / 1440)) : 0;
+  return {
+    days: Number.isFinite(days) ? (days >= 10 ? Math.round(days) : Math.round(days * 10) / 10).toString().replace('.', ',') : '?',
+    amount: notice?.amount ?? levyAmount(state),
+    daysLeft: dayLeft,
+    inKind: LEVY.inKindShare > 0,
+    way: easiestGoldWay(state),
+    source: stoneSource(state),
+  };
 }

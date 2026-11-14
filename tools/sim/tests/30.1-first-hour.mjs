@@ -23,8 +23,8 @@ const tools = (page, fn, arg) => page.evaluate(fn, arg);
     const G = await import('/src/systems/Guide.js');
     const D = await import('/src/data/guide.js');
     const { GameState } = await import('/src/state/GameState.js');
-    c('rehber: tablo sürümlü, 14 adım (30.2: +3 hikâye adımı; 30.4a: +1 ilk vefat; 30.4b: +1 doktrin), her adımın görünme ve tamamlanma koşulu var', D.GUIDE_TABLE_VERSION === 4 && D.GUIDE_STEPS.length === 14 &&
-      D.GUIDE_STEPS.every((s) => typeof G.CONDITIONS[s.id]?.when === 'function' && typeof G.CONDITIONS[s.id]?.done === 'function' && s.text.split(/[.?!]\s/).length <= 3));
+    c('rehber: tablo sürümlü, 18 adım (30.2: +3 hikâye adımı; 30.4a: +1 ilk vefat; 30.4b: +1 doktrin; 30.6: +4 yiyecek / tahsildar / altın / taş), her adımın görünme ve tamamlanma koşulu var', D.GUIDE_TABLE_VERSION === 5 && D.GUIDE_STEPS.length === 18 &&
+      D.GUIDE_STEPS.every((s) => typeof G.CONDITIONS[s.id]?.when === 'function' && typeof G.CONDITIONS[s.id]?.done === 'function' && (typeof s.text === 'function' || s.text.split(/[.?!]\s/).length <= 3)));
     const st = game.state;
     const ids = (guide, facts) => G.currentStep(st, guide, facts)?.id ?? null;
     const g = { done: [], off: false };
@@ -34,7 +34,7 @@ const tools = (page, fn, arg) => page.evaluate(fn, arg);
     g.done.push('meet'); seq.push(ids(g, {}));
     g.done.push('harvest'); seq.push(ids(g, {}));
     c('rehber: görünme sırası move > meet > harvest > build', seq.join() === 'move,meet,harvest,build', seq.join());
-    g.done.push('build');
+    g.done.push('build', 'food'); // (30.6) yiyecek adımı yapı adımından hemen sonra gelir; bu sınama onu tamamlanmış sayar
     const t0 = st.totalMinutes;
     g.at = { build: t0 };
     c('rehber: Hedefler adımı (4 tamam), hız adımı 2 oyun saatinden sonra', ids(g, {}) === 'goals' && G.CONDITIONS.speed.when({ state: st, guide: g, facts: {} }) === false);
@@ -273,14 +273,14 @@ const live = await open({ seed: 42, stopLoop: false });
   }
   check('uygun yer yok: ekranda yer yoksa mesaj ve en yakın yerin yönü', none.complete && none.vis === 0 && none.texts.includes('Bu ekranda uygun yer yok') && (none.nearest === null || none.outside), JSON.stringify({ ...none, texts: undefined }));
   await page.evaluate(() => game.events.emit('ui:setTool', { tool: 'build', buildType: 'cabin' }));
-  // Esc / Listeyi aç
+  // Esc (30.6: Esc hiçbir şey AÇMAZ; şeritteyken ilk Esc aracı bırakır)
   await page.keyboard.press('Escape');
   await page.waitForTimeout(150);
   const e1 = await page.evaluate(() => ({ list: !document.querySelector('.build-items').hidden, tool: game.scenes.current.tools.tool }));
   await page.keyboard.press('Escape');
   await page.waitForTimeout(150);
   const e2 = await page.evaluate(() => game.scenes.current.tools.tool);
-  check('şerit: Esc listeyi geri açar, ikinci Esc aracı bırakır', e1.list && e1.tool === 'build' && e2 === 'select', JSON.stringify({ e1, e2 }));
+  check('şerit: Esc listeyi AÇMAZ, aracı bırakır (30.6)', !e1.list && e1.tool === 'select' && e2 === 'select', JSON.stringify({ e1, e2 }));
   // Menü açıkken ve şerit modunda gerçek tıklamayla kurulum, yığın boyu sabit
   const okTile = (mode) => page.evaluate((mode) => {
     const sc = game.scenes.current; const cam = sc.camera; const T = 16; const w = sc.map.width;

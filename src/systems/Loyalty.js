@@ -215,9 +215,10 @@ export function restorePulse(data) {
 }
 
 /** Kiler kaç gün yeter: stok ÷ günlük tüketim (son 2 günün ortalaması). Tüketim kaydı yoksa tahmin yok (Infinity). */
-export function foodDaysLeft(supply, eaten) {
+export function foodDaysLeft(supply, eaten, population = null) {
   const list = (eaten ?? []).filter((v) => Number.isFinite(v) && v > 0);
-  if (!list.length) return Infinity;
+  // (30.6) tüketim kaydı yokken (ilk gün, yeni kayıt) nüfus x günlük ihtiyaçtan tahmin
+  if (!list.length) return engineOn('novicePath') && population > 0 ? Math.max(0, supply) / (population * DISCONTENT.famine.dailyPerPerson) : Infinity;
   const perDay = list.reduce((a, b) => a + b, 0) / list.length;
   return Math.max(0, supply) / perDay;
 }

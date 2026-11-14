@@ -225,7 +225,7 @@ export class DiscontentSystem {
 
   /** Kiler kaç gün yeter (≈). */
   foodDays() {
-    return foodDaysLeft(foodSupply(this.state), this.state.pulse?.eaten);
+    return foodDaysLeft(foodSupply(this.state), this.state.pulse?.eaten, this.state.characters.filter((c) => !c.role).length);
   }
 
   checkPantry() {

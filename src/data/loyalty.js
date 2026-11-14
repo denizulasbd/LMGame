@@ -83,7 +83,7 @@ export const DISCONTENT = {
   pulse: { dayWindow: 2, dailyKeep: 3, arrowAt: 2, topReasons: 3, ringHours: 24 },
   feedback: { seconds: 4, flashSeconds: 1.2 },
   // Kıtlık: "≈ N gün yeter" (stok ÷ son 2 günün günlük tüketimi); 1 günün altında sayaç kırmızı ve yanıp söner, hikâye kartı
-  famine: { windowDays: 2, redBelowDays: 1, criticalDays: 3 }, // tüketim kaydı yoksa (oyunun ilk günü) tahmin yapılmaz
+  famine: { windowDays: 2, redBelowDays: 1, criticalDays: 3, dailyPerPerson: 3.5 }, // (30.6) dailyPerPerson: tüketim kaydı yokken kişi başı günlük yiyecek ihtiyacı (ilk günden "≈ N gün yeter") // tüketim kaydı yoksa (oyunun ilk günü) tahmin yapılmaz
 };
 
 // Nabız ipucundaki neden adları (LoyaltySystem.adjust'in nedenleri gruplanır; gün dönümü kayması neden sayılmaz)
