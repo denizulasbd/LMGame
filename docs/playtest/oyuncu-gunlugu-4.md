@@ -26,7 +26,7 @@ Parayı geri istemezdim. Ama bir oyun arkadaşıma "ilk 15 gün muhteşem, sonra
 - 4. gün: bir olay penceresi çıktı ve oyun durdu: "Sığınmacı Kafilesi". 40 yiyecek + 20 odun karşılığı misafir et, ya da kabul et (yatak yok) ya da geri çevir. Elimde 33 yiyecek vardı, geri çevirdim. ![olay](img4/03-kafile-olayi.png) Okuması rahat, süre yok yazıyor.
 - 4. gün: Tekerlekle uzaklaştırınca harita çok daha büyükmüş (göl, köprü, orman). Üstte kırmızı "Tahsildar yolda · 89 altın" çıktı, elimde 17 altın var. Süs havuzuna tıklayınca "İç vergi" paneli açıldı. Ağır vergi seçtim, tahmini 96 altın diyor ama "güven -8, keyif -10, çalışma hızı -%15" ve "3 gün ferman kilitli". ![vergi](img4/04-agir-vergi.png)
 - 5. gün: Elif'in doğum günü bildirimi "Armağana gönder" ile 5 altın harcadım. İki yeni kulübe, taş ocağı (sadece açık yeşil karolara kurulabiliyor; bunu deneyerek buldum). Nüfus 10/10.
-- **5. gün ara notu (19:53, ~12 dk):** Şu an kulübeleri yükseltmeye çalışıyorum çünkü Hedefler "seviye 2 yapı" istiyor. Bir sonraki hedef Kasaba Hanı. Sıkılmıyorum ama çoğu zaman bekliyorum: odun/taş gelsin diye. Kasaba 5 gün öncekinden büyük: 3→4 ev, iki bahçe, taş ocağı. İnsanlar eskisi gibi benim emrim olmadan dolaşıyor, bir de randevuya gidiyorlar. Olay pencereleri (kafile, hazine haritası, tapınak) iyi sürpriz.
+- **5. gün ara notu (19:53, ~12 dk):** Şu an kulübeleri yükseltmeye çalışıyorum çünkü Hedefler "seviye 2 yapı" istiyor. Bir sonraki hedef Kasaba Hanı. Sıkılmıyorum ama çoğu zaman bekliyorum: odun/taş gelsin diye. Kasaba 5 gün öncekinden büyük: 3→4 ev, iki bahçe, taş ocağı. İnsanlar eskisi gibi benim emrim olmadan dolaşıyor, bir de randevuya gidiyorlar. Olay pencereleri (kafile, tiyatro, ozanlar, hazine haritası) iyi sürpriz.
 
 - **19:55, 8. gün** Nüfus 12'ye çıktı (kulübe yetmedi, iki kişi kaldı ama yeni gelenler Kasaba Hanı'nda sabahlıyor yazıyor). "Kasaba Hanı" 45 odun + 25 taş. Hedefler 3/14. Ekranda "Şenlik Coşkusu", "Güneş ve Nehir Panayırı" gibi bildirimler var; kimse bana ne yapmam gerektiğini söylemiyor ama olaylar anlatılıyor.
 - **19:57, 9. gün** Günlük listesinde: Elif ile Emre evlendi, düğün meydanda yapıldı. ![düğün](img4/06-dugun-gunluk.png) Güzel şeydi, ama ben bir şey yapmadım; sakinler kendi başına bunu yaptı. Bu hoşuma gitti.
@@ -116,6 +116,6 @@ Para kazanma için açık bir yol/hedef; altını görebileceğim bir "gelir/gid
 - Sesi duyamadım (ses açık/kapalı düğmesi var, çalıp çalmadığını bilmiyorum).
 - 100–120 dakikalık oturumun yarısından azını oynadım (53 dk).
 - Geç oyun hedefi: 14 hedefin 10'unu görmedim; "Kasaba" ve sonrası seviyeleri görmedim.
-- Hazine haritası seferinin sonu, tapınak, Bilgelik Evi, Belediye Konağı, Pazar'da takas.
+- Hazine haritası seferinin sonu, Bilgelik Evi, Belediye Konağı, Pazar'da takas.
 - Tarihçe Kütüğü sekmesi, bir sakin panelinin Özet/İç Dünya/Bağlar sekmelerinin ayrıntılı içeriği (tıkladım ama not almadım).
 - Yağma ve isyanın tam çözümü.
