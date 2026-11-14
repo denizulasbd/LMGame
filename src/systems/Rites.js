@@ -2,6 +2,7 @@
 // doğum günü / evlilik yıl dönümü tespiti, "aynı toplulukta" denetimi. Durum değiştirmez, rastgelelik kullanmaz.
 import { RITE_RULES as R, SPECIAL_RULES as S, RITE_VENUES } from '../data/rites.js';
 import { AGING } from '../data/lifeStages.js';
+import { CALENDAR } from '../data/seasons.js';
 import { ACTIVITIES } from '../data/activities.js';
 import { getFriendship, arePartners } from './RelationshipSystem.js';
 import { hasTag } from './Chemistry.js';
@@ -130,9 +131,23 @@ export function friendsOfDead(state, dead) {
 // ---------------------------------------------------------------------------------------------------------------------
 // Özel günler
 
-/** Bugün yaş aldı mı (gün dönümünde yaşı bir yıl doldu)? */
+/**
+ * Bugün doğum günü mü? Gün dönümünde yaş aldı ve bu, takvim yılı penceresindeki (CALENDAR.daysPerYear gün) ilk yaş alışı: kutlama
+ * yılda birdir. (30.4a) Her mevsim bir yaş alınır (4 günde bir); eskiden bir yaş = bir takvim yılıydı, kural aynı sonucu verir.
+ */
 export function isBirthday(c) {
-  return Number.isFinite(c?.ageInDays) && (c.agedDays ?? 0) > 0 && c.ageInDays > 0 && c.ageInDays % AGING.daysPerYear === 0;
+  if (!Number.isFinite(c?.ageInDays) || !((c.agedDays ?? 0) > 0) || !(c.ageInDays > 0)) return false;
+  return c.ageInDays % AGING.daysPerAge === 0 && c.ageInDays % CALENDAR.daysPerYear < AGING.daysPerAge;
+}
+
+/** (30.4a) Bir sonraki doğum günü kutlamasına kalan gün (1..). */
+export function daysToBirthday(c) {
+  const start = Math.max(0, Math.floor(c?.ageInDays ?? 0));
+  for (let k = 1; k <= 2 * CALENDAR.daysPerYear + AGING.daysPerAge; k++) {
+    const d = start + k;
+    if (d % AGING.daysPerAge === 0 && d % CALENDAR.daysPerYear < AGING.daysPerAge) return k;
+  }
+  return CALENDAR.daysPerYear;
 }
 
 /** Bugün evlilik yıl dönümü mü (16 günde bir; eşi hâlâ yanında)? */

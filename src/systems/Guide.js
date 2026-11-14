@@ -47,6 +47,11 @@ export function upgradeCheck(state) {
 
 /** Her adımın görünme (when) ve tamamlanma (done) koşulu; ikisi de ({ state, facts, guide }) alır. */
 export const CONDITIONS = {
+  // (30.4a) ilk doğal vefat (kaza sayılmaz); yalnızca "Anladım" ile tamamlanır
+  lifespan: {
+    when: ({ state }) => (state.lifeStages?.deaths ?? 0) - (state.lifeStages?.accidents ?? 0) >= 1,
+    done: () => false,
+  },
   move: { when: () => true, done: ({ facts }) => Boolean(facts.moved) },
   meet: { when: ({ guide }) => isDone(guide, 'move'), done: ({ facts }) => Boolean(facts.selected) },
   harvest: {

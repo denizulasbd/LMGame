@@ -7,5 +7,13 @@ export const ENGINES = {
   rites: true, // (29.7) Anma Töreni ve özel günler (doğum günü, evlilik yıl dönümü)
   discontent: true, // (30.3) Kararın Ağırlığı: günlük sadakat kaynakları, beş kademe, iş bırakma, Halkın Nabzı, anında geri bildirim
   gentleExodus: true, // (30.4a) terk ediş sınırı: günde ve isyan başına en çok kaç sakin ayrılır (aile tek birim)
+  swiftAging: true, // (30.4a) kuşaklar: her mevsim bir yaş (AGING.daysPerAge); takvim yılı 16 gün kalır
 };
+// (30.4a) Açılıştan ÖNCE bilinmesi gereken şalterler (kurucuların ageInDays değeri sahne kurulurken hesaplanır): modül yüklenirken
+// globalThis.__LMGAME_ENGINES_OFF dizisi okunur (anahtar adları; '*' hepsi). tools/sim/lib.mjs -> openGame({ enginesOff }) bunu sayfa
+// açılmadan enjekte eder; dondurulmuş tests.mjs bütün şalterleri bu yolla kapatır.
+{
+  const off = globalThis.__LMGAME_ENGINES_OFF;
+  if (Array.isArray(off)) for (const k of Object.keys(ENGINES)) if (off.includes('*') || off.includes(k)) ENGINES[k] = false;
+}
 export const engineOn = (key) => ENGINES[key] !== false;

@@ -339,6 +339,13 @@
   opacity: 0.75;
 }
 
+/* (30.4a) yaklaşan bilgelik / ömrün son demleri */
+.life-stage-soon {
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
 .character-traits {
   display: flex;
   flex-wrap: wrap;

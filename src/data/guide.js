@@ -2,9 +2,11 @@
 // söyler; görünme ve tamamlanma koşulları systems/Guide.js'te (saf işlevler, oyun durumundan okunur).
 // Her kart en çok iki kısa cümle; **kalın** sözcükler arayüzdeki düğme adlarıdır. target: karta eşlik eden düğmenin
 // CSS seçicisi (GuideCard yanıp söndürür; seçici hiçbir öğeye uymuyorsa kart yine görünür).
-export const GUIDE_TABLE_VERSION = 2; // (30.2) hikâye kartı ve Yakından izle adımları eklendi
+export const GUIDE_TABLE_VERSION = 3; // (30.2) hikâye kartı ve Yakından izle adımları eklendi; (30.4a) ilk doğal vefat kartı
 
 export const GUIDE_STEPS = [
+  // (30.4a) kasabadaki ilk doğal vefatta bir kez (tablonun başında: bekleyen öteki adımların arkasında kalmasın; "Anladım" ile biter)
+  { id: 'lifespan', text: 'Sakinlerin ömrü var. Vefat edenler anıtta anılır; öyküleri kitabede kalır.', target: null },
   { id: 'move', text: 'Haritayı WASD ya da sağ tıkla sürükleyerek gez. Tekerlek yakınlaştırır.', target: null },
   { id: 'meet', text: 'Sakinlerin kendi başına yaşar. Birine tıkla, kim olduğuna bak.', target: null },
   { id: 'harvest', text: 'Odun ve taş için **Topla**\'yı seç, ağaçların ve kayaların üstünde sürükle.', target: '.tool-btn[data-tool="harvest"]' },

@@ -73,7 +73,7 @@ const seed = Number(positional[0] ?? 42);
 const days = Number(positional[1] ?? 32);
 const speed = Number(options.speed ?? 4);
 
-const { browser, page, errors } = await openGame({ seed });
+const { browser, page, errors } = await openGame({ seed, enginesOff: typeof options['engines-off'] === 'string' ? options['engines-off'] : null }); // (30.4a) açılıştan önce
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
 if (options.stories) await page.evaluate((f) => { window.game.scenes.current.storyDirector.autoTick = true; if (f) window.game.events.emit('ui:setStoryFilter', { filter: f }); }, typeof options['story-filter'] === 'string' ? options['story-filter'] : null); // (30.2)

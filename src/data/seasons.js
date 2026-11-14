@@ -16,6 +16,10 @@
 //   tint        : gündüz ekrana eklenen hafif mevsim ışığı { r, g, b, a }
 import { CONFIG } from '../config.js';
 
+// (30.4a) Takvim: mevsimler, festivaller, evlilik yıl dönümü ve doğum günü kutlaması bu yıla bağlıdır (yılda bir). Sakinlerin yaşlanma
+// hızı ayrıdır (data/lifeStages.js -> AGING.daysPerAge).
+export const CALENDAR = { daysPerSeason: CONFIG.DAYS_PER_SEASON, daysPerYear: CONFIG.DAYS_PER_SEASON * 4 };
+
 export const SEASONS = [
   {
     key: 'spring',

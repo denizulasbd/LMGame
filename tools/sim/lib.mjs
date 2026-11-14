@@ -35,8 +35,10 @@ export function parseArgs(argv = process.argv.slice(2)) {
 /**
  * Tarayıcıyı açar, oyunu verilen tohumla yükler ve döngüyü durdurur.
  * Dönüş: { browser, page, errors } — errors: sayfa hataları ve konsol uyarıları
+ * (30.4a) enginesOff: kapatılacak ENGINES anahtarları (dizi ya da virgüllü metin; '*' hepsi). Sayfa açılmadan önce
+ * globalThis.__LMGAME_ENGINES_OFF olarak enjekte edilir: Engines.js modül yüklenirken okur (açılışta bilinmesi gereken şalterler).
  */
-export async function openGame({ seed = 42, path = '', viewport = { width: 1280, height: 800 }, randomSeed = seed, stopLoop = true } = {}) {
+export async function openGame({ seed = 42, path = '', viewport = { width: 1280, height: 800 }, randomSeed = seed, stopLoop = true, enginesOff = null } = {}) {
   const { chromium } = require('playwright');
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport });
@@ -45,6 +47,8 @@ export async function openGame({ seed = 42, path = '', viewport = { width: 1280,
   page.on('console', (m) => {
     if (m.type() === 'error' || m.type() === 'warning') errors.push(`[${m.type()}] ${m.text()}`);
   });
+  const off = Array.isArray(enginesOff) ? enginesOff : typeof enginesOff === 'string' ? enginesOff.split(',').map((k) => k.trim()).filter(Boolean) : [];
+  if (off.length) await page.addInitScript((keys) => { globalThis.__LMGAME_ENGINES_OFF = keys; }, off);
   if (randomSeed !== null) {
     await page.addInitScript((s) => {
       let x = (s * 2654435761) >>> 0 || 1;

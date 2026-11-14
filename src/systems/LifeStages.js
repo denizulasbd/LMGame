@@ -1,29 +1,50 @@
 // (25.1) Yaşam evrelerinin saf hesapları: evre, yaş / gün dönüşümü, doğum günü, çekirdek yetişkinler, emeklilik ve
 // bilgelerin refah katkısı. Durum değiştirmez, rastgelelik kullanmaz (LifeStageSystem uygular).
 import { AGING, ELDER, LIFE_STAGE_KEYS } from '../data/lifeStages.js';
+import { CALENDAR } from '../data/seasons.js';
 
-/** Kimliğe göre doğum gününün yıl içindeki sırası (0..birthdaySpread-1). */
+/** Doğum günlerinin dağıldığı gün sayısı: bir yaşın ilk yarısı (16 günlük yaşta 8, 4 günlükte 2). */
+export function birthdaySpread() {
+  return Math.max(1, Math.round((AGING.birthdaySpread * AGING.daysPerAge) / CALENDAR.daysPerYear));
+}
+
+/** Kimliğe göre doğum gününün bir yaş içindeki sırası (0..birthdaySpread()-1). */
 export function birthdayOffset(id) {
-  return ((Number.isFinite(id) ? Math.abs(Math.floor(id)) : 0) * 5) % AGING.birthdaySpread;
+  return ((Number.isFinite(id) ? Math.abs(Math.floor(id)) : 0) * 5) % birthdaySpread();
 }
 
 /** Yaş (yıl) -> doğduğundan bu yana geçen oyun günü (doğum günü kimlikten). */
 export function daysForAge(age, id) {
-  return Math.max(0, Math.floor(age)) * AGING.daysPerYear + birthdayOffset(id);
+  return Math.max(0, Math.floor(age)) * AGING.daysPerAge + birthdayOffset(id);
 }
 
 /** Oyun günü -> yaş (yıl). */
 export function ageFromDays(ageInDays) {
-  return Math.floor(Math.max(0, ageInDays) / AGING.daysPerYear);
+  return Math.floor(Math.max(0, ageInDays) / AGING.daysPerAge);
+}
+
+/** (30.4a) Bir sonraki yaşa kalan gün (1..daysPerAge). */
+export function daysToNextAge(ageInDays) {
+  const d = AGING.daysPerAge;
+  return d - (Math.max(0, Math.floor(ageInDays)) % d);
+}
+
+/**
+ * (30.4a) Kayıt göçü (v40 -> v41): 16 günlük yaştan bugünkü daysPerAge'e. Yaş ve yaş içindeki ilerleme oranı korunur (aşağı yuvarlama):
+ * floor(gün x daysPerAge / 16). Şalter kapalıyken değişmez. Zar çekmez.
+ */
+export function rescaleAgeDays(ageInDays, from = CALENDAR.daysPerYear) {
+  if (!Number.isFinite(ageInDays) || ageInDays < 0) return ageInDays;
+  return Math.floor((Math.floor(ageInDays) * AGING.daysPerAge) / from);
 }
 
 /**
  * İki sakinin kuşak yaşı farkı (yıl): kasabaya katıldıkları / büyüdükleri andaki yaşlarının farkı. Herkes her gün birlikte
- * yaşlandığı için zamanla değişmez; doğum günleri yılın ilk 8 gününe dağıldığından (8/16 < 0,5) yuvarlama tam yıl farkını verir.
+ * yaşlandığı için zamanla değişmez; doğum günleri bir yaşın ilk yarısına dağıldığından (fark en çok 7/16 ya da 1/4 gün-yaş, < 0,5) yuvarlama tam yıl farkını verir.
  */
 export function ageGap(a, b) {
-  const cohort = (c) => (Number.isFinite(c.ageInDays) ? c.ageInDays - (c.agedDays ?? 0) : (c.age ?? 0) * AGING.daysPerYear);
-  return Math.round(Math.abs(cohort(a) - cohort(b)) / AGING.daysPerYear);
+  const cohort = (c) => (Number.isFinite(c.ageInDays) ? c.ageInDays - (c.agedDays ?? 0) : (c.age ?? 0) * AGING.daysPerAge);
+  return Math.round(Math.abs(cohort(a) - cohort(b)) / AGING.daysPerAge);
 }
 
 /** Yaşa ve çocukluğa göre evre. Evreler geri dönmez: kazanılmış bilge unvanı ve yetişkinlik korunur. */

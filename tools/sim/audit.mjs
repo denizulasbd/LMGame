@@ -382,7 +382,7 @@ const PAGE_HELPERS = () => {
       const mate = s.characters.find((c) => c.id === d.partnerId);
       const ward = pool.find((c) => c !== v && c !== d && c !== mate && !c.apprenticeship);
       const workshop = s.buildings.find((b) => b.type === 'workshop' && b.functional);
-      for (const c of [v, d]) { c.lifeStage = 'elder'; c.age = 72; c.ageInDays = 72 * 16; c.children = []; c.inventory = (c.inventory ?? []).filter((x) => !x.heirloom); }
+      for (const c of [v, d]) { c.lifeStage = 'elder'; c.age = 72; c.ageInDays = 72 * (await import('/src/data/lifeStages.js')).AGING.daysPerAge; c.children = []; c.inventory = (c.inventory ?? []).filter((x) => !x.heirloom); }
       const homeV = v.homeId;
       const venerableNow = lc.makeVenerable(v);
       if (workshop) { ward.lifeStage = 'youth'; ward.apprenticeship = { masterId: d.id, profession: 'workshop', buildingId: workshop.id, progress: 10, since: 0, crafted: 0 }; }
@@ -492,7 +492,7 @@ const PAGE_HELPERS = () => {
 
     // --- 2m. (25.1) Kıdemli Bilge emekliyken ve nasihat verirken, bir Genç 21. doğum gününün eşiğindeyken ---
     {
-      const Y = 16;
+      const Y = (await import('/src/data/lifeStages.js')).AGING.daysPerAge; // (30.4a) bir yaş kaç gün
       const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
       const sage = adults[0];
       sage.ageInDays = 65 * Y - 1; // (29.2b) Kıdemli Bilge yaşı 65
@@ -521,7 +521,7 @@ const PAGE_HELPERS = () => {
 
     // --- 2n. (25.2) Çırak ustasının yanında taburede otururken, Gururlu Usta etkinken ve kapı açıkken ---
     {
-      const Y = 16;
+      const Y = (await import('/src/data/lifeStages.js')).AGING.daysPerAge; // (30.4a) bir yaş kaç gün
       sim.give({ wood: 300, stone: 200, food: 300 });
       const hut = sim.place('lumberHut');
       const people = s.characters.filter((c) => !c.isChild && !c.role && !c.away && c.lifeStage === 'adult' && !c.emigrating).sort((a, b) => a.id - b.id);
@@ -677,8 +677,9 @@ const PAGE_HELPERS = () => {
       const diff = A.roundtrip();
       check('sofra kuruluyken kayıt -> yükleme durum kayması yok (currentFeast, ikram sayacı, bonuslar)', s.currentFeast?.tier === 'rich' && s.currentFeast.served > 0 && JSON.stringify(s.currentFeast) === live && diff.length === 0, `${live} ${diff.join(' | ')}`);
       const food0 = s.resources.food;
+      const spoil0 = s.granary.spoiled.food ?? 0; // (30.4a) silosuz kasabada yağmurda / kışın bozulan mahsul kiler ölçümünden ayrılır
       hours(5);
-      check('yüklemeden sonra sofra 22:00\'de toplanır, yenmeyen erzak kilere döner, besin kişi başı 3\'ün üstünde', s.currentFeast === null && s.resources.food >= food0 && s.stats.feasts === (keepStat[0] ?? 0) + 1 && Math.floor(s.resources.food + s.resources.bread * 2.5) >= s.characters.length * 3, `${s.resources.food} ${food0}`);
+      check('yüklemeden sonra sofra 22:00\'de toplanır, yenmeyen erzak kilere döner, besin kişi başı 3\'ün üstünde', s.currentFeast === null && s.resources.food + ((s.granary.spoiled.food ?? 0) - spoil0) >= food0 && s.stats.feasts === (keepStat[0] ?? 0) + 1 && Math.floor(s.resources.food + s.resources.bread * 2.5) >= s.characters.length * 3, `${s.resources.food} ${food0}`);
       s.goldenAge.since = keepGA;
       s.stats.feasts = keepStat[0];
       s.stats.feastServings = keepStat[1];
@@ -739,13 +740,14 @@ const PAGE_HELPERS = () => {
       const off1 = game.events.on('feast:ended', (p) => (feastEnd = p));
       const off2 = game.events.on('fair:ended', (p) => (fairEnd = p));
       const food0 = s.resources.food;
+      const spoil0 = s.granary.spoiled.food ?? 0; // (30.4a) bozulan mahsul ayrılır
       while (s.currentFeast && t.hour < 23) {
         sim.step(30);
         const f = s.currentFeast;
         if (f) { peak = Math.max(peak, f.served - f.servings); if (new Set(f.eatenIds).size !== f.eatenIds.length || f.eatenIds.length !== f.served) dup = true; }
       }
       off1(); off2();
-      check('27.1: yüklemeden sonra kimse ikinci kez ikram almaz (served <= servings); 22:00 iadesi negatif değil', !dup && peak <= 0 && feastEnd && feastEnd.refund.food >= 0 && feastEnd.refund.bread >= 0 && s.resources.food >= food0, `${peak} ${JSON.stringify(feastEnd?.refund)}`);
+      check('27.1: yüklemeden sonra kimse ikinci kez ikram almaz (served <= servings); 22:00 iadesi negatif değil', !dup && peak <= 0 && feastEnd && feastEnd.refund.food >= 0 && feastEnd.refund.bread >= 0 && s.resources.food + ((s.granary.spoiled.food ?? 0) - spoil0) >= food0, `${peak} ${JSON.stringify(feastEnd?.refund)}`);
       check('27.1: kapanış sayımı yüklemeden önce dans edenleri de içerir', fairEnd && dancers.every((id) => fairEnd.attendees.includes(id)), `${fairEnd?.attendees.length}`);
       s.goldenAge.since = keepGA;
       [s.stats.feasts, s.stats.feastServings, s.stats.fairs] = keepStat;
@@ -806,7 +808,7 @@ const PAGE_HELPERS = () => {
       master.workplaceId = hut.id;
       master.skills.herbalism = Math.max(master.skills.herbalism ?? 0, 1600);
       for (const c of s.characters) if (c.apprenticeship?.buildingId === hut.id) c.apprenticeship = null;
-      Object.assign(youth, { lifeStage: 'youth', ageInDays: 19 * 16, age: 19, workplaceId: null });
+      Object.assign(youth, { lifeStage: 'youth', ageInDays: 19 * (await import('/src/data/lifeStages.js')).AGING.daysPerAge, age: 19, workplaceId: null });
       youth.profile = youth.buildProfile();
       const enrolled = sim.scene().apprenticeship.enroll(youth, hut);
       Object.assign(t, { day: t.day + 1, hour: 6, minute: 55 });

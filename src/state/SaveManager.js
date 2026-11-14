@@ -12,6 +12,7 @@ import { migrateChemistry } from '../systems/Chemistry.js';
 import { migrateMoodlets } from '../systems/Moodlets.js';
 import { migrateWants } from '../systems/Wants.js';
 import { migrateEvolution } from '../systems/Evolution.js';
+import { rescaleAgeDays } from '../systems/LifeStages.js';
 
 const SLOT_KEYS = {
   main: CONFIG.SAVE_KEY,
@@ -40,6 +41,17 @@ function migrate(data) {
     }
     data.rites = { pending: [], active: null, names: [], held: 0, condolences: 0, celebrated: 0, forgotten: 0 };
     if (data.trust?.revolt && typeof data.trust.revolt === 'object') data.trust.revolt.leaderId = null;
+  }
+  // (30.4a) v40 -> v41: her mevsim bir yaş. Gün cinsinden yaş 16 günlük yaştan bugünkü AGING.daysPerAge'e ölçeklenir (yaş ve yaş içindeki
+  // ilerleme korunur, aşağı yuvarlama); kuşak yaşı (ageInDays - agedDays) aynı oranla ölçeklenir. ENGINES.swiftAging kapalıyken değişmez. Zar çekmez.
+  if (data.version < 41 && Array.isArray(data.characters)) {
+    for (const c of data.characters) {
+      if (!c || typeof c !== 'object' || !Number.isFinite(c.ageInDays) || c.ageInDays < 0) continue;
+      const days = rescaleAgeDays(c.ageInDays);
+      const cohort = rescaleAgeDays(Math.max(0, c.ageInDays - (Number.isFinite(c.agedDays) ? Math.max(0, c.agedDays) : 0)));
+      if (Number.isFinite(c.agedDays)) c.agedDays = Math.max(0, Math.min(days, days - cohort));
+      c.ageInDays = days;
+    }
   }
   // (29.3) v37 -> v38: her sakine boş arzu / korku listeleri, 50 doyum, boş sonuç kaydı; duruma boş sayaçlar (zar çekmez:
   // listeler yüklemeden sonraki ilk 06:00'da dolar)

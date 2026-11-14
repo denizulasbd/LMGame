@@ -110,7 +110,7 @@ const out = await page.evaluate(async (fixture) => {
   const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
   game.events.emit('ui:load');
   const back = game.state.rites?.active;
-  check('tören ortasında kaydet-yükle: tören, katılanlar ve taziye geri gelir; kayıt sürümü 40', raw.version === 40 && back?.names[0] === 'K' && back.condolence && back.attendees[0] === lives[0].id && back.dead[0].closestId === lives[1].id, JSON.stringify(back));
+  check('tören ortasında kaydet-yükle: tören, katılanlar ve taziye geri gelir; kayıt sürümü (güncel)', raw.version === (await import('/src/config.js')).CONFIG.SAVE_VERSION && back?.names[0] === 'K' && back.condolence && back.attendees[0] === lives[0].id && back.dead[0].closestId === lives[1].id, JSON.stringify(back));
   game.state.rites.active = null;
 
   // 6. özel günler
@@ -201,7 +201,7 @@ const out = await page.evaluate(async (fixture) => {
   const migr = g.characters.every((c) => c.loyalty === 0 && c.weddingDay === null && c.specialDay === null) && JSON.stringify(g.rites) === JSON.stringify(RI.emptyRites()) && (g.trust.revolt === null || g.trust.revolt.leaderId === null);
   game.events.emit('ui:save');
   const re = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-  check('v39 -> v40: sadakat 0, weddingDay / specialDay null, boş tören durumu; yeniden kayıtta sürüm 40', migr && re.version === 40 && re.characters.every((c) => c.loyalty === 0) && Array.isArray(re.rites.names));
+  check('v39 -> v40: sadakat 0, weddingDay / specialDay null, boş tören durumu; yeniden kayıtta güncel sürüm', migr && re.version === (await import('/src/config.js')).CONFIG.SAVE_VERSION && re.characters.every((c) => c.loyalty === 0) && Array.isArray(re.rites.names));
   return out;
 }, fixture);
 results.push(...out);

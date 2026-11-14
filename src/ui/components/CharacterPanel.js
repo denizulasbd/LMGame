@@ -61,7 +61,8 @@ import { LOYALTY_TIERS, LOYALTY_EFFECT_TEXT, LOYALTY_SOURCES, DISCONTENT } from 
 import { adoptTip } from './HoverTip.js';
 
 const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}`;
-import { giftStatus } from '../../systems/Rites.js';
+import { giftStatus, daysToBirthday as birthdayIn } from '../../systems/Rites.js';
+import { daysToNextAge } from '../../systems/LifeStages.js';
 import { SPECIAL_KIND_NAMES, SPECIAL_RULES } from '../../data/rites.js';
 import { EVOLUTION_AXES } from '../../data/evolution.js';
 import { lifeStory, statusSentence } from '../../systems/LifeStory.js';
@@ -101,6 +102,17 @@ const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
 // Boş yuvada soluk gösterilen örnek simge
 const SLOT_PLACEHOLDER = { tool: 'sturdyTool', clothing: 'winterCoat', bag: 'backpack' };
+
+/**
+ * (30.4a) Kartta küçük not: Kıdemli Bilge olmaya AGING.noteYears yaş kalan yetişkin "Yakında bilgeleşecek"; ömrünün son
+ * AGING.noteYears yaşındaki sakin "Ömrünün son demlerinde" (ikisi birden olursa ömür notu). Çocuk ve ziyaretçide yok.
+ */
+export function lifeNoteOf(c) {
+  if (!c || c.role || c.isChild || !Number.isFinite(c.age)) return null;
+  if (Number.isFinite(c.lifespan) && c.age >= c.lifespan - AGING.noteYears && c.age < c.lifespan) return { key: 'last', text: 'Ömrünün son demlerinde' };
+  if (c.lifeStage !== 'elder' && c.age >= AGING.elderAt - AGING.noteYears && c.age < AGING.elderAt) return { key: 'elder', text: 'Yakında bilgeleşecek' };
+  return null;
+}
 
 export class CharacterPanel {
   constructor(game) {
@@ -349,7 +361,7 @@ export class CharacterPanel {
 
   /** Kimlik bilgisi değişince yeniden kurulur (karakter, ev, çocukluk, aile durumu). */
   identityKey(character) {
-    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}:${character.lifeStage}:${character.age}:${character.retired}:${evolutionKey(character)}`; // (29.4) özellikler / derin biçimler / ipucu değişince
+    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}:${character.lifeStage}:${character.age}:${character.ageInDays}:${character.retired}:${evolutionKey(character)}`; // (29.4) özellikler / derin biçimler / ipucu değişince
   }
 
   /** Değişmedikçe bir kez kurulan kısımlar: ad, yaş, ev, özellik etiketleri. */
@@ -394,14 +406,18 @@ export class CharacterPanel {
   renderLifeStage(character) {
     const key = LIFE_STAGES[character.lifeStage] ? character.lifeStage : character.isChild ? 'child' : 'adult';
     const stage = LIFE_STAGES[key];
-    const daysToBirthday = AGING.daysPerYear - (character.ageInDays % AGING.daysPerYear);
+    const daysToBirthday = birthdayIn(character);
     const note =
       key === 'elder' ? (character.retired ? 'Emekli · ağır işlerden muaf' : 'Gönüllü usta · kasabada çalışan el az') : key === 'youth' ? 'Çevik ve hevesli' : null;
     const title = `${stage.description} Bir sonraki doğum gününe ${daysToBirthday} gün var.`;
+    // (30.4a) her mevsim bir yaş: yaş ibaresinin ipucu ve yaklaşan evre / ömür notu
+    const ageTip = `Sakinler her mevsim bir yaş alır. Bir sonraki yaşa ${daysToNextAge(character.ageInDays)} gün var.`;
+    const soon = lifeNoteOf(character);
     this.stageBadge.replaceChildren(
       el('span', { className: `life-stage-badge is-${key}`, title }, [el('img', { src: getAnyIconURL(stage.icon), alt: '' }), stage.name]),
-      el('span', { className: 'life-stage-age', text: `${character.age} yaşında` }),
+      el('span', { className: 'life-stage-age', text: `${character.age} yaşında`, title: ageTip }),
       ...(note ? [el('span', { className: 'life-stage-note', text: note })] : []),
+      ...(soon ? [el('span', { className: `life-stage-soon is-${soon.key}`, text: soon.text })] : []),
       // (28.3) Saygın Büyük: nüfus kotasından muaf, yatağı yok
       ...(character.isVenerable ? [el('span', { className: 'life-stage-venerable', title: 'Ocağını ve yadigârını devretti; yatağını gençlere bıraktı. Nüfus sınırına sayılmaz; geceleri Bilgelik Evi\'nde, handa ya da belediyede sabahlar.', text: 'Saygın Büyük (Nüfus Kotasından Muaf)' })] : [])
     );

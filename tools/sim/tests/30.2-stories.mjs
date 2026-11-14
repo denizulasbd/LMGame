@@ -231,7 +231,7 @@ const open = async (opts) => {
     st.watched = [];
     const empty = JSON.parse(JSON.stringify(st.toJSON()));
     st.watched = keep;
-    c('kayıt gidiş-dönüşü: watched yazılır, geri yüklenir; boşken kayda hiç yazılmaz; kayıt sürümü 40', back.watched.join() === st.watched.join() && !('watched' in empty) && CONFIG.SAVE_VERSION === 40 && Array.isArray(json.watched));
+    c('kayıt gidiş-dönüşü: watched yazılır, geri yüklenir; boşken kayda hiç yazılmaz; kayıt sürümü (güncel)', back.watched.join() === st.watched.join() && !('watched' in empty) && CONFIG.SAVE_VERSION >= 40 && Array.isArray(json.watched));
     // ölen sakin düşer
     const gone = a;
     st.characters.splice(st.characters.indexOf(gone), 1);

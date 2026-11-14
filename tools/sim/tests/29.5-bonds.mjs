@@ -172,7 +172,7 @@ const out = await page.evaluate(async () => {
   const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
   game.events.emit('ui:load');
   const back = game.state.characters.find((x) => x.id === id0);
-  check('kaydet-yükle: yeni moodlet geri gelir, kayıt sürümü 40', raw.version === 40 && back?.moodlets.some((m) => m.key === 'side_by_side'), `önce ${pre}, sonra ${JSON.stringify(back?.moodlets?.map((m) => m.key))}`);
+  check('kaydet-yükle: yeni moodlet geri gelir, kayıt sürümü (güncel)', raw.version === (await import('/src/config.js')).CONFIG.SAVE_VERSION && back?.moodlets.some((m) => m.key === 'side_by_side'), `önce ${pre}, sonra ${JSON.stringify(back?.moodlets?.map((m) => m.key))}`);
   return out;
 });
 results.push(...out);
