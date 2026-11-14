@@ -5,7 +5,7 @@ import { el } from '../dom.js';
 
 const VISIBLE_MS = 3600;
 const FADE_MS = 400;
-const MAX_TOASTS = 4;
+const MAX_TOASTS = 3; // (30.6) üstteki bildirimler aynı anda en çok 3
 
 export class Toasts {
   constructor(game) {

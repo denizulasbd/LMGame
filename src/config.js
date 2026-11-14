@@ -14,6 +14,10 @@ export const CONFIG = {
   DEFAULT_ZOOM: 3,            // Her oyun pikseli ekranda kaç piksel olacak
   MIN_ZOOM: 2,
   MAX_ZOOM: 6,                // Yakınlaştırma tam sayı adımlarla yapılır (pixel-perfect)
+  CAMERA_REF_WIDTH: 1280,     // (30.6) kamera hızı pencere genişliği / bu değer ile ölçeklenir (sınırlar: CAMERA_SCALE_MIN / MAX)
+  CAMERA_SCALE_MIN: 0.8,
+  CAMERA_SCALE_MAX: 2,
+  PAN_MIN_TILES: 4,           // (30.6) bir tuşa tek basışta kaydırılan en az karo sayısı
   CAMERA_SPEED: 600,          // Klavye ile kaydırma hızı (ekran pikseli / saniye)
 
   // --- Döngü ---

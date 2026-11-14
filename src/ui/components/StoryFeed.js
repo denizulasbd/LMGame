@@ -6,7 +6,7 @@ import { el } from '../dom.js';
 import { getAnyIconURL } from '../../art/ui/index.js';
 import { getCharacterPortraitURL } from '../../art/sprites/index.js';
 import { actionStatus } from '../../systems/StoryCards.js';
-import { STORY_TEXT } from '../../data/storyCards.js';
+import { STORY_TEXT, STORY_LIMITS } from '../../data/storyCards.js';
 import { MOOD_MARKS, BOND_LINES, LINK_COLORS, markIconURL, readEmotionPref } from '../../rendering/ExpressionLayer.js';
 
 export const LEGEND_HIDDEN_KEY = 'lmgame.ui.emotionLegendHidden';
@@ -132,7 +132,7 @@ export class StoryFeed {
     }
     for (const card of dir.visible) {
       const n = this.nodes.get(card.uid);
-      n.bar.style.width = `${Math.max(0, Math.min(100, (card.left / 12) * 100))}%`;
+      n.bar.style.width = `${Math.max(0, Math.min(100, (card.left / STORY_LIMITS.fadeSeconds) * 100))}%`;
       const watched = card.ids.some((id) => state.watched?.includes(id));
       if (n.star.hidden === watched) n.star.hidden = !watched;
       const st = actionStatus(state, card);

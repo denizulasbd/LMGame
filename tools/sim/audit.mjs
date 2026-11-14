@@ -1474,6 +1474,24 @@ const PAGE_HELPERS = () => {
         if (!visible(q('.emotion-legend'))) problems.push('Duygu açıklaması görünmüyor');
         if (!visible(q('.guide-card'))) problems.push('rehber kartı görünmüyor');
         inspect('sol alt sütun (kartlar + açıklama + rehber)');
+        // (30.6) bildirimler (en çok 3) hikâye kartlarına, rehber kartına, açıklamaya, sakinlere, dock'a ve karara binmez
+        for (let i = 0; i < 5; i++) E.emit('toast', { text: `Denetim bildirimi ${i + 1}: kasabaya yeni bir sakin geldi, karşılamaya hazırlanın`, tone: i % 2 ? 'warn' : 'info', icon: 'sparkle' });
+        await wait(650);
+        game.render(0);
+        await wait(100);
+        {
+          const g2 = regions();
+          const toasts = shown('.toast');
+          if (toasts.length > 3) problems.push(`sol alt sütun: aynı anda ${toasts.length} bildirim (en çok 3)`);
+          for (const t of toasts) {
+            const tb = rect(t);
+            for (const [i, sc] of g2.story.entries()) if (area(tb, sc) > 4) problems.push(`bildirim hikâye kartı ${i + 1} ile üst üste biniyor (${px(tb)} / ${px(sc)})`);
+            for (const [bn, b] of [['rehber kartı', g2.guide], ['açıklama', g2.legend], ['dock', g2.dock], ['üst çubuk', g2.top], ['çipler', g2.chips], ['sakinler', g2.collapsed ? null : g2.drawer], ['kart', g2.card]]) {
+              if (area(tb, b) > 4) problems.push(`bildirim ${bn} ile üst üste biniyor (${px(tb)} / ${px(b)})`);
+            }
+          }
+        }
+        document.querySelectorAll('.toast').forEach((t) => t.remove());
         scene.expression.setEnabled(false);
         dir.queue = [];
         dir.visible = [];

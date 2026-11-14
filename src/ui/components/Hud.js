@@ -54,6 +54,7 @@ import { getCharacterPortraitURL } from '../../art/sprites/index.js';
 import { moodMarkOf, markIconURL, MOOD_MARKS } from '../../rendering/ExpressionLayer.js';
 import { adoptTip } from './HoverTip.js';
 import { engineOn } from '../../systems/Engines.js';
+import { goldTooltip, goodsHint } from '../../systems/Money.js';
 import { reasonsText } from '../../systems/Loyalty.js';
 import { DISCONTENT } from '../../data/loyalty.js';
 
@@ -322,13 +323,21 @@ export class Hud {
       }
       if (damaged.length) {
         const crisisDamage = state.buildings.some((x) => x.damaged && !x.isBurning && (x.damageKind === 'fire' || x.damageKind === 'raid'));
-        const firstDamaged = state.buildings.find((x) => x.damaged && !x.isBurning);
+        const damagedList = state.buildings.filter((x) => x.damaged && !x.isBurning);
+        const firstDamaged = damagedList[0];
         add(2, crisisDamage ? 'repair' : 'storm', `${damaged.length} hasarlı yapı`, {
           what: `Hasarlı yapılar: ${damaged.join(', ')}.`,
           why: 'Fırtına, yangın ya da baskın yapıya zarar verdi.',
           left: 'Ustalar kendiliğinden onarır; panelden pahalı "Tamir Et" hemen onarır.',
-          effect: 'Hasarlı yapı verimsiz çalışır. Tıkla: ilk hasarlı yapıyı seç.',
-        }, ' is-freezing', () => (firstDamaged ? ev.emit('ui:selectBuilding', firstDamaged.id) : openGoals()));
+          effect: 'Hasarlı yapı verimsiz çalışır. Tıkla: hasarlı yapıları sırayla gez.',
+        }, ' is-freezing', () => {
+          // (30.6) her tıklama sıradaki hasarlı yapıyı seçer (son seçilenden sonraki); sıra bitince başa döner
+          if (!damagedList.length) return openGoals();
+          const i = engineOn('novicePath') ? damagedList.findIndex((x) => x.id === this.damageCursor) : -1;
+          const target = damagedList[(i + 1) % damagedList.length];
+          this.damageCursor = target.id;
+          ev.emit('ui:selectBuilding', target.id);
+        });
       }
       if (injured.length) add(2, 'bandage', `${injured.length} hafif yaralı`, { what: `Yaralılar: ${injured.join(', ')}.`, why: 'Yangın, baskın ya da kaza.', left: "Şifacı'da sarılırlar; yoksa 1,5 günde kendiliğinden geçer.", effect: 'Yürüme ve çalışma %20 yavaş. Tıkla: ilk yaralıya odaklan.' }, '', selectChar(state.characters.find((c) => c.isInjured)?.id));
       if (mourners + shaken > 0) {
@@ -485,10 +494,21 @@ export class Hud {
         const text = trade.shipments ? `${trade.shipments} sefer · +${trade.goldEarned}` : 'liman teknesi bekleniyor';
         if (slot.detail.textContent !== text) slot.detail.textContent = text;
         slot.box.title = `${RESOURCES[key].longName}: ${state.resources[key]} (sınırsız)\n${RESOURCES[key].hint}\n${trade.shipments ? `${trade.shipments} ihracat seferinden toplam ${trade.goldEarned} altın` : 'Henüz ihracat yapılmadı'}`;
+        // (30.6) altın sayacının ipucu: son 3 günün gelir kalemleri, yaklaşan ödemeler ve altın kazanma yolları (açık / kilitli)
+        if (engineOn('novicePath')) slot.box.title = goldTooltip(state, this.game.scenes?.current?.economy?.ledger).join('\n');
         continue;
       }
       const { count, today } = producersOf(state, key);
-      const text = count ? `${count} yapı · bugün +${today}` : 'üreten yapı yok';
+      // (30.6) üreten yapı yoksa hangi yapının ürettiği ve hangi seviyede açıldığı; yapı açıksa satıra tıklamak inşa menüsünde onu seçer
+      const hint = !count && engineOn('novicePath') ? goodsHint(state, key) : null;
+      const text = count ? `${count} yapı · bugün +${today}` : hint ? hint.detail : 'üreten yapı yok';
+      if (hint) {
+        slot.box.dataset.build = hint.type ?? '';
+        slot.box.classList.toggle('is-linked', Boolean(hint.type));
+      } else {
+        delete slot.box.dataset.build;
+        slot.box.classList.remove('is-linked');
+      }
       if (slot.detail.textContent !== text) slot.detail.textContent = text;
       slot.box.title = `${RESOURCES[key].longName}: ${state.resources[key]}/${storageLimit(state, key)}\n${RESOURCES[key].hint}\n${count ? `${count} yapı üretiyor, bugün +${today}` : 'Henüz üreten yapı yok'}`;
     }
@@ -640,6 +660,16 @@ export class Hud {
         ]),
       ]));
       this.resources[key] = { box, amount, detail, last: '' };
+      if (goods) {
+        // (30.6) üreten yapı yokken ve yapı açıkken satıra tıklamak inşa menüsünde o yapıyı seçer
+        box.addEventListener('mousedown', (e) => e.preventDefault());
+        box.addEventListener('click', () => {
+          const type = box.dataset.build;
+          if (!type) return;
+          this.setGoodsExpanded(false);
+          game.events.emit('ui:setTool', { tool: 'build', buildType: type });
+        });
+      }
       return box;
     };
     // Temel kaynaklar ve hazine üst çubukta; işlenmiş mallar açılır listede
@@ -763,6 +793,9 @@ export class Hud {
       this.renderTitle(game.state);
       this.renderWelfare(game.state);
       this.renderGoodsDetail(game.state);
+      // (30.6) üst çubuğun altındaki çipler (olaylar, izlenenler) bildirimlerle çakışmasın: bildirimler çiplerin altından başlar
+      const root = this.element.closest('#ui-layer');
+      if (root) root.style.setProperty('--ui-under-h', `${this.under.hidden || !this.under.offsetHeight ? 0 : this.under.offsetHeight + 8}px`);
     }
     for (const key of RESOURCE_KEYS) {
       const slot = this.resources[key];

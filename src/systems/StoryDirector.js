@@ -10,12 +10,13 @@ import { STORY_LIMITS as L } from '../data/storyCards.js';
 import { makeCard, allows, enqueue, nextIndex, daySummary, toggleWatched, pruneWatched, filterKeyOf, actionStatus } from './StoryCards.js';
 import { epitaphStory } from './LifeStory.js';
 import { specialKindOf } from './Rites.js';
+import { engineOn } from './Engines.js';
 
 const EVENTS = [
   'population:died', 'rite:started', 'relationship:married', 'family:childBorn', 'trait:evolved', 'special:forgotten',
   'want:fulfilled', 'fear:realized', 'apprentice:grandmaster', 'masterwork:created', 'relationship:partnered', 'chemistry:kindred',
   'loyalty:changed', 'moodlet:mourning', 'moodlet:consoled', 'family:grownUp', 'venerable:became', 'relationship:quarrel',
-  'relationship:reconciled', 'pantry:low', 'dilemma:resolved',
+  'relationship:reconciled', 'pantry:low', 'dilemma:resolved', 'storm:struck', 'crisis:raidResolved',
 ];
 
 export class StoryDirector {
@@ -196,10 +197,16 @@ export class StoryDirector {
     this.hovered = hovered;
     if (paused) return;
     if (!hovered) {
-      for (const card of this.visible) if (!card.open) card.left -= dt;
+      for (const card of this.visible) if (!card.open && !this.holds(card)) card.left -= dt;
       this.visible = this.visible.filter((c) => c.left > 0);
     }
     this.promote();
+  }
+
+  /** (30.6) Eylem düğmesi olan kart (armağan / taziye), eylem hâlâ geçerliyken ve yapılmamışken solmaz; oyuncu kapatana dek kalır. */
+  holds(card) {
+    if (!engineOn('novicePath') || !card.action || card.action.type === 'story' || card.used) return false;
+    return actionStatus(this.state, card).enabled;
   }
 
   promote() {

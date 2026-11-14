@@ -110,6 +110,15 @@ export class UIManager {
     hint.addEventListener('click', () => this.setCinematic(false));
     this.root.appendChild(hint);
     events.on('ui:toggleCinematic', () => this.setCinematic(!this.cinematic));
+    // (30.6) Fotoğraf modundan F ve Esc HER durumda çıkar: odak bir metin kutusunda kalsa bile (Input yazarken tuşları yok sayar)
+    window.addEventListener('keydown', (e) => {
+      if (!this.cinematic || e.repeat) return;
+      const typing = e.target instanceof HTMLElement && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable);
+      if (!typing || (e.code !== 'KeyF' && e.key !== 'Escape')) return;
+      e.preventDefault();
+      e.target.blur();
+      this.setCinematic(false);
+    }, true);
     for (const name of ['dilemma:opened', 'town:tierUp', 'town:legendary', 'wonder:completed', 'title:show']) {
       events.on(name, () => this.setCinematic(false));
     }
@@ -120,6 +129,7 @@ export class UIManager {
     if (on === this.cinematic) return;
     if (on) this.modals.closeCurrent(); // fotoğrafa açık pencere girmesin
     this.cinematic = on;
+    if (on && document.activeElement instanceof HTMLElement) document.activeElement.blur(); // (30.6) odak gizli bir kutuda kalıp F'yi yutmasın
     this.root.classList.toggle('is-cinematic', on);
     this.game.events.emit('ui:setCinematic', on);
   }

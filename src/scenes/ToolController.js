@@ -31,6 +31,7 @@ import { drawAreaCursor } from '../rendering/TileCursor.js';
 import { getStructureSprite } from '../art/sprites/index.js';
 import { getTileSprite } from '../art/tiles/index.js';
 import { CONFIG } from '../config.js';
+import { engineOn } from '../systems/Engines.js';
 import { AESTHETIC } from '../data/landscape.js';
 import { aestheticLevel } from '../systems/Landscape.js';
 import { drawHintLabel, wrapText, DANGER_COLOR } from '../rendering/MapLabels.js';
@@ -122,7 +123,8 @@ export class ToolController {
     if (input.wasPressed('toolDemolish')) this.setTool(this.tool === 'demolish' ? 'select' : 'demolish');
     if (input.wasPressed('cancel') && this.isActive) {
       // (30.1) Yapı şeridi küçükken Esc önce listeyi geri açar; ikinci Esc aracı bırakır
-      if (this.tool === 'build' && this.buildType && !this.listOpen) this.setListOpen(true);
+      // (30.6) Esc hiçbir şey AÇMAZ: sıra açık pencere -> yapı listesi / şerit (aracın kendi arayüzü) -> araç -> seçim
+      if (!engineOn('novicePath') && this.tool === 'build' && this.buildType && !this.listOpen) this.setListOpen(true);
       else this.setTool('select');
       return true;
     }
@@ -171,7 +173,9 @@ export class ToolController {
     }
     let mode = 'add';
     if (this.tool === 'harvest' && this.jobs.jobAt(tile.tileX, tile.tileY)) mode = 'remove';
-    this.stroke = { mode, visited: new Set(), changed: false, failure: null, last: null, placed: 0, removed: { tiles: 0, buildings: 0, names: [] }, refund: {} };
+    // (30.6) Topla: sürüklemenin ilk karosundaki tür (ağaç / kaya / çalı) belirler; karışık alanda ötekiler işaretlenmez
+    const kind = this.tool === 'harvest' && mode === 'add' ? this.jobs.harvestKind(tile.tileX, tile.tileY) : null;
+    this.stroke = { kind, mode, visited: new Set(), changed: false, failure: null, last: null, placed: 0, removed: { tiles: 0, buildings: 0, names: [] }, refund: {} };
     if (this.tool === 'demolish') {
       // İlk tıklama: toplama emri iptali ya da her boyutta yapı / yol; sürükleme yalnızca yol ve küçük süs
       const job = this.jobs.jobAt(tile.tileX, tile.tileY);
@@ -215,7 +219,7 @@ export class ToolController {
     } else if (this.tool === 'harvest') {
       const job = this.jobs.jobAt(x, y);
       if (this.stroke.mode === 'remove' && job && job.type !== 'build') this.jobs.cancel(job);
-      if (this.stroke.mode === 'add' && !job) this.jobs.designate(x, y);
+      if (this.stroke.mode === 'add' && !job && (!this.stroke.kind || this.jobs.harvestKind(x, y) === this.stroke.kind)) this.jobs.designate(x, y);
     } else if (this.tool === 'demolish') {
       this.demolishTile(x, y);
     }

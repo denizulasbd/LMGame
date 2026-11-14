@@ -22,7 +22,7 @@ const open = async (opts) => {
     const [a, b, k, d] = st.characters.filter((x) => !x.role);
     const mk = (ev, p, ctx = {}) => S.makeCard(ev, p, { state: st, ...ctx });
     const prio = { 'population:died': 5, 'rite:started': 5, 'relationship:married': 4, 'family:childBorn': 4, 'trait:evolved': 4, 'special:morning': 3, 'special:forgotten': 3, 'want:fulfilled': 3, 'fear:realized': 3, 'apprentice:grandmaster': 3, 'masterwork:created': 3, 'relationship:partnered': 2, 'chemistry:kindred': 2, 'loyalty:changed': 2, 'moodlet:mourning': 2, 'moodlet:consoled': 2, 'family:grownUp': 2, 'venerable:became': 2, 'relationship:quarrel': 1, 'relationship:reconciled': 1 };
-    c('tablo: sürüm 2 (30.3: pantry:low), 20 olayın önceliği şartnameyle aynı', D.STORY_TABLE_VERSION === 2 && D.STORY_PRIORITY['pantry:low'] === 4 && Object.entries(prio).every(([e, p]) => D.STORY_PRIORITY[e] === p) && D.STORY_LIMITS.visible === 2 && D.STORY_LIMITS.queue === 6 && D.STORY_LIMITS.fadeSeconds === 12 && D.STORY_FILTERS.important.min === 3 && D.STORY_DEFAULT_FILTER === 'important');
+    c('tablo: sürüm 3 (30.3: pantry:low; 30.6: hasar kartları), 20 olayın önceliği şartnameyle aynı', D.STORY_TABLE_VERSION === 3 && D.STORY_PRIORITY['pantry:low'] === 4 && Object.entries(prio).every(([e, p]) => D.STORY_PRIORITY[e] === p) && D.STORY_LIMITS.visible === 2 && D.STORY_LIMITS.queue === 6 && D.STORY_LIMITS.fadeSeconds === 20 && D.STORY_FILTERS.important.min === 3 && D.STORY_DEFAULT_FILTER === 'important');
     const cases = [
       ['population:died', { character: a, age: 70, text: 'x' }, { story: 'Deniz bir gün geldi. İkinci cümle.' }, `${a.name} aramızdan ayrıldı. Deniz bir gün geldi.`],
       ['rite:started', { rite: { names: ['Deniz'], day: 1, place: null }, ids: [] }, {}, 'Deniz için anma töreni başlıyor.'],
@@ -101,15 +101,15 @@ const open = async (opts) => {
     E.emit('population:died', { character: d, age: 70, cause: 'age', text: 'öldü' });
     const nextUp = dir.queue[(await import('/src/systems/StoryCards.js')).nextIndex(dir.queue)];
     c('aynı anda en çok 2 kart görünür, ötekiler kuyrukta; boşalan yere en yüksek öncelikli gelir', dir.visible.length === 2 && dir.queue.length === 2 && nextUp.event === 'population:died', dir.visible.map((x) => x.event).join());
-    // 12 sn sonra solar; fare üstündeyken beklemez
+    // (30.6) 20 sn sonra solar; fare üstündeyken beklemez
     const before = dir.visible.map((x) => x.uid).join();
     dir.tick(6, { hovered: true });
     dir.tick(20, { hovered: true });
     const held = dir.visible.map((x) => x.uid).join() === before;
-    dir.tick(11.5, {});
+    dir.tick(19.5, {});
     const still = dir.visible.length === 2;
     dir.tick(1, {});
-    c('kart 12 gerçek sn sonra solar; fare üstündeyken ve duraklatılmışken süre işlemez', held && still && dir.visible.map((x) => x.uid).join() !== before, `${held} ${still}`);
+    c('kart 20 gerçek sn sonra solar; fare üstündeyken ve duraklatılmışken süre işlemez', held && still && dir.visible.map((x) => x.uid).join() !== before, `${held} ${still}`);
     reset();
     for (let i = 0; i < 3; i++) E.emit('relationship:married', { a, b: st.characters.filter((x) => !x.role)[i + 1] });
     const queued = dir.queue.length;

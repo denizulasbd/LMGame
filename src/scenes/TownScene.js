@@ -659,12 +659,24 @@ export class TownScene extends Scene {
     const camera = this.camera;
 
     // Klavye: ekranda sabit hızda kaysın diye yakınlaştırmaya bölünür
-    const speed = (CONFIG.CAMERA_SPEED * dt) / camera.zoom;
+    // (30.6) hız pencere genişliğiyle ölçeklenir (geniş ekranda yavaş kalmaz) ve bir tuşa tek basış bile en az PAN_MIN_TILES karo kaydırır
+    // (kısa dokunuş bir kareden kısa sürse de: kalan mesafe tuş bırakılsa da tamamlanır)
+    const scale = Math.max(CONFIG.CAMERA_SCALE_MIN, Math.min(CONFIG.CAMERA_SCALE_MAX, renderer.width / CONFIG.CAMERA_REF_WIDTH));
+    const speed = (CONFIG.CAMERA_SPEED * scale * dt) / camera.zoom;
     let manual = false;
     const moves = { left: [-speed, 0], right: [speed, 0], up: [0, -speed], down: [0, speed] };
+    this.panOwed ??= { left: 0, right: 0, up: 0, down: 0 };
     for (const [action, [dx, dy]] of Object.entries(moves)) {
+      if (input.wasPressed(action)) this.panOwed[action] = CONFIG.PAN_MIN_TILES * CONFIG.TILE_SIZE;
+      const step = Math.abs(dx || dy);
       if (input.isDown(action)) {
         camera.move(dx, dy);
+        this.panOwed[action] = Math.max(0, this.panOwed[action] - step);
+        manual = true;
+      } else if (this.panOwed[action] > 0) {
+        const part = Math.min(step, this.panOwed[action]);
+        camera.move(Math.sign(dx) * part, Math.sign(dy) * part);
+        this.panOwed[action] -= part;
         manual = true;
       }
     }

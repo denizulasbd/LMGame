@@ -13,6 +13,7 @@ import { condolenceStatus, giftStatus, riteVenue } from './Rites.js';
 import { loyaltyTier } from './Loyalty.js';
 import { foodSupply } from './TownStatus.js';
 import { genitive, accusative } from '../utils/turkish.js';
+import { engineOn } from './Engines.js';
 
 export function filterKeyOf(value) {
   return STORY_FILTERS[value] ? value : STORY_DEFAULT_FILTER;
@@ -124,6 +125,17 @@ export function makeCard(event, p = {}, ctx = {}) {
       // (30.3) kiler bir günden az yeter ("Git" kileri seçer)
       card = base(event, 'Kiler boşalıyor: yiyecek bir günden az yeter.', [], { go: Number.isFinite(p.buildingId) ? { kind: 'building', id: p.buildingId } : null, key: `pantry:${day}` });
       break;
+    case 'storm:struck':
+    case 'crisis:raidResolved': {
+      // (30.6) hasar nerede? Ne oldu ve hangi yapılar hasarlı; "Git" ilk hasarlı yapıyı seçer
+      if (!engineOn('novicePath')) return null;
+      const list = event === 'storm:struck' ? (p.damaged ?? []) : [state?.buildings.find((b) => b.id === p.damagedId)].filter(Boolean);
+      const names = list.map((b) => b.name).filter(Boolean);
+      if (!names.length) return null;
+      const what = event === 'crisis:raidResolved' ? 'Haydutlar baskın yaptı' : p.kind === 'wolves' ? 'Kurtlar Koyun Ağılı\'na daldı' : p.winter ? 'Kar fırtınası vurdu' : 'Fırtına vurdu';
+      card = base(event, `${what}: ${names.join(', ')} hasarlı. Ustalar onarır; hemen onarmak için yapıya tıkla.`, [], { go: { kind: 'building', id: list[0].id }, key: `damage:${day}:${event}` });
+      break;
+    }
     case 'dilemma:resolved': {
       // (30.4b) karar sonrası: sonucu anlatan kart (kişili olayda konu sakinin portresi)
       if (!p.dilemma?.midgame || !p.result) return null;

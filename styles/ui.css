@@ -2359,10 +2359,25 @@ button.relation-row:hover {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
+  gap: 10px;
   align-items: center;
   justify-content: center;
-  background: rgba(27, 20, 35, 0.45);
+  background: rgba(14, 9, 22, 0.72); /* (30.6) oyun durduğu belli olsun: geri kalan ekran belirgin biçimde kararır */
 }
+
+.dilemma-paused {
+  flex: none;
+  padding: 4px 14px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: #fff6dc;
+  background: rgba(142, 58, 42, 0.92);
+  border: 2px solid var(--ui-line);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.dilemma-paused::before { content: '⏸ '; }
 
 .dilemma[hidden] {
   display: none;
@@ -2373,7 +2388,7 @@ button.relation-row:hover {
   flex-direction: column;
   gap: 10px;
   width: min(460px, calc(100% - 32px));
-  max-height: calc(100% - 32px);
+  max-height: calc(100% - 80px);
   overflow-y: auto;
   padding: 16px 18px;
 }
@@ -3294,7 +3309,7 @@ kbd {
 /* ---------- Bildirimler: üst çubuğun altında ---------- */
 .ui-top {
   position: absolute;
-  top: var(--ui-top-reserve, 64px);
+  top: calc(var(--ui-top-reserve, 64px) + var(--ui-under-h, 0px)); /* (30.6) çiplerin altından */
   left: 50%;
   transform: translateX(-50%);
   width: min(460px, calc(100% - 24px));
@@ -5464,3 +5479,9 @@ kbd {
 /* (30.4b) Hedefler penceresi: tamamlanmamış ilk hedef "Sıradaki" etiketiyle öne çıkar */
 .goal-row.is-next { border-color: var(--ui-accent, #e0b04a); box-shadow: inset 3px 0 0 var(--ui-accent, #e0b04a); }
 .goal-next { margin-left: 8px; padding: 1px 6px; font-size: 12px; background: var(--ui-accent, #e0b04a); color: #1b1408; border-radius: 3px; vertical-align: middle; }
+
+/* (30.6) Para ve Akış */
+.goal-blocker { display: block; margin-top: 3px; font-size: 12px; color: #8e3a2a; font-weight: bold; }
+.goal-blocker::before { content: '✗ '; }
+.hud-goods-menu .resource.is-linked { cursor: pointer; }
+.hud-goods-menu .resource.is-linked .resource-detail { text-decoration: underline dotted; }

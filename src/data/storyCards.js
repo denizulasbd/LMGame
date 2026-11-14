@@ -1,12 +1,12 @@
 // (30.2 "Görünen Hikâye") Hikâye kartlarının veri tablosu: hangi olay kaç öncelikli, hangi eşikler, süzgeç kademeleri. Metinler
 // systems/StoryCards.js'te saf işlevlerle üretilir (aynı olay yükü aynı metni verir). Bu tablo yalnızca arayüzü etkiler;
 // simülasyona hiçbir şey yazmaz. Sayıları buradan ayarla (gün başına 2-8 kart hedefi: tools/sim/tests/30.2-stories.mjs).
-export const STORY_TABLE_VERSION = 2; // (30.3) 2: 'pantry:low' (Kiler boşalıyor)
+export const STORY_TABLE_VERSION = 3; // (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20
 
 export const STORY_LIMITS = {
   visible: 2, // aynı anda görünen kart
   queue: 6, // kuyrukta bekleyen kart; fazlası önceliği düşükten atılır
-  fadeSeconds: 12, // kart bu kadar GERÇEK saniye sonra solar (fare üstündeyken ya da duraklatılmışken beklemez)
+  fadeSeconds: 20, // kart bu kadar GERÇEK saniye sonra solar (fare üstündeyken ya da duraklatılmışken beklemez); (30.6) 12 -> 20, eylemi geçerli olan kart kapatılana dek kalır
   summaryHour: 22, // gün özeti saati
   summaryItems: 3, // gün özetinde en önemli kaç olay
   watchedMax: 3, // "Yakından izle" üst sınırı
@@ -39,6 +39,8 @@ export const STORY_PRIORITY = {
   'relationship:quarrel': 1,
   'relationship:reconciled': 1,
   'pantry:low': 4, // (30.3) kiler bir günden az yeter
+  'storm:struck': 4, // (30.6) fırtına / kurt sonrası hasar kartı
+  'crisis:raidResolved': 4, // (30.6) baskın sonrası hasar kartı (yalnızca yapı hasar gördüyse)
   'dilemma:resolved': 4, // (30.4b) orta oyun kararının sonucu (yalnızca yeni kartlar)
   'story:summary': 2,
 };
