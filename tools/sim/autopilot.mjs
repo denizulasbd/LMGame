@@ -160,12 +160,13 @@ await page.evaluate(async (off) => {
   // iş bırakma günleri (11:00'de meydanda 'strike' görevindeki en az 2 yetişkin), Nabız (yüz, yön, ilk üç neden)
   const W = (window.__weightStats = { daily: [], heavyDay: null, strikes: [], switchDay: null, switchPop: null, famine: [] });
   ev.on('tax:rateChanged', ({ rate }) => { if (rate === 'heavy' && W.heavyDay === null) W.heavyDay = window.game.state.time.day; });
+  ev.on('pantry:low', () => { if (window.__famine && window.game.state.time.day >= window.__famine) W.lowDay ??= window.game.state.time.day; });
   ev.on('time:newDay', () => {
     const s = window.game.state;
     const L = s.characters.filter((c) => !c.isChild && !c.role).map((c) => c.loyalty ?? 0);
     const n = Math.max(1, L.length);
     const pulse = window.game.scenes.current.discontent?.summary?.() ?? null;
-    W.daily.push({ day: s.time.day, grum: L.filter((v) => v <= -20 && v > -40).length / n, bitter: L.filter((v) => v <= -40).length / n, pleased: L.filter((v) => v >= 20).length / n, avg: L.reduce((a, b) => a + b, 0) / n, gold: Math.round(s.resources.gold), pop: s.characters.length, food: Math.round(s.resources.food), pulse: pulse ? { face: pulse.face, dir: pulse.dir, top: pulse.top.map((r) => r.key), pts: pulse.top.map((r) => r.points) } : null });
+    W.daily.push({ day: s.time.day, grum: L.filter((v) => v <= -20 && v > -40).length / n, bitter: L.filter((v) => v <= -40).length / n, pleased: L.filter((v) => v >= 20).length / n, avg: L.reduce((a, b) => a + b, 0) / n, gold: Math.round(s.resources.gold), pop: s.characters.length, food: Math.round(s.resources.food), trust: Math.round(s.trust.value), pulse: pulse ? { face: pulse.face, dir: pulse.dir, top: pulse.top.map((r) => r.key), pts: pulse.top.map((r) => r.points) } : null });
   });
   // (30.3) kıtlık tanısı: günlük yiyecek girişi / çıkışı, aç sakin sayısı
   W.food = { gain: 0, loss: 0 };
@@ -1174,8 +1175,9 @@ if (options.profile || options['profile-report']) {
   }
   if (options.famine) {
     const fd = Number(options.famine === true ? 5 : options.famine);
-    const hit = d.find((x) => x.day > fd && x.pulse && x.pulse.dir === 'down' && x.pulse.top.includes('hunger'));
-    extra += ` · kıtlık G${fd}: Nabız düşüşte + "açlık" ilk üçte ${hit ? `G${hit.day} (+${hit.day - fd})` : 'olmadı'} · yiyecek ${d.filter((x) => x.day >= fd).map((x) => `${x.food}(+${x.gain}/-${x.loss}, aç ${x.hangry}, bahçe ${x.gardens})`).join(' ')} · Nabız ${d.filter((x) => x.day >= fd).map((x) => (x.pulse ? `${x.pulse.face}${x.pulse.dir === 'down' ? '↓' : x.pulse.dir === 'up' ? '↑' : '→'}${x.avg.toFixed(1)}[${x.pulse.top.map((k, i) => `${k}${x.pulse.pts?.[i] ?? ''}`).join(',')}]` : '-')).join(' ')}`;
+    const from = W.lowDay ?? fd;
+    const hit = d.find((x) => x.day > from && x.pulse && x.pulse.dir === 'down' && x.pulse.top.includes('hunger'));
+    extra += ` · kıtlık G${fd} (kiler boşaldı: ${W.lowDay ? `G${W.lowDay}` : '-'}): Nabız düşüşte + "açlık" ilk üçte ${hit ? `G${hit.day} (+${hit.day - from})` : 'olmadı'} · yiyecek ${d.filter((x) => x.day >= fd).map((x) => `${x.food}(+${x.gain}/-${x.loss}, aç ${x.hangry}, bahçe ${x.gardens})`).join(' ')} · Nabız ${d.filter((x) => x.day >= fd).map((x) => (x.pulse ? `${x.pulse.face}${x.pulse.dir === 'down' ? '↓' : x.pulse.dir === 'up' ? '↑' : '→'}${x.avg.toFixed(1)}[${x.pulse.top.map((k, i) => `${k}${x.pulse.pts?.[i] ?? ''}`).join(',')}]` : '-')).join(' ')}`;
   }
   console.log(`(30.3) ${options.profile ?? 'normal'}: Ağır Vergi ${W.heavyDay !== null ? `G${W.heavyDay}` : '-'} · Homurdanan+Kırgın >= %30 ${rel(firstGrum)} · ilk iş bırakma ${rel(strikeDays[0])} · iş bırakma günü ${strikeDays.length} · isyan ${W.revolts.length} · terk eden ${W.left} · G30 hazine ${g30} · son nüfus ${last.pop} · son gün Homurdanan ${pct(last.grum ?? 0)} / Kırgın ${pct(last.bitter ?? 0)} / Memnun+ ${pct(last.pleased ?? 0)}${extra}`);
   riteStats.weight = { heavyDay: W.heavyDay, firstGrum, strikeDays, revolts: W.revolts, left: W.left, g30, lastPop: last.pop, last, switchDay: W.switchDay, switchPop: W.switchPop, daily: d };

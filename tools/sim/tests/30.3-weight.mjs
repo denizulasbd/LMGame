@@ -31,7 +31,7 @@ const open = async (opts) => {
     const adults = () => st.characters.filter((x) => !x.role && !x.isChild);
     const zero = () => { for (const x of st.characters) { x.loyalty = 0; M.recomputeMood(x); } };
     const S = D.LOYALTY_SOURCES;
-    c('tablo: yeni kaynaklar şartnameyle aynı (sürüm 1); mevcut kaynaklar duruyor', D.DISCONTENT_TABLE_VERSION === 1 && JSON.stringify(S.taxDaily) === JSON.stringify({ exempt: 2, low: 1, standard: 0, heavy: -3 }) && S.hungryDaily === -4 && S.coldDaily === -3 && S.friendRejected === -4 && S.friendFulfilled === 2 && D.DISCONTENT.friendAt === 40 && S.petitionRejected === -15 && S.taxCollected.heavy === -7 && S.gift === 10 && ENGINES.discontent === true);
+    c('tablo: yeni kaynaklar şartnameyle aynı (sürüm 2: taxDaily 6/2/1/−3, Kırgın iş x0,85, bitterTrust −0,4); mevcut kaynaklar duruyor', D.DISCONTENT_TABLE_VERSION === 2 && D.LOYALTY.bitterTrust.perHour === -0.4 && JSON.stringify(S.taxDaily) === JSON.stringify({ exempt: 6, low: 2, standard: 1, heavy: -3 }) && S.hungryDaily === -4 && S.coldDaily === -3 && S.friendRejected === -4 && S.friendFulfilled === 2 && D.DISCONTENT.friendAt === 40 && S.petitionRejected === -15 && S.taxCollected.heavy === -7 && S.gift === 10 && ENGINES.discontent === true);
     // günlük vergi kaynağı
     const [a, b, k, d] = adults();
     const rows = [];
@@ -44,7 +44,7 @@ const open = async (opts) => {
       rows.push(a.loyalty);
     }
     st.tax.rate = 'standard';
-    c('taxDaily: gün dönümünde kademeye göre +2 / +1 / 0 / −3', rows.join() === '2,1,0,-3', rows.join());
+    c('taxDaily: gün dönümünde kademeye göre +6 / +2 / +1 / −3 (30.3 ayarı)', rows.join() === '6,2,1,-3', rows.join());
     // açlık ve üşüme
     zero();
     M.addMoodlet(a, 'hangry', st.totalMinutes, { reason: 'hangry' });
@@ -54,7 +54,7 @@ const open = async (opts) => {
     const after = [a.loyalty, b.loyalty, k.loyalty];
     sc.loyalty.daily();
     M.removeMoodlet(a, 'hangry');
-    c('hungryDaily −4 (Açlıktan Gözü Dönmüş), coldDaily −3 (o gün üşüyen; günde bir kez)', after.join() === '-4,-3,0' && b.loyalty === -3, `${after} / ${b.loyalty}`);
+    c('hungryDaily −4 (Açlıktan Gözü Dönmüş), coldDaily −3 (o gün üşüyen; günde bir kez); Standart Vergi +1 üstüne', st.tax.rate === 'standard' && after.join() === '-3,-2,1' && b.loyalty === -1, `${after} / ${b.loyalty}`);
     // dostlar
     zero();
     st.relationships[pairKey(a.id, b.id)] = 40;
@@ -82,7 +82,7 @@ const open = async (opts) => {
       sc.loyalty.adjust(a, v - a.loyalty, 'test');
       muls[key] = { w: Math.round((a.mood.workMul / base) * 1000) / 1000, q: a.mood.quarrelMul };
     }
-    c('kademe değişince c.mood yenilenir: iş x0,8 / 0,92 / 1,03 / 1,06, Kırgın atışma x1,2', muls.bitter.w === 0.8 && muls.bitter.q === 1.2 && muls.grumbling.w === 0.92 && muls.grumbling.q === 1 && muls.pleased.w === 1.03 && muls.loyal.w === 1.06, JSON.stringify(muls));
+    c('kademe değişince c.mood yenilenir: iş x0,85 / 0,92 / 1,03 / 1,06, Kırgın atışma x1,2', muls.bitter.w === 0.85 && muls.bitter.q === 1.2 && muls.grumbling.w === 0.92 && muls.grumbling.q === 1 && muls.pleased.w === 1.03 && muls.loyal.w === 1.06, JSON.stringify(muls));
     // MOOD_LIMITS içinde kalma
     a.loyalty = -100;
     for (const key of ['hangry', 'exhausted', 'mourning', 'drudgery', 'cold_wake']) M.addMoodlet(a, key, st.totalMinutes, { tier: 'critical' });
@@ -323,7 +323,7 @@ const open = async (opts) => {
     await frame();
     game.render(0);
     const rejBtn = document.querySelector('.petition-buttons .is-reject');
-    c('ipuçları: Ağır Vergi "Günlük: herkes −3 sadakat · tahsilatta −7"; ret "Sahibi −15 · dostları −4"', heavyBtn?.title.includes('Günlük: herkes −3 sadakat · tahsilatta −7') && stdBtn?.title.includes('Günlük: herkes ±0 sadakat · tahsilatta −1') && rejBtn?.title.includes('Sahibi −15 · dostları −4') && heavyBtn.dataset.htip === '1', `${heavyBtn?.title.split('\n').at(-1)} | ${rejBtn?.title.split('\n').at(-1)}`);
+    c('ipuçları: Ağır Vergi "Günlük: herkes −3 sadakat · tahsilatta −7"; ret "Sahibi −15 · dostları −4"', heavyBtn?.title.includes('Günlük: herkes −3 sadakat · tahsilatta −7') && stdBtn?.title.includes('Günlük: herkes +1 sadakat · tahsilatta −1') && rejBtn?.title.includes('Sahibi −15 · dostları −4') && heavyBtn.dataset.htip === '1', `${heavyBtn?.title.split('\n').at(-1)} | ${rejBtn?.title.split('\n').at(-1)}`);
     // özel ipucu: bütün çiplerde, Nabız'da, sayaçlarda ve nüfusta 300 ms'de açılır
     game.events.emit('ui:deselect');
     st.tax.lockedUntil = 0;
@@ -401,7 +401,7 @@ const open = async (opts) => {
     sc.loyalty.daily();
     for (const x of adults()) M.removeMoodlet(x, 'hangry');
     const top = sc.discontent.summary().top;
-    c('aç sakinlerin sadakati düşer; Nabız ipucunda neden "açlık"', top[0]?.key === 'hunger' && top[0].name === 'açlık' && top[0].points === -4 * adults().length && adults().every((x) => x.loyalty === -4), JSON.stringify(top));
+    c('aç sakinlerin sadakati düşer; Nabız ipucunda neden "açlık"', top[0]?.key === 'hunger' && top[0].name === 'açlık' && top[0].points === -4 * adults().length && adults().every((x) => x.loyalty === -3), JSON.stringify(top));
     // homurdanma sözü (söz üreteci; c.speech'e yazılmaz)
     for (const x of st.characters) { x.loyalty = 0; x.grumble = null; x.speech = null; }
     const awake = adults().filter((x) => x.visible && !x.isSleeping && !x.away);

@@ -20,7 +20,8 @@ export const LOYALTY = {
   hungryBelow: 25, // dağıtım anında tokluğu bunun altındaki sakin "aç" sayılır (reliefHungry; Açlıktan Gözü Dönmüş eşiği)
   // (29.10) Kırgın kasaba: Kırgın yetişkinlerin payı share'i aşınca Yönetim Güveni saat başı perHour x pay kadar erir (TrustSystem.hourly).
   // 29.6'da sadakatin isyanın tetiklenmesine hiçbir yolu yoktu: iyi beslenen kasabada Ağır Vergi ve reddedilen dilekçelerle bile güven %100'de kalıyordu.
-  bitterTrust: { share: 0.25, perHour: -1.7 },
+  // (30.3) -1,7 -> -0,4: sadakat artık günler içinde Kırgın'a iniyor (eskiden ~30 gün); -1,7'de Zorba kasaba 15. günde 3 sakine iniyordu
+  bitterTrust: { share: 0.25, perHour: -0.4 },
 };
 
 export const LOYALTY_SOURCES = {
@@ -39,8 +40,10 @@ export const LOYALTY_SOURCES = {
   condolence: 5, // (29.7) Taziye Sofrası: törene katılanlara (29.10: 3 -> 5)
   gift: 10, // (29.7) özel günde armağan (29.10: 6 -> 10)
   // (30.3) "Kararın Ağırlığı" (ENGINES.discontent): sadakat artık her gün kıpırdar
-  taxDaily: { exempt: 2, low: 1, standard: 0, heavy: -3 }, // her gün dönümünde, o günkü vergi kademesine göre
-  hungryDaily: -4, // gün dönümünde (ya da o gün) "Açlıktan Gözü Dönmüş" olan sakin; günde bir kez
+  // her gün dönümünde, o günkü vergi kademesine göre. 30.3 ayarı: { exempt 2, low 1, standard 0 } -> { 6, 2, 1 } (pişman yönetim 12 günde
+  // toparlanabilsin; Özensiz kasabada Standart Vergi tahsilat ve kaymayla birlikte sadakati aşağı itmesin)
+  taxDaily: { exempt: 6, low: 2, standard: 1, heavy: -3 },
+  hungryDaily: -4, // gün dönümünde (ya da o gün) "Açlıktan Gözü Dönmüş" olan sakin; günde bir kez (-8 denendi: Özensiz kasabada Homurdanan + Kırgın %74)
   coldDaily: -3, // o gün üşüyerek uyanmış / donmuş olan sakin (gün dönümünde, bir kez)
   friendRejected: -4, // reddedilen dilekçenin sahibiyle ilişki puanı >= friendAt olan her sakin
   friendFulfilled: 2, // karşılanan dilekçenin sahibinin dostları
@@ -49,13 +52,13 @@ export const LOYALTY_SOURCES = {
 // ---------------------------------------------------------------------------------------------------------------------
 // (30.3) Kararın Ağırlığı: hoşnutsuzluk basamakları, iş bırakma, Halkın Nabzı ve anında geri bildirim (ENGINES.discontent).
 // Saf hesaplar src/systems/Loyalty.js'te, olaylar src/systems/DiscontentSystem.js'te. HİÇ ZAR ÇEKMEZ (sözler tohum + 41).
-export const DISCONTENT_TABLE_VERSION = 1;
+export const DISCONTENT_TABLE_VERSION = 2; // 2: denge ayarı (taxDaily 6/2/1/-3, Kırgın iş x0,85, bitterTrust -0,4)
 
 export const DISCONTENT = {
   friendAt: 40, // dilekçe sahibinin "dostu": ilişki puanı bu ve üstü
   // Beş kademe (yukarıdan aşağıya ilk uyan): sadakat <= max. Etkiler Moodlets.recomputeMood'a MOOD_LIMITS kırpmasından önce katılır.
   levels: [
-    { key: 'bitter', max: -40, effects: { workMul: 0.8, quarrelMul: 1.2 } },
+    { key: 'bitter', max: -40, effects: { workMul: 0.85, quarrelMul: 1.2 } }, // 30.3 ayarı: iş 0,8 -> 0,85
     { key: 'grumbling', max: -20, effects: { workMul: 0.92 } },
     { key: 'calm', max: 19, effects: {} },
     { key: 'pleased', max: 39, effects: { workMul: 1.03 } },
@@ -134,7 +137,7 @@ export const LOYALTY_TIERS = {
 };
 // (30.3) Kademe etkisi açıklamaları (rozetin ipucuna eklenir)
 export const LOYALTY_EFFECT_TEXT = {
-  bitter: 'İş −%20 · atışma +%20 · her sabah 10:00-12:00 meydanda iş bırakır (en az 2 Kırgın varsa)',
+  bitter: 'İş −%15 · atışma +%20 · her sabah 10:00-12:00 meydanda iş bırakır (en az 2 Kırgın varsa)',
   grumbling: 'İş −%8',
   pleased: 'İş +%3',
   loyal: 'İş +%6',
