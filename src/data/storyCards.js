@@ -1,7 +1,7 @@
 // (30.2 "Görünen Hikâye") Hikâye kartlarının veri tablosu: hangi olay kaç öncelikli, hangi eşikler, süzgeç kademeleri. Metinler
 // systems/StoryCards.js'te saf işlevlerle üretilir (aynı olay yükü aynı metni verir). Bu tablo yalnızca arayüzü etkiler;
 // simülasyona hiçbir şey yazmaz. Sayıları buradan ayarla (gün başına 2-8 kart hedefi: tools/sim/tests/30.2-stories.mjs).
-export const STORY_TABLE_VERSION = 1;
+export const STORY_TABLE_VERSION = 2; // (30.3) 2: 'pantry:low' (Kiler boşalıyor)
 
 export const STORY_LIMITS = {
   visible: 2, // aynı anda görünen kart
@@ -38,6 +38,7 @@ export const STORY_PRIORITY = {
   'venerable:became': 2,
   'relationship:quarrel': 1,
   'relationship:reconciled': 1,
+  'pantry:low': 4, // (30.3) kiler bir günden az yeter
   'story:summary': 2,
 };
 

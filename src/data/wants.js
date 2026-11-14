@@ -52,41 +52,42 @@ export const SATISFACTION = {
   ],
 };
 
+// (30.3) told: hikâye kartlarının üçüncü ağız cümlesi ("{ad} {told}."); name birinci ağızdır (sakin kartı).
 // Arzu kataloğu (sıra = seçim sırası; aynı olay bir sakinde en çok bir arzuyu, bu sırayla ilkini gerçekleştirir)
 export const WANTS = {
-  see_pupil_master: { name: 'Çırağım {who} ustalaşsın', cat: 'legacy', days: null, points: 14, grandmasterBonus: 8, base: 2.5, icon: 'masterpiece', traits: {}, quirks: { craftsman: 1.5 }, drive: {} },
-  pass_heirloom: { name: 'Yadigârımı devredeyim', cat: 'legacy', days: null, points: 18, base: 1, icon: 'treasure', traits: {}, quirks: {}, drive: {} },
-  see_grandchild: { name: 'Torun seveyim', cat: 'family', days: null, points: 20, base: 1, icon: 'heart', traits: { cheerful: 1.3 }, quirks: {}, drive: {} },
-  get_married: { name: '{who} ile evleneyim', cat: 'love', days: null, points: 20, base: 1.5, icon: 'ring', traits: {}, quirks: {}, drive: { seek: true } },
-  have_child: { name: 'Bir evladımız olsun', cat: 'family', days: null, points: 22, base: 1, icon: 'heart', traits: {}, quirks: {}, drive: {} },
-  find_love: { name: 'Gönlüme göre birini bulayım', cat: 'love', days: 4, points: 18, base: 1, icon: 'love', traits: { socialButterfly: 1.3, introvert: 0.6 }, quirks: {}, drive: { social: true } },
-  craft_masterwork: { name: 'Usta işi bir eser çıkarayım', cat: 'craft', days: 4, points: 20, base: 1, icon: 'masterpiece', traits: { ambitious: 2.5, hardworking: 1.5 }, quirks: { craftsman: 1.5 }, drive: { focus: true, ownCraft: true } },
-  level_up_skill: { name: 'Mesleğimde ilerleyeyim', cat: 'craft', days: 3, points: 10, base: 1, icon: 'hammer', traits: { ambitious: 2, hardworking: 2 }, quirks: {}, drive: { focus: true, ownCraft: true } },
-  chat_kindred: { name: '{who} ile dertleşeyim', cat: 'social', days: 2, points: 4, base: 1, icon: 'chat', traits: { socialButterfly: 1.5 }, quirks: {}, drive: { seek: true, social: true } },
-  make_friend: { name: 'Yeni bir dost edineyim', cat: 'social', days: 3, points: 12, base: 1, icon: 'handshake', traits: { socialButterfly: 2.5, introvert: 0.4 }, quirks: {}, drive: { social: true } },
-  reconcile: { name: '{who} ile barışayım', cat: 'social', days: 3, points: 12, base: 1, icon: 'handshake', traits: { grumpy: 0.5 }, quirks: {}, drive: { seek: true, social: true } },
-  sherbet_with_spouse: { name: '{who} ile handa şerbet içeyim', cat: 'love', days: 3, points: 10, base: 0.6, icon: 'sherbet', traits: { cheerful: 1.5 }, quirks: {}, drive: { inn: true, seek: true, social: true } },
-  family_dinner: { name: 'Ailece sofraya oturalım', cat: 'family', days: 2, points: 6, base: 1, icon: 'apple', traits: { cheerful: 1.5 }, quirks: {}, drive: {} },
-  feast_meal: { name: 'Ağız tadıyla bir ziyafet', cat: 'comfort', days: 2, points: 3, base: 1, icon: 'sherbet', traits: { glutton: 3 }, quirks: {}, drive: { inn: true } },
-  quiet_day: { name: 'Kafamı dinleyeyim', cat: 'comfort', days: 2, points: 3, base: 1, icon: 'book', traits: { introvert: 3, natureLover: 2, grumpy: 1.5 }, quirks: { bookworm: 1.5, philosopher: 1.5 }, drive: { leisure: true } },
-  treat_self: { name: 'Kendime bir şey alayım', cat: 'comfort', days: 3, points: 3, base: 1, icon: 'purse', traits: {}, quirks: { entrepreneur: 0.5 }, drive: { shop: true } },
-  go_expedition: { name: 'Sefere çıkayım', cat: 'craft', days: 4, points: 12, base: 1, icon: 'adventure', traits: { ambitious: 2 }, quirks: {}, drive: {} },
-  be_heard: { name: 'Dilekçem kabul görsün', cat: 'civic', days: null, points: 12, base: 1, icon: 'scroll', traits: {}, quirks: {}, drive: {} },
+  see_pupil_master: { name: 'Çırağım {who} ustalaşsın', told: 'çırağı {who} ustalaşınca gururlandı', cat: 'legacy', days: null, points: 14, grandmasterBonus: 8, base: 2.5, icon: 'masterpiece', traits: {}, quirks: { craftsman: 1.5 }, drive: {} },
+  pass_heirloom: { name: 'Yadigârımı devredeyim', told: 'yadigârını devretti', cat: 'legacy', days: null, points: 18, base: 1, icon: 'treasure', traits: {}, quirks: {}, drive: {} },
+  see_grandchild: { name: 'Torun seveyim', told: 'torun sevdi', cat: 'family', days: null, points: 20, base: 1, icon: 'heart', traits: { cheerful: 1.3 }, quirks: {}, drive: {} },
+  get_married: { name: '{who} ile evleneyim', told: '{who} ile evlendi', cat: 'love', days: null, points: 20, base: 1.5, icon: 'ring', traits: {}, quirks: {}, drive: { seek: true } },
+  have_child: { name: 'Bir evladımız olsun', told: 'evlat sahibi oldu', cat: 'family', days: null, points: 22, base: 1, icon: 'heart', traits: {}, quirks: {}, drive: {} },
+  find_love: { name: 'Gönlüme göre birini bulayım', told: 'gönlüne göre birini buldu', cat: 'love', days: 4, points: 18, base: 1, icon: 'love', traits: { socialButterfly: 1.3, introvert: 0.6 }, quirks: {}, drive: { social: true } },
+  craft_masterwork: { name: 'Usta işi bir eser çıkarayım', told: 'usta işi bir eser çıkardı', cat: 'craft', days: 4, points: 20, base: 1, icon: 'masterpiece', traits: { ambitious: 2.5, hardworking: 1.5 }, quirks: { craftsman: 1.5 }, drive: { focus: true, ownCraft: true } },
+  level_up_skill: { name: 'Mesleğimde ilerleyeyim', told: 'mesleğinde ilerledi', cat: 'craft', days: 3, points: 10, base: 1, icon: 'hammer', traits: { ambitious: 2, hardworking: 2 }, quirks: {}, drive: { focus: true, ownCraft: true } },
+  chat_kindred: { name: '{who} ile dertleşeyim', told: '{who} ile dertleşti', cat: 'social', days: 2, points: 4, base: 1, icon: 'chat', traits: { socialButterfly: 1.5 }, quirks: {}, drive: { seek: true, social: true } },
+  make_friend: { name: 'Yeni bir dost edineyim', told: 'yeni bir dost edindi', cat: 'social', days: 3, points: 12, base: 1, icon: 'handshake', traits: { socialButterfly: 2.5, introvert: 0.4 }, quirks: {}, drive: { social: true } },
+  reconcile: { name: '{who} ile barışayım', told: '{who} ile barıştı', cat: 'social', days: 3, points: 12, base: 1, icon: 'handshake', traits: { grumpy: 0.5 }, quirks: {}, drive: { seek: true, social: true } },
+  sherbet_with_spouse: { name: '{who} ile handa şerbet içeyim', told: '{who} ile handa şerbet içti', cat: 'love', days: 3, points: 10, base: 0.6, icon: 'sherbet', traits: { cheerful: 1.5 }, quirks: {}, drive: { inn: true, seek: true, social: true } },
+  family_dinner: { name: 'Ailece sofraya oturalım', told: 'ailesiyle sofraya oturdu', cat: 'family', days: 2, points: 6, base: 1, icon: 'apple', traits: { cheerful: 1.5 }, quirks: {}, drive: {} },
+  feast_meal: { name: 'Ağız tadıyla bir ziyafet', told: 'ağız tadıyla bir ziyafet yedi', cat: 'comfort', days: 2, points: 3, base: 1, icon: 'sherbet', traits: { glutton: 3 }, quirks: {}, drive: { inn: true } },
+  quiet_day: { name: 'Kafamı dinleyeyim', told: 'kafasını dinledi', cat: 'comfort', days: 2, points: 3, base: 1, icon: 'book', traits: { introvert: 3, natureLover: 2, grumpy: 1.5 }, quirks: { bookworm: 1.5, philosopher: 1.5 }, drive: { leisure: true } },
+  treat_self: { name: 'Kendime bir şey alayım', told: 'kendine bir şey aldı', cat: 'comfort', days: 3, points: 3, base: 1, icon: 'purse', traits: {}, quirks: { entrepreneur: 0.5 }, drive: { shop: true } },
+  go_expedition: { name: 'Sefere çıkayım', told: 'sefere çıktı', cat: 'craft', days: 4, points: 12, base: 1, icon: 'adventure', traits: { ambitious: 2 }, quirks: {}, drive: {} },
+  be_heard: { name: 'Dilekçem kabul görsün', told: 'dilekçesinin kabul gördüğünü duydu', cat: 'civic', days: null, points: 12, base: 1, icon: 'scroll', traits: {}, quirks: {}, drive: {} },
 };
 export const WANT_KEYS = Object.keys(WANTS);
 
 // Korku kataloğu (sıra = seçim sırası)
 export const FEARS = {
-  fire_at_work: { name: 'İş yerimde yangın çıkması', days: 4, points: 10, burnedPoints: 6, base: 1, icon: 'fire', traits: {}, quirks: {}, drive: {} },
-  quarrel_foe: { name: '{who} ile kavga etmek', days: 3, points: 8, base: 1, icon: 'angry', traits: { grumpy: 0.5, cheerful: 1.5 }, quirks: {}, drive: { avoid: true } },
-  winter_cold: { name: 'Soğukta üşümek', days: 4, points: 8, base: 1, icon: 'cold', traits: { natureLover: 1.5 }, quirks: {}, drive: { warmth: true } },
-  go_hungry: { name: 'Aç kalmak', days: 3, points: 8, base: 1, icon: 'apple', traits: { glutton: 3 }, quirks: {}, drive: { hunger: true } },
-  loss_of_loved: { name: '{who} için: yokluğu', days: null, points: 20, base: 3, icon: 'candle', traits: {}, quirks: {}, drive: {} },
-  be_lonely: { name: 'Yapayalnız kalmak', days: 3, points: 6, base: 1, icon: 'sulk', traits: { socialButterfly: 3, introvert: 0.3 }, quirks: {}, drive: {} },
-  fall_ill: { name: 'Hastalanmak / yaralanmak', days: 4, points: 8, base: 1, icon: 'sneeze', traits: {}, quirks: {}, drive: {} },
-  heartbreak: { name: 'Kalbimin kırılması', days: 4, points: 12, base: 1, icon: 'sulk', traits: {}, quirks: {}, drive: {} },
-  unheard: { name: 'Sesimin duyulmaması', days: null, points: 8, base: 1, icon: 'scroll', traits: { ambitious: 1.5 }, quirks: {}, drive: {} },
-  burnout: { name: 'Tükenmek', days: 3, points: 6, base: 1, icon: 'zzz', traits: { sleepyhead: 2.5, hardworking: 0.5 }, quirks: {}, drive: { energy: true } },
+  fire_at_work: { name: 'İş yerimde yangın çıkması', told: 'iş yerinde çıkan yangına tanık oldu', days: 4, points: 10, burnedPoints: 6, base: 1, icon: 'fire', traits: {}, quirks: {}, drive: {} },
+  quarrel_foe: { name: '{who} ile kavga etmek', told: '{who} ile kavga etti', days: 3, points: 8, base: 1, icon: 'angry', traits: { grumpy: 0.5, cheerful: 1.5 }, quirks: {}, drive: { avoid: true } },
+  winter_cold: { name: 'Soğukta üşümek', told: 'soğukta üşüdü', days: 4, points: 8, base: 1, icon: 'cold', traits: { natureLover: 1.5 }, quirks: {}, drive: { warmth: true } },
+  go_hungry: { name: 'Aç kalmak', told: 'aç kaldı', days: 3, points: 8, base: 1, icon: 'apple', traits: { glutton: 3 }, quirks: {}, drive: { hunger: true } },
+  loss_of_loved: { name: '{who} için: yokluğu', told: 'çok sevdiği birini yitirdi: {who}', days: null, points: 20, base: 3, icon: 'candle', traits: {}, quirks: {}, drive: {} },
+  be_lonely: { name: 'Yapayalnız kalmak', told: 'yapayalnız kaldı', days: 3, points: 6, base: 1, icon: 'sulk', traits: { socialButterfly: 3, introvert: 0.3 }, quirks: {}, drive: {} },
+  fall_ill: { name: 'Hastalanmak / yaralanmak', told: 'hastalandı ya da yaralandı', days: 4, points: 8, base: 1, icon: 'sneeze', traits: {}, quirks: {}, drive: {} },
+  heartbreak: { name: 'Kalbimin kırılması', told: 'kalbi kırıldı', days: 4, points: 12, base: 1, icon: 'sulk', traits: {}, quirks: {}, drive: {} },
+  unheard: { name: 'Sesimin duyulmaması', told: 'sesinin duyulmadığını gördü', days: null, points: 8, base: 1, icon: 'scroll', traits: { ambitious: 1.5 }, quirks: {}, drive: {} },
+  burnout: { name: 'Tükenmek', told: 'tükendi', days: 3, points: 6, base: 1, icon: 'zzz', traits: { sleepyhead: 2.5, hardworking: 0.5 }, quirks: {}, drive: { energy: true } },
 };
 export const FEAR_KEYS = Object.keys(FEARS);
 

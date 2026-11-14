@@ -200,6 +200,7 @@ export class EconomySystem {
       need = 0;
     }
     if (pantry.credit < EPSILON) pantry.credit = 0;
+    this.eaten = (Number.isFinite(this.eaten) ? this.eaten : 0) + (Number.isFinite(units) ? units : 0); // (30.3) yenen yiyecek değeri (Halkın Nabzı: "≈ N gün yeter"; yalnızca sayaç, kaydedilmez)
     this.checkHunger();
     return { ok: true, bread: usedBread };
   }

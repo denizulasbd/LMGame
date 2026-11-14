@@ -258,6 +258,7 @@ export class ChemistrySystem {
     const characters = this.world.characters;
     for (const c of characters) expireTags(c, now);
 
+    const present = new Set(characters); // (30.3) aynı saatte ayrılan / ölen sakin grupta kalmış olabilir: ona kayıt yazılmaz (kopuk referans)
     for (const group of this.relationships.groups) {
       const members = group.members;
       if (members.length < 2) continue;
@@ -266,7 +267,7 @@ export class ChemistrySystem {
         for (let j = i + 1; j < members.length; j++) {
           const a = members[i];
           const b = members[j];
-          if (a.role || b.role) continue;
+          if (a.role || b.role || !present.has(a) || !present.has(b)) continue;
           if (workshop && bondCraft(state, a, b, EMOTION_RULES.craftHours)) this.events.emit('chemistry:craftBond', { a, b });
           this.admire(a, b, workshop);
           this.admire(b, a, workshop);

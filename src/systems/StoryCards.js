@@ -8,6 +8,7 @@
 import { STORY_PRIORITY, STORY_LIMITS as L, STORY_FILTERS, STORY_DEFAULT_FILTER, STORY_ACTIONS, STORY_TEXT } from '../data/storyCards.js';
 import { SPECIAL_KIND_NAMES } from '../data/rites.js';
 import { wantName } from './Wants.js';
+import { WANTS, FEARS } from '../data/wants.js';
 import { condolenceStatus, giftStatus, riteVenue } from './Rites.js';
 import { loyaltyTier } from './Loyalty.js';
 import { foodSupply } from './TownStatus.js';
@@ -31,6 +32,13 @@ export function firstSentence(text) {
 /** Olaydaki sakinler (kimlikler): izleme süzgeci ve "Git" için. */
 export function involvedIds(card) {
   return card.ids ?? [];
+}
+
+/** (30.3) Dilek / korku kartının üçüncü ağız cümlesi: "{ad} {told}." (told yoksa eski biçim). */
+export function toldText(kind, c, entry) {
+  const def = (kind === 'fear' ? FEARS : WANTS)[entry?.key];
+  if (def?.told) return `${c.name} ${def.told.replace('{who}', entry.whoName ?? 'biri')}.`;
+  return kind === 'fear' ? `${genitive(c.name)} korktuğu başına geldi: ${wantName('fear', entry)}.` : `${genitive(c.name)} dileği oldu: ${wantName('want', entry)}.`;
 }
 
 const base = (event, text, chars, extra = {}) => {
@@ -103,14 +111,19 @@ export function makeCard(event, p = {}, ctx = {}) {
     }
     case 'want:fulfilled': {
       if (!p.character || !(p.points >= L.wantMin)) return null;
-      card = base(event, `${genitive(p.character.name)} dileği oldu: ${wantName('want', p.want)}.`, [p.character]);
+      // (30.3) kartta üçüncü ağız: "Mehmet gönlüne göre birini buldu." (WANTS[].told)
+      card = base(event, toldText('want', p.character, p.want), [p.character]);
       break;
     }
     case 'fear:realized': {
       if (!p.character || !(p.points >= L.fearMin)) return null;
-      card = base(event, `${genitive(p.character.name)} korktuğu başına geldi: ${wantName('fear', p.fear)}.`, [p.character]);
+      card = base(event, toldText('fear', p.character, p.fear), [p.character]);
       break;
     }
+    case 'pantry:low':
+      // (30.3) kiler bir günden az yeter ("Git" kileri seçer)
+      card = base(event, 'Kiler boşalıyor: yiyecek bir günden az yeter.', [], { go: Number.isFinite(p.buildingId) ? { kind: 'building', id: p.buildingId } : null, key: `pantry:${day}` });
+      break;
     case 'apprentice:grandmaster':
       if (!p.character) return null;
       card = base(event, `${p.character.name} Başusta oldu.`, [p.character]);

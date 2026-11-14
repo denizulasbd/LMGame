@@ -40,6 +40,7 @@ import { BondSystem } from '../systems/BondSystem.js';
 import { LoyaltySystem } from '../systems/LoyaltySystem.js';
 import { RiteSystem } from '../systems/RiteSystem.js';
 import { LOYALTY_SEED_OFFSET } from '../data/loyalty.js';
+import { DiscontentSystem } from '../systems/DiscontentSystem.js';
 import { ConflictSystem } from '../systems/ConflictSystem.js';
 import { FamilySystem } from '../systems/FamilySystem.js';
 import { CraftingSystem } from '../systems/CraftingSystem.js';
@@ -185,7 +186,11 @@ export class TownScene extends Scene {
     // (29.6) Vefa ve Husumet: sadakat, isyan elebaşı, yağma kırgınlığı, anının kişisi (üreteci yok)
     this.loyalty = new LoyaltySystem(this.game, this.world, { chemistry: this.chemistry });
     // (29.7) Anma Töreni ve özel günler (izole üreteç seed + 41: yalnızca sözler; tören ve özel günler zar çekmez)
-    this.rites = new RiteSystem(this.game, this.world, new Random(state.seed + LOYALTY_SEED_OFFSET), { economy: this.economy, relationships: this.relationships, loyalty: this.loyalty });
+    // (30.3) Kararın Ağırlığı: Halkın Nabzı, anında geri bildirim, iş bırakma, homurdanma (söz üreteci RiteSystem ile ortak: tohum + 41).
+    // Yönetim eylemlerinin ön dinleyicileri için eylemi işleyen sistemlerden (RiteSystem, Trust, Petition, Tax, Dilemma) ÖNCE kurulur.
+    const speech41 = new Random(state.seed + LOYALTY_SEED_OFFSET);
+    this.discontent = new DiscontentSystem(this.game, this.world, speech41, { economy: this.economy });
+    this.rites = new RiteSystem(this.game, this.world, speech41, { economy: this.economy, relationships: this.relationships, loyalty: this.loyalty });
     this.social = new SocialSystem(this.game, this.world, new Random(state.seed + 19), { relationships: this.relationships });
     this.crafting = new CraftingSystem(this.game, this.world, this.economy);
     this.health = new HealthSystem(this.game, this.world, new Random(state.seed + 8));
@@ -307,6 +312,7 @@ export class TownScene extends Scene {
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
     this.guideSystem = new GuideSystem(this.game, { attract: this.attract }); // (30.1) güncelleme listesinde değil: yalnızca olay dinler
     this.storyDirector = new StoryDirector(this.game, { attract: this.attract }); // (30.2) güncelleme listesinde değil: yalnızca olay dinler
+    this.discontent.attachLate(); // (30.3) yönetim eylemlerinin son dinleyicileri (eylemi işleyen bütün sistemlerden sonra)
     this.disposables = [
       this.guideSystem,
       this.storyDirector,
@@ -330,6 +336,7 @@ export class TownScene extends Scene {
       this.evolution,
       this.bonds,
       this.loyalty,
+      this.discontent,
       this.rites,
       this.family,
       this.social,

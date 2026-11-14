@@ -33,6 +33,7 @@ import { CrisisModal } from './components/CrisisModal.js';
 import { MapTooltip } from './components/MapTooltip.js';
 import { GuideCard } from './components/GuideCard.js';
 import { StoryFeed } from './components/StoryFeed.js';
+import { HoverTip } from './components/HoverTip.js';
 
 const BOTTOM_GAP = 10; // dock ile pencere kenarı / sağ sütun arasındaki boşluk (piksel)
 
@@ -54,7 +55,9 @@ export class UIManager {
     this.modals = new ModalHost(root, game);
 
     this.dock = new BuildMenu(game);
+    this.hoverTip = new HoverTip(); // (30.3) özel ipucu (üst çubuk, Nabız, sayaçlar, vergi düğmeleri)
     this.components = [
+      this.hoverTip,
       new Hud(game),
       new TradePanel(game),
       new ResidentList(game),

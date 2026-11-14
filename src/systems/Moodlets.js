@@ -9,9 +9,11 @@
 //   traumaOf(c)                    : teselli edilebilir, henüz teselli edilmemiş travma (yas, sarsıntı, kalp kırıklığı) ya da null
 //   soothe(c, now, by)             : teselli: travmanın kalan süresi %40 kısalır, "Yüreği Ferahladı" eklenir
 //   effectText(m) / remainingHours : kart metinleri
+//   (30.3) recomputeMood sadakat kademesinin (Loyalty.levelEffects) çarpanlarını da katar (şalter: ENGINES.discontent)
 //   (29.3) recomputeMood yaşam doyumu kademesinin (Wants.satisfactionTier) etkilerini de katar: mood.satisfaction = kademe anahtarı
 import { MOODLETS, MOODLET_CAPS, MOOD_LIMITS, TIER_SCALE, NEUTRAL_FEEL, DOMINANT_THRESHOLD, MOOD_RULES, CONSOLE, MOOD_REASONS } from '../data/moodlets.js';
 import { satisfactionTier } from './Wants.js';
+import { levelEffects } from './Loyalty.js';
 
 /**
  * Motorun ana şalteri. Oyunda hep açıktır. Hedefli testler (tools/sim/tests.mjs) eski aşamaların kesin sayılı kurallarını
@@ -186,6 +188,9 @@ export function recomputeMood(c) {
   const tier = satisfactionTier(c.satisfaction);
   for (const k in tier.effects) mood[k] *= tier.effects[k];
   mood.satisfaction = tier.key;
+  // (30.3) Sadakat kademesi (Kırgın / Homurdanıyor / Memnun / Sadık): yaşam doyumu gibi kırpmadan ÖNCE katılır (ENGINES.discontent)
+  const lev = levelEffects(c);
+  if (lev) for (const k in lev) mood[k] *= lev[k];
   for (const k of MUL_KEYS) {
     const limit = MOOD_LIMITS[k];
     if (mood[k] < limit[0]) mood[k] = limit[0];

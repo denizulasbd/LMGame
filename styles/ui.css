@@ -5398,3 +5398,51 @@ kbd {
 .buff-chip { font-variant-numeric: tabular-nums; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* ---------- 30.3: Kararın Ağırlığı — Halkın Nabzı, anında geri bildirim, kıtlık sayacı, özel ipucu ---------- */
+.hover-tip { position: fixed; top: 0; left: 0; z-index: 90; max-width: min(380px, calc(100vw - 16px)); padding: 5px 9px 6px; text-align: left; color: var(--ui-ink); background: rgba(20, 13, 10, 0.96); border: 1px solid rgba(255, 214, 160, 0.28); border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); pointer-events: none; }
+.hover-tip[hidden] { display: none; }
+.hover-tip-title { font-size: 13px; font-weight: 700; color: var(--ui-highlight); font-variant-numeric: tabular-nums; }
+.hover-tip-text { margin-top: 2px; font-size: 13px; line-height: 1.35; color: var(--ui-ink-soft); white-space: pre-line; font-variant-numeric: tabular-nums; }
+.hover-tip-text[hidden] { display: none; }
+#ui-layer.is-cinematic .hover-tip { display: none; }
+.hud-pulse { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 1px 5px; }
+.hud-pulse:hover { border-color: rgba(255, 214, 160, 0.35); }
+.hud.topbar .hud-pulse .pulse-face { width: 16px; height: 16px; image-rendering: pixelated; }
+.hud-pulse .pulse-name { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.hud-pulse .pulse-arrow { font-size: 13px; font-weight: 700; min-width: 0.8em; text-align: center; }
+.hud-pulse .pulse-arrow.is-up { color: var(--ui-ok); }
+.hud-pulse .pulse-arrow.is-down { color: var(--ui-bad); }
+.hud-pulse .pulse-arrow.is-flat { color: var(--ui-ink-soft); }
+.hud-pulse[data-face='angry'] .pulse-name { color: var(--ui-bad); }
+.hud-pulse[data-face='grumbling'] .pulse-name { color: var(--ui-warn); }
+.hud-pulse[data-face='pleased'] .pulse-name, .hud-pulse[data-face='grateful'] .pulse-name { color: var(--ui-ok); }
+.hud-pulse.is-off .pulse-face, .hud-pulse.is-off .pulse-name, .hud-pulse.is-off .pulse-arrow { display: none; }
+.hud-pulse .trust-mini-bar { position: relative; overflow: visible; }
+.trust-mini-mark { position: absolute; top: -2px; width: 2px; height: 7px; margin-left: -1px; background: var(--ui-bad); border-radius: 1px; pointer-events: none; }
+.hud-pulse.is-flash-bad { animation: pulse-flash-bad 1.2s ease-out 1; }
+.hud-pulse.is-flash-good { animation: pulse-flash-good 1.2s ease-out 1; }
+@keyframes pulse-flash-bad { 0%, 40% { background: rgba(239, 90, 76, 0.55); border-color: var(--ui-bad); } 100% { background: transparent; } }
+@keyframes pulse-flash-good { 0%, 40% { background: rgba(92, 192, 90, 0.5); border-color: var(--ui-ok); } 100% { background: transparent; } }
+.pulse-feedback { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; padding: 3px 10px; border-radius: 6px; background: rgba(20, 13, 10, 0.92); border: 1px solid rgba(255, 214, 160, 0.3); color: var(--ui-ink); white-space: nowrap; animation: pulse-feedback-in 0.25s ease-out 1; }
+.pulse-feedback[hidden] { display: none; }
+.pulse-feedback.is-bad { border-color: var(--ui-bad); color: #ffd0c8; }
+.pulse-feedback.is-good { border-color: var(--ui-ok); color: #d4f5cf; }
+@keyframes pulse-feedback-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.hud.topbar .resource:has(.resource-days:not([hidden])) { position: relative; }
+.resource-days { position: absolute; top: calc(100% + 2px); left: 50%; transform: translateX(-50%); z-index: 2; padding: 0 5px; font-size: 13px; line-height: 17px; font-weight: 700; color: var(--ui-warn); white-space: nowrap; font-variant-numeric: tabular-nums; background: rgba(20, 13, 10, 0.92); border: 1px solid currentColor; border-radius: 4px; pointer-events: none; }
+.resource-days[hidden] { display: none; }
+.hud.topbar .resource.is-famine { border-color: var(--ui-bad); animation: famine-blink 0.9s steps(2, jump-none) infinite; }
+.resource.is-famine .resource-amount, .resource.is-famine .resource-days { color: var(--ui-bad); }
+@keyframes famine-blink { 50% { background: rgba(239, 90, 76, 0.35); } }
+.loyalty-box .petition-head.loyalty-grumbling .petition-title { color: var(--ui-warn); }
+.loyalty-box .petition-head.loyalty-pleased .petition-title { color: var(--ui-ok); }
+/* dar üst çubuk (1500 px ve altı): Nabız iki katlı küçük rozet — üstte yüz ve ok, altta güven çubuğu; adı ve kalkan ipucunda */
+@media (max-width: 1500px) {
+  .hud-pulse { display: inline-grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 2px; row-gap: 2px; padding: 1px 3px; }
+  .hud-pulse .pulse-name, .hud-pulse .trust-mini { display: none; }
+  .hud.topbar .hud-pulse .pulse-face { grid-column: 1; grid-row: 1; width: 14px; height: 14px; }
+  .hud-pulse .pulse-arrow { grid-column: 2; grid-row: 1; font-size: 13px; line-height: 14px; }
+  .hud-pulse .trust-mini-bar { grid-column: 1 / 3; grid-row: 2; width: 100%; min-width: 26px; }
+  .hud.topbar .hud-zone-res { gap: 3px; }
+}

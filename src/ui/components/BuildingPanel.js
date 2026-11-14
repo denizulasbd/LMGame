@@ -40,6 +40,8 @@ import { arePartners } from '../../systems/RelationshipSystem.js';
 import { getStructureSprite } from '../../art/sprites/index.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
+import { adoptTip } from './HoverTip.js';
+import { LOYALTY_SOURCES } from '../../data/loyalty.js';
 import { luxuryCards, relicShelf, goldDecreeCards } from './luxuryCards.js';
 import { ACTIVITY_SKILLS, SKILL_LEVELS } from '../../data/skills.js';
 import { skillLevel } from '../../systems/SkillSystem.js';
@@ -92,6 +94,16 @@ const cargoText = (cargo) =>
     .join(', ');
 
 const percent = (value) => `%${Math.round(value * 100)}`;
+
+const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}`;
+
+/** (30.3) Vergi kademesinin sadakat etkisi (düğme ipucu). */
+export function taxLoyaltyText(rate, current) {
+  const daily = LOYALTY_SOURCES.taxDaily[rate] ?? 0;
+  const collected = LOYALTY_SOURCES.taxCollected[rate] ?? 0;
+  const raise = rate === 'heavy' && current !== 'heavy' ? ` · geçişte ${signed(LOYALTY_SOURCES.taxRaisedToHeavy)}` : '';
+  return `Günlük: herkes ${signed(daily)} sadakat · tahsilatta ${signed(collected)}${raise}`;
+}
 
 export class BuildingPanel {
   constructor(game) {
@@ -600,7 +612,9 @@ export class BuildingPanel {
     const buttons = TAX_RATE_KEYS.map((key) => {
       const def = TAX_RATES[key];
       const locked = lockLeft > 0 && key !== tax.rate;
-      const b = this.button(def.short, locked ? `Ferman kilitli: ${formatRemaining(lockLeft)}` : `${def.name}: ${def.description}`, () => this.events.emit('ui:setTaxRate', { rate: key }));
+      // (30.3) ipucunda beklenen sadakat etkisi: "Günlük: herkes −3 sadakat · tahsilatta −7"
+      const effect = engineOn('discontent') ? `\n${taxLoyaltyText(key, tax.rate)}` : '';
+      const b = adoptTip(this.button(def.short, locked ? `Ferman kilitli: ${formatRemaining(lockLeft)}${effect}` : `${def.name}: ${def.description}${effect}`, () => this.events.emit('ui:setTaxRate', { rate: key })));
       b.disabled = locked;
       b.classList.add('tax-rate-button', `is-${key}`);
       b.classList.toggle('is-active', key === tax.rate);

@@ -69,7 +69,8 @@ const out = await page.evaluate(async () => {
   const off = game.events.on('loyalty:changed', (p) => seen.push(`${p.from}>${p.to}`));
   scene.loyalty.adjust(a, 30, 't'); scene.loyalty.adjust(a, 15, 't'); scene.loyalty.adjust(a, -10, 't'); scene.loyalty.adjust(a, -80, 't');
   off();
-  check('loyalty:changed yalnızca Sadık / Kırgın eşiği geçilince', seen.join() === '30>45,45>35,35>-45', seen.join());
+  // (30.3) ENGINES.discontent açıkken olay beş kademe içindir (Memnun 20..39 da bir kademe): 0>30 ve 30>45 ayrı olaylar
+  check('loyalty:changed yalnızca kademe eşiği geçilince (30.3: beş kademe)', seen.join() === (ENGINES.discontent ? '0>30,30>45,45>35,35>-45' : '30>45,45>35,35>-45'), seen.join());
 
   // 5. isyancı sıralaması ve elebaşı
   zero();

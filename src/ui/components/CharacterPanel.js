@@ -56,8 +56,11 @@ import { WANTS, FEARS, WANT_CAPS } from '../../data/wants.js';
 import { satisfactionTier, tierEffectText, wantName, remainingText } from '../../systems/Wants.js';
 import { hintOf, evolutionKey } from '../../systems/Evolution.js';
 import { DEEP_TRAITS, CAUSE_TEXT, EVOLUTION_TEXT } from '../../data/evolution.js';
-import { loyaltyTier } from '../../systems/Loyalty.js';
-import { LOYALTY_TIERS } from '../../data/loyalty.js';
+import { loyaltyTier, badgeTier, loyaltyScope } from '../../systems/Loyalty.js';
+import { LOYALTY_TIERS, LOYALTY_EFFECT_TEXT, LOYALTY_SOURCES, DISCONTENT } from '../../data/loyalty.js';
+import { adoptTip } from './HoverTip.js';
+
+const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}`;
 import { giftStatus } from '../../systems/Rites.js';
 import { SPECIAL_KIND_NAMES, SPECIAL_RULES } from '../../data/rites.js';
 import { EVOLUTION_AXES } from '../../data/evolution.js';
@@ -622,7 +625,7 @@ export class CharacterPanel {
   /** (29.9) Hayat: Yaşam Öyküsü (3-6 cümle; şablon tabanlı). Yalnızca öyküyü etkileyen alanlar değişince yeniden yazılır. */
   renderStory(character, state) {
     const kids = character.children?.length ?? 0;
-    const key = [character.id, character.name, character.age, character.partnerId, character.married, kids, character.wishCount, satisfactionTier(character.satisfaction).key, loyaltyTier(character), evolutionKey(character), gmTitleOf(character), character.isVenerable, character.memories?.length, primarySkill(character)?.level.level].join('/');
+    const key = [character.id, character.name, character.age, character.partnerId, character.married, kids, character.wishCount, satisfactionTier(character.satisfaction).key, badgeTier(character), evolutionKey(character), gmTitleOf(character), character.isVenerable, character.memories?.length, primarySkill(character)?.level.level].join('/');
     if (key === this.lastStory) return;
     this.lastStory = key;
     this.storyBox.textContent = lifeStory(character, state);
@@ -799,7 +802,7 @@ export class CharacterPanel {
 
   /** (29.6) Sadakat satırı (Sadık / Kırgın rozeti; eşik dışında gizli) ve (29.7) özel günde "Armağan Gönder". */
   renderLoyalty(character, state) {
-    const tier = !character.isChild && !character.role ? loyaltyTier(character) : null;
+    const tier = badgeTier(character); // (30.3) beş kademe (Sakin'de gizli); şalter kapalıyken Sadık / Kırgın
     const d = character.specialDay && character.specialDay.day === state.time.day ? character.specialDay : null;
     const gift = d ? giftStatus(state, character) : null;
     const key = `${character.id}:${tier}:${d ? `${d.kind}${d.celebrated}${d.gifted}` : ''}:${gift?.ok}:${gift?.reason}`;
@@ -808,7 +811,8 @@ export class CharacterPanel {
     const rows = [];
     if (tier) {
       const def = LOYALTY_TIERS[tier];
-      rows.push(el('div', { className: 'petition-head', title: def.hint }, [el('img', { src: getAnyIconURL(def.icon), alt: '' }), el('span', { className: 'petition-title', text: `Sadakat · ${def.name}` }), el('span', { className: 'petition-state', text: `${character.loyalty > 0 ? '+' : ''}${character.loyalty}` })]));
+      const effect = engineOn('discontent') && LOYALTY_EFFECT_TEXT[tier] ? ` (${LOYALTY_EFFECT_TEXT[tier]})` : '';
+      rows.push(el('div', { className: `petition-head loyalty-${tier}`, title: `${def.hint}${effect}` }, [el('img', { src: getAnyIconURL(def.icon), alt: '' }), el('span', { className: 'petition-title', text: `Sadakat · ${def.name}` }), el('span', { className: 'petition-state', text: `${character.loyalty > 0 ? '+' : ''}${character.loyalty}` })]));
     }
     if (d) {
       const b = this.button(`Armağan Gönder (${SPECIAL_RULES.giftCost} altın)`, gift.ok ? 'Yönetimden armağan: sadakat ve yaşam doyumu artar, bugün unutulmuş hissetmez' : gift.reason, () => this.events.emit('ui:giftSpecialDay', { id: character.id }));
@@ -850,7 +854,11 @@ export class CharacterPanel {
       b.classList.add('is-grant');
       buttons.push(b);
     }
-    const reject = this.button('Reddet', 'Dileği reddet: sakinin keyfi ve Yönetim Güveni düşer', () => this.events.emit('ui:rejectPetition', { id: p.id }));
+    // (30.3) ret düğmesinin ipucunda sadakat etkisi: "Sahibi −15 · dostları −4"
+    const owner = state.characters.find((x) => x.id === p.characterId) ?? null;
+    const friends = engineOn('discontent') && owner ? state.characters.filter((x) => x !== owner && loyaltyScope(x) && getFriendship(state, owner, x) >= DISCONTENT.friendAt).length : 0;
+    const rejectTip = engineOn('discontent') ? `\nSadakat: Sahibi ${signed(LOYALTY_SOURCES.petitionRejected)} · dostları ${signed(LOYALTY_SOURCES.friendRejected)}${friends ? ` (${friends} kişi)` : ' (dostu yok)'}` : '';
+    const reject = adoptTip(this.button('Reddet', `Dileği reddet: sakinin keyfi ve Yönetim Güveni düşer${rejectTip}`, () => this.events.emit('ui:rejectPetition', { id: p.id })));
     reject.classList.add('is-reject');
     buttons.push(reject);
     this.petitionBox.hidden = false;

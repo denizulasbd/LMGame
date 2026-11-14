@@ -52,6 +52,20 @@ import { productionOf, storageLimit } from '../../systems/Granary.js';
 import { TOWN_BUFFS } from '../../data/town.js';
 import { getCharacterPortraitURL } from '../../art/sprites/index.js';
 import { moodMarkOf, markIconURL, MOOD_MARKS } from '../../rendering/ExpressionLayer.js';
+import { adoptTip } from './HoverTip.js';
+import { engineOn } from '../../systems/Engines.js';
+import { reasonsText } from '../../systems/Loyalty.js';
+import { DISCONTENT } from '../../data/loyalty.js';
+
+const ARROWS = { up: '↑', flat: '→', down: '↓' };
+const ARROW_TEXT = { up: 'yükseliyor', flat: 'durgun', down: 'düşüyor' };
+const LEVEL_NAMES = { bitter: 'Kırgın', grumbling: 'Homurdanıyor', calm: 'Sakin', pleased: 'Memnun', loyal: 'Sadık' };
+
+/** (30.3) "≈ 2,4 gün" */
+export function formatDays(days) {
+  if (!Number.isFinite(days)) return '∞';
+  return days < 10 ? (Math.floor(days * 10) / 10).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : String(Math.floor(days));
+}
 
 /** (30.2) Üst şeridin altında aynı anda görünen en çok çip; fazlası "Olaylar" listesinde. */
 export const CHIP_LIMIT = 4;
@@ -174,6 +188,7 @@ export class Hud {
       // (21. aşama) Yönetim Güveni
       const tl = trustLevel(trust);
       this.trustFill.style.width = `${trust}%`;
+      this.trustMark.style.left = `${REVOLT.critical}%`;
       this.trustFill.className = `trust-mini-fill is-${revolt ? 'revolt' : tl.key}`;
       this.trustWrap.className = `trust-mini is-${revolt ? 'revolt' : tl.key}`;
       this.trustWrap.dataset.trust = String(trust);
@@ -188,8 +203,10 @@ export class Hud {
       this.populationWrap.classList.toggle('is-full', population >= capacity);
       this.population.classList.toggle('is-full', population >= capacity);
       const lines = status.checks.map((c) => `${c.ok ? '✓' : '✗'} ${c.text}`);
+      this.renderPulse(state, true);
       this.populationWrap.title = `${population} sakin / ${capacity} yatak${venerable ? ` (+${venerable} Saygın Büyük: yatağı olmayan, nüfus kotasına sayılmayan bilgeler)` : ''}. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
     }
+    this.renderPulse(state, false);
     const buffs = activeBuffs(state);
     const heating = Math.round(heatingPerDay(state) * 10) / 10;
     const freezing = state.heating.cold && heating > 0;
@@ -395,7 +412,7 @@ export class Hud {
       const shownChips = list.slice(0, CHIP_LIMIT);
       const rest = list.slice(CHIP_LIMIT);
       const make = (d) => {
-        const bt = el('button', { className: `buff-chip is-action is-click${d.cls}`, type: 'button', title: d.title, tabIndex: -1 }, [el('img', { src: getAnyIconURL(d.icon), alt: '' }), d.text]);
+        const bt = adoptTip(el('button', { className: `buff-chip is-action is-click${d.cls}`, type: 'button', tabIndex: -1 }, [el('img', { src: getAnyIconURL(d.icon), alt: '' }), d.text]), d.title); // (30.3) özel ipucu
         bt.addEventListener('mousedown', (e) => e.preventDefault());
         bt.addEventListener('click', () => {
           this.setMoreOpen(false);
@@ -448,9 +465,18 @@ export class Hud {
   renderGoodsDetail(state) {
     const supply = Math.floor(foodSupply(state));
     const bread = state.resources.bread ?? 0;
+    // (30.3) Kıtlık görünür olsun: "≈ N gün yeter" (stok ÷ son 2 günün günlük tüketimi); kritikse sayacın yanında, 1 günün altında kırmızı
+    const famine = engineOn('discontent') ? this.game.scenes?.current?.discontent ?? null : null;
+    const days = famine ? famine.foodDays() : Infinity;
+    const daysLine = famine ? (Number.isFinite(days) ? `\n≈ ${formatDays(days)} gün yeter (son 2 günün tüketimine göre)` : '\nKaç gün yeteceği yarın belli olur (dünkü tüketim kaydı yok)') : '';
     this.resources.food.box.title = bread > 0
-      ? `Yiyecek · kilerdeki toplam besin değeri ${supply} (${bread} ekmek × 2,5 dahil)\n${RESOURCES.food.hint}`
-      : `Yiyecek\n${RESOURCES.food.hint}`;
+      ? `Yiyecek · kilerdeki toplam besin değeri ${supply} (${bread} ekmek × 2,5 dahil)${daysLine}\n${RESOURCES.food.hint}`
+      : `Yiyecek${daysLine}\n${RESOURCES.food.hint}`;
+    const critical = Boolean(famine) && days < DISCONTENT.famine.criticalDays;
+    this.foodDays.hidden = !critical;
+    if (critical) this.foodDays.textContent = `≈ ${formatDays(days)} gün`;
+    this.resources.food.box.classList.toggle('is-famine', Boolean(famine) && days < DISCONTENT.famine.redBelowDays);
+    this.resources.food.box.classList.toggle('is-scarce', critical);
     for (const key of GOODS_KEYS) {
       const slot = this.resources[key];
       if (RESOURCES[key].treasury) {
@@ -557,12 +583,31 @@ export class Hud {
     this.trustFill = el('span', { className: 'trust-mini-fill' });
     this.trustIcon = el('img', { className: 'hud-icon trust-icon', src: getAnyIconURL('trust'), alt: '' });
     this.trustWrap = el('span', { className: 'trust-mini' }, [this.trustIcon]);
-    this.welfareRow = el('span', { className: 'hud-chip hud-welfare' }, [
+    this.welfareRow = adoptTip(el('span', { className: 'hud-chip hud-welfare' }, [
       this.welfareIcon,
-      el('span', { className: 'welfare-bars' }, [el('span', { className: 'need-bar welfare-bar' }, [this.welfareFill]), el('span', { className: 'trust-mini-bar' }, [this.trustFill])]),
+      el('span', { className: 'welfare-bars' }, [el('span', { className: 'need-bar welfare-bar' }, [this.welfareFill])]),
       this.welfareValue,
+    ]));
+    // (30.3) Halkın Nabzı: güven çubuğunun yerinde tek bileşen (yüz + ad, yön oku, Yönetim Güveni çubuğu ve isyan eşiği işareti, kalkan).
+    // İpucunda kademe başına sakin sayısı ve son 2 günün en büyük üç nedeni; tıklayınca Belediye Konağı / meydan paneli.
+    this.pulseFace = el('img', { className: 'hud-icon pulse-face', alt: '' });
+    this.pulseName = el('span', { className: 'pulse-name' });
+    this.pulseArrow = el('span', { className: 'pulse-arrow' });
+    this.trustMark = el('span', { className: 'trust-mini-mark' });
+    this.pulseWrap = adoptTip(el('button', { className: 'hud-chip hud-pulse', type: 'button', tabIndex: -1 }, [
+      this.pulseFace,
+      this.pulseName,
+      this.pulseArrow,
+      el('span', { className: 'trust-mini-bar' }, [this.trustFill, this.trustMark]),
       this.trustWrap,
-    ]);
+    ]));
+    this.pulseWrap.addEventListener('mousedown', (e) => e.preventDefault());
+    this.pulseWrap.addEventListener('click', () => this.openHall());
+    this.lastPulse = '';
+    // (30.3) Anında geri bildirim: üst çubuğun altında 4 saniyelik tek satır ("Halk: 12 sakin hoşnutsuz (Ağır Vergi)")
+    this.feedbackLine = el('div', { className: 'pulse-feedback', hidden: true, role: 'status' });
+    this.feedbackTimer = 0;
+    game.events.on('pulse:feedback', (fb) => this.showFeedback(fb));
     this.buffs = el('div', { className: 'hud-buffs ui-interactive' });
     // (30.2) "Olaylar ▾ (N)": çubuğa sığmayan çipler
     this.moreCount = el('span');
@@ -573,7 +618,7 @@ export class Hud {
     this.moreWrap = el('span', { className: 'hud-more' }, [this.moreButton, this.moreList]);
     this.watch = el('div', { className: 'watch-strip ui-interactive', hidden: true });
     this.watchKey = '';
-    this.under = el('div', { className: 'hud-under' }, [this.buffs, this.watch]);
+    this.under = el('div', { className: 'hud-under' }, [this.feedbackLine, this.buffs, this.watch]);
     this.chipList = [];
     // (30.2) Vadi Karakteri çipi kaldırıldı: bilgi kasaba adının ipucunda. Aynı bilgi ekran okuyucular için görünmez bir öğede de durur.
     this.valleyText = el('span', { className: 'hud-valley' });
@@ -586,14 +631,14 @@ export class Hud {
     const resourceBox = (key, goods) => {
       const amount = el('span', { className: 'resource-amount' });
       const detail = el('span', { className: 'resource-detail' });
-      const box = el('span', { className: `resource${goods ? ' is-goods' : ''}`, title: `${RESOURCES[key].name}\n${RESOURCES[key].hint}` }, [
+      const box = adoptTip(el('span', { className: `resource${goods ? ' is-goods' : ''}`, title: `${RESOURCES[key].name}\n${RESOURCES[key].hint}` }, [
         el('img', { className: 'resource-icon', src: getIconDataURL(RESOURCES[key].icon), alt: '' }),
         el('span', { className: 'resource-text' }, [
           ...(goods ? [el('span', { className: 'resource-name', text: RESOURCES[key].name })] : []),
           amount,
           ...(goods ? [detail] : []),
         ]),
-      ]);
+      ]));
       this.resources[key] = { box, amount, detail, last: '' };
       return box;
     };
@@ -601,6 +646,8 @@ export class Hud {
     const goodsKeys = GOODS_KEYS.filter((k) => !RESOURCES[k].treasury);
     const treasuryKeys = GOODS_KEYS.filter((k) => RESOURCES[k].treasury);
     const resourceBoxes = [...BASE_RESOURCE_KEYS, ...treasuryKeys].map((key) => resourceBox(key, false));
+    this.foodDays = el('span', { className: 'resource-days', hidden: true }); // (30.3) "≈ N gün"
+    this.resources.food.box.append(this.foodDays);
     this.goodsSummary = el('span', { className: 'goods-summary' });
     this.goodsToggle = button('', '', () => this.setGoodsExpanded(!this.goodsExpanded));
     this.goodsToggle.classList.add('goods-toggle');
@@ -618,9 +665,70 @@ export class Hud {
         this.pausedBadge,
         this.muteButton,
       ]),
-      zone('hud-zone-res', [...resourceBoxes, this.goodsWrap, this.welfareRow, this.populationWrap]),
+      zone('hud-zone-res', [...resourceBoxes, this.goodsWrap, this.welfareRow, this.pulseWrap, this.populationWrap]),
       this.under,
     ]);
+    // (30.3) üst çubuğun öteki ipuçları da özel ipucu bileşeniyle
+    for (const node of [this.townName, this.tierBadge, this.populationWrap, this.venerable, this.goodsToggle, this.moreButton, this.seasonText.parentElement, this.icon, this.weatherIcon]) adoptTip(node);
+  }
+
+  /** (30.3) Belediye Konağı (yoksa meydan havuzu) paneli: vergi ve yardım düğmelerinin olduğu yer. */
+  openHall() {
+    const state = this.game.state;
+    const hall = state.buildings.find((x) => x.functional && BUILDINGS[x.type].civic) ?? state.buildings.find((x) => x.functional && x.type === 'fountain');
+    if (hall) this.game.events.emit('ui:selectBuilding', hall.id);
+    else this.game.events.emit('ui:toggleGoals');
+  }
+
+  /** (30.3) Halkın Nabzı: yüz, ad, yön oku; ipucunda kademe sayıları, son 2 günün ilk üç nedeni ve güven. */
+  renderPulse(state, force) {
+    const d = engineOn('discontent') ? this.game.scenes?.current?.discontent ?? null : null;
+    this.pulseWrap.classList.toggle('is-off', !d);
+    const trust = Math.round(trustValue(state));
+    const revolt = Boolean(state.trust?.revolt);
+    if (!d) {
+      const key = `off|${trust}|${revolt}`;
+      if (!force && key === this.lastPulse) return;
+      this.lastPulse = key;
+      this.pulseWrap.title = `Yönetim Güveni: %${trust}${revolt ? ' · İSYAN sürüyor!' : ''}\nİsyan eşiği %${REVOLT.critical}.\nTıkla: Belediye Konağı (vergi ve yardım)`;
+      return;
+    }
+    const p = d.summary();
+    const counts = ['bitter', 'grumbling', 'calm', 'pleased', 'loyal'].map((k) => `${LEVEL_NAMES[k]} ${p.counts[k]}`).join(' · ');
+    const avg = Math.round(p.avg);
+    const key = `${p.face}|${p.dir}|${avg}|${counts}|${reasonsText(p.top)}|${trust}|${revolt}`;
+    if (!force && key === this.lastPulse) return;
+    this.lastPulse = key;
+    this.pulseFace.src = getAnyIconURL(p.icon);
+    this.pulseName.textContent = p.name;
+    this.pulseArrow.textContent = ARROWS[p.dir];
+    this.pulseArrow.className = `pulse-arrow is-${p.dir}`;
+    this.pulseWrap.dataset.face = p.face;
+    this.pulseWrap.dataset.dir = p.dir;
+    this.pulseWrap.title = [
+      `Halkın Nabzı: ${p.name} ${ARROWS[p.dir]} (ortalama sadakat ${avg > 0 ? '+' : avg < 0 ? '−' : ''}${Math.abs(avg)}, 24 saatte ${ARROW_TEXT[p.dir]})`,
+      counts,
+      `Son 2 gün: ${p.top.length ? reasonsText(p.top) : 'kayda değer bir değişim yok'}`,
+      `Yönetim Güveni: %${trust}${revolt ? ' · İSYAN sürüyor!' : ''} (isyan eşiği %${REVOLT.critical})`,
+      'Tıkla: Belediye Konağı (vergi ve yardım)',
+    ].join('\n');
+  }
+
+  /** (30.3) Anında geri bildirim satırı (4 gerçek saniye) ve Nabız'ın kısa renk parlaması. */
+  showFeedback(fb) {
+    if (!fb?.text) return;
+    this.feedbackLine.textContent = fb.text;
+    this.feedbackLine.className = `pulse-feedback is-${fb.tone}`;
+    this.feedbackLine.hidden = false;
+    this.pulseWrap.classList.remove('is-flash-good', 'is-flash-bad');
+    void this.pulseWrap.offsetWidth; // animasyon baştan başlasın
+    this.pulseWrap.classList.add(`is-flash-${fb.tone}`);
+    this.renderPulse(this.game.state, true);
+    clearTimeout(this.feedbackTimer);
+    this.feedbackTimer = setTimeout(() => {
+      this.feedbackLine.hidden = true;
+      this.pulseWrap.classList.remove('is-flash-good', 'is-flash-bad');
+    }, DISCONTENT.feedback.seconds * 1000);
   }
 
   setMoreOpen(open) {
@@ -683,11 +791,11 @@ export class Hud {
     this.watch.replaceChildren(
       ...list.map((c) => {
         const mark = moodMarkOf(c);
-        const b = el('button', { className: 'watch-item', type: 'button', tabIndex: -1, title: `${c.name} (yakından izleniyor)\n${c.activityLabel}${mark ? `\nRuh hali: ${MOOD_MARKS[mark].name}` : ''}` }, [
+        const b = adoptTip(el('button', { className: 'watch-item', type: 'button', tabIndex: -1, title: `${c.name} (yakından izleniyor)\n${c.activityLabel}${mark ? `\nRuh hali: ${MOOD_MARKS[mark].name}` : ''}` }, [
           el('img', { className: 'watch-portrait', src: getCharacterPortraitURL(c.appearance, c.look), alt: c.name }),
           ...(mark ? [el('img', { className: 'watch-mark', src: markIconURL(mark), alt: '' })] : []),
           el('img', { className: 'watch-star', src: getAnyIconURL('star'), alt: '' }),
-        ]);
+        ]));
         b.addEventListener('mousedown', (e) => e.preventDefault());
         b.addEventListener('click', () => this.game.events.emit('ui:selectCharacter', c.id));
         return b;

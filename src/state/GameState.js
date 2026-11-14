@@ -45,6 +45,7 @@ import { emptyGuestBook, restoreGuestBook, sanitizeActiveGuest } from '../system
 import { emptyRites, restoreRites, pruneRites } from '../systems/Rites.js';
 import { emptyGuide, restoreGuide } from '../systems/Guide.js';
 import { restoreWatched } from '../systems/StoryCards.js'; // (30.2)
+import { restorePulse } from '../systems/Loyalty.js'; // (30.3)
 import { STORY_FILTERS } from '../data/storyCards.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
@@ -212,6 +213,7 @@ export class GameState {
     this.rites = emptyRites(); // (29.7) anma törenleri (bekleyen, süren, kitabe) ve özel gün sayaçları
     this.settings = {}; // (30.1) oyuncu tercihleri (isteğe bağlı alanlar): { dilemmaTimer?: boolean } — yoksa kapalı
     this.watched = []; // (30.2) "Yakından izle" sakin kimlikleri (isteğe bağlı alan; boşsa kayda yazılmaz)
+    this.pulse = null; // (30.3) Halkın Nabzı (isteğe bağlı): { daily: [son 3 günün ortalaması], reasons: [{ day, totals }] (son 2 gün), eaten?: [günlük tüketim] }
     this.guide = emptyGuide(); // (30.1) rehber kartları: { done: [adım kimlikleri], off: bool, at?: { adım: oyun dakikası } }
     this.evolution = emptyEvolutionStats(); // (29.4) kişilik evrimi sayaçları: { turned, deepened, acquired (özellik -> adet), total }
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
@@ -331,6 +333,7 @@ export class GameState {
       ...(Object.keys(this.settings).length ? { settings: { ...this.settings } } : {}),
       guide: this.guide,
       ...(this.watched.length ? { watched: [...this.watched] } : {}),
+      ...(this.pulse ? { pulse: this.pulse } : {}), // (30.3)
     };
   }
 
@@ -470,6 +473,7 @@ export class GameState {
     // (30.1) rehber: kayıtta yoksa nüfusu 8'den fazla olan oyun için kapalı, yoksa açık başlar
     next.guide = restoreGuide(data.guide, next.characters.length);
     next.watched = restoreWatched(data.watched).filter((id) => next.characters.some((c) => c.id === id)); // (30.2)
+    next.pulse = data.pulse ? restorePulse(data.pulse) : null; // (30.3) yoksa boş başlar
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }

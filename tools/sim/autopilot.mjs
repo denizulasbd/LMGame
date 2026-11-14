@@ -58,6 +58,8 @@
 //   --no-apprentice : (25.2) Çırak Kapısı hiç açılmaz (çıraklık katmanının kapalıyken oyunu hiç değiştirmediğini göstermek için)
 //   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
 //               oyunun ana üretecini tüketmediğini göstermek için: --crisis huzurlu ile 22. aşamanın koşusunu bire bir verir)
+//   --loy     : (30.3) data/loyalty.js'i bellekte geçersiz kılar (denge denemesi): "LOYALTY.bitterTrust.perHour=-0.5"
+//   --famine [gün=5] : (30.3) kıtlık senaryosu: o günden sonra bütün bahçeler yıkılır, toplama emri ve acil dağıtım yapılmaz (oyuncu tepkisiz)
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
 //               bulunursa çıkış kodu 1 olur
 import fs from 'fs';
@@ -77,6 +79,20 @@ await installMonitor(page);
 if (options.stories) await page.evaluate((f) => { window.game.scenes.current.storyDirector.autoTick = true; if (f) window.game.events.emit('ui:setStoryFilter', { filter: f }); }, typeof options['story-filter'] === 'string' ? options['story-filter'] : null); // (30.2)
 // (29.4) --evo "rules.decayPerDay=3;sources.moodlets.quarrel=..." : denge denemeleri için evrim verisini bellekte geçersiz kılar (dosyaya yazmaz).
 // Yol: evolution.js dışa aktarımı.alan...; değer JSON. Örn: --evo "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
+// (30.3) --loy "LOYALTY.bitterTrust.perHour=-0.5;LOYALTY_SOURCES.hungryDaily=-6" : denge denemeleri için data/loyalty.js'i bellekte geçersiz kılar
+if (options.loy) {
+  await page.evaluate(async (spec) => {
+    const mod = await import('/src/data/loyalty.js');
+    for (const part of String(spec).split(';')) {
+      const [path, raw] = part.split('=');
+      if (!path || raw === undefined) continue;
+      const keys = path.trim().split('.');
+      let obj = mod;
+      for (const k of keys.slice(0, -1)) obj = obj[k];
+      obj[keys[keys.length - 1]] = JSON.parse(raw);
+    }
+  }, options.loy);
+}
 if (options.evo) {
   await page.evaluate(async (spec) => {
     const mod = await import('/src/data/evolution.js');
@@ -96,9 +112,10 @@ await page.evaluate((o) => {
   window.__noApprentice = o.noApprentice; // (25.2)
   if (o.crisis) window.game.state.crisis.difficulty = o.crisis; // doğrudan durumdan (bildirim / ses tüketmesin: huzurlu + --no-safety koşusu 22. aşamayla bire bir aynı olmalı)
   window.__profile = o.profile; // (29.10)
-}, { noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null });
-if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent'].includes(options.profile)) {
-  console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent)`);
+  window.__famine = o.famine; // (30.3)
+}, { famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null });
+if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent', 'repent2'].includes(options.profile)) {
+  console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent | repent2)`);
   process.exit(2);
 }
 
@@ -139,6 +156,32 @@ await page.evaluate(async (off) => {
     P.left.push({ day: window.game.state.time.day, name: character.name, loyalty: character.loyalty ?? 0, tier: tierOf(character.loyalty ?? 0) });
   });
   ev.on('rite:condolence', () => (P.condolences += 1));
+  // (30.3) kararın ağırlığı ölçümü (yalnızca dinler): gün dönümünde Homurdanan / Kırgın / Memnun+ oranı, hazine, Ağır Vergi'ye geçiş günü,
+  // iş bırakma günleri (11:00'de meydanda 'strike' görevindeki en az 2 yetişkin), Nabız (yüz, yön, ilk üç neden)
+  const W = (window.__weightStats = { daily: [], heavyDay: null, strikes: [], switchDay: null, switchPop: null, famine: [] });
+  ev.on('tax:rateChanged', ({ rate }) => { if (rate === 'heavy' && W.heavyDay === null) W.heavyDay = window.game.state.time.day; });
+  ev.on('time:newDay', () => {
+    const s = window.game.state;
+    const L = s.characters.filter((c) => !c.isChild && !c.role).map((c) => c.loyalty ?? 0);
+    const n = Math.max(1, L.length);
+    const pulse = window.game.scenes.current.discontent?.summary?.() ?? null;
+    W.daily.push({ day: s.time.day, grum: L.filter((v) => v <= -20 && v > -40).length / n, bitter: L.filter((v) => v <= -40).length / n, pleased: L.filter((v) => v >= 20).length / n, avg: L.reduce((a, b) => a + b, 0) / n, gold: Math.round(s.resources.gold), pop: s.characters.length, food: Math.round(s.resources.food), pulse: pulse ? { face: pulse.face, dir: pulse.dir, top: pulse.top.map((r) => r.key), pts: pulse.top.map((r) => r.points) } : null });
+  });
+  // (30.3) kıtlık tanısı: günlük yiyecek girişi / çıkışı, aç sakin sayısı
+  W.food = { gain: 0, loss: 0 };
+  ev.on('resources:changed', ({ resource, delta }) => { if (resource === 'food' || resource === 'bread') W.food[delta > 0 ? 'gain' : 'loss'] += Math.abs(delta) * (resource === 'bread' ? 2.5 : 1); });
+  ev.on('time:newDay', () => {
+    const s = window.game.state;
+    const last = W.daily.at(-1);
+    if (last) Object.assign(last, { gain: Math.round(W.food.gain), loss: Math.round(W.food.loss), hangry: s.characters.filter((c) => c.moodlets?.some((m) => m.key === 'hangry')).length, gardens: s.buildings.filter((b) => b.type === 'garden').length });
+    W.food = { gain: 0, loss: 0 };
+  });
+  ev.on('time:hour', (h) => {
+    if (h !== 11) return;
+    const s = window.game.state;
+    const k = s.characters.filter((c) => c.task?.activity === 'strike').length;
+    if (k >= 2) W.strikes.push({ day: s.time.day, n: k });
+  });
   ev.on('special:gifted', () => (P.gifts += 1));
   // (29.6 §2 teşhisi) yapı türü başına çalışılan saat (mesaide yapıda / iş emrinde 'perform' evresindeki sakin başına saat başı 1)
   const WH = (window.__workHours = {});
@@ -422,9 +465,18 @@ await page.evaluate((passive) => {
     const cy = plaza.centerY;
     const res = s.resources;
     window.__decide();
+    // (30.3) --famine [gün=5] : kıtlık senaryosu. O günden sonra bütün bahçeler (şantiyeleri de) her saat yıkılır; Nabız ve kiler ölçülür
+    if (window.__famine && s.time.day >= window.__famine) {
+      for (const b of [...s.buildings]) if (b.type === 'garden') scene.construction.demolish(b, { quiet: true });
+    }
     // (29.10b) careless: Standart Vergi, dilekçelerin yarısı (sırayla bir kabul, bir ret) reddedilir, kıtlıkta dağıtım / taziye / armağan yok.
     // repent: 20. güne kadar tyrant, sonra benevolent.
-    const profile = window.__profile === 'repent' ? (s.time.day < 20 ? 'tyrant' : 'benevolent') : window.__profile; // (29.10) yönetim senaryosu
+    // (30.3) repent2: ilk isyan başlayana kadar tyrant, isyan başladığı an benevolent (isyan 30. güne kadar çıkmazsa 30. günde geçer)
+    if (window.__profile === 'repent2' && window.__weightStats.switchDay === null && (s.trust.revolt || s.time.day >= 30)) {
+      window.__weightStats.switchDay = s.time.day;
+      window.__weightStats.switchPop = s.characters.length;
+    }
+    const profile = window.__profile === 'repent' ? (s.time.day < 20 ? 'tyrant' : 'benevolent') : window.__profile === 'repent2' ? (window.__weightStats.switchDay === null ? 'tyrant' : 'benevolent') : window.__profile; // (29.10) yönetim senaryosu
     window.__stats.minWelfare = Math.min(window.__stats.minWelfare, s.town.welfare ?? 100);
     // (21. aşama) Vatandaş dilekçeleri ve Yönetim Güveni
     {
@@ -568,7 +620,7 @@ await page.evaluate((passive) => {
       }
       // Güven düşerse (ya da isyan çıkarsa) acil dağıtım
       const T = window.__trust;
-      if (profile !== 'tyrant' && profile !== 'careless' && (s.trust.revolt || s.trust.value < 40)) {
+      if (profile !== 'tyrant' && profile !== 'careless' && !(window.__famine && s.time.day >= window.__famine) && (s.trust.revolt || s.trust.value < 40)) {
         for (const kind of ['food', 'gold']) if (T.reliefStatus(s, kind).ok) game.events.emit('ui:relief', { kind });
       }
       // (29.10) benevolent: her törende Taziye Sofrası, her özel günde (altın yetiyorsa) armağan
@@ -602,7 +654,8 @@ await page.evaluate((passive) => {
     const autumn = yearDay >= 8 && yearDay < 13;
     if (res.wood < (autumn ? 90 : 45) && pending('chop') < 4) designateNear(['oak', 'pine'], 4);
     if (res.stone < 35 && pending('mine') < 3) designateNear(['rock'], 2);
-    if (res.food < 25 && pending('forage') < 3) {
+    // (30.3) kıtlık senaryosunda oyuncu kıtlığa tepki vermez: toplama emri yok
+    if (res.food < 25 && pending('forage') < 3 && !(window.__famine && s.time.day >= window.__famine)) {
       for (const bush of world.getBuildingsOfType('berryBush')) {
         if (pending('forage') >= 3) break;
         if (bush.berries > 0 && Math.hypot(bush.tileX - cx, bush.tileY - cy) < 22) scene.jobs.designate(bush.tileX, bush.tileY);
@@ -1100,6 +1153,32 @@ if (options.profile || options['profile-report']) {
   console.log(`(29.10) profil ${options.profile ?? 'normal'}: Kırgın en çok ${pct(maxBitter)} · son gün Sadık ${pct(last.loyal)} / Kırgın ${pct(last.bitter)} (ortalama ${last.avg.toFixed(1)}) · isyan ${P.revolts.length} ${P.revolts.map((r) => `[G${r.day} ${r.n} kişi, elebaşı ${r.leader ?? '-'} ${r.leaderLoyalty} / en düşük ${r.minLoyalty}]`).join(' ')} · terk eden ${P.left.length} ${P.left.map((l) => `${l.name}:${l.tier}`).join(', ')} · taziye ${P.condolences} · armağan ${P.gifts}`);
   { const d = P.daily; const at = (k) => d.find((x) => x.day === k) ?? d.at(-1); const lastDay = d.at(-1)?.day ?? 0; console.log(`(29.10b) profil ${options.profile ?? 'normal'}: nüfus başlangıç ${d[0]?.pop} · G20 ${at(20)?.pop} · son ${d.at(-1)?.pop} · güven G20 ${at(20)?.trust} · G30 ${at(30)?.trust} · son ${d.at(-1)?.trust} · son 10 günde yeni isyan ${P.revolts.filter((r) => r.day > lastDay - 10).length} · isyan günleri ${P.revolts.map((r) => r.day)}`); }
   riteStats.profile = { maxBitter, lastLoyal: last.loyal, lastBitter: last.bitter, revolts: P.revolts, left: P.left, condolences: P.condolences, gifts: P.gifts };
+}
+{
+  // (30.3) kararın ağırlığı: ilk Homurdanan günü (Homurdanan + Kırgın >= %30), ilk iş bırakma, isyan, terk eden, 30. gün hazinesi, son nüfus
+  const W = await page.evaluate(() => ({ ...window.__weightStats, revolts: window.__profileStats.revolts.map((r) => r.day), left: window.__profileStats.left.length }));
+  const d = W.daily;
+  const pct = (v) => `%${Math.round(100 * v)}`;
+  const from = W.heavyDay ?? 0;
+  const firstGrum = d.find((x) => x.day >= from && x.grum + x.bitter >= 0.3)?.day ?? null;
+  const strikeDays = [...new Set(W.strikes.map((x) => x.day))];
+  const g30 = (d.find((x) => x.day === 30) ?? d.at(-1))?.gold;
+  const last = d.at(-1) ?? {};
+  const rel = (day) => (day === null || day === undefined ? '-' : W.heavyDay !== null ? `G${day} (+${day - W.heavyDay})` : `G${day}`);
+  let extra = '';
+  if (W.switchDay !== null) {
+    const after = d.filter((x) => x.day > W.switchDay && x.day <= W.switchDay + 12);
+    const calmDay = after.find((x) => x.bitter < 0.25)?.day ?? null;
+    const lastDay = last.day ?? 0;
+    extra = ` · geçiş G${W.switchDay} (nüfus ${W.switchPop}) · Kırgın < %25 ${calmDay ? `G${calmDay}` : 'olmadı'} (en çok ${pct(Math.max(0, ...after.map((x) => x.bitter)))}) · son 6 günde yeni isyan ${W.revolts.filter((r) => r > lastDay - 6).length} · son nüfus / geçiş ${pct((last.pop ?? 0) / Math.max(1, W.switchPop))}`;
+  }
+  if (options.famine) {
+    const fd = Number(options.famine === true ? 5 : options.famine);
+    const hit = d.find((x) => x.day > fd && x.pulse && x.pulse.dir === 'down' && x.pulse.top.includes('hunger'));
+    extra += ` · kıtlık G${fd}: Nabız düşüşte + "açlık" ilk üçte ${hit ? `G${hit.day} (+${hit.day - fd})` : 'olmadı'} · yiyecek ${d.filter((x) => x.day >= fd).map((x) => `${x.food}(+${x.gain}/-${x.loss}, aç ${x.hangry}, bahçe ${x.gardens})`).join(' ')} · Nabız ${d.filter((x) => x.day >= fd).map((x) => (x.pulse ? `${x.pulse.face}${x.pulse.dir === 'down' ? '↓' : x.pulse.dir === 'up' ? '↑' : '→'}${x.avg.toFixed(1)}[${x.pulse.top.map((k, i) => `${k}${x.pulse.pts?.[i] ?? ''}`).join(',')}]` : '-')).join(' ')}`;
+  }
+  console.log(`(30.3) ${options.profile ?? 'normal'}: Ağır Vergi ${W.heavyDay !== null ? `G${W.heavyDay}` : '-'} · Homurdanan+Kırgın >= %30 ${rel(firstGrum)} · ilk iş bırakma ${rel(strikeDays[0])} · iş bırakma günü ${strikeDays.length} · isyan ${W.revolts.length} · terk eden ${W.left} · G30 hazine ${g30} · son nüfus ${last.pop} · son gün Homurdanan ${pct(last.grum ?? 0)} / Kırgın ${pct(last.bitter ?? 0)} / Memnun+ ${pct(last.pleased ?? 0)}${extra}`);
+  riteStats.weight = { heavyDay: W.heavyDay, firstGrum, strikeDays, revolts: W.revolts, left: W.left, g30, lastPop: last.pop, last, switchDay: W.switchDay, switchPop: W.switchPop, daily: d };
 }
 console.log(`(29.7) anma töreni ${riteStats.held} (vefat günü ${riteStats.deathDays}, töreni gelmiş ${riteStats.dueDeathDays}) · ortalama katılım ${riteStats.attendance.toFixed(1)} · 20:00'de süren tören görevi ${riteStats.late} · özel gün kutlanan ${riteStats.celebrated} / unutulan ${riteStats.forgotten} (%${Math.round((100 * riteStats.celebrated) / Math.max(1, riteStats.celebrated + riteStats.forgotten))})`);
 console.log(`(29.5) Omuz Omuza ${bondStats.side} · Diken Üstünde ${bondStats.rub} · en az bir kez Omuz Omuza alan ${bondStats.ever}/${bondStats.pop} (%${Math.round((100 * bondStats.ever) / Math.max(1, bondStats.pop))}) · Diken Üstünde alan ${bondStats.everRub} · en çok birlikte çalışan çiftler: ${bondStats.pairs.join(', ') || '-'}`);

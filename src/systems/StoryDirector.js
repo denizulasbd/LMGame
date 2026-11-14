@@ -15,7 +15,7 @@ const EVENTS = [
   'population:died', 'rite:started', 'relationship:married', 'family:childBorn', 'trait:evolved', 'special:forgotten',
   'want:fulfilled', 'fear:realized', 'apprentice:grandmaster', 'masterwork:created', 'relationship:partnered', 'chemistry:kindred',
   'loyalty:changed', 'moodlet:mourning', 'moodlet:consoled', 'family:grownUp', 'venerable:became', 'relationship:quarrel',
-  'relationship:reconciled',
+  'relationship:reconciled', 'pantry:low',
 ];
 
 export class StoryDirector {

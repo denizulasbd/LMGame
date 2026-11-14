@@ -63,6 +63,8 @@ import { findSufferer } from '../systems/MoodletSystem.js';
 import { TEMPERAMENT } from '../data/temperament.js';
 import { isMemorialTime, memorialEligible, urgentNeed, riteWindow, riteVenue } from '../systems/Rites.js';
 import { engineOn } from '../systems/Engines.js';
+import { shouldStrike } from '../systems/Loyalty.js';
+import { DISCONTENT } from '../data/loyalty.js';
 
 const COLD_SEASONS = ['autumn', 'winter']; // (29.3) "Soğukta üşümek" korkusunun sıcak mekân arayışı
 
@@ -215,7 +217,13 @@ export class Brain {
     if (isWorkHours(hour) && !c.isChild) {
       // (29.2) gururlu / akıştaki / ilhamlı sakin mola vermez (zar yine atılır: üretecin sırası değişmez)
       // (29.3) mesleğinde ilerlemek / eser çıkarmak isteyen de (drive.focus)
-      if (this.rng.next() >= profile.work.breakChance || c.mood.focus || c.drive.focus) {
+      const breakRoll = this.rng.next();
+      // (30.3) İş bırakma: Kırgın yetişkin 10:00-12:00 meydanda protesto eder (mola zarı yine atıldı; acil ihtiyaç, yangın, yaralı, isyan önce)
+      if (engineOn('discontent') && shouldStrike(this.world.state, c, hour) && !urgentNeed(c)) {
+        const plan = this.planStrike(c);
+        if (plan) return plan;
+      }
+      if (breakRoll >= profile.work.breakChance || c.mood.focus || c.drive.focus) {
         // (25.2) Çırak: ustası tezgâhtaysa onun yanına (mola zarı her zamanki gibi atıldı; çırak planı kendi üretecini kullanır)
         const plan = (c.apprenticeship && this.apprenticeship?.planFor(c)) || this.planWork(c);
         // (29.2) bıkkın / tükenmiş / üşümüş sakin ağır işten (maden, taş ocağı, inşaat) kaçınır; öncelikli iş emri hariç
@@ -887,6 +895,19 @@ export class Brain {
     const plan = this.planGathering(c, venue, null, 'festival', Math.max(3, w.end - now));
     if (!plan) return null;
     return { ...plan, activity: 'memorial' };
+  }
+
+  /** (30.3) İş bırakma: meydan havuzunun (yoksa kamp ateşinin) çevresinde 12:00'ye kadar; zar çekmez. */
+  planStrike(c) {
+    const state = this.world.state;
+    const venue = this.world.getCompleted('fountain')[0] ?? this.world.getCompleted('campfire')[0] ?? null;
+    if (!venue) return null;
+    const end = (state.time.day - 1) * 1440 + DISCONTENT.strike.hours[1] * 60;
+    const left = end - state.totalMinutes;
+    if (left < 3) return null;
+    const plan = this.planGathering(c, venue, null, 'festival', left);
+    if (!plan) return null;
+    return { ...plan, activity: 'strike' };
   }
 
   /** Toplanma Zili: meydanın çevresinde zil süresi bitene kadar beklemek. */
