@@ -10,6 +10,7 @@ Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 20 sat�
 - Kapılar kapalı (`quarantineUntil`, isteğe bağlı): göç ve tüccar bir gün durur (`TownStatus.quarantined`).
 - Bağlanamayan: `away` (sefer düzeneği ganimet / macera akışına bağlı) → `census` "iki genci gönder" yerine "Gönüllüleri azıklandır" (altın −60, yiyecek −30, enerji −15, itibar +8). `leave` `DesertionSystem.startLeaving` ile bağlandı.
 - Araçlar: autopilot yeni kartlarda varsayılan seçeneği seçer, `(30.4b)` satırı ve JSON `mid`. Testler `tools/sim/tests/30.4b-midgame.mjs` (29); 30.1 testi 14 adım / tablo sürümü 4.
+- Ölçüm 6 tohum × 50 gün × 4x (tohum: farklı olay / G20 sonrası yeni kart / hedef /14 / Altın Çağ günü / hazine): 7: 9 / 8 of 11 / 11 / 42 / 3.567 · 13: 9 / 4 of 8 / 12 / 28 / 99.596 · 21: 9 / 8 of 9 / 10 / 41 / 971 · 42: 10 / 6 of 9 / 11 / 38 / 20.472 · 77: 10 / 6 of 9 / 11 / 29 / 62.151 · 101: 11 / 8 of 10 / 11 / 25 / 94.698. Altın Çağ ort 33,8 (taban 33,8), hazine ort 46.909 (taban 49.858, %94), en küçük tekrar aralığı 8 gün, nüfus 30–33. Ayar: `lateRatio` 2 → 3 (2'de tohum 42'de yeni kart payı tam %50).
 - Çıraklık ölçümü: 30.3'te 50 günde mezun 0 / 1 / 0 / 0 (tohum 7 / 13 / 42 / 77), 30.4a'da 1 / 6 / 1 / 5; ayar gerekmedi. Ekran görüntüleri `docs/playtest/img30.4b/`.
 
 ## Aşama 30.4a — Kuşaklar (kayıt sürümü 41; şalterler `gentleExodus`, `swiftAging`, `traitScarcity`)
