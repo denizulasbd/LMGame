@@ -781,7 +781,12 @@ const PAGE_HELPERS = () => {
       check('27.1: konuk çıkışa yürürken kayıt -> yükleme: haritada kalır ve çıkış rotası yeniden kurulur (buharlaşmaz), durum kayması yok', g0 && moving && JSON.stringify(s.activeGuest) !== 'null' && s.activeGuest?.leaving && back?.isMoving && sim.scene().world.guests.length === 1 && diff.length === 0, `${live} ${diff.join(' | ')}`);
       let thanks = null;
       const off = game.events.on('guest:left', (p) => (thanks = p.thanks));
-      hours(4);
+      // (30.4b) yeni karar olayları da sabah 10:00'da pencere açıp zamanı durdurabilir: her saatte varsayılan seçenekle kapatılır
+      for (let i = 0; i < 4; i++) {
+        if (s.dilemma.active) game.events.emit('ui:chooseDilemma', { optionId: s.dilemma.active.defaultId });
+        s.time.paused = false;
+        hours(1);
+      }
       off();
       check('27.1: yüklemeden sonra çıkışa varıp teşekkürle ayrılır', s.activeGuest === null && sim.scene().world.guests.length === 0 && thanks === true, `${thanks}`);
       s.goldenAge.since = keepGA;

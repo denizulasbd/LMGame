@@ -16,11 +16,11 @@ export const GUIDE_STEPS = [
   { id: 'goals', text: 'Sırada ne var? **Hedefler** penceresi yol gösterir.', target: '.goals-toggle' },
   { id: 'upgrade', text: 'Bir kulübeye tıkla, panelindeki **Yükselt**\'e bas.', target: '.upgrade-button' },
   { id: 'petition', text: 'Bir sakinin senden isteği var. Üstteki çipe tıkla.', target: '.hud-buffs .is-petition' },
+  // (30.4b, ENGINES.midgame) Belediye Konağı kurulunca, doktrin seçilene dek
+  { id: 'doctrine', text: 'Belediye Konağı\'nda bir **Kasaba Doktrini** seçebilirsin; geri dönüşü yoktur.', target: null },
   // (30.2)
   { id: 'cards', text: 'Sol alttaki kartlar kasabada olup biteni anlatır. **Git** seni oraya götürür.', target: '.story-card .story-go' },
   { id: 'cardAction', text: 'Bazı kartlarda yapabileceğin bir şey vardır.', target: '.story-card .story-action' },
-  // (30.4b, ENGINES.midgame) Belediye Konağı kurulunca, doktrin seçilene dek
-  { id: 'doctrine', text: 'Belediye Konağı\'nda bir **Kasaba Doktrini** seçebilirsin; geri dönüşü yoktur.', target: null },
   { id: 'watch', text: 'Bir sakini **Yakından izle**; başına gelenleri kaçırmazsın.', target: '.resident-watch, .watch-toggle' },
 ];
 /** Nüfus bu sayıya ulaşınca "Yakından izle" adımı çıkar. */
