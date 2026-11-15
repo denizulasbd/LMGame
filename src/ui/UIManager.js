@@ -9,6 +9,7 @@
 //   cards   : sağ altta bağımsız bilgi kartı (sakin, yapı, takas); çekmeceyle aynı sütunda, üst üste binmez
 //   bottom  : alt ortada birleşik araç çubuğu (dock): araçlar ve pencere düğmeleri
 //   modal   : ekranın ortasında açılan pencereler (Günlük, Hedefler, Arşiv, Ayarlar); bkz. ModalHost
+//   left    : (30.2) sol altta dock'un üstünde: Duygu Katmanı açıklaması, hikâye kartları, rehber kartı
 //   free    : kendi konumunu CSS ile belirleyenler (karar penceresi, kutlama, başlangıç ekranı, harita ipucu)
 // Dock'un yüksekliği ölçülüp --ui-bottom-reserve olarak verilir; sağ sütun ve pencereler onun üstünde biter.
 import { el } from './dom.js';
@@ -30,6 +31,9 @@ import { StatsPanel } from './components/StatsPanel.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
 import { CrisisModal } from './components/CrisisModal.js';
 import { MapTooltip } from './components/MapTooltip.js';
+import { GuideCard } from './components/GuideCard.js';
+import { StoryFeed } from './components/StoryFeed.js';
+import { HoverTip } from './components/HoverTip.js';
 
 const BOTTOM_GAP = 10; // dock ile pencere kenarı / sağ sütun arasındaki boşluk (piksel)
 
@@ -43,14 +47,17 @@ export class UIManager {
       drawer: el('div', { className: 'ui-drawer' }),
       cards: el('div', { className: 'ui-cards' }),
       bottom: el('div', { className: 'ui-bottom' }),
+      left: el('div', { className: 'ui-left' }), // (30.2) sol alt sütun: Duygu Katmanı açıklaması, hikâye kartları, rehber kartı
       free: root,
     };
     const right = el('div', { className: 'ui-right' }, [this.slots.drawer, this.slots.cards]);
-    root.append(this.slots.top, this.slots.toasts, right, this.slots.bottom);
+    root.append(this.slots.top, this.slots.toasts, right, this.slots.bottom, this.slots.left);
     this.modals = new ModalHost(root, game);
 
     this.dock = new BuildMenu(game);
+    this.hoverTip = new HoverTip(); // (30.3) özel ipucu (üst çubuk, Nabız, sayaçlar, vergi düğmeleri)
     this.components = [
+      this.hoverTip,
       new Hud(game),
       new TradePanel(game),
       new ResidentList(game),
@@ -68,6 +75,8 @@ export class UIManager {
       new DilemmaModal(game),
       new TitleMenu(game),
       new MapTooltip(game),
+      new StoryFeed(game), // (30.2)
+      new GuideCard(game), // (30.1)
     ];
     for (const component of this.components) {
       if (component.element) (this.slots[component.slot] ?? root).appendChild(component.element);
@@ -101,6 +110,15 @@ export class UIManager {
     hint.addEventListener('click', () => this.setCinematic(false));
     this.root.appendChild(hint);
     events.on('ui:toggleCinematic', () => this.setCinematic(!this.cinematic));
+    // (30.6) Fotoğraf modundan F ve Esc HER durumda çıkar: odak bir metin kutusunda kalsa bile (Input yazarken tuşları yok sayar)
+    window.addEventListener('keydown', (e) => {
+      if (!this.cinematic || e.repeat) return;
+      const typing = e.target instanceof HTMLElement && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable);
+      if (!typing || (e.code !== 'KeyF' && e.key !== 'Escape')) return;
+      e.preventDefault();
+      e.target.blur();
+      this.setCinematic(false);
+    }, true);
     for (const name of ['dilemma:opened', 'town:tierUp', 'town:legendary', 'wonder:completed', 'title:show']) {
       events.on(name, () => this.setCinematic(false));
     }
@@ -111,6 +129,7 @@ export class UIManager {
     if (on === this.cinematic) return;
     if (on) this.modals.closeCurrent(); // fotoğrafa açık pencere girmesin
     this.cinematic = on;
+    if (on && document.activeElement instanceof HTMLElement) document.activeElement.blur(); // (30.6) odak gizli bir kutuda kalıp F'yi yutmasın
     this.root.classList.toggle('is-cinematic', on);
     this.game.events.emit('ui:setCinematic', on);
   }

@@ -31,6 +31,7 @@
 // Gözcü Kulesi'nde nöbet ('patrol', work) üretim yapmaz.
 import { towerMasteryMultiplier, recordTowerWork, towerStageIndex } from './GoldenAge.js';
 import { skillLevel } from './SkillSystem.js';
+import { engineOn } from './Engines.js';
 import { ACTIVITIES, LEAVING_HOME_LABEL, BREAK_PREFIX, LOVE_BUBBLES, RIVAL_BUBBLES } from '../data/activities.js';
 import { RESOURCES, MEAL_FOOD_COST } from '../data/resources.js';
 import { EQUIPMENT } from '../data/equipment.js';
@@ -140,6 +141,9 @@ export class BehaviorSystem {
       game.events.on('revolt:joined', ({ ids }) => this.interrupt(ids)),
       game.events.on('revolt:raid', ({ raid }) => this.interrupt(raid.members, ['protest'])),
       game.events.on('revolt:ended', ({ rioters }) => this.interrupt(rioters, ['protest'], true)),
+      // (30.3) İş bırakma: 10:00'da Kırgın yetişkinler elindeki (yarıda kesilebilen) işi bırakıp meydana yürür; 12:00'de işe döner
+      game.events.on('strike:started', ({ ids }) => engineOn('discontent') && this.interrupt(ids)),
+      game.events.on('strike:ended', ({ ids }) => engineOn('discontent') && this.interrupt(ids, ['strike'], true)),
       // (23. aşama) Yangın: yanan yapıdaki çalışanlar ve koşacak sakinler elindeki (yarıda kesilebilen) işi bırakır
       game.events.on('crisis:fireStarted', ({ building, responders }) => {
         this.interrupt([...building.workerIds, ...responders]);

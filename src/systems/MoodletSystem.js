@@ -475,6 +475,7 @@ export class MoodletSystem {
   /** Teselli gerçekleşir: süre kısalır, Yüreği Ferahladı, ilişki +12, Minnettar etiketi, iki günlüğe anı. */
   console(by, sufferer) {
     const state = this.state;
+    if (!state.characters.includes(by) || !state.characters.includes(sufferer)) return null; // (30.6) aynı saatte vefat eden / ayrılan sakine kayıt yazılmaz
     const now = state.totalMinutes;
     const result = soothe(sufferer, now, by);
     if (!result) return null;

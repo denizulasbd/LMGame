@@ -1,5 +1,9 @@
 // Kasaba sakinleriyle ilgili saf veriler: ihtiyaçlar, kişilik özellikleri, günlük düzen
 // ve başlangıç sakinleri havuzu. Bu verilerin nasıl yorumlandığı src/ai/ altındadır.
+import { engineOn } from '../systems/Engines.js';
+
+// (30.4a) Kuşak ayarları yalnızca ENGINES.swiftAging açılışta açıkken (Engines.js yüklenirken okunur); kapalı dünyada eski yaşlar.
+const SWIFT = engineOn('swiftAging');
 
 // İhtiyaçlar 0-100 arası; 100 = tamamen karşılanmış. decayPerHour: oyun saati başına azalma.
 export const NEEDS = {
@@ -152,7 +156,7 @@ export const RESIDENT_POOL = [
   },
   {
     name: 'Mehmet',
-    age: 41,
+    age: SWIFT ? 55 : 41, // (30.4a) 41 -> 55: 50 günlük koşuda Altın Çağ'dan sonra bilgeleşip yadigâr bıraksın (her mevsim bir yaş)
     traits: ['hardworking', 'glutton'],
     appearance: { hair: 'short', hairColor: 'black', skin: 'tan', shirt: 'forest', pants: 'brown' },
   },
@@ -206,7 +210,7 @@ export const RESIDENT_POOL = [
   },
   {
     name: 'Kemal',
-    age: 58,
+    age: SWIFT ? 61 : 58, // (30.4a) 58 -> 61: ikinci en yaşlı havuz sakini 50 günde bilgeleşip ömrüne erişebilsin
     traits: ['grumpy', 'hardworking'],
     appearance: { hair: 'hat', hairColor: 'gray', skin: 'tan', shirt: 'mustard', pants: 'navy' },
   },
@@ -224,13 +228,17 @@ export const RESIDENT_POOL = [
   },
   {
     name: 'Leyla',
-    age: 37,
+    age: SWIFT ? 56 : 37, // (30.4a) 37 -> 56: aynı neden
     traits: ['cheerful', 'hardworking', 'introvert'],
     appearance: { hair: 'long', hairColor: 'brown', skin: 'tan', shirt: 'lavender', pants: 'navy' },
   },
 ];
 
 export const STARTING_RESIDENT_COUNT = 6;
+
+// (30.4a) Havuz bitince gelen adsız göçmenlerin yaş aralığı (tek zar: rng.int(min, max); sınırlar dışında çağrı değişmez).
+// 60 -> 66: her mevsim bir yaşla 50 günlük koşuda vefat 2-6 bandına girsin (tohum 77'de 60 ile 1 vefat)
+export const IMMIGRANT_AGE = { min: 18, max: SWIFT ? 66 : 60 };
 
 // Havuz tükenince göçmenler için ad ve görünüm parçaları
 export const EXTRA_NAMES = ['Bora', 'Ece', 'Kaan', 'Yağmur', 'Arda', 'Duru', 'Efe', 'Lale', 'Tolga', 'Sude'];

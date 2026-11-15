@@ -3,7 +3,8 @@
 //
 //   axisOf(trait)                       : { index, sign } (+1 artı kutup, -1 eksi kutup) ya da null (Obur, Gece Kuşu, bilinmeyen)
 //   evolves(c)                          : eksen biriktirebilen sakin (çocuk ve ziyaretçi değil)
-//   contribution(c, i, amount, opts)    : stageMul, dailyCap ve ±clamp uygulanmış, kırpılmış tam sayı katkı
+//   contribution(c, i, amount, opts)    : stageMul, (30.4a) kıtlık çarpanı, dailyCap ve ±clamp uygulanmış, kırpılmış tam sayı katkı
+//   scarcityMul(pay) / traitShares(state) : (30.4a) kişilik çeşitliliği çarpanı ve yetişkinler arasında özellik payları
 //   pendingShift(c, day)                : uygulanacak { kind, axis, from, to } ya da null (bekleme, ömür, edinim sınırı, eksen sırası)
 //   applyShift(c, shift)                : { traits, deepTraits } (yeni diziler; yerinde değiştirmez)
 //   hintOf(c)                           : { axis, sign, text } ya da null (panel eğilim ipucu)
@@ -52,14 +53,34 @@ export function stageMul(c) {
   return EVOLUTION_RULES.stageMul[c?.lifeStage] ?? 1;
 }
 
+/** (30.4a) Kıtlık çarpanı: clamp(base - slope x pay, min, max). Pay geçersizse 0 sayılır. */
+export function scarcityMul(share) {
+  const S = EVOLUTION_RULES.scarcity;
+  const p = Number.isFinite(share) ? Math.max(0, Math.min(1, share)) : 0;
+  return Math.max(S.min, Math.min(S.max, S.base - S.slope * p));
+}
+
+/** (30.4a) Yetişkinler (kasabalı, çocuk değil) arasında her özelliğin payı { özellik: 0..1 }; yetişkin yoksa boş. */
+export function traitShares(state) {
+  const adults = (state?.characters ?? []).filter((c) => evolves(c));
+  const out = {};
+  if (!adults.length) return out;
+  for (const c of adults) for (const t of new Set(c.traits ?? [])) out[t] = (out[t] ?? 0) + 1;
+  for (const t of Object.keys(out)) out[t] /= adults.length;
+  return out;
+}
+
 /**
- * Bir katkının eksene gerçekte işleyecek miktarı: evre çarpanı, yuvarlama, (gün dönümü katkısı değilse) günlük sınır ve ±clamp.
- * @param {{ daily?: boolean }} opts daily: gün dönümü katkısı (dailyCap'e takılmaz; growthToday zaten sıfırlanır)
+ * Bir katkının eksene gerçekte işleyecek miktarı: evre çarpanı, (30.4a) kıtlık çarpanı, yuvarlama, (gün dönümü katkısı değilse) günlük
+ * sınır ve ±clamp.
+ * @param {{ daily?: boolean, shares?: object|null }} opts daily: gün dönümü katkısı (dailyCap'e takılmaz; growthToday zaten sıfırlanır);
+ *   shares: özellik payları (traitShares; verilmezse çarpan 1): katkının yöneldiği kutbun payına göre scarcityMul
  */
-export function contribution(c, axisIndex, amount, { daily = false } = {}) {
+export function contribution(c, axisIndex, amount, { daily = false, shares = null } = {}) {
   if (!evolves(c) || !(axisIndex >= 0 && axisIndex < AXIS_COUNT) || !Number.isFinite(amount)) return 0;
   const R = EVOLUTION_RULES;
-  let v = roundAway(amount * stageMul(c));
+  const scarcity = shares && amount !== 0 ? scarcityMul(shares[poles(axisIndex, sgn(amount)).target] ?? 0) : 1;
+  let v = roundAway(amount * stageMul(c) * scarcity);
   if (v === 0) return 0;
   if (!daily) {
     const today = c.growthToday?.[axisIndex] ?? 0;

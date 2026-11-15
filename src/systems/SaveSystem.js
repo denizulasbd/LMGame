@@ -76,6 +76,8 @@ export class SaveSystem {
   }
 
   autosave() {
+    // (30.1) Oturum kaydı da her sabah tazelenir: sayfa kapanış olayları hiç çalışmasa (tarayıcı sonlandırıldı) en çok bir gün gider
+    this.persistSession();
     if (this.write('main')) this.events.emit('toast', { text: 'Otomatik kaydedildi', tone: 'info', icon: 'sparkle' });
     this.announce();
   }
@@ -116,7 +118,9 @@ export class SaveSystem {
   startNewTown(name, seed) {
     SaveManager.clear('session');
     const difficulty = this.game.state.crisis?.difficulty;
+    const prefs = this.preferences();
     this.game.state.reset(Number.isFinite(seed) ? seed : undefined, name);
+    this.restorePreferences(prefs, false); // başlangıç ekranından yeni kasaba: rehber her zaman açık başlar (arka plandaki eski kayıt kapalı olabilir)
     if (difficulty && this.game.state.crisis) this.game.state.crisis.difficulty = difficulty; // (23. aşama) tehlike sıklığı tercihi yeni kasabaya taşınır
     this.reloadScene();
     this.events.emit('toast', { text: `${this.state.townName} kuruldu. Kolay gelsin!`, tone: 'success', icon: 'sun' });
@@ -125,10 +129,22 @@ export class SaveSystem {
   newGame() {
     SaveManager.clear('session');
     const difficulty = this.game.state.crisis?.difficulty;
+    const prefs = this.preferences();
     this.game.state.reset();
+    this.restorePreferences(prefs);
     if (difficulty && this.game.state.crisis) this.game.state.crisis.difficulty = difficulty; // (23. aşama) tercih yeni haritaya taşınır
     this.reloadScene();
     this.events.emit('toast', { text: 'Yeni harita başladı', tone: 'info', icon: 'sun' });
+  }
+
+  /** (30.1) Oyuncu tercihleri (karar süresi, rehber açık / kapalı) yeni kasabaya taşınır; rehberin ilerlemesi sıfırlanır. */
+  preferences() {
+    return { settings: { ...this.game.state.settings }, guideOff: this.game.state.guide?.off === true };
+  }
+
+  restorePreferences({ settings, guideOff }, keepGuideOff = true) {
+    this.game.state.settings = settings;
+    this.game.state.guide = { done: [], off: keepGuideOff && guideOff };
   }
 
   label(time) {

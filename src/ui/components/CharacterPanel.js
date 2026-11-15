@@ -56,9 +56,13 @@ import { WANTS, FEARS, WANT_CAPS } from '../../data/wants.js';
 import { satisfactionTier, tierEffectText, wantName, remainingText } from '../../systems/Wants.js';
 import { hintOf, evolutionKey } from '../../systems/Evolution.js';
 import { DEEP_TRAITS, CAUSE_TEXT, EVOLUTION_TEXT } from '../../data/evolution.js';
-import { loyaltyTier } from '../../systems/Loyalty.js';
-import { LOYALTY_TIERS } from '../../data/loyalty.js';
-import { giftStatus } from '../../systems/Rites.js';
+import { loyaltyTier, badgeTier, loyaltyScope } from '../../systems/Loyalty.js';
+import { LOYALTY_TIERS, LOYALTY_EFFECT_TEXT, LOYALTY_SOURCES, DISCONTENT } from '../../data/loyalty.js';
+import { adoptTip } from './HoverTip.js';
+
+const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}`;
+import { giftStatus, daysToBirthday as birthdayIn } from '../../systems/Rites.js';
+import { daysToNextAge } from '../../systems/LifeStages.js';
 import { SPECIAL_KIND_NAMES, SPECIAL_RULES } from '../../data/rites.js';
 import { EVOLUTION_AXES } from '../../data/evolution.js';
 import { lifeStory, statusSentence } from '../../systems/LifeStory.js';
@@ -98,6 +102,17 @@ const PORTRAIT_SCALE = 5;
 const LOW_NEED = 25;
 // Boş yuvada soluk gösterilen örnek simge
 const SLOT_PLACEHOLDER = { tool: 'sturdyTool', clothing: 'winterCoat', bag: 'backpack' };
+
+/**
+ * (30.4a) Kartta küçük not: Kıdemli Bilge olmaya AGING.noteYears yaş kalan yetişkin "Yakında bilgeleşecek"; ömrünün son
+ * AGING.noteYears yaşındaki sakin "Ömrünün son demlerinde" (ikisi birden olursa ömür notu). Çocuk ve ziyaretçide yok.
+ */
+export function lifeNoteOf(c) {
+  if (!c || c.role || c.isChild || !Number.isFinite(c.age)) return null;
+  if (Number.isFinite(c.lifespan) && c.age >= c.lifespan - AGING.noteYears && c.age < c.lifespan) return { key: 'last', text: 'Ömrünün son demlerinde' };
+  if (c.lifeStage !== 'elder' && c.age >= AGING.elderAt - AGING.noteYears && c.age < AGING.elderAt) return { key: 'elder', text: 'Yakında bilgeleşecek' };
+  return null;
+}
 
 export class CharacterPanel {
   constructor(game) {
@@ -212,6 +227,12 @@ export class CharacterPanel {
       this.events.emit('ui:followCharacter', next);
     });
     this.followButton.classList.add('character-follow');
+    // (30.2) Yakından izle (yıldız): en çok 3 sakin; izlenenin her olayı hikâye kartı olur
+    this.watchButton = this.button('Yakından izle', 'Başına gelen her şey (küçük olaylar dahil) hikâye kartı olur; en çok 3 sakin', () => this.events.emit('ui:toggleWatch', { id: this.characterId }));
+    this.watchButton.classList.add('watch-toggle');
+    this.watchButton.prepend(el('img', { src: getAnyIconURL('star'), alt: '' }));
+    this.watchLabel = this.watchButton.childNodes[1];
+    this.game.events.on('story:watchChanged', () => this.updateFollowButton());
 
     const section = (title, body) => el('div', { className: 'relations' }, [el('div', { className: 'relations-title', text: title }), body]);
     // (29.9) yeni sunumlar: tek cümlelik durum, en önemli arzu / korku, kişilik ekseni çubukları, değişim günlüğü, yaşam öyküsü, omuz omuza
@@ -240,6 +261,7 @@ export class CharacterPanel {
         el('div', { className: 'character-needs' }, needs),
         this.desireSection,
         this.followButton,
+        this.watchButton,
       ]),
       inner: body('inner', [
         section('Ruh Hali ve İç Dünya', this.moodList),
@@ -332,11 +354,14 @@ export class CharacterPanel {
     const following = this.characterId !== null && this.followingId === this.characterId;
     this.followButton.textContent = following ? 'Takibi Bırak' : 'Kamerayla Takip Et';
     this.followButton.classList.toggle('is-active', following);
+    const watching = this.characterId !== null && (this.game.state.watched ?? []).includes(this.characterId);
+    if (this.watchLabel) this.watchLabel.textContent = watching ? 'Yakından izleniyor' : 'Yakından izle';
+    this.watchButton.classList.toggle('is-active', watching);
   }
 
   /** Kimlik bilgisi değişince yeniden kurulur (karakter, ev, çocukluk, aile durumu). */
   identityKey(character) {
-    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}:${character.lifeStage}:${character.age}:${character.retired}:${evolutionKey(character)}`; // (29.4) özellikler / derin biçimler / ipucu değişince
+    return `${character.id}:${character.name}:${character.homeId}:${character.isChild}:${character.partnerId}:${character.married}:${character.quirk}:${character.lifeStage}:${character.age}:${character.ageInDays}:${character.retired}:${evolutionKey(character)}`; // (29.4) özellikler / derin biçimler / ipucu değişince
   }
 
   /** Değişmedikçe bir kez kurulan kısımlar: ad, yaş, ev, özellik etiketleri. */
@@ -381,14 +406,18 @@ export class CharacterPanel {
   renderLifeStage(character) {
     const key = LIFE_STAGES[character.lifeStage] ? character.lifeStage : character.isChild ? 'child' : 'adult';
     const stage = LIFE_STAGES[key];
-    const daysToBirthday = AGING.daysPerYear - (character.ageInDays % AGING.daysPerYear);
+    const daysToBirthday = birthdayIn(character);
     const note =
       key === 'elder' ? (character.retired ? 'Emekli · ağır işlerden muaf' : 'Gönüllü usta · kasabada çalışan el az') : key === 'youth' ? 'Çevik ve hevesli' : null;
     const title = `${stage.description} Bir sonraki doğum gününe ${daysToBirthday} gün var.`;
+    // (30.4a) her mevsim bir yaş: yaş ibaresinin ipucu ve yaklaşan evre / ömür notu
+    const ageTip = `Sakinler her mevsim bir yaş alır. Bir sonraki yaşa ${daysToNextAge(character.ageInDays)} gün var.`;
+    const soon = lifeNoteOf(character);
     this.stageBadge.replaceChildren(
       el('span', { className: `life-stage-badge is-${key}`, title }, [el('img', { src: getAnyIconURL(stage.icon), alt: '' }), stage.name]),
-      el('span', { className: 'life-stage-age', text: `${character.age} yaşında` }),
+      el('span', { className: 'life-stage-age', text: `${character.age} yaşında`, title: ageTip }),
       ...(note ? [el('span', { className: 'life-stage-note', text: note })] : []),
+      ...(soon ? [el('span', { className: `life-stage-soon is-${soon.key}`, text: soon.text })] : []),
       // (28.3) Saygın Büyük: nüfus kotasından muaf, yatağı yok
       ...(character.isVenerable ? [el('span', { className: 'life-stage-venerable', title: 'Ocağını ve yadigârını devretti; yatağını gençlere bıraktı. Nüfus sınırına sayılmaz; geceleri Bilgelik Evi\'nde, handa ya da belediyede sabahlar.', text: 'Saygın Büyük (Nüfus Kotasından Muaf)' })] : [])
     );
@@ -612,7 +641,7 @@ export class CharacterPanel {
   /** (29.9) Hayat: Yaşam Öyküsü (3-6 cümle; şablon tabanlı). Yalnızca öyküyü etkileyen alanlar değişince yeniden yazılır. */
   renderStory(character, state) {
     const kids = character.children?.length ?? 0;
-    const key = [character.id, character.name, character.age, character.partnerId, character.married, kids, character.wishCount, satisfactionTier(character.satisfaction).key, loyaltyTier(character), evolutionKey(character), gmTitleOf(character), character.isVenerable, character.memories?.length, primarySkill(character)?.level.level].join('/');
+    const key = [character.id, character.name, character.age, character.partnerId, character.married, kids, character.wishCount, satisfactionTier(character.satisfaction).key, badgeTier(character), evolutionKey(character), gmTitleOf(character), character.isVenerable, character.memories?.length, primarySkill(character)?.level.level].join('/');
     if (key === this.lastStory) return;
     this.lastStory = key;
     this.storyBox.textContent = lifeStory(character, state);
@@ -789,7 +818,7 @@ export class CharacterPanel {
 
   /** (29.6) Sadakat satırı (Sadık / Kırgın rozeti; eşik dışında gizli) ve (29.7) özel günde "Armağan Gönder". */
   renderLoyalty(character, state) {
-    const tier = !character.isChild && !character.role ? loyaltyTier(character) : null;
+    const tier = badgeTier(character); // (30.3) beş kademe (Sakin'de gizli); şalter kapalıyken Sadık / Kırgın
     const d = character.specialDay && character.specialDay.day === state.time.day ? character.specialDay : null;
     const gift = d ? giftStatus(state, character) : null;
     const key = `${character.id}:${tier}:${d ? `${d.kind}${d.celebrated}${d.gifted}` : ''}:${gift?.ok}:${gift?.reason}`;
@@ -798,7 +827,8 @@ export class CharacterPanel {
     const rows = [];
     if (tier) {
       const def = LOYALTY_TIERS[tier];
-      rows.push(el('div', { className: 'petition-head', title: def.hint }, [el('img', { src: getAnyIconURL(def.icon), alt: '' }), el('span', { className: 'petition-title', text: `Sadakat · ${def.name}` }), el('span', { className: 'petition-state', text: `${character.loyalty > 0 ? '+' : ''}${character.loyalty}` })]));
+      const effect = engineOn('discontent') && LOYALTY_EFFECT_TEXT[tier] ? ` (${LOYALTY_EFFECT_TEXT[tier]})` : '';
+      rows.push(el('div', { className: `petition-head loyalty-${tier}`, title: `${def.hint}${effect}` }, [el('img', { src: getAnyIconURL(def.icon), alt: '' }), el('span', { className: 'petition-title', text: `Sadakat · ${def.name}` }), el('span', { className: 'petition-state', text: `${character.loyalty > 0 ? '+' : ''}${character.loyalty}` })]));
     }
     if (d) {
       const b = this.button(`Armağan Gönder (${SPECIAL_RULES.giftCost} altın)`, gift.ok ? 'Yönetimden armağan: sadakat ve yaşam doyumu artar, bugün unutulmuş hissetmez' : gift.reason, () => this.events.emit('ui:giftSpecialDay', { id: character.id }));
@@ -840,7 +870,11 @@ export class CharacterPanel {
       b.classList.add('is-grant');
       buttons.push(b);
     }
-    const reject = this.button('Reddet', 'Dileği reddet: sakinin keyfi ve Yönetim Güveni düşer', () => this.events.emit('ui:rejectPetition', { id: p.id }));
+    // (30.3) ret düğmesinin ipucunda sadakat etkisi: "Sahibi −15 · dostları −4"
+    const owner = state.characters.find((x) => x.id === p.characterId) ?? null;
+    const friends = engineOn('discontent') && owner ? state.characters.filter((x) => x !== owner && loyaltyScope(x) && getFriendship(state, owner, x) >= DISCONTENT.friendAt).length : 0;
+    const rejectTip = engineOn('discontent') ? `\nSadakat: Sahibi ${signed(LOYALTY_SOURCES.petitionRejected)} · dostları ${signed(LOYALTY_SOURCES.friendRejected)}${friends ? ` (${friends} kişi)` : ' (dostu yok)'}` : '';
+    const reject = adoptTip(this.button('Reddet', `Dileği reddet: sakinin keyfi ve Yönetim Güveni düşer${rejectTip}`, () => this.events.emit('ui:rejectPetition', { id: p.id })));
     reject.classList.add('is-reject');
     buttons.push(reject);
     this.petitionBox.hidden = false;

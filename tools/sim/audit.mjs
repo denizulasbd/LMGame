@@ -382,7 +382,7 @@ const PAGE_HELPERS = () => {
       const mate = s.characters.find((c) => c.id === d.partnerId);
       const ward = pool.find((c) => c !== v && c !== d && c !== mate && !c.apprenticeship);
       const workshop = s.buildings.find((b) => b.type === 'workshop' && b.functional);
-      for (const c of [v, d]) { c.lifeStage = 'elder'; c.age = 72; c.ageInDays = 72 * 16; c.children = []; c.inventory = (c.inventory ?? []).filter((x) => !x.heirloom); }
+      for (const c of [v, d]) { c.lifeStage = 'elder'; c.age = 72; c.ageInDays = 72 * (await import('/src/data/lifeStages.js')).AGING.daysPerAge; c.children = []; c.inventory = (c.inventory ?? []).filter((x) => !x.heirloom); }
       const homeV = v.homeId;
       const venerableNow = lc.makeVenerable(v);
       if (workshop) { ward.lifeStage = 'youth'; ward.apprenticeship = { masterId: d.id, profession: 'workshop', buildingId: workshop.id, progress: 10, since: 0, crafted: 0 }; }
@@ -492,7 +492,7 @@ const PAGE_HELPERS = () => {
 
     // --- 2m. (25.1) Kıdemli Bilge emekliyken ve nasihat verirken, bir Genç 21. doğum gününün eşiğindeyken ---
     {
-      const Y = 16;
+      const Y = (await import('/src/data/lifeStages.js')).AGING.daysPerAge; // (30.4a) bir yaş kaç gün
       const adults = s.characters.filter((c) => !c.isChild && !c.role && !c.away && c.lifeStage !== 'elder').sort((a, b) => a.id - b.id);
       const sage = adults[0];
       sage.ageInDays = 65 * Y - 1; // (29.2b) Kıdemli Bilge yaşı 65
@@ -521,7 +521,7 @@ const PAGE_HELPERS = () => {
 
     // --- 2n. (25.2) Çırak ustasının yanında taburede otururken, Gururlu Usta etkinken ve kapı açıkken ---
     {
-      const Y = 16;
+      const Y = (await import('/src/data/lifeStages.js')).AGING.daysPerAge; // (30.4a) bir yaş kaç gün
       sim.give({ wood: 300, stone: 200, food: 300 });
       const hut = sim.place('lumberHut');
       const people = s.characters.filter((c) => !c.isChild && !c.role && !c.away && c.lifeStage === 'adult' && !c.emigrating).sort((a, b) => a.id - b.id);
@@ -677,8 +677,9 @@ const PAGE_HELPERS = () => {
       const diff = A.roundtrip();
       check('sofra kuruluyken kayıt -> yükleme durum kayması yok (currentFeast, ikram sayacı, bonuslar)', s.currentFeast?.tier === 'rich' && s.currentFeast.served > 0 && JSON.stringify(s.currentFeast) === live && diff.length === 0, `${live} ${diff.join(' | ')}`);
       const food0 = s.resources.food;
+      const spoil0 = s.granary.spoiled.food ?? 0; // (30.4a) silosuz kasabada yağmurda / kışın bozulan mahsul kiler ölçümünden ayrılır
       hours(5);
-      check('yüklemeden sonra sofra 22:00\'de toplanır, yenmeyen erzak kilere döner, besin kişi başı 3\'ün üstünde', s.currentFeast === null && s.resources.food >= food0 && s.stats.feasts === (keepStat[0] ?? 0) + 1 && Math.floor(s.resources.food + s.resources.bread * 2.5) >= s.characters.length * 3, `${s.resources.food} ${food0}`);
+      check('yüklemeden sonra sofra 22:00\'de toplanır, yenmeyen erzak kilere döner, besin kişi başı 3\'ün üstünde', s.currentFeast === null && s.resources.food + ((s.granary.spoiled.food ?? 0) - spoil0) >= food0 && s.stats.feasts === (keepStat[0] ?? 0) + 1 && Math.floor(s.resources.food + s.resources.bread * 2.5) >= s.characters.length * 3, `${s.resources.food} ${food0}`);
       s.goldenAge.since = keepGA;
       s.stats.feasts = keepStat[0];
       s.stats.feastServings = keepStat[1];
@@ -739,13 +740,14 @@ const PAGE_HELPERS = () => {
       const off1 = game.events.on('feast:ended', (p) => (feastEnd = p));
       const off2 = game.events.on('fair:ended', (p) => (fairEnd = p));
       const food0 = s.resources.food;
+      const spoil0 = s.granary.spoiled.food ?? 0; // (30.4a) bozulan mahsul ayrılır
       while (s.currentFeast && t.hour < 23) {
         sim.step(30);
         const f = s.currentFeast;
         if (f) { peak = Math.max(peak, f.served - f.servings); if (new Set(f.eatenIds).size !== f.eatenIds.length || f.eatenIds.length !== f.served) dup = true; }
       }
       off1(); off2();
-      check('27.1: yüklemeden sonra kimse ikinci kez ikram almaz (served <= servings); 22:00 iadesi negatif değil', !dup && peak <= 0 && feastEnd && feastEnd.refund.food >= 0 && feastEnd.refund.bread >= 0 && s.resources.food >= food0, `${peak} ${JSON.stringify(feastEnd?.refund)}`);
+      check('27.1: yüklemeden sonra kimse ikinci kez ikram almaz (served <= servings); 22:00 iadesi negatif değil', !dup && peak <= 0 && feastEnd && feastEnd.refund.food >= 0 && feastEnd.refund.bread >= 0 && s.resources.food + ((s.granary.spoiled.food ?? 0) - spoil0) >= food0, `${peak} ${JSON.stringify(feastEnd?.refund)}`);
       check('27.1: kapanış sayımı yüklemeden önce dans edenleri de içerir', fairEnd && dancers.every((id) => fairEnd.attendees.includes(id)), `${fairEnd?.attendees.length}`);
       s.goldenAge.since = keepGA;
       [s.stats.feasts, s.stats.feastServings, s.stats.fairs] = keepStat;
@@ -779,7 +781,12 @@ const PAGE_HELPERS = () => {
       check('27.1: konuk çıkışa yürürken kayıt -> yükleme: haritada kalır ve çıkış rotası yeniden kurulur (buharlaşmaz), durum kayması yok', g0 && moving && JSON.stringify(s.activeGuest) !== 'null' && s.activeGuest?.leaving && back?.isMoving && sim.scene().world.guests.length === 1 && diff.length === 0, `${live} ${diff.join(' | ')}`);
       let thanks = null;
       const off = game.events.on('guest:left', (p) => (thanks = p.thanks));
-      hours(4);
+      // (30.4b) yeni karar olayları da sabah 10:00'da pencere açıp zamanı durdurabilir: her saatte varsayılan seçenekle kapatılır
+      for (let i = 0; i < 4; i++) {
+        if (s.dilemma.active) game.events.emit('ui:chooseDilemma', { optionId: s.dilemma.active.defaultId });
+        s.time.paused = false;
+        hours(1);
+      }
       off();
       check('27.1: yüklemeden sonra çıkışa varıp teşekkürle ayrılır', s.activeGuest === null && sim.scene().world.guests.length === 0 && thanks === true, `${thanks}`);
       s.goldenAge.since = keepGA;
@@ -806,7 +813,7 @@ const PAGE_HELPERS = () => {
       master.workplaceId = hut.id;
       master.skills.herbalism = Math.max(master.skills.herbalism ?? 0, 1600);
       for (const c of s.characters) if (c.apprenticeship?.buildingId === hut.id) c.apprenticeship = null;
-      Object.assign(youth, { lifeStage: 'youth', ageInDays: 19 * 16, age: 19, workplaceId: null });
+      Object.assign(youth, { lifeStage: 'youth', ageInDays: 19 * (await import('/src/data/lifeStages.js')).AGING.daysPerAge, age: 19, workplaceId: null });
       youth.profile = youth.buildProfile();
       const enrolled = sim.scene().apprenticeship.enroll(youth, hut);
       Object.assign(t, { day: t.day + 1, hour: 6, minute: 55 });
@@ -1355,6 +1362,11 @@ const PAGE_HELPERS = () => {
           items: visible(q('.build-items')) ? rect(q('.build-items')) : null,
           hint: visible(q('.build-hint')) ? rect(q('.build-hint')) : null,
           modals: shown('.modal-window'),
+          // (30.2) sol alt sütun: Duygu açıklaması, hikâye kartları, rehber kartı; izlenenler ve çipler üst şeridin altında
+          legend: visible(q('.emotion-legend')) ? rect(q('.emotion-legend')) : null,
+          story: shown('.story-card').map(rect),
+          guide: visible(q('.guide-card')) ? rect(q('.guide-card')) : null,
+          chips: visible(q('.hud-under')) ? rect(q('.hud-under')) : null,
         };
       };
       const inspect = (label) => {
@@ -1385,6 +1397,25 @@ const PAGE_HELPERS = () => {
           ['kart', g.card, 'yapı listesi', g.items],
           ['kart', g.card, 'araç ipucu', g.hint],
           ['yapı listesi', g.items, 'dock', g.dock],
+          // (30.2) sol alt sütun birbirine, dock'a, üst şeride, çiplere, sakinlere ve karta binmez
+          ['açıklama', g.legend, 'dock', g.dock],
+          ['açıklama', g.legend, 'üst çubuk', g.top],
+          ['açıklama', g.legend, 'çipler', g.chips],
+          ['açıklama', g.legend, 'sakinler', g.collapsed ? null : g.drawer],
+          ['açıklama', g.legend, 'kart', g.card],
+          ['rehber', g.guide, 'dock', g.dock],
+          ['rehber', g.guide, 'açıklama', g.legend],
+          ['rehber', g.guide, 'sakinler', g.collapsed ? null : g.drawer],
+          ['rehber', g.guide, 'kart', g.card],
+          ...g.story.flatMap((sc, i) => [
+            [`hikâye kartı ${i + 1}`, sc, 'dock', g.dock],
+            [`hikâye kartı ${i + 1}`, sc, 'üst çubuk', g.top],
+            [`hikâye kartı ${i + 1}`, sc, 'açıklama', g.legend],
+            [`hikâye kartı ${i + 1}`, sc, 'rehber', g.guide],
+            [`hikâye kartı ${i + 1}`, sc, 'çipler', g.chips],
+            [`hikâye kartı ${i + 1}`, sc, 'sakinler', g.collapsed ? null : g.drawer],
+            [`hikâye kartı ${i + 1}`, sc, 'kart', g.card],
+          ]),
         ];
         for (const [an, a, bn, b] of pairs) if (area(a, b) > 4) problems.push(`${label}: ${an} ile ${bn} üst üste biniyor (${px(a)} / ${px(b)})`);
         // Üst çubuk: geniş ekranda tek satır, dar ekranda bile ince
@@ -1422,6 +1453,53 @@ const PAGE_HELPERS = () => {
       const select = (id) => {
         E.emit('ui:selectCharacter', id);
       };
+      // 0. (30.2) sol alt sütun: iki hikâye kartı + Duygu açıklaması + rehber kartı + izlenenler, hepsi aynı anda
+      {
+        const dir = scene.storyDirector;
+        const people = s.characters.filter((x) => !x.role);
+        s.guide = { done: ['move', 'meet'], off: false };
+        s.watched = people.slice(0, 3).map((x) => x.id);
+        dir.queue = [];
+        dir.visible = [];
+        dir.paused = false;
+        E.emit('relationship:married', { a: people[0], b: people[1] });
+        E.emit('population:died', { character: people[2], age: 70, cause: 'age', text: 'Uzun bir hayat sürdü ve herkesin sevgisini kazandı' });
+        scene.expression.setEnabled(true);
+        if (window.innerWidth <= 620 && !q('.resident-drawer').classList.contains('is-collapsed')) q('.resident-toggle').click();
+        await wait(320);
+        game.render(0);
+        await frame();
+        game.render(0);
+        if (shown('.story-card').length !== 2) problems.push(`hikâye kartı sayısı ${shown('.story-card').length} (2 bekleniyordu)`);
+        if (!visible(q('.emotion-legend'))) problems.push('Duygu açıklaması görünmüyor');
+        if (!visible(q('.guide-card'))) problems.push('rehber kartı görünmüyor');
+        inspect('sol alt sütun (kartlar + açıklama + rehber)');
+        // (30.6) bildirimler (en çok 3) hikâye kartlarına, rehber kartına, açıklamaya, sakinlere, dock'a ve karara binmez
+        for (let i = 0; i < 5; i++) E.emit('toast', { text: `Denetim bildirimi ${i + 1}: kasabaya yeni bir sakin geldi, karşılamaya hazırlanın`, tone: i % 2 ? 'warn' : 'info', icon: 'sparkle' });
+        await wait(650);
+        game.render(0);
+        await wait(100);
+        {
+          const g2 = regions();
+          const toasts = shown('.toast');
+          if (toasts.length > 3) problems.push(`sol alt sütun: aynı anda ${toasts.length} bildirim (en çok 3)`);
+          for (const t of toasts) {
+            const tb = rect(t);
+            for (const [i, sc] of g2.story.entries()) if (area(tb, sc) > 4) problems.push(`bildirim hikâye kartı ${i + 1} ile üst üste biniyor (${px(tb)} / ${px(sc)})`);
+            for (const [bn, b] of [['rehber kartı', g2.guide], ['açıklama', g2.legend], ['dock', g2.dock], ['üst çubuk', g2.top], ['çipler', g2.chips], ['sakinler', g2.collapsed ? null : g2.drawer], ['kart', g2.card]]) {
+              if (area(tb, b) > 4) problems.push(`bildirim ${bn} ile üst üste biniyor (${px(tb)} / ${px(b)})`);
+            }
+          }
+        }
+        document.querySelectorAll('.toast').forEach((t) => t.remove());
+        scene.expression.setEnabled(false);
+        dir.queue = [];
+        dir.visible = [];
+        game.render(0);
+        s.watched = [];
+        if (window.innerWidth <= 620 && q('.resident-drawer').classList.contains('is-collapsed')) q('.resident-tab').click();
+        await wait(320);
+      }
       // 1. Yapı kartı (han) ve sakin kartı
       E.emit('ui:selectBuilding', s.buildings.find((b) => b.type === 'inn').id);
       await frame();

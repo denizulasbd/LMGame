@@ -43,6 +43,10 @@ import { sanitizeCurrentFestival } from '../systems/Fair.js';
 import { sanitizeCurrentFeast } from '../systems/Feast.js';
 import { emptyGuestBook, restoreGuestBook, sanitizeActiveGuest } from '../systems/Guest.js';
 import { emptyRites, restoreRites, pruneRites } from '../systems/Rites.js';
+import { emptyGuide, restoreGuide } from '../systems/Guide.js';
+import { restoreWatched } from '../systems/StoryCards.js'; // (30.2)
+import { restorePulse } from '../systems/Loyalty.js'; // (30.3)
+import { STORY_FILTERS } from '../data/storyCards.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
 
@@ -207,6 +211,10 @@ export class GameState {
     this.moodlets = emptyMoodletStats(); // (29.2) ruh hali sayaçları: { given: { anahtar: adet }, consoled, grieved, mourners }
     this.wants = emptyWantStats(); // (29.3) arzu / korku sayaçları: { rolled, fulfilled, expired, fearsRolled, realized, passed } (anahtar -> adet)
     this.rites = emptyRites(); // (29.7) anma törenleri (bekleyen, süren, kitabe) ve özel gün sayaçları
+    this.settings = {}; // (30.1) oyuncu tercihleri (isteğe bağlı alanlar): { dilemmaTimer?: boolean } — yoksa kapalı
+    this.watched = []; // (30.2) "Yakından izle" sakin kimlikleri (isteğe bağlı alan; boşsa kayda yazılmaz)
+    this.pulse = null; // (30.3) Halkın Nabzı (isteğe bağlı): { daily: [son 3 günün ortalaması], reasons: [{ day, totals }] (son 2 gün), eaten?: [günlük tüketim] }
+    this.guide = emptyGuide(); // (30.1) rehber kartları: { done: [adım kimlikleri], off: bool, at?: { adım: oyun dakikası } }
     this.evolution = emptyEvolutionStats(); // (29.4) kişilik evrimi sayaçları: { turned, deepened, acquired (özellik -> adet), total }
     this.lineage = emptyLineage(); // (25.4) Aile Kütüğü: ocaklar, reisler, sayaçlar
     this.heirloom = emptyHeirloomState(); // (25.5) aile yadigârları: sayaçlar, arşiv, Kuşak Şöleni
@@ -321,6 +329,11 @@ export class GameState {
       season: getSeason(this.time.day).key, // bilgi amaçlı: mevsim yüklenirken günden yeniden hesaplanır
       characters: this.characters.map((c) => c.toJSON()),
       buildings: this.buildings.map((b) => b.toJSON()),
+      // (30.1) isteğe bağlı alanlar: anahtar sırası hep sonda; boş tercih yazılmaz
+      ...(Object.keys(this.settings).length ? { settings: { ...this.settings } } : {}),
+      guide: this.guide,
+      ...(this.watched.length ? { watched: [...this.watched] } : {}),
+      ...(this.pulse ? { pulse: this.pulse } : {}), // (30.3)
     };
   }
 
@@ -419,6 +432,7 @@ export class GameState {
     next.wants = restoreWantStats(data.wants); // (29.3)
     next.evolution = restoreEvolutionStats(data.evolution); // (29.4)
     next.rites = restoreRites(data.rites); // (29.7) v2-v39 kayıtlarında yoktur: boş
+    next.settings = restoreSettings(data.settings); // (30.1) eski kayıtlarda yok: hepsi varsayılan
     next.lineage = restoreLineage(data.lineage);
     next.activeGuest = sanitizeActiveGuest(data.activeGuest); // (26.3) v2-v30 kayıtlarında alan yoktur: null
     next.guestBook = restoreGuestBook(data.guestBook);
@@ -456,9 +470,21 @@ export class GameState {
       else if (c.apprenticeship.masterId !== null && !cIds.has(c.apprenticeship.masterId)) c.apprenticeship.masterId = null;
     }
     sanitizeReferences(next);
+    // (30.1) rehber: kayıtta yoksa nüfusu 8'den fazla olan oyun için kapalı, yoksa açık başlar
+    next.guide = restoreGuide(data.guide, next.characters.length);
+    next.watched = restoreWatched(data.watched).filter((id) => next.characters.some((c) => c.id === id)); // (30.2)
+    next.pulse = data.pulse ? restorePulse(data.pulse) : null; // (30.3) yoksa boş başlar
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
   }
+}
+
+/** (30.1) Kayıttaki oyuncu tercihleri: yalnızca bilinen alanlar, doğru türde. */
+function restoreSettings(data) {
+  const out = {};
+  if (data && typeof data === 'object' && typeof data.dilemmaTimer === 'boolean') out.dilemmaTimer = data.dilemmaTimer;
+  if (data && typeof data === 'object' && STORY_FILTERS[data.storyCards]) out.storyCards = data.storyCards; // (30.2)
+  return out;
 }
 
 const NUM = (v) => (Number.isFinite(v) ? v : null);
@@ -526,6 +552,9 @@ function restoreExodus(data) {
   out.startedAt = NUM(data.startedAt);
   for (const k of ['left', 'coins', 'items']) out[k] = COUNT(data[k]);
   out.log = (Array.isArray(data.log) ? data.log : []).filter((l) => l && typeof l.name === 'string').slice(-12);
+  // (30.4a) terk ediş sınırı sayaçları (isteğe bağlı; şalter kapalı dünyada hiç yazılmaz)
+  const cap = data.cap;
+  if (cap && typeof cap === 'object') out.cap = { day: NUM(cap.day), today: COUNT(cap.today), revoltSince: NUM(cap.revoltSince), revolt: COUNT(cap.revolt) };
   return out;
 }
 

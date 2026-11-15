@@ -28,6 +28,19 @@ export const LINK_COLORS = { pink: '#ff7fb0', gold: '#ffd24a', red: '#ff5a4d', g
 // Ruh hali işaret renkleri moodlet çiplerinin tonlarıyla aynıdır (styles/ui.css .moodlet-chip)
 export const MARK_COLORS = { trauma: '#8a3fa0', positive: '#d9a520', negative: '#d98a2c' };
 
+// (30.2) Duygu Katmanı açıklaması ve sakinler çekmecesi AYNI işaretleri kullanır (ayrı bir simge dili yok)
+export const MOOD_MARKS = {
+  cloud: { name: 'Ağır bir yük taşıyor (yas, sarsıntı)', hint: 'Koyu bulut: yas, sarsıntı ya da kalp kırıklığı' },
+  sparkle: { name: 'Coşkulu / ilhamlı', hint: 'Pırıltı: coşkulu ya da ilhamlı' },
+  sweat: { name: 'Yorgun / bıkkın', hint: 'Ter damlası: yorgun ya da bıkkın' },
+};
+export const BOND_LINES = {
+  pink: { name: 'Eş / sevgili', hint: 'Seçili sakinin eşi ya da sevgilisi' },
+  gold: { name: 'Ruh ikizi', hint: 'Ruh ikizi' },
+  red: { name: 'Kırgın / rakip', hint: 'Kırgın ya da rakip' },
+  green: { name: 'Yakın dost', hint: 'Yakın dost (ilişki puanı 40 ve üstü)' },
+};
+
 export function readEmotionPref() {
   try {
     return localStorage.getItem(EMOTION_PREF_KEY) === '1';
@@ -120,6 +133,23 @@ function drawPattern(ctx, rows, px, py, u, base, light, hot) {
       ctx.fillRect(px + k * u, py + r * u, u, u);
     }
   }
+}
+
+const markUrlCache = new Map();
+/** İşaretin küçük resmi (HTML arayüzü için): haritadaki işaretle aynı desen ve renkler. */
+export function markIconURL(mark) {
+  if (markUrlCache.has(mark)) return markUrlCache.get(mark);
+  const canvas = document.createElement('canvas');
+  canvas.width = 20;
+  canvas.height = 14;
+  const ctx = canvas.getContext('2d');
+  const u = 2;
+  if (mark === 'cloud') drawPattern(ctx, CLOUD, 3, 3, u, '#3a2147', MARK_COLORS.trauma, '#ffffff');
+  else if (mark === 'sparkle') drawPattern(ctx, SPARKLE_A, 4, 2, u, '#d9a520', '#ffe58a', '#ffffff');
+  else if (mark === 'sweat') drawPattern(ctx, SWEAT, 7, 3, u, MARK_COLORS.negative, '#8fd0ff', '#ffffff');
+  const url = canvas.toDataURL();
+  markUrlCache.set(mark, url);
+  return url;
 }
 
 function drawMark(ctx, mark, sx, sy, u, time) {

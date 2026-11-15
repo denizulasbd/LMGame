@@ -133,7 +133,7 @@ export class TradePostSystem {
     const c = tp.ship.contracts[index];
     if (!this.economy.spend({ [c.resource]: c.qty })) return 0;
     const gold = status.gold;
-    this.economy.add('gold', gold);
+    this.economy.add('gold', gold, 'contract');
     c.done = true;
     c.paid = gold;
     tp.ship.sold.push(c.resource);

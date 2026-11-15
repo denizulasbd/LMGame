@@ -3,7 +3,7 @@
 // (sabah 08:00, boş yatak + yeterli yiyecek + yüksek refah; bkz. data/town.js -> IMMIGRATION).
 import { Character } from '../entities/Character.js';
 import { compoundName } from '../utils/names.js';
-import { RESIDENT_POOL, EXTRA_NAMES, APPEARANCE_PARTS, TRAITS, NEED_KEYS } from '../data/characters.js';
+import { RESIDENT_POOL, EXTRA_NAMES, APPEARANCE_PARTS, TRAITS, NEED_KEYS, IMMIGRANT_AGE } from '../data/characters.js';
 import { clashesWithOwn } from '../ai/TraitProfile.js';
 
 const ARRIVAL_SPACING_MINUTES = 12; // aynı sabah gelenler üst üste yürümesin
@@ -88,6 +88,6 @@ export class PopulationSystem {
       if (traitKeys.length < 2 && !clashesWithOwn(traitKeys, key)) traitKeys.push(key);
     }
     const appearance = Object.fromEntries(Object.entries(APPEARANCE_PARTS).map(([k, options]) => [k, this.rng.pick(options)]));
-    return { name, age: this.rng.int(18, 60), traits: traitKeys, appearance };
+    return { name, age: this.rng.int(IMMIGRANT_AGE.min, IMMIGRANT_AGE.max), traits: traitKeys, appearance };
   }
 }

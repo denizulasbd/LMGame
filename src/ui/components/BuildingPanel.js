@@ -40,6 +40,8 @@ import { arePartners } from '../../systems/RelationshipSystem.js';
 import { getStructureSprite } from '../../art/sprites/index.js';
 import { getIconDataURL, getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
+import { adoptTip } from './HoverTip.js';
+import { LOYALTY_SOURCES } from '../../data/loyalty.js';
 import { luxuryCards, relicShelf, goldDecreeCards } from './luxuryCards.js';
 import { ACTIVITY_SKILLS, SKILL_LEVELS } from '../../data/skills.js';
 import { skillLevel } from '../../systems/SkillSystem.js';
@@ -92,6 +94,16 @@ const cargoText = (cargo) =>
     .join(', ');
 
 const percent = (value) => `%${Math.round(value * 100)}`;
+
+const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v)}`;
+
+/** (30.3) Vergi kademesinin sadakat etkisi (düğme ipucu). */
+export function taxLoyaltyText(rate, current) {
+  const daily = LOYALTY_SOURCES.taxDaily[rate] ?? 0;
+  const collected = LOYALTY_SOURCES.taxCollected[rate] ?? 0;
+  const raise = rate === 'heavy' && current !== 'heavy' ? ` · geçişte ${signed(LOYALTY_SOURCES.taxRaisedToHeavy)}` : '';
+  return `Günlük: herkes ${signed(daily)} sadakat · tahsilatta ${signed(collected)}${raise}`;
+}
 
 export class BuildingPanel {
   constructor(game) {
@@ -243,7 +255,7 @@ export class BuildingPanel {
         ? [JSON.stringify(state.luxury), state.resources.gold, Math.floor((state.buffs.spices ?? 0) / 60), Math.floor((state.buffs.goldBonus ?? 0) / 60), Math.floor((state.buffs.royalArchitects ?? 0) / 60), state.time.day, state.buildings.length].join(':')
         : '';
     const pickerKey = this.pickerFor === building.id ? this.workerCandidates(building, state).map((o) => `${o.character.id}:${o.character.name}:${o.level}:${o.pinnedTo}`).join(',') : '';
-    const crownKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.tax?.rate, state.tax?.lockedUntil, Math.floor(taxLockLeft(state) / 60), state.tax?.last, Math.floor(((state.tax?.nextAt ?? 0) - state.totalMinutes) / 60), state.crown, Math.floor((state.crown?.nextLevyAt - state.totalMinutes) / 60), levyAmount(state), state.crown?.decree ? decreeStatus(state, state.crown.decree) : null, estimateTax(state), state.resources]) : '';
+    const crownKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.tax?.rate, state.tax?.lockedUntil, Math.floor(taxLockLeft(state) / 60), state.tax?.last, Math.floor(((state.tax?.nextAt ?? 0) - state.totalMinutes) / 60), state.crown, Math.floor((state.crown?.nextLevyAt - state.totalMinutes) / 60), levyAmount(state), state.crown?.decree ? decreeStatus(state, state.crown.decree) : null, estimateTax(state), state.resources, this.heavyArmed === true]) : '';
     const bellKey = (building.type === 'fountain' || building.definition.civic ? crownKey : '') + (building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}:${Math.round(trustValue(state))}:${JSON.stringify(state.trust?.revolt?.rioters ?? null)}:${state.trust?.revolt?.raids?.length ?? 0}:${JSON.stringify(reliefStatus(state, 'food'))}:${JSON.stringify(reliefStatus(state, 'gold'))}:${(state.petitions?.list ?? []).map((p) => `${p.id}${p.status}${Math.floor((p.deadline - state.totalMinutes) / 60)}`).join(',')}` : '');
     // (16. aşama) keşif seferi (liman, belediye) ve kadim yazıtlar (Bilgelik Evi)
     const exploreKey =
@@ -600,7 +612,25 @@ export class BuildingPanel {
     const buttons = TAX_RATE_KEYS.map((key) => {
       const def = TAX_RATES[key];
       const locked = lockLeft > 0 && key !== tax.rate;
-      const b = this.button(def.short, locked ? `Ferman kilitli: ${formatRemaining(lockLeft)}` : `${def.name}: ${def.description}`, () => this.events.emit('ui:setTaxRate', { rate: key }));
+      // (30.3) ipucunda beklenen sadakat etkisi: "Günlük: herkes −3 sadakat · tahsilatta −7"
+      const effect = engineOn('discontent') ? `\n${taxLoyaltyText(key, tax.rate)}` : '';
+      // (30.6) tıklamadan ÖNCE "3 gün değiştirilemez"; Ağır Vergi ilk tıklamada onay ister (ikinci tıklama uygular)
+      const novice = engineOn('novicePath');
+      const lockNote = novice && key !== tax.rate && !locked ? `\nSeçersen ${TAX.lockDays} gün değiştirilemez` : '';
+      const armed = novice && key === 'heavy' && key !== tax.rate && this.heavyArmed === true;
+      const label = armed ? 'Emin misin?' : def.short;
+      const tip = armed ? `Ağır Vergi: çalışma hızı −%15, güven ve sadakat düşer, ${TAX.lockDays} gün değiştirilemez. Onaylamak için yeniden tıkla.` : locked ? `Ferman kilitli: ${formatRemaining(lockLeft)}${effect}` : `${def.name}: ${def.description}${effect}${lockNote}`;
+      const b = adoptTip(this.button(label, tip, () => {
+        if (novice && key === 'heavy' && tax.rate !== 'heavy' && this.heavyArmed !== true) {
+          this.heavyArmed = true;
+          clearTimeout(this.heavyTimer);
+          this.heavyTimer = setTimeout(() => { this.heavyArmed = false; this.lastKey = ''; }, 6000);
+          this.lastKey = '';
+          return;
+        }
+        this.heavyArmed = false;
+        this.events.emit('ui:setTaxRate', { rate: key });
+      }));
       b.disabled = locked;
       b.classList.add('tax-rate-button', `is-${key}`);
       b.classList.toggle('is-active', key === tax.rate);
@@ -642,6 +672,7 @@ export class BuildingPanel {
       el('div', { className: 'building-section-title', text: 'İç Vergi ve Öşür' }),
       el('div', { className: `decree luxury-card tax-card is-${tax.rate}` }, [
         el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL(rate.icon), alt: '' }), rate.name, el('span', { className: 'decree-state', text: `%${rate.percent}` })]),
+        ...(engineOn('novicePath') ? [el('div', { className: `upgrade-text tax-lock-note${lockLeft > 0 ? ' is-active' : ''}`, text: lockLeft > 0 ? `Kilitli: ${formatRemaining(lockLeft)} sonra değiştirilebilir` : `Seçtiğin kademe ${TAX.lockDays} gün değiştirilemez` })] : []),
         el('div', { className: 'tax-rates' }, buttons),
         el('div', { className: 'upgrade-text', text: rate.description }),
         el('div', { className: `upgrade-text${lockLeft > 0 ? ' is-active' : ''}`, text: lockLeft > 0 ? `Ferman kilitli: ${formatRemaining(lockLeft)} (kademe ${TAX.lockDays} oyun günü boyunca değiştirilemez)` : `Kademeyi değiştirirsen ferman ${TAX.lockDays} gün kilitlenir (bir tam tahsilat döngüsü).` }),

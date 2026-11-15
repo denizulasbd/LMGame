@@ -10,7 +10,7 @@
 //     kullanır. Bir ekmek dilimlenince artan yiyecek değeri pay olarak saklanır, hiçbir şey kaybolmaz.
 //   - Üretim yapıları produce() ile ekler: işlenmiş malların toplam üretimi state.stats.goods'a yazılır,
 //     kasabanın ilk yünü / demiri / ekmeği için 'goods:firstProduced' { resource, building } yayınlanır
-import { RESOURCES, BASE_STORAGE_CAPACITY } from '../data/resources.js';
+import { RESOURCES, BASE_STORAGE_CAPACITY, sourceHint } from '../data/resources.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { foodSupply } from './TownStatus.js';
 import { civicStorageBonus } from './CivicSystem.js';
@@ -32,6 +32,7 @@ export class EconomySystem {
     this.world = world;
     this.fullWarned = new Set();
     this.hungerWarned = false;
+    this.ledger = {}; // (30.6) altın gelir kalemleri { gün: { kaynak: miktar } }; yalnızca son günler, KAYDEDİLMEZ (üst çubuk ipucu)
     this.recalculateCapacity();
   }
 
@@ -83,6 +84,12 @@ export class EconomySystem {
       .map(([r]) => RESOURCES[r].name);
   }
 
+  /** (30.1) "Yetersiz kaynak: Taş · Topla aracıyla kayalardan." biçiminde eksik kaynak bildirimi. */
+  shortfall(cost = {}) {
+    const keys = Object.entries(cost).filter(([r, v]) => this.amount(r) < v).map(([r]) => r);
+    return `Yetersiz kaynak: ${keys.map((r) => RESOURCES[r].name).join(', ')}${sourceHint(keys)}`;
+  }
+
   /** Maliyeti öder; yetmiyorsa hiçbir şey harcamaz ve false döner. */
   spend(cost = {}) {
     if (!this.canAfford(cost)) return false;
@@ -101,13 +108,22 @@ export class EconomySystem {
     return true;
   }
 
+  /** (30.6) Altın gelir kalemi kaydı (yalnızca son 6 gün tutulur). */
+  record(source, amount) {
+    const day = this.state.time.day;
+    const today = (this.ledger[day] ??= {});
+    today[source] = (today[source] ?? 0) + amount;
+    for (const d of Object.keys(this.ledger)) if (Number(d) < day - 5) delete this.ledger[d];
+  }
+
   /** Kaynak ekler (depo kapasitesine kadar). Gerçekten eklenen miktarı döndürür. */
-  add(resource, amount) {
+  add(resource, amount, source = null) {
     const current = this.amount(resource);
     const limit = this.limit(resource); // hazinenin (altın) sınırı yok; tarımsal kaynaklara silo eklenir
     const added = Math.max(0, Math.min(Math.floor(amount), limit - current));
     if (added > 0) {
       this.state.resources[resource] = current + added;
+      if (resource === 'gold' && source) this.record(source, added);
       this.emitChange(resource, added);
     }
     const now = this.amount(resource);
@@ -194,6 +210,7 @@ export class EconomySystem {
       need = 0;
     }
     if (pantry.credit < EPSILON) pantry.credit = 0;
+    this.eaten = (Number.isFinite(this.eaten) ? this.eaten : 0) + (Number.isFinite(units) ? units : 0); // (30.3) yenen yiyecek değeri (Halkın Nabzı: "≈ N gün yeter"; yalnızca sayaç, kaydedilmez)
     this.checkHunger();
     return { ok: true, bread: usedBread };
   }

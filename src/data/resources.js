@@ -103,3 +103,13 @@ export function formatCost(cost) {
   const parts = Object.entries(cost ?? {}).map(([k, v]) => `${RESOURCES[k].name} ${v}`);
   return parts.length ? parts.join(', ') : 'Ücretsiz';
 }
+
+/**
+ * (30.1) Yetersiz kaynak bildiriminin "nereden bulunur" ipucu (yalnızca temel kaynaklar için): oyuncu yapı kuramayınca
+ * Topla aracını bulabilsin. Örn. eksik = ['stone'] -> "Topla aracıyla kayalardan."
+ */
+const SOURCE_PHRASES = { wood: 'ağaçlardan', stone: 'kayalardan', food: 'çalılardan' };
+export function sourceHint(missingKeys) {
+  const phrases = missingKeys.filter((k) => SOURCE_PHRASES[k]).map((k) => SOURCE_PHRASES[k]);
+  return phrases.length ? ` · Topla aracıyla ${phrases.join(', ')}.` : '';
+}

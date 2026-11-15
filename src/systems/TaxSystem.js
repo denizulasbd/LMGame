@@ -74,7 +74,7 @@ export class TaxSystem {
       const coins = coinTax(c, def.percent);
       if (coins > 0) {
         c.coins -= coins;
-        this.economy.add('gold', coins);
+        this.economy.add('gold', coins, 'tax');
         gold += coins;
         paid = true;
       }

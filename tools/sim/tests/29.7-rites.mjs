@@ -14,6 +14,7 @@ const out = await page.evaluate(async (fixture) => {
   const RI = await import('/src/systems/Rites.js');
   const MD = await import('/src/data/moodlets.js');
   const EV = await import('/src/data/evolution.js');
+  const EVX = await import('/src/systems/Evolution.js'); // (30.4a)
   const { ENGINES } = await import('/src/systems/Engines.js');
   const { pairKey } = await import('/src/systems/RelationshipSystem.js');
   const { getMoodlet } = await import('/src/systems/Moodlets.js');
@@ -110,7 +111,7 @@ const out = await page.evaluate(async (fixture) => {
   const raw = JSON.parse(localStorage.getItem('lmgame.save.v2'));
   game.events.emit('ui:load');
   const back = game.state.rites?.active;
-  check('tören ortasında kaydet-yükle: tören, katılanlar ve taziye geri gelir; kayıt sürümü 40', raw.version === 40 && back?.names[0] === 'K' && back.condolence && back.attendees[0] === lives[0].id && back.dead[0].closestId === lives[1].id, JSON.stringify(back));
+  check('tören ortasında kaydet-yükle: tören, katılanlar ve taziye geri gelir; kayıt sürümü (güncel)', raw.version === (await import('/src/config.js')).CONFIG.SAVE_VERSION && back?.names[0] === 'K' && back.condolence && back.attendees[0] === lives[0].id && back.dead[0].closestId === lives[1].id, JSON.stringify(back));
   game.state.rites.active = null;
 
   // 6. özel günler
@@ -156,8 +157,10 @@ const out = await page.evaluate(async (fixture) => {
   S2().time.hour = 22;
   sc.rites.closeSpecialDays();
   const near = (got, want) => Math.abs(got - want) <= 0.5 && Math.sign(got) === Math.sign(want);
-  const stageMul = (c) => EV.EVOLUTION_RULES.stageMul[c.lifeStage] ?? 1;
-  const fOk = getMoodlet(forgottenOne, 'forgotten') && forgottenOne.satisfaction === Math.max(0, fsat - 4) && near(forgottenOne.growth[3] - fg[3], -3 * stageMul(forgottenOne)) && near(forgottenOne.growth[1] - fg[1], -2 * stageMul(forgottenOne));
+  // (30.4a) kişilik çeşitliliği çarpanı: katkı yöneldiği kutbun (Huysuz / İçine Kapanık) payına göre ölçeklenir
+  const shares = sc.evolution.shares;
+  const stageMul = (c, axis = 3, sign = -1) => (EV.EVOLUTION_RULES.stageMul[c.lifeStage] ?? 1) * (shares ? EVX.scarcityMul(shares[EVX.poles(axis, sign).target] ?? 0) : 1);
+  const fOk = getMoodlet(forgottenOne, 'forgotten') && forgottenOne.satisfaction === Math.max(0, fsat - 4) && near(forgottenOne.growth[3] - fg[3], -3 * stageMul(forgottenOne)) && near(forgottenOne.growth[1] - fg[1], -2 * stageMul(forgottenOne, 1));
   check('22:00\'de kutlanmayan: Unutuldu (keyif x1,15), doyum -4, evrim spirit -3 / company -2; seekIds temizlenir', fOk && MD.MOODLETS.forgotten.effects.joyRateMul === 1.15 && !bd.drive.seekIds.includes(comps[0]) && !(bd.specialSeek ?? []).length, `${fsat}->${forgottenOne.satisfaction} · ${fg}->${forgottenOne.growth}`);
   check('çocukta yalnızca moodlet (doyum ve evrim değişmez)', !child || (getMoodlet(child, 'forgotten') && child.satisfaction === csat && child.growth.join() === cg.join()));
   check('Armağan: 5 altın, sadakat +6, doyum +4, günde bir kez; o gün Unutuldu olmaz', giftOk && !getMoodlet(gifted, 'forgotten') && S2().rites.forgotten === f0 + 1 + (child ? 1 : 0), `${gifted.loyalty} · ${S2().resources.gold}`);
@@ -201,7 +204,7 @@ const out = await page.evaluate(async (fixture) => {
   const migr = g.characters.every((c) => c.loyalty === 0 && c.weddingDay === null && c.specialDay === null) && JSON.stringify(g.rites) === JSON.stringify(RI.emptyRites()) && (g.trust.revolt === null || g.trust.revolt.leaderId === null);
   game.events.emit('ui:save');
   const re = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-  check('v39 -> v40: sadakat 0, weddingDay / specialDay null, boş tören durumu; yeniden kayıtta sürüm 40', migr && re.version === 40 && re.characters.every((c) => c.loyalty === 0) && Array.isArray(re.rites.names));
+  check('v39 -> v40: sadakat 0, weddingDay / specialDay null, boş tören durumu; yeniden kayıtta güncel sürüm', migr && re.version === (await import('/src/config.js')).CONFIG.SAVE_VERSION && re.characters.every((c) => c.loyalty === 0) && Array.isArray(re.rites.names));
   return out;
 }, fixture);
 results.push(...out);

@@ -646,6 +646,21 @@ export const ACTIVITIES = {
     bubbles: ['angry', 'torch'],
     partnerBubbles: ['angry', 'torch', 'sulk'],
   },
+  // (30.3) İş bırakma: Kırgın yetişkinler 10:00-12:00 meydanda yönetimi protesto eder (Brain.planStrike; süre 12:00'ye kadar, zar yok)
+  strike: {
+    kind: 'social',
+    target: 'fountain',
+    travelLabel: 'İşi bırakıp meydana yürüyor',
+    label: 'İş bıraktı: meydanda yönetimi protesto ediyor',
+    partnerLabel: '{partner} ile meydanda iş bırakmış, yönetimi protesto ediyor',
+    duration: [60, 60],
+    effects: {},
+    socialGain: 0.5,
+    aloneSocialGain: 0.3,
+    faceBuilding: true,
+    bubbles: ['fist', 'banner'],
+    partnerBubbles: ['fist', 'banner', 'angry'],
+  },
   loot: {
     kind: 'riot',
     travelLabel: 'Öfkeli kalabalıkla yağmaya yürüyor',

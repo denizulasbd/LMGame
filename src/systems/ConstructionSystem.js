@@ -62,14 +62,11 @@ export class ConstructionSystem {
   }
 
   /**
-   * Bir yapının (sol üst köşesi tileX, tileY) buraya kurulup kurulamayacağı.
-   * Dönüş: { ok, reason, footprint: [{x,y}], doors: [{x,y}], orientation? }
+   * (30.1) Konumdan bağımsız kurulamama nedeni (tek olabilen yapı, kasaba seviyesi, nüfus, Altın Çağ, Kraliyet Beratı, ganimet) ya da
+   * null. checkPlacement bunu ilk sırada söyler; uygun karo boyaması bu nedenlerde hiç tarama yapmaz.
    */
-  checkPlacement(type, tileX, tileY) {
+  globalBlock(type) {
     const def = BUILDINGS[type];
-    const map = this.world.map;
-    const allowed = def.allowedTiles ?? GROUND_TILES;
-    const footprint = [];
     // Kasabada tek olabilen yapı (anıt) zaten varsa önce bu söylenir
     let reason = def.unique && this.world.getBuildingsOfType(type).length > 0 ? `Kasabada yalnızca bir ${def.name} olabilir` : null;
     // Kasaba seviyesiyle açılan yapılar (değirmen: Köy, belediye: Kasaba) önce bunu söyler
@@ -87,6 +84,20 @@ export class ConstructionSystem {
     if (!reason && def.item && itemCount(this.world.state, def.item) < 1) {
       reason = `Önce bir keşif seferinden ${EXOTIC_ITEMS[def.item].name} getirilmeli`;
     }
+    return reason;
+  }
+
+  /**
+   * Bir yapının (sol üst köşesi tileX, tileY) buraya kurulup kurulamayacağı.
+   * Dönüş: { ok, reason, footprint: [{x,y}], doors: [{x,y}], orientation? }
+   */
+  checkPlacement(type, tileX, tileY) {
+    const def = BUILDINGS[type];
+    const map = this.world.map;
+    const allowed = def.allowedTiles ?? GROUND_TILES;
+    const footprint = [];
+    // Kasabada tek olabilen yapı, kasaba seviyesi, nüfus, Altın Çağ, Kraliyet Beratı, ganimet: konumdan bağımsız nedenler önce söylenir
+    let reason = this.globalBlock(type);
     let orientation = 'right';
 
     for (let y = tileY; y < tileY + def.size.h; y++) {
@@ -173,7 +184,7 @@ export class ConstructionSystem {
       if (starved) reason = `${starved.name} ${starved.underConstruction ? 'şantiyesinin' : 'iş yerinin'} son çalışma yerini kapatır: etrafında bir karo açık bırak`;
     }
     if (!reason && !this.economy.canAfford(def.cost)) {
-      reason = `Yetersiz kaynak: ${this.economy.missing(def.cost).join(', ')}`;
+      reason = this.economy.shortfall(def.cost);
     }
     return { ok: !reason, reason, footprint, doors, orientation };
   }
@@ -300,7 +311,7 @@ export class ConstructionSystem {
     if (!def.allowedTiles.includes(tile)) return { ok: false, reason: `${TILE_TYPES[tile].name} üzerine döşenemez` };
     const object = map.getObject(x, y);
     if (object && !OBJECT_TYPES[object].clearable) return { ok: false, reason: `Önce ${OBJECT_TYPES[object].name.toLowerCase()} temizlenmeli` };
-    if (!this.economy.canAfford(def.cost)) return { ok: false, reason: `Yetersiz kaynak: ${this.economy.missing(def.cost).join(', ')}` };
+    if (!this.economy.canAfford(def.cost)) return { ok: false, reason: this.economy.shortfall(def.cost) };
     return { ok: true };
   }
 
@@ -315,6 +326,21 @@ export class ConstructionSystem {
     if (def.result === 'bridge') assignBridgeVariants(this.world.map);
     this.events.emit('terrain:painted', { x, y, type, tile: def.result });
     return { ok: true };
+  }
+
+  /** (30.1) Yapıyı yıkınca depoya dönecek miktar ({ kaynak: adet }): demolish() ile aynı hesap (yükseltme maliyetinin yarısı dahil). */
+  demolishRefund(building) {
+    const def = BUILDINGS[building.type];
+    const out = {};
+    const add = (cost, ratio) => {
+      for (const [r, v] of Object.entries(cost ?? {})) {
+        const n = Math.floor(v * ratio);
+        if (n > 0) out[r] = (out[r] ?? 0) + n;
+      }
+    };
+    add(def.cost, building.underConstruction && building.buildProgress === 0 ? 1 : DEMOLISH_REFUND);
+    if (def.upgrade && (building.upgraded || building.project)) add(def.upgrade.cost, DEMOLISH_REFUND);
+    return out;
   }
 
   /** Bu karoda yıkılabilecek bir şey var mı (önizleme için)? */
@@ -480,7 +506,7 @@ export class ConstructionSystem {
     if (building.underConstruction) reason = 'Önce inşaatı bitmeli';
     else if (building.project) reason = PROJECT_WORDS[kind].busy;
     else if (!this.hasReachableRing(building)) reason = 'Çevresine ulaşılamıyor: önce bir yol aç';
-    else if (!this.economy.canAfford(spec.cost)) reason = `Yetersiz kaynak: ${this.economy.missing(spec.cost).join(', ')}`;
+    else if (!this.economy.canAfford(spec.cost)) reason = this.economy.shortfall(spec.cost);
     return { ok: !reason, reason, kind, spec };
   }
 

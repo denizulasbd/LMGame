@@ -1,3 +1,4 @@
+import { engineOn } from '../systems/Engines.js';
 // Kasabanın geneline ait kurallar: refah (ortalama mutluluk), göç koşulları, şenlik,
 // kasaba çapındaki geçici bonuslar ve (10. aşama) kasaba seviyesi / prestij ile belediyenin erzak dengesi.
 // Hesaplar src/systems/TownStatus.js, EventSystem.js ve TownLevelSystem.js'te.
@@ -167,6 +168,17 @@ export const TOWN_TIERS = [
     perks: ['Şehir gururu: kasaba refahına kalıcı +4', 'Göç sınırı 24 yerine 30 sakin', 'Kervanbaşı Şehir Kervanı ve Lonca Ustaları getirir', 'Tüccarın her malından +3 stok', 'Bir köpek daha gelir'],
   },
 ];
+
+// (30.6, ENGINES.novicePath) Köy için nüfus eşiği 13 -> 12 (ve aşağıda Kasaba'nın yapı / yükseltme eşikleri): acemi profilin ilk kışı (yiyecek ve göçmen dalgası) 13. sakini bir iki gün geciktiriyordu;
+// Köy ≤ 18. gün hedefi (tools/sim/autopilot.mjs --profile novice). Öteki eşikler aynı.
+{
+  // Kasaba (3. seviye): yapı 17 -> 15, Seviye 2 yapı 3 -> 2 (acemi: iki günde bir tek yapı kararı ile 40 günde 20 karar; Kasaba ≤ 35. gün)
+  for (const [index, patch] of [[1, { population: 12 }], [2, { buildings: 15, upgraded: 2 }]]) {
+    const own = TOWN_TIERS[index].requires;
+    const eased = { ...own, ...patch };
+    Object.defineProperty(TOWN_TIERS[index], 'requires', { enumerable: true, configurable: true, get: () => (engineOn('novicePath') ? eased : own) });
+  }
+}
 
 export const TOWN_LEVEL = {
   welfareHours: 12, // ortalama refahın zaman sabiti (oyun saati): yaklaşık yarım günlük yürüyen ortalama

@@ -8,6 +8,11 @@
 //     requires    : 'freeBed' (boş yatak), 'explorers:N' (boşta N yetişkin), 'tools:N' (depoda / üstünde N Sağlam Alet),
 //                   'dog' (kasabada köpek)
 //     effect      : { buff, fun, recruit, fortify, explorers, expedition, watchChance }
+//                   (30.4b, ENGINES.midgame) yeni etki türleri: gold, resources { ad: ±N }, loyalty { all | target | target2 | both |
+//                   friendsOfTarget | parentsOfTarget | elders | lowest: [adet, N] }, trust, satisfaction { all | target }, relation { pair },
+//                   tag { from, to, tag }, moodlet { who, key, reason }, energy, sick, reputation, quarantine (gün), leave: 'target'
+//     (30.4b) target: kişili olay kuralı ('master' | 'feud' | 'smallestChild'; zar çekmez); metinde {who} / {who2}; requires'a
+//                   minTier, buildingsMin { tür: adet }, plaza, foodRatio, child; midgame: true = yeni kart (şalter kapalıyken havuzda yok)
 //     default     : süre dolunca uygulanır; birden çoksa ilk uygulanabilir olanı (güvenli seçenek)
 export const DILEMMA_SCHEDULE = {
   hour: 10, // olay sabah bu saatte gelir
@@ -16,6 +21,19 @@ export const DILEMMA_SCHEDULE = {
   timeoutSeconds: 30, // karar süresi (gerçek saniye; oyun duraklatılır)
   repeatGapDays: 6, // aynı olay bu kadar gün içinde tekrarlanmaz
 };
+
+// (30.4b, ENGINES.midgame) orta oyun: tekrar kuralları ve yeni kartların ağırlığı
+export const MIDGAME = {
+  repeatGapDays: 8, // aynı olay en az bu kadar gün sonra
+  noRepeatLast: 2, // seçilen kart son iki karttan biri olamaz (havuzda başka uygun kart varsa)
+  lateDay: 20, // bu günden sonra yeni kartların toplam ağırlığı eski kartlarınkinin en az lateRatio katı
+  lateRatio: 3, // (başlangıç 2: tohum 42 / 13'te yeni kart payı %50-56 sınırdaydı)
+};
+
+// (30.6, ENGINES.novicePath) Olay bedelleri kasaya göre: orta oyun kartlarında altın ve erzak (yiyecek, ekmek) bedelleri kasaba
+// seviyesiyle ölçeklenir (seviye 1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir). Kasaba (x1) kartların yazılı sayılarıdır.
+// minAffordable: bir kartın en az bu kadar seçeneği karşılanabilir değilse o gün çıkmaz.
+export const COST_SCALE = { byTier: { 1: 0.4, 2: 0.6, 3: 1, 4: 1.3 }, resources: ['gold', 'food', 'bread'], minAffordable: 2 };
 
 export const DILEMMAS = {
   refugees: {
@@ -189,6 +207,115 @@ export const DILEMMAS = {
     ],
   },
 };
+
+// (30.4b) Orta oyun kartları. Sayılar başlangıç değeridir; ayar yalnızca buradaki ağırlık, bedel ve etki sayılarıyla yapılır.
+// Her seçeneğin görünür bir bedeli vardır (cost ya da olumsuz etki); default = "orta yol".
+const MID = {
+  masterOffer: {
+    title: 'Şehirden İş Teklifi',
+    icon: 'star',
+    text: 'Şehirden bir lonca ustası geldi: {who} için yüklü maaşlı bir iş teklifi getirmiş. {who} kararsız; gözü sana bakıyor.',
+    weight: 3,
+    target: 'master',
+    requires: { minPopulation: 8, minDay: 20 },
+    options: [
+      { id: 'pay', label: 'Maaş ver', cost: { gold: 60 }, effect: { loyalty: { target: 15 } }, result: '{who} için maaş zammı yapıldı; gözü kasabadan başka yere kaymadı.' },
+      { id: 'feast', label: 'Onuruna sofra kur', cost: { food: 30 }, effect: { loyalty: { target: 8 }, fun: 5 }, result: 'Meydanda {who} için sofra kuruldu; herkes ustasıyla gurur duydu.', default: true },
+      { id: 'release', label: 'Yolun açık olsun', effect: { leave: 'target', loyalty: { friendsOfTarget: -4 } }, result: '{who} bohçasını toplayıp şehre doğru yola çıktı. Dostları ardından uzun uzun baktı.' },
+    ],
+  },
+  neighborFeud: {
+    title: 'Komşu Husumeti',
+    icon: 'angry',
+    text: '{who} ile {who2} arasındaki husumet büyüdü. Bahçe çitinden başlayan laf, artık sokakta herkesin ağzında.',
+    weight: 3,
+    target: 'feud',
+    requires: { minPopulation: 8, minDay: 12 },
+    options: [
+      { id: 'side', label: 'Haklı bul: {who}', effect: { loyalty: { target2: -12 }, tag: { from: 'target2', to: 'target', tag: 'resentful' } }, result: '{who} haklı bulundu; {who2} kırgın ve gönülsüz döndü.' },
+      { id: 'scold', label: 'İkisini de azarla', effect: { loyalty: { both: -5 }, relation: { pair: 10 } }, result: 'İkisi de azar işitti; kızgın ama suskun, aralarındaki ip biraz gevşedi.', default: true },
+      { id: 'reconcile', label: 'Meydanda barıştır', cost: { gold: 20, food: 15 }, effect: { relation: { pair: 25 }, moodlet: { who: 'both', key: 'comforted', reason: 'Meydanda barıştırıldı' } }, result: 'Meydanda ortak bir sofra kuruldu; {who} ile {who2} el sıkıştı.' },
+    ],
+  },
+  drought: {
+    title: 'Kuraklık',
+    icon: 'sun',
+    text: 'Haftalardır yağmur yok, tarlalar çatlıyor. Bahçelerin çatlak toprağı kasabanın kileri için kötü haber.',
+    weight: 3,
+    requires: { minPopulation: 8, minDay: 16, seasons: ['summer'], buildingsMin: { garden: 2 } },
+    options: [
+      { id: 'muster', label: 'Kuyudan sulama seferberliği', effect: { energy: -20 }, result: 'Bütün kasaba kovalarla kuyu başına dizildi; mahsul kurtuldu, kollar yorgun.', default: true },
+      { id: 'buy', label: 'Dışarıdan erzak al', cost: { gold: 80 }, effect: { resources: { food: 60 } }, result: 'Bir kervancıdan pahalıya erzak alındı; kiler idare edecek.' },
+      { id: 'wait', label: 'Bekle', effect: { resources: { food: -35 }, loyalty: { all: -2 } }, result: 'Tarlalar kurudu, kilerden yenen yiyecek geri gelmedi; sakinler söylendi.' },
+    ],
+  },
+  census: {
+    title: 'Kraliyet Sayımı',
+    icon: 'coin',
+    text: 'Kraliyet sayım memuru geldi: kasabadan iki genç asker istiyor. Reddetmek ağır bir laf yedirir, göndermek sakinlerin gönlünü kırar.',
+    weight: 2,
+    requires: { minPopulation: 14, minDay: 24, minTier: 3 },
+    options: [
+      { id: 'send', label: 'Gönüllüleri azıklandır', cost: { gold: 60, food: 30 }, effect: { energy: -15, reputation: 8 }, result: 'Kasaba gönüllüleri azıkla yolcu etti; krallıkta adın iyiye çıktı.' },
+      { id: 'pay', label: 'Bedelini öde', cost: { gold: 120 }, effect: {}, result: 'Sayım memuru kesesini doldurup gitti; kimse askere gitmedi.', default: true },
+      { id: 'refuse', label: 'Reddet', effect: { reputation: -10, loyalty: { all: 3 } }, result: 'Memur kasvetle ayrıldı. Sakinler seninle gurur duydu, krallık ise kaşını çattı.' },
+    ],
+  },
+  plagueRumor: {
+    title: 'Salgın Söylentisi',
+    icon: 'heart',
+    text: 'Komşu köyde salgın söylentisi var. Henüz kimse hasta değil ama kasabada fısıltılar dolaşıyor.',
+    weight: 2,
+    requires: { minPopulation: 14, minDay: 20 },
+    options: [
+      { id: 'close', label: 'Kapıları kapat', effect: { quarantine: 1, loyalty: { all: -3 } }, result: 'Bir gün boyunca kapılar kapandı: ne tüccar ne göçmen girdi. Sakinler söylendi.' },
+      { id: 'herbs', label: 'Şifalı ot stokla', cost: { gold: 50 }, effect: {}, result: 'Şifacılara ot alındı; salgın kasabanın kapısından geri döndü.', default: true },
+      { id: 'ignore', label: 'Kulak asma', effect: { sick: 3 }, result: 'Söylenti gerçek çıktı: üç sakin yatağa düştü.' },
+    ],
+  },
+  travelingTheater: {
+    title: 'Seyyar Tiyatro',
+    icon: 'note',
+    text: 'Bir seyyar tiyatro kumpanyası konaklamak istiyor. Meydanı sahne yapıp bir gece oyun çıkarmayı teklif ediyorlar.',
+    weight: 3,
+    requires: { minPopulation: 8, minDay: 12, plaza: true },
+    options: [
+      { id: 'pay', label: 'Parasını ver', cost: { gold: 40 }, effect: { fun: 15, satisfaction: { all: 3 } }, result: 'Meydanda fenerler yandı; oyun herkesi güldürüp düşündürdü.' },
+      { id: 'feed', label: 'Erzakla ağırla', cost: { food: 30 }, effect: { fun: 10 }, result: 'Kumpanya karnını doyurup kısa bir gösteri yaptı.', default: true },
+      { id: 'refuse', label: 'Geri çevir', effect: { fun: -3, loyalty: { all: -2 } }, result: 'Kumpanya arabalarını çevirip yola koyuldu; çocuklar kapıdan baktı.' },
+    ],
+  },
+  lostChild: {
+    title: 'Kayıp Çocuk',
+    icon: 'map',
+    text: '{who} akşam eve dönmedi. Ebeveynleri kapıda, gözleri karanlık ormanda.',
+    weight: 2,
+    target: 'smallestChild',
+    requires: { minPopulation: 8, child: true },
+    options: [
+      { id: 'all', label: 'Herkes arasın', effect: { energy: -25, loyalty: { parentsOfTarget: 12, all: 3 } }, result: 'Bütün kasaba meşalelerle ormana döküldü; {who} ağaç kovuğunda uyurken bulundu.', default: true },
+      { id: 'guards', label: 'Bekçiler arasın', cost: { gold: 20 }, requires: 'guardTower', effect: { loyalty: { parentsOfTarget: 6 } }, result: 'Bekçiler gece boyunca aradı; {who} sabaha karşı bulundu.' },
+      { id: 'wait', label: 'Sabahı bekle', effect: { loyalty: { parentsOfTarget: -15 }, moodlet: { who: 'parentsOfTarget', key: 'shaken', reason: 'Çocuğu bir gece kayıptı' } }, result: '{who} sabah kendi kendine döndü; ebeveynleri geceyi gözyaşıyla geçirdi ve yönetime kırgın.' },
+    ],
+  },
+  bumperHarvest: {
+    title: 'Bereketli Hasat',
+    icon: 'food',
+    text: 'Bu yıl bereket taştı; kiler ağzına kadar dolu. Fazlasıyla ne yapalım?',
+    weight: 3,
+    requires: { minPopulation: 8, seasons: ['autumn'], foodRatio: 0.7 },
+    options: [
+      { id: 'feast', label: 'Hasat şöleni', cost: { food: 40 }, effect: { fun: 10, loyalty: { all: 4 } }, result: 'Meydanda hasat şöleni kuruldu; herkes doyasıya yedi, türküler söylendi.', default: true },
+      { id: 'sell', label: 'Kervana sat', cost: { food: 40 }, effect: { gold: 70 }, result: 'Fazla ürün bir kervana satıldı; hazine doldu.' },
+      { id: 'give', label: 'Yoksula dağıt', cost: { food: 25 }, effect: { loyalty: { lowest: [5, 10] } }, result: 'Fazla yiyecek en muhtaç sakinlere dağıtıldı; duaları ardından geldi.' },
+    ],
+  },
+};
+for (const def of Object.values(MID)) {
+  def.midgame = true;
+  for (const o of def.options) { o.detail = ''; o.midgame = true; } // (30.6) o.midgame: bedel ölçeği bu seçeneğe uygulanır
+}
+Object.assign(DILEMMAS, MID);
 export const DILEMMA_KEYS = Object.keys(DILEMMAS);
 
 // Fırtına / kurt saldırısı: karardan bu kadar oyun saati sonra gelir; güçlendirilmemişse hasar verir

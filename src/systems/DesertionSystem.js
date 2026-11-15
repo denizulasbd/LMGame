@@ -75,9 +75,41 @@ export class DesertionSystem {
       this.events.emit('exodus:started', {});
       this.events.emit('toast', { text: 'Umut tükeniyor: sakinler köyü terk etmeyi konuşuyor! Göçmenler de kötü şöhret yüzünden gelmiyor.', tone: 'warn', icon: 'bundle' });
     }
-    if (e.active && (e.lastAt === null || e.lastAt === undefined || now - e.lastAt >= EXODUS.everyMinutes)) {
-      if (this.leaveNext()) e.lastAt = now;
+    if (e.active && (e.lastAt === null || e.lastAt === undefined || now - e.lastAt >= EXODUS.everyMinutes) && !this.capped()) {
+      const group = this.leaveNext();
+      if (group) {
+        e.lastAt = now;
+        this.countLeaving(group);
+      }
     }
+  }
+
+  /**
+   * (30.4a) Terk ediş sınırı (ENGINES.gentleExodus): bugün maxPerDay ya da bu isyanda maxPerRevolt sakine ulaşıldıysa kimse yola
+   * çıkmaz. Sayaçlar state.exodus.cap'te ({ day, today, revoltSince, revolt }; kayda girer). Kapalıyken hiçbir zaman sınır yok.
+   */
+  capped() {
+    if (!engineOn('gentleExodus')) return false;
+    const s = this.state;
+    const cap = (this.exodus.cap ??= { day: null, today: 0, revoltSince: null, revolt: 0 });
+    if (cap.day !== s.time.day) {
+      cap.day = s.time.day;
+      cap.today = 0;
+    }
+    const revolt = s.trust?.revolt;
+    if (revolt && cap.revoltSince !== revolt.since) {
+      cap.revoltSince = revolt.since;
+      cap.revolt = 0;
+    }
+    return cap.today >= EXODUS.maxPerDay || cap.revolt >= EXODUS.maxPerRevolt;
+  }
+
+  /** Yola çıkan grubu sayaçlara ekler (aile birlikte sayılır; sınır bir kez aşılabilir). */
+  countLeaving(group) {
+    const cap = this.exodus.cap;
+    if (!cap || !engineOn('gentleExodus')) return;
+    cap.today += group.length;
+    cap.revolt += group.length;
   }
 
   end() {

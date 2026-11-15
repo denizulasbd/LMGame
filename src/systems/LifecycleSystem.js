@@ -10,6 +10,7 @@
 //                  yadigârı mirasçısına (yoksa arşive) geçer ('population:left' { reason: 'death' }), kesesi eşine ya da evladına kalır.
 //   Kaza         : 'life:fatalAccident' { character, cause } (CrisisSystem: yangın / baskın, ExpeditionSystem: sefer) sakini anında öldürür.
 // Rastgelelik kullanmaz (ömür kimlikten türer; kazanın zarı onu atan sistemdedir).
+import { pruneRelations } from './Chemistry.js';
 import { removeResident } from './DesertionSystem.js';
 import { lifespanFor, hearthSettled, heirloomSettled, venerableCandidate } from './Venerable.js';
 import { heirloomSlot } from './Citizens.js';
@@ -162,6 +163,7 @@ export class LifecycleSystem {
     const text = cause === 'age' ? `${name} ${age} yaşında huzur içinde hayata gözlerini yumdu.` : `${name} ${age} yaşında ${CAUSE_TEXT[cause] ?? 'can verdi'}.`;
     this.events.emit('population:died', { character: c, age, cause, text });
     this.events.emit('toast', { text, tone: cause === 'age' ? 'info' : 'warn', icon: cause === 'age' ? 'book' : 'heart' });
+    pruneRelations(s.characters); // (30.6) vefat işleyicileri (yas, tören) ölene kayıt yazmış olabilir: hepsi bittikten sonra son temizlik
     return true;
   }
 }

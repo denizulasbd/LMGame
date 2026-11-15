@@ -40,11 +40,14 @@ import { BondSystem } from '../systems/BondSystem.js';
 import { LoyaltySystem } from '../systems/LoyaltySystem.js';
 import { RiteSystem } from '../systems/RiteSystem.js';
 import { LOYALTY_SEED_OFFSET } from '../data/loyalty.js';
+import { DiscontentSystem } from '../systems/DiscontentSystem.js';
 import { ConflictSystem } from '../systems/ConflictSystem.js';
 import { FamilySystem } from '../systems/FamilySystem.js';
 import { CraftingSystem } from '../systems/CraftingSystem.js';
 import { JournalSystem } from '../systems/JournalSystem.js';
 import { SaveSystem } from '../systems/SaveSystem.js';
+import { GuideSystem } from '../systems/GuideSystem.js'; // (30.1) rehber kartları
+import { StoryDirector } from '../systems/StoryDirector.js'; // (30.2) hikâye kartları
 import { EventSystem } from '../systems/EventSystem.js';
 import { HeatingSystem } from '../systems/HeatingSystem.js';
 import { MilestoneSystem } from '../systems/MilestoneSystem.js';
@@ -183,7 +186,11 @@ export class TownScene extends Scene {
     // (29.6) Vefa ve Husumet: sadakat, isyan elebaşı, yağma kırgınlığı, anının kişisi (üreteci yok)
     this.loyalty = new LoyaltySystem(this.game, this.world, { chemistry: this.chemistry });
     // (29.7) Anma Töreni ve özel günler (izole üreteç seed + 41: yalnızca sözler; tören ve özel günler zar çekmez)
-    this.rites = new RiteSystem(this.game, this.world, new Random(state.seed + LOYALTY_SEED_OFFSET), { economy: this.economy, relationships: this.relationships, loyalty: this.loyalty });
+    // (30.3) Kararın Ağırlığı: Halkın Nabzı, anında geri bildirim, iş bırakma, homurdanma (söz üreteci RiteSystem ile ortak: tohum + 41).
+    // Yönetim eylemlerinin ön dinleyicileri için eylemi işleyen sistemlerden (RiteSystem, Trust, Petition, Tax, Dilemma) ÖNCE kurulur.
+    const speech41 = new Random(state.seed + LOYALTY_SEED_OFFSET);
+    this.discontent = new DiscontentSystem(this.game, this.world, speech41, { economy: this.economy });
+    this.rites = new RiteSystem(this.game, this.world, speech41, { economy: this.economy, relationships: this.relationships, loyalty: this.loyalty });
     this.social = new SocialSystem(this.game, this.world, new Random(state.seed + 19), { relationships: this.relationships });
     this.crafting = new CraftingSystem(this.game, this.world, this.economy);
     this.health = new HealthSystem(this.game, this.world, new Random(state.seed + 8));
@@ -250,7 +257,7 @@ export class TownScene extends Scene {
     });
     this.milestones = new MilestoneSystem(this.game, this.world, TILE_TYPES.cobble.id);
     this.townLevel = new TownLevelSystem(this.game, this.world, this.economy, { attract: this.attract });
-    this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population }, { attract: this.attract });
+    this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population, loyalty: this.loyalty, chemistry: this.chemistry, moodlets: this.moodlets, health: this.health, desertion: this.desertion, relationships: this.relationships }, { attract: this.attract });
     this.expeditions = new ExpeditionSystem(this.game, this.world, { economy: this.economy, health: this.health, dilemmas: this.dilemmas }, new Random(state.seed + 17));
     // (26.3) Gezgin Konuklar: Seyyar Ozan, Nadir Takasçı, Yaşlı Seyyah (kendi üreteci seed + 34; Altın Çağ'dan sonra)
     this.guestSystem = new GuestSystem(this.game, this.world, new Random(state.seed + 34), { expeditions: this.expeditions, attract: this.attract });
@@ -303,7 +310,12 @@ export class TownScene extends Scene {
     ];
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
+    this.guideSystem = new GuideSystem(this.game, { attract: this.attract }); // (30.1) güncelleme listesinde değil: yalnızca olay dinler
+    this.storyDirector = new StoryDirector(this.game, { attract: this.attract }); // (30.2) güncelleme listesinde değil: yalnızca olay dinler
+    this.discontent.attachLate(); // (30.3) yönetim eylemlerinin son dinleyicileri (eylemi işleyen bütün sistemlerden sonra)
     this.disposables = [
+      this.guideSystem,
+      this.storyDirector,
       this.timeSystem,
       this.construction,
       this.nature,
@@ -324,6 +336,7 @@ export class TownScene extends Scene {
       this.evolution,
       this.bonds,
       this.loyalty,
+      this.discontent,
       this.rites,
       this.family,
       this.social,
@@ -362,6 +375,8 @@ export class TownScene extends Scene {
     ];
 
     this.camera = new Camera();
+    // (30.1) araçlar için görünen alan (boyama taraması): kamera ve çizim yüzeyinin güncel boyutu
+    this.toolView = { camera: this.camera, get width() { return renderer.width; }, get height() { return renderer.height; } };
     const size = CONFIG.TILE_SIZE;
     this.camera.centerOn(landmarks.plaza.centerX * size, landmarks.plaza.centerY * size, renderer.width, renderer.height);
     this.camera.clamp(map.pixelWidth, map.pixelHeight, renderer.width, renderer.height);
@@ -577,6 +592,7 @@ export class TownScene extends Scene {
     this.fireflies.update(dt, this.map);
     this.audio.update(dt, tick.hour);
 
+    this.storyDirector.sync(); // (30.2) hikâye kartı kuyruğu (oyun saati işleri); zar çekmez, simülasyona yazmaz
     if (this.attract) {
       this.drainInput();
       return;
@@ -590,9 +606,10 @@ export class TownScene extends Scene {
       this.updateCameraTarget(dt);
       return;
     }
+    this.guideSystem.sync(); // (30.1) yalnızca state.guide'ı günceller; zar çekmez
     const hovered = this.hoveredTile();
     const escapeUsed = this.tools.handleKeys();
-    this.tools.update(hovered);
+    this.tools.update(hovered, this.toolView);
     if (!this.tools.isActive) this.handleSelectionInput(escapeUsed);
 
     this.updateCameraTarget(dt);
@@ -642,12 +659,24 @@ export class TownScene extends Scene {
     const camera = this.camera;
 
     // Klavye: ekranda sabit hızda kaysın diye yakınlaştırmaya bölünür
-    const speed = (CONFIG.CAMERA_SPEED * dt) / camera.zoom;
+    // (30.6) hız pencere genişliğiyle ölçeklenir (geniş ekranda yavaş kalmaz) ve bir tuşa tek basış bile en az PAN_MIN_TILES karo kaydırır
+    // (kısa dokunuş bir kareden kısa sürse de: kalan mesafe tuş bırakılsa da tamamlanır)
+    const scale = Math.max(CONFIG.CAMERA_SCALE_MIN, Math.min(CONFIG.CAMERA_SCALE_MAX, renderer.width / CONFIG.CAMERA_REF_WIDTH));
+    const speed = (CONFIG.CAMERA_SPEED * scale * dt) / camera.zoom;
     let manual = false;
     const moves = { left: [-speed, 0], right: [speed, 0], up: [0, -speed], down: [0, speed] };
+    this.panOwed ??= { left: 0, right: 0, up: 0, down: 0 };
     for (const [action, [dx, dy]] of Object.entries(moves)) {
+      if (input.wasPressed(action)) this.panOwed[action] = CONFIG.PAN_MIN_TILES * CONFIG.TILE_SIZE;
+      const step = Math.abs(dx || dy);
       if (input.isDown(action)) {
         camera.move(dx, dy);
+        this.panOwed[action] = Math.max(0, this.panOwed[action] - step);
+        manual = true;
+      } else if (this.panOwed[action] > 0) {
+        const part = Math.min(step, this.panOwed[action]);
+        camera.move(Math.sign(dx) * part, Math.sign(dy) * part);
+        this.panOwed[action] -= part;
         manual = true;
       }
     }
@@ -662,6 +691,7 @@ export class TownScene extends Scene {
     if (manual) {
       this.setFollow(null);
       this.focusId = null;
+      this.game.events.emit('camera:moved', {}); // (30.1) rehber: kamera elle gezildi
     }
 
     // Tekerlek imleç etrafında, klavye ekran merkezinde yakınlaştırır
@@ -673,6 +703,7 @@ export class TownScene extends Scene {
       const anchorY = input.mouse.inside && !this.followId ? input.mouse.y : renderer.height / 2;
       if (camera.zoomAt(anchorX, anchorY, camera.zoom + zoomSteps)) {
         this.game.events.emit('camera:zoom', camera.zoom);
+        this.game.events.emit('camera:moved', {}); // (30.1)
       }
     }
 
@@ -900,7 +931,7 @@ export class TownScene extends Scene {
     this.drawSelectedBuilding(renderer);
 
     if (this.tools.isActive) {
-      this.tools.render(renderer, env);
+      this.tools.render(renderer, env, this.camera);
     } else if (this.hovered && this.hoveredCharacterId === null) {
       const { tileX, tileY } = this.hovered;
       drawTileCursor(renderer, tileX, tileY, this.animationTime, this.map.isBuildable(tileX, tileY));

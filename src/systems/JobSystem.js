@@ -71,6 +71,14 @@ export class JobSystem {
     return Boolean(object && OBJECT_TYPES[object].harvest);
   }
 
+  /** (30.6) Bu karoda toplanabilecek şeyin iş türü ('chop' ağaç, 'mine' kaya, 'forage' çalı) ya da null. */
+  harvestKind(x, y) {
+    if (!this.isHarvestable(x, y)) return null;
+    const building = this.world.getBuilding(this.world.map.getOccupant(x, y));
+    if (building) return BUILDINGS[building.type].harvest.job;
+    return OBJECT_TYPES[this.world.map.getObject(x, y)].harvest.job;
+  }
+
   /** Toplama emri verir. Başarılıysa iş döner. */
   designate(x, y) {
     if (this.jobAt(x, y) || !this.isHarvestable(x, y)) return null;

@@ -196,7 +196,9 @@ const out = await page.evaluate(async () => {
   // 14. sadakat ayarı (29.10b): Kırgın kasaba erimesi yumuşatıldı, kasabayı bir günde boşaltmaz
   {
     const { LOYALTY } = await import('/src/data/loyalty.js');
-    check('29.10b: Kırgın kasaba erimesi saat başı -1,7 (günde en çok ~38 puan), eşik %25', LOYALTY.bitterTrust.perHour === -1.7 && LOYALTY.bitterTrust.share === 0.25, JSON.stringify(LOYALTY.bitterTrust));
+    // (30.3) sadakat artık günler içinde Kırgın'a indiği için erime -1,7 -> -0,4 (günde en çok ~10 puan) ayarlandı
+    // (30.4a) terk ediş sınırıyla çöküş kalktı: -0,4 -> -0,6 (günde en çok ~14 puan)
+    check('29.10b / 30.3 / 30.4a: Kırgın kasaba erimesi saat başı -0,6 (günde en çok ~14 puan), eşik %25', LOYALTY.bitterTrust.perHour === -0.6 && LOYALTY.bitterTrust.share === 0.25, JSON.stringify(LOYALTY.bitterTrust));
   }
   return out;
 });

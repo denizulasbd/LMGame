@@ -396,7 +396,7 @@ export class HarborSystem {
     const trade = this.trade;
     let bonus = null;
     if (gold > 0) {
-      this.economy.add('gold', gold);
+      this.economy.add('gold', gold, 'export');
       trade.shipments += 1;
       trade.goldEarned += gold;
       for (const [r, v] of Object.entries(cargo)) trade.exported[r] = (trade.exported[r] ?? 0) + v;

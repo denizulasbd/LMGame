@@ -7,10 +7,12 @@ import { getCharacterPortraitURL, lookKey } from '../../art/sprites/index.js';
 import { NEED_KEYS } from '../../data/characters.js';
 import { getAnyIconURL } from '../../art/ui/index.js';
 import { el } from '../dom.js';
-import { moodMarkOf } from '../../rendering/ExpressionLayer.js';
+import { moodMarkOf, markIconURL, MOOD_MARKS } from '../../rendering/ExpressionLayer.js';
+import { WANTS } from '../../data/wants.js';
+import { wantName } from '../../systems/Wants.js';
 
-// (29.8) çekmecedeki ruh hali işareti: bulut / pırıltı / ter damlası (Duygu Katmanı ile aynı eşleme) ve özel gün simgesi
-const MARK_ICONS = { cloud: ['sulk', 'is-trauma', 'Ruh hali: ağır bir yük taşıyor'], sparkle: ['sparkle', 'is-positive', 'Ruh hali: coşkulu'], sweat: ['sweat', 'is-negative', 'Ruh hali: yorgun / bıkkın'] };
+// (29.8) çekmecedeki ruh hali işareti: Duygu Katmanı ile AYNI simge (30.2: ExpressionLayer.markIconURL) ve özel gün simgesi
+const MARK_CLASS = { cloud: 'is-trauma', sparkle: 'is-positive', sweat: 'is-negative' };
 
 const COLLAPSED_KEY = 'lmgame.ui.residentsCollapsed';
 
@@ -54,13 +56,25 @@ export class ResidentList {
     this.rosterKey = '';
 
     this.title = el('span', { className: 'resident-title' });
+    // (30.2) "?" ipucu: satır simgelerinin anlamı
+    const legendRow = (src, text) => el('div', {}, [el('img', { src, alt: '' }), el('span', { text })]);
+    this.helpTip = el('div', { className: 'panel resident-help-tip ui-interactive', hidden: true }, [
+      ...Object.entries(MOOD_MARKS).map(([key, def]) => legendRow(markIconURL(key), def.name)),
+      legendRow(getAnyIconURL('star'), 'Yakından izleniyor (satırdaki yıldızla aç / kapat)'),
+      legendRow(getAnyIconURL('flower'), 'Bugün özel günü'),
+      legendRow(getAnyIconURL('sparkle'), 'Açık bir dileği var (simge dileğin türünü gösterir)'),
+    ]);
+    this.helpButton = el('button', { className: 'hud-btn resident-help-btn', type: 'button', text: '?', title: 'Simgeler ne demek?', tabIndex: -1 });
+    this.helpButton.addEventListener('mousedown', (e) => e.preventDefault());
+    this.helpButton.addEventListener('click', () => (this.helpTip.hidden = !this.helpTip.hidden));
+    this.helpWrap = el('span', { className: 'resident-help' }, [this.helpButton, this.helpTip]);
     this.toggle = el('button', { className: 'hud-btn resident-toggle', type: 'button', text: '▸', title: 'Listeyi gizle', tabIndex: -1 });
     this.toggle.setAttribute('aria-label', 'Sakinler listesini gizle');
     this.toggle.addEventListener('mousedown', (e) => e.preventDefault());
     this.toggle.addEventListener('click', () => this.setCollapsed(true));
     this.list = el('div', { className: 'resident-list' });
     this.panel = el('div', { className: 'panel residents ui-interactive' }, [
-      el('div', { className: 'resident-header' }, [el('img', { className: 'resident-title-icon', src: getAnyIconURL('people'), alt: '' }), this.title, this.toggle]),
+      el('div', { className: 'resident-header' }, [el('img', { className: 'resident-title-icon', src: getAnyIconURL('people'), alt: '' }), this.title, this.helpWrap, this.toggle]),
       this.list,
     ]);
     // Kapalıyken kalan ince sekme
@@ -112,37 +126,51 @@ export class ResidentList {
     if (!collapsed) this.rosterKey = ''; // kapalıyken güncellenmeyen satırlar yenilensin
   }
 
-  rebuild(characters) {
+  rebuild(characters, watched = []) {
     this.list.replaceChildren();
     this.rows.clear();
-    for (const c of characters) {
+    // (30.2) izlenenler en üstte (kendi aralarında izleme sırasıyla), ötekiler listedeki sırada
+    const ordered = [...watched.map((id) => characters.find((c) => c.id === id)).filter(Boolean), ...characters.filter((c) => !watched.includes(c.id))];
+    for (const c of ordered) {
       const status = el('span', { className: 'resident-status' });
       const mood = el('span', { className: 'status-dot resident-mood' });
       const mark = el('img', { className: 'resident-mark resident-mood-mark', alt: '', hidden: true });
+      const isWatched = watched.includes(c.id);
+      const watchBtn = el('span', { className: 'resident-watch', role: 'button', title: isWatched ? 'Yakından izlemeyi bırak' : 'Yakından izle (en çok 3 sakin)' }, [el('img', { src: getAnyIconURL('star'), alt: 'Yakından izle' })]);
+      watchBtn.addEventListener('mousedown', (e) => e.preventDefault());
+      watchBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.events.emit('ui:toggleWatch', { id: c.id });
+      });
+      const wish = el('img', { className: 'resident-wish', alt: '', hidden: true });
       const special = el('img', { className: 'resident-mark resident-special', src: getAnyIconURL('flower'), alt: '', title: 'Bugün onun özel günü', hidden: true });
       const row = el('button', { className: 'resident-row', type: 'button', tabIndex: -1 }, [
         el('img', { className: `resident-portrait${c.isChild ? ' is-child' : ''}`, src: getCharacterPortraitURL(c.appearance, c.look), alt: '' }),
         el('span', { className: 'resident-text' }, [el('span', { className: 'resident-name', text: c.name }), status]),
+        watchBtn,
+        wish,
         special,
         mark,
         mood,
       ]);
+      row.classList.toggle('is-watched', isWatched);
       row.addEventListener('mousedown', (e) => e.preventDefault());
       row.addEventListener('click', () => this.events.emit('ui:selectCharacter', c.id));
       row.classList.toggle('is-selected', c.id === this.selectedId);
       this.list.append(row);
-      this.rows.set(c.id, { row, status, mood, mark, special, lastStatus: '', lastMood: '', lastMark: undefined, lastSpecial: undefined });
+      this.rows.set(c.id, { row, status, mood, mark, special, wish, lastStatus: '', lastMood: '', lastMark: undefined, lastSpecial: undefined, lastWish: undefined });
     }
   }
 
   render(game) {
     const characters = game.state.characters;
-    const rosterKey = characters.map((c) => `${c.id}:${lookKey(c.look)}`).join(',');
+    const watched = game.state.watched ?? [];
+    const rosterKey = `${watched.join('.')}|${characters.map((c) => `${c.id}:${lookKey(c.look)}`).join(',')}`;
     if (rosterKey !== this.rosterKey) {
       this.rosterKey = rosterKey;
       this.title.textContent = `Kasaba Sakinleri (${characters.length})`;
       this.tabCount.textContent = String(characters.length);
-      this.rebuild(characters);
+      this.rebuild(characters, watched);
     }
     if (this.collapsed) return;
 
@@ -157,13 +185,25 @@ export class ResidentList {
       const markKey = c.mood?.feel === 'Dengeli' ? null : moodMarkOf(c);
       if (entry.lastMark !== markKey) {
         entry.lastMark = markKey;
-        const spec = markKey ? MARK_ICONS[markKey] : null;
-        entry.mark.hidden = !spec;
-        if (spec) {
-          entry.mark.src = getAnyIconURL(spec[0]);
-          entry.mark.className = `resident-mark resident-mood-mark ${spec[1]}`;
-          entry.mark.title = spec[2];
-          entry.mark.alt = spec[2];
+        entry.mark.hidden = !markKey;
+        if (markKey) {
+          entry.mark.src = markIconURL(markKey);
+          entry.mark.className = `resident-mark resident-mood-mark ${MARK_CLASS[markKey]}`;
+          entry.mark.dataset.mark = markKey;
+          entry.mark.title = `Ruh hali: ${MOOD_MARKS[markKey].name}`;
+          entry.mark.alt = entry.mark.title;
+        }
+      }
+      // (30.2) açık dileği olan sakinde dilek simgesi (dileğin kendi simgesi)
+      const want = c.wants?.length ? c.wants[0] : null;
+      const wishKey = want ? want.key : null;
+      if (entry.lastWish !== wishKey) {
+        entry.lastWish = wishKey;
+        const def = want ? WANTS[want.key] : null;
+        entry.wish.hidden = !def;
+        if (def) {
+          entry.wish.src = getAnyIconURL(def.icon);
+          entry.wish.title = entry.wish.alt = `Dileği: ${wantName('want', want)}`;
         }
       }
       const special = c.specialDay && c.specialDay.day === game.state.time.day ? c.specialDay.kind ?? 'birthday' : false;

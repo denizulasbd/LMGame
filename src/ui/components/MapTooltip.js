@@ -102,6 +102,11 @@ export class MapTooltip {
     let y = this.mouse.y + OFFSET_Y;
     if (x + w > window.innerWidth - 8) x = this.mouse.x - w - 8;
     if (y + h > window.innerHeight - 8) y = this.mouse.y - h - 10;
+    // (30.2) Üst şeridin (kasaba adı, çipler) üstüne binmesin: şeridin altına iner
+    const top = (this.topbar ??= document.querySelector('.hud.topbar'));
+    const floor = top ? top.getBoundingClientRect().bottom + 4 : 4;
+    y = Math.max(y, floor);
+    if (y + h > window.innerHeight - 8) y = Math.max(floor, window.innerHeight - h - 8);
     this.element.style.transform = `translate(${Math.round(Math.max(4, x))}px, ${Math.round(Math.max(4, y))}px)`;
   }
 }

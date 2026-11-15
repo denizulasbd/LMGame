@@ -46,6 +46,7 @@
 //                                         [--crisis huzurlu|dengeli|cetin] [--no-safety] [--crisis-state]
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
 //   --speed   : oyun hızı (varsayılan 4); 1x'te aynı oyun günü dört kat çok, daha küçük adımla geçer
+//   --stories : (30.2) hikâye kartı günlüğünü dosyaya yazar (gün başına kart sayımı); --story-filter all|important|off süzgeci seçer
 //   --save    : simülasyon sonunda oyunu kayıt dosyasına yazar (uyumluluk testinin fikstürü için)
 //   --crisis  : (23. aşama) tehlike sıklığı (varsayılan dengeli); huzurlu + --no-safety, 22. aşamayla bire bir aynı koşuyu verir
 //   --crisis-state : (23. aşama) kayıttan hemen önce bir yangın, bir hasarlı yapı, bir yaralı ve bekleyen bir haydut baskını oluşturur
@@ -57,6 +58,9 @@
 //   --no-apprentice : (25.2) Çırak Kapısı hiç açılmaz (çıraklık katmanının kapalıyken oyunu hiç değiştirmediğini göstermek için)
 //   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
 //               oyunun ana üretecini tüketmediğini göstermek için: --crisis huzurlu ile 22. aşamanın koşusunu bire bir verir)
+//   --loy     : (30.3) data/loyalty.js'i bellekte geçersiz kılar (denge denemesi): "LOYALTY.bitterTrust.perHour=-0.5"
+//   --start-food N : (30.6) başlangıç yiyeceğini geçersiz kılar (denge denemesi)
+//   --famine [gün=5] : (30.3) kıtlık senaryosu: o günden sonra bütün bahçeler yıkılır, toplama emri ve acil dağıtım yapılmaz (oyuncu tepkisiz)
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
 //               bulunursa çıkış kodu 1 olur
 import fs from 'fs';
@@ -70,11 +74,27 @@ const seed = Number(positional[0] ?? 42);
 const days = Number(positional[1] ?? 32);
 const speed = Number(options.speed ?? 4);
 
-const { browser, page, errors } = await openGame({ seed });
+const { browser, page, errors } = await openGame({ seed, enginesOff: typeof options['engines-off'] === 'string' ? options['engines-off'] : null }); // (30.4a) açılıştan önce
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
+if (options['start-food'] !== undefined) await page.evaluate((v) => { window.game.state.resources.food = v; }, Number(options['start-food'])); // (30.6) denge denemesi: başlangıç yiyeceği
+if (options.stories) await page.evaluate((f) => { window.game.scenes.current.storyDirector.autoTick = true; if (f) window.game.events.emit('ui:setStoryFilter', { filter: f }); }, typeof options['story-filter'] === 'string' ? options['story-filter'] : null); // (30.2)
 // (29.4) --evo "rules.decayPerDay=3;sources.moodlets.quarrel=..." : denge denemeleri için evrim verisini bellekte geçersiz kılar (dosyaya yazmaz).
 // Yol: evolution.js dışa aktarımı.alan...; değer JSON. Örn: --evo "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
+// (30.3) --loy "LOYALTY.bitterTrust.perHour=-0.5;LOYALTY_SOURCES.hungryDaily=-6" : denge denemeleri için data/loyalty.js'i bellekte geçersiz kılar
+if (options.loy) {
+  await page.evaluate(async (spec) => {
+    const mod = await import('/src/data/loyalty.js');
+    for (const part of String(spec).split(';')) {
+      const [path, raw] = part.split('=');
+      if (!path || raw === undefined) continue;
+      const keys = path.trim().split('.');
+      let obj = mod;
+      for (const k of keys.slice(0, -1)) obj = obj[k];
+      obj[keys[keys.length - 1]] = JSON.parse(raw);
+    }
+  }, options.loy);
+}
 if (options.evo) {
   await page.evaluate(async (spec) => {
     const mod = await import('/src/data/evolution.js');
@@ -94,12 +114,55 @@ await page.evaluate((o) => {
   window.__noApprentice = o.noApprentice; // (25.2)
   if (o.crisis) window.game.state.crisis.difficulty = o.crisis; // doğrudan durumdan (bildirim / ses tüketmesin: huzurlu + --no-safety koşusu 22. aşamayla bire bir aynı olmalı)
   window.__profile = o.profile; // (29.10)
-}, { noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null });
-if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent'].includes(options.profile)) {
-  console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent)`);
+  window.__famine = o.famine; // (30.3)
+}, { famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null });
+if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent', 'repent2', 'novice'].includes(options.profile)) {
+  console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent | repent2 | novice)`);
   process.exit(2);
 }
 
+// (30.6) acemi profili ölçümü (yalnızca dinler; altın akışı çağıran yığınından etiketlenir, oyunun durumuna / üretecine dokunmaz)
+await page.evaluate(async () => {
+  window.__townMetrics = (await import('/src/systems/TownStatus.js')).townMetrics;
+  const g = window.game;
+  const N = (window.__nov = { gold: { in: {}, out: {} }, daily: [], tiers: {}, zero: {}, zeroRun: {}, zeroLongest: {}, levy: [], foodMin5: Infinity, goals: [], decisions: 0 });
+  const econ = g.scenes.current.economy;
+  const label = () => {
+    const lines = new Error().stack.split('\n').slice(2);
+    for (const l of lines) {
+      const m = l.match(/at (?:async )?(?:\w+\.)?(\w+) .*\/(\w+)\.js/) ?? l.match(/\/(\w+)\.js.*/);
+      if (m && m[2] !== 'EconomySystem') return `${m[2]}.${m[1]}`;
+      if (m && !m[2]) return m[1];
+    }
+    return '?';
+  };
+  for (const [fn, bucket, sign] of [['add', 'in', 1], ['spend', 'out', -1]]) {
+    const orig = econ[fn].bind(econ);
+    econ[fn] = (...a) => {
+      const before = econ.amount('gold');
+      const r = orig(...a);
+      const d = (econ.amount('gold') - before) * sign;
+      if (d > 0) { const k = label(); N.gold[bucket][k] = (N.gold[bucket][k] ?? 0) + d; }
+      return r;
+    };
+  }
+  g.events.on('town:tierUp', ({ tier }) => { N.tiers[tier.tier] = g.state.time.day; });
+  g.events.on('crown:levyPaid', ({ amount, goods }) => N.levy.push({ day: g.state.time.day, ok: true, amount, goods: Object.keys(goods ?? {}).length > 0 }));
+  g.events.on('crown:levyFailed', ({ amount }) => N.levy.push({ day: g.state.time.day, ok: false, amount }));
+  g.events.on('milestone:completed', ({ milestone }) => N.goals.push(`${g.state.time.day}:${milestone.id}`));
+  g.events.on('time:hour', () => {
+    const s = g.state;
+    if (s.time.day <= 5) N.foodMin5 = Math.min(N.foodMin5, s.resources.food);
+  });
+  g.events.on('time:newDay', () => {
+    const s = g.state;
+    const r = s.resources;
+    N.daily.push({ m: window.__townMetrics(s), day: s.time.day, gold: r.gold, food: r.food, bread: r.bread, wood: r.wood, stone: r.stone, tier: s.town.tier, pop: s.characters.length });
+    for (const k of ['gold', 'food', 'wood', 'stone']) {
+      if ((r[k] ?? 0) <= 0) { N.zeroRun[k] = (N.zeroRun[k] ?? 0) + 1; N.zeroLongest[k] = Math.max(N.zeroLongest[k] ?? 0, N.zeroRun[k]); } else N.zeroRun[k] = 0;
+    }
+  });
+});
 // (29.5) --engines-off bonds[,ad...] : A/B karşılaştırması için mekanik şalterlerini kapatır; bağ ölçümü (yalnızca dinler, durumu değiştirmez)
 await page.evaluate(async (off) => {
   const { ENGINES } = await import('/src/systems/Engines.js');
@@ -137,6 +200,33 @@ await page.evaluate(async (off) => {
     P.left.push({ day: window.game.state.time.day, name: character.name, loyalty: character.loyalty ?? 0, tier: tierOf(character.loyalty ?? 0) });
   });
   ev.on('rite:condolence', () => (P.condolences += 1));
+  // (30.3) kararın ağırlığı ölçümü (yalnızca dinler): gün dönümünde Homurdanan / Kırgın / Memnun+ oranı, hazine, Ağır Vergi'ye geçiş günü,
+  // iş bırakma günleri (11:00'de meydanda 'strike' görevindeki en az 2 yetişkin), Nabız (yüz, yön, ilk üç neden)
+  const W = (window.__weightStats = { daily: [], heavyDay: null, strikes: [], switchDay: null, switchPop: null, famine: [] });
+  ev.on('tax:rateChanged', ({ rate }) => { if (rate === 'heavy' && W.heavyDay === null) W.heavyDay = window.game.state.time.day; });
+  ev.on('pantry:low', () => { if (window.__famine && window.game.state.time.day >= window.__famine) W.lowDay ??= window.game.state.time.day; });
+  ev.on('time:newDay', () => {
+    const s = window.game.state;
+    const L = s.characters.filter((c) => !c.isChild && !c.role).map((c) => c.loyalty ?? 0);
+    const n = Math.max(1, L.length);
+    const pulse = window.game.scenes.current.discontent?.summary?.() ?? null;
+    W.daily.push({ day: s.time.day, grum: L.filter((v) => v <= -20 && v > -40).length / n, bitter: L.filter((v) => v <= -40).length / n, pleased: L.filter((v) => v >= 20).length / n, avg: L.reduce((a, b) => a + b, 0) / n, gold: Math.round(s.resources.gold), pop: s.characters.length, food: Math.round(s.resources.food), trust: Math.round(s.trust.value), pulse: pulse ? { face: pulse.face, dir: pulse.dir, top: pulse.top.map((r) => r.key), pts: pulse.top.map((r) => r.points) } : null });
+  });
+  // (30.3) kıtlık tanısı: günlük yiyecek girişi / çıkışı, aç sakin sayısı
+  W.food = { gain: 0, loss: 0 };
+  ev.on('resources:changed', ({ resource, delta }) => { if (resource === 'food' || resource === 'bread') W.food[delta > 0 ? 'gain' : 'loss'] += Math.abs(delta) * (resource === 'bread' ? 2.5 : 1); });
+  ev.on('time:newDay', () => {
+    const s = window.game.state;
+    const last = W.daily.at(-1);
+    if (last) Object.assign(last, { gain: Math.round(W.food.gain), loss: Math.round(W.food.loss), hangry: s.characters.filter((c) => c.moodlets?.some((m) => m.key === 'hangry')).length, gardens: s.buildings.filter((b) => b.type === 'garden').length });
+    W.food = { gain: 0, loss: 0 };
+  });
+  ev.on('time:hour', (h) => {
+    if (h !== 11) return;
+    const s = window.game.state;
+    const k = s.characters.filter((c) => c.task?.activity === 'strike').length;
+    if (k >= 2) W.strikes.push({ day: s.time.day, n: k });
+  });
   ev.on('special:gifted', () => (P.gifts += 1));
   // (29.6 §2 teşhisi) yapı türü başına çalışılan saat (mesaide yapıda / iş emrinde 'perform' evresindeki sakin başına saat başı 1)
   const WH = (window.__workHours = {});
@@ -242,6 +332,8 @@ await page.evaluate((passive) => {
     wolves: ['fence', 'dogs', 'risk'],
     expedition: ['bigParty', 'scout', 'ignore'],
   };
+  window.__midLog = []; // (30.4b) karar günlüğü: { day, id, midgame, option }
+  game.events.on('dilemma:resolved', ({ id, option, dilemma }) => window.__midLog.push({ day: game.state.time.day, id, midgame: Boolean(dilemma?.midgame), option: option.id }));
   window.__decide = () => {
     const scene = game.scenes.current;
     const active = game.state.dilemma.active;
@@ -249,6 +341,10 @@ await page.evaluate((passive) => {
     const system = scene.dilemmas;
     // (16. aşama) Macera: kafileyle riski en çok %15 olan ganimetli yollardan en değerlisi (bulgusu çok olan), yoksa
     // güvenli kamp. Kazasız geçen riskli yollar (usta + alet) önce gelir.
+    if (active.kind === 'adventure' && window.__profile === 'novice') {
+      game.events.emit('ui:chooseDilemma', { optionId: active.defaultId });
+      return;
+    }
     if (active.kind === 'adventure') {
       const X = window.__exploration;
       const scen = window.__adventures[active.id];
@@ -266,6 +362,16 @@ await page.evaluate((passive) => {
       return;
     }
     const def = window.__dilemmaDefs?.[active.id];
+    // (30.6) acemi: her zaman varsayılan seçenek
+    if (window.__profile === 'novice') {
+      game.events.emit('ui:chooseDilemma', { optionId: active.defaultId });
+      return;
+    }
+    // (30.4b) yeni kartlar: otopilot varsayılan ("orta yol") seçeneği seçer; uygulanamıyorsa DilemmaSystem'in varsayılanı
+    if (def?.midgame) {
+      game.events.emit('ui:chooseDilemma', { optionId: active.defaultId });
+      return;
+    }
     for (const id of PREFER[active.id] ?? []) {
       const option = def?.options.find((o) => o.id === id);
       if (option && system.optionStatus(option).ok) {
@@ -420,14 +526,32 @@ await page.evaluate((passive) => {
     const cy = plaza.centerY;
     const res = s.resources;
     window.__decide();
+    // (30.3) --famine [gün=5] : kıtlık senaryosu. O günden sonra bütün bahçeler (şantiyeleri de) her saat yıkılır; Nabız ve kiler ölçülür
+    if (window.__famine && s.time.day >= window.__famine) {
+      for (const b of [...s.buildings]) if (b.type === 'garden') scene.construction.demolish(b, { quiet: true });
+    }
     // (29.10b) careless: Standart Vergi, dilekçelerin yarısı (sırayla bir kabul, bir ret) reddedilir, kıtlıkta dağıtım / taziye / armağan yok.
     // repent: 20. güne kadar tyrant, sonra benevolent.
-    const profile = window.__profile === 'repent' ? (s.time.day < 20 ? 'tyrant' : 'benevolent') : window.__profile; // (29.10) yönetim senaryosu
+    // (30.3) repent2: ilk isyan başlayana kadar tyrant, isyan başladığı an benevolent (isyan 30. güne kadar çıkmazsa 30. günde geçer)
+    if (window.__profile === 'repent2' && window.__weightStats.switchDay === null && (s.trust.revolt || s.time.day >= 30)) {
+      window.__weightStats.switchDay = s.time.day;
+      window.__weightStats.switchPop = s.characters.length;
+    }
+    const profile = window.__profile === 'repent' ? (s.time.day < 20 ? 'tyrant' : 'benevolent') : window.__profile === 'repent2' ? (window.__weightStats.switchDay === null ? 'tyrant' : 'benevolent') : window.__profile; // (29.10) yönetim senaryosu
     window.__stats.minWelfare = Math.min(window.__stats.minWelfare, s.town.welfare ?? 100);
     // (21. aşama) Vatandaş dilekçeleri ve Yönetim Güveni
     {
       const PT = window.__petitions;
       for (const p of [...s.petitions.list]) {
+        // (30.6) acemi: dilekçelerin yarısı karşılanır (sırayla), yarısı reddedilir
+        if (profile === 'novice') {
+          window.__novPet = (window.__novPet ?? 0) + 1;
+          if (window.__novPet % 2 === 0) { game.events.emit('ui:rejectPetition', { id: p.id }); continue; }
+          const g = PT.grantStatus(s, p, s.equipment.sturdyTool ?? 0);
+          if (g.available && g.ok) game.events.emit('ui:grantPetition', { id: p.id });
+          else if (p.status !== 'accepted') game.events.emit('ui:acceptPetition', { id: p.id });
+          continue;
+        }
         // (29.10) tyrant: bütün dilekçeler reddedilir
         if (profile === 'tyrant') {
           game.events.emit('ui:rejectPetition', { id: p.id });
@@ -464,8 +588,8 @@ await page.evaluate((passive) => {
           }
         }
       }
-      // (22. aşama) İç vergi: güven düştükçe hafiflet, toparlanınca Standart'a dön
-      {
+      // (22. aşama) İç vergi: güven düştükçe hafiflet, toparlanınca Standart'a dön (30.6: acemi vergiye ve fermana dokunmaz)
+      if (profile !== 'novice') {
         const CR = window.__crown;
         const t = s.trust.value;
         const want = profile === 'tyrant' ? 'heavy' : profile === 'careless' ? 'standard' : profile === 'benevolent' ? (t < 62 || res.gold >= 200 ? 'exempt' : 'low') : t < 40 ? 'exempt' : t < 62 ? 'low' : 'standard';
@@ -503,7 +627,7 @@ await page.evaluate((passive) => {
         }
       }
       // (24. aşama) Ekim tercihi: gıda kritikse hepsi Buğday; silo varken ve besin bolken bir bahçe Keten, biri Şerbetçiotu
-      if (!window.__noAgri) {
+      if (!window.__noAgri && profile !== 'novice') {
         const GR = window.__granary;
         const A = (window.__stats.agri ??= { toGrain: 0, toFlax: 0, toHops: 0, critical: 0, fullBack: 0 });
         const gardens = world.getCompleted('garden').filter((b) => !b.damaged).sort((a, b) => a.id - b.id);
@@ -535,7 +659,7 @@ await page.evaluate((passive) => {
         }
       }
       // (24.3) Dış ticaret: rezervleri koruyarak ihracat, altın bolken kritik hammaddeyi ithal et
-      if (!window.__noAgri && s.tradePost?.ship && window.__tradePost.shipDocked(s)) {
+      if (!window.__noAgri && profile !== 'novice' && s.tradePost?.ship && window.__tradePost.shipDocked(s)) {
         const TPm = window.__tradePost;
         const X = (window.__stats.trade ??= { contracts: 0, gold: 0, imports: 0, held: 0 });
         const pop = Math.max(1, s.characters.length);
@@ -566,7 +690,7 @@ await page.evaluate((passive) => {
       }
       // Güven düşerse (ya da isyan çıkarsa) acil dağıtım
       const T = window.__trust;
-      if (profile !== 'tyrant' && profile !== 'careless' && (s.trust.revolt || s.trust.value < 40)) {
+      if (profile !== 'tyrant' && profile !== 'careless' && profile !== 'novice' && !(window.__famine && s.time.day >= window.__famine) && (s.trust.revolt || s.trust.value < 40)) {
         for (const kind of ['food', 'gold']) if (T.reliefStatus(s, kind).ok) game.events.emit('ui:relief', { kind });
       }
       // (29.10) benevolent: her törende Taziye Sofrası, her özel günde (altın yetiyorsa) armağan
@@ -600,7 +724,8 @@ await page.evaluate((passive) => {
     const autumn = yearDay >= 8 && yearDay < 13;
     if (res.wood < (autumn ? 90 : 45) && pending('chop') < 4) designateNear(['oak', 'pine'], 4);
     if (res.stone < 35 && pending('mine') < 3) designateNear(['rock'], 2);
-    if (res.food < 25 && pending('forage') < 3) {
+    // (30.3) kıtlık senaryosunda oyuncu kıtlığa tepki vermez: toplama emri yok
+    if (res.food < 25 && pending('forage') < 3 && !(window.__famine && s.time.day >= window.__famine)) {
       for (const bush of world.getBuildingsOfType('berryBush')) {
         if (pending('forage') >= 3) break;
         if (bush.berries > 0 && Math.hypot(bush.tileX - cx, bush.tileY - cy) < 22) scene.jobs.designate(bush.tileX, bush.tileY);
@@ -614,6 +739,8 @@ await page.evaluate((passive) => {
       if (ruin) scene.construction.startProject(ruin);
     }
 
+    // (30.6) acemi: ferman, araştırma, liman, kule, keşif, imar yok; yalnızca iki günde bir tek yapı kararı
+    if (profile !== 'novice') {
     // Belediye fermanları: stoklar dolunca
     const cap = s.storageCapacity;
     if (world.getCompleted('townHall').length) {
@@ -767,6 +894,8 @@ await page.evaluate((passive) => {
     // (18. aşama) İmar: kapıları yola bağla, meydanı parke taşa çevir, sokak eşyaları ve ağaçlar
     window.__imar(scene, s, res);
 
+    }
+    if (profile === 'novice' && s.time.day - (window.__novLast ?? -9) < 2) return;
     const sites = s.buildings.filter((b) => (b.underConstruction || b.project) && b.type !== 'wonder').length;
     if (sites >= 2) return;
     const beds = s.buildings.filter((b) => b.functional && b.capacity).reduce((n, b) => n + b.capacity, 0);
@@ -792,16 +921,28 @@ await page.evaluate((passive) => {
       next = 'cabin';
       nextSpot = null;
     }
-    if (res.wood > 70 && res.stone > 55) {
+    // (30.6) acemi yalnızca hedeflerin istediği kadar (3) yükseltme yapar
+    if (res.wood > 70 && res.stone > 55 && !(profile === 'novice' && s.buildings.filter((b) => b.functional && b.upgraded).length >= 3)) {
       for (const type of UPGRADES) {
         const b = s.buildings.find((x) => x.type === type && x.functional && !x.upgraded && !x.project && !x.damaged);
-        if (b && scene.construction.startProject(b).ok) return;
+        if (b && scene.construction.startProject(b).ok) { window.__novLast = s.time.day; return; }
       }
+    }
+    // (30.6) acemi, Rehber'in yiyecek kartını izler: "Yiyecek ≈ N gün yeter" 5 günün altındaysa ve kişi başına bahçe azsa sıradaki yapı bahçe olur
+    if (profile === 'novice') {
+      const pop = Math.max(1, s.characters.filter((c) => !c.role).length);
+      const days = window.__foodSupply(s) / (pop * 3.5);
+      if (days < 5 && (counts.garden ?? 0) < Math.ceil(pop / 4)) { next = 'garden'; nextSpot = null; }
+      // ... ve taş kartını: taş 15'in altına inip Taş Ocağı yoksa sıradaki yapı Taş Ocağı olur (kalıcı kaynak)
+      if (res.stone < 15 && !(counts.quarry ?? 0)) { next = 'quarry'; nextSpot = null; }
+      // ... ve Hedefler'in engel satırını: "Han gerekir" (Sıcak Sofra hedefi) 10. günden sonra Han kurulur
+      if (s.time.day >= 10 && !(counts.inn ?? 0) && next !== 'garden' && next !== 'quarry') { next = 'inn'; nextSpot = null; }
     }
     if (!next) return;
     if (!ESSENTIAL.includes(next) && res.wood - (WOOD[next] ?? 0) < (autumn ? 50 : 15)) return;
-    const spot = nextSpot ?? safetySpot(next) ?? (SAFETY.includes(next) ? null : sim.findSpot(next));
-    if (spot) scene.construction.placeSite(next, spot.x, spot.y);
+    const spot = nextSpot ?? safetySpot(next) ?? (SAFETY.includes(next) ? null : sim.findSpot(next, next === 'quarry' ? 45 : 30));
+    if (profile === 'novice' && window.__nov) { const d = (window.__nov.dbg ??= []); if (d.length < 400 && (!d.length || d.at(-1).next !== next || d.at(-1).day !== s.time.day)) d.push({ day: s.time.day, next, spot: Boolean(spot), wood: res.wood, stone: res.stone }); }
+    if (spot && scene.construction.placeSite(next, spot.x, spot.y)?.ok) window.__novLast = s.time.day;
   };
 }, Boolean(options.passive));
 // Olay tanımlarını sayfaya ver (karar politikası seçeneklere bakar)
@@ -1047,6 +1188,12 @@ if (options.save) {
   fs.writeFileSync(options.save, snapshot);
   console.log('kayıt yazıldı:', options.save);
 }
+if (options.stories) {
+  // (30.2) --stories dosya.json : hikâye kartı günlüğü (gün başına kart sayısı, metinler); raporu ve kaydı etkilemez
+  const out = await page.evaluate(() => ({ log: window.game.scenes.current.storyDirector?.log ?? [], shown: window.game.scenes.current.storyDirector?.shownLog ?? [] }));
+  fs.writeFileSync(options.stories, JSON.stringify(out, null, 1));
+  console.log('hikâye günlüğü yazıldı:', options.stories, `(${out.log.length} olay, ${out.shown.length} gösterilen kart)`);
+}
 const mon = await monitorReport(page);
 const bondStats = await page.evaluate(() => {
   const sc = window.game.scenes.current;
@@ -1056,6 +1203,22 @@ const bondStats = await page.evaluate(() => {
   const pairs = [...(sc.bonds?.pairs ?? [])].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 3).map(([k, n]) => `${k.split('-').map((x) => names(Number(x))).join(' & ')} ${n} sa`);
   const pop = window.game.state.characters.filter((c) => !c.isChild && !c.role).length;
   return { side: given.side_by_side ?? 0, rub: given.rubbing_wrong ?? 0, ever: ever.side.size, everRub: ever.rub.size, pop, pairs };
+});
+const midStats = await page.evaluate(() => {
+  const s = window.game.state;
+  const log = window.__midLog ?? [];
+  const after = log.filter((e) => e.day > 20);
+  return {
+    log: log.map((e) => `${e.day}:${e.id}`),
+    distinct: new Set(log.map((e) => e.id)).size,
+    after20: after.length,
+    freshAfter20: after.filter((e) => e.midgame).length,
+    milestones: Object.keys(s.milestones).length,
+    doneIds: Object.keys(s.milestones),
+    goldenSince: s.goldenAge?.since?.day ?? null,
+    gold: s.resources.gold,
+    pop: s.characters.length,
+  };
 });
 const riteStats = await page.evaluate(() => {
   const s = window.game.state;
@@ -1093,7 +1256,48 @@ if (options.profile || options['profile-report']) {
   { const d = P.daily; const at = (k) => d.find((x) => x.day === k) ?? d.at(-1); const lastDay = d.at(-1)?.day ?? 0; console.log(`(29.10b) profil ${options.profile ?? 'normal'}: nüfus başlangıç ${d[0]?.pop} · G20 ${at(20)?.pop} · son ${d.at(-1)?.pop} · güven G20 ${at(20)?.trust} · G30 ${at(30)?.trust} · son ${d.at(-1)?.trust} · son 10 günde yeni isyan ${P.revolts.filter((r) => r.day > lastDay - 10).length} · isyan günleri ${P.revolts.map((r) => r.day)}`); }
   riteStats.profile = { maxBitter, lastLoyal: last.loyal, lastBitter: last.bitter, revolts: P.revolts, left: P.left, condolences: P.condolences, gifts: P.gifts };
 }
+if (options.profile === 'novice') {
+  const N = await page.evaluate(() => ({ ...window.__nov, doneGoals: window.game.state.milestones ? Object.keys(window.game.state.milestones).length : 0 }));
+  const sum = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`).join(' ');
+  const tot = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+  console.log(`(30.6) acemi: Köy G${N.tiers[2] ?? '-'} · Kasaba G${N.tiers[3] ?? '-'} · hedef ${N.doneGoals}/14 · 0'da en uzun gün ${JSON.stringify(N.zeroLongest)} · ilk 5 günde yiyecek en düşük ${Number.isFinite(N.foodMin5) ? Math.round(N.foodMin5) : '-'}`);
+  console.log(`(30.6) altın gelir ${tot(N.gold.in)}: ${sum(N.gold.in)} · gider ${tot(N.gold.out)}: ${sum(N.gold.out)}`);
+  console.log(`(30.6) Krallık Vergisi: ${N.levy.map((l) => `G${l.day}${l.ok ? (l.goods ? '+malla' : '✓') : '✗'}(${l.amount})`).join(' ') || '-'} · ceza ${N.levy.filter((l) => !l.ok).length}`);
+  console.log(`(30.6) karar günlüğü (gün:sıradaki:yer:odun/taş): ${(N.dbg ?? []).filter((d, i, a) => i === 0 || d.next !== a[i - 1].next || !d.spot).slice(0, 60).map((d) => `${d.day}:${d.next}:${d.spot ? 'y' : 'N'}:${d.wood}/${d.stone}`).join(' ')}`);
+  console.log(`(30.6) gün gün altın: ${N.daily.map((d) => `${d.day}:${d.gold}`).join(' ')}`);
+  console.log(`(30.6) gün gün nüfus/yapı/yük/refah: ${N.daily.filter((d) => d.day % 4 === 0).map((d) => `${d.day}:${d.m.population}/${d.m.buildings}/${d.m.upgraded}/${Math.round(d.m.welfare)}`).join(' ')}`);
+  console.log(`(30.6) gün gün yiyecek: ${N.daily.map((d) => `${d.day}:${d.food}`).join(' ')}`);
+  riteStats.novice = N;
+}
+{
+  // (30.3) kararın ağırlığı: ilk Homurdanan günü (Homurdanan + Kırgın >= %30), ilk iş bırakma, isyan, terk eden, 30. gün hazinesi, son nüfus
+  const W = await page.evaluate(() => ({ ...window.__weightStats, revolts: window.__profileStats.revolts.map((r) => r.day), left: window.__profileStats.left.length }));
+  const d = W.daily;
+  const pct = (v) => `%${Math.round(100 * v)}`;
+  const from = W.heavyDay ?? 0;
+  const firstGrum = d.find((x) => x.day >= from && x.grum + x.bitter >= 0.3)?.day ?? null;
+  const strikeDays = [...new Set(W.strikes.map((x) => x.day))];
+  const g30 = (d.find((x) => x.day === 30) ?? d.at(-1))?.gold;
+  const last = d.at(-1) ?? {};
+  const rel = (day) => (day === null || day === undefined ? '-' : W.heavyDay !== null ? `G${day} (+${day - W.heavyDay})` : `G${day}`);
+  let extra = '';
+  if (W.switchDay !== null) {
+    const after = d.filter((x) => x.day > W.switchDay && x.day <= W.switchDay + 12);
+    const calmDay = after.find((x) => x.bitter < 0.25)?.day ?? null;
+    const lastDay = last.day ?? 0;
+    extra = ` · geçiş G${W.switchDay} (nüfus ${W.switchPop}) · Kırgın < %25 ${calmDay ? `G${calmDay}` : 'olmadı'} (en çok ${pct(Math.max(0, ...after.map((x) => x.bitter)))}) · son 6 günde yeni isyan ${W.revolts.filter((r) => r > lastDay - 6).length} · son nüfus / geçiş ${pct((last.pop ?? 0) / Math.max(1, W.switchPop))}`;
+  }
+  if (options.famine) {
+    const fd = Number(options.famine === true ? 5 : options.famine);
+    const from = W.lowDay ?? fd;
+    const hit = d.find((x) => x.day > from && x.pulse && x.pulse.dir === 'down' && x.pulse.top.includes('hunger'));
+    extra += ` · kıtlık G${fd} (kiler boşaldı: ${W.lowDay ? `G${W.lowDay}` : '-'}): Nabız düşüşte + "açlık" ilk üçte ${hit ? `G${hit.day} (+${hit.day - from})` : 'olmadı'} · yiyecek ${d.filter((x) => x.day >= fd).map((x) => `${x.food}(+${x.gain}/-${x.loss}, aç ${x.hangry}, bahçe ${x.gardens})`).join(' ')} · Nabız ${d.filter((x) => x.day >= fd).map((x) => (x.pulse ? `${x.pulse.face}${x.pulse.dir === 'down' ? '↓' : x.pulse.dir === 'up' ? '↑' : '→'}${x.avg.toFixed(1)}[${x.pulse.top.map((k, i) => `${k}${x.pulse.pts?.[i] ?? ''}`).join(',')}]` : '-')).join(' ')}`;
+  }
+  console.log(`(30.3) ${options.profile ?? 'normal'}: Ağır Vergi ${W.heavyDay !== null ? `G${W.heavyDay}` : '-'} · Homurdanan+Kırgın >= %30 ${rel(firstGrum)} · ilk iş bırakma ${rel(strikeDays[0])} · iş bırakma günü ${strikeDays.length} · isyan ${W.revolts.length} · terk eden ${W.left} · G30 hazine ${g30} · son nüfus ${last.pop} · son gün Homurdanan ${pct(last.grum ?? 0)} / Kırgın ${pct(last.bitter ?? 0)} / Memnun+ ${pct(last.pleased ?? 0)}${extra}`);
+  riteStats.weight = { heavyDay: W.heavyDay, firstGrum, strikeDays, revolts: W.revolts, left: W.left, g30, lastPop: last.pop, last, switchDay: W.switchDay, switchPop: W.switchPop, daily: d };
+}
 console.log(`(29.7) anma töreni ${riteStats.held} (vefat günü ${riteStats.deathDays}, töreni gelmiş ${riteStats.dueDeathDays}) · ortalama katılım ${riteStats.attendance.toFixed(1)} · 20:00'de süren tören görevi ${riteStats.late} · özel gün kutlanan ${riteStats.celebrated} / unutulan ${riteStats.forgotten} (%${Math.round((100 * riteStats.celebrated) / Math.max(1, riteStats.celebrated + riteStats.forgotten))})`);
+console.log(`(30.4b) olay: ${midStats.distinct} farklı (${midStats.log.length} karar; G20 sonrası ${midStats.freshAfter20}/${midStats.after20} yeni) · hedef ${midStats.milestones}/14 (${midStats.doneIds.join(',')}) · ${midStats.log.join(' ')}`);
 console.log(`(29.5) Omuz Omuza ${bondStats.side} · Diken Üstünde ${bondStats.rub} · en az bir kez Omuz Omuza alan ${bondStats.ever}/${bondStats.pop} (%${Math.round((100 * bondStats.ever) / Math.max(1, bondStats.pop))}) · Diken Üstünde alan ${bondStats.everRub} · en çok birlikte çalışan çiftler: ${bondStats.pairs.join(', ') || '-'}`);
 const so = mon.social;
 console.log(
@@ -1235,7 +1439,7 @@ for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}
 const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0 && mon.social.stuck.length === 0;
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, gold: report.gold, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, gold: report.gold, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();

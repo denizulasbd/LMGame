@@ -47,6 +47,11 @@ export const LEVY = {
   failed: { trust: -12, reputation: -20, goodsShare: 0.4, goodsPerGold: 3 }, // ödenemezse hazineye el konur, depodan mal çekilir
 };
 
+// (30.6, ENGINES.novicePath) Acemi kasaya göre Krallık Vergisi: ilk tahsilat en erken firstDay'de (hazine ilk günlerde boştur),
+// tutar daha yumuşak (acemi profilin 40 günlük altın geliri ~650: vergi hazinenin en çok yarısını almalı) ve süresi dolan
+// fermanın cezası altın yerine yarı yarıya.
+export const LEVY_EASE = { firstDay: 9, base: 10, perTier: 10, perResident: 2, decreeFailedGoldPerTier: 20 };
+
 // Krallık İtibarı (0-100, başlangıç 50): vergiyi ve ferman ödüllerini etkiler
 export const REPUTATION = {
   start: 50,
@@ -138,6 +143,11 @@ export const EXODUS = {
   graceHours: 24, // ... bu kadar saat kalırsa ve isyan yağmaya varmışsa (ya da bir gündür sürüyorsa) terk ediş başlar
   revoltHours: 24,
   everyMinutes: 360, // 6 saatte bir bir sakin (ya da bir aile) ayrılır
+  // (30.4a, ENGINES.gentleExodus) terk ediş sınırı: bir oyun gününde en çok maxPerDay, bir isyan boyunca (isyan bittikten sonraki
+  // terk edişler de son isyana sayılır; yeni isyan sayacı sıfırlar) en çok maxPerRevolt sakin ayrılır. Aile tek birimdir: sayaç
+  // sınırın altındayken yola çıkan aile sınırı bir kez aşabilir.
+  maxPerDay: 2,
+  maxPerRevolt: 4,
   core: 3, // kasabada her koşulda en az bu kadar sakin kalır
   leaveTimeoutMinutes: 720, // harita kenarına bu kadar sürede varamayan doğrudan ayrılmış sayılır
   // Kötü şöhret: göç koşullarına eklenen şart

@@ -339,6 +339,13 @@
   opacity: 0.75;
 }
 
+/* (30.4a) yaklaşan bilgelik / ömrün son demleri */
+.life-stage-soon {
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
 .character-traits {
   display: flex;
   flex-wrap: wrap;
@@ -2352,10 +2359,25 @@ button.relation-row:hover {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
+  gap: 10px;
   align-items: center;
   justify-content: center;
-  background: rgba(27, 20, 35, 0.45);
+  background: rgba(14, 9, 22, 0.72); /* (30.6) oyun durduğu belli olsun: geri kalan ekran belirgin biçimde kararır */
 }
+
+.dilemma-paused {
+  flex: none;
+  padding: 4px 14px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: #fff6dc;
+  background: rgba(142, 58, 42, 0.92);
+  border: 2px solid var(--ui-line);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.dilemma-paused::before { content: '⏸ '; }
 
 .dilemma[hidden] {
   display: none;
@@ -2366,7 +2388,7 @@ button.relation-row:hover {
   flex-direction: column;
   gap: 10px;
   width: min(460px, calc(100% - 32px));
-  max-height: calc(100% - 32px);
+  max-height: calc(100% - 80px);
   overflow-y: auto;
   padding: 16px 18px;
 }
@@ -3287,7 +3309,7 @@ kbd {
 /* ---------- Bildirimler: üst çubuğun altında ---------- */
 .ui-top {
   position: absolute;
-  top: var(--ui-top-reserve, 64px);
+  top: calc(var(--ui-top-reserve, 64px) + var(--ui-under-h, 0px)); /* (30.6) çiplerin altından */
   left: 50%;
   transform: translateX(-50%);
   width: min(460px, calc(100% - 24px));
@@ -5019,3 +5041,447 @@ kbd {
   .card-tab .card-tab-label { display: none; }
   .card-tab img { width: 18px; height: 18px; }
 }
+
+/* ---------------------------------------------------------------------------
+   (30.1) Rehber kartı ve yanıp sönen düğme
+   --------------------------------------------------------------------------- */
+.guide-card {
+  position: relative; /* (30.2) sol alt sütunun en altı: hikâye kartlarının altında, dock'un üstünde */
+  z-index: 39;
+  width: 100%;
+  pointer-events: auto;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'badge badge' 'text ok';
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+  padding: 6px 10px 8px;
+}
+
+.guide-card[hidden] { display: none; }
+
+.guide-badge {
+  grid-area: badge;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-highlight);
+}
+
+.guide-text {
+  grid-area: text;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.guide-text strong { color: var(--ui-highlight); font-weight: 600; }
+
+.guide-ok { grid-area: ok; white-space: nowrap; }
+
+@keyframes guide-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 214, 102, 0); filter: none; }
+  50% { box-shadow: 0 0 0 3px rgba(255, 214, 102, 0.95), 0 0 12px 2px rgba(255, 214, 102, 0.55); filter: brightness(1.18); }
+}
+
+.guide-glow {
+  animation: guide-glow 1.4s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-glow { animation: none; box-shadow: 0 0 0 3px rgba(255, 214, 102, 0.95); }
+}
+
+.dilemma.is-untimed .dilemma-timer-text { opacity: 0.9; }
+
+/* ---------------------------------------------------------------------------
+   (30.1) İnce yapı şeridi ve sabit yükseklikli ipucu satırı (kaçan tıklama: yığının boyu metne göre değişmesin)
+   --------------------------------------------------------------------------- */
+.build-hint {
+  box-sizing: border-box;
+  height: 24px;
+  line-height: 18px;
+  width: min(560px, calc(100vw - 24px));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.build-strip {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  width: min(720px, calc(100vw - 16px));
+  padding: 2px 8px;
+  overflow: hidden;
+}
+
+.build-strip[hidden] { display: none; }
+
+.build-strip-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.build-strip-name {
+  flex: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.build-strip-costs {
+  flex: none;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.build-strip-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #a8ef9c;
+}
+
+.build-strip-info.is-bad { color: #ff9f93; }
+
+.build-strip-open {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.build-strip-open kbd {
+  font-size: 10px;
+  padding: 0 4px;
+  border: 1px solid var(--ui-frame);
+  border-radius: 3px;
+  opacity: 0.8;
+}
+
+/* (30.1) Yapı listesi: sekme çubuğu sabit, yalnızca kart ızgarası kayar. (Eskiden panelin tamamı kayıyor, yapışkan sekme çubuğu ilk sıradaki
+   kartların üstüne biniyor ve kart adları kesiliyordu.) */
+.build-items.panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.build-items.panel[hidden] { display: none; }
+
+.build-items.panel > .build-tabs {
+  position: static;
+  flex: none;
+}
+
+.build-items.panel > .build-item-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  align-content: flex-start;
+  padding: 2px 0;
+}
+
+/* (30.1) Üst şerit: 1366 px altında bölgeler sarılır; sığmayan bölge ikinci satıra iner (eskiden 1241-1440 px arasında 1fr sütunda
+   ortalanan zaman bölgesi taşıp kasaba adının / unvan çipinin üstüne biniyordu). */
+@media (max-width: 1365px) {
+  .hud.topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    column-gap: 12px;
+    row-gap: 4px;
+  }
+
+  .hud-zone-town,
+  .hud-zone-time {
+    flex: 0 0 auto;
+  }
+
+  .hud-zone-res {
+    flex: 0 1 auto;
+    margin-left: auto;
+  }
+
+
+  .hud-zone-res { margin-left: auto; }
+}
+@media (max-width: 1240px) {
+  .hud-zone-res { margin-left: 0; }
+}
+
+/* (30.1) Küçük pencerede (en çok 720 px yükseklik) sakin kartı açıkken sakin listesi çekmecesi yer açar: kartın alt yarısı araç
+   çubuğunun altında / kaydırma gerektiren bölgede kalmaz. Kart kapanınca (✕ / Esc) liste geri gelir. */
+@media (max-height: 720px) {
+  .ui-right:has(.ui-cards > .panel:not([hidden])) .ui-drawer {
+    display: none;
+  }
+}
+
+/* (30.1) Hedefler: koşul açıklaması ve tam dolu çubuk */
+.tier-check-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tier-check-hint {
+  font-size: 11px;
+  opacity: 0.75;
+  line-height: 1.2;
+}
+
+.goal-bar.is-full .goal-fill { width: 100% !important; }
+
+/* ---------------------------------------------------------------------------
+   (30.1) Okunurluk: sayılar en az 13 px, sabit genişlikli rakamlarla (8 ile S, 0 ile O karışmasın)
+   Piksel yazı tipi başlıklarda kalır; yalnızca sayı taşıyan öğeler okunaklı sistem yazı tipine geçer.
+   --------------------------------------------------------------------------- */
+:root {
+  --ui-num-font: 'DejaVu Sans Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+#ui-layer {
+  font-variant-numeric: tabular-nums;
+}
+
+#ui-layer .resource-amount,
+#ui-layer .resource-detail,
+#ui-layer .hud-season,
+#ui-layer .hud-day,
+#ui-layer .hud-clock,
+#ui-layer .hud-speed .hud-btn,
+#ui-layer .goods-summary,
+#ui-layer .welfare-value,
+#ui-layer .hud-population,
+#ui-layer .dock-badge,
+#ui-layer .need-value,
+#ui-layer .build-cost,
+#ui-layer .build-tab-count,
+#ui-layer .goal-detail,
+#ui-layer .goal-done,
+#ui-layer .tier-check-name,
+#ui-layer .building-badge,
+#ui-layer .life-stage-age {
+  font-family: var(--ui-num-font);
+  font-variant-numeric: tabular-nums;
+  font-size: max(13px, 1em);
+  letter-spacing: 0;
+}
+
+#ui-layer .hud-clock { font-size: 17px; min-width: 52px; }
+#ui-layer .hud-day { font-size: 13px; }
+#ui-layer .dock-badge { min-width: 18px; line-height: 1.25; padding: 0 4px; }
+#ui-layer .build-items .build-cost { font-size: 13px; }
+#ui-layer .build-tab-count { font-size: 13px; }
+#ui-layer .goal-detail { font-size: 13px; }
+#ui-layer .character-meta,
+#ui-layer .goal-description,
+#ui-layer .upgrade-text { font-size: 13px; }
+
+/* (30.1) Çip yazıları (ısınma, vadi, vergi...) sayı taşır: en az 13 px */
+#ui-layer .buff-chip,
+#ui-layer .hud-valley { font-size: 13px; }
+
+/* Küçük pencerede kart kendi içinde kayar: alt yarısı araç çubuğunun altına taşmaz */
+@media (max-height: 720px) {
+  .ui-cards > .panel { max-height: 100%; overflow-y: auto; }
+}
+
+/* (30.1) Kasaba adı daha dar: 1366 px'te tek satır kalsın; sığmayan uzun ad + büyük sayılar yine ikinci satıra iner */
+#ui-layer .hud.topbar .hud-town-name { max-width: 170px; }
+
+
+/* ---------------------------------------------------------------------------
+   (30.2) Sol alt sütun: Duygu Katmanı açıklaması, hikâye kartları, rehber kartı (yukarıdan aşağı).
+   Dock'un hemen üstünde biter; haritayı ve araç çubuğunu örtmez.
+   --------------------------------------------------------------------------- */
+.ui-left {
+  position: absolute;
+  left: 8px;
+  bottom: var(--ui-bottom-reserve, 96px);
+  z-index: 38;
+  width: min(300px, calc(100vw - 16px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}
+
+.ui-left > *, .story-feed > * { pointer-events: auto; }
+.story-feed { display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.story-feed[hidden] { display: none; }
+.story-cards { display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.story-cards > * { pointer-events: auto; }
+
+.emotion-legend { box-sizing: border-box; padding: 4px 8px 6px; font-size: 11px; }
+.emotion-legend[hidden] { display: none; }
+.legend-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.legend-title { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ui-highlight); }
+.legend-close { padding: 0 6px; min-width: 0; line-height: 16px; font-size: 11px; }
+.legend-list { list-style: none; margin: 2px 0 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 1px 8px; }
+.legend-row { display: flex; align-items: center; gap: 6px; line-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.legend-row span { overflow: hidden; text-overflow: ellipsis; }
+.legend-mark { width: 20px; height: 14px; image-rendering: pixelated; flex: none; }
+.legend-line { display: inline-block; width: 20px; height: 3px; flex: none; border-radius: 1px; }
+
+.story-card { box-sizing: border-box; padding: 6px 8px 8px; overflow: hidden; animation: story-in 0.25s ease-out; }
+@keyframes story-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .story-card { animation: none; } }
+.story-card.is-p5 { border-color: #b56ad0; }
+.story-card.is-p4 { border-color: var(--ui-highlight); }
+.story-main { display: flex; gap: 6px; align-items: flex-start; }
+.story-portraits { display: flex; flex: none; }
+.story-portrait { width: 32px; height: 32px; image-rendering: pixelated; object-fit: cover; background: var(--ui-card); border: 2px solid var(--ui-line); }
+.story-portrait + .story-portrait { margin-left: -8px; }
+.story-body { flex: 1; min-width: 0; }
+.story-text { margin: 0; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+.story-long { margin: 4px 0 0; font-size: 11px; line-height: 1.3; color: var(--ui-ink-soft); max-height: 110px; overflow-y: auto; }
+.story-long[hidden], .story-watched[hidden] { display: none; }
+.story-watched { width: 14px; height: 14px; image-rendering: pixelated; flex: none; }
+.story-close { flex: none; background: none; border: 0; color: var(--ui-ink-soft); font-size: 12px; line-height: 12px; padding: 0 2px; cursor: pointer; }
+.story-buttons { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
+.story-buttons:empty { display: none; }
+.story-btn { padding: 1px 8px; font-size: 11px; }
+.story-btn[hidden] { display: none; }
+.story-btn.is-used { opacity: 0.6; }
+.story-timer { display: block; height: 2px; margin-top: 4px; background: var(--ui-highlight); opacity: 0.55; transition: width 0.2s linear; }
+
+.guide-card { max-width: 100%; }
+
+/* Üst şeridin altı: çipler ve izlenen sakinlerin portreleri */
+.hud-under { position: absolute; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: min(640px, 60vw); pointer-events: none; }
+.hud-under > * { pointer-events: auto; }
+.hud.topbar .hud-under .hud-buffs { position: static; max-width: none; }
+.hud-more { position: relative; }
+.hud-more-list { position: absolute; top: calc(100% + 3px); left: 0; z-index: 45; display: flex; flex-direction: column; gap: 3px; padding: 4px; min-width: 220px; max-width: min(360px, 90vw); }
+.hud-more-list[hidden] { display: none; }
+.hud-more-list .buff-chip { white-space: normal; }
+.buff-chip.is-more { cursor: pointer; border-color: var(--ui-ink-soft); }
+.buff-chip { cursor: default; }
+.buff-chip.is-action, .buff-chip.is-click { cursor: pointer; }
+.watch-strip { display: flex; gap: 4px; align-items: center; }
+.watch-strip[hidden] { display: none; }
+.watch-item { position: relative; padding: 0; width: 34px; height: 34px; background: var(--ui-paper); border: 2px solid var(--ui-highlight); cursor: pointer; }
+.watch-item img.watch-portrait { width: 100%; height: 100%; image-rendering: pixelated; object-fit: cover; display: block; }
+.watch-item img.watch-mark { position: absolute; right: -2px; top: -4px; width: 20px; height: 14px; image-rendering: pixelated; }
+.watch-item img.watch-star { position: absolute; left: -3px; bottom: -3px; width: 12px; height: 12px; image-rendering: pixelated; }
+
+/* Üst şerit: uzun kasaba adı kısalır (tam ad ipucunda); mevsim çipiyle çakışmaz */
+.hud-town-name { max-width: min(34vw, 320px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hud-pop, .hud-pop * { cursor: help; }
+
+/* Sakinler çekmecesi: izlenenler, dilek simgesi ve "?" ipucu */
+.resident-row.is-watched { box-shadow: inset 3px 0 0 var(--ui-highlight); }
+.resident-watch { flex: none; width: 16px; height: 16px; padding: 0; border: 0; background: none; cursor: pointer; opacity: 0.35; }
+.resident-watch img { width: 14px; height: 14px; image-rendering: pixelated; display: block; }
+.resident-row.is-watched .resident-watch, .resident-row:hover .resident-watch { opacity: 1; }
+.resident-wish { width: 14px; height: 14px; image-rendering: pixelated; flex: none; }
+.resident-mark.resident-mood-mark { width: 20px; height: 14px; }
+.resident-help { position: relative; flex: none; margin-left: 4px; }
+.resident-help-btn { padding: 0 6px; min-width: 0; line-height: 16px; font-size: 11px; cursor: help; }
+.resident-help-tip { position: absolute; top: calc(100% + 4px); right: 0; z-index: 46; width: 230px; padding: 6px 8px; font-size: 11px; line-height: 1.35; }
+.resident-help-tip[hidden] { display: none; }
+.resident-help-tip div { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+.resident-help-tip img { width: 20px; height: 14px; image-rendering: pixelated; flex: none; }
+
+/* Sakin kartındaki "Yakından izle" yıldızı */
+.watch-toggle { display: inline-flex; align-items: center; gap: 4px; }
+.watch-toggle img { width: 14px; height: 14px; image-rendering: pixelated; }
+.watch-toggle.is-active { border-color: var(--ui-highlight); background: var(--ui-card-hi); }
+
+.settings-story-row { flex-wrap: wrap; }
+
+.map-hint { position: absolute; left: 50%; top: 26%; transform: translateX(-50%); z-index: 36; padding: 4px 12px; font-size: 13px; color: var(--ui-ink); background: var(--ui-paper); border: 2px solid var(--ui-line); pointer-events: none; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4); white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
+.map-hint[hidden] { display: none; }
+
+/* Telefon genişliğinde sakinler çekmecesi ya da sağ alt kart açıkken sol alt sütun gizlenir (kartlar çekmece kapanınca sürer) */
+@media (max-width: 620px) {
+  #ui-layer:has(.resident-drawer:not(.is-collapsed)) .ui-left,
+  #ui-layer:has(.ui-cards > .panel:not([hidden])) .ui-left { display: none; }
+  .hud-under { max-width: calc(100vw - 16px); }
+}
+
+.buff-chip { font-variant-numeric: tabular-nums; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* ---------- 30.3: Kararın Ağırlığı — Halkın Nabzı, anında geri bildirim, kıtlık sayacı, özel ipucu ---------- */
+.hover-tip { position: fixed; top: 0; left: 0; z-index: 90; max-width: min(380px, calc(100vw - 16px)); padding: 5px 9px 6px; text-align: left; color: var(--ui-ink); background: rgba(20, 13, 10, 0.96); border: 1px solid rgba(255, 214, 160, 0.28); border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); pointer-events: none; }
+.hover-tip[hidden] { display: none; }
+.hover-tip-title { font-size: 13px; font-weight: 700; color: var(--ui-highlight); font-variant-numeric: tabular-nums; }
+.hover-tip-text { margin-top: 2px; font-size: 13px; line-height: 1.35; color: var(--ui-ink-soft); white-space: pre-line; font-variant-numeric: tabular-nums; }
+.hover-tip-text[hidden] { display: none; }
+#ui-layer.is-cinematic .hover-tip { display: none; }
+.hud-pulse { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 1px 5px; }
+.hud-pulse:hover { border-color: rgba(255, 214, 160, 0.35); }
+.hud.topbar .hud-pulse .pulse-face { width: 16px; height: 16px; image-rendering: pixelated; }
+.hud-pulse .pulse-name { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.hud-pulse .pulse-arrow { font-size: 13px; font-weight: 700; min-width: 0.8em; text-align: center; }
+.hud-pulse .pulse-arrow.is-up { color: var(--ui-ok); }
+.hud-pulse .pulse-arrow.is-down { color: var(--ui-bad); }
+.hud-pulse .pulse-arrow.is-flat { color: var(--ui-ink-soft); }
+.hud-pulse[data-face='angry'] .pulse-name { color: var(--ui-bad); }
+.hud-pulse[data-face='grumbling'] .pulse-name { color: var(--ui-warn); }
+.hud-pulse[data-face='pleased'] .pulse-name, .hud-pulse[data-face='grateful'] .pulse-name { color: var(--ui-ok); }
+.hud-pulse.is-off .pulse-face, .hud-pulse.is-off .pulse-name, .hud-pulse.is-off .pulse-arrow { display: none; }
+.hud-pulse .trust-mini-bar { position: relative; overflow: visible; }
+.trust-mini-mark { position: absolute; top: -2px; width: 2px; height: 7px; margin-left: -1px; background: var(--ui-bad); border-radius: 1px; pointer-events: none; }
+.hud-pulse.is-flash-bad { animation: pulse-flash-bad 1.2s ease-out 1; }
+.hud-pulse.is-flash-good { animation: pulse-flash-good 1.2s ease-out 1; }
+@keyframes pulse-flash-bad { 0%, 40% { background: rgba(239, 90, 76, 0.55); border-color: var(--ui-bad); } 100% { background: transparent; } }
+@keyframes pulse-flash-good { 0%, 40% { background: rgba(92, 192, 90, 0.5); border-color: var(--ui-ok); } 100% { background: transparent; } }
+.pulse-feedback { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; padding: 3px 10px; border-radius: 6px; background: rgba(20, 13, 10, 0.92); border: 1px solid rgba(255, 214, 160, 0.3); color: var(--ui-ink); white-space: nowrap; animation: pulse-feedback-in 0.25s ease-out 1; }
+.pulse-feedback[hidden] { display: none; }
+.pulse-feedback.is-bad { border-color: var(--ui-bad); color: #ffd0c8; }
+.pulse-feedback.is-good { border-color: var(--ui-ok); color: #d4f5cf; }
+@keyframes pulse-feedback-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.hud.topbar .resource:has(.resource-days:not([hidden])) { position: relative; }
+.resource-days { position: absolute; top: calc(100% + 2px); left: 50%; transform: translateX(-50%); z-index: 2; padding: 0 5px; font-size: 13px; line-height: 17px; font-weight: 700; color: var(--ui-warn); white-space: nowrap; font-variant-numeric: tabular-nums; background: rgba(20, 13, 10, 0.92); border: 1px solid currentColor; border-radius: 4px; pointer-events: none; }
+.resource-days[hidden] { display: none; }
+.hud.topbar .resource.is-famine { border-color: var(--ui-bad); animation: famine-blink 0.9s steps(2, jump-none) infinite; }
+.resource.is-famine .resource-amount, .resource.is-famine .resource-days { color: var(--ui-bad); }
+@keyframes famine-blink { 50% { background: rgba(239, 90, 76, 0.35); } }
+.loyalty-box .petition-head.loyalty-grumbling .petition-title { color: var(--ui-warn); }
+.loyalty-box .petition-head.loyalty-pleased .petition-title { color: var(--ui-ok); }
+/* dar üst çubuk (1500 px ve altı): Nabız iki katlı küçük rozet — üstte yüz ve ok, altta güven çubuğu; adı ve kalkan ipucunda */
+@media (max-width: 1500px) {
+  .hud-pulse { display: inline-grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 2px; row-gap: 2px; padding: 1px 3px; }
+  .hud-pulse .pulse-name, .hud-pulse .trust-mini { display: none; }
+  .hud.topbar .hud-pulse .pulse-face { grid-column: 1; grid-row: 1; width: 14px; height: 14px; }
+  .hud-pulse .pulse-arrow { grid-column: 2; grid-row: 1; font-size: 13px; line-height: 14px; }
+  .hud-pulse .trust-mini-bar { grid-column: 1 / 3; grid-row: 2; width: 100%; min-width: 26px; }
+  .hud.topbar .hud-zone-res { gap: 3px; }
+}
+
+/* (30.4b) Kişili karar olayı: konu sakinlerin portresi */
+.dilemma-portraits { display: flex; justify-content: center; gap: 14px; margin: 6px 0 4px; }
+.dilemma-portraits:empty { display: none; }
+.dilemma-portrait { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.dilemma-portrait-img { width: 56px; height: 56px; image-rendering: pixelated; object-fit: cover; background: var(--ui-card); border: 2px solid var(--ui-line); }
+.dilemma-portrait-name { font-size: 13px; }
+
+/* (30.4b) Hedefler penceresi: tamamlanmamış ilk hedef "Sıradaki" etiketiyle öne çıkar */
+.goal-row.is-next { border-color: var(--ui-accent, #e0b04a); box-shadow: inset 3px 0 0 var(--ui-accent, #e0b04a); }
+.goal-next { margin-left: 8px; padding: 1px 6px; font-size: 12px; background: var(--ui-accent, #e0b04a); color: #1b1408; border-radius: 3px; vertical-align: middle; }
+
+/* (30.6) Para ve Akış */
+.goal-blocker { display: block; margin-top: 3px; font-size: 12px; color: #8e3a2a; font-weight: bold; }
+.goal-blocker::before { content: '✗ '; }
+.hud-goods-menu .resource.is-linked { cursor: pointer; }
+.hud-goods-menu .resource.is-linked .resource-detail { text-decoration: underline dotted; }

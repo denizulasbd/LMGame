@@ -59,7 +59,10 @@
 //   save-v30.json: 26.2'nin oyunu (kayıt sürümü 30, bugünkü): otopilotla 73 gün (--crisis-state); 72. gün (Yaz Güneşi Şenliği panayırı) hazırlık evresinde kurulmuş Zengin Şölen Sofrası
 //                  (currentFeast: 5 fıçı şerbet, 9 ekmek, 22 yiyecek, 1 kumaş bağışı, 32 ikram), daha önce 10 sofra ve 171 ikram. Eski kayıtlarda
 //                  (sürüm 2-29) currentFeast yoktur: null ile açılır
-//   save-v40.json: 29.6-29.7'nin oyunu (kayıt sürümü 40, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin sadakati (loyalty),
+//   save-v41.json: 30.4a'nın oyunu (kayıt sürümü 41, bugünkü): otopilotla 72 gün (--crisis-state; tohum 42): her mevsim bir yaş (ageInDays 4 günlük
+//                  yaşla), kuşaklar, vefatlar ve anma törenleri. Eski kayıtlarda (sürüm 24-40) gün cinsinden yaş 16 günlük yaştan ölçeklenir
+//                  (floor(gün x 4 / 16); yaş ve evre aynı kalır, zar çekilmez)
+//   save-v40.json: 29.6-29.7'nin oyunu (kayıt sürümü 40): otopilotla 72 gün (--crisis-state; tohum 42): sakinlerin sadakati (loyalty),
 //                  anıların kişisi (memories[].whoId), evlilik günü ve özel gün durumu (weddingDay / specialDay), anma törenleri, kitabe ve
 //                  sayaçlar (rites). Eski kayıtlarda (sürüm 2-39) alanlar yoktur: sadakat 0, weddingDay / specialDay null, boş tören durumu
 //                  (göç zar çekmez; isyan sürüyorsa elebaşı yok)
@@ -93,7 +96,7 @@ capOutput('compat');
 // Göç zinciri (SaveManager.migrate) bağımsız `if (version < N)` adımlarının sırayla her yüklemede uygulanmasıdır: örneklenen eski
 // kayıt yine bütün sonraki göç adımlarından geçer. Sürüme özgü kontroller yalnızca o fikstür koşulunca eklenir; toplam sayı ona göre değişir.
 const SAMPLE = [2, 6, 10, 14, 18, 22, 26, 30, 33, 36];
-const ALL_VERSIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40];
+const ALL_VERSIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41];
 const latest = ALL_VERSIONS.slice(-3);
 const wanted = process.argv.includes('--sample') && !process.argv.includes('--all') ? new Set([...SAMPLE, ...latest]) : null;
 const fixtures = ALL_VERSIONS.filter((v) => !wanted || wanted.has(v)).map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
@@ -220,7 +223,8 @@ for (const { name, raw } of fixtures) {
       empty: !s.tradePost.ship && s.tradePost.nextShipAt === null && s.tradePost.visits === 0 && Object.keys(s.tradePost.market).length === 0 && s.tradePost.completed === 0,
     };
     // (25.1) yaşam evreleri (yüklendiği an)
-    loaded.life = s.characters.map((c) => ({ id: c.id, age: c.age, days: c.ageInDays, stage: c.lifeStage, child: c.isChild, retired: c.retired, role: Boolean(c.role) }));
+    loaded.life = s.characters.map((c) => ({ id: c.id, age: c.age, days: c.ageInDays, aged: c.agedDays, stage: c.lifeStage, child: c.isChild, retired: c.retired, role: Boolean(c.role) }));
+    loaded.daysPerAge = (await import('/src/data/lifeStages.js')).AGING.daysPerAge; // (30.4a)
     loaded.lifeState = JSON.stringify(s.lifeStages);
     // (25.5) yadigârlar (yüklendiği an)
     loaded.heirloom = {
@@ -648,7 +652,10 @@ for (const { name, raw } of fixtures) {
   // (25.1) yaşam evreleri
   {
     const L = r.loaded.life;
-    const valid = (x) => (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage)) && Number.isInteger(x.days) && x.days >= 0 && x.age === Math.floor(x.days / 16);
+    const D = r.loaded.daysPerAge; // (30.4a) bir yaş kaç gün (her mevsim bir yaş: 4)
+    const valid = (x) => (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage)) && Number.isInteger(x.days) && x.days >= 0 && x.age === Math.floor(x.days / D);
+    // (30.4a) v40 -> v41: gün cinsinden yaş 16 günlük yaştan D günlüğe ölçeklenir (aşağı yuvarlama)
+    const scaled = (days) => (data.version < 41 ? Math.floor((days * D) / 16) : days);
     if (data.version < 24) {
       const ageOf = new Map(data.characters.map((c) => [c.id, c.age]));
       const expected = (x) => (x.child ? 'child' : x.age >= 65 ? 'elder' : 'adult');
@@ -661,9 +668,18 @@ for (const { name, raw } of fixtures) {
       const saved = new Map(data.characters.map((c) => [c.id, c]));
       results.push({
         name: `${tag}: yaşam evreleri, gün cinsinden yaşlar ve evre sayaçları korundu`,
-        ok: L.every(valid) && L.every((x) => saved.get(x.id)?.lifeStage === x.stage && saved.get(x.id)?.ageInDays === x.days) && r.loaded.lifeState === JSON.stringify({ ...data.lifeStages, venerables: data.lifeStages.venerables ?? 0, deaths: data.lifeStages.deaths ?? 0, accidents: data.lifeStages.accidents ?? 0, lastDeath: data.lifeStages.lastDeath ?? null }), // (28.3) v34'ten eski kayıtlarda vefat alanları 0 / null
+        ok: L.every(valid) && L.every((x) => saved.get(x.id)?.lifeStage === x.stage && scaled(saved.get(x.id)?.ageInDays) === x.days) && r.loaded.lifeState === JSON.stringify({ ...data.lifeStages, venerables: data.lifeStages.venerables ?? 0, deaths: data.lifeStages.deaths ?? 0, accidents: data.lifeStages.accidents ?? 0, lastDeath: data.lifeStages.lastDeath ?? null }), // (28.3) v34'ten eski kayıtlarda vefat alanları 0 / null
         detail: `${L.filter((x) => x.stage === 'elder').length} bilge, ${L.filter((x) => x.stage === 'youth').length} genç · ${r.loaded.lifeState}`,
       });
+      // (30.4a) v40 -> v41: her sakinin yaşı (yıl) ve evresi göçten önce ve sonra aynı; yaş içindeki ilerleme oranı korundu (aşağı yuvarlama)
+      if (data.version < 41) {
+        const same = L.filter((x) => saved.has(x.id) && Number.isFinite(saved.get(x.id).ageInDays));
+        const ok41 = same.every((x) => {
+          const old = saved.get(x.id).ageInDays;
+          return x.age === Math.floor(old / 16) && x.stage === saved.get(x.id).lifeStage && x.days % D === Math.floor(((old % 16) * D) / 16) && x.aged <= x.days;
+        });
+        results.push({ name: `${tag}: v40 -> v41 göçü: her sakinin yaşı ve evresi aynı, yaş içindeki ilerleme oranı korundu`, ok: ok41 && same.length > 0, detail: `${same.length} sakin · bir yaş ${D} gün` });
+      }
       const elders = L.filter((x) => x.stage === 'elder');
       const core = L.filter((x) => !x.child && !x.role && x.stage !== 'elder').length;
       results.push({ name: `${tag}: bilgeler emekli (çekirdek sakin kuralı), ölmedi`, ok: (elders.length > 0 || !data.characters.some((c) => c.lifeStage === 'elder')) && elders.every((x) => x.retired === core >= 3), detail: `${elders.length} bilge, ${core} çekirdek sakin` });
@@ -672,7 +688,7 @@ for (const { name, raw } of fixtures) {
     const grew = r.lifeAfter.filter((x) => before.has(x.id) && !before.get(x.id).role);
     results.push({
       name: `${tag}: bir gün sonra herkesin yaşı bir gün ilerledi, evreler geçerli, kimse silinmedi`,
-      ok: grew.every((x) => (x.days === before.get(x.id).days + 1 || (before.get(x.id).child && !x.child && x.days >= 18 * 16)) && (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage))) && grew.length >= L.filter((x) => !x.role).length - 2,
+      ok: grew.every((x) => (x.days === before.get(x.id).days + 1 || (before.get(x.id).child && !x.child && x.days >= 18 * D)) && (x.child ? x.stage === 'child' : ['youth', 'adult', 'elder'].includes(x.stage))) && grew.length >= L.filter((x) => !x.role).length - 2,
       detail: `${grew.length} sakin`,
     });
   }
@@ -790,7 +806,8 @@ for (const { name, raw } of fixtures) {
       const saved = new Map(data.characters.filter((c) => c.apprenticeship).map((c) => [c.id, JSON.stringify(c.apprenticeship)]));
       results.push({
         name: `${tag}: çıraklar, ustaları, ilerlemeleri, açık kapılar ve sayaçlar korundu`,
-        ok: P.list.length === saved.size && P.list.length > 0 && P.list.every((x) => x.youth && saved.get(x.id) === x.a) && P.state === JSON.stringify({ ...data.apprenticeship, grandmasters: data.apprenticeship.grandmasters ?? 0, grandmasterSaved: data.apprenticeship.grandmasterSaved ?? 0 }), // (28.2) v33'ten eski kayıtlarda Başusta sayaçları 0 gelir
+        ok: P.list.length === saved.size && (P.list.length > 0 || data.version >= 41) && P.list.every((x) => x.youth && saved.get(x.id) === x.a) && P.state === JSON.stringify({ ...data.apprenticeship, grandmasters: data.apprenticeship.grandmasters ?? 0, grandmasterSaved: data.apprenticeship.grandmasterSaved ?? 0 }), // (28.2) v33'ten eski kayıtlarda Başusta sayaçları 0 gelir
+        // (30.4a) her mevsim bir yaşla gençlik 12 gün sürüyor: v41 fikstüründe (72. gün) kayıt anında çırak yok; çıraklı fikstürler v25-v40
         detail: `${P.list.length} çırak · ${data.apprenticeship.open.length} açık kapı · ${data.apprenticeship.crafted} çırak işi`,
       });
     }

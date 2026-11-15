@@ -349,7 +349,7 @@ export class Character extends Entity {
     this.growsUpAt = null;
     this.age = CHILDREN.adultAge;
     // (25.1) büyüyen çocuk Genç evresine geçer (18 yaşının doğum gününden başlar)
-    this.ageInDays = Math.max(this.ageInDays, this.age * AGING.daysPerYear);
+    this.ageInDays = Math.max(this.ageInDays, this.age * AGING.daysPerAge);
     this.agedDays = 0; // yetişkin hayatının kuşak yaşı 18
     this.age = ageFromDays(this.ageInDays);
     this.lifeStage = stageFor(this);

@@ -8,7 +8,8 @@
 //
 // Yaş döngüsü RASTGELELİK KULLANMAZ: her sakinin doğum günü kimliğinden türetilir, yaşı yalnızca gün dönümlerinde (00:00)
 // ilerler; oyunun hiçbir üretecinin sırası değişmez.
-import { CONFIG } from '../config.js';
+import { CALENDAR } from './seasons.js';
+import { engineOn } from '../systems/Engines.js';
 
 export const LIFE_STAGE_KEYS = ['child', 'youth', 'adult', 'elder'];
 
@@ -20,14 +21,26 @@ export const LIFE_STAGES = {
   elder: { name: 'Kıdemli Bilge', icon: 'book', description: 'Emekli usta: ağır işlerden muaftır; çardakta, bankta ve Bilgelik Evi\'nde vakit geçirir, gençlere Bilge Nasihati verir.' },
 };
 
-// Takvim: bir yaş = bir oyun yılı (4 mevsim). Gençlik youthUntil yaşına kadar sürer; elderAt yaşında sakin Kıdemli Bilge olur.
-// (29.2b) Kuruluş sakinlerinin en yaşlısı (66) oyunun ilk günlerinde bilgeleşir, ikincisi (58) yaklaşık 7 yıl (112 gün) sonra (çocuklar 18 yaşında Genç olur).
+// Yaşlanma: (30.4a, ENGINES.swiftAging) sakinler her mevsim bir yaş alır: bir yaş = daysPerAge oyun günü (şalter kapalıyken bir takvim
+// yılı, 16 gün). Takvim yılı (CALENDAR.daysPerYear, 16 gün) ayrıdır: doğum günü kutlaması, yıl dönümü ve festivaller yılda birdir.
+// Gençlik youthUntil yaşına kadar sürer; elderAt yaşında sakin Kıdemli Bilge olur (evre eşikleri ve ömür yaş olarak değişmedi).
+// (29.2b) Havuzun en yaşlısı (66) oyunun ilk günlerinde bilgeleşir, ikincisi (30.4a: 61) 4 yaş (16 gün) sonra (çocuklar 18 yaşında Genç olur).
 export const AGING = {
-  daysPerYear: CONFIG.DAYS_PER_SEASON * 4,
+  swiftDaysPerAge: 4, // (30.4a) her mevsim bir yaş (eski: 16)
+  get daysPerAge() {
+    return engineOn('swiftAging') ? this.swiftDaysPerAge : CALENDAR.daysPerYear;
+  },
+  /** Eski ad (25.1-30.3): takvim yılının gün sayısı. Yaşlanma için daysPerAge, takvim için CALENDAR.daysPerYear kullanılır. */
+  get daysPerYear() {
+    return CALENDAR.daysPerYear;
+  },
   youthUntil: 21,
   elderAt: 65,
-  // Doğum günleri kimliğe göre yılın ilk birthdaySpread gününe dağılır (herkes aynı gün yaşlanmasın; rastgelelik yok)
+  // Doğum günleri (yaş aldığı gün) kimliğe göre bir yaşın ilk yarısına dağılır: 16 günlük yaşta ilk 8 gün, 4 günlükte ilk 2 gün
+  // (herkes aynı gün yaşlanmasın; rastgelelik yok). birthdaySpread 16 günlük yaşa göredir; LifeStages.birthdayOffset ölçekler.
   birthdaySpread: 8,
+  // (30.4a) kartta "Yakında bilgeleşecek" (elderAt'a bu kadar yaş kala) ve "Ömrünün son demlerinde" (ömre bu kadar yaş kala)
+  noteYears: 2,
 };
 
 // Gençlik: energyGain, uykuda ve dinlenirken enerjinin dolma çarpanıdır. 25.1'de 1 (kapalı): 1,15 denendiğinde tohum 42'nin
@@ -64,7 +77,7 @@ export const ELDER_LINES = [
 export const ELDER_ADVICE = ['Sabır her işin başıdır, evlat.', 'Ağaç yaşken eğilir.', 'Komşu komşunun külüne muhtaç.', 'Bir elin nesi var, iki elin sesi var.', 'Damlaya damlaya göl olur.'];
 
 // (28.3) Sürdürülebilir kuşak döngüsü
-//   LIFESPAN  : her sakinin ömrü (yaş olarak; 1 yaş = AGING.daysPerYear oyun günü) 67-75 arasından kimliğinden ve tohumdan türetilir
+//   LIFESPAN  : her sakinin ömrü (yaş olarak; 1 yaş = AGING.daysPerAge oyun günü) 67-75 arasından kimliğinden ve tohumdan türetilir
 //               (Venerable.lifespanFor: izole üreteç, ana üretece dokunmaz). Kıdemli Bilge / Saygın Büyük bu yaşa ulaştığı gün dönümünde (00:00) vefat eder.
 //   VENERABLE : Kıdemli Bilge, Ocak Devri'ni ve Yadigâr Devri'ni tamamlayınca Saygın Büyük olur (kontrol her gün 19:00'da; Yadigâr töreni 18:00'dır).
 //               hearthGraceAge: ocağını bu yaşa dek devredememiş (evlatları evlenmemiş) bilgenin devri muaf sayılır (kasaba kilitlenmesin).

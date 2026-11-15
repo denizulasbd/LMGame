@@ -5,6 +5,7 @@
 //                 ids, deadIds, closestId }, names: [{ name, day, age }], held, condolences, celebrated, forgotten }
 // c.weddingDay (evlendiği gün; eski kayıtta null), c.specialDay = null | { day, kind: 'birthday' | 'anniversary', celebrated, gifted }
 // HİÇ ZAR ÇEKMEZ: izole üreteç (tohum + 41, LoyaltySystem ile aynı anahtar) yalnızca veda / kutlama sözlerinin seçimi içindir.
+import { CALENDAR } from './seasons.js';
 
 export const RITE_RULES = {
   startHour: 18, // vefatı izleyen gün 18:00-19:00
@@ -21,7 +22,7 @@ export const RITE_RULES = {
 };
 
 export const SPECIAL_RULES = {
-  yearDays: 16, // evlilik yıl dönümü: 16 günde bir (bir oyun yılı)
+  yearDays: CALENDAR.daysPerYear, // evlilik yıl dönümü: 16 günde bir (bir takvim yılı; 30.4a: yaşlanmadan bağımsız)
   startHour: 6, // o gün 06:00'da başlar
   deadlineHour: 22, // 22:00'ye dek kutlanmazsa "Unutuldu"
   closest: 2, // doğum gününde birbirini arayan en yakın kişi sayısı (eş, ebeveyn, sonra ilişki puanı)

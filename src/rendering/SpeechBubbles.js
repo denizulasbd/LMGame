@@ -1,3 +1,4 @@
+// (30.3) c.grumble = { text, at, duration }: Homurdanan / Kırgın sakinin yakınması (DiscontentSystem); c.speech yoksa aynı balonla çizilir.
 // (25.2) Konuşma baloncukları: usta / çırak (ve bilge) sözlerini karakterin başının üstünde küçük bir metin balonu olarak
 // ekran koordinatında çizer. c.speech = { text, at, duration, remaining? }. İkon balonundan (c.bubble) ayrı bir katmandır.
 // (27.1) Süre simülasyonda düşer: updateSpeechBubbles() TownScene.update'te her adımda (tick.dtSeconds) çağrılır ve biten
@@ -27,10 +28,18 @@ export function updateSpeechBubbles(characters, guests, dtSeconds) {
     if (!list) continue;
     for (const c of list) {
       const s = c.speech;
-      if (!s) continue;
-      const left = remainingOf(s) - dt;
-      if (left <= 0) c.speech = null;
-      else s.remaining = left;
+      if (s) {
+        const left = remainingOf(s) - dt;
+        if (left <= 0) c.speech = null;
+        else s.remaining = left;
+      }
+      // (30.3) homurdanma sözü ayrı alanda yaşar (c.speech'e bakan üreteçlerin sırası değişmesin); yalnızca söz yokken çizilir
+      const g = c.grumble;
+      if (g) {
+        const left = remainingOf(g) - dt;
+        if (left <= 0) c.grumble = null;
+        else g.remaining = left;
+      }
     }
   }
 }
@@ -47,7 +56,7 @@ export function drawSpeechBubbles(renderer, camera, characters, budget = null, s
   ctx.font = FONT;
   ctx.textBaseline = 'middle';
   for (const c of characters) {
-    const s = c.speech;
+    const s = c.speech ?? c.grumble ?? null; // (30.3) homurdanma: süren söz yoksa
     if (!s || !c.visible) continue;
     if (phase === 1 && c.id !== selectedId) continue;
     if (phase === 2 && c.id === selectedId) continue;

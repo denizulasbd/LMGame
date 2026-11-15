@@ -4,6 +4,7 @@
 // 10. aşama: kasabanın toplam yiyecek değeri (ekmek 2,5 sayılır), kasaba seviyesi (Mezra -> Gelişmiş
 // Şehir) ölçütleri ve unvanı, belediyenin iş verimi çarpanı.
 import { lateDiscontent } from './LateGame.js';
+import { engineOn } from './Engines.js';
 import { goldenWelfareMultiplier, goldenWorkMultiplier } from './GoldenAge.js';
 import { silkPrestige } from './Luxury.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -144,9 +145,16 @@ export function immigrationStatus(state) {
       text: `Refah %${Math.round(happiness)} (en az %${IMMIGRATION.minHappiness})`,
     },
     { key: 'fame', ok: !fame.blocked, text: fame.text },
+    // (30.4b) Salgın Söylentisi: "Kapıları kapat" kararı kapıları bir gün kapatır (göç ve tüccar yok)
+    ...(quarantined(state) ? [{ key: 'quarantine', ok: false, text: 'Kapılar kapalı: salgın söylentisi' }] : []),
   ];
   const perMorning = townTier(state).maxPerMorning ?? IMMIGRATION.maxPerMorning;
   return { ok: checks.every((c) => c.ok), freeBeds: freeBedCount, maxPerMorning: fame.slow ? Math.min(1, perMorning) : perMorning, checks };
+}
+
+/** (30.4b, ENGINES.midgame) Kapılar kapalı mı (Salgın Söylentisi)? */
+export function quarantined(state) {
+  return engineOn('midgame') && (state.dilemma?.quarantineUntil ?? 0) > state.totalMinutes;
 }
 
 /** Göçle ulaşılabilecek en yüksek nüfus (Gelişmiş Şehir'de artar). */

@@ -12,12 +12,13 @@
 //                     ('ui:rejectDecree') Krallık para / erzak cezası keser.
 //   Aslanlı Heykel  : Kraliyet Beratı'yla açılır (yapı: royalStatue); kalıcı refah (townBonus) ve saat başı güven.
 // Durum: state.crown (kayda girer).
-import { LEVY, DECREES, DECREE_KEYS, DECREE, DECREE_ITEMS, ROYAL_STATUE } from '../data/crown.js';
+import { LEVY, LEVY_EASE, DECREES, DECREE_KEYS, DECREE, DECREE_ITEMS, ROYAL_STATUE } from '../data/crown.js';
 import { GOLDEN_AGE } from '../data/goldenAge.js';
 import { emptyCrown, nextOnSchedule, levyAmount, levyPlan, decreeNeed, decreeStatus, reputationLevel } from './Crown.js';
 import { isGoldenAge } from './GoldenAge.js';
 import { researchLeft } from './Petitions.js';
 import { clamp } from '../utils/math.js';
+import { engineOn } from './Engines.js';
 
 const PENALTY_BUFF = 'royalPenalty';
 
@@ -40,7 +41,11 @@ export class CrownSystem {
     this.state.crown ??= emptyCrown();
     const cr = this.state.crown;
     const now = this.state.totalMinutes;
-    if (!Number.isFinite(cr.nextLevyAt)) cr.nextLevyAt = nextOnSchedule(now, LEVY.everyDays, LEVY.hour);
+    if (!Number.isFinite(cr.nextLevyAt)) {
+      cr.nextLevyAt = nextOnSchedule(now, LEVY.everyDays, LEVY.hour);
+      // (30.6) ilk tahsilat en erken LEVY_EASE.firstDay'de (yeni oyunda; kayıttan yüklenen takvime dokunulmaz)
+      if (engineOn('novicePath')) cr.nextLevyAt = Math.max(cr.nextLevyAt, (LEVY_EASE.firstDay - 1) * 1440 + LEVY.hour * 60);
+    }
     if (!Number.isFinite(cr.nextDecreeAt)) cr.nextDecreeAt = Math.max(now + 1440, (DECREE.firstDay - 1) * 1440 + 10 * 60);
     this.unsubscribers = [
       game.events.on('time:hour', (hour) => this.hourly(hour)),
@@ -240,7 +245,7 @@ export class CrownSystem {
           item = null;
         } else cr.statueRight = true;
       }
-      this.economy.add('gold', gold);
+      this.economy.add('gold', gold, 'decree');
       result.gold = gold;
       result.item = item;
       this.events.emit('crown:decreeDelivered', { decree: d, def, gold, item });
@@ -248,10 +253,11 @@ export class CrownSystem {
     } else {
       cr.decreesFailed += 1;
       const tier = Math.max(1, Math.min(4, s.town?.tier ?? 1));
-      const gold = Math.min(s.resources.gold ?? 0, DECREE.failed.goldPerTier * tier);
+      const fineGold = (engineOn('novicePath') ? LEVY_EASE.decreeFailedGoldPerTier : DECREE.failed.goldPerTier) * tier; // (30.6)
+      const gold = Math.min(s.resources.gold ?? 0, fineGold);
       if (gold > 0) this.economy.spend({ gold });
       let food = 0;
-      if (gold < DECREE.failed.goldPerTier * tier) {
+      if (gold < fineGold) {
         food = Math.min(s.resources.food ?? 0, DECREE.failed.foodPerTier * tier);
         if (food > 0) this.economy.spend({ food });
       }
