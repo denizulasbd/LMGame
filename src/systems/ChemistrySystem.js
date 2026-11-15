@@ -99,6 +99,8 @@ export class ChemistrySystem {
    */
   tag(from, toId, tag, days = null) {
     if (!from || from.role) return false;
+    // (30.6) vefat eden / ayrılan sakine kayıt yazılmaz (yadigâr devri ölenin ardından gelir: kopuk referans)
+    if (toId !== RULER_ID && !this.state.characters.some((x) => x.id === toId)) return false;
     const now = this.state.totalMinutes;
     const added = addTag(from, toId, tag, now);
     if (days !== null && EMOTION_TAGS[tag].days !== null) from.relationships[toId].until[tag] = Math.round(now + days * 1440);
@@ -257,6 +259,7 @@ export class ChemistrySystem {
     const now = state.totalMinutes;
     const characters = this.world.characters;
     for (const c of characters) expireTags(c, now);
+    pruneRelations(this.state.characters); // (30.6) kopuk kimya kaydı (ölen sakine) hiçbir karede kalmaz
 
     const present = new Set(characters); // (30.3) aynı saatte ayrılan / ölen sakin grupta kalmış olabilir: ona kayıt yazılmaz (kopuk referans)
     for (const group of this.relationships.groups) {
@@ -287,7 +290,7 @@ export class ChemistrySystem {
         const id = Number(key);
         if (id <= a.id) continue; // her çift bir kez (Yönetim kaydı da atlanır)
         const b = this.world.getCharacter(id);
-        if (!b) continue;
+        if (!b || !present.has(b) || !this.state.characters.includes(b)) continue; // (30.6) vefat eden / ayrılan sakin dünya tablosunda bir an daha kalabilir: ona ruh ikizi bağı kurulmaz
         const chemistry = refreshChemistry(state, a, b);
         if (chemistry >= KINDRED_MIN_CHEMISTRY) {
           if (!hasTag(a, b.id, 'kindred') && getFriendship(state, a, b) >= EMOTION_RULES.kindredScore && this.kindredCount(a) < EMOTION_RULES.kindredLimit && this.kindredCount(b) < EMOTION_RULES.kindredLimit) this.becomeKindred(a, b);

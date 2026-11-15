@@ -9,7 +9,7 @@ const out = options.out ?? 'docs/playtest/img30.6';
 fs.mkdirSync(out, { recursive: true });
 const { browser, page, errors } = await openGame({ seed: 21, stopLoop: false, viewport: { width: 1280, height: 800 } });
 const wait = (ms) => page.waitForTimeout(ms);
-const shot = async (name) => { await wait(350); await page.screenshot({ path: `${out}/${name}.png` }); console.log(`${out}/${name}.png`); };
+const shot = async (name) => { await page.mouse.move(640, 760); await wait(350); await page.screenshot({ path: `${out}/${name}.png` }); console.log(`${out}/${name}.png`); };
 
 // Hazırlık: Köy seviyesinde, birkaç yapılı bir kasaba; zaman durur (ekran görüntüsü kararlı olsun)
 await page.evaluate(async () => {
@@ -82,8 +82,11 @@ await page.evaluate(() => {
   sc.storyDirector.queue = [];
   sc.storyDirector.visible = [];
   game.events.emit('storm:struck', { kind: 'storm', damaged, safe: false, winter: false });
+  game.events.emit('time:setPaused', false); // hikâye kartları duraklatılmışken sahneye çıkmaz
+  game.state.time.speed = 1;
 });
 await wait(900);
+await page.evaluate(() => game.events.emit('time:setPaused', true));
 await shot('05-hasar-karti');
 
 // 6. "Sıradaki" hedefin engel satırı (Hedefler penceresi)

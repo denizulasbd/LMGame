@@ -224,13 +224,12 @@ const open = async (opts) => {
     // ---- denge ayarları (şalter açık / kapalı): Taş Ocağı yalnızca odun, Köy / Kasaba eşikleri, küçük keselerde vergi yuvarlama, başlangıç yiyeceği
     const { BUILDINGS } = await import('/src/data/buildings.js');
     const { TOWN_TIERS } = await import('/src/data/town.js');
-    const { NOVICE_START, STARTING_RESOURCES } = await import('/src/data/resources.js');
-    const probe = { coins: 4, isChild: false, role: null };
+        const probe = { coins: 4, isChild: false, role: null };
     const onVals = [JSON.stringify(BUILDINGS.quarry.cost), TOWN_TIERS[1].requires.population, TOWN_TIERS[2].requires.buildings, TOWN_TIERS[2].requires.upgraded, Cr.coinTax(probe, 20)];
     ENGINES.novicePath = false;
     const offVals = [JSON.stringify(BUILDINGS.quarry.cost), TOWN_TIERS[1].requires.population, TOWN_TIERS[2].requires.buildings, TOWN_TIERS[2].requires.upgraded, Cr.coinTax(probe, 20)];
     ENGINES.novicePath = true;
-    c('denge ayarları: Taş Ocağı yalnızca odunla (50; eski odun 35 + taş 15), Köy nüfus 12 (13), Kasaba yapı 15 / yükseltme 2 (17 / 3), 4 altınlık keseden %20 vergi 1 (0), başlangıç yiyeceği 45 (25); şalter kapalıyken eski değerler', onVals.join() === '{"wood":50},12,15,2,1' && offVals.join() === '{"wood":35,"stone":15},13,17,3,0' && NOVICE_START.food === 45 && STARTING_RESOURCES.food === 25, `${onVals} | ${offVals}`);
+    c('denge ayarları: Taş Ocağı yalnızca odunla (50; eski odun 35 + taş 15), Köy nüfus 12 (13), Kasaba yapı 15 / yükseltme 2 (17 / 3), 4 altınlık keseden %20 vergi 1 (0); şalter kapalıyken eski değerler', onVals.join() === '{"wood":50},12,15,2,1' && offVals.join() === '{"wood":35,"stone":15},13,17,3,0', `${onVals} | ${offVals}`);
     c('kayıt sürümü 41 kalır, yeni alan yalnızca çalışma anında', CONFIG.SAVE_VERSION === 41 && !JSON.stringify(sc.saves.snapshot()).includes('goldDry'));
     return out;
   })));

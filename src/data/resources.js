@@ -90,8 +90,6 @@ export const GOODS_KEYS = RESOURCE_KEYS.filter((k) => RESOURCES[k].processed);
 // Yiyecek yerine sayılan kaynaklar (yiyecek, ekmek)
 export const FOOD_KEYS = RESOURCE_KEYS.filter((k) => RESOURCES[k].foodValue);
 
-// (30.6, ENGINES.novicePath) acemi başlangıç yiyeceği: ilk günlerde (bahçe henüz hasat vermezken) kiler boşalmasın
-export const NOVICE_START = { food: 45 };
 export const STARTING_RESOURCES = { wood: 30, stone: 20, food: 25, wool: 0, iron: 0, bread: 0, flax: 0, hops: 0, cloth: 0, sherbet: 0, gears: 0, gold: 0 };
 
 // Depo binası olmadan her kaynaktan saklanabilecek miktar (her Kiler buna eklenir)

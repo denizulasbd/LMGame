@@ -59,6 +59,7 @@
 //   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
 //               oyunun ana üretecini tüketmediğini göstermek için: --crisis huzurlu ile 22. aşamanın koşusunu bire bir verir)
 //   --loy     : (30.3) data/loyalty.js'i bellekte geçersiz kılar (denge denemesi): "LOYALTY.bitterTrust.perHour=-0.5"
+//   --start-food N : (30.6) başlangıç yiyeceğini geçersiz kılar (denge denemesi)
 //   --famine [gün=5] : (30.3) kıtlık senaryosu: o günden sonra bütün bahçeler yıkılır, toplama emri ve acil dağıtım yapılmaz (oyuncu tepkisiz)
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
 //               bulunursa çıkış kodu 1 olur
@@ -76,6 +77,7 @@ const speed = Number(options.speed ?? 4);
 const { browser, page, errors } = await openGame({ seed, enginesOff: typeof options['engines-off'] === 'string' ? options['engines-off'] : null }); // (30.4a) açılıştan önce
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
+if (options['start-food'] !== undefined) await page.evaluate((v) => { window.game.state.resources.food = v; }, Number(options['start-food'])); // (30.6) denge denemesi: başlangıç yiyeceği
 if (options.stories) await page.evaluate((f) => { window.game.scenes.current.storyDirector.autoTick = true; if (f) window.game.events.emit('ui:setStoryFilter', { filter: f }); }, typeof options['story-filter'] === 'string' ? options['story-filter'] : null); // (30.2)
 // (29.4) --evo "rules.decayPerDay=3;sources.moodlets.quarrel=..." : denge denemeleri için evrim verisini bellekte geçersiz kılar (dosyaya yazmaz).
 // Yol: evolution.js dışa aktarımı.alan...; değer JSON. Örn: --evo "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
