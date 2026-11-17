@@ -5487,3 +5487,25 @@ kbd {
 .goal-blocker::before { content: '✗ '; }
 .hud-goods-menu .resource.is-linked { cursor: pointer; }
 .hud-goods-menu .resource.is-linked .resource-detail { text-decoration: underline dotted; }
+
+/* (Erişilebilirlik) Kaydırma okları: kayan panellerin solunda ▲ / ▼ (Ayarlar > Erişilebilirlik) */
+.scroll-arrows-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 47;
+  pointer-events: none;
+}
+.hud-btn.scroll-arrow {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  touch-action: none;
+}
+.hud-btn.scroll-arrow[hidden] { display: none; }
