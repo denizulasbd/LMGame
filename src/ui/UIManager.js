@@ -32,6 +32,7 @@ import { SettingsPanel } from './components/SettingsPanel.js';
 import { CrisisModal } from './components/CrisisModal.js';
 import { MapTooltip } from './components/MapTooltip.js';
 import { GuideCard } from './components/GuideCard.js';
+import { ScrollArrows } from './components/ScrollArrows.js';
 import { StoryFeed } from './components/StoryFeed.js';
 import { HoverTip } from './components/HoverTip.js';
 
@@ -77,6 +78,7 @@ export class UIManager {
       new MapTooltip(game),
       new StoryFeed(game), // (30.2)
       new GuideCard(game), // (30.1)
+      new ScrollArrows(game), // (Erişilebilirlik) kayan panellerin yanında ▲ / ▼ düğmeleri; Ayarlar'dan açılır
     ];
     for (const component of this.components) {
       if (component.element) (this.slots[component.slot] ?? root).appendChild(component.element);
