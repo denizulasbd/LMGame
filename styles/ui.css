@@ -3381,7 +3381,9 @@ kbd {
   width: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
-  pointer-events: none;
+  /* Kayan kutu fare olaylarını almalı: yoksa kaydırma çubuğu tutulamaz ve touchpad/dokunmatik kaydırma
+     haritaya düşer. Kutu yalnızca kartlar kadar yer kaplar (boşken 0 px), haritayı örtmez. */
+  pointer-events: auto;
 }
 
 .ui-cards > .panel {
