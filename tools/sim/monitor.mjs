@@ -304,6 +304,14 @@ export async function installMonitor(page) {
           const residents = homeCount.get(b.id) ?? 0;
           if (b.capacity && residents > b.capacity) m.overfull.push(`G${s.time.day} ${b.type}#${b.id} ${residents}/${b.capacity}`);
         }
+        // ---- (32.1) Dava kaydı: açık davanın suçlusu hayatta; dava ve sicilde kopuk kişi kimliği yok ----
+        if (s.justice) {
+          for (const k of s.justice.cases) if (!ids.has(k.offenderId)) broke(`dava #${k.id}: açık davanın suçlusu kayıp (${k.offenderId})`);
+          for (const k of [...s.justice.cases, ...s.justice.log]) {
+            for (const f of ['offenderId', 'victimId', 'witnessId']) if (k[f] !== null && k[f] !== undefined && !ids.has(k[f])) broke(`dava #${k.id}: ${f} kopuk (${k[f]})`);
+          }
+          for (const key of Object.keys(s.justice.records)) if (!ids.has(Number(key))) broke(`sicil: kopuk kişi ${key}`);
+        }
         // ---- (19. aşama) Evlilik akışı: taşınma, ortak ev, kutlama, huylar, dedikodu ----
         m.minPop = Math.min(m.minPop, s.characters.length);
         // (28.4) Geç oyun beklentisi: açıkken anlık refah ve eksik lüks örnekleri

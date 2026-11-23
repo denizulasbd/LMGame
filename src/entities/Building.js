@@ -718,6 +718,8 @@ export class Building extends Entity {
       this.drawProgressBar(renderer, env, this.projectRatio, top);
       return;
     }
+    // (32.1) ufak haylazlık: bozulan süsün üstünde küçük onarım işareti (CrimeSystem; kaydedilmez, hasar sistemi değil)
+    if (this.scuffed && !this.damaged) renderer.drawImage(getIconSprite('repair'), Math.round(this.center.x) - 4, this.y + this.height - this.currentSprite(env).height - 6);
     if (this.damaged) {
       // Hasarlı yapının üstünde sallanan uyarı: fırtına bulutu ya da (yangın / baskın) kırık-çekiç simgesi
       const bob = Math.sin(env.time * 3) > 0 ? 0 : 1;

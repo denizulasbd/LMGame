@@ -60,6 +60,7 @@
 //               oyunun ana üretecini tüketmediğini göstermek için: --crisis huzurlu ile 22. aşamanın koşusunu bire bir verir)
 //   --loy     : (30.3) data/loyalty.js'i bellekte geçersiz kılar (denge denemesi): "LOYALTY.bitterTrust.perHour=-0.5"
 //   --start-food N : (30.6) başlangıç yiyeceğini geçersiz kılar (denge denemesi)
+//   --crime-diag : (32.1) suç planı vakti gelmiş sakinin kararlarını sayar (yalnızca okur; (32.1) satırına eklenir)
 //   --famine [gün=5] : (30.3) kıtlık senaryosu: o günden sonra bütün bahçeler yıkılır, toplama emri ve acil dağıtım yapılmaz (oyuncu tepkisiz)
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
 //               bulunursa çıkış kodu 1 olur
@@ -115,7 +116,8 @@ await page.evaluate((o) => {
   if (o.crisis) window.game.state.crisis.difficulty = o.crisis; // doğrudan durumdan (bildirim / ses tüketmesin: huzurlu + --no-safety koşusu 22. aşamayla bire bir aynı olmalı)
   window.__profile = o.profile; // (29.10)
   window.__famine = o.famine; // (30.3)
-}, { famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null });
+  window.__crimeDiag = o.crimeDiag; // (32.1) tanı
+}, { famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null, crimeDiag: Boolean(options['crime-diag']) });
 if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent', 'repent2', 'novice'].includes(options.profile)) {
   console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent | repent2 | novice)`);
   process.exit(2);
@@ -124,6 +126,7 @@ if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent', 'repent2'
 // (30.6) acemi profili ölçümü (yalnızca dinler; altın akışı çağıran yığınından etiketlenir, oyunun durumuna / üretecine dokunmaz)
 await page.evaluate(async () => {
   window.__townMetrics = (await import('/src/systems/TownStatus.js')).townMetrics;
+  window.__justiceMod = await import('/src/systems/Justice.js'); // (32.1) beklenen suç sayısı (saf risk toplamı; zar çekmez)
   const g = window.game;
   const N = (window.__nov = { gold: { in: {}, out: {} }, daily: [], tiers: {}, zero: {}, zeroRun: {}, zeroLongest: {}, levy: [], foodMin5: Infinity, goals: [], decisions: 0 });
   const econ = g.scenes.current.economy;
@@ -333,6 +336,66 @@ await page.evaluate((passive) => {
     expedition: ['bigParty', 'scout', 'ignore'],
   };
   window.__midLog = []; // (30.4b) karar günlüğü: { day, id, midgame, option }
+  // (32.1) suç günlüğü (yalnızca dinler): { day, crime, caught, motive, guard }
+  window.__crimeLog = [];
+  // (32.1) 08:00'deki risk toplamından beklenen suç: yuva başına min(0,85, toplam) (ölçüm için; oyunu etkilemez)
+  window.__crimeExpect = { sum: 0, days: 0, maxRisk: 0, planned: 0, dropped: 0, started: 0, hours: {} };
+  game.events.on('crime:planned', ({ plan }) => { window.__crimeExpect.planned++; const h = Math.floor((plan.at % 1440) / 60); window.__crimeExpect.hours[h] = (window.__crimeExpect.hours[h] ?? 0) + 1; });
+  game.events.on('crime:dropped', () => window.__crimeExpect.dropped++);
+  // tanı (--crime-diag): planı vakti gelmiş sakinin her kararı (yalnızca okur; kararı değiştirmez)
+  if (window.__crimeDiag) {
+    const brain = game.scenes.current.behavior.brain;
+    const decide = brain.decide.bind(brain);
+    window.__crimeExpect.decisions = {};
+    const pc = brain.planCrime.bind(brain);
+    window.__crimeExpect.nulls = {};
+    brain.planCrime = (ch, hour) => {
+      const p = ch.crimePlan;
+      const r = pc(ch, hour);
+      if (!r && p) {
+        const w = game.scenes.current.world;
+        const s = game.state;
+        let why = 'time';
+        if (s.totalMinutes >= p.at && s.totalMinutes <= p.until) {
+          if (p.victimId !== undefined) { const v = w.getCharacter(p.victimId); why = !v ? 'novictim' : v.away ? 'away' : v.insideBuildingId ? 'inside' : 'victimPath'; }
+          else { const b = w.getBuilding(p.buildingId); why = !b?.functional ? 'nobuilding' : !w.getSpots(b).length ? 'nodoors' : 'path'; }
+          why = `${p.crime}:${why}`;
+        }
+        window.__crimeExpect.nulls[why] = (window.__crimeExpect.nulls[why] ?? 0) + 1;
+      }
+      return r;
+    };
+    brain.decide = (ch, hour) => {
+      const p = ch.crimePlan;
+      const due = p && game.state.totalMinutes >= p.at && game.state.totalMinutes <= p.until;
+      const ready = due ? window.__justiceMod.crimeReady(game.state, ch, hour) : null;
+      const plan = decide(ch, hour);
+      if (due) { const key = `${plan?.activity ?? 'null'}${ready ? '' : '!r'}${plan?.onBreak ? '~b' : ''}`; window.__crimeExpect.decisions[key] = (window.__crimeExpect.decisions[key] ?? 0) + 1; }
+      return plan;
+    };
+  }
+  // tanı: planı vakti gelmiş sakin o saat ne yapıyor
+  window.__crimeExpect.busy = {};
+  game.events.on('time:hour', () => {
+    const s = game.state;
+    for (const x of s.characters) if (x.crimePlan && s.totalMinutes >= x.crimePlan.at) { const k = x.task?.activity ?? 'none'; window.__crimeExpect.busy[k] = (window.__crimeExpect.busy[k] ?? 0) + 1; }
+  });
+  game.events.on('time:hour', (h) => {
+    const Jm = window.__justiceMod;
+    if (h !== 8 || !Jm?.justiceActive(game.state)) return;
+    const s = game.state;
+    const risks = s.characters.filter((x) => Jm.crimeCandidate(s, x)).map((x) => Jm.crimeRisk(s, x)).sort((p, q) => q - p);
+    let total = risks.reduce((p, q) => p + q, 0);
+    let e = 0;
+    for (let i = 0; i < Jm.slotsFor(s); i++) {
+      e += Math.min(0.85, total);
+      total -= risks[i] ?? 0;
+    }
+    window.__crimeExpect.sum += e;
+    window.__crimeExpect.days += 1;
+    window.__crimeExpect.maxRisk = Math.max(window.__crimeExpect.maxRisk, risks.reduce((p, q) => p + q, 0));
+  });
+  game.events.on('crime:recorded', ({ kase, caught }) => window.__crimeLog.push({ day: kase.day, crime: kase.crime, caught, motive: kase.motive, guard: kase.witnessIsGuard, amount: kase.stolen?.amount ?? 0, coins: Boolean(kase.stolen?.coins) }));
   game.events.on('dilemma:resolved', ({ id, option, dilemma }) => window.__midLog.push({ day: game.state.time.day, id, midgame: Boolean(dilemma?.midgame), option: option.id }));
   window.__decide = () => {
     const scene = game.scenes.current;
@@ -1297,6 +1360,40 @@ if (options.profile === 'novice') {
   riteStats.weight = { heavyDay: W.heavyDay, firstGrum, strikeDays, revolts: W.revolts, left: W.left, g30, lastPop: last.pop, last, switchDay: W.switchDay, switchPop: W.switchPop, daily: d };
 }
 console.log(`(29.7) anma töreni ${riteStats.held} (vefat günü ${riteStats.deathDays}, töreni gelmiş ${riteStats.dueDeathDays}) · ortalama katılım ${riteStats.attendance.toFixed(1)} · 20:00'de süren tören görevi ${riteStats.late} · özel gün kutlanan ${riteStats.celebrated} / unutulan ${riteStats.forgotten} (%${Math.round((100 * riteStats.celebrated) / Math.max(1, riteStats.celebrated + riteStats.forgotten))})`);
+const crimeStats = await page.evaluate(() => {
+  // (32.1) suç motoru: işlenen / yakalanan / tür dağılımı / günlük en çok / ilk suç günü / kapanan dava
+  const log = window.__crimeLog ?? [];
+  const perDay = {};
+  const byType = {};
+  const byMotive = {};
+  for (const e of log) {
+    perDay[e.day] = (perDay[e.day] ?? 0) + 1;
+    byType[e.crime] = (byType[e.crime] ?? 0) + 1;
+    byMotive[e.motive] = (byMotive[e.motive] ?? 0) + 1;
+  }
+  const j = window.game.state.justice;
+  return {
+    committed: log.length,
+    caught: log.filter((e) => e.caught).length,
+    guard: log.filter((e) => e.guard).length,
+    byType,
+    byMotive,
+    maxPerDay: Math.max(0, ...Object.values(perDay)),
+    firstDay: log[0]?.day ?? null,
+    open: j?.cases.length ?? 0,
+    closed: j?.log.length ?? 0,
+    days: log.map((e) => e.day),
+    expected: Math.round((window.__crimeExpect?.sum ?? 0) * 10) / 10,
+    activeDays: window.__crimeExpect?.days ?? 0,
+    planned: window.__crimeExpect?.planned ?? 0,
+    dropped: window.__crimeExpect?.dropped ?? 0,
+    busy: window.__crimeExpect?.busy ?? {},
+    decisions: window.__crimeExpect?.decisions ?? null,
+    nulls: window.__crimeExpect?.nulls ?? null,
+    hours: window.__crimeExpect?.hours ?? {},
+  };
+});
+console.log(`(32.1) suç: ${crimeStats.committed} işlendi · ${crimeStats.caught} yakalandı (bekçi ${crimeStats.guard}) · tür ${JSON.stringify(crimeStats.byType)} · motivasyon ${JSON.stringify(crimeStats.byMotive)} · günlük en çok ${crimeStats.maxPerDay} · ilk G${crimeStats.firstDay ?? '-'} · açık dava ${crimeStats.open} · beklenen ${crimeStats.expected} (${crimeStats.activeDays} etkin gün) · plan ${crimeStats.planned} / düşen ${crimeStats.dropped}${crimeStats.decisions ? ` · plan saatleri ${JSON.stringify(crimeStats.hours)} · vakti gelince ${JSON.stringify(crimeStats.busy)} · kararlar ${JSON.stringify(crimeStats.decisions)} · boş ${JSON.stringify(crimeStats.nulls)}` : ''}`);
 console.log(`(30.4b) olay: ${midStats.distinct} farklı (${midStats.log.length} karar; G20 sonrası ${midStats.freshAfter20}/${midStats.after20} yeni) · hedef ${midStats.milestones}/14 (${midStats.doneIds.join(',')}) · ${midStats.log.join(' ')}`);
 console.log(`(29.5) Omuz Omuza ${bondStats.side} · Diken Üstünde ${bondStats.rub} · en az bir kez Omuz Omuza alan ${bondStats.ever}/${bondStats.pop} (%${Math.round((100 * bondStats.ever) / Math.max(1, bondStats.pop))}) · Diken Üstünde alan ${bondStats.everRub} · en çok birlikte çalışan çiftler: ${bondStats.pairs.join(', ') || '-'}`);
 const so = mon.social;
@@ -1439,7 +1536,7 @@ for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}
 const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0 && mon.social.stuck.length === 0;
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, gold: report.gold, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, gold: report.gold, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();

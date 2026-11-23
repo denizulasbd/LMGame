@@ -64,6 +64,7 @@ import { TEMPERAMENT } from '../data/temperament.js';
 import { isMemorialTime, memorialEligible, urgentNeed, riteWindow, riteVenue } from '../systems/Rites.js';
 import { engineOn } from '../systems/Engines.js';
 import { shouldStrike } from '../systems/Loyalty.js';
+import { crimeReady } from '../systems/Justice.js';
 import { DISCONTENT } from '../data/loyalty.js';
 
 const COLD_SEASONS = ['autumn', 'winter']; // (29.3) "Soğukta üşümek" korkusunun sıcak mekân arayışı
@@ -248,6 +249,15 @@ export class Brain {
       const plan = this.planGrieve(c);
       if (plan) return { ...plan, onBreak };
     }
+    // (32.1) Suç: CrimeSystem 08:00'da izole üreteçle (tohum + 42) planladıysa boş zamanda / molada, acil ihtiyaç, yangın, isyan, yara,
+    // teselli ve yas önceliklerinden SONRA (randevu, sohbet, alışveriş ve planLeisure'dan ÖNCE) hedefin kapısına gider; zar çekmez.
+    // Plan enjekte edildiğinde atlanan randevu / sohbet / alışveriş / planLeisure zarlarının kayması beklenen bir durumdur (suç
+    // işlenmedikçe kararlar ve zar sırası aynıdır). Ölçüm: planLeisure'ın hemen önünde planların ~%75'i sohbete (meydan) kaçıyordu.
+    // Buraya mesai saatinde gelen sakin ya moladadır ya da iş bulamamıştır (boşta): ikisi de boş zaman sayılır.
+    if (c.crimePlan && engineOn('justice') && !c.isChild) {
+      const plan = this.planCrime(c, hour);
+      if (plan) return { ...plan, onBreak };
+    }
     // (19. aşama) Bekâr ve ilişkisi yüksek sakinler boş zamanlarında birbirleriyle vakit geçirmeye öncelik verir
     if (!c.isChild && !c.married && !grieving && (!isWorkHours(hour) || onBreak)) {
       const plan = this.planDate(c, hour);
@@ -271,6 +281,53 @@ export class Brain {
     }
     const leisure = this.planLeisure(c, hour);
     return leisure ? { ...leisure, onBreak } : this.planWait();
+  }
+
+  /** (32.1) Yapının ayak izini çevreleyen yürünebilir ve kasabaya bağlı karolar (kapısı olmayan süsler için). */
+  crimeRing(b) {
+    const { w, h } = BUILDINGS[b.type]?.size ?? { w: 1, h: 1 };
+    const out = [];
+    for (let y = b.tileY - 1; y <= b.tileY + h; y++) {
+      for (let x = b.tileX - 1; x <= b.tileX + w; x++) {
+        const edge = x === b.tileX - 1 || x === b.tileX + w || y === b.tileY - 1 || y === b.tileY + h;
+        if (edge && this.world.map.isWalkable(x, y) && this.world.isReachable(x, y)) out.push({ x, y });
+      }
+    }
+    return out;
+  }
+
+  /** (32.1) Planlanan suçun hedefi: yapının kapısı ya da kurbanın yanı. Zamanı gelmediyse / uygun değilse null. Zar çekmez. */
+  planCrime(c, hour) {
+    const state = this.world.state;
+    const plan = c.crimePlan;
+    if (state.totalMinutes < plan.at || state.totalMinutes > plan.until || !crimeReady(state, c, hour)) return null;
+    const origin = this.originTile(c);
+    let spot = null;
+    let target = null;
+    if (plan.victimId !== undefined) {
+      const v = this.world.getCharacter(plan.victimId);
+      if (!v || v.away) return null;
+      const home = v.insideBuildingId ? this.world.getBuilding(v.insideBuildingId) : null;
+      const doors = home ? this.world.getSpots(home) : [];
+      spot = home ? (doors.length ? this.nearest(doors, c) : null) : { x: v.tileX, y: v.tileY };
+    } else {
+      target = this.world.getBuilding(plan.buildingId);
+      if (!target?.functional) return null;
+      // süs yapılarının (çit, bank, fener) kullanım noktası yoksa çevresindeki yürünebilir karo
+      const doors = this.world.getSpots(target);
+      const around = doors.length ? doors : this.crimeRing(target);
+      if (!around.length) return null;
+      // en yakın birkaç noktadan yolu olan ilki (çitle çevrili bahçe gibi yerlerde en yakın karo kopuk olabilir)
+      const d2 = (p) => (p.x - origin.x) ** 2 + (p.y - origin.y) ** 2;
+      spot = [...around].sort((p, q) => d2(p) - d2(q)).slice(0, 4).find((p) => this.world.findPath(origin, p)) ?? null;
+      if (!spot) return null;
+    }
+    // kurban bankta / havuz başında oturuyor olabilir (yürünemez karo): yanına kadar yürür
+    if (!spot) return null;
+    const blocked = plan.victimId !== undefined && !this.world.map.isWalkable(spot.x, spot.y);
+    if (plan.victimId !== undefined && !this.world.findPath(origin, spot, { allowBlockedGoal: blocked })) return null;
+    delete c.crimePlan;
+    return { activity: 'pilfer', ...(target ? { buildingId: target.id, faceTarget: target.center } : {}), spot, ...(blocked ? { allowBlockedGoal: true } : {}), duration: plan.duration, crime: plan };
   }
 
   // ---------------------------------------------------------------------------

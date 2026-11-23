@@ -12,6 +12,7 @@ export const ENGINES = {
   novicePath: true, // (30.6) Para ve Akış: acemi dostu denge (olay bedelleri kasaya göre, Krallık Vergisi ve ferman cezası yumuşar, yiyecek rehberi) ve davranış değişiklikleri
   townDecor: true, // (31) Kasaba Süsleri: İlan Tahtası, Odun Yığını, Korkuluk, Müzik Köşkü, Kahraman Heykeli (inşa menüsü ve etkileri)
   traitScarcity: true, // (30.4a) kişilik çeşitliliği: yaygın özelliğe doğru evrim katkısı küçülür, nadire doğru büyür
+  justice: true, // (32.1) Suç Motoru: küçük suçlar (handan aşırma, kese hafifletme, ufak haylazlık), tanık ve bekçi, dava kaydı, Muhtar uyarısı
 };
 // (30.4a) Açılıştan ÖNCE bilinmesi gereken şalterler (kurucuların ageInDays değeri sahne kurulurken hesaplanır): modül yüklenirken
 // globalThis.__LMGAME_ENGINES_OFF dizisi okunur (anahtar adları; '*' hepsi). tools/sim/lib.mjs -> openGame({ enginesOff }) bunu sayfa

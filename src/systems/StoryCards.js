@@ -143,6 +143,17 @@ export function makeCard(event, p = {}, ctx = {}) {
       card = base(event, p.result, chars, { key: `dilemma:${p.id}:${day}` });
       break;
     }
+    case 'crime:caught':
+    case 'crime:unsolved': {
+      // (32.1) suç: yakalanan (suçlu ve tanık portresi, "Git" suçluyu seçer) ya da kayıp (portresiz, "Git" yeri seçer)
+      const k = p.kase;
+      if (!k || !p.text) return null;
+      const caught = event === 'crime:caught';
+      const chars = caught ? [p.character, p.witness] : [];
+      const go = caught ? null : p.building ? { kind: 'building', id: p.building.id } : p.victim ? { kind: 'character', id: p.victim.id } : null;
+      card = base(event, p.text, chars, { key: `crime:${k.id}`, crime: true, ...(caught ? {} : { go }) });
+      break;
+    }
     case 'apprentice:grandmaster':
       if (!p.character) return null;
       card = base(event, `${p.character.name} Başusta oldu.`, [p.character]);

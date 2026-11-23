@@ -109,6 +109,8 @@ import { GuestEffects } from '../rendering/GuestEffects.js';
 import { currentFeastOf } from '../systems/Feast.js';
 import { FairDecor } from '../rendering/FairDecor.js';
 import { currentFair, fairVenue } from '../systems/Fair.js';
+import { CrimeSystem } from '../systems/CrimeSystem.js';
+import { JUSTICE_SEED_OFFSET } from '../data/justice.js';
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -270,6 +272,8 @@ export class TownScene extends Scene {
     this.heating = new HeatingSystem(this.game, this.world, this.economy);
     // (31. aşama) Kasaba Süsleri: zar çekmez; görünüm durumu, konser, heykel gururu, ilan tahtasının dilekçe süresi
     this.townDecor = new TownDecorSystem(this.game, this.world, { economy: this.economy, trust: this.trust, moodlets: this.moodlets });
+    // (32.1) Suç Motoru: yalnızca olay dinler (08:00 planı, eylem bitişi, saatlik kapanış); izole üreteç seed + 42, ana üreteçlere dokunmaz
+    this.crime = new CrimeSystem(this.game, this.world, { economy: this.economy, relationships: this.relationships }, new Random(state.seed + JUSTICE_SEED_OFFSET));
     this.systems = [
       this.weather,
       this.structures,
@@ -333,6 +337,7 @@ export class TownScene extends Scene {
       this.structures,
       this.heating,
       this.townDecor,
+      this.crime,
       this.milestones,
       this.relationships,
       this.chemistry,

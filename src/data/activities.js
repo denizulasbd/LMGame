@@ -671,6 +671,18 @@ export const ACTIVITIES = {
     bubbles: ['torch', 'angry', 'loot'],
     finishEvent: 'riot:loot',
   },
+  // (32.1) Suç: CrimeSystem'in planladığı sakin boş zamanında hedefin kapısına sinsi ama sevimli bir yürüyüşle gider (Brain.planCrime;
+  // süre plandan gelir, Brain zar çekmez). Bitince 'crime:committed' (CrimeSystem malı aktarır, tanık arar, davayı yazar).
+  pilfer: {
+    kind: 'leisure',
+    target: 'none',
+    travelLabel: 'Etrafına bakına bakına, ıslık çalarak yürüyor',
+    label: 'Kimse bakmıyor mu diye etrafı kolluyor',
+    duration: [8, 14],
+    effects: { fun: 0.1 },
+    bubbles: ['whisper', 'sparkle', 'laugh'],
+    finishEvent: 'crime:committed',
+  },
   // --- 22. aşama: köyü terk etme (kesesi ve çantasıyla harita kenarına yürür, orada kasabadan ayrılır) ---
   emigrate: {
     kind: 'away',

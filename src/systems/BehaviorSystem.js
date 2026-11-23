@@ -144,6 +144,8 @@ export class BehaviorSystem {
       // (30.3) İş bırakma: 10:00'da Kırgın yetişkinler elindeki (yarıda kesilebilen) işi bırakıp meydana yürür; 12:00'de işe döner
       game.events.on('strike:started', ({ ids }) => engineOn('discontent') && this.interrupt(ids)),
       game.events.on('strike:ended', ({ ids }) => engineOn('discontent') && this.interrupt(ids, ['strike'], true)),
+      // (32.1) Suç: vakti gelen planlı sakin süren boş zaman / sohbet görevini bırakır (CrimeSystem yalnızca bu türleri gönderir)
+      game.events.on('crime:nudge', ({ ids }) => engineOn('justice') && this.interrupt(ids)),
       // (23. aşama) Yangın: yanan yapıdaki çalışanlar ve koşacak sakinler elindeki (yarıda kesilebilen) işi bırakır
       game.events.on('crisis:fireStarted', ({ building, responders }) => {
         this.interrupt([...building.workerIds, ...responders]);

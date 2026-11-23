@@ -1,7 +1,7 @@
 // (30.2 "Görünen Hikâye") Hikâye kartlarının veri tablosu: hangi olay kaç öncelikli, hangi eşikler, süzgeç kademeleri. Metinler
 // systems/StoryCards.js'te saf işlevlerle üretilir (aynı olay yükü aynı metni verir). Bu tablo yalnızca arayüzü etkiler;
 // simülasyona hiçbir şey yazmaz. Sayıları buradan ayarla (gün başına 2-8 kart hedefi: tools/sim/tests/30.2-stories.mjs).
-export const STORY_TABLE_VERSION = 3; // (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20
+export const STORY_TABLE_VERSION = 4; // (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20; (32.1) 4: 'crime:caught' / 'crime:unsolved'
 
 export const STORY_LIMITS = {
   visible: 2, // aynı anda görünen kart
@@ -14,6 +14,7 @@ export const STORY_LIMITS = {
   fearMin: 12, // korku kartı için en düşük puan
   specialStartHour: 6, // özel gün sabahı kartı (RiteSystem 06:00'da işaretler)
   storyChars: 220, // "Öyküsünü oku" ile açılan metnin üst sınırı
+  crimePerDay: 1, // (32.1) "Yalnızca önemli" süzgecinde günde en çok bu kadar suç kartı (fazlası gün özetine; izlenen sakinin kartı sayılmaz)
 };
 
 // Olay -> öncelik (5 en önemli). Süzgeç: 'important' öncelik >= 3 olanları gösterir.
@@ -42,6 +43,8 @@ export const STORY_PRIORITY = {
   'storm:struck': 4, // (30.6) fırtına / kurt sonrası hasar kartı
   'crisis:raidResolved': 4, // (30.6) baskın sonrası hasar kartı (yalnızca yapı hasar gördüyse)
   'dilemma:resolved': 4, // (30.4b) orta oyun kararının sonucu (yalnızca yeni kartlar)
+  'crime:caught': 3, // (32.1) suçüstü yakalanan küçük suç ("Yalnızca önemli" süzgecinde günde en çok bir suç kartı: crimePerDay)
+  'crime:unsolved': 3, // (32.1) kimsenin görmediği kayıp
   'story:summary': 2,
 };
 
