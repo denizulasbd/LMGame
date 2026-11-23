@@ -2,6 +2,18 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 20 satır. README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 31 — Kasaba Süsleri (kayıt sürümü 41 kalır; şalter `ENGINES.townDecor`)
+- Beş yeni yapı (kurallar `data/townDecor.js`, saf yardımcılar `systems/TownDecor.js`, sistem `systems/TownDecorSystem.js`, görseller `art/sprites/structuresDecor.js`, panel `ui/components/decorCards.js`). Tasarım önerisinin ilk dilimi; kalan yedi yapı (Kuş Evi, Çamaşır İpi, Güneş Saati, Arı Kovanı, Salıncak, Rasat Dürbünü, Havai Fişek Rampası) sonraki aşamada.
+- İlan Tahtası (1x1, Köy, 10 odun + 4 taş): panelde açık işlerin tek listesi (isyan, baskın, tahsildar, Kraliyet Fermanı ve istenen mallar, Kraliyet Cezası, dilekçeler, vergi günü; en acil önce, tıklayınca sakin ya da Belediye seçilir). Tahta varken yeni dilekçe +6 saat (`petition.noticed`, isteğe bağlı). Tahtada açık iş kadar kâğıt (en çok 4), fermanda mühürlü parşömen.
+- Odun Yığını (1x1, Mezra, 8 odun): yalnızca oduna +25 depo (`state.woodStoreCapacity`, kaydedilmez; `Granary.storageLimit`), 5 karo içindeki evler kışın ×0,85 odun yakar (`HeatingSystem`), kütükler odun stoğunun depo sınırına oranıyla 0-3 kat.
+- Korkuluk (1x1, Mezra, 6 odun + 2 yiyecek): 2 karo içindeki bahçeye ×1,08 (`productionFactors.scarecrow`, bahçe başına bir; panelde "Korkuluk: +%8"). Kolunda oyun saatiyle konup kalkan karga, sonbaharda kırmızı şenlik kıyafeti.
+- Müzik Köşkü (3x3, Şehir, tek, 40 odun + 60 taş + 250 altın): Akşam Konseri 40 altın, 17:00-21:59 arası, 2 günde bir. Konser `state.rally`'yi `{ concert: true }` ile kurar (sakinler Toplanma Zili gibi köşkte toplanır), 5 karo içindekilerin keyfi dakikada +0,22, sosyalliği +0,18 (Seyyar Ozan kasabadaysa ×2), bitişte Yönetim Güveni +4, `stats.concerts`. Akşam ışık dizisi.
+- Kahraman Heykeli (2x2, Şehir, 50 taş + 10 demir + 200 altın): kurulunca örtülü; panelden bir yetişkin seçilir (en deneyimli 8 aday; sakin başına bir heykel), `building.decor` { honoreeId, honoreeName, pose, honoredDay }. Poz en güçlü beceriden: çekiç / kitap / olta / orak. Eş, ebeveyn, çocuk ve torunlar 4 karo yakından geçince Hatırlandı moodlet'i (yeni neden `ancestor_pride`).
+- Yeni moodlet yok (dondurulmuş sayı 32 kalır): konser dinleyicisine Tatlı Sohbet (neden `concert`). `MOOD_REASONS`'a iki neden.
+- Kayıt: `Building.decor` isteğe bağlı (yalnızca doluyken yazılır), `Building.look` görünüm durumu (kaydedilmez). Göç yok.
+- Şalter kapalıyken menüde yok, `globalBlock` kurulumu reddeder, odun deposu ve ısınma çarpanı etkisiz, sistem görünüm durumu yazmaz.
+- Testler `tools/sim/tests/31-decor.mjs` (27). Ekran görüntüleri `docs/playtest/img31/` (`tools/sim/shots31.mjs`).
+
 ## Aşama 30.6 — Para ve Akış (kayıt sürümü 41 kalır; şalter `ENGINES.novicePath`)
 - Kök neden: denge usta otopilotla ölçülmüştü. `autopilot.mjs --profile novice` (iki günde bir tek yapı kararı, takas / ihracat / liman / vergi yok, olaylarda varsayılan, dilekçelerin yarısı; Rehber'in yiyecek, taş ve Han kartlarını izler) + altın kalemi / yiyecek / vergi ölçümü (`tools/sim/novice-run.sh`).
 - Para duvarının gerçek nedenleri (taban, 3 tohum × 40 gün): altının tek kaynağı iç vergi (~650); Krallık Vergisi ~%55'ini, süresi dolan ferman cezası (Köy 80 / Kasaba 120) ~%20'sini alıyordu; küçük keseler (4 altın × %20) hiç vergi vermiyordu; Taş Ocağı taş istiyordu (taş 0 + kayalar bitince kurulamıyordu).

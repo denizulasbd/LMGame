@@ -32,6 +32,7 @@ import { getWonderSprite } from './structuresWonder.js';
 import { getCherryTreeSprite, getGazeboLayer, getMarbleArchSprite, getFlowerFenceSprite } from './structuresGarden.js';
 import { getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.js';
 import { getMarbleFountainSprite, getGoldenLanternSprite, getRoyalStatueSprite } from './structuresGoldenAge.js';
+import { getNoticeBoardSprite, getWoodpileSprite, getScarecrowSprite, getBandstandSprite, getHeroStatueSprite } from './structuresDecor.js';
 import { getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
 import { getSiloSprite } from './structuresGranary.js';
 import { getLoomSprite, getBrewerySprite } from './structuresRefinery.js';
@@ -781,6 +782,17 @@ function getBaseStructureSprite(type, state) {
     case 'goldenLantern':
       return getGoldenLanternSprite(Boolean(state.lit ?? state.windowsLit));
     // 22. aşama: Kraliyet Beratı'yla dikilen anıt
+    // (31. aşama) Kasaba Süsleri: görünüm durumu state.look'ta (TownDecorSystem yazar; menü önizlemesinde dolu / örtüsüz)
+    case 'noticeBoard':
+      return getNoticeBoardSprite(state.look?.notes ?? 2, Boolean(state.look?.royal));
+    case 'woodpile':
+      return getWoodpileSprite(state.look?.fill ?? 3);
+    case 'scarecrow':
+      return getScarecrowSprite(Boolean(state.look?.crow), Boolean(state.look?.dressed));
+    case 'bandstand':
+      return getBandstandSprite(Boolean(state.lit) || Boolean(state.look?.concert));
+    case 'heroStatue':
+      return getHeroStatueSprite(state.look ? state.look.pose : 'hammer');
     case 'royalStatue':
       return getRoyalStatueSprite();
     // 23. aşama: güvenlik yapıları

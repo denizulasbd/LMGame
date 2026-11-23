@@ -50,6 +50,7 @@ import {
   CHERRY_ART,
   IRON_LANTERN_ART,
   GOLDEN_LANTERN_ART,
+  BANDSTAND_ART,
   SIGNPOST_ART,
   getGazeboLayer,
   getSheepFarmLayer,
@@ -109,6 +110,12 @@ const BASELINE_INSET = {
   // 23. aşama
   well: 3,
   guardTower: 2,
+  // 31. aşama
+  noticeBoard: 3,
+  woodpile: 2,
+  scarecrow: 3,
+  bandstand: 3,
+  heroStatue: 2,
   // 24. aşama
   silo: 2,
   // 24.2
@@ -169,6 +176,7 @@ export class Building extends Entity {
     plantedAt = null,
     crop = undefined,
     sherbet = 0,
+    decor = null,
   }) {
     super({ id, x: tileX * T, y: tileY * T });
     this.type = type;
@@ -233,6 +241,10 @@ export class Building extends Entity {
     // 24.2: handaki fıçı şerbeti (RefinerySystem kasaba deposundan taşır); eski kayıtlarda 0
     this.visitor = null; // (24.3) iskelede yanaşan gemi / kervan { mode, x, y, side } (TradePostSystem yazar; kayda girmez)
     this.sherbet = type === 'inn' ? Math.max(0, Math.floor(Number(sherbet) || 0)) : 0;
+    // (31. aşama) Kasaba Süsleri: yapıya özgü kalıcı durum (Müzik Köşkü'nün son konseri, Kahraman Heykeli'nin onurlandırdığı sakin)
+    // ve görünüm durumu (TownDecorSystem her adımda yazar; kaydedilmez)
+    this.decor = decor && typeof decor === 'object' ? { ...decor } : null;
+    this.look = null;
   }
 
   /** (18. aşama) Süs fidanının büyüme kademesi: 0 fidan, 1 genç ağaç, 2 ulu ağaç. */
@@ -512,6 +524,7 @@ export class Building extends Entity {
       step: Math.min(3, Math.floor(this.projectRatio * 4)),
       crop: this.crop,
       docked: Boolean(this.visitor),
+      look: this.look,
     });
   }
 
@@ -872,6 +885,11 @@ export class Building extends Entity {
       const artTop = this.y + this.height - TORCH_ART.height;
       const flicker = Math.sin(env.time * 9 + this.id) * 3;
       out.push({ x: this.x + TORCH_ART.light.x, y: artTop + TORCH_ART.light.y, radius: 58 + flicker, color: [90, 170, 255], intensity: 0.9, glow: 0.42 });
+    } else if (this.type === 'bandstand' && (this.lit || this.look?.concert)) {
+      // (31. aşama) Müzik Köşkü: sütunlar arasındaki ışık dizisi; konser gecesi daha parlak
+      const artTop = this.y + this.height - BANDSTAND_ART.height;
+      const strong = this.look?.concert ? 1.25 : 1;
+      for (const l of BANDSTAND_ART.lights) out.push({ x: this.x + l.x, y: artTop + l.y, radius: 34 * strong, color: [255, 214, 130], intensity: 0.8, glow: 0.32 });
     } else if (this.type === 'monument' && env.windowsLit) {
       // Anıtın yıldızı gece hafifçe parlar
       const artTop = this.y + this.height - MONUMENT_ART.height;
@@ -1014,6 +1032,7 @@ export class Building extends Entity {
       plantedAt: this.plantedAt,
       crop: this.crop,
       sherbet: this.sherbet,
+      ...(this.decor ? { decor: this.decor } : {}), // (31. aşama) isteğe bağlı: anahtar yalnızca doluyken yazılır
     };
   }
 }

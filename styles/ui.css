@@ -5509,3 +5509,74 @@ kbd {
   touch-action: none;
 }
 .hud-btn.scroll-arrow[hidden] { display: none; }
+
+/* (31. aşama) Kasaba Süsleri: İlan Tahtası'nın açık işler listesi ve Kahraman Heykeli'nin sakin seçimi */
+.notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.notice-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--ui-line);
+  border-radius: 3px;
+  background: var(--ui-card);
+  color: var(--ui-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notice-row:hover,
+.notice-row:focus-visible {
+  background: var(--ui-card-hi);
+  outline: none;
+}
+
+.notice-row.is-urgent {
+  background: var(--ui-card-bad);
+}
+
+.notice-row img {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  image-rendering: pixelated;
+}
+
+.notice-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.notice-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.notice-text {
+  font-size: 11px;
+  color: var(--ui-ink-soft);
+}
+
+.notice-left {
+  font-size: 11px;
+  color: var(--ui-warn);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.statue-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}

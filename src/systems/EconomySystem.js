@@ -15,6 +15,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { foodSupply } from './TownStatus.js';
 import { civicStorageBonus } from './CivicSystem.js';
 import { storageLimit, isAgricultural } from './Granary.js';
+import { woodStoreCapacity } from './TownDecor.js';
 
 const FULL_RESET_RATIO = 0.9; // doluluk bu oranın altına inince "depo doldu" uyarısı yeniden verilebilir
 const EPSILON = 1e-9;
@@ -52,6 +53,7 @@ export class EconomySystem {
     }
     this.state.storageCapacity = capacity;
     this.state.granaryCapacity = granary;
+    this.state.woodStoreCapacity = woodStoreCapacity(this.state); // (31. aşama) Odun Yığını: yalnızca oduna
   }
 
   /** (24. aşama) Bu kaynağın depo sınırı (tarımsal kaynaklarda silo katkısı dahil; hazine sınırsız). */

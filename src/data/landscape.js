@@ -39,6 +39,12 @@ export const AESTHETIC = {
     royalStatue: 7, // (22. aşama) Kraliyet Aslanlı Heykeli: kasabanın en şık anıtı
     well: 1.5, // (23. aşama) Su Kuyusu: hafif estetik
     guardTower: 1, // (23. aşama) Gözcü Kulesi
+    // (31. aşama) Kasaba Süsleri
+    noticeBoard: 1,
+    scarecrow: 1.2,
+    woodpile: 0.4,
+    bandstand: 6,
+    heroStatue: 6,
   },
   // Döşemeli zemin karoları: komşuluğuna küçük estetik katkı (taş plaka meydanı en şık zemindir)
   tileValues: { plaza: 0.35, cobble: 0.2 },

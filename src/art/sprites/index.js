@@ -25,6 +25,7 @@ export { WONDER_ART, wonderSpriteHeight } from './structuresWonder.js';
 export { CHERRY_ART, GAZEBO_ART, ARCH_ART, FENCE_ART, getGazeboLayer } from './structuresGarden.js';
 export { VINE_ART, TORCH_ART, getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.js';
 export { IRON_LANTERN_ART, SIGNPOST_ART, getOrnamentalTreeSprite } from './structuresLandscape.js';
+export { NOTICE_BOARD_ART, WOODPILE_ART, SCARECROW_ART, BANDSTAND_ART, HERO_STATUE_ART, getNoticeBoardSprite, getWoodpileSprite, getScarecrowSprite, getBandstandSprite, getHeroStatueSprite } from './structuresDecor.js';
 export { MARBLE_FOUNTAIN_ART, GOLDEN_LANTERN_ART, ROYAL_STATUE_ART, getMarbleFountainSprite, getGoldenLanternSprite, getRoyalStatueSprite } from './structuresGoldenAge.js';
 export { WELL_ART, GUARD_TOWER_ART, getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
 export { SILO_ART, getSiloSprite } from './structuresGranary.js';

@@ -93,6 +93,9 @@ import { engineOn } from '../systems/Engines.js';
 //   ornamentalTree : { foliage } süs fidanı: dikildikten sonra iki günde büyür, ulu ağacın gölgesinde dinlenilir
 //   grownName    : büyüyünce aldığı ad (Huş Fidanı -> Huş Ağacı)
 //
+// 31. aşama — Kasaba Süsleri (data/townDecor.js): noticeBoard, woodpile, scarecrow, bandstand, heroStatue. Yapıya özgü kalıcı
+//   durum building.decor'da (konser zamanı, onurlandırılan sakin), görünüm durumu building.look'ta (kaydedilmez).
+//
 // Seviye 2 (8. aşama) — upgrade: yapı yıkılmadan Yapı Bilgi Paneli'nden geliştirilir:
 //   { name, description, cost, buildWork, capacity?, workers?, productionBonus?, seasonalFloor?,
 //     heatingFactor?, sleepFunPerMinute? }
@@ -892,6 +895,80 @@ export const BUILDINGS = {
     allowedTiles: [...GROUND_TILES],
     ornamentalTree: { foliage: 'pine' },
   },
+  // --- (31. aşama) Kasaba Süsleri: küçük işleri olan süsler (kurallar data/townDecor.js, mantık systems/TownDecor.js; şalter townDecor) ---
+  noticeBoard: {
+    name: 'İlan Tahtası',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description:
+      'Çatılı tahta pano. Kasabanın bütün açık işleri (dilekçeler, Kraliyet Fermanı, tahsildar, vergi günü, ceza, baskın) panelinde tek listede durur ve tahtada kâğıt olarak asılır. Tahta varken yeni dilekçeler komşulara duyurulur: süreleri 6 saat uzar.',
+    cost: { wood: 10, stone: 4 },
+    buildWork: 40,
+    allowedTiles: [...GROUND_TILES, 'path', 'cobble', 'plaza'],
+    requiresTier: 2,
+    sortLine: 13,
+  },
+  woodpile: {
+    name: 'Odun Yığını',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Depolama',
+    description:
+      'Kepenk çatılı sundurmada istiflenmiş kütükler. Yalnızca oduna +25 depo; çevresindeki (5 karo) evler kışın %15 daha az odun yakar. Kütükler kasabanın odun stoğuyla dolup boşalır: kışa hazır mısın, bir bakışta görünür.',
+    cost: { wood: 8 },
+    buildWork: 25,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+  },
+  scarecrow: {
+    name: 'Korkuluk',
+    size: { w: 1, h: 1 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description:
+      'Hasır şapkalı, yamalı gömlekli korkuluk. 2 karo yakınındaki Sebze Bahçesi\'ne kuşlar dadanmaz: +%8 verim (bahçe başına bir korkuluk sayılır). Arada koluna bir karga konar; sonbaharda şenlik kıyafeti giyer.',
+    cost: { wood: 6, food: 2 },
+    buildWork: 20,
+    allowedTiles: [...GROUND_TILES],
+  },
+  bandstand: {
+    name: 'Müzik Köşkü',
+    size: { w: 3, h: 3 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Sosyal',
+    description:
+      'Beyaz sütunlu, kırmızı-beyaz kubbeli müzik köşkü. Panelinden Akşam Konseri verilir (40 altın, 2 günde bir, 17:00-21:59 arası): kasaba köşkün önünde toplanır, dinleyenlerin keyfi ve sosyalliği dolar, bitince Yönetim Güveni artar. Seyyar Ozan kasabadaysa sahneye çıkar, etkisi iki katı.',
+    cost: { wood: 40, stone: 60, gold: 250 },
+    buildWork: 300,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 4,
+    litHours: { from: 18, to: 23 },
+    funAura: { radius: 56, perMinute: 0.06 },
+  },
+  heroStatue: {
+    name: 'Kahraman Heykeli',
+    size: { w: 2, h: 2 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    category: 'Peyzaj',
+    description:
+      'Mermer kaide üstünde bronz bir sakin. Kurulunca panelinden onurlandırılacak sakini seçersin: adı altın künyeye kazınır, elindeki alet ustalığına göre dökülür. Ailesi (eşi, çocukları, torunları, ebeveynleri) heykelin önünden geçtikçe gururlanır.',
+    cost: { stone: 50, iron: 10, gold: 200 },
+    buildWork: 220,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 4,
+    funAura: { radius: 48, perMinute: 0.06 },
+  },
   // (16. aşama) Keşif seferlerinden gelen egzotik ganimetlerle dikilen yapılar (item: harcanan ganimet; kaynak bedeli yok)
   grapeVine: {
     name: 'Üzüm Asması',
@@ -1110,6 +1187,8 @@ export const BUILD_MENU = [
   'royalStatue',
   'well',
   'guardTower',
+  // (31. aşama) Kasaba Süsleri (şalter kapalıyken menüde yok)
+  ...(engineOn('townDecor') ? ['noticeBoard', 'woodpile', 'scarecrow', 'heroStatue', 'bandstand'] : []),
 ];
 
 /** (18. aşama) Menü öğesinin İnşa sekmesi: 'roads' (zemin fırçaları), 'decor' (süs ve sokak eşyaları), 'buildings'. */
