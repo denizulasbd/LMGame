@@ -135,6 +135,9 @@ export const DOMINANT_THRESHOLD = 1;
 
 // Tetiklenme nedenleri (kartta görünür). {who}: kişi adı
 export const MOOD_REASONS = {
+  // (31. aşama) Kasaba Süsleri: yeni moodlet yok, var olanlara yeni nedenler
+  concert: 'Müzik Köşkü\'ndeki akşam konserinde komşularıyla eğlendi',
+  ancestor_pride: 'Yakını {who} için dikilen heykelin önünden geçerken gururlandı',
   proud_trait: 'Çalışkan doğası gereği üretimden gurur duydu',
   proud_ambitious: 'Hırsı işini bitirince tatmin oldu',
   proud_craft: 'Zanaatkâr ruhu tezgâh başında şevke geldi',

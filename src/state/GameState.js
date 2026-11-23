@@ -78,7 +78,8 @@ export class GameState {
     // Dilimlenmiş ekmekten artan yiyecek değeri (EconomySystem.consumeFood; ekmek 2,5 yiyecek sayılır)
     this.pantry = { credit: 0 };
     this.storageCapacity = BASE_STORAGE_CAPACITY; // EconomySystem yapılara göre günceller
-    this.granaryCapacity = 0; // (24. aşama) Ürün Silosu'nun tarımsal kaynaklara eklediği kapasite (EconomySystem günceller)
+    this.granaryCapacity = 0;
+    this.woodStoreCapacity = 0; // (31. aşama) Odun Yığınları'nın yalnızca oduna eklediği kapasite (EconomySystem günceller; kaydedilmez) // (24. aşama) Ürün Silosu'nun tarımsal kaynaklara eklediği kapasite (EconomySystem günceller)
     this.characters = [];
     this.buildings = [];
     this.jobs = []; // oyuncunun verdiği iş emirleri (JobSystem)

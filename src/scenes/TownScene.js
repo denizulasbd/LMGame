@@ -50,6 +50,7 @@ import { GuideSystem } from '../systems/GuideSystem.js'; // (30.1) rehber kartla
 import { StoryDirector } from '../systems/StoryDirector.js'; // (30.2) hikâye kartları
 import { EventSystem } from '../systems/EventSystem.js';
 import { HeatingSystem } from '../systems/HeatingSystem.js';
+import { TownDecorSystem } from '../systems/TownDecorSystem.js';
 import { MilestoneSystem } from '../systems/MilestoneSystem.js';
 import { TownLevelSystem } from '../systems/TownLevelSystem.js';
 import { HealthSystem } from '../systems/HealthSystem.js';
@@ -267,6 +268,8 @@ export class TownScene extends Scene {
     this.structures = new StructureSystem(this.game, this.world);
     this.landscape = new LandscapeSystem(this.game, this.world, new Random(state.seed + 18));
     this.heating = new HeatingSystem(this.game, this.world, this.economy);
+    // (31. aşama) Kasaba Süsleri: zar çekmez; görünüm durumu, konser, heykel gururu, ilan tahtasının dilekçe süresi
+    this.townDecor = new TownDecorSystem(this.game, this.world, { economy: this.economy, trust: this.trust, moodlets: this.moodlets });
     this.systems = [
       this.weather,
       this.structures,
@@ -307,6 +310,7 @@ export class TownScene extends Scene {
       this.fairSystem,
       this.feastSystem,
       this.guestSystem,
+      this.townDecor,
     ];
 
     this.tools = new ToolController(this.game, this.world, { construction: this.construction, jobs: this.jobs });
@@ -328,6 +332,7 @@ export class TownScene extends Scene {
       this.audio,
       this.structures,
       this.heating,
+      this.townDecor,
       this.milestones,
       this.relationships,
       this.chemistry,

@@ -10,6 +10,7 @@ export const ENGINES = {
   swiftAging: true, // (30.4a) kuşaklar: her mevsim bir yaş (AGING.daysPerAge); takvim yılı 16 gün kalır
   midgame: true, // (30.4b) orta oyun: sekiz yeni karar olayı (kişili olaylar, yeni etki türleri, tekrar kuralları) ve beş ara hedef
   novicePath: true, // (30.6) Para ve Akış: acemi dostu denge (olay bedelleri kasaya göre, Krallık Vergisi ve ferman cezası yumuşar, yiyecek rehberi) ve davranış değişiklikleri
+  townDecor: true, // (31) Kasaba Süsleri: İlan Tahtası, Odun Yığını, Korkuluk, Müzik Köşkü, Kahraman Heykeli (inşa menüsü ve etkileri)
   traitScarcity: true, // (30.4a) kişilik çeşitliliği: yaygın özelliğe doğru evrim katkısı küçülür, nadire doğru büyür
 };
 // (30.4a) Açılıştan ÖNCE bilinmesi gereken şalterler (kurucuların ageInDays değeri sahne kurulurken hesaplanır): modül yüklenirken

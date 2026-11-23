@@ -49,7 +49,8 @@ export function storageLimit(state, resource) {
   if (RESOURCES[resource]?.treasury) return Infinity;
   // (28.4) Tarım Doktrini: silonun tarımsal kapasite katkısı +%50
   const silo = isAgricultural(resource) ? Math.round((state.granaryCapacity ?? 0) * (1 + ((state.granaryCapacity ?? 0) > 0 ? doctrineGranaryBonus(state) : 0))) : 0;
-  return state.storageCapacity + silo;
+  const woodpile = resource === 'wood' ? (state.woodStoreCapacity ?? 0) : 0; // (31. aşama) Odun Yığını
+  return state.storageCapacity + silo + woodpile;
 }
 
 export function hasGranary(state) {

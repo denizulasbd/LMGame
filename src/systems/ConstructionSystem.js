@@ -22,6 +22,8 @@ import { accessTiles, hasAccessRule } from '../world/footprint.js';
 import { TOWN_TIERS } from '../data/town.js';
 import { EXOTIC_ITEMS } from '../data/exploration.js';
 import { itemCount } from './Exploration.js';
+import { DECOR_TYPES } from '../data/townDecor.js';
+import { engineOn } from './Engines.js';
 
 const DEMOLISH_REFUND = 0.5;
 
@@ -68,6 +70,8 @@ export class ConstructionSystem {
   globalBlock(type) {
     const def = BUILDINGS[type];
     // Kasabada tek olabilen yapı (anıt) zaten varsa önce bu söylenir
+    // (31. aşama) Kasaba Süsleri şalteri kapalıyken bu yapılar kurulamaz
+    if (DECOR_TYPES.includes(type) && !engineOn('townDecor')) return 'Bu yapı bu sürümde kapalı';
     let reason = def.unique && this.world.getBuildingsOfType(type).length > 0 ? `Kasabada yalnızca bir ${def.name} olabilir` : null;
     // Kasaba seviyesiyle açılan yapılar (değirmen: Köy, belediye: Kasaba) önce bunu söyler
     if (!reason && def.requiresTier && (this.world.state.town?.tier ?? 1) < def.requiresTier) {

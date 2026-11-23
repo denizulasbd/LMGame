@@ -20,6 +20,7 @@ import { clamp } from '../utils/math.js';
 import { VINE } from '../data/exploration.js';
 import { schemeGardenMultiplier } from './Exploration.js';
 import { wellGardenMultiplier } from './Crisis.js';
+import { scarecrowGardenMultiplier } from './TownDecor.js';
 import { storageLimit } from './Granary.js';
 import { luxuryHungry } from './Refinery.js';
 
@@ -74,6 +75,8 @@ export function productionFactors(building, world, raining, season) {
   const vines = 1 + vineCount * VINE.gardenBonus;
   // (23. aşama) Su Kuyusu: 4 karo yakınındaki bahçeler sulanır (+%10)
   const well = building.type === 'garden' ? wellGardenMultiplier(world.state, building) : 1;
+  // (31. aşama) Korkuluk: 2 karo yakınındaki bahçeye kuş dadanmaz
+  const scarecrow = scarecrowGardenMultiplier(world.state, building);
   return {
     seasonal,
     seasonalRaw,
@@ -87,7 +90,8 @@ export function productionFactors(building, world, raining, season) {
     vines,
     vineCount,
     well,
-    total: seasonal * trees * rain * biome * upgrade * scheme * vines * well,
+    scarecrow,
+    total: seasonal * trees * rain * biome * upgrade * scheme * vines * well * scarecrow,
   };
 }
 
