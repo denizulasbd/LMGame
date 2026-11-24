@@ -27,7 +27,7 @@ const errors = [];
     a.educated = true;
     st.characters.find((x) => x !== a && !x.isChild && !x.role).graduate = { field: 'herbalism', day: 1 };
     c('şalter kapalı: dinleyici yok, menüde ve kurulumda yok, educationMerit de kapalı sayılır', !sc.university.unsubscribers.length && !B.BUILD_MENU.includes('university') && /kapalı/.test(sc.construction.globalBlock('university') ?? '') && ENGINES.educationMerit === true && !engineOn('educationMerit'));
-    c('şalter kapalı: suç faktörü 1, itibar eğitim payı 0, öğrenci ders çarpanı / çırak / XP nötr', J.educationFactor(a) === 1 && R.renownEducation(st) === 0 && U.apprenticeBoost({ higherStudy: { field: 'farming' } }) === 1 && U.universityOf(st) === null);
+    c('şalter kapalı: suç faktörü 1, itibar eğitim payı 0, işleyen Darülfünun yok', J.educationFactor(a) === 1 && R.renownEducation(st) === 0 && U.universityOf(st) === null);
     sim.step(225 * 30);
     c('şalter kapalı: state.university ve karakter alanları yazılmaz (yeni oyunda)', st.university === null && !('university' in st.toJSON()) && st.characters.every((x) => !x.higherStudy) && !('students' in (st.history.at(-1) ?? {})));
     return out;
@@ -173,15 +173,19 @@ const errors = [];
     master.task = { activity: 'brew', workBuildingId: wsBuilding.id, buildingId: wsBuilding.id, phase: 'perform', elapsed: 0, duration: 60 };
     const apTask = { activity: 'apprentice', buildingId: wsBuilding.id, phase: 'perform', elapsed: 0, duration: 60 };
     sc.apprenticeship.learn(ap, apTask, 60);
-    const gainStudent = ap.apprenticeship.progress - 10;
-    const keep = ap.higherStudy;
-    ap.higherStudy = null;
+    const gainWork = ap.apprenticeship.progress - 10;
     ap.apprenticeship.progress = 10;
-    sc.apprenticeship.learn(ap, apTask, 60);
-    const gainPlain = ap.apprenticeship.progress - 10;
-    ap.higherStudy = keep;
-    const net = (UD.UNIVERSITY.apprenticeBoost * (540 - UD.UNIVERSITY.minutesPerDay)) / 540;
-    c('çırak öğrenci: ilerleme ×1,2; ders saatinin götürdüğü mesai net telafi (en çok ±%3)', Math.abs(gainStudent / gainPlain - 1.2) < 1e-6 && Math.abs(net - 1) <= 0.03, `${gainStudent.toFixed(3)} / ${gainPlain.toFixed(3)} · net ${net}`);
+    ap.higherStudy.today = 0;
+    ap.higherStudy.day = st.time.day;
+    sc.university.learn(ap, uni, 60); // usta tezgâhta: ders dakikası çıraklık sayılır (×1,3)
+    const gainLecture = ap.apprenticeship.progress - 10;
+    master.task = null;
+    ap.apprenticeship.progress = 10;
+    ap.higherStudy.today = 0;
+    sc.university.learn(ap, uni, 60); // usta tezgâhta değil: telafi yok (öğrenci olmasaydı da ilerlemeyecekti)
+    const gainAway = ap.apprenticeship.progress - 10;
+    master.task = { activity: 'brew', workBuildingId: wsBuilding.id, buildingId: wsBuilding.id, phase: 'perform', elapsed: 0, duration: 60 };
+    c('çırak öğrenci: ders dakikası yalnızca ustası o an tezgâhtaysa çıraklık sayılır (×1,3, yürüyüşü karşılar); öğrenci değilken çıraklık hızı aynı', Math.abs(gainLecture / gainWork - UD.UNIVERSITY.apprenticeCredit) < 1e-6 && gainAway === 0 && Math.abs(gainWork - 60 / 18) < 1e-6, `${gainWork.toFixed(3)} ${gainLecture.toFixed(3)} ${gainAway}`);
     ap.apprenticeship.progress = 100;
     ap.higherStudy.field = 'herbalism'; // kabul anında çırak olsaydı bölümü bu olurdu (fieldFor: çırak mesleği önce)
     ap.higherStudy.minutes = 600;
@@ -344,6 +348,42 @@ const errors = [];
     return out;
   })));
   await browser.close();
+}
+
+// ---- D. çırak telafisi ölçümü: aynı tohum ve kurulum, bir mesai günü; öğrenci çırak ile öğrenci olmayan çırağın kazancı (±%3)
+async function apprenticeDay(student) {
+  const { browser, page } = await openGame({ seed: 5 });
+  page.on('pageerror', (e) => errors.push(String(e)));
+  const r = await page.evaluate(async (student) => {
+    const st = game.state;
+    const sc = game.scenes.current;
+    sim.give({ wood: 999, stone: 999, food: 900, gold: 3000, iron: 300, wool: 300 });
+    st.town.tier = 4;
+    for (let i = 0; i < 3; i++) sim.place('cabin');
+    sc.population.welcomeNewcomers(4);
+    sim.place('university');
+    const hut = sim.place('healerHut');
+    const ad = st.characters.filter((c) => !c.isChild && !c.role).sort((a, b) => a.id - b.id);
+    const y = ad[0];
+    const m = ad[1];
+    m.workplaceId = hut.id;
+    m.skills.herbalism = 2000;
+    y.lifeStage = 'youth';
+    y.age = 19;
+    y.educated = true;
+    y.apprenticeship = { masterId: m.id, profession: 'healerHut', buildingId: hut.id, progress: 0, since: 0, crafted: 0 };
+    if (student) sc.university.newDay();
+    while (st.time.hour < 18) sim.step(15);
+    return { gain: y.apprenticeship?.progress ?? -1, student: Boolean(y.higherStudy), lectured: y.higherStudy?.today ?? 0 };
+  }, student);
+  await browser.close();
+  return r;
+}
+{
+  const plain = await apprenticeDay(false);
+  const stud = await apprenticeDay(true);
+  const ratio = stud.gain / plain.gain;
+  results.push({ name: 'ölçüm: aynı tohumda öğrenci çırak, öğrenci olmayan çıraktan en çok %3 geride / önde (bir mesai günü, ders 90 dk alındı)', ok: plain.gain > 0 && stud.student && stud.lectured >= 60 && Math.abs(ratio - 1) <= 0.03, detail: `${stud.gain.toFixed(2)} / ${plain.gain.toFixed(2)} = ${ratio.toFixed(3)} · ders ${stud.lectured} dk` });
 }
 
 const ok = report(errors);

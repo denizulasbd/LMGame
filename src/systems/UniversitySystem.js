@@ -27,7 +27,8 @@ export class UniversitySystem {
    * @param {import('../core/Game.js').Game} game
    * @param {import('../world/World.js').World} world
    */
-  constructor(game, world, { moodlets = null } = {}) {
+  constructor(game, world, { moodlets = null, apprenticeship = null } = {}) {
+    this.apprenticeship = apprenticeship; // (çırak telafisi: lectureCredit)
     this.game = game;
     this.events = game.events;
     this.world = world;
@@ -133,7 +134,12 @@ export class UniversitySystem {
     }
     const raw = Math.min(minutes, Math.max(0, U.minutesPerDay - h.today));
     if (raw <= 0) return;
-    if (c.apprenticeship) h.ap = 1;
+    if (c.apprenticeship) {
+      h.ap = 1;
+      // öğrenci çırak: ustası o an tezgâhtaysa ders dakikası çıraklık sayılır (telafi)
+      const credit = this.apprenticeship?.lectureCredit(c, raw, U.apprenticeCredit) ?? 0;
+      if (credit > 0) this.stats.apprenticeCredit = Math.round(((this.stats.apprenticeCredit ?? 0) + credit) * 100) / 100;
+    }
     h.today = Math.round((h.today + raw) * 100) / 100;
     h.minutes = Math.round((h.minutes + raw * lectureMultiplier(s, building).total) * 100) / 100;
     this.stats.lectureMinutes = Math.round((this.stats.lectureMinutes + raw) * 100) / 100;

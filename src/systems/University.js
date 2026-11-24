@@ -3,7 +3,7 @@
 //   canEnroll / admissionQueue: kabul koşulları ve bekleme sırası (en yüksek schooling önce, eşitlikte küçük kimlik)
 //   fieldFor(c)               : bölüm (çırak mesleği → huy / özellik tablosu → primarySkill → kimliğe göre yedek)
 //   lectureMultiplier         : Müderris ×2, Kraliyet Arşivi ×1,2, misafir Kıdemli Bilge ×1,25
-//   universityCrimeFactor / renownEducationShare / apprenticeBoost / scholarResearchFactor : öteki sistemlerin kancaları
+//   universityCrimeFactor / renownEducationShare / scholarResearchFactor : öteki sistemlerin kancaları (çırak telafisi ApprenticeshipSystem.lectureCredit)
 // Character.js bu dosyanın yalnızca sanitize işlevlerini, Justice.js ve Renown.js faktör işlevlerini çağırır.
 import { UNIVERSITY as U, EDUCATION_CRIME, EDUCATION_RENOWN, FIELD_BY_QUIRK, FIELD_BY_TRAIT, FIELD_FALLBACK } from '../data/university.js';
 import { PROFESSIONS } from '../data/apprenticeship.js';
@@ -162,11 +162,6 @@ export function renownEducationShare(state) {
   return clamp01((two + merit) / adults.length);
 }
 
-/** (ApprenticeshipSystem.learn) öğrenci çırağın ilerleme çarpanı. */
-export function apprenticeBoost(c) {
-  return engineOn('university') && c?.higherStudy ? U.apprenticeBoost : 1;
-}
-
 /** (ResearchSystem.work) Bilgelik Evi'nde içeride çalışan Bilge Bilgelik bölümü mezunuysa ×1,15. */
 export function scholarResearchFactor(state, building) {
   if (!engineOn('university') || !building?.workerIds?.size) return 1;
@@ -194,7 +189,7 @@ export function sanitizeGraduate(raw) {
 
 /** state.university (isteğe bağlı sayaçlar). */
 export function emptyUniversity() {
-  return { admitted: 0, graduated: 0, dropped: 0, left: 0, studentDays: 0, lectureMinutes: 0, fields: {}, apprentices: 0, grandmasters: 0 };
+  return { admitted: 0, graduated: 0, dropped: 0, left: 0, studentDays: 0, lectureMinutes: 0, fields: {}, apprentices: 0, grandmasters: 0, apprenticeCredit: 0 };
 }
 
 export function restoreUniversity(data) {

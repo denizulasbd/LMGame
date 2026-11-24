@@ -41,7 +41,6 @@ import { addMemory } from './MemorySystem.js';
 import { levelFor } from './SkillSystem.js';
 import { clamp } from '../utils/math.js';
 import { TEMPERAMENT } from '../data/temperament.js';
-import { apprenticeBoost } from './University.js'; // (32.4)
 
 export class ApprenticeshipSystem {
   /**
@@ -229,7 +228,7 @@ export class ApprenticeshipSystem {
     if (!master) return false; // ustası tezgâhtan kalktı: çırak da kalkar (bir sonraki planda işine döner)
     if (task.phase !== 'perform') return true;
     const rate = atWork ? 1 : APPRENTICE.practiceRate;
-    a.progress = Math.min(100, a.progress + APPRENTICE.perMinute * rate * minutes * apprenticeBoost(c)); // (32.4) öğrenci çırağın telafisi (öğrenci değilse 1)
+    a.progress = Math.min(100, a.progress + APPRENTICE.perMinute * rate * minutes);
     this.state.apprenticeship.minutes += minutes;
     const prof = PROFESSIONS[a.profession];
     if (!atWork) {
@@ -258,6 +257,22 @@ export class ApprenticeshipSystem {
       this.say(who, this.rng.pick(prof.lines[who === master ? 'master' : 'apprentice']));
     }
     return true;
+  }
+
+  /**
+   * (32.4) Darülfünun telafisi: dersteki öğrenci çırağın ders dakikası, ustası O AN tezgâhtaysa (ya da Tezgâh Pratiği koşulu varsa,
+   * practiceRate ile) çıraklık sayılır ("ustanın notları"). Yalnızca dersin gerçekten götürdüğü çıraklık telafi edilir; zar yok.
+   * Kazanılan ilerleme döner. UniversitySystem.learn çağırır; öğrenci değilse hiç çağrılmaz.
+   */
+  lectureCredit(c, minutes, scale = 1) {
+    const a = c?.apprenticeship;
+    if (!a || minutes <= 0 || !townCanSpare(this.state)) return 0;
+    const building = this.world.getBuilding(a.buildingId);
+    if (!building || !safeForApprentice(building)) return 0;
+    const k = this.masterAtWork(c) ? 1 : this.practiceMaster(c) ? APPRENTICE.practiceRate : 0;
+    const before = a.progress;
+    a.progress = Math.min(100, a.progress + APPRENTICE.perMinute * k * minutes * scale);
+    return a.progress - before;
   }
 
   say(c, text) {

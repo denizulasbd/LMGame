@@ -27,9 +27,10 @@ export const UNIVERSITY = {
   fieldXpMultiplier: 1.15,
   // Bilgelik bölümü mezunu Bilgelik Evi'nde Bilge olarak çalışırken araştırma hızı
   scholarResearch: 1.15,
-  // Öğrenci çırağın çıraklık ilerlemesi (öğrenciliği süresince): ders saatinin götürdüğü mesaiyi telafi eder
-  // (mesai 08-17 = 540 dk; ders en çok 90 dk → 540 / 450 = 1,2)
-  apprenticeBoost: 1.2,
+  // Öğrenci çırağın telafisi (ApprenticeshipSystem.lectureCredit): ders dakikası, ustası o an tezgâhtaysa çıraklık sayılır, bu çarpanla
+  // (derse gidiş-dönüş yürüyüşünü de karşılar). Ölçüm: sabit ×1,2 yetmiyordu (ustanın tezgâh saatleri öğleden sonraya yığılıyor,
+  // ders o günün çıraklığının yarısını götürüyordu: 6,3 / 11,7).
+  apprenticeCredit: 1.3,
   // Misafir hoca: Kıdemli Bilgenin boş zaman ağırlığı (ELDER.readLibraryBase ile çarpılır; yalnızca yapı varken ve ders saatinde)
   guestWeight: 0.6,
   // Müderris seçimi (JobSystem): eğitim seviyesi başına yapı bu kadar karo yakınmış gibi görünür (Bilgelik becerisi zaten sayılır)

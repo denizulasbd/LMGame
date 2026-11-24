@@ -247,7 +247,7 @@ export class TownScene extends Scene {
     // (28.3) Saygın Büyük, doğal vefat ve kazalar (ömür kimlikten türer: seed + 30 izole üreteci; rastgelelik tüketmez). Yaşlanmadan SONRA kayıt olur.
     this.lifecycle = new LifecycleSystem(this.game, this.world, { jobs: this.jobs });
     // (32.4) Darülfünun: üreteci yok; gün dönümü dinleyicisi yaşlanmadan (LifeStageSystem) SONRA kurulur (mezuniyet önce, kabul sonra)
-    this.university = new UniversitySystem(this.game, this.world, { moodlets: this.moodlets });
+    this.university = new UniversitySystem(this.game, this.world, { moodlets: this.moodlets, apprenticeship: this.apprenticeship });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       crisis: this.crisis,
