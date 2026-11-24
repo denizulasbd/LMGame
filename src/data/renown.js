@@ -111,7 +111,7 @@ export const ROYAL_CATEGORY = 'Kraliyet Lütfu';
 export const ROYAL_EFFECTS = {
   peaceFountain: { crimeRisk: 0.85 }, // kasaba çapında suç riski çarpanı (Justice.riskFactors → renown)
   royalRoseGarden: { happiness: 2, romance: 1.2 }, // refah +2 (townHappinessBonus), aşk / evlilik olasılığı ×1,2
-  royalArchive: { research: 1.15 }, // araştırma ve yazıt çözme hızı ×1,15
+  royalArchive: { research: 1.15 }, // araştırma ve yazıt çözme hızı ×1,15; (32.4) Darülfünun'da ders ×1,2 (data/university.js → archiveMultiplier)
 };
 
 export const ROYAL_LETTER = {

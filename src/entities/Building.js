@@ -58,6 +58,7 @@ import {
 import { getBubbleSprite, BUBBLE_WIDTH, BUBBLE_HEIGHT, getIconSprite } from '../art/ui/index.js';
 import { winterize } from '../art/seasons.js';
 import { PEACE_FOUNTAIN_ART, ROYAL_ARCHIVE_ART } from '../art/sprites/structuresRoyal.js'; // (32.3)
+import { UNIVERSITY_ART } from '../art/sprites/structuresUniversity.js'; // (32.4)
 
 const T = CONFIG.TILE_SIZE;
 
@@ -898,6 +899,10 @@ export class Building extends Entity {
       // (32.3) Barış Çeşmesi: akşam suyu serin mavi, yumuşak bir ışıkla parlar
       const artTop = this.y + this.height - PEACE_FOUNTAIN_ART.height;
       out.push({ x: this.x + PEACE_FOUNTAIN_ART.light.x, y: artTop + PEACE_FOUNTAIN_ART.light.y, radius: 60, color: [140, 210, 255], intensity: 0.75, glow: 0.34 });
+    } else if (this.type === 'university' && (env.windowsLit || this.look?.lecture)) {
+      // (32.4) Darülfünun: revak pencereleri (ders saatinde de)
+      const artTop = this.y + this.height - UNIVERSITY_ART.height;
+      for (const w of UNIVERSITY_ART.windows) out.push({ x: this.x + w.x, y: artTop + w.y, radius: 24, color: [255, 214, 130], intensity: env.windowsLit ? 0.7 : 0.35, glow: 0.28 });
     } else if (this.type === 'royalArchive' && env.windowsLit) {
       const artTop = this.y + this.height - ROYAL_ARCHIVE_ART.height;
       for (const w of ROYAL_ARCHIVE_ART.windows) out.push({ x: this.x + w.x, y: artTop + w.y, radius: 26, color: [255, 214, 130], intensity: 0.7, glow: 0.3 });

@@ -114,6 +114,7 @@ import { CourtSystem } from '../systems/CourtSystem.js';
 import { JUSTICE_SEED_OFFSET, COURT_SEED_OFFSET } from '../data/justice.js';
 import { RenownSystem } from '../systems/RenownSystem.js';
 import { RENOWN_SEED_OFFSET } from '../data/renown.js';
+import { UniversitySystem } from '../systems/UniversitySystem.js'; // (32.4)
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -245,6 +246,8 @@ export class TownScene extends Scene {
     this.lifeStages = new LifeStageSystem(this.game, this.world, new Random(state.seed + 27));
     // (28.3) Saygın Büyük, doğal vefat ve kazalar (ömür kimlikten türer: seed + 30 izole üreteci; rastgelelik tüketmez). Yaşlanmadan SONRA kayıt olur.
     this.lifecycle = new LifecycleSystem(this.game, this.world, { jobs: this.jobs });
+    // (32.4) Darülfünun: üreteci yok; gün dönümü dinleyicisi yaşlanmadan (LifeStageSystem) SONRA kurulur (mezuniyet önce, kabul sonra)
+    this.university = new UniversitySystem(this.game, this.world, { moodlets: this.moodlets });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       crisis: this.crisis,
@@ -255,6 +258,7 @@ export class TownScene extends Scene {
       health: this.health,
       research: this.research,
       apprenticeship: this.apprenticeship,
+      university: this.university,
     });
     this.saves = new SaveSystem(this.game, {
       captureTerrain: () => diffTerrain(this.baseTerrain, this.map),
@@ -287,6 +291,7 @@ export class TownScene extends Scene {
       this.structures,
       this.landscape,
       this.research,
+      this.university, // (32.4) yalnızca yapının boşta durumu (şalter kapalıyken hiçbir şey yapmaz)
       this.harbor,
       this.economy,
       this.jobs,
@@ -348,6 +353,7 @@ export class TownScene extends Scene {
       this.crime,
       this.court,
       this.renown,
+      this.university, // (32.4)
       this.milestones,
       this.relationships,
       this.chemistry,

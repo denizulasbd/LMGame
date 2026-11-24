@@ -41,6 +41,7 @@ export const ACTIVITY_SKILLS = {
   brew: 'herbalism',
   gatherHerbs: 'herbalism',
   teach: 'scholarship',
+  profess: 'scholarship', // (32.4) Darülfünun'da Müderris
   // (24.2) dokumacı zanaatkârlığı, mahzen ustası aşçılığı geliştirir
   weave: 'crafting',
   brewSherbet: 'cooking',

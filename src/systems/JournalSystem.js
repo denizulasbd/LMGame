@@ -20,6 +20,7 @@
 //         lifeStage:retired (çekirdek sakin kuralıyla gönüllü çalışmaya dönen / yeniden emekli olan bilge)
 //   25.2: apprentice:enrolled / proud / crafted (ilk çırak işi) / graduated (Yetkin Usta / Kıdemli Kalfa)
 // Yazılan her kayıt için 'journal:added' yayınlanır (arayüz okunmamış sayacını günceller).
+import { fieldName } from './University.js'; // (32.4)
 import { TIERS } from '../data/feast.js';
 import { WEATHER_TYPES } from '../data/weather.js';
 import { RESOURCES } from '../data/resources.js';
@@ -307,6 +308,10 @@ export class JournalSystem {
       // 12. aşama: Bilgelik Evi, okul, liman ve harika
       on('research:started', ({ research }) => this.log(`Bilgelik Evi'nde araştırma başladı: ${research.name}`, 'book')),
       on('research:completed', ({ research }) => this.log(`Araştırma tamamlandı: ${research.name}`, research.icon)),
+      // (32.4) Darülfünun
+      on('university:admitted', ({ character, field }) => this.log(`${character.name} Darülfünun'a kabul edildi: ${fieldName(field)} bölümü`, 'book')),
+      on('university:graduated', ({ character, field }) => this.log(`${character.name} Darülfünun'u ${fieldName(field)} bölümünden bitirdi`, 'star')),
+      on('university:dropped', ({ character, field, ratio }) => this.log(`${character.name} Darülfünun'u yarım bıraktı (${fieldName(field)}, %${Math.floor((ratio ?? 0) * 100)})`, 'book')),
       on('school:graduated', ({ character, skill }) =>
         this.log(`${character.name} okulda öğrendikleriyle doğrudan Kalfa ${SKILLS[skill].title} olarak başladı`, 'book')
       ),

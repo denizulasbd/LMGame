@@ -11,6 +11,7 @@
 //   (32.2, isteğe bağlı) court?: true (Adalet Sarayı'nın davası), revealed?: { day, witnessName } (sonradan konuşan tanık),
 //     statement?: { offender, plea?, pleaLine?, witness } (ifade değişkenleri; dava açılırken izole üreteçle bir kez seçilir),
 //     verdict: { kind, by: 'elder' | 'court', auto, day, at?, band?, harsh?, deserved?, stale?, restitution?, fine?, service?, served?, effects? }
+import { universityCrimeFactor } from './University.js'; // (32.4)
 import { renownCrimeFactor } from './Renown.js'; // (32.3)
 import { JUSTICE, RISK, TRAIT_LEAN, QUIRK_LEAN, REMORSE, CATCH, CRIMES, CRIME_KEYS, VANDAL_GROUP, VANDAL_TEXT, LOOT_WORDS, CRIME_TEXT } from '../data/justice.js';
 import { COURT, SENTENCES, SENTENCE_KEYS, FINE, DESERVED, BANDS, IMPUNITY, STATEMENTS, VICTIM_PLEAS, PLEA_RULES, WITNESS_LINES, COURT_TEXT } from '../data/justice.js';
@@ -242,9 +243,12 @@ export function isHungry(c) {
   return isHangry(c) || (c.needs?.hunger ?? 100) < RISK.hunger[0].below;
 }
 
-/** (32.4) Eğitim: Bilgelik Evi'nin yüksek okulunu bitiren sakinin riski düşecek. Bu adımda 1. */
-export function educationFactor(_c) {
-  return 1;
+/**
+ * (32.4) Eğitim (systems/University.js → universityCrimeFactor): Darülfünun öğrencisi ×0,8, mezunu ×0,65; Bilgelik Evi mezunu ×0,85
+ * yalnızca ENGINES.educationMerit açıkken (Darülfünun kurulmasa da suç tarihini değiştirdiği için ayrı alt anahtar). Kapalıyken 1.
+ */
+export function educationFactor(c) {
+  return universityCrimeFactor(c);
 }
 
 /** (32.5) Hobi evleri ve kulüpler: kulübe üye sakinin riski düşecek. Bu adımda 1. */

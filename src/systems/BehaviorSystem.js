@@ -96,6 +96,7 @@ export class BehaviorSystem {
     this.research = services.research;
     this.crisis = services.crisis ?? null; // (23. aşama)
     this.apprenticeship = services.apprenticeship ?? null; // (25.2)
+    this.university = services.university ?? null; // (32.4)
     this.state = game.state;
     this.brain = new Brain(world, rng, services);
     this.unsubscribers = [
@@ -107,6 +108,8 @@ export class BehaviorSystem {
       game.events.on('building:removed', (building) => {
         for (const c of this.world.characters) if (c.workplaceId === building.id) c.workplaceId = null;
       }),
+      // (32.4) Darülfünun ders zili (14:00): derse gidecek öğrencilerin yarıda kesilebilir işi biter (şalter kapalıyken olay yok)
+      game.events.on('university:bell', ({ ids }) => this.interrupt(ids)),
       game.events.on('expedition:depart', ({ ids, until, exit }) => this.departExpedition(ids, until, exit)),
       // Şenlik başlayınca boş zamanı olanlar elindekini bırakıp şenliğe katılır
       // (14. aşama) Toplanma Zili: uyanık herkes elindekini bırakır (uyuyanlar uyanmaz)
@@ -550,6 +553,7 @@ export class BehaviorSystem {
       const school = this.world.getBuilding(task.buildingId);
       if (school) this.research.learn(c, school, minutes);
     }
+    if (task.activity === 'lecture' && task.phase === 'perform') this.university?.learn(c, this.world.getBuilding(task.buildingId), minutes); // (32.4)
     if (task.activity === 'sleep') this.applyHomeComfort(c, minutes);
 
     let bubbles = activity.bubbles;
@@ -698,6 +702,7 @@ export class BehaviorSystem {
     const building = this.world.getBuilding(task.workBuildingId);
     if (!building || building.frozen || building.damaged || building.isBurning) return false; // tarla dondu / fırtına yıktı / yapı yanıyor: iş biter
     if (building.definition.academy) return this.research.work(building, amount);
+    if (building.definition.university) return Boolean(this.university?.work(building)); // (32.4) Müderris
     // (23. aşama) Gözcü Kulesi: bekçi nöbet tutar (üretim yok; güven katkısı CrisisSystem'de saatliktir)
     if (building.definition.guard) return true;
     // (12. aşama) Gelişmiş Çarklar: oduncu, taş ocağı, maden ve değirmende verim +%20

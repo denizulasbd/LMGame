@@ -5,6 +5,8 @@
 // Kart = { event, priority, text, portraits: [{ id, name, appearance, look, isChild }], ids: [kimlikler], go, action, story?, day, key }
 //   go     : null | { kind: 'character', id } | { kind: 'building', id }   ("Git" düğmesi nereye götürür)
 //   action : null | { type: 'story' | 'condolence' | 'gift' | 'case', label, id? }   ((32.2) 'case': dava penceresini açar)
+import { UNIVERSITY_TEXT } from '../data/university.js'; // (32.4)
+import { fieldName } from './University.js'; // (32.4)
 import { STORY_PRIORITY, STORY_LIMITS as L, STORY_FILTERS, STORY_DEFAULT_FILTER, STORY_ACTIONS, STORY_TEXT } from '../data/storyCards.js';
 import { SPECIAL_KIND_NAMES } from '../data/rites.js';
 import { wantName } from './Wants.js';
@@ -188,6 +190,16 @@ export function makeCard(event, p = {}, ctx = {}) {
       if (!p.key || !p.name) return null;
       card = base(event, `Kraliyet Lütufnamesi geldi: ${p.name} kurma izni! (İnşa Et → Kraliyet Lütfu)`, [], { key: `renown:g:${p.key}`, action: { type: 'letter', id: p.key, label: STORY_ACTIONS.letter } });
       break;
+    case 'university:admitted':
+    case 'university:graduated':
+    case 'university:dropped': {
+      // (32.4) Darülfünun: "Zeynep Darülfünun'u Şifacılık bölümünden bitirdi."
+      if (!p.character || !p.field) return null;
+      const t = UNIVERSITY_TEXT[event.slice(11)];
+      const text = t.replace('{name}', p.character.name).replace('{field}', fieldName(p.field)).replace('{pct}', String(Math.floor((p.ratio ?? 0) * 100)));
+      card = base(event, text, [p.character], { key: `uni:${event.slice(11, 13)}:${p.character.id}` });
+      break;
+    }
     case 'apprentice:grandmaster':
       if (!p.character) return null;
       card = base(event, `${p.character.name} Başusta oldu.`, [p.character]);

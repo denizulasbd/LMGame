@@ -22,6 +22,7 @@ import { el } from '../dom.js';
 import { dockButton, modalHeader } from '../dockButton.js';
 import { engineOn } from '../../systems/Engines.js';
 import { royalLedger } from './renownCards.js'; // (32.3)
+import { universityLedger } from './universityCards.js'; // (32.4)
 
 const CHART_W = 236;
 const CHART_H = 84;
@@ -33,6 +34,11 @@ const CHARTS = [
   { key: 'gold', title: 'Kasaba Hazinesi', icon: 'coin', color: '#ffd23f', fill: 'rgba(255, 210, 63, 0.2)', unit: 'altın' },
   // (32.3) Krallık İtibarı (şalter açıkken; eski arşiv satırlarında değer yoksa o günler atlanır)
   ...(engineOn('renown') ? [{ key: 'reputation', title: 'Krallık İtibarı', icon: 'crown', color: '#c9a2ff', fill: 'rgba(160, 120, 230, 0.22)', unit: '%', min: 0, max: 100, optional: true }] : []),
+  // (32.4) Darülfünun öğrencileri ve yaşayan mezunlar (şalter açıkken; değer yoksa o günler atlanır)
+  ...(engineOn('university') ? [
+    { key: 'students', title: 'Darülfünun Öğrencisi', icon: 'book', color: '#7fb3ff', fill: 'rgba(110, 160, 240, 0.2)', unit: 'öğrenci', min: 0, optional: true },
+    { key: 'graduates', title: 'Darülfünun Mezunu', icon: 'star', color: '#ffb84d', fill: 'rgba(255, 184, 77, 0.2)', unit: 'mezun', min: 0, optional: true },
+  ] : []),
 ];
 
 const formatNumber = (n) => Math.round(n).toLocaleString('tr-TR');
@@ -303,6 +309,7 @@ export class StatsPanel {
         // (32.3) Kraliyet Lütufları ve (Kraliyet Arşivi kurulunca) Kasabanın Kraliyet Defteri
         ...(state.renown?.grants?.length && engineOn('renown') ? [entry('decree', 'Kraliyet Lütufları', [gold(state.renown.grants.map((g) => `${BUILDINGS[g.key].name} (Gün ${g.day})`).join(', '))], 'Krallık İtibarı uzun süre Kraliyet Gözdesi kaldı')] : []),
         ...((l) => (l ? [entry('crown', l.title, [l.body.join(' · ')], l.meta)] : []))(royalLedger(state)),
+        ...((l) => (l ? [entry('book', l.title, [l.body.join(' · ')], l.meta)] : []))(universityLedger(state)), // (32.4)
         entry('bell', 'Altın Çağ', isGoldenAge(state) ? [gold(`${when(ch.goldenAge ?? ga.since)}`), ' · çalışma şevki +%10, refah +%10', ...(ga.books ? [` · kitaplıkta ${ga.books} antik kitap`] : [])] : [pending('Kule tamamlanınca başlar')]),
       ])
     );

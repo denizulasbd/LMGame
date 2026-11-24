@@ -93,6 +93,7 @@ import { engineOn } from '../systems/Engines.js';
 //   ornamentalTree : { foliage } süs fidanı: dikildikten sonra iki günde büyür, ulu ağacın gölgesinde dinlenilir
 //   grownName    : büyüyünce aldığı ad (Huş Fidanı -> Huş Ağacı)
 //
+// 32.4 — Darülfünun (university; data/university.js, systems/UniversitySystem.js): university: true, Müderris workActivity 'profess'.
 // 32.2 — Adalet Sarayı (courthouse; data/justice.js -> COURT, systems/CourtSystem.js): görünüm durumu building.look.cases (kaydedilmez).
 // 31. aşama — Kasaba Süsleri (data/townDecor.js): noticeBoard, woodpile, scarecrow, bandstand, heroStatue. Yapıya özgü kalıcı
 //   durum building.decor'da (konser zamanı, onurlandırılan sakin), görünüm durumu building.look'ta (kaydedilmez).
@@ -1036,6 +1037,28 @@ export const BUILDINGS = {
     buildWork: 260,
     allowedTiles: [...GROUND_TILES, 'plaza'],
   },
+  // --- (32.4) Darülfünun: Bilgelik Evi'nin üst kademesi; yalnızca Bilgelik Evi mezunu gençler (18-20) okur. Tek çalışanı Müderris
+  // (workActivity 'profess'); ders 14:00-16:00. Kurallar data/university.js, sistem systems/UniversitySystem.js; şalter university.
+  university: {
+    name: 'Darülfünun',
+    size: { w: 4, h: 3 },
+    spots: 'door',
+    doorTiles: [{ dx: 1, dy: 3 }, { dx: 2, dy: 3 }],
+    entrance: { x: 32, y: 47 },
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Bilgi',
+    description:
+      "Kubbeli, avlulu taş medrese; revaklarında kitaplıklar. Bilgelik Evi'ni bitiren gençler (18-20) burada bir bölümde okur (en çok 6 öğrenci): ders 14:00-16:00, Müderris içerideyken iki kat hızlı. Mezun bölümünde en az Kalfa olur, o meslekte ömür boyu %15 hızlı ustalaşır; eğitimli halk suça daha az meyleder, Krallık İtibarı'nı yükseltir.",
+    cost: { wood: 80, stone: 110, iron: 20, wool: 30 },
+    buildWork: 380,
+    workers: 1,
+    workActivity: 'profess',
+    university: true,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 4,
+  },
   // (16. aşama) Keşif seferlerinden gelen egzotik ganimetlerle dikilen yapılar (item: harcanan ganimet; kaynak bedeli yok)
   grapeVine: {
     name: 'Üzüm Asması',
@@ -1260,6 +1283,8 @@ export const BUILD_MENU = [
   ...(engineOn('court') ? ['courthouse'] : []),
   // (32.3) Kraliyet Lütfu (şalter kapalıyken menüde yok; açıkken lütuf gelene dek düğmesi gizli)
   ...(engineOn('renown') ? ['peaceFountain', 'royalRoseGarden', 'royalArchive'] : []),
+  // (32.4) Darülfünun (şalter kapalıyken menüde yok)
+  ...(engineOn('university') ? ['university'] : []),
 ];
 
 /** (18. aşama) Menü öğesinin İnşa sekmesi: 'roads' (zemin fırçaları), 'decor' (süs ve sokak eşyaları), 'buildings'. */

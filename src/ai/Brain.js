@@ -45,6 +45,8 @@ import { ILLNESS } from '../data/health.js';
 import { FIRE } from '../data/crisis.js';
 import { VENERABLE } from '../data/lifeStages.js';
 import { SCHOOL } from '../data/research.js';
+import { UNIVERSITY } from '../data/university.js'; // (32.4)
+import { universityOf, isLectureHour } from '../systems/University.js'; // (32.4)
 import { isRallyActive } from '../systems/RallySystem.js';
 import { healSpeedMultiplier } from '../systems/ResearchSystem.js';
 import { QUIRKS, QUIRK_RULES, DATING, HOME_DINNER } from '../data/social.js';
@@ -106,7 +108,8 @@ export class Brain {
    *   relationships: import('../systems/RelationshipSystem.js').RelationshipSystem,
    *   crafting: import('../systems/CraftingSystem.js').CraftingSystem }} services
    */
-  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null, apprenticeship = null }) {
+  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null, apprenticeship = null, university = null }) {
+    this.university = university; // (32.4) Darülfünun (kendi üreteci yok; zar çekmez)
     this.crisis = crisis; // (23. aşama) yangın ve yaralanma kararları
     this.apprenticeship = apprenticeship; // (25.2) çıraklık (kendi üreteci)
 
@@ -228,6 +231,12 @@ export class Brain {
       // (30.3) İş bırakma: Kırgın yetişkin 10:00-12:00 meydanda protesto eder (mola zarı yine atıldı; acil ihtiyaç, yangın, yaralı, isyan önce)
       if (engineOn('discontent') && shouldStrike(this.world.state, c, hour) && !urgentNeed(c)) {
         const plan = this.planStrike(c);
+        if (plan) return plan;
+      }
+      // (32.4) Darülfünun dersi: öğrenci (c.higherStudy) 14:00-16:00 derse gider. Mola zarı yine atıldı (üretecin sırası değişmez); acil
+      // ihtiyaç, yangın, isyan, iş bırakma ve yaralı önce. Çırak planından ve planWork'ten ÖNCE; öğrenci yokken bu dal hiç çalışmaz.
+      if (c.higherStudy && this.university && engineOn('university') && !urgentNeed(c) && !c.isInjured) {
+        const plan = this.university.planLecture(c, hour);
         if (plan) return plan;
       }
       if (breakRoll >= profile.work.breakChance || c.mood.focus || c.drive.focus) {
@@ -1089,6 +1098,8 @@ export class Brain {
       if (weights.gazebo) weights.gazebo *= ELDER.leisure.gazebo;
       if (weights.shade) weights.shade *= ELDER.leisure.shade;
       if (this.world.getCompleted('academy').length > 0) weights.readLibrary = (weights.readLibrary ?? 0) + ELDER.readLibraryBase * ELDER.leisure.readLibrary;
+      // (32.4) Misafir hoca: Darülfünun varken ders saatinde düşük ağırlıklı "Darülfünun'da sohbet" (yapı yokken anahtar hiç eklenmez)
+      if (this.university && universityOf(this.world.state) && isLectureHour(hour)) weights.uniTalk = ELDER.readLibraryBase * UNIVERSITY.guestWeight;
     }
 
     const options = Object.entries(weights).filter(([name, w]) => w > 0 && ACTIVITIES[name]);
@@ -1130,6 +1141,15 @@ export class Brain {
           return { activity, buildingId: library.id, spot, finalPoint: library.entrancePoint, duration };
         }
         return null;
+      }
+      case 'uniTalk': {
+        // (32.4) misafir Kıdemli Bilge: Darülfünun'un kapısından içeri
+        const uni = universityOf(this.world.state);
+        const doors = uni ? this.world.getSpots(uni) : [];
+        if (!doors.length) return null;
+        const spot = this.nearest(doors, c);
+        if (!this.world.findPath(this.originTile(c), spot)) return null;
+        return { activity, buildingId: uni.id, spot, finalPoint: uni.entrancePoint, duration };
       }
       case 'music':
         return this.planMusic(c, hour, duration);

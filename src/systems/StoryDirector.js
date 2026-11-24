@@ -20,6 +20,7 @@ const EVENTS = [
   'crime:caught', 'crime:unsolved', // (32.1)
   'court:verdict', 'court:exiled', 'court:revealed', 'court:stale', // (32.2)
   'renown:tier', 'renown:grant', // (32.3)
+  'university:admitted', 'university:graduated', 'university:dropped', // (32.4)
 ];
 
 export class StoryDirector {

@@ -494,6 +494,29 @@ export const ACTIVITIES = {
     duration: [50, 80],
     effects: { social: 0.3, fun: 0.15 },
   },
+  // (32.4) Darülfünun: gençler 14:00-16:00 ders dinler (içeride); Müderris ders verir; misafir Kıdemli Bilge gençlerle sohbet eder
+  lecture: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: "Darülfünun'a derse gidiyor",
+    label: "Darülfünun'da ders dinliyor",
+    duration: [90, 90],
+    effects: { social: 0.2, fun: 0.05 },
+  },
+  profess: {
+    kind: 'work',
+    indoor: true,
+    travelLabel: "Darülfünun'a gidiyor",
+    label: "Darülfünun'da Müderris: ders veriyor",
+  },
+  uniTalk: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: "Darülfünun'a gençlerle sohbete gidiyor",
+    label: "Darülfünun'da gençlerle sohbet ediyor (misafir hoca)",
+    duration: [50, 80],
+    effects: { fun: 0.5, social: 0.4 },
+  },
   // Keşif seferine çıkan sakin harita kenarına yürür ve bir gün ortadan kaybolur
   expedition: {
     kind: 'away',

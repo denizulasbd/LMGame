@@ -159,6 +159,8 @@ export async function installMonitor(page) {
       const exo = { left: game.state.exodus?.left ?? 0, emigrants: game.state.stats?.emigrants ?? 0 };
       game.events.on('population:left', ({ character, reason } = {}) => {
         const s = game.state;
+        // (32.4) ayrılan / sürgün edilen / ölen öğrencinin kaydı (UniversitySystem dinleyicisi bizden önce) silinmiş olmalı
+        if (character?.higherStudy) broke(`${character.name}: kasabadan ayrıldı ama Darülfünun kaydı duruyor`);
         if (reason === 'exile') {
           m.exiles++;
           if ((s.exodus?.left ?? 0) !== exo.left || (s.stats?.emigrants ?? 0) !== exo.emigrants) broke(`sürgün ${character?.name}: terk ediş sayacı değişti`);
@@ -329,6 +331,16 @@ export async function installMonitor(page) {
             for (const f of ['offenderId', 'victimId', 'witnessId']) if (k[f] !== null && k[f] !== undefined && !ids.has(k[f])) broke(`dava #${k.id}: ${f} kopuk (${k[f]})`);
           }
           for (const key of Object.keys(s.justice.records)) if (!ids.has(Number(key))) broke(`sicil: kopuk kişi ${key}`);
+        }
+        // (32.4) Darülfünun: öğrenci yalnızca Genç ve Bilgelik Evi mezunu; kapasite aşılmaz; öğrenci aynı anda mezun değildir
+        {
+          const studs = s.characters.filter((c) => c.higherStudy);
+          if (studs.length > 6) broke(`Darülfünun: ${studs.length} öğrenci (kapasite 6)`);
+          for (const c of studs) {
+            if (c.lifeStage !== 'youth') broke(`${c.name}: Genç değil ama Darülfünun öğrencisi`);
+            if (!c.educated) broke(`${c.name}: Bilgelik Evi mezunu değil ama öğrenci`);
+            if (c.graduate) broke(`${c.name}: hem öğrenci hem mezun`);
+          }
         }
         // (32.2) sürgün yolunda süresini aşan sakin kalmaz
         for (const c of s.characters) if (c.sentence?.exile && now - c.sentence.exile.since > 420) broke(`${c.name}: sürgün yolunda takıldı`);

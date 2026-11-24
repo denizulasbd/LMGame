@@ -74,6 +74,7 @@ export class ConstructionSystem {
     // (31. aşama) Kasaba Süsleri şalteri kapalıyken bu yapılar kurulamaz
     if (DECOR_TYPES.includes(type) && !engineOn('townDecor')) return 'Bu yapı bu sürümde kapalı';
     if (type === 'courthouse' && !engineOn('court')) return 'Bu yapı bu sürümde kapalı'; // (32.2)
+    if (type === 'university' && !engineOn('university')) return 'Bu yapı bu sürümde kapalı'; // (32.4)
     // (32.3) Kraliyet Lütfu: şalter kapalıyken ya da lütuf gelmeden kurulamaz (menüde de görünmez)
     if (def.royalGrant && !royalGranted(this.world.state, type)) return engineOn('renown') ? 'Bu yapı yalnızca bir Kraliyet Lütfu ile açılır' : 'Bu yapı bu sürümde kapalı';
     let reason = def.unique && this.world.getBuildingsOfType(type).length > 0 ? `Kasabada yalnızca bir ${def.name} olabilir` : null;

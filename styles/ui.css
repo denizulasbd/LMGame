@@ -5678,3 +5678,11 @@ kbd {
   .hud-pulse .trust-mini-bar { min-width: 20px; }
   .hud.topbar .hud-zone-res { gap: 2px; }
 }
+
+/* (32.4) Darülfünun paneli: öğrenci satırları ve ilerleme çubukları */
+.building-university .university-list { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
+.building-university .university-row { display: grid; grid-template-columns: minmax(0, 1fr) 72px 34px; align-items: center; gap: 6px; font-size: 12px; }
+.building-university .university-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-ink); }
+.building-university .university-bar { height: 7px; border-radius: 4px; background: rgba(0, 0, 0, 0.28); overflow: hidden; }
+.building-university .university-fill { display: block; height: 100%; background: linear-gradient(90deg, #7fb3ff, #ffd23f); }
+.building-university .university-pct { text-align: right; font-variant-numeric: tabular-nums; }

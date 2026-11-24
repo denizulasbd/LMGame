@@ -8,6 +8,8 @@ import { el } from '../dom.js';
 import { modalHeader } from '../dockButton.js';
 import { getAnyIconURL } from '../../art/ui/index.js';
 import { adoptTip } from './HoverTip.js';
+import { educationRenownLine } from './universityCards.js'; // (32.4)
+import { UNIVERSITY } from '../../data/university.js'; // (32.4)
 import { BUILDINGS } from '../../data/buildings.js';
 import { ROYAL_LETTER, ROYAL_EFFECTS, RENOWN_GRANT, RENOWN_DRIFT, RENOWN_LEVELS } from '../../data/renown.js';
 import { engineOn } from '../../systems/Engines.js';
@@ -39,6 +41,7 @@ export function renownLines(state, s = renownSummary(state)) {
     `Krallık İtibarı: %${Math.round(s.value)} · ${s.level.name} ${ARROWS[s.dir]} (24 saatte ${ARROW_TEXT[s.dir]})`,
     early ? `Hedef %${Math.round(s.target)} · kayma ${RENOWN_DRIFT.minDay}. günden itibaren` : `Hedef %${Math.round(s.target)} · bu gece ${signed(s.step)} (boşluğun %${Math.round(RENOWN_DRIFT.share * 100)}'si, en çok ${RENOWN_DRIFT.maxStep})`,
     `Nedenler: ${s.reasons.length ? renownReasonsText(s.reasons) : 'henüz yok'}`,
+    ...((t) => (t ? [t] : []))(educationRenownLine(state)), // (32.4) hedefteki Eğitim katkısı
     `Vergi ×${s.level.levy} · ferman ödülü ×${s.level.reward}${s.level.key === 'bad' ? ' · fermanlar 2 günlük' : rankOf(state) >= 2 ? ' · göçmenler Kalfa gelir' : ''}`,
   ];
 }
@@ -83,6 +86,7 @@ export function royalBuildingLines(state, type) {
   if (type === 'peaceFountain') lines.push(half(`Kasaba çapında suç riski −%${Math.round((1 - e.crimeRisk) * 100 * (weak ? share : 1))}`), 'Akşamları suyu ışıl ışıl; çevresinde dinlenenlerin keyfi dolar');
   if (type === 'royalRoseGarden') lines.push(half(`Kasaba refahı +${weak ? e.happiness * share : e.happiness} · aşk ve evlilik olasılığı +%${Math.round((e.romance - 1) * 100 * (weak ? share : 1))}`), 'Çevresine bolca güzellik yayar');
   if (type === 'royalArchive') lines.push(half(`Araştırma ve yazıt çözme +%${Math.round((e.research - 1) * 100 * (weak ? share : 1))}`), 'Tarihçe Kütüğü: Kasabanın Kraliyet Defteri');
+  if (type === 'royalArchive' && engineOn('university')) lines.push(`Darülfünun'da ders ×${String(UNIVERSITY.archiveMultiplier).replace('.', ',')} (saray defterleri derste okunur)`); // (32.4)
   const g = state.renown?.grants?.find((x) => x.key === type);
   if (g) lines.push(`Kraliyet Lütfu: Gün ${g.day}`);
   lines.push(`Etkiler itibar Şüpheli'ye (%${RENOWN_LEVELS.find((l) => l.key === 'ok').min} altı) düşerse yarıya iner`);

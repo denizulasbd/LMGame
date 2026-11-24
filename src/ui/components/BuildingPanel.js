@@ -25,6 +25,7 @@ import { CLOCK_GEAR } from '../../data/goldenAge.js';
 import { decorKey, decorSection } from './decorCards.js';
 import { justiceKey, justiceSection } from './justiceCards.js'; // (32.2)
 import { royalKey, royalSection, renownLines, grantStatusText } from './renownCards.js'; // (32.3)
+import { universityKey, universitySection, academyUniversityLine } from './universityCards.js'; // (32.4)
 import { BUILDINGS, mendSpec, PROJECT_WORDS } from '../../data/buildings.js';
 import { STORM } from '../../data/dilemmas.js';
 import { RESOURCES, RESOURCE_KEYS, formatCost } from '../../data/resources.js';
@@ -139,6 +140,7 @@ export class BuildingPanel {
     this.decorBox = el('div', { className: 'building-decrees building-decor', hidden: true }); // (31. aşama) Kasaba Süsleri
     this.justiceBox = el('div', { className: 'building-decrees building-justice', hidden: true }); // (32.2) Adalet Sarayı
     this.royalBox = el('div', { className: 'building-decrees building-royal', hidden: true }); // (32.3) Kraliyet Lütfu
+    this.universityBox = el('div', { className: 'building-decrees building-university', hidden: true }); // (32.4) Darülfünun
     this.expedition = el('div', { className: 'building-decrees building-expedition' });
     this.inscriptions = el('div', { className: 'building-decrees building-inscriptions' });
     this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
@@ -192,6 +194,7 @@ export class BuildingPanel {
       this.decorBox,
       this.justiceBox,
       this.royalBox,
+      this.universityBox,
       this.bell,
       this.expedition,
       this.inscriptions,
@@ -320,6 +323,7 @@ export class BuildingPanel {
       decorKey(building, state), // (31. aşama)
       justiceKey(building, state), // (32.2)
       royalKey(building, state), // (32.3)
+      universityKey(building, state), // (32.4)
     ].join('/');
     if (key === this.lastKey) return;
     this.lastKey = key;
@@ -353,6 +357,7 @@ export class BuildingPanel {
     this.renderDecor(building, state);
     { const nodes = justiceSection(building, state, { emit: (n, p) => this.events.emit(n, p) }); this.justiceBox.hidden = !nodes.length; this.justiceBox.replaceChildren(...nodes); } // (32.2) ui/components/justiceCards.js
     { const nodes = royalSection(building, state); this.royalBox.hidden = !nodes.length; this.royalBox.replaceChildren(...nodes); } // (32.3) ui/components/renownCards.js
+    { const nodes = universitySection(building, state); this.universityBox.hidden = !nodes.length; this.universityBox.replaceChildren(...nodes); } // (32.4) ui/components/universityCards.js
     this.renderBell(building, state);
     this.renderFeast(building, state);
     this.renderExpedition(building, state);
@@ -1398,6 +1403,7 @@ export class BuildingPanel {
         }
         const educated = state.characters.filter((c) => c.educated).length;
         if (educated) lines.push(`Okuldan yetişen: ${educated} sakin`);
+        if (academyUniversityLine()) lines.push(academyUniversityLine()); // (32.4)
         const done = RESEARCH_KEYS.filter((id) => state.research.done[id]).length;
         lines.push(`Tamamlanan araştırma: ${done}/${RESEARCH_KEYS.length}`);
         if (building.processStatus) lines.push(building.processStatus);

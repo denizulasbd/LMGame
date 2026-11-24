@@ -41,6 +41,7 @@ import { addMemory } from './MemorySystem.js';
 import { levelFor } from './SkillSystem.js';
 import { clamp } from '../utils/math.js';
 import { TEMPERAMENT } from '../data/temperament.js';
+import { apprenticeBoost } from './University.js'; // (32.4)
 
 export class ApprenticeshipSystem {
   /**
@@ -228,7 +229,7 @@ export class ApprenticeshipSystem {
     if (!master) return false; // ustası tezgâhtan kalktı: çırak da kalkar (bir sonraki planda işine döner)
     if (task.phase !== 'perform') return true;
     const rate = atWork ? 1 : APPRENTICE.practiceRate;
-    a.progress = Math.min(100, a.progress + APPRENTICE.perMinute * rate * minutes);
+    a.progress = Math.min(100, a.progress + APPRENTICE.perMinute * rate * minutes * apprenticeBoost(c)); // (32.4) öğrenci çırağın telafisi (öğrenci değilse 1)
     this.state.apprenticeship.minutes += minutes;
     const prof = PROFESSIONS[a.profession];
     if (!atWork) {

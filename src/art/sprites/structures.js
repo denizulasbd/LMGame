@@ -36,6 +36,7 @@ import { getNoticeBoardSprite, getWoodpileSprite, getScarecrowSprite, getBandsta
 import { getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
 import { getCourthouseSprite } from './structuresJustice.js';
 import { getPeaceFountainSprite, getRoseGardenSprite, getRoyalArchiveSprite } from './structuresRoyal.js';
+import { getUniversitySprite } from './structuresUniversity.js'; // (32.4)
 import { getSiloSprite } from './structuresGranary.js';
 import { getLoomSprite, getBrewerySprite } from './structuresRefinery.js';
 import { getTradingPostSprite } from './structuresTrade.js';
@@ -679,6 +680,7 @@ const WINTER_ROOFS = {
   gazebo: { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 },
   courthouse: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 22 }, // (32.2) alınlığın saçağı
   royalArchive: { light: ['c'], main: ['b'], dark: ['N'], maxRow: 13 }, // (32.3) kubbe
+  university: { light: ['c', 'a', 'Z'], main: ['b', 'C'], dark: ['U'], maxRow: 32 }, // (32.4) kubbeler ve saçak
 };
 
 export function getStructureSprite(type, state = {}) {
@@ -809,6 +811,9 @@ function getBaseStructureSprite(type, state) {
       return getRoseGardenSprite(state.season ?? 'summer');
     case 'royalArchive':
       return getRoyalArchiveSprite(Boolean(state.windowsLit));
+    // (32.4) Darülfünun: mevsim ağaçları; ders saatinde (state.look.lecture) ve akşam pencereler yanar
+    case 'university':
+      return getUniversitySprite(state.season ?? 'summer', Boolean(state.look?.lecture || state.windowsLit));
     // 23. aşama: güvenlik yapıları
     case 'well':
       return getWellSprite(state.frame ?? 0);

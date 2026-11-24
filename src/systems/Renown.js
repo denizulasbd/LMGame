@@ -13,6 +13,7 @@ import { trustWelfare } from './TrustSystem.js';
 import { pulseStats } from './Loyalty.js';
 import { isGoldenAge } from './GoldenAge.js';
 import { SKILL_LEVELS } from '../data/skills.js';
+import { renownEducationShare } from './University.js'; // (32.4)
 
 const clampTo = (v, min, max) => Math.max(min, Math.min(max, v));
 const round1 = (v) => Math.round(v * 10) / 10;
@@ -63,11 +64,11 @@ export function rankOf(state) {
 // ---------------------------------------------------------------------------------------------------------------------- hedef
 
 /**
- * (32.4) Eğitim payı: 0-1. Bilgelik Evi'nin yüksek okulunu bitiren yetişkinlerin payı (beklenen 0-0,6). Ağırlık RENOWN_TARGET.education
- * (6): tam eğitimli kasaba +6. Bu adımda yüksek okul yok: 0.
+ * (32.4) Eğitim payı: 0-1. Yetişkinler içinde Darülfünun mezunu payı + 0,3 × yalnızca Bilgelik Evi mezunu payı (ikincisi
+ * ENGINES.educationMerit'e bağlı; beklenen 0-0,6). Ağırlık RENOWN_TARGET.education (6). Şalter university kapalıyken 0.
  */
-export function renownEducation(_state) {
-  return 0;
+export function renownEducation(state) {
+  return renownEducationShare(state);
 }
 
 /**

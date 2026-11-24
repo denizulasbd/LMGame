@@ -14,6 +14,8 @@ export const ENGINES = {
   traitScarcity: true, // (30.4a) kişilik çeşitliliği: yaygın özelliğe doğru evrim katkısı küçülür, nadire doğru büyür
   justice: true, // (32.1) Suç Motoru: küçük suçlar (handan aşırma, kese hafifletme, ufak haylazlık), tanık ve bekçi, dava kaydı, Muhtar uyarısı
   court: true, // (32.2) Adalet Sarayı ve Dava: dava penceresi, cezalar, orantılılık, cezasızlık, sürgün (justice kapalıyken etkisiz)
+  university: true, // (32.4) Darülfünun: Bilgelik Evi mezunu gençlerin yüksek okulu (kabul, bölüm, ders, Müderris, mezuniyet, bölüm deneyimi)
+  educationMerit: true, // (32.4) Bilgelik Evi mezunlarının (c.educated) suç riski ×0,85 ve itibardaki eğitim payı (Darülfünun kurulmasa da tarihi değiştirir; university'ye bağlı)
   renown: true, // (32.3) Kasaba Şöhreti: Krallık İtibarı'nın günlük hedefe kayması, Kraliyet Gözdesi kademesi, rozet, Kraliyet Lütfu (gizli yapılar)
 };
 // (30.4a) Açılıştan ÖNCE bilinmesi gereken şalterler (kurucuların ageInDays değeri sahne kurulurken hesaplanır): modül yüklenirken
@@ -23,4 +25,4 @@ export const ENGINES = {
   const off = globalThis.__LMGAME_ENGINES_OFF;
   if (Array.isArray(off)) for (const k of Object.keys(ENGINES)) if (off.includes('*') || off.includes(k)) ENGINES[k] = false;
 }
-export const engineOn = (key) => ENGINES[key] !== false && (key !== 'court' || ENGINES.justice !== false); // (32.2) court, justice'e bağlı
+export const engineOn = (key) => ENGINES[key] !== false && (key !== 'court' || ENGINES.justice !== false) && (key !== 'educationMerit' || ENGINES.university !== false); // (32.2) court, justice'e; (32.4) educationMerit, university'ye bağlı

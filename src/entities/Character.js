@@ -50,6 +50,7 @@ import { sanitizeGrowth, sanitizeGrowthToday, sanitizeGrowthCause, sanitizeDeepT
 import { sanitizeWants, sanitizeWantLog, clampSatisfaction, sanitizeCount, neutralDrive, recomputeDrive } from '../systems/Wants.js';
 import { WANTS, FEARS, WANT_CAPS } from '../data/wants.js';
 import { sanitizeLoyalty } from '../systems/Loyalty.js';
+import { sanitizeHigherStudy, sanitizeGraduate } from '../systems/University.js'; // (32.4)
 
 const HALF_WIDTH = CHARACTER_WIDTH / 2;
 const BUBBLE_POP_TIME = 0.15;
@@ -149,6 +150,8 @@ export class Character extends Entity {
     weddingDay = null,
     specialDay = null,
     sentence = null,
+    higherStudy = null,
+    graduate = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -253,6 +256,9 @@ export class Character extends Entity {
     // (32.2) Adalet Sarayı cezası (isteğe bağlı, kayda yalnızca doluyken girer): { service?: kalan saat, serviceDay?, serviceToday?,
     // caseId?, banUntil?: oyun dakikası, exile?: { since, exit } } — CourtSystem yazar
     this.sentence = sanitizeSentence(sentence);
+    // (32.4) Darülfünun (isteğe bağlı, kayda yalnızca doluyken girer): öğrencilik { field, minutes, today, day, since } ve mezuniyet { field, day }
+    this.higherStudy = sanitizeHigherStudy(higherStudy);
+    this.graduate = sanitizeGraduate(graduate);
     this.drive = neutralDrive();
     recomputeDrive(this);
     this.mood = neutralMood();
@@ -700,6 +706,8 @@ export class Character extends Entity {
       weddingDay: this.weddingDay,
       specialDay: this.specialDay,
       ...(this.sentence ? { sentence: this.sentence } : {}), // (32.2)
+      ...(this.higherStudy ? { higherStudy: this.higherStudy } : {}), // (32.4)
+      ...(this.graduate ? { graduate: this.graduate } : {}), // (32.4)
     };
   }
 

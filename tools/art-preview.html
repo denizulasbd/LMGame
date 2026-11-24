@@ -62,6 +62,16 @@
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
 
+    // --- 32.4: Darülfünun — kubbeli, avlulu, kitaplıklı taş medrese; dört mevsim avlu ağaçları, ders saatinde aydınlık pencereler, kış ---
+    {
+      show('Darülfünun (4x3): dört mevsim, ders saati (aydınlık pencereler) ve şantiye', [
+        ...SEASONS.map((k) => [NAMES[k], getStructureSprite('university', { season: k })]),
+        ['ders saati', getStructureSprite('university', { season: 'summer', look: { lecture: true } })],
+        ['kış akşamı', getStructureSprite('university', { season: 'winter', windowsLit: true })],
+        ['şantiye', getConstructionSiteSprite(4, 3, 1, 'university')],
+      ], 4);
+    }
+
     // --- 32.3: Kraliyet Lütfu — Barış Çeşmesi (akşam ışıklı su), Kraliyet Gül Bahçesi (dört mevsim), Kraliyet Arşivi (akşam pencereleri) ---
     {
       show('Barış Çeşmesi (2x2): su kareleri, akşam ışığı, şantiye', [
