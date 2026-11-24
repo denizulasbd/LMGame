@@ -18,6 +18,7 @@ const EVENTS = [
   'loyalty:changed', 'moodlet:mourning', 'moodlet:consoled', 'family:grownUp', 'venerable:became', 'relationship:quarrel',
   'relationship:reconciled', 'pantry:low', 'dilemma:resolved', 'storm:struck', 'crisis:raidResolved',
   'crime:caught', 'crime:unsolved', // (32.1)
+  'court:verdict', 'court:exiled', 'court:revealed', 'court:stale', // (32.2)
 ];
 
 export class StoryDirector {
@@ -217,7 +218,7 @@ export class StoryDirector {
 
   /** (30.6) Eylem düğmesi olan kart (armağan / taziye), eylem hâlâ geçerliyken ve yapılmamışken solmaz; oyuncu kapatana dek kalır. */
   holds(card) {
-    if (!engineOn('novicePath') || !card.action || card.action.type === 'story' || card.used) return false;
+    if (!engineOn('novicePath') || !card.action || card.action.type === 'story' || card.action.type === 'case' || card.used) return false; // (32.2) dava kartı normal solar
     return actionStatus(this.state, card).enabled;
   }
 
@@ -272,6 +273,10 @@ export class StoryDirector {
     }
     const st = actionStatus(this.state, card);
     if (!st.enabled || card.used) return false;
+    if (a.type === 'case') {
+      this.events.emit('ui:openCase', { id: a.id }); // (32.2) dosya her basışta açılır (kart "kullanıldı" sayılmaz)
+      return true;
+    }
     card.used = true;
     if (a.type === 'gift') this.events.emit('ui:giftSpecialDay', { id: a.id });
     else if (a.type === 'condolence') this.events.emit('ui:condolence');

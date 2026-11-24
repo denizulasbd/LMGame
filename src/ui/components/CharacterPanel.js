@@ -37,6 +37,7 @@ import { SCHOOL } from '../../data/research.js';
 import { CHARACTER_NAME_MAX_LENGTH } from '../../data/characters.js';
 import { LUXURY_GOODS } from '../../data/luxury.js';
 import { el } from '../dom.js';
+import { sentenceKey, sentenceNodes } from './justiceCards.js'; // (32.2)
 import { QUIRKS } from '../../data/social.js';
 import { ITEMS, PETITION_KINDS } from '../../data/citizens.js';
 import { RESOURCES } from '../../data/resources.js';
@@ -776,7 +777,7 @@ export class CharacterPanel {
     const raid = rioter ? raidOf(state, character) : null;
     const inv = character.inventory ?? [];
     const leaving = Boolean(character.emigrating); // (22. aşama) köyü terk ediyor
-    const key = `${character.id}:${character.coins}:${capacity}:${rioter}:${leaving}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}${s.heirloom ? s.heirloom.chain.join('>') : ''}`).join(',')}`;
+    const key = `${sentenceKey(character, state)}:${character.id}:${character.coins}:${capacity}:${rioter}:${leaving}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}${s.heirloom ? s.heirloom.chain.join('>') : ''}`).join(',')}`;
     if (key === this.lastPurse) return;
     this.lastPurse = key;
     const coins = el('div', { className: 'purse-coins', title: 'Kişisel kese: yevmiyeler, usta eseri ödülleri ve alışveriş (kasaba hazinesinden ayrıdır)' }, [
@@ -788,6 +789,7 @@ export class CharacterPanel {
         : rioter
           ? [el('span', { className: 'purse-rioter', text: raid ? 'Yağmada' : 'İsyancı', title: 'Yönetime öfkeli: işi bıraktı, meydanda toplanıyor' })]
           : []),
+      ...sentenceNodes(character, state, (n, p) => this.events.emit(n, p)), // (32.2) ceza rozeti ve "Dava dosyası"
     ]);
     const slots = [];
     for (let i = 0; i < capacity; i++) {

@@ -6,6 +6,8 @@ import { RESOURCES } from '../data/resources.js';
 import { TOWN_BUFFS } from '../data/town.js';
 import { SKILL_KEYS } from '../data/skills.js';
 import { engineOn } from './Engines.js';
+import { courtOf } from './Justice.js'; // (32.2)
+import { CRIMES } from '../data/justice.js';
 import { getSeason } from '../data/seasons.js';
 
 const usable = (state, type) => state.buildings.filter((b) => b.type === type && b.functional);
@@ -70,6 +72,11 @@ export function noticeItems(state) {
   petitions.sort((a, b) => a.deadline - b.deadline || a.id - b.id);
   for (const p of petitions) {
     items.push({ key: `petition:${p.id}`, icon: 'scroll', title: `Dilekçe · ${p.name}`, text: p.text, left: hoursText(p.deadline - now), urgent: p.deadline - now < 6 * 60, target: { character: p.characterId }, noticed: Boolean(p.noticed) });
+  }
+  // (32.2) Adalet Sarayı'nın açık davaları (en acil önce; tıklayınca dava dosyası açılır)
+  if (courtOf(state)) {
+    const cases = (state.justice?.cases ?? []).filter((k) => k.court).sort((a, b) => a.deadline - b.deadline || a.id - b.id);
+    for (const k of cases) items.push({ key: `case:${k.id}`, icon: 'scales', title: `Dava · ${k.offenderName}`, text: `${CRIMES[k.crime]?.name ?? 'Suç'}: Adalet Sarayı'nda kararını bekliyor.`, left: hoursText(k.deadline - now), urgent: k.deadline - now < 12 * 60, target: { case: k.id } });
   }
   const taxAt = state.tax?.nextAt;
   if (Number.isFinite(taxAt) && taxAt > now) items.push({ key: 'tax', icon: 'coin', title: 'İç vergi tahsilatı', text: 'Sakinlerin kesesinden kademeye göre vergi alınır.', left: hoursText(taxAt - now), urgent: false, target: { hall: true } });

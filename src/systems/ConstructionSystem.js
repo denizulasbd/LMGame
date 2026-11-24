@@ -72,6 +72,7 @@ export class ConstructionSystem {
     // Kasabada tek olabilen yapı (anıt) zaten varsa önce bu söylenir
     // (31. aşama) Kasaba Süsleri şalteri kapalıyken bu yapılar kurulamaz
     if (DECOR_TYPES.includes(type) && !engineOn('townDecor')) return 'Bu yapı bu sürümde kapalı';
+    if (type === 'courthouse' && !engineOn('court')) return 'Bu yapı bu sürümde kapalı'; // (32.2)
     let reason = def.unique && this.world.getBuildingsOfType(type).length > 0 ? `Kasabada yalnızca bir ${def.name} olabilir` : null;
     // Kasaba seviyesiyle açılan yapılar (değirmen: Köy, belediye: Kasaba) önce bunu söyler
     if (!reason && def.requiresTier && (this.world.state.town?.tier ?? 1) < def.requiresTier) {

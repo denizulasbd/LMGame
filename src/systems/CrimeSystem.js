@@ -5,14 +5,16 @@
 //   Plan      : 08:00'da (izole üreteç tohum + 42; ana üreteçlerden zar ÇEKİLMEZ) o günün en çok 1 suçu (kasaba 20 sakini aşınca 2)
 //               planlanır: aday sakinlerin risk toplamı kadar olasılıkla bir yuva dolar, sakin riskiyle ağırlıklı seçilir, motivasyon
 //               riskin baskın çarpanından, suç türü ve hedef ağırlıklı seçeneklerden. Sakine geçici (kaydedilmeyen) c.crimePlan yazılır
-//               { crime, variant, buildingId?, victimId?, motive, at, until, duration }. Pencere (5 saat) geçerse plan düşer.
-//   Eylem     : Brain.planCrime boş zamanda / molada (planLeisure'dan hemen önce) sakini hedefin kapısına götürür ('pilfer');
+//               { crime, variant, buildingId?, victimId?, motive, at, until, duration }. Pencere (8 saat, en geç 23:00) geçerse plan düşer.
+//   Eylem     : Brain.planCrime boş zamanda / molada (acil ihtiyaç, yangın, isyan, yara, teselli ve yastan SONRA; randevu, sohbet,
+//               alışveriş ve planLeisure'dan ÖNCE) sakini hedefin kapısına götürür ('pilfer');
 //               bitince 'crime:committed' (activities.finishEvent). Vakti gelen sakin uzun bir boş zaman / sohbet görevindeyse saat
 //               başı görevi bırakır ('crime:nudge'; şenlik, iş, uyku bölünmez). Yüklemede yarım kalan plan ve görev sessizce düşer.
 //   Kayıt     : çalınan mal yok olmaz, suçlunun çantasına / kesesine geçer (stok aynı miktarda düşer). Tanık aranır (Justice.catchChance);
 //               yakalanan dava açık kalır (state.justice.cases), yakalanmayan 'unsolved' kapanmış olarak günlüğe (log) girer.
 //   Kapanış   : Adalet Sarayı yokken açık dava bir gün sonra Muhtar uyarısıyla kendiliğinden kapanır (closeCase; tek kapanış yolu).
-//               Güven, sadakat, refah etkisi yok; yalnızca sicile (records) yazılır. 32.2 dava penceresi closeCase'i kendi kararıyla çağırır.
+//               Güven, sadakat, refah etkisi yok; yalnızca sicile (records) yazılır. (32.2) Saray varken davayı CourtSystem kapatır
+//               (hâkimin kararı ya da sürüncemede kalan dava); karar ayrıntıları verdict'e eklenir, etkiler CourtSystem'dedir.
 //   Görünürlük: hikâye kartı ('crime:caught' / 'crime:unsolved'), Kasaba Günlüğü satırı, suçlunun ve kurbanın anısı, sayaçlar
 //               (state.justice.stats). Yakalanınca kurbanla küçük bir ilişki düşüşü (RelationshipSystem.add).
 //   Temizlik  : ayrılan / ölen sakinin açık davası düşer, kapanmış davalardaki kimliği null olur, sicilden silinir (Justice.pruneJustice).
@@ -26,7 +28,7 @@ import { loyaltyLevel } from './Loyalty.js';
 import { getFriendship } from './RelationshipSystem.js';
 import {
   emptyJustice, pruneJustice, justiceActive, crimeCandidate, crimeReady, slotsFor, riskFactors, crimeRisk, motiveOf, crimeOptions,
-  crimeAmount, severityOf, catchChance, remorseWeights, autoVerdict, caseText, isHungry, welfareOf, trustOf,
+  crimeAmount, severityOf, catchChance, remorseWeights, autoVerdict, caseText, isHungry, welfareOf, trustOf, courtOf, normalizeVerdict,
 } from './Justice.js';
 
 const on = () => engineOn('justice');
@@ -244,7 +246,9 @@ export class CrimeSystem {
     const opts = { lootName, buildingType: target?.type ?? null };
     const caught = k.status === 'open';
     const text = caseText(k, caught ? 'caught' : 'unsolved', opts);
-    const entry = s.addJournal(caseText(k, caught ? 'journalCaught' : 'journalUnsolved', opts), caught ? 'shield' : 'whisper');
+    // (32.2) Adalet Sarayı varken dava Muhtar'a değil saraya düşer (courtOf, ENGINES.court kapalıyken hep null)
+    const journalKey = caught ? (courtOf(s) ? 'journalCourt' : 'journalCaught') : 'journalUnsolved';
+    const entry = s.addJournal(caseText(k, journalKey, opts), caught ? 'shield' : 'whisper');
     this.events.emit('journal:added', entry);
     addMemory(s, c, caseText(k, caught ? 'memoryCaught' : 'memoryUnsolved', opts), caught ? 'sweat' : 'whisper', { kind: 'life', fond: !caught, ...(witness ? { whoId: witness.id } : {}) });
     if (victim) addMemory(s, victim, caseText(k, caught ? 'memoryVictimCaught' : 'memoryVictimUnsolved', opts), 'purse', { kind: 'life', fond: false, ...(caught ? { whoId: c.id } : {}) });
@@ -274,14 +278,15 @@ export class CrimeSystem {
     j.cases.splice(i, 1);
     const day = this.state.time.day;
     k.status = 'closed';
-    k.verdict = { kind: verdict.kind, by: verdict.by, auto: Boolean(verdict.auto), day };
+    // (32.2) mahkeme kararının ayrıntıları (bant, sertlik, iade, ceza...) isteğe bağlı olarak eklenir
+    k.verdict = normalizeVerdict({ ...(verdict.extra ?? {}), kind: verdict.kind, by: verdict.by, auto: Boolean(verdict.auto), day });
     k.closedDay = day;
     const r = (j.records[k.offenderId] ??= { count: 0, lastDay: 0 });
     r.count += 1;
     r.lastDay = day;
     this.pushLog(k);
     const c = this.world.getCharacter(k.offenderId);
-    if (c && verdict.kind === 'warning') addMemory(this.state, c, CRIME_TEXT.memoryWarned, 'scroll', { kind: 'life', fond: false });
+    if (c && verdict.kind === 'warning' && verdict.by === 'elder') addMemory(this.state, c, CRIME_TEXT.memoryWarned, 'scroll', { kind: 'life', fond: false });
     this.events.emit('crime:closed', { kase: k, verdict: k.verdict });
     return k;
   }

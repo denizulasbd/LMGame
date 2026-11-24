@@ -34,6 +34,7 @@ import { getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.j
 import { getMarbleFountainSprite, getGoldenLanternSprite, getRoyalStatueSprite } from './structuresGoldenAge.js';
 import { getNoticeBoardSprite, getWoodpileSprite, getScarecrowSprite, getBandstandSprite, getHeroStatueSprite } from './structuresDecor.js';
 import { getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
+import { getCourthouseSprite } from './structuresJustice.js';
 import { getSiloSprite } from './structuresGranary.js';
 import { getLoomSprite, getBrewerySprite } from './structuresRefinery.js';
 import { getTradingPostSprite } from './structuresTrade.js';
@@ -675,6 +676,7 @@ const WINTER_ROOFS = {
   academy: { light: ['c'], main: ['B', 'b'], dark: ['n', 'N'], maxRow: 39 },
   harbor: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 22 },
   gazebo: { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 },
+  courthouse: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 22 }, // (32.2) alınlığın saçağı
 };
 
 export function getStructureSprite(type, state = {}) {
@@ -795,6 +797,9 @@ function getBaseStructureSprite(type, state) {
       return getHeroStatueSprite(state.look ? state.look.pose : 'hammer');
     case 'royalStatue':
       return getRoyalStatueSprite();
+    // (32.2) Adalet Sarayı: mevsim saksıları ve açık davada kapıda parşömen (state.look.cases; menü önizlemesinde yok)
+    case 'courthouse':
+      return getCourthouseSprite(state.season ?? 'summer', Boolean(state.look?.cases));
     // 23. aşama: güvenlik yapıları
     case 'well':
       return getWellSprite(state.frame ?? 0);

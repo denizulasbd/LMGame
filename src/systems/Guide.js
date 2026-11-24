@@ -9,6 +9,7 @@ import { storageLimit } from './Granary.js';
 import { nextTownTier, tierChecks } from './TownStatus.js';
 
 import { engineOn } from './Engines.js';
+import { courtOf } from './Justice.js';
 import { foodSupply } from './TownStatus.js';
 import { foodDaysLeft } from './Loyalty.js';
 import { levyAmount } from './Crown.js';
@@ -58,6 +59,11 @@ export const CONDITIONS = {
   // (30.4a) ilk doğal vefat (kaza sayılmaz); yalnızca "Anladım" ile tamamlanır
   lifespan: {
     when: ({ state }) => (state.lifeStages?.deaths ?? 0) - (state.lifeStages?.accidents ?? 0) >= 1,
+    done: () => false,
+  },
+  // (32.2) Adalet Sarayı varken ilk açık dava; yalnızca "Anladım" ile tamamlanır
+  court: {
+    when: ({ state }) => Boolean(courtOf(state)) && Boolean(state.justice?.cases?.some((k) => k.court)),
     done: () => false,
   },
   move: { when: () => true, done: ({ facts }) => Boolean(facts.moved) },

@@ -148,6 +148,7 @@ export class Character extends Entity {
     loyalty = 0,
     weddingDay = null,
     specialDay = null,
+    sentence = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -249,6 +250,9 @@ export class Character extends Entity {
     this.weddingDay = Number.isFinite(weddingDay) && weddingDay >= 1 ? Math.floor(weddingDay) : null;
     this.specialDay = sanitizeSpecialDay(specialDay);
     this.specialSeek = []; // (29.7) özel günde aranan kişiler (kaydedilmez; RiteSystem kurar)
+    // (32.2) Adalet Sarayı cezası (isteğe bağlı, kayda yalnızca doluyken girer): { service?: kalan saat, serviceDay?, serviceToday?,
+    // caseId?, banUntil?: oyun dakikası, exile?: { since, exit } } — CourtSystem yazar
+    this.sentence = sanitizeSentence(sentence);
     this.drive = neutralDrive();
     recomputeDrive(this);
     this.mood = neutralMood();
@@ -695,6 +699,7 @@ export class Character extends Entity {
       loyalty: this.loyalty,
       weddingDay: this.weddingDay,
       specialDay: this.specialDay,
+      ...(this.sentence ? { sentence: this.sentence } : {}), // (32.2)
     };
   }
 
@@ -729,4 +734,24 @@ export class Character extends Entity {
 function sanitizeSpecialDay(d) {
   if (!d || typeof d !== 'object' || !Number.isFinite(d.day) || (d.kind !== 'birthday' && d.kind !== 'anniversary')) return null;
   return { day: Math.max(1, Math.floor(d.day)), kind: d.kind, celebrated: Boolean(d.celebrated), gifted: Boolean(d.gifted) };
+}
+
+/** (32.2) Kayıttaki ceza durumu: bozuk alanlar atılır; hiçbir şey kalmazsa null. */
+function sanitizeSentence(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const out = {};
+  if (Number.isFinite(raw.service) && raw.service > 0) {
+    out.service = Math.round(raw.service * 100) / 100;
+    if (Number.isInteger(raw.serviceDay)) out.serviceDay = raw.serviceDay;
+    if (Number.isFinite(raw.serviceToday)) out.serviceToday = Math.max(0, raw.serviceToday);
+    if (Number.isInteger(raw.caseId)) out.caseId = raw.caseId;
+  }
+  if (Number.isFinite(raw.banUntil) && raw.banUntil > 0) out.banUntil = Math.round(raw.banUntil);
+  if (raw.exile && Number.isFinite(raw.exile.since)) {
+    const e = raw.exile;
+    out.exile = { since: e.since, exit: e.exit && Number.isFinite(e.exit.x) ? { x: e.exit.x, y: e.exit.y } : null };
+    if (typeof e.band === 'string') out.exile.band = e.band.slice(0, 12);
+    if (typeof e.crime === 'string') out.exile.crime = e.crime.slice(0, 20);
+  }
+  return Object.keys(out).length ? out : null;
 }

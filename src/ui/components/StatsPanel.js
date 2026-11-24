@@ -249,7 +249,7 @@ export class StatsPanel {
     const ga = state.goldenAge ?? {};
     const tower = towerOf(state);
     const leader = towerMasterOf(state);
-    const key = JSON.stringify([ch, ga.since, ga.chimes, ga.books, tower?.wonderStage, tower?.underConstruction, leader, state.townName, state.heirloom?.archive?.length, state.rites?.held, state.rites?.names?.length]);
+    const key = JSON.stringify([ch, ga.since, ga.chimes, ga.books, tower?.wonderStage, tower?.underConstruction, leader, state.townName, state.heirloom?.archive?.length, state.rites?.held, state.rites?.names?.length, state.justice?.exiles?.length]);
     if (key === this.lastChronicle) return;
     this.lastChronicle = key;
     const when = (v) => (v && Number.isFinite(v.day) ? `Gün ${v.day}${Number.isFinite(v.hour) ? `, ${String(v.hour).padStart(2, '0')}:00` : ''}` : '');
@@ -292,6 +292,8 @@ export class StatsPanel {
         el('ul', { className: 'chronicle-stages' }, stageRows),
         // (29.7) Anma törenleri ve kitabe
         ...(state.rites?.names?.length ? [entry('candle', 'Kitabe: Anılanlar', [gold(state.rites.names.slice(-12).map((n) => `${n.name} (${n.age})`).join(', ')), ...(state.rites.names.at(-1).story ? [` · ${state.rites.names.at(-1).name}: ${state.rites.names.at(-1).story}`] : [])], `${state.rites.held} anma töreni · son: ${when(state.rites.names.at(-1))}`)] : []),
+        // (32.2) Adalet Sarayı'nın sürgünleri
+        ...(state.justice?.exiles?.length ? [entry('bundle', 'Sürgünler', [state.justice.exiles.slice(-6).map((e) => `${e.name} (Gün ${e.day})`).join(', ')], `${state.justice.exiles.length} sakin Adalet Sarayı kararıyla kasabadan sürüldü`)] : []),
         entry('bell', 'Altın Çağ', isGoldenAge(state) ? [gold(`${when(ch.goldenAge ?? ga.since)}`), ' · çalışma şevki +%10, refah +%10', ...(ga.books ? [` · kitaplıkta ${ga.books} antik kitap`] : [])] : [pending('Kule tamamlanınca başlar')]),
       ])
     );

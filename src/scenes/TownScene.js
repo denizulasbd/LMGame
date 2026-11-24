@@ -110,7 +110,8 @@ import { currentFeastOf } from '../systems/Feast.js';
 import { FairDecor } from '../rendering/FairDecor.js';
 import { currentFair, fairVenue } from '../systems/Fair.js';
 import { CrimeSystem } from '../systems/CrimeSystem.js';
-import { JUSTICE_SEED_OFFSET } from '../data/justice.js';
+import { CourtSystem } from '../systems/CourtSystem.js';
+import { JUSTICE_SEED_OFFSET, COURT_SEED_OFFSET } from '../data/justice.js';
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -274,6 +275,8 @@ export class TownScene extends Scene {
     this.townDecor = new TownDecorSystem(this.game, this.world, { economy: this.economy, trust: this.trust, moodlets: this.moodlets });
     // (32.1) Suç Motoru: yalnızca olay dinler (08:00 planı, eylem bitişi, saatlik kapanış); izole üreteç seed + 42, ana üreteçlere dokunmaz
     this.crime = new CrimeSystem(this.game, this.world, { economy: this.economy, relationships: this.relationships }, new Random(state.seed + JUSTICE_SEED_OFFSET));
+    // (32.2) Adalet Sarayı ve Dava: yalnızca olay dinler (karar, saatlik süre / tanık / yasak, hizmet ve sürgün bitişi); izole üreteç seed + 43
+    this.court = new CourtSystem(this.game, this.world, { crime: this.crime, economy: this.economy, trust: this.trust, loyalty: this.loyalty, chemistry: this.chemistry, moodlets: this.moodlets, relationships: this.relationships, jobs: this.jobs }, new Random(state.seed + COURT_SEED_OFFSET));
     this.systems = [
       this.weather,
       this.structures,
@@ -338,6 +341,7 @@ export class TownScene extends Scene {
       this.heating,
       this.townDecor,
       this.crime,
+      this.court,
       this.milestones,
       this.relationships,
       this.chemistry,

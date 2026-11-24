@@ -64,7 +64,8 @@ import { TEMPERAMENT } from '../data/temperament.js';
 import { isMemorialTime, memorialEligible, urgentNeed, riteWindow, riteVenue } from '../systems/Rites.js';
 import { engineOn } from '../systems/Engines.js';
 import { shouldStrike } from '../systems/Loyalty.js';
-import { crimeReady } from '../systems/Justice.js';
+import { crimeReady, isBanned, serviceDue } from '../systems/Justice.js';
+import { COURT, SHAME } from '../data/justice.js';
 import { DISCONTENT } from '../data/loyalty.js';
 
 const COLD_SEASONS = ['autumn', 'winter']; // (29.3) "Soğukta üşümek" korkusunun sıcak mekân arayışı
@@ -124,6 +125,11 @@ export class Brain {
     const { needs, profile } = c;
     const bedtime = isBedtime(profile, hour);
 
+    // (32.2) Sürgün: yalnızca suçlu, her şeyden önce bohçasıyla harita kenarına yürür (terk edişten ayrı işaret: c.sentence.exile)
+    if (c.sentence?.exile && engineOn('court')) {
+      const plan = this.planExile(c);
+      if (plan) return plan;
+    }
     // (22. aşama) Köyü terk etmeye karar verdiyse her şeyden önce harita kenarına yürür
     if (c.emigrating) {
       const plan = this.planEmigrate(c);
@@ -258,6 +264,11 @@ export class Brain {
       const plan = this.planCrime(c, hour);
       if (plan) return { ...plan, onBreak };
     }
+    // (32.2) Kamu Hizmeti: Adalet Sarayı'nın cezası, boş zamanda / molada (mesai ve uyku bölünmez, acil ihtiyaçlar önce); zar çekmez
+    if (!c.isChild && (!isWorkHours(hour) || onBreak) && serviceDue(this.world.state, c)) {
+      const plan = this.planService(c);
+      if (plan) return { ...plan, onBreak };
+    }
     // (19. aşama) Bekâr ve ilişkisi yüksek sakinler boş zamanlarında birbirleriyle vakit geçirmeye öncelik verir
     if (!c.isChild && !c.married && !grieving && (!isWorkHours(hour) || onBreak)) {
       const plan = this.planDate(c, hour);
@@ -281,6 +292,32 @@ export class Brain {
     }
     const leisure = this.planLeisure(c, hour);
     return leisure ? { ...leisure, onBreak } : this.planWait();
+  }
+
+  /** (32.2) Sürgün yolu: harita kenarındaki çıkış (yol yoksa null; CourtSystem süre dolunca çıkarır). */
+  planExile(c) {
+    const exit = c.sentence?.exile?.exit;
+    if (!exit || !this.world.findPath(this.originTile(c), exit)) return null;
+    return { activity: 'exile', spot: exit, duration: 0 };
+  }
+
+  /**
+   * (32.2) Kamu Hizmeti: meydanın çevresindeki yürüyüş karolarından biri (sakin kimliği ve saatten belirlenir: zar çekmez); yolu
+   * olan ilk aday. Bir oturum COURT.serviceMinutes sürer.
+   */
+  planService(c) {
+    const plaza = this.world.landmarks.plaza;
+    const center = { x: plaza.centerX, y: plaza.centerY };
+    const pool = this.world.strollSpots.filter((p) => distanceSq(p, center) <= 64);
+    const spots = pool.length ? pool : this.world.strollSpots;
+    if (!spots.length) return null;
+    const origin = this.originTile(c);
+    const start = (c.id * 7 + Math.floor(this.world.state.totalMinutes / 60)) % spots.length;
+    for (let i = 0; i < Math.min(4, spots.length); i++) {
+      const spot = spots[(start + i * 3) % spots.length];
+      if (this.world.findPath(origin, spot)) return { activity: 'publicService', spot, facing: 'down', duration: COURT.serviceMinutes };
+    }
+    return null;
   }
 
   /** (32.1) Yapının ayak izini çevreleyen yürünebilir ve kasabaya bağlı karolar (kapısı olmayan süsler için). */
@@ -437,6 +474,7 @@ export class Brain {
     // (25.3) Girişimci ve Zanaatkâr Pazar'a daha sık uğrar (zar her sakinde aynı atılır)
     // (29.3) "Kendime bir şey alayım" arzusu: eşik shopMul kat (zar yine bir kez atılır)
     if (this.citizenRng.next() >= SHOP.chance * (TEMPERAMENT.shopBoost[c.quirk] ?? 1) * c.drive.shopMul) return null;
+    if (isBanned(this.world.state, c)) return null; // (32.2) Uzaklaştırma: Pazar yasağı (zar yine atıldı)
     const origin = this.originTile(c);
     for (const market of markets) {
       const doors = this.world.getSpots(market);
@@ -604,7 +642,8 @@ export class Brain {
   planMeal(c) {
     const origin = this.originTile(c);
     const places = [];
-    for (const inn of this.world.getCompleted('inn')) if (inn.meals > 0) places.push({ place: inn, activity: 'innMeal' });
+    // (32.2) Uzaklaştırma cezalısı hana giremez; evde ve kilerde yemek her zaman serbest
+    if (!isBanned(this.world.state, c)) for (const inn of this.world.getCompleted('inn')) if (inn.meals > 0) places.push({ place: inn, activity: 'innMeal' });
     // Kilerde yiyecek ya da ekmek (2,5 yiyecek değerinde) varsa evde / kilerde oturup yenir
     if (this.economy.canFeed(MEAL_FOOD_COST)) {
       for (const storage of this.world.getCompleted('storage')) places.push({ place: storage, activity: 'meal' });
@@ -871,7 +910,8 @@ export class Brain {
   }
 
   planSocial(c, hour) {
-    const gatherings = this.availableGatherings();
+    const banned = isBanned(this.world.state, c); // (32.2) Han yasağı
+    const gatherings = banned ? this.availableGatherings().filter((b) => !COURT.banVenues.includes(b.type)) : this.availableGatherings();
 
     // Önce zaten insanların toplandığı yere katıl
     let best = null;
@@ -998,6 +1038,8 @@ export class Brain {
     const inn = this.world.getCompleted('inn').find((b) => b.lit);
     if (!inn) weights.inn = 0;
     else if (evening) weights.inn *= 5;
+    const banned = isBanned(this.world.state, c); // (32.2) Uzaklaştırma: han ağırlığı 0
+    if (banned) weights.inn = 0;
     // (16. aşama) Seferden dönen maceracı anlatacak hikâyesiyle hana koşar (han yoksa ateş başına / meydana)
     if (c.tale) {
       weights.inn = (weights.inn ?? 0) * 6;
@@ -1011,6 +1053,7 @@ export class Brain {
     // (13. aşama) Çardak: meydandaki havuz kadar sevilir; sevgilisi / eşi olan için iki kat
     if (this.availableGatherings().some((b) => b.type === 'gazebo')) weights.gazebo = (weights.fountain ?? 1) * (c.partnerId !== null && c.partnerId !== undefined ? 1.8 : 0.9);
     for (const building of this.availableGatherings()) {
+      if (banned && COURT.banVenues.includes(building.type)) continue;
       const people = this.participants(building, c);
       if (people.length === 0) continue;
       // (29.1) kırgın olduğu kişinin oturduğu yerden kaçınır, minnettar olduğu kişinin olduğu yere meyleder
@@ -1029,6 +1072,8 @@ export class Brain {
       for (const k of ['inn', 'campfire', 'bench', 'shade']) if (weights[k]) weights[k] *= 2;
       if (weights.stroll) weights.stroll *= 0.3;
     }
+    // (32.2) Mahcup (sürgün edilenin ailesi): kalabalık mekânlardan hafifçe kaçınır
+    if (engineOn('court') && getMoodlet(c, 'shamed')) for (const k of ['inn', 'fountain', 'campfire', 'gazebo']) if (weights[k]) weights[k] *= SHAME.crowdMul;
     if (c.mood.seek && c.traits.includes('introvert')) {
       for (const k of ['bench', 'river', 'readBench', 'readLibrary', 'viewpoint', 'shade', 'flowers']) if (weights[k]) weights[k] *= 3;
       for (const k of ['inn', 'fountain', 'campfire', 'gazebo']) if (weights[k]) weights[k] *= 0.3;
@@ -1249,7 +1294,7 @@ export class Brain {
   /** Müzisyen: akşamları handa (açıksa) ya da meydan havuzunun başında çalar. */
   planMusic(c, hour, duration) {
     if (!this.isMusicHour(hour)) return null;
-    const inn = this.world.getCompleted('inn').find((b) => b.lit);
+    const inn = isBanned(this.world.state, c) ? null : this.world.getCompleted('inn').find((b) => b.lit); // (32.2) Han yasağı
     const fountain = this.world.getCompleted('fountain')[0];
     const venues = [inn, fountain].filter(Boolean);
     if (inn && fountain && this.rng.next() < 0.45) venues.reverse();
@@ -1355,7 +1400,7 @@ export class Brain {
     const options = [];
     const gazebo = this.availableGatherings().find((b) => b.type === 'gazebo' && this.world.freeGatherSpots(b, c.id).length >= 2);
     if (gazebo) options.push(['gazebo', DATING.venues.gazebo]);
-    const inn = this.availableGatherings().find((b) => b.type === 'inn' && this.world.freeGatherSpots(b, c.id).length >= 2);
+    const inn = isBanned(this.world.state, c) ? null : this.availableGatherings().find((b) => b.type === 'inn' && this.world.freeGatherSpots(b, c.id).length >= 2); // (32.2) Han yasağı
     if (inn) options.push(['inn', DATING.venues.inn]);
     const benches = this.benchPair(c);
     if (benches) options.push(['bench', DATING.venues.bench]);

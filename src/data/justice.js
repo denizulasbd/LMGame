@@ -4,6 +4,8 @@
 // Oyunun sakin ruhu: şiddet, silah, hapis yok. Küçük, insani, hafif mizahi suçlar; çalınan mal yok olmaz, suçlunun çantasına ya
 // da kesesine geçer (32.2'de tazminatın kanıtı ve kaynağı). Sonraki adımlar: 32.2 Adalet Sarayı ve dava penceresi (closeCase'in
 // kararı), 32.3 Krallık İtibarı (crimeRate / solvedRatio), 32.4 eğitim (educationFactor), 32.5 kulüpler (clubFactor).
+// (32.2) Adalet Sarayı ve Dava: dosyanın sonundaki COURT, SENTENCES, DESERVED, BANDS, VERDICT_EFFECTS, IMPUNITY, REVEAL, EXILE, SHAME
+// ve dava metinleri. Şalter ENGINES.court (justice kapalıyken etkisiz). Durum systems/CourtSystem.js'te, saf hesaplar Justice.js'te.
 
 export const JUSTICE_SEED_OFFSET = 42; // izole üreteç: tohum + 42 (35 ömür, 36 vadi, 37 kimya, 38 moodlet, 39 arzu, 40 evrim, 41 söz)
 export const JUSTICE_TABLE_VERSION = 1;
@@ -23,7 +25,7 @@ export const JUSTICE = {
   closeAfterMinutes: 1440, // açık dava (Adalet Sarayı yokken) bir gün sonra Muhtar uyarısıyla kapanır
   logSize: 40, // kapanmış davaların son N'i
   rateDays: 8, // crimeRate penceresi (gün)
-  courtType: 'courthouse', // (32.2) Adalet Sarayı yapı türü; bu adımda yapı yok, kural her zaman Muhtar uyarısı
+  courtType: 'courthouse', // (32.2) Adalet Sarayı yapı türü (ENGINES.court kapalıyken Justice.courtOf hep null: Muhtar kuralı)
   vandalHours: 18, // bozulan süsün üstünde küçük onarım işareti kalma süresi (oyun saati; kaydedilmez)
 };
 
@@ -242,6 +244,7 @@ export const CRIME_TEXT = {
   seenNone: 'sonradan anlaşıldı',
   unsolved: '{lost}; kimse bir şey görmedi.',
   journalCaught: '{who} {act} yakalandı ({seen}); dava Muhtar\'a gitti',
+  journalCourt: '{who} {act} yakalandı ({seen}); dava Adalet Sarayı\'na düştü', // (32.2)
   journalUnsolved: '{lost}; kimse bir şey görmedi',
   memoryCaught: '{actCap} yakalandı, yüzü kızardı',
   memoryUnsolved: '{didCap}, kimse görmedi',
@@ -255,3 +258,188 @@ export const CRIME_BUBBLES = { caught: 'sweat', unsolved: 'laugh' }; // eylem ba
 
 // Kurbanla ilişki düşüşü (yakalanınca; RelationshipSystem.add ile, abartısız)
 export const VICTIM_RELATION = -6;
+
+
+// =====================================================================================================================
+// (32.2) Adalet Sarayı ve Dava. Hâkim oyuncunun kendisidir; dava penceresi oyunu DURDURMAZ. HER ceza HER suçta seçilebilir:
+// oyunun özü orantılı cezayı bulmak. Halkın tepkisi önceden gösterilmez; karardan sonra sonuç ekranında yazılır.
+// =====================================================================================================================
+
+export const COURT_SEED_OFFSET = 43; // izole üreteç: tohum + 43 (ifade değişkeni, tanık zarı, karalama, sürgün çıkışı); 42 suç motorunun
+export const COURT_TABLE_VERSION = 1;
+
+export const COURT = {
+  deadlineDays: 2, // saray varken açık davanın süresi (oyun günü); dolarsa "sürüncemede" (otomatik Uyarı)
+  stale: { trust: -2, impunity: 1 },
+  recordCap: 2.25, // sicil (tekrar) payının üst sınırı
+  logShow: 6, // panelde son kararlar
+  urgentHours: 12, // kalan süre bunun altındaysa acil
+  serviceDailyCap: 4, // kamu hizmeti: günde en çok bu kadar saat (sakin yemek, uyku ve sohbete de vakit bulsun)
+  serviceMinutes: 60, // bir hizmet oturumu (oyun dakikası)
+  serviceFun: -0.04, // hizmet sürerken dakikada keyif (hafif düşüş)
+  fineHourCoins: 4, // kese yetmeyen para cezasının her 4 altını 1 saat kamu hizmetine çevrilir
+  banDays: 4, // Uzaklaştırma: Han ve Pazar yasağı (gün)
+  banVenues: ['inn', 'market'],
+  banActivities: ['inn', 'innMeal', 'shop', 'music'], // yasaklının yolda döndüğü görevler (hedef yapı han / pazarsa)
+};
+
+// Cezalar ve sertlik puanları (harsh 0-6). Hepsi her suçta seçilebilir.
+export const SENTENCES = {
+  pardon: { name: 'Af', harsh: 0, icon: 'heart', detail: 'Hiçbir yaptırım yok; sicile yazılır.' },
+  warning: { name: 'Uyarı', harsh: 1, icon: 'scroll', detail: 'Sözlü uyarı: "Bir daha olmasın."' },
+  fineLight: { name: 'Para Cezası (hafif)', harsh: 2, icon: 'coin', detail: 'Çalınanın değeri kadar altın kesesinden hazineye.' },
+  serviceLight: { name: 'Kamu Hizmeti (4 saat)', harsh: 2, icon: 'broom', hours: 4, detail: 'Boş zamanında ücretsiz meydan ve yol süpürür.' },
+  ban: { name: 'Uzaklaştırma', harsh: 3, icon: 'sulk', detail: '4 gün Han ve Pazar yasağı (evde ve kilerde yemek serbest).' },
+  fineHeavy: { name: 'Para Cezası (ağır)', harsh: 3.5, icon: 'coin', detail: 'Çalınanın üç katı altın (en çok 40) kesesinden hazineye.' },
+  serviceHeavy: { name: 'Kamu Hizmeti (12 saat)', harsh: 3.5, icon: 'broom', hours: 12, detail: 'Birkaç akşam boyunca ücretsiz meydan ve yol süpürür.' },
+  exile: { name: 'Sürgün', harsh: 6, icon: 'bundle', detail: 'Yalnızca suçlu kasabadan sürülür; ailesi kalır.' },
+};
+export const SENTENCE_KEYS = Object.keys(SENTENCES);
+
+// Para cezası tutarları (altın): hafif ≈ değer, ağır ≈ 3 kat (tavanlı). Değeri olmayan suçta (haylazlık) ağırlıktan.
+export const FINE = { lightMin: 3, heavyMul: 3, heavyMin: 9, heavyCap: 40, perSeverity: 3 };
+
+// Hak edilen sertlik (Justice.deserved): severity tabanı + bağlam payları
+export const DESERVED = {
+  hungry: -1,
+  hungryFamine: -1.5,
+  poorBelow: 6, // kesesi bundan azsa yoksul
+  poor: -0.5,
+  remorse: { confess: -0.5, apologize: -0.75, deny: 0.5, excuse: 0.25 },
+  denyWitness: 0.75, // inkâr ve tanık varsa (yerine)
+  repeat: 0.75, // sicildeki her eski suç
+  youth: -0.5,
+  plea: { forgive: -0.75, lesson: 0.5, restore: 0 },
+  unreturned: 0.5, // çalınan duruyor ve iade ettirilmediyse
+  min: 0.25, // taban: en hafif davada Af da Uyarı da adil sayılır (ilk değer 0: aç ve itiraf eden yoksula Uyarı "sert" çıkıyordu)
+  max: 6,
+};
+
+// Bantlar (fark = seçilen sertlik − hak edilen)
+export const BANDS = {
+  fairWithin: 0.75,
+  harshTo: 2, // 0,75 < fark <= 2 sert; > 2 zalim
+  lenientTo: -2, // -2 <= fark < -0,75 hafif; < -2 gevşek
+  names: { fair: 'Adil', harsh: 'Sert', cruel: 'Zalim', lenient: 'Hafif', lax: 'Gevşek' },
+  keys: ['fair', 'harsh', 'cruel', 'lenient', 'lax'],
+};
+
+// Bantların etkileri (var olan API'ler; sadakat nedenleri 'verdict:<bant>', PULSE_REASONS'ta)
+export const VERDICT_EFFECTS = {
+  fair: { trust: 2, offenderRemorseful: 3, victim: 3 },
+  harsh: { trust: -3, kin: -4 },
+  cruel: { trust: -8, everyone: -3, kin: -8 },
+  lenient: { victimSide: -3, impunity: 1 },
+  lax: { victim: -6, trust: -2, impunity: 2 },
+};
+
+// Cezasızlık: son `days` gündeki hafif / gevşek / sürüncemede kararların puanı riski artırır, adil kararlar söndürür
+export const IMPUNITY = { days: 8, perPoint: 0.15, cap: 1.6, fairDamp: 1 };
+
+// Saray varken yakalanmamış eski suçlar (son `days` gün): günde bir izole zar; tutarsa bir tanık konuşur ve dava açılır
+export const REVEAL = { hour: 9, days: 4, chance: 0.3, perDay: 1 };
+
+// Sürgün: yalnızca suçlu bohçasıyla harita kenarına yürür
+export const EXILE = { timeoutMinutes: 360, cruelKin: -6 };
+
+// Geride kalan aileye utanç (Mahcup) ve halk arasında karalama (resentful etiketi, süreli)
+export const SHAME = {
+  hours: { fair: 48, other: 72 },
+  tier: { fair: 'minor', harsh: 'minor', cruel: 'major', lenient: 'minor', lax: 'minor' },
+  slander: { fair: { people: 2, days: 2 }, other: { people: 3, days: 4 } },
+  crowdMul: 0.5, // Mahcup sakin hanı, meydanı ve ateş başını daha az seçer
+};
+
+// Karar penceresi ve sonuç metinleri
+export const COURT_TEXT = {
+  courtName: 'Adalet Sarayı',
+  stale: '{who} davası sürüncemede kaldı: süre doldu, kendiliğinden Uyarı verildi.',
+  staleJournal: '{who} davası sürüncemede kaldı; hâkim karar vermedi',
+  opened: 'Dava Adalet Sarayı\'na düştü.',
+  revealed: '{lostCap}: {witness} sonunda konuştu. Dava açıldı: {who}.',
+  revealedJournal: '{lost}: {witness} sonunda konuştu, dava {who} adına açıldı',
+  verdictJournal: 'Adalet Sarayı: {who} için karar {sentence} ({band})',
+  verdictCard: '{who} için karar: {sentence}. Halk {bandLower} buldu.',
+  exileCard: '{who} kasabadan sürüldü. Ailesi geride kaldı.',
+  exileJournal: '{who} kasabadan sürüldü; kesesi ve çantasıyla yola düştü. Ailesi kasabada kaldı',
+  exileChronicle: '{who} ({crime}) kasabadan sürüldü',
+  exileWarn: '{who} kasabadan sürülecek. {kin}',
+  exileKin: 'Eşi ve çocukları kalır',
+  exileKinNamed: 'Geride kalanlar: {names}.',
+  exileAlone: 'Kasabada ailesi yok.',
+  restitutionOff: { none: 'Çalınan bir şey yok', gone: 'Çalınan çoktan harcanmış', building: 'Mal sahibi yapı artık yok' },
+  memoryOffender: 'Adalet Sarayı\'nda yargılandı: {sentence}',
+  memoryVictim: '{who} için verilen karar: {sentence}',
+  memoryServed: 'Kamu hizmetini bitirdi, borcunu ödedi',
+  memoryExiled: 'Kasabadan sürüldü; ardına bakmadan yürüdü',
+  memoryKin: '{who} kasabadan sürüldü',
+  memoryStale: 'Davası sürüncemede kaldı, kimse bir şey demedi',
+  served: 'borcunu ödedi',
+  turnBack: 'Yasaklı olduğunu hatırladı, yolundan döndü',
+};
+
+// Halkın tepkisinin nedeni (sonuç ekranı): bant x bağlam
+export const BAND_REASONS = {
+  fair: 'Halk kararı orantılı buldu: ceza suça denk düştü.',
+  harsh: 'Halk kararı sert buldu: ceza suçtan ağır.',
+  cruel: 'Halk kararı zalimce buldu: bu kadarını hiç kimse beklemiyordu.',
+  lenient: 'Halk kararı hafif buldu: mağdur hakkını alamadı.',
+  lax: 'Halk kararı gevşek buldu: suç cezasız kaldı sayılır.',
+};
+export const BAND_HINTS = {
+  hungry: 'aç birinin ekmeğine',
+  youth: 'bir gencin hatasına',
+  repeat: 'sicili kabarık birine',
+  deny: 'inkâr edene',
+  forgive: 'kurbanın af dilediği bir suça',
+  lesson: 'kurbanın ders istediği bir suça',
+};
+
+// Suçlunun ifadesi: motivasyon x pişmanlık; her biri en az iki değişken ({loot}: çalınan, {victim}: kurban)
+export const STATEMENTS = {
+  hunger: {
+    confess: ['Üç gündür midem kazınıyordu, {loot} aldım. Utanıyorum.', 'Evet, ben aldım. Açlık insana neler yaptırıyor...'],
+    apologize: ['Karnım öyle açtı ki aklım başımdan gitti. Özür dilerim, ödeyeceğim.', 'Bağışlayın beni. Bir lokma için bunu yaptım, bir daha olmayacak.'],
+    deny: ['Ben mi? Ben sadece kokusuna bakıyordum.', 'Aç olabilirim ama hırsız değilim. Başkası almıştır.'],
+    excuse: ['Kilerde yiyecek kalmamıştı, ne yapsaydım? Herkes aç.', 'Kimse bana bir tas çorba bile vermedi. Ben de kendim aldım.'],
+  },
+  poverty: {
+    confess: ['Kesemde tek kuruş yoktu. {loot} aldım, doğru.', 'İnkâr etmeyeceğim. Param yoktu, aldım.'],
+    apologize: ['Elim boştu, aklım karıştı. Çalışıp borcumu ödeyeceğim, söz.', 'Özür dilerim. Yoksulluk ayıp değil ama hırsızlık ayıp, biliyorum.'],
+    deny: ['Benim kesemde onu alacak yer mi var? Bakın, bomboş!', 'Yanlış adam. O sırada iş arıyordum.'],
+    excuse: ['Herkesin kesesi dolu, benimki bomboş. Biraz paylaştım diyelim.', 'Ücretim zaten az. Kasaba bana borçlu sayılır.'],
+  },
+  grudge: {
+    confess: ['Evet, ben yaptım. İçim öyle doluydu ki...', 'Yaptım. Çünkü bu kasabada kimse bizi duymuyor.'],
+    apologize: ['Öfkeme yenildim. Hatalıydım, özür dilerim.', 'Kırgındım ama acısını başkasından çıkardım. Bağışlayın.'],
+    deny: ['Beni kim gördü? Söylesin bakalım yüzüme!', 'Ben öyle şeyler yapmam. Bana iftira atıyorlar.'],
+    excuse: ['Vergiler, reddedilen dilekçeler... Sabrın da bir sınırı var.', 'Bize yapılanların yanında bu ne ki?'],
+  },
+  temptation: {
+    confess: ['Gözüm kaydı, {loot} aldım. Kabul ediyorum.', 'Öyle güzel duruyordu ki dayanamadım. Evet, ben aldım.'],
+    apologize: ['Bir anlık hevesti. Çok mahcubum, özür dilerim.', 'Hiç gerek yoktu, biliyorum. Bağışlayın, geri vereceğim.'],
+    deny: ['Ben mi? O gün oralarda bile değildim.', 'Hayatımda öyle bir şey görmedim bile.'],
+    excuse: ['Kimse sahip çıkmıyordu, ben de kaybolmasın diye aldım.', 'Bir tanecikten bir şey olmaz sandım.'],
+  },
+  mischief: {
+    confess: ['Şaka olsun diye yaptım, bu kadar büyüyeceğini bilmiyordum.', 'Evet ben yaptım. Gülmek istemiştim, kimse gülmedi.'],
+    apologize: ['Çocukluk ettim. Düzeltmeme izin verin, özür dilerim.', 'Haylazlığım tuttu. Bir daha olmayacak, söz.'],
+    deny: ['Ben değilim! Rüzgâr yapmıştır.', 'Ben mi? Ben kuzu gibiyimdir.'],
+    excuse: ['Can sıkıntısından oldu. Bu kasabada eğlence mi var?', 'Zaten yamuk duruyordu, ben sadece biraz yardım ettim.'],
+  },
+};
+
+// Kurbanın sözü (kurban sakinse): ilişkiye ve kişiliğe göre (Justice.victimPlea, zar yok); metin değişkeni izole üreteçle
+export const VICTIM_PLEAS = {
+  forgive: { name: 'affedin', lines: ['Gençtir, bir kereliğine affedin.', 'Komşumdur, kalbi iyidir. Bu sefer affedin.'] },
+  restore: { name: 'malımı geri istiyorum', lines: ['Malımı geri istiyorum, o kadar.', 'Ben kimsenin cezalanmasını istemem; yeter ki hakkım geri gelsin.'] },
+  lesson: { name: 'ders almalı', lines: ['Ders almalı. Yoksa yarın yine yapar.', 'Bu iş böyle kalmasın. Ders almalı.'] },
+};
+export const PLEA_RULES = { forgiveAt: 40, lessonBelow: -10, forgiveTraits: ['cheerful'], lessonTraits: ['grumpy', 'ambitious'] };
+
+// Tanık ifadesi ({witness}, {who})
+export const WITNESS_LINES = {
+  guard: ['Kasaba bekçisi: "Nöbetteydim, gözümle gördüm. {who} etrafına bakına bakına aldı."', 'Kasaba bekçisi: "Fenerimi tuttum, {who} kaçacak yer aradı."'],
+  resident: ['{witness}: "Oradaydım, {who} olduğuna yemin ederim."', '{witness}: "Görmez olaydım. Ama gördüm, {who} idi."'],
+  revealed: ['{witness}: "Günlerdir içimde tutuyordum. O gün {whoAcc} gördüm."', '{witness}: "Susmak bana ağır geldi. {who} idi."'],
+};

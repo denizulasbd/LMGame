@@ -116,6 +116,7 @@ const BASELINE_INSET = {
   scarecrow: 3,
   bandstand: 3,
   heroStatue: 2,
+  courthouse: 3, // 32.2
   // 24. aşama
   silo: 2,
   // 24.2

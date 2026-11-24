@@ -35,6 +35,7 @@ import { GuideCard } from './components/GuideCard.js';
 import { ScrollArrows } from './components/ScrollArrows.js';
 import { StoryFeed } from './components/StoryFeed.js';
 import { HoverTip } from './components/HoverTip.js';
+import { CaseModal } from './components/CaseModal.js'; // (32.2)
 
 const BOTTOM_GAP = 10; // dock ile pencere kenarı / sağ sütun arasındaki boşluk (piksel)
 
@@ -71,6 +72,7 @@ export class UIManager {
       new TownJournal(game),
       new StatsPanel(game),
       new SettingsPanel(game),
+      new CaseModal(game), // (32.2) dava dosyası (oyunu durdurmaz)
       new CrisisModal(game),
       new CelebrationModal(game),
       new DilemmaModal(game),

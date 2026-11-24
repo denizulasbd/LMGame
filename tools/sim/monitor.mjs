@@ -154,6 +154,24 @@ export async function installMonitor(page) {
         if (m.broken.length < 50) m.broken.push(`G${game.state.time.day} ${String(game.state.time.hour).padStart(2, '0')} ${text}`);
       };
 
+      // ---- (32.2) Sürgün: terk ediş sayaçlarına yazılmaz; geride kalan çocuk evsiz / kopuk kalmaz; sürgün yolunda takılan yok ----
+      m.exiles = 0;
+      const exo = { left: game.state.exodus?.left ?? 0, emigrants: game.state.stats?.emigrants ?? 0 };
+      game.events.on('population:left', ({ character, reason } = {}) => {
+        const s = game.state;
+        if (reason === 'exile') {
+          m.exiles++;
+          if ((s.exodus?.left ?? 0) !== exo.left || (s.stats?.emigrants ?? 0) !== exo.emigrants) broke(`sürgün ${character?.name}: terk ediş sayacı değişti`);
+          const ids = new Set(s.characters.map((c) => c.id));
+          for (const c of s.characters) {
+            if (!c.isChild) continue;
+            if (c.homeId === null || !s.buildings.some((b) => b.id === c.homeId)) broke(`sürgün ${character?.name}: çocuk ${c.name} evsiz`);
+            if (c.parentIds.some((id) => !ids.has(id)) || (c.parents ?? []).some((id) => !ids.has(id))) broke(`sürgün ${character?.name}: çocuk ${c.name} kopuk ebeveyn`);
+          }
+        }
+        exo.left = s.exodus?.left ?? 0;
+        exo.emigrants = s.stats?.emigrants ?? 0;
+      });
       m.sample = () => {
         const scene = game.scenes.current;
         const world = scene.world;
@@ -312,6 +330,8 @@ export async function installMonitor(page) {
           }
           for (const key of Object.keys(s.justice.records)) if (!ids.has(Number(key))) broke(`sicil: kopuk kişi ${key}`);
         }
+        // (32.2) sürgün yolunda süresini aşan sakin kalmaz
+        for (const c of s.characters) if (c.sentence?.exile && now - c.sentence.exile.since > 420) broke(`${c.name}: sürgün yolunda takıldı`);
         // ---- (19. aşama) Evlilik akışı: taşınma, ortak ev, kutlama, huylar, dedikodu ----
         m.minPop = Math.min(m.minPop, s.characters.length);
         // (28.4) Geç oyun beklentisi: açıkken anlık refah ve eksik lüks örnekleri

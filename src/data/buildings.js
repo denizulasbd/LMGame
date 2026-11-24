@@ -93,6 +93,7 @@ import { engineOn } from '../systems/Engines.js';
 //   ornamentalTree : { foliage } süs fidanı: dikildikten sonra iki günde büyür, ulu ağacın gölgesinde dinlenilir
 //   grownName    : büyüyünce aldığı ad (Huş Fidanı -> Huş Ağacı)
 //
+// 32.2 — Adalet Sarayı (courthouse; data/justice.js -> COURT, systems/CourtSystem.js): görünüm durumu building.look.cases (kaydedilmez).
 // 31. aşama — Kasaba Süsleri (data/townDecor.js): noticeBoard, woodpile, scarecrow, bandstand, heroStatue. Yapıya özgü kalıcı
 //   durum building.decor'da (konser zamanı, onurlandırılan sakin), görünüm durumu building.look'ta (kaydedilmez).
 //
@@ -969,6 +970,24 @@ export const BUILDINGS = {
     requiresTier: 4,
     funAura: { radius: 48, perMinute: 0.06 },
   },
+  // --- (32.2) Adalet Sarayı: hâkim oyuncudur (işçi yok). Kurallar data/justice.js (COURT), sistem systems/CourtSystem.js; şalter court ---
+  courthouse: {
+    name: 'Adalet Sarayı',
+    size: { w: 3, h: 3 },
+    spots: 'door',
+    doorTiles: [{ dx: 1, dy: 3 }],
+    entrance: { x: 24, y: 47 },
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Yönetim',
+    description:
+      'Sütunlu taş saray, alınlığında altın terazi. Yakalanan suçlar Muhtar\'a değil buraya düşer: dava dosyasını okur, cezayı sen verirsin. Her ceza her suça verilebilir; halk orantıya bakar. Saray varken susan tanıklar da zamanla konuşur.',
+    cost: { wood: 60, stone: 50, gold: 120 },
+    buildWork: 320,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 3,
+  },
   // (16. aşama) Keşif seferlerinden gelen egzotik ganimetlerle dikilen yapılar (item: harcanan ganimet; kaynak bedeli yok)
   grapeVine: {
     name: 'Üzüm Asması',
@@ -1189,6 +1208,8 @@ export const BUILD_MENU = [
   'guardTower',
   // (31. aşama) Kasaba Süsleri (şalter kapalıyken menüde yok)
   ...(engineOn('townDecor') ? ['noticeBoard', 'woodpile', 'scarecrow', 'heroStatue', 'bandstand'] : []),
+  // (32.2) Adalet Sarayı (şalter kapalıyken menüde yok)
+  ...(engineOn('court') ? ['courthouse'] : []),
 ];
 
 /** (18. aşama) Menü öğesinin İnşa sekmesi: 'roads' (zemin fırçaları), 'decor' (süs ve sokak eşyaları), 'buildings'. */

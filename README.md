@@ -47,6 +47,10 @@ tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler,
 | İlan Tahtası panelinde bir işe tıkla | (31) Dilekçe sahibini ya da Belediye Konağı'nı seç; liste kasabanın bütün açık işlerini (ferman, tahsildar, ceza, baskın, vergi günü) en acil önce gösterir |
 | Müzik Köşkü panelinde **Akşam Konseri** | (31) 40 altın, 17:00-21:59 arası, 2 günde bir: sakinler iki saat köşkte toplanır, keyif ve sosyallik dolar, bitince Yönetim Güveni artar |
 | Kahraman Heykeli panelinde bir sakinin adı | (31) Heykeli o sakine ada: adı künyeye kazınır, aleti ustalığına göre dökülür (seçim kalıcı) |
+| Adalet Sarayı panelinde bir davaya tıkla | (32.2) Dava dosyasını aç; panel açık davaları (en acil önce), son kararları ve halkın tepkisini, adil / sert / hafif sayaçlarını ve cezasızlığı gösterir |
+| Dava dosyasında bir ceza + **Kararı ver** | (32.2) Her ceza her suça verilebilir (Af, Uyarı, Para Cezası, Kamu Hizmeti, Uzaklaştırma, Sürgün); "Çalınanı sahibine iade ettir" bir iadedir. Oyun durmaz; halkın tepkisi karardan sonra yazılır |
+| Üst çubuğun altındaki **Dava · {suçlu}** çipi | (32.2) O davanın dosyasını aç (2 gün içinde karar verilmezse dava sürüncemede kalır: Yönetim Güveni −2) |
+| İlan Tahtası / sakin kartında **Dava dosyası** | (32.2) Saraydaki açık davalar İlan Tahtası'nda da durur; suçlunun kartındaki küçük bağlantı dosyasını açar |
 | Hasarlı yapının panelinde **Onarımı Başlat** | Fırtınada / kurt saldırısında hasar gören yapıyı onar |
 | Hasarlı yapının panelinde **Tamir Et** | (23. aşama; **28.1'de pahalandı**) Anında onarım artık acil durum lüksüdür: inşa maliyetinin **%50'si (odun + taş) + 25 altın**. Acelen yoksa boştaki ustalar yangın / baskın / fırtına hasarını maliyetin yalnızca **%20'siyle** onarır (yangın / baskında 2 saat sonra kendiliğinden başlar) |
 | Yanan yapının panelinde **Acil Seferberlik** | (28.1; eski bedava "Acil Söndür"ün yerine) **30 altın**: yangın sönmez ama o yangına 4 yerine **8 kişi** koşar ve kova **2 kat hızlı** taşınır; kova atan herkes yangın bitince **Enerji -40, Keyif -20** kaybeder |

@@ -8,14 +8,19 @@
 //     context: { hungry, coins, loyaltyTier, welfare, trust, repeat, ageStage },
 //     remorse: 'confess' | 'apologize' | 'deny' | 'excuse', deadline, status: 'open' | 'closed', verdict: null | { kind, by, auto, day },
 //     unsolved?: true, closedDay? }
+//   (32.2, isteğe bağlı) court?: true (Adalet Sarayı'nın davası), revealed?: { day, witnessName } (sonradan konuşan tanık),
+//     statement?: { offender, plea?, pleaLine?, witness } (ifade değişkenleri; dava açılırken izole üreteçle bir kez seçilir),
+//     verdict: { kind, by: 'elder' | 'court', auto, day, at?, band?, harsh?, deserved?, stale?, restitution?, fine?, service?, served?, effects? }
 import { JUSTICE, RISK, TRAIT_LEAN, QUIRK_LEAN, REMORSE, CATCH, CRIMES, CRIME_KEYS, VANDAL_GROUP, VANDAL_TEXT, LOOT_WORDS, CRIME_TEXT } from '../data/justice.js';
+import { COURT, SENTENCES, SENTENCE_KEYS, FINE, DESERVED, BANDS, IMPUNITY, STATEMENTS, VICTIM_PLEAS, PLEA_RULES, WITNESS_LINES, COURT_TEXT } from '../data/justice.js';
 import { PURSE, REVOLT } from '../data/citizens.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { engineOn } from './Engines.js';
 import { roomFor } from './Citizens.js';
 import { loyaltyLevel, shouldStrike, foodDaysLeft, isHangry } from './Loyalty.js';
 import { townHappiness, foodSupply } from './TownStatus.js';
-import { genitive } from '../utils/turkish.js';
+import { genitive, accusative } from '../utils/turkish.js';
+import { countItem } from './Citizens.js';
 
 // ---------------------------------------------------------------------------------------------------------------------- durum
 
@@ -23,9 +28,14 @@ export function emptyJustice() {
   return { cases: [], log: [], records: {}, stats: { committed: 0, caught: 0, unsolved: 0, byType: {} }, nextId: 1 };
 }
 
+/** (32.2) Mahkeme sayaçları (state.justice.stats.court; isteğe bağlı, ilk kararda kurulur). */
+export function emptyCourtStats() {
+  return { fair: 0, harsh: 0, cruel: 0, lenient: 0, lax: 0, stale: 0, exiled: 0, revealed: 0, decided: 0, waitMinutes: 0 };
+}
+
 /** Hiç suç işlenmemiş (kayda yazılmaz). */
 export function justiceEmpty(j) {
-  return !j || (!j.cases?.length && !j.log?.length && !Object.keys(j.records ?? {}).length && !(j.stats?.committed > 0));
+  return !j || (!j.cases?.length && !j.log?.length && !Object.keys(j.records ?? {}).length && !(j.stats?.committed > 0) && !j.exiles?.length);
 }
 
 const NUM = (v, d = null) => (Number.isFinite(v) ? v : d);
@@ -65,9 +75,58 @@ function restoreCase(k) {
     remorse: REMORSE.keys.includes(k.remorse) ? k.remorse : 'apologize',
     deadline: NUM(k.deadline, 0),
     status: k.status === 'open' ? 'open' : 'closed',
-    verdict: v ? { kind: STR(v.kind, 20) ?? 'warning', by: STR(v.by, 20) ?? 'elder', auto: Boolean(v.auto), ...(Number.isFinite(v.day) ? { day: v.day } : {}) } : null,
+    verdict: v ? restoreVerdict(v) : null,
     ...(k.unsolved ? { unsolved: true } : {}),
     ...(Number.isFinite(k.closedDay) ? { closedDay: k.closedDay } : {}),
+    // (32.2) isteğe bağlı mahkeme alanları
+    ...(k.court ? { court: true } : {}),
+    ...(k.revealed && typeof k.revealed === 'object' ? { revealed: { day: COUNT(k.revealed.day), witnessName: STR(k.revealed.witnessName) ?? '?' } } : {}),
+    ...(k.statement && typeof k.statement === 'object' ? { statement: restoreStatement(k.statement) } : {}),
+  };
+}
+
+/**
+ * (32.2) Davanın alan sırası kayıttan dönenle aynı olsun (kaydet → yükle aynı JSON): nesnenin kimliği korunur, alanlar yerinde
+ * yeniden dizilir. Mahkeme davayı değiştirdikçe (saraya geçiş, tanık, karar, hizmet bitişi) çağrılır.
+ */
+export function canonicalCase(k) {
+  const c = restoreCase(k);
+  if (!c) return k;
+  for (const key of Object.keys(k)) delete k[key];
+  return Object.assign(k, c);
+}
+
+/** (32.2) Kararın alan sırası ve biçimi sabit (çalışma anı ile kayıttan dönen aynı JSON'u versin). */
+export function normalizeVerdict(v) {
+  return restoreVerdict(v);
+}
+
+function restoreVerdict(v) {
+  const out = { kind: STR(v.kind, 20) ?? 'warning', by: STR(v.by, 20) ?? 'elder', auto: Boolean(v.auto), ...(Number.isFinite(v.day) ? { day: v.day } : {}) };
+  // (32.2) mahkeme kararının ayrıntıları (yalnızca varsa)
+  if (Number.isFinite(v.at)) out.at = Math.round(v.at);
+  if (BANDS.keys.includes(v.band)) out.band = v.band;
+  if (Number.isFinite(v.harsh)) out.harsh = v.harsh;
+  if (Number.isFinite(v.deserved)) out.deserved = Math.round(v.deserved * 100) / 100;
+  if (v.stale) out.stale = true;
+  if (COUNT(v.restitution)) out.restitution = COUNT(v.restitution);
+  if (v.fine && typeof v.fine === 'object') out.fine = { asked: COUNT(v.fine.asked), paid: COUNT(v.fine.paid), hours: COUNT(v.fine.hours) };
+  if (COUNT(v.service)) out.service = COUNT(v.service);
+  if (v.served) out.served = true;
+  if (Number.isFinite(v.impunity) && v.impunity > 0) out.impunity = v.impunity;
+  if (v.effects && typeof v.effects === 'object') {
+    const e = v.effects;
+    out.effects = { trust: Math.round(NUM(e.trust, 0)), down: COUNT(e.down), up: COUNT(e.up), downPts: Math.round(NUM(e.downPts, 0)), upPts: Math.round(NUM(e.upPts, 0)) };
+  }
+  return out;
+}
+
+function restoreStatement(st) {
+  const idx = (v) => (Number.isInteger(v) && v >= 0 && v < 8 ? v : 0);
+  return {
+    offender: idx(st.offender),
+    witness: idx(st.witness),
+    ...(VICTIM_PLEAS[st.plea] ? { plea: st.plea, pleaLine: idx(st.pleaLine) } : {}),
   };
 }
 
@@ -84,6 +143,13 @@ export function restoreJustice(data, ids = null) {
   const st = data.stats && typeof data.stats === 'object' ? data.stats : {};
   out.stats = { committed: COUNT(st.committed), caught: COUNT(st.caught), unsolved: COUNT(st.unsolved), byType: {} };
   for (const k of CRIME_KEYS) if (COUNT(st.byType?.[k])) out.stats.byType[k] = COUNT(st.byType[k]);
+  if (st.court && typeof st.court === 'object') {
+    out.stats.court = emptyCourtStats();
+    for (const key of Object.keys(out.stats.court)) out.stats.court[key] = COUNT(st.court[key]);
+  }
+  if (Array.isArray(data.exiles) && data.exiles.length) {
+    out.exiles = data.exiles.filter((e) => e && typeof e.name === 'string').slice(-12).map((e) => ({ name: STR(e.name) ?? '?', day: COUNT(e.day), crime: CRIMES[e.crime] ? e.crime : 'innPilfer', band: BANDS.keys.includes(e.band) ? e.band : 'fair' }));
+  }
   const maxId = Math.max(0, ...out.cases.map((k) => k.id), ...out.log.map((k) => k.id));
   out.nextId = Math.max(COUNT(data.nextId), maxId + 1, 1);
   return ids ? pruneJustice(out, ids) : out;
@@ -118,9 +184,22 @@ export function justiceActive(state) {
 export function crimeCandidate(state, c) {
   if (!c || c.role || c.isChild || c.isVenerable) return false;
   if (c.lifeStage !== 'youth' && c.lifeStage !== 'adult') return false; // Çocuk ve Kıdemli Bilge suç işlemez
-  if (c.away || c.emigrating || c.newcomer || c.relocating) return false;
+  if (c.away || c.emigrating || c.newcomer || c.relocating || c.sentence?.exile) return false;
   if (c.illness || c.isInjured || c.mood?.grief) return false;
   return true;
+}
+
+/** (32.2) Uzaklaştırma cezası sürüyor mu (Han ve Pazar yasağı)? */
+export function isBanned(state, c) {
+  return engineOn('court') && Number.isFinite(c?.sentence?.banUntil) && state.totalMinutes < c.sentence.banUntil;
+}
+
+/** (32.2) Bugün kamu hizmetine çıkabilir mi: kalan saat var ve günlük tavan dolmadı. */
+export function serviceDue(state, c) {
+  const st = c?.sentence;
+  if (!engineOn('court') || !st || !(st.service > 0)) return false;
+  const today = st.serviceDay === state.time.day ? st.serviceToday ?? 0 : 0;
+  return today < COURT.serviceDailyCap;
 }
 
 /** Şu an eyleme geçebilir mi: aday + uyanık; görevdeki bekçi, iş bırakan ya da (isyan saatinde) isyancı değil. */
@@ -172,9 +251,29 @@ export function clubFactor(_c) {
   return 1;
 }
 
-/** (32.2) Cezasızlık: yakalanmayan / cezasız kalan suçlar arttıkça risk artacak. Bu adımda 1. */
-export function impunityFactor(_state) {
-  return 1;
+/**
+ * (32.2) Cezasızlık: son IMPUNITY.days gündeki Adalet Sarayı kararlarından hafif (+1) / gevşek (+2) / sürüncemede kalan (+1) puanlar
+ * riski artırır, her adil karar puanı fairDamp kadar söndürür. 1 + perPoint × puan (tavan cap). Saray kararı yoksa (Muhtar) 1.
+ */
+export function impunityFactor(state) {
+  if (!engineOn('court')) return 1;
+  const score = impunityScore(state);
+  return Math.min(IMPUNITY.cap, 1 + IMPUNITY.perPoint * score);
+}
+
+/** (32.2) Cezasızlık puanı (0 ve üstü): son günlerin hafif / gevşek / sürüncemede kararları eksi adil kararlar. */
+export function impunityScore(state, days = IMPUNITY.days) {
+  const log = state.justice?.log;
+  if (!log?.length) return 0;
+  const from = state.time.day - days;
+  let score = 0;
+  for (const k of log) {
+    const v = k.verdict;
+    if (!v || v.by !== 'court' || !(k.closedDay > from)) continue;
+    if (Number.isFinite(v.impunity)) score += v.impunity;
+    if (v.band === 'fair') score -= IMPUNITY.fairDamp;
+  }
+  return Math.max(0, score);
 }
 
 /** Riskin çarpanları (hepsi 1 civarı): { poverty, hunger, loyalty, town, personality, education, club, impunity }. */
@@ -225,7 +324,7 @@ function lean(c, crime) {
 
 /** Kese hırsızlığına uygun kurbanlar: rolsüz, çocuk olmayan, seferde olmayan, kesesi dolgun komşular. */
 export function victimsFor(state, c, minCoins = CRIMES.pursePinch.variants.coins.minVictimCoins) {
-  return state.characters.filter((o) => o !== c && !o.role && !o.isChild && !o.away && !o.emigrating && (o.coins ?? 0) >= minCoins);
+  return state.characters.filter((o) => o !== c && !o.role && !o.isChild && !o.away && !o.emigrating && !o.sentence?.exile && (o.coins ?? 0) >= minCoins);
 }
 
 /**
@@ -381,8 +480,9 @@ export function remorseWeights(c, motive) {
 
 // ---------------------------------------------------------------------------------------------------------------------- karar
 
-/** (32.2) Adalet Sarayı: kullanılabilir yapı (bu adımda yapı türü yok: her zaman null). */
+/** (32.2) Adalet Sarayı: kullanılabilir yapı; ENGINES.court kapalıyken (ya da justice kapalıyken) her zaman null (32.1 Muhtar kuralı). */
 export function courtOf(state) {
+  if (!engineOn('court')) return null;
   return state.buildings.find((b) => b.type === JUSTICE.courtType && ok(b)) ?? null;
 }
 
@@ -411,6 +511,207 @@ export function crimeRate(state, days = JUSTICE.rateDays) {
 export function solvedRatio(state) {
   const s = state.justice?.stats;
   return s?.committed ? s.caught / s.committed : 1;
+}
+
+/**
+ * (32.2) 32.3 Krallık İtibarı'nın kullanacağı adalet ölçüsü (saf): son `n` Adalet Sarayı kararında adil oranı, zalim sayısı, bant
+ * dağılımı; cezasızlık puanı; Muhtar uyarıları ve sürüncemede kalan davalar AYRI sayılır (bantlara girmez).
+ * Dönüş: { verdicts, fairRatio, cruel, bands: { fair, harsh, cruel, lenient, lax }, impunity, impunityFactor, elder, stale, exiled }.
+ */
+export function justiceRecord(state, n = 10) {
+  const log = state.justice?.log ?? [];
+  const bands = { fair: 0, harsh: 0, cruel: 0, lenient: 0, lax: 0 };
+  const court = log.filter((k) => k.verdict?.by === 'court' && !k.verdict.stale && bands[k.verdict.band] !== undefined).slice(-n);
+  for (const k of court) bands[k.verdict.band] += 1;
+  const elder = log.filter((k) => k.verdict?.by === 'elder').length;
+  const stale = log.filter((k) => k.verdict?.stale).length;
+  return {
+    verdicts: court.length,
+    fairRatio: court.length ? bands.fair / court.length : 1,
+    cruel: bands.cruel,
+    bands,
+    impunity: impunityScore(state),
+    impunityFactor: impunityFactor(state),
+    elder,
+    stale,
+    exiled: state.justice?.stats?.court?.exiled ?? 0,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------- (32.2) dava
+
+/** Sakinin ailesi (eş, çocuklar, ebeveynler, kardeşler; kasabada olanlar). Saf; kimlik sırasıyla. */
+export function kinOf(state, c) {
+  if (!c) return [];
+  const parents = new Set([...(c.parentIds ?? []), ...(c.parents ?? [])]);
+  const out = state.characters.filter((o) => {
+    if (o === c || o.role) return false;
+    if (o.id === c.partnerId) return true;
+    if (parents.has(o.id)) return true;
+    if ((o.parentIds ?? []).includes(c.id) || (o.parents ?? []).includes(c.id) || (c.children ?? []).includes(o.id)) return true;
+    const op = [...(o.parentIds ?? []), ...(o.parents ?? [])];
+    return op.some((id) => parents.has(id)); // kardeş
+  });
+  return out.sort((a, b) => a.id - b.id);
+}
+
+/** Suçlu sicildeki kaçıncı suçunda (bu dava dahil): 1 = ilk suçu. */
+export function recordNumber(k) {
+  return (k.context?.repeat ?? 0) + 1;
+}
+
+/** Kurbanın sözü (kurban sakinse; zar yok): 'forgive' | 'restore' | 'lesson' | null. rel: ilişki puanı (kurban -> suçlu). */
+export function victimPlea(state, k, victim, rel = 0) {
+  if (!victim) return null;
+  const offender = state.characters.find((x) => x.id === k.offenderId) ?? null;
+  const traits = victim.traits ?? [];
+  if (rel >= PLEA_RULES.forgiveAt || (traits.some((t) => PLEA_RULES.forgiveTraits.includes(t)) && (offender?.lifeStage === 'youth' || k.motive === 'hunger'))) return 'forgive';
+  if (rel <= PLEA_RULES.lessonBelow || traits.some((t) => PLEA_RULES.lessonTraits.includes(t)) || recordNumber(k) > 1) return 'lesson';
+  return 'restore';
+}
+
+/** Çalınan şimdi nerede ve iade edilebilir mi: { possible, amount, reason } (saf; suçlunun çantası / kesesi). */
+export function restitutionStatus(state, k, offender = null) {
+  const s = k.stolen;
+  if (!s || !(s.amount > 0)) return { possible: false, amount: 0, reason: COURT_TEXT.restitutionOff.none };
+  const c = offender ?? state.characters.find((x) => x.id === k.offenderId);
+  if (!c) return { possible: false, amount: 0, reason: COURT_TEXT.restitutionOff.gone };
+  if (s.coins) {
+    const n = Math.min(s.amount, c.coins ?? 0);
+    const victim = Number.isInteger(k.victimId) ? state.characters.find((x) => x.id === k.victimId) : null;
+    if (!victim) return { possible: false, amount: 0, reason: COURT_TEXT.restitutionOff.gone };
+    return n > 0 ? { possible: true, amount: n, reason: '' } : { possible: false, amount: 0, reason: COURT_TEXT.restitutionOff.gone };
+  }
+  const n = Math.min(s.amount, countItem(c, s.item));
+  if (n <= 0) return { possible: false, amount: 0, reason: COURT_TEXT.restitutionOff.gone };
+  if (CRIMES[k.crime]?.variants[k.variant]?.source === 'inn' && !state.buildings.some((b) => b.id === k.buildingId)) return { possible: false, amount: 0, reason: COURT_TEXT.restitutionOff.building };
+  return { possible: true, amount: n, reason: '' };
+}
+
+/**
+ * Hak edilen sertlik (0-6, saf): severity tabanı + bağlam (açlık, yoksulluk, pişmanlık, tekrar, gençlik, kurbanın sözü, iade).
+ * opts: { restitution: bool (iade ettirilecek mi), famine: bool, plea } — verilmezse durumdan okunur.
+ */
+export function deserved(k, state, opts = {}) {
+  const parts = deservedParts(k, state, opts);
+  const v = parts.reduce((a, p) => a + p.value, 0);
+  return snapDeserved(Math.max(DESERVED.min, Math.min(DESERVED.max, Math.round(v * 100) / 100)));
+}
+
+/**
+ * Boşluk kuralı: hiçbir cezanın adil penceresine (sertlik ± BANDS.fairWithin) düşmeyen değer (ör. 4,25 ile 5,25 arası: ağır ceza 3,5
+ * ile sürgün 6'nın arası) en yakın pencere kenarına yaslanır. Böylece her davada en az bir ceza "Adil" olur.
+ */
+export function snapDeserved(v) {
+  const w = BANDS.fairWithin;
+  const points = [...new Set(SENTENCE_KEYS.map((k) => SENTENCES[k].harsh))].sort((a, b) => a - b);
+  if (points.some((p) => Math.abs(v - p) <= w)) return v;
+  let best = v;
+  let gap = Infinity;
+  for (const p of points) {
+    for (const edge of [p - w, p + w]) {
+      const d = Math.abs(v - edge);
+      if (d < gap - 1e-9) {
+        gap = d;
+        best = edge;
+      }
+    }
+  }
+  return Math.round(best * 100) / 100;
+}
+
+/** deserved'in kalemleri: [{ key, value }] (sonuç ekranının nedeni ve testler için). */
+export function deservedParts(k, state, { restitution = false, famine = null, plea = undefined } = {}) {
+  const ctx = k.context ?? {};
+  const parts = [{ key: 'severity', value: k.severity ?? 1 }];
+  if (ctx.hungry) parts.push({ key: 'hungry', value: (famine ?? isFamine(state)) ? DESERVED.hungryFamine : DESERVED.hungry });
+  if ((ctx.coins ?? 0) < DESERVED.poorBelow) parts.push({ key: 'poor', value: DESERVED.poor });
+  const witness = Boolean(k.witnessName) || Boolean(k.revealed);
+  const r = k.remorse;
+  if (r === 'deny' && witness) parts.push({ key: 'deny', value: DESERVED.denyWitness });
+  else if (DESERVED.remorse[r] !== undefined) parts.push({ key: r, value: DESERVED.remorse[r] });
+  if (ctx.repeat > 0) parts.push({ key: 'repeat', value: Math.min(COURT.recordCap, ctx.repeat * DESERVED.repeat) });
+  if (ctx.ageStage === 'youth') parts.push({ key: 'youth', value: DESERVED.youth });
+  const pl = plea === undefined ? k.statement?.plea ?? null : plea;
+  if (pl && DESERVED.plea[pl]) parts.push({ key: pl, value: DESERVED.plea[pl] });
+  if (!restitution && restitutionStatus(state, k).possible) parts.push({ key: 'unreturned', value: DESERVED.unreturned });
+  return parts;
+}
+
+/** Bant: fark = seçilen − hak edilen. 'fair' | 'harsh' | 'cruel' | 'lenient' | 'lax'. */
+export function verdictBand(diff) {
+  if (Math.abs(diff) <= BANDS.fairWithin) return 'fair';
+  if (diff > 0) return diff <= BANDS.harshTo ? 'harsh' : 'cruel';
+  return diff >= BANDS.lenientTo ? 'lenient' : 'lax';
+}
+
+/** Para cezası tutarı (altın): hafif ≈ çalınanın değeri, ağır ≈ 3 katı (tavanlı); değersiz suçta ağırlıktan. */
+export function fineAmount(k, kind) {
+  const value = k.stolen?.value ?? 0;
+  const base = value > 0 ? value : (k.severity ?? 1) * FINE.perSeverity;
+  if (kind === 'fineLight') return Math.max(FINE.lightMin, Math.round(base));
+  if (kind === 'fineHeavy') return Math.min(FINE.heavyCap, Math.max(FINE.heavyMin, Math.round(base * FINE.heavyMul)));
+  return 0;
+}
+
+/** Kese yetmezse kalan altının kamu hizmeti karşılığı: { paid, hours }. */
+export function finePlan(coins, amount) {
+  const paid = Math.min(Math.max(0, Math.floor(coins ?? 0)), amount);
+  const hours = Math.ceil((amount - paid) / COURT.fineHourCoins);
+  return { paid, hours };
+}
+
+/** Her cezanın seçilebilirliği: HER ceza HER suçta seçilebilir (kısıt yok); yalnızca ayrıntı metni döner. */
+export function sentenceOptions(state, k) {
+  return SENTENCE_KEYS.map((key) => {
+    const def = SENTENCES[key];
+    let detail = def.detail;
+    if (key === 'fineLight' || key === 'fineHeavy') {
+      const c = state.characters.find((x) => x.id === k.offenderId);
+      const amount = fineAmount(k, key);
+      const plan = finePlan(c?.coins ?? 0, amount);
+      detail = `${amount} altın kesesinden hazineye${plan.hours ? ` (kesesinde ${plan.paid} var: kalanı ${plan.hours} saat kamu hizmeti)` : ''}.`;
+    }
+    return { key, name: def.name, harsh: def.harsh, icon: def.icon, detail, enabled: true };
+  });
+}
+
+/** Davanın bağlam satırları (gerçekler, puan değil): [{ label, value }]. */
+export function caseFacts(state, k, tierName = (t) => t) {
+  const ctx = k.context ?? {};
+  const rows = [
+    { label: 'Aç mıydı', value: ctx.hungry ? 'Evet, karnı açtı' : 'Hayır' },
+    { label: 'Kesesinde', value: `${ctx.coins ?? 0} altın` },
+    { label: 'Yönetime bakışı', value: tierName(ctx.loyaltyTier ?? 'calm') },
+    { label: 'Sicil', value: recordNumber(k) === 1 ? 'İlk suçu' : `${recordNumber(k)}. suçu` },
+  ];
+  if (k.stolen) {
+    const st = restitutionStatus(state, k);
+    rows.push({ label: 'Çalınan', value: `${lootText(k.stolen)} (değeri ${k.stolen.value} altın) · ${st.possible ? (k.stolen.coins ? 'kesesinde hâlâ duruyor' : 'çantasında hâlâ duruyor') : st.reason.toLocaleLowerCase('tr')}` });
+  }
+  return rows;
+}
+
+/** Suçlunun ifadesi (motivasyon × pişmanlık; değişken davada yazılı). */
+export function statementText(k) {
+  const lines = STATEMENTS[k.motive]?.[k.remorse] ?? STATEMENTS.temptation.confess;
+  const line = lines[(k.statement?.offender ?? 0) % lines.length];
+  return fill(line, { loot: k.stolen ? lootText(k.stolen) : 'onu' });
+}
+
+/** Tanığın ifadesi (yoksa null): bekçi "Kasaba bekçisi", sonradan konuşan tanık ayrı söz. */
+export function witnessText(k) {
+  if (!k.witnessName) return null;
+  const pool = k.revealed ? WITNESS_LINES.revealed : k.witnessIsGuard ? WITNESS_LINES.guard : WITNESS_LINES.resident;
+  const line = pool[(k.statement?.witness ?? 0) % pool.length];
+  return fill(line, { witness: k.witnessName, who: k.offenderName, whoAcc: accusative(k.offenderName) });
+}
+
+/** Kurbanın sözü (yoksa null). */
+export function pleaText(k) {
+  const p = VICTIM_PLEAS[k.statement?.plea];
+  if (!p || !k.victimName) return null;
+  return `${k.victimName}: "${p.lines[(k.statement.pleaLine ?? 0) % p.lines.length]}"`;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------- metinler

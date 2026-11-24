@@ -61,6 +61,9 @@
 //   --loy     : (30.3) data/loyalty.js'i bellekte geçersiz kılar (denge denemesi): "LOYALTY.bitterTrust.perHour=-0.5"
 //   --start-food N : (30.6) başlangıç yiyeceğini geçersiz kılar (denge denemesi)
 //   --crime-diag : (32.1) suç planı vakti gelmiş sakinin kararlarını sayar (yalnızca okur; (32.1) satırına eklenir)
+//   --judge fair|harsh|lenient|novice : (32.2) Adalet Sarayı'nın hâkim politikası (varsayılan fair). fair: hak edilene en yakın ceza ve
+//               iade; harsh: bir-iki kademe sert (hak edilen + 1,5); lenient: hep Af ya da Uyarı; novice: rastgele (sürgün nadir; sayfa
+//               içi ayrı üreteç, oyunun üreteçlerine dokunmaz). Dava açıldıktan sonraki ilk saat başında (novice 6 saat sonra) karar verir.
 //   --famine [gün=5] : (30.3) kıtlık senaryosu: o günden sonra bütün bahçeler yıkılır, toplama emri ve acil dağıtım yapılmaz (oyuncu tepkisiz)
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
 //               bulunursa çıkış kodu 1 olur
@@ -73,6 +76,11 @@ import { installMonitor, monitorReport } from './monitor.mjs';
 const { positional, options } = parseArgs();
 const seed = Number(positional[0] ?? 42);
 const days = Number(positional[1] ?? 32);
+const judge = options.judge ?? 'fair'; // (32.2)
+if (!['fair', 'harsh', 'lenient', 'novice'].includes(judge)) {
+  console.log(`bilinmeyen --judge: ${judge} (fair | harsh | lenient | novice)`);
+  process.exit(2);
+}
 const speed = Number(options.speed ?? 4);
 
 const { browser, page, errors } = await openGame({ seed, enginesOff: typeof options['engines-off'] === 'string' ? options['engines-off'] : null }); // (30.4a) açılıştan önce
@@ -117,7 +125,8 @@ await page.evaluate((o) => {
   window.__profile = o.profile; // (29.10)
   window.__famine = o.famine; // (30.3)
   window.__crimeDiag = o.crimeDiag; // (32.1) tanı
-}, { famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null, crimeDiag: Boolean(options['crime-diag']) });
+  window.__judge = o.judge; // (32.2)
+}, { judge, famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null, crimeDiag: Boolean(options['crime-diag']) });
 if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent', 'repent2', 'novice'].includes(options.profile)) {
   console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent | repent2 | novice)`);
   process.exit(2);
@@ -127,6 +136,7 @@ if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent', 'repent2'
 await page.evaluate(async () => {
   window.__townMetrics = (await import('/src/systems/TownStatus.js')).townMetrics;
   window.__justiceMod = await import('/src/systems/Justice.js'); // (32.1) beklenen suç sayısı (saf risk toplamı; zar çekmez)
+  window.__justiceData = await import('/src/data/justice.js'); // (32.2) hâkim politikası
   const g = window.game;
   const N = (window.__nov = { gold: { in: {}, out: {} }, daily: [], tiers: {}, zero: {}, zeroRun: {}, zeroLongest: {}, levy: [], foodMin5: Infinity, goals: [], decisions: 0 });
   const econ = g.scenes.current.economy;
@@ -300,8 +310,10 @@ await page.evaluate((passive) => {
     PLAN.splice(PLAN.indexOf('mill') + 1, 0, 'well');
     PLAN.splice(PLAN.indexOf('townHall') + 1, 0, 'guardTower');
   }
+  // (32.2) Adalet Sarayı: Kasaba seviyesinden sonra, Belediye (ve Gözcü Kulesi) ardından; isteğe bağlı (kurulamazsa sıra beklemez)
+  PLAN.splice(PLAN.indexOf(window.__noSafety ? 'townHall' : 'guardTower') + 1, 0, 'courthouse');
   const UPGRADES = ['cabin', 'cabin', 'lumberHut', 'garden', 'cabin', 'quarry', 'cabin', 'garden', 'cabin', 'cabin', 'lumberHut', 'cabin'];
-  const WOOD = { storage: 30, lumberHut: 20, garden: 15, cabin: 25, quarry: 35, inn: 45, workshop: 25, sheepFarm: 30, market: 40, ironMine: 40, mill: 40, fishingPier: 30, townHall: 60, monument: 40, healerHut: 30, flowerBed: 8, academy: 70, harbor: 120, well: 15, guardTower: 50, silo: 40 };
+  const WOOD = { storage: 30, lumberHut: 20, garden: 15, cabin: 25, quarry: 35, inn: 45, workshop: 25, sheepFarm: 30, market: 40, ironMine: 40, mill: 40, fishingPier: 30, townHall: 60, monument: 40, healerHut: 30, flowerBed: 8, academy: 70, harbor: 120, well: 15, guardTower: 50, silo: 40, courthouse: 60 };
   const ESSENTIAL = ['storage', 'lumberHut', 'garden', 'cabin'];
   // (23. aşama) Su Kuyusu ateşli yapıların (fırın, atölye) yanına, Gözcü Kulesi meydandan uzağa (kenar mahalleye) dikilir: meydana
   // yakın boş yerleri (Ulu Saat Kulesi gibi büyük yapılara lazım) kapatmasın
@@ -325,7 +337,7 @@ await page.evaluate((passive) => {
     return null;
   };
   // İsteğe bağlı yapılar: kaçıncı kopyasından itibaren (kurulamıyorsa sıra beklemeden atlanır)
-  const OPTIONAL = { academy: 1, harbor: 1, ironMine: 1, mill: 2, cherryTree: 1, gazebo: 1, marbleArch: 1, flowerFence: 1, well: 1, guardTower: 1, silo: 1 };
+  const OPTIONAL = { academy: 1, harbor: 1, ironMine: 1, mill: 2, cherryTree: 1, gazebo: 1, marbleArch: 1, flowerFence: 1, well: 1, guardTower: 1, silo: 1, courthouse: 1 };
 
   /** Karar politikası: kasabanın yararına olan ve gücü yeten seçenek. */
   const PREFER = {
@@ -396,6 +408,45 @@ await page.evaluate((passive) => {
     window.__crimeExpect.maxRisk = Math.max(window.__crimeExpect.maxRisk, risks.reduce((p, q) => p + q, 0));
   });
   game.events.on('crime:recorded', ({ kase, caught }) => window.__crimeLog.push({ day: kase.day, crime: kase.crime, caught, motive: kase.motive, guard: kase.witnessIsGuard, amount: kase.stolen?.amount ?? 0, coins: Boolean(kase.stolen?.coins) }));
+  // (32.2) Hâkim politikası: saraydaki açık davaya saat başında karar ('ui:courtVerdict', oyuncu gibi). Novice'in zarı sayfa içi ayrı
+  // üreteçten (oyunun üreteçlerine dokunmaz). Ölçüm: impunity zirvesi, karar süreleri.
+  window.__court = { imp: [], impMax: 1, decided: 0, waitH: 0, byJudge: {} };
+  game.events.on('building:completed', (b) => { if (b?.type === 'courthouse' && window.__courtDay === undefined) window.__courtDay = game.state.time.day; });
+  {
+    let x = (Number(game.state.seed) * 2654435761 + 97) >>> 0 || 1;
+    const nrand = () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+    game.events.on('time:hour', () => {
+      const s = game.state;
+      const J = window.__justiceMod;
+      const Dj = window.__justiceData;
+      if (!J || !Dj || !J.courtOf(s) || passive) return;
+      const imp = J.impunityFactor(s);
+      window.__court.impMax = Math.max(window.__court.impMax, imp);
+      for (const k of [...(s.justice?.cases ?? [])]) {
+        if (!k.court || s.justice.cases.indexOf(k) < 0) continue;
+        const age = s.totalMinutes - k.minute;
+        if (age < (window.__judge === 'novice' ? 360 : 60)) continue;
+        const rs = J.restitutionStatus(s, k).possible;
+        const want = J.deserved(k, s, { restitution: rs && window.__judge !== 'lenient' });
+        const keys = Dj.SENTENCE_KEYS;
+        const nearest = (target) => keys.reduce((best, key) => (Math.abs(Dj.SENTENCES[key].harsh - target) < Math.abs(Dj.SENTENCES[best].harsh - target) - 1e-9 ? key : best), keys[0]);
+        let sentence;
+        let restitution = rs;
+        if (window.__judge === 'harsh') sentence = nearest(want + 1.5);
+        else if (window.__judge === 'lenient') { sentence = want >= 2 ? 'warning' : 'pardon'; restitution = false; }
+        else if (window.__judge === 'novice') {
+          const w = keys.map((key) => [key, key === 'exile' ? 0.05 : 1]);
+          let r = nrand() * w.reduce((a, [, v]) => a + v, 0);
+          sentence = w.find(([, v]) => (r -= v) < 0)?.[0] ?? 'warning';
+          restitution = rs && nrand() < 0.5;
+        } else sentence = nearest(want);
+        game.events.emit('ui:courtVerdict', { caseId: k.id, sentence, restitution });
+        window.__court.decided += 1;
+        window.__court.waitH += age / 60;
+        window.__court.byJudge[sentence] = (window.__court.byJudge[sentence] ?? 0) + 1;
+      }
+    });
+  }
   game.events.on('dilemma:resolved', ({ id, option, dilemma }) => window.__midLog.push({ day: game.state.time.day, id, midgame: Boolean(dilemma?.midgame), option: option.id }));
   window.__decide = () => {
     const scene = game.scenes.current;
@@ -1393,6 +1444,34 @@ const crimeStats = await page.evaluate(() => {
     hours: window.__crimeExpect?.hours ?? {},
   };
 });
+const courtStats = await page.evaluate(() => {
+  // (32.2) Adalet Sarayı: davalar, bantlar, sürgün, ortalama karar süresi, cezasızlık, yakalanma oranı
+  const s = window.game.state;
+  const J = window.__justiceMod;
+  const st = s.justice?.stats?.court ?? {};
+  const built = s.buildings.find((b) => b.type === 'courthouse' && b.functional);
+  const C = window.__court ?? { decided: 0, waitH: 0, impMax: 1, byJudge: {} };
+  const log = s.justice?.log ?? [];
+  const decided = log.filter((k) => k.verdict?.by === 'court');
+  return {
+    judge: window.__judge,
+    builtDay: window.__courtDay ?? null,
+    built: Boolean(built),
+    cases: decided.length + (s.justice?.cases ?? []).filter((k) => k.court).length,
+    bands: { fair: st.fair ?? 0, harsh: st.harsh ?? 0, cruel: st.cruel ?? 0, lenient: st.lenient ?? 0, lax: st.lax ?? 0 },
+    stale: st.stale ?? 0,
+    exiled: st.exiled ?? 0,
+    revealed: st.revealed ?? 0,
+    elder: log.filter((k) => k.verdict?.by === 'elder').length,
+    sentences: C.byJudge,
+    avgDecisionHours: C.decided ? Math.round((C.waitH / C.decided) * 10) / 10 : null,
+    impunityMax: Math.round(C.impMax * 100) / 100,
+    impunityEnd: J ? Math.round(J.impunityFactor(s) * 100) / 100 : 1,
+    solvedRatio: J ? Math.round(J.solvedRatio(s) * 100) / 100 : 1,
+    record: J ? J.justiceRecord(s) : null,
+  };
+});
+console.log(`(32.2) saray: ${courtStats.built ? `kurulu (G${courtStats.builtDay ?? '-'})` : 'yok'} · hâkim ${courtStats.judge} · dava ${courtStats.cases} · bant ${JSON.stringify(courtStats.bands)} · sürüncemede ${courtStats.stale} · sürgün ${courtStats.exiled} · tanık konuştu ${courtStats.revealed} · Muhtar ${courtStats.elder} · ceza ${JSON.stringify(courtStats.sentences)} · ort. karar ${courtStats.avgDecisionHours ?? '-'} sa · cezasızlık en çok ×${courtStats.impunityMax} / son ×${courtStats.impunityEnd} · yakalanma %${Math.round(courtStats.solvedRatio * 100)}`);
 console.log(`(32.1) suç: ${crimeStats.committed} işlendi · ${crimeStats.caught} yakalandı (bekçi ${crimeStats.guard}) · tür ${JSON.stringify(crimeStats.byType)} · motivasyon ${JSON.stringify(crimeStats.byMotive)} · günlük en çok ${crimeStats.maxPerDay} · ilk G${crimeStats.firstDay ?? '-'} · açık dava ${crimeStats.open} · beklenen ${crimeStats.expected} (${crimeStats.activeDays} etkin gün) · plan ${crimeStats.planned} / düşen ${crimeStats.dropped}${crimeStats.decisions ? ` · plan saatleri ${JSON.stringify(crimeStats.hours)} · vakti gelince ${JSON.stringify(crimeStats.busy)} · kararlar ${JSON.stringify(crimeStats.decisions)} · boş ${JSON.stringify(crimeStats.nulls)}` : ''}`);
 console.log(`(30.4b) olay: ${midStats.distinct} farklı (${midStats.log.length} karar; G20 sonrası ${midStats.freshAfter20}/${midStats.after20} yeni) · hedef ${midStats.milestones}/14 (${midStats.doneIds.join(',')}) · ${midStats.log.join(' ')}`);
 console.log(`(29.5) Omuz Omuza ${bondStats.side} · Diken Üstünde ${bondStats.rub} · en az bir kez Omuz Omuza alan ${bondStats.ever}/${bondStats.pop} (%${Math.round((100 * bondStats.ever) / Math.max(1, bondStats.pop))}) · Diken Üstünde alan ${bondStats.everRub} · en çok birlikte çalışan çiftler: ${bondStats.pairs.join(', ') || '-'}`);
@@ -1536,7 +1615,8 @@ for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}
 const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0 && mon.social.stuck.length === 0;
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, gold: report.gold, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
+  const endState = await page.evaluate(() => ({ pop: window.game.state.characters.length, trust: Math.round(window.game.state.trust?.value ?? 0), trustMin: Math.round(window.game.state.trust?.min ?? 0), revolts: window.game.state.stats?.revolts ?? null })); // (32.2) ölçüm özeti
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, court: courtStats, gold: report.gold, golden: report.golden?.since ?? null, end: endState, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();

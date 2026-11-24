@@ -1,7 +1,7 @@
 // (30.2 "Görünen Hikâye") Hikâye kartlarının veri tablosu: hangi olay kaç öncelikli, hangi eşikler, süzgeç kademeleri. Metinler
 // systems/StoryCards.js'te saf işlevlerle üretilir (aynı olay yükü aynı metni verir). Bu tablo yalnızca arayüzü etkiler;
 // simülasyona hiçbir şey yazmaz. Sayıları buradan ayarla (gün başına 2-8 kart hedefi: tools/sim/tests/30.2-stories.mjs).
-export const STORY_TABLE_VERSION = 4; // (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20; (32.1) 4: 'crime:caught' / 'crime:unsolved'
+export const STORY_TABLE_VERSION = 5; // (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20; (32.1) 4: 'crime:caught' / 'crime:unsolved'; (32.2) 5: 'court:*' (karar, sürgün, tanık, sürüncemede)
 
 export const STORY_LIMITS = {
   visible: 2, // aynı anda görünen kart
@@ -45,6 +45,10 @@ export const STORY_PRIORITY = {
   'dilemma:resolved': 4, // (30.4b) orta oyun kararının sonucu (yalnızca yeni kartlar)
   'crime:caught': 3, // (32.1) suçüstü yakalanan küçük suç ("Yalnızca önemli" süzgecinde günde en çok bir suç kartı: crimePerDay)
   'crime:unsolved': 3, // (32.1) kimsenin görmediği kayıp
+  'court:verdict': 2, // (32.2) Adalet Sarayı kararı: adil / hafif kısa kart (2); sert ve zalim karar önemli (kartın kendi önceliği 4)
+  'court:exiled': 4, // (32.2) sürgün
+  'court:revealed': 3, // (32.2) susan tanık konuştu, dava açıldı
+  'court:stale': 3, // (32.2) dava sürüncemede kaldı
   'story:summary': 2,
 };
 
@@ -60,6 +64,7 @@ export const STORY_ACTIONS = {
   story: 'Öyküsünü oku',
   condolence: 'Taziye Sofrası Kur',
   gift: 'Armağan Gönder',
+  case: 'Dava dosyası', // (32.2)
 };
 
 export const STORY_TEXT = {

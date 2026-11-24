@@ -23,6 +23,7 @@
 // değiştiğini anlamak için her karede kısa bir anahtar üretir; anahtar değişmedikçe DOM'a dokunmaz.
 import { CLOCK_GEAR } from '../../data/goldenAge.js';
 import { decorKey, decorSection } from './decorCards.js';
+import { justiceKey, justiceSection } from './justiceCards.js'; // (32.2)
 import { BUILDINGS, mendSpec, PROJECT_WORDS } from '../../data/buildings.js';
 import { STORM } from '../../data/dilemmas.js';
 import { RESOURCES, RESOURCE_KEYS, formatCost } from '../../data/resources.js';
@@ -135,6 +136,7 @@ export class BuildingPanel {
     this.crownBox = el('div', { className: 'building-decrees building-crown' }); // (22. aşama) iç vergi ve Krallık
     this.crisisBox = el('div', { className: 'building-decrees building-crisis' }); // (23. aşama) yangın, tamir, kuyu, kule
     this.decorBox = el('div', { className: 'building-decrees building-decor', hidden: true }); // (31. aşama) Kasaba Süsleri
+    this.justiceBox = el('div', { className: 'building-decrees building-justice', hidden: true }); // (32.2) Adalet Sarayı
     this.expedition = el('div', { className: 'building-decrees building-expedition' });
     this.inscriptions = el('div', { className: 'building-decrees building-inscriptions' });
     this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
@@ -186,6 +188,7 @@ export class BuildingPanel {
       this.riteBox,
       this.crisisBox,
       this.decorBox,
+      this.justiceBox,
       this.bell,
       this.expedition,
       this.inscriptions,
@@ -312,6 +315,7 @@ export class BuildingPanel {
       affordable,
       lines.join('|'),
       decorKey(building, state), // (31. aşama)
+      justiceKey(building, state), // (32.2)
     ].join('/');
     if (key === this.lastKey) return;
     this.lastKey = key;
@@ -343,6 +347,7 @@ export class BuildingPanel {
     this.renderRite(building, state);
     this.renderCrisis(building, state);
     this.renderDecor(building, state);
+    { const nodes = justiceSection(building, state, { emit: (n, p) => this.events.emit(n, p) }); this.justiceBox.hidden = !nodes.length; this.justiceBox.replaceChildren(...nodes); } // (32.2) ui/components/justiceCards.js
     this.renderBell(building, state);
     this.renderFeast(building, state);
     this.renderExpedition(building, state);

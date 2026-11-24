@@ -174,6 +174,7 @@ export function reasonKey(reason) {
   if (r === 'petition:expired') return 'petitionExpired';
   if (r === 'relief') return 'relief:food';
   if (r.startsWith('dilemma:')) return PULSE_REASONS[r] ? r : 'other'; // (30.4b)
+  if (r.startsWith('verdict:')) return PULSE_REASONS[r] ? r : 'other'; // (32.2)
   return PULSE_REASONS[r] ? r : 'other';
 }
 

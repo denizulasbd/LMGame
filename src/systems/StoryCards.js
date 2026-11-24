@@ -4,7 +4,7 @@
 //
 // Kart = { event, priority, text, portraits: [{ id, name, appearance, look, isChild }], ids: [kimlikler], go, action, story?, day, key }
 //   go     : null | { kind: 'character', id } | { kind: 'building', id }   ("Git" düğmesi nereye götürür)
-//   action : null | { type: 'story' | 'condolence' | 'gift', label, id? }
+//   action : null | { type: 'story' | 'condolence' | 'gift' | 'case', label, id? }   ((32.2) 'case': dava penceresini açar)
 import { STORY_PRIORITY, STORY_LIMITS as L, STORY_FILTERS, STORY_DEFAULT_FILTER, STORY_ACTIONS, STORY_TEXT } from '../data/storyCards.js';
 import { SPECIAL_KIND_NAMES } from '../data/rites.js';
 import { wantName } from './Wants.js';
@@ -14,6 +14,8 @@ import { loyaltyTier } from './Loyalty.js';
 import { foodSupply } from './TownStatus.js';
 import { genitive, accusative } from '../utils/turkish.js';
 import { engineOn } from './Engines.js';
+import { courtOf } from './Justice.js';
+import { COURT_TEXT } from '../data/justice.js';
 
 export function filterKeyOf(value) {
   return STORY_FILTERS[value] ? value : STORY_DEFAULT_FILTER;
@@ -151,9 +153,30 @@ export function makeCard(event, p = {}, ctx = {}) {
       const caught = event === 'crime:caught';
       const chars = caught ? [p.character, p.witness] : [];
       const go = caught ? null : p.building ? { kind: 'building', id: p.building.id } : p.victim ? { kind: 'character', id: p.victim.id } : null;
-      card = base(event, p.text, chars, { key: `crime:${k.id}`, crime: true, ...(caught ? {} : { go }) });
+      // (32.2) Adalet Sarayı varken dava saraya düşer: kartta "Dava dosyası" (courtOf, ENGINES.court kapalıyken hep null)
+      const court = caught && state && courtOf(state);
+      card = base(event, court ? `${p.text} ${COURT_TEXT.opened}` : p.text, chars, { key: `crime:${k.id}`, crime: true, ...(caught ? {} : { go }), ...(court ? { action: { type: 'case', id: k.id, label: STORY_ACTIONS.case } } : {}) });
       break;
     }
+    case 'court:verdict': {
+      // (32.2) karar: sert / zalim önemli (öncelik 4), adil / hafif / gevşek kısa kart
+      if (!p.kase || !p.text) return null;
+      const heavy = p.band === 'harsh' || p.band === 'cruel';
+      card = base(event, p.text, [p.character, p.victim], { key: `court:v:${p.kase.id}`, ...(heavy ? { priority: 4 } : {}) });
+      break;
+    }
+    case 'court:exiled':
+      if (!p.character || !p.text) return null;
+      card = base(event, p.text, (p.kin ?? []).slice(0, 2), { key: `court:x:${p.character.id}` });
+      break;
+    case 'court:revealed':
+      if (!p.kase || !p.text) return null;
+      card = base(event, p.text, [p.character, p.witness], { key: `court:r:${p.kase.id}`, action: { type: 'case', id: p.kase.id, label: STORY_ACTIONS.case } });
+      break;
+    case 'court:stale':
+      if (!p.kase || !p.text) return null;
+      card = base(event, p.text, [p.character], { key: `court:s:${p.kase.id}` });
+      break;
     case 'apprentice:grandmaster':
       if (!p.character) return null;
       card = base(event, `${p.character.name} Başusta oldu.`, [p.character]);
@@ -298,6 +321,11 @@ export function actionStatus(state, card) {
   if (a.type === 'condolence') {
     const st = condolenceStatus(state, foodSupply(state));
     return { show: st.ok, enabled: st.ok, reason: st.reason ?? '' };
+  }
+  if (a.type === 'case') {
+    // (32.2) dava hâlâ açıksa dosya açılır
+    const open = Boolean(state.justice?.cases?.some((k) => k.id === a.id)) && Boolean(courtOf(state));
+    return { show: open, enabled: open, reason: open ? '' : 'Karara bağlandı' };
   }
   return { show: false, enabled: false, reason: '' };
 }

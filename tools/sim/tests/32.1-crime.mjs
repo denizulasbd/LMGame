@@ -41,7 +41,7 @@ results.push(...(await page.evaluate(async () => {
   for (const x of st.characters) calm(x);
 
   // ---- 1. veri
-  c('veri: şalter açık, tohum + 42 izole (35-41 dolu), altı suç türü, ağırlıklar 1-5, moodlet sayısı 32', ENGINES.justice === true && D.JUSTICE_SEED_OFFSET === 42 && D.CRIME_KEYS.join() === 'innPilfer,marketFruit,pantryRation,woodpile,pursePinch,pettyVandal' && D.CRIME_KEYS.every((key) => D.CRIMES[key].severity.every((v) => v >= 1 && v <= 5)) && MD.MOODLET_KEYS.length === 32 && CONFIG.SAVE_VERSION === 41);
+  c('veri: şalter açık, tohum + 42 izole (35-41 dolu), altı suç türü, ağırlıklar 1-5, moodlet sayısı 33', ENGINES.justice === true && D.JUSTICE_SEED_OFFSET === 42 && D.CRIME_KEYS.join() === 'innPilfer,marketFruit,pantryRation,woodpile,pursePinch,pettyVandal' && D.CRIME_KEYS.every((key) => D.CRIMES[key].severity.every((v) => v >= 1 && v <= 5)) && MD.MOODLET_KEYS.length === 33 && CONFIG.SAVE_VERSION === 41);
 
   // ---- 2. adaylar
   const elder = { ...a, lifeStage: 'elder', isChild: false };
@@ -165,7 +165,7 @@ results.push(...(await page.evaluate(async () => {
   c('anılar: suçlu ve kurban (kurbanın anısının kişisi suçlu); kurbanla küçük ilişki düşüşü', a.memories.some((m) => /yakalandı/.test(m.text)) && b.memories.some((m) => /kesesinden/.test(m.text) && m.whoId === a.id) && sc.relationships.get(a, b) < rel0 && sc.relationships.get(a, b) >= rel0 + D.VICTIM_RELATION - 0.01, `${rel0} → ${sc.relationships.get(a, b)}`);
   const caughtCard = cards.find(([t]) => t === 'c')?.[1];
   const card = caughtCard && SC.makeCard('crime:caught', caughtCard, { state: st });
-  c('hikâye kartı: öncelik 3, suçlu ve tanık portresi, "Git" suçluya (tablo sürümü 4)', card && card.priority === 3 && card.ids[0] === a.id && card.ids.includes(b.id) && card.go?.id === a.id && SD.STORY_TABLE_VERSION === 4 && SD.STORY_PRIORITY['crime:unsolved'] === 3, card?.text);
+  c('hikâye kartı: öncelik 3, suçlu ve tanık portresi, "Git" suçluya (tablo sürümü 5)', card && card.priority === 3 && card.ids[0] === a.id && card.ids.includes(b.id) && card.go?.id === a.id && SD.STORY_TABLE_VERSION === 5 && SD.STORY_PRIORITY['crime:unsolved'] === 3, card?.text);
   // Yalnızca önemli süzgecinde günde en çok bir suç kartı
   const dir = sc.storyDirector;
   st.settings.storyCards = 'important';

@@ -88,7 +88,8 @@ function noticeSection(state, emit) {
   const hall = hallOf(state);
   const rows = items.map((item) => {
     const go = () => {
-      if (item.target?.character !== undefined) emit('ui:selectCharacter', item.target.character);
+      if (item.target?.case !== undefined) emit('ui:openCase', { id: item.target.case }); // (32.2) dava dosyası
+      else if (item.target?.character !== undefined) emit('ui:selectCharacter', item.target.character);
       else if (hall) emit('ui:selectBuilding', hall.id);
     };
     const row = el('button', { className: `notice-row${item.urgent ? ' is-urgent' : ''}`, type: 'button', title: 'Tıkla: ilgili sakini ya da yönetim binasını aç' }, [

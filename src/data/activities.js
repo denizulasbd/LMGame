@@ -683,6 +683,30 @@ export const ACTIVITIES = {
     bubbles: ['whisper', 'sparkle', 'laugh'],
     finishEvent: 'crime:committed',
   },
+  // (32.2) Kamu Hizmeti: Adalet Sarayı'nın cezası. Boş zamanında meydanda ve yollarda süpürge sallar (ücretsiz; mesai ve uykuyu
+  // bölmez, acil ihtiyaç önce gelir). Bitince 'court:served' (CourtSystem saat sayacını düşürür). Keyif hafifçe düşer.
+  publicService: {
+    kind: 'leisure',
+    target: 'none',
+    travelLabel: 'Süpürgesini omuzlamış, kamu hizmetine gidiyor',
+    label: 'Kamu hizmeti: meydanı ve yolları süpürüyor',
+    pose: 'work',
+    tool: 'broom',
+    duration: [60, 60],
+    effects: { fun: -0.04 },
+    bubbles: ['sweat', 'repair'],
+    finishEvent: 'court:served',
+  },
+  // (32.2) Sürgün: yalnızca suçlu, bohçasıyla harita kenarına yürür (Brain.planExile; işaret c.sentence.exile, terk edişten AYRI)
+  exile: {
+    kind: 'away',
+    travelLabel: 'Sürgün yolunda: bohçasıyla kasabadan ayrılıyor',
+    label: 'Son kez ardına bakıp kasabadan uzaklaşıyor',
+    duration: [0, 0],
+    effects: {},
+    bubbles: ['bundle'],
+    finishEvent: 'court:exileArrived',
+  },
   // --- 22. aşama: köyü terk etme (kesesi ve çantasıyla harita kenarına yürür, orada kasabadan ayrılır) ---
   emigrate: {
     kind: 'away',

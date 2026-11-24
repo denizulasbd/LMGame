@@ -5580,3 +5580,53 @@ kbd {
   gap: 4px;
   margin-top: 4px;
 }
+
+/* (32.2) Adalet Sarayı: dava penceresi (oyunu durdurmaz), saray paneli, sakin kartındaki bağlantı */
+.case-panel[hidden] { display: none; }
+.modal-window.case-panel { width: min(600px, 100%); }
+.case-body { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.case-head { display: flex; align-items: center; gap: 10px; }
+.case-portrait { width: 40px; height: 40px; image-rendering: pixelated; border: 2px solid var(--ui-line); border-radius: 4px; background: var(--ui-card); flex: none; }
+.case-title { font-size: 16px; font-weight: 600; color: var(--ui-highlight); }
+.case-meta { font-size: 12px; color: var(--ui-ink-soft); }
+.case-deadline { font-size: 12px; color: var(--ui-ink-soft); }
+.case-deadline.is-urgent { color: var(--ui-bad); }
+.case-section { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border: 1px solid var(--ui-line); border-radius: 3px; background: var(--ui-card); }
+.case-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ui-ink-soft); }
+.case-text, .case-quote { margin: 0; font-size: 13px; line-height: 1.35; }
+.case-quote { font-style: italic; }
+.case-facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2px 12px; }
+.case-fact { display: flex; gap: 6px; font-size: 12px; min-width: 0; }
+.case-fact-label { color: var(--ui-ink-soft); white-space: nowrap; }
+.case-fact-value { min-width: 0; }
+.case-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.case-option { display: grid; grid-template-columns: 16px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 6px; align-items: center; padding: 4px 6px; border: 1px solid var(--ui-line); border-radius: 3px; background: var(--ui-paper); color: var(--ui-ink); font: inherit; text-align: left; cursor: pointer; }
+.case-option img { width: 16px; height: 16px; image-rendering: pixelated; grid-row: span 2; }
+.case-option-name { font-size: 12px; font-weight: 600; }
+.case-option-detail { font-size: 10px; color: var(--ui-ink-soft); }
+.case-option:hover { background: var(--ui-card-hi); }
+.case-option.is-chosen { background: var(--ui-card-hi); outline: 2px solid var(--ui-highlight); outline-offset: -2px; }
+.case-restitution { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; cursor: pointer; }
+.case-restitution.is-off { color: var(--ui-ink-soft); cursor: default; }
+.case-warn { font-size: 12px; color: var(--ui-warn); padding: 4px 6px; border-radius: 3px; background: var(--ui-card-bad); }
+.case-decide { margin-top: 6px; align-self: flex-start; }
+.case-result { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--ui-line); border-radius: 3px; background: var(--ui-card); }
+.case-result-band { font-size: 16px; font-weight: 600; }
+.case-result-sentence { font-size: 12px; color: var(--ui-ink-soft); }
+.case-result.is-fair { background: var(--ui-card-ok); }
+.case-result.is-harsh, .case-result.is-cruel { background: var(--ui-card-bad); }
+.case-result.is-lenient, .case-result.is-lax, .case-result.is-stale { background: var(--ui-card-info); }
+.case-effects { margin: 2px 0 0; padding-left: 18px; font-size: 12px; }
+.case-empty { padding: 10px 0; color: var(--ui-ink-soft); }
+.case-band { font-size: 11px; white-space: nowrap; padding: 0 4px; border-radius: 3px; }
+.case-band.is-fair { color: var(--ui-ok); }
+.case-band.is-harsh, .case-band.is-cruel { color: var(--ui-bad); }
+.case-band.is-lenient, .case-band.is-lax, .case-band.is-stale { color: var(--ui-info); }
+.case-link { margin-left: 6px; padding: 0 5px; border: 1px solid var(--ui-line); border-radius: 3px; background: var(--ui-card-hi); color: var(--ui-ink); font: inherit; font-size: 11px; cursor: pointer; }
+.purse-rioter.is-service { background: var(--ui-card-info); }
+.upgrade-text.is-warn { color: var(--ui-warn); }
+@media (max-width: 1100px), (max-height: 700px) {
+  .case-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .case-section { padding: 4px 6px; }
+  .case-text, .case-quote { font-size: 12px; }
+}
