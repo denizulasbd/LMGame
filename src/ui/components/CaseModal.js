@@ -15,6 +15,7 @@ import { engineOn } from '../../systems/Engines.js';
 import { caseText, caseFacts, statementText, witnessText, pleaText, sentenceOptions, restitutionStatus, kinOf, fill, courtOf, lootText } from '../../systems/Justice.js';
 import { verdictLines } from '../../systems/CourtSystem.js';
 import { leftText } from './justiceCards.js';
+import { verdictRenownImpact } from '../../systems/Renown.js'; // (32.3)
 
 const tierName = (t) => LOYALTY_TIERS[t]?.name ?? 'Sakin';
 
@@ -164,6 +165,9 @@ export class CaseModal {
     const title = stale ? 'Dava sürüncemede kaldı' : v.by === 'court' ? `Halk kararı ${BANDS.names[band]?.toLocaleLowerCase('tr') ?? 'adil'} buldu` : 'Muhtar uyardı';
     const reason = stale ? fill(COURT_TEXT.stale, { who: k.offenderName }) : v.by === 'court' ? BAND_REASONS[band] : 'Dava Muhtar\'a gitti: "Bir daha olmasın."';
     const lines = verdictLines(k).map((t) => el('li', { text: t }));
+    // (32.3) Kararın Krallık İtibarı hedefine etkisi (sicilde bu kararın olduğu ve olmadığı hâlin farkı)
+    const impact = !stale && v.by === 'court' ? verdictRenownImpact(state, k) : 0;
+    if (impact) lines.push(el('li', { className: `case-renown is-${impact < 0 ? 'down' : 'up'}`, text: `Krallık İtibarı'na etkisi: yarından itibaren hedef ${impact > 0 ? '+' : '−'}${Math.abs(impact)}` }));
     const close = el('button', { className: 'hud-btn upgrade-button case-decide', type: 'button', tabIndex: -1, text: 'Tamam' });
     close.addEventListener('mousedown', (e) => e.preventDefault());
     close.addEventListener('click', () => this.setOpen(false));

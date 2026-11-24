@@ -47,6 +47,7 @@ import { emptyGuide, restoreGuide } from '../systems/Guide.js';
 import { restoreWatched } from '../systems/StoryCards.js'; // (30.2)
 import { restorePulse } from '../systems/Loyalty.js'; // (30.3)
 import { restoreJustice, justiceEmpty } from '../systems/Justice.js'; // (32.1)
+import { restoreRenown } from '../systems/Renown.js'; // (32.3)
 import { STORY_FILTERS } from '../data/storyCards.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
@@ -216,6 +217,7 @@ export class GameState {
     this.settings = {}; // (30.1) oyuncu tercihleri (isteğe bağlı alanlar): { dilemmaTimer?: boolean } — yoksa kapalı
     this.watched = []; // (30.2) "Yakından izle" sakin kimlikleri (isteğe bağlı alan; boşsa kayda yazılmaz)
     this.justice = null; // (32.1) Suç Motoru (isteğe bağlı): { cases: [açık davalar], log: [son 40 kapanmış], records: { kimlik: { count, lastDay } }, stats, nextId } — boşsa kayda yazılmaz
+    this.renown = null; // (32.3) Kasaba Şöhreti (isteğe bağlı; yalnızca ENGINES.renown açıkken kurulur): { reasons, daily, gozdeStreak, grants: [{ key, day }], lastGrantDay, rank, tiers, drift }
     this.pulse = null; // (30.3) Halkın Nabzı (isteğe bağlı): { daily: [son 3 günün ortalaması], reasons: [{ day, totals }] (son 2 gün), eaten?: [günlük tüketim] }
     this.guide = emptyGuide(); // (30.1) rehber kartları: { done: [adım kimlikleri], off: bool, at?: { adım: oyun dakikası } }
     this.evolution = emptyEvolutionStats(); // (29.4) kişilik evrimi sayaçları: { turned, deepened, acquired (özellik -> adet), total }
@@ -338,6 +340,7 @@ export class GameState {
       ...(this.watched.length ? { watched: [...this.watched] } : {}),
       ...(this.pulse ? { pulse: this.pulse } : {}), // (30.3)
       ...(justiceEmpty(this.justice) ? {} : { justice: this.justice }), // (32.1)
+      ...(this.renown ? { renown: this.renown } : {}), // (32.3)
     };
   }
 
@@ -478,6 +481,7 @@ export class GameState {
     next.guide = restoreGuide(data.guide, next.characters.length);
     next.watched = restoreWatched(data.watched).filter((id) => next.characters.some((c) => c.id === id)); // (30.2)
     next.pulse = data.pulse ? restorePulse(data.pulse) : null; // (30.3) yoksa boş başlar
+    next.renown = restoreRenown(data.renown); // (32.3) yoksa null
     next.justice = data.justice ? restoreJustice(data.justice, new Set(next.characters.map((c) => c.id))) : null; // (32.1) yoksa boş
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);

@@ -62,6 +62,23 @@
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
 
+    // --- 32.3: Kraliyet Lütfu — Barış Çeşmesi (akşam ışıklı su), Kraliyet Gül Bahçesi (dört mevsim), Kraliyet Arşivi (akşam pencereleri) ---
+    {
+      show('Barış Çeşmesi (2x2): su kareleri, akşam ışığı, şantiye', [
+        ['kare 0', getStructureSprite('peaceFountain', { frame: 0 })],
+        ['kare 1', getStructureSprite('peaceFountain', { frame: 1 })],
+        ['akşam', getStructureSprite('peaceFountain', { frame: 0, lit: true })],
+        ['şantiye', getConstructionSiteSprite(2, 2, 1, 'peaceFountain')],
+      ], 5);
+      show('Kraliyet Gül Bahçesi (3x3): dört mevsim', SEASONS.map((k) => [NAMES[k], getStructureSprite('royalRoseGarden', { season: k })]), 4);
+      show('Kraliyet Arşivi (2x3): gündüz, akşam, kış', [
+        ['gündüz', getStructureSprite('royalArchive', {})],
+        ['akşam', getStructureSprite('royalArchive', { windowsLit: true })],
+        ['kış', getStructureSprite('royalArchive', { season: 'winter' })],
+        ['şantiye', getConstructionSiteSprite(2, 3, 1, 'royalArchive')],
+      ], 5);
+    }
+
     // --- 32.2: Adalet Sarayı — sütunlu taş saray, alınlıkta altın terazi; mevsim saksıları, kışın kar, açık davada kapıda parşömen ---
     {
       show('Adalet Sarayı (3x3): dört mevsim, kış, açık dava (kapıda parşömen) ve şantiye', [

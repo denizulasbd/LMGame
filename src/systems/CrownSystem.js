@@ -19,6 +19,7 @@ import { isGoldenAge } from './GoldenAge.js';
 import { researchLeft } from './Petitions.js';
 import { clamp } from '../utils/math.js';
 import { engineOn } from './Engines.js';
+import { RENOWN_EFFECTS } from '../data/renown.js';
 
 const PENALTY_BUFF = 'royalPenalty';
 
@@ -165,19 +166,21 @@ export class CrownSystem {
     const kind = forceKind ?? this.rng.pick(options);
     const def = DECREES[kind];
     const now = s.totalMinutes;
+    // (32.3) Şüpheli kasabaya ferman kısa süreli gelir (3 gün yerine 2; para cezası değil)
+    const span = engineOn('renown') && reputationLevel(cr.reputation).key === 'bad' ? RENOWN_EFFECTS.suspiciousDecreeMinutes : DECREE.deadlineMinutes;
     cr.decree = {
       id: cr.nextDecreeId++,
       kind,
       need: decreeNeed(s, kind),
       createdAt: now,
-      deadline: now + DECREE.deadlineMinutes,
+      deadline: now + span,
       baseline: { done: Object.keys(s.research?.done ?? {}).length },
       reward: this.rewardFor(kind),
       day: s.time.day,
     };
     cr.nextDecreeAt = now + this.rng.int(DECREE.intervalMinutes[0], DECREE.intervalMinutes[1]);
     this.events.emit('crown:decree', { decree: cr.decree, def });
-    this.events.emit('toast', { text: `Kraliyet Fermanı: ${def.name}. ${Math.round(DECREE.deadlineMinutes / 1440)} gün içinde teslim edilmeli.`, tone: 'info', icon: 'decree' });
+    this.events.emit('toast', { text: `Kraliyet Fermanı: ${def.name}. ${Math.round(span / 1440)} gün içinde teslim edilmeli.`, tone: 'info', icon: 'decree' });
     return cr.decree;
   }
 

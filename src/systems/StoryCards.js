@@ -177,6 +177,17 @@ export function makeCard(event, p = {}, ctx = {}) {
       if (!p.kase || !p.text) return null;
       card = base(event, p.text, [p.character], { key: `court:s:${p.kase.id}` });
       break;
+    case 'renown:tier': {
+      // (32.3) Krallık İtibarı kademesi: Gözde'ye çıkış ve Şüpheli'ye düşüş önemli (4)
+      if (!p.text) return null;
+      const heavy = (p.up && p.key === 'favored') || (!p.up && p.key === 'bad');
+      card = base(event, p.text, [], { key: `renown:t:${day}:${p.key}`, ...(heavy ? { priority: 4 } : {}) });
+      break;
+    }
+    case 'renown:grant':
+      if (!p.key || !p.name) return null;
+      card = base(event, `Kraliyet Lütufnamesi geldi: ${p.name} kurma izni! (İnşa Et → Kraliyet Lütfu)`, [], { key: `renown:g:${p.key}`, action: { type: 'letter', id: p.key, label: STORY_ACTIONS.letter } });
+      break;
     case 'apprentice:grandmaster':
       if (!p.character) return null;
       card = base(event, `${p.character.name} Başusta oldu.`, [p.character]);
@@ -322,6 +333,7 @@ export function actionStatus(state, card) {
     const st = condolenceStatus(state, foodSupply(state));
     return { show: st.ok, enabled: st.ok, reason: st.reason ?? '' };
   }
+  if (a.type === 'letter') return { show: true, enabled: true, reason: '' }; // (32.3)
   if (a.type === 'case') {
     // (32.2) dava hâlâ açıksa dosya açılır
     const open = Boolean(state.justice?.cases?.some((k) => k.id === a.id)) && Boolean(courtOf(state));

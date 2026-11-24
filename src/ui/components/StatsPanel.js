@@ -20,6 +20,8 @@ import { MASTERPIECES, MASTERWORK } from '../../data/masterpieces.js';
 import { masterworkSaleStatus, masterworkHappiness, bestMasterworkBuyer } from '../../systems/Masterworks.js';
 import { el } from '../dom.js';
 import { dockButton, modalHeader } from '../dockButton.js';
+import { engineOn } from '../../systems/Engines.js';
+import { royalLedger } from './renownCards.js'; // (32.3)
 
 const CHART_W = 236;
 const CHART_H = 84;
@@ -29,6 +31,8 @@ const CHARTS = [
   { key: 'welfare', title: 'Ortalama Refah', icon: 'smile', color: '#5cc46a', fill: 'rgba(56, 160, 70, 0.22)', unit: '%', min: 0, max: 100 },
   { key: 'stock', title: 'Stok Toplamı', icon: 'wood', color: '#d69a5c', fill: 'rgba(214, 154, 92, 0.2)', unit: 'birim' },
   { key: 'gold', title: 'Kasaba Hazinesi', icon: 'coin', color: '#ffd23f', fill: 'rgba(255, 210, 63, 0.2)', unit: 'altın' },
+  // (32.3) Krallık İtibarı (şalter açıkken; eski arşiv satırlarında değer yoksa o günler atlanır)
+  ...(engineOn('renown') ? [{ key: 'reputation', title: 'Krallık İtibarı', icon: 'crown', color: '#c9a2ff', fill: 'rgba(160, 120, 230, 0.22)', unit: '%', min: 0, max: 100, optional: true }] : []),
 ];
 
 const formatNumber = (n) => Math.round(n).toLocaleString('tr-TR');
@@ -144,7 +148,9 @@ export class StatsPanel {
     this.renderTotals(state);
   }
 
-  drawChart({ spec, canvas, value, change, range }, points) {
+  drawChart({ spec, canvas, value, change, range }, allPoints) {
+    const points = spec.optional ? allPoints.filter((p) => Number.isFinite(p[spec.key])) : allPoints;
+    if (!points.length) return;
     const values = points.map((p) => p[spec.key] ?? 0);
     const last = values[values.length - 1];
     const firstValue = values[0];
@@ -294,6 +300,9 @@ export class StatsPanel {
         ...(state.rites?.names?.length ? [entry('candle', 'Kitabe: Anılanlar', [gold(state.rites.names.slice(-12).map((n) => `${n.name} (${n.age})`).join(', ')), ...(state.rites.names.at(-1).story ? [` · ${state.rites.names.at(-1).name}: ${state.rites.names.at(-1).story}`] : [])], `${state.rites.held} anma töreni · son: ${when(state.rites.names.at(-1))}`)] : []),
         // (32.2) Adalet Sarayı'nın sürgünleri
         ...(state.justice?.exiles?.length ? [entry('bundle', 'Sürgünler', [state.justice.exiles.slice(-6).map((e) => `${e.name} (Gün ${e.day})`).join(', ')], `${state.justice.exiles.length} sakin Adalet Sarayı kararıyla kasabadan sürüldü`)] : []),
+        // (32.3) Kraliyet Lütufları ve (Kraliyet Arşivi kurulunca) Kasabanın Kraliyet Defteri
+        ...(state.renown?.grants?.length && engineOn('renown') ? [entry('decree', 'Kraliyet Lütufları', [gold(state.renown.grants.map((g) => `${BUILDINGS[g.key].name} (Gün ${g.day})`).join(', '))], 'Krallık İtibarı uzun süre Kraliyet Gözdesi kaldı')] : []),
+        ...((l) => (l ? [entry('crown', l.title, [l.body.join(' · ')], l.meta)] : []))(royalLedger(state)),
         entry('bell', 'Altın Çağ', isGoldenAge(state) ? [gold(`${when(ch.goldenAge ?? ga.since)}`), ' · çalışma şevki +%10, refah +%10', ...(ga.books ? [` · kitaplıkta ${ga.books} antik kitap`] : [])] : [pending('Kule tamamlanınca başlar')]),
       ])
     );

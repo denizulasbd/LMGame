@@ -25,6 +25,7 @@ import { getFriendship } from './RelationshipSystem.js';
 import { removeResident } from './DesertionSystem.js';
 import { loyaltyScope } from './Loyalty.js';
 import { addItem, takeItem, addCoins } from './Citizens.js';
+import { INN_SHERBET } from '../data/refinery.js';
 import {
   courtOf, deserved, verdictBand, fineAmount, finePlan, restitutionStatus, victimPlea, kinOf, emptyCourtStats, caseVars, fill, lootText, isBanned, normalizeVerdict, canonicalCase,
 } from './Justice.js';
@@ -295,7 +296,12 @@ export class CourtSystem {
     }
     if (v?.source === 'inn') {
       const inn = this.world.getBuilding(k.buildingId);
-      if (inn) inn[v.field] = (inn[v.field] ?? 0) + taken;
+      // (32.3 düzeltmesi) han fıçısı INN_SHERBET.capacity'yi aşmasın (bekçi "geçersiz fıçı sayısı" buluyordu); sığmayan çantada kalır
+      const room = v.field === 'sherbet' ? Math.max(0, INN_SHERBET.capacity - (inn?.[v.field] ?? 0)) : Infinity;
+      const back = inn ? Math.min(taken, room) : 0;
+      if (inn) inn[v.field] = (inn[v.field] ?? 0) + back;
+      if (back < taken) addItem(c, st.item, taken - back);
+      return back;
     }
     return taken; // pazar tezgâhı: mal tezgâha döner (stok tutulmaz)
   }

@@ -46,6 +46,7 @@ export const AESTHETIC = {
     bandstand: 6,
     heroStatue: 6,
     courthouse: 3, // (32.2) Adalet Sarayı
+    peaceFountain: 5, royalRoseGarden: 9, royalArchive: 3, // (32.3) Kraliyet Lütfu
   },
   // Döşemeli zemin karoları: komşuluğuna küçük estetik katkı (taş plaka meydanı en şık zemindir)
   tileValues: { plaza: 0.35, cobble: 0.2 },

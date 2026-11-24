@@ -137,6 +137,28 @@ await page.evaluate(async () => {
   window.__townMetrics = (await import('/src/systems/TownStatus.js')).townMetrics;
   window.__justiceMod = await import('/src/systems/Justice.js'); // (32.1) beklenen suç sayısı (saf risk toplamı; zar çekmez)
   window.__justiceData = await import('/src/data/justice.js'); // (32.2) hâkim politikası
+  window.__renownMod = await import('/src/systems/Renown.js'); // (32.3) Kasaba Şöhreti ölçümü (saf; zar çekmez)
+  window.__buildingsData = await import('/src/data/buildings.js'); // (32.3) lütuf yapılarının bedeli
+  {
+    // (32.3) itibar seyri (gün dönümünden sonra), kademe günleri, lütuflar, Krallık Vergisi toplamı, göçmenler
+    const R = (window.__renown = { series: {}, tiers: [], grants: [], built: {}, levyGold: 0, levyPaid: 0, levyFailed: 0, joined: 0, skilled: 0, targets: {} });
+    const ev = window.game.events;
+    ev.on('time:newDay', (day) => {
+      const s = window.game.state;
+      R.series[day] = Math.round((s.crown?.reputation ?? 0) * 10) / 10;
+      if (day % 10 === 0) {
+        const t = window.__renownMod.renownTarget(s);
+        R.targets[day] = { target: t.target, top: t.parts.slice(0, 4).map((p) => `${p.key}:${p.value}`) };
+      }
+    });
+    ev.on('renown:tier', ({ key, up }) => R.tiers.push({ day: window.game.state.time.day, key, up }));
+    ev.on('renown:grant', ({ key, day }) => R.grants.push({ key, day }));
+    ev.on('building:completed', (b) => { if (['peaceFountain', 'royalRoseGarden', 'royalArchive'].includes(b?.type)) R.built[b.type] = window.game.state.time.day; });
+    ev.on('crown:levyPaid', ({ amount }) => { R.levyGold += amount; R.levyPaid += 1; });
+    ev.on('crown:levyFailed', () => { R.levyFailed += 1; });
+    ev.on('population:joined', () => { R.joined += 1; });
+    ev.on('renown:skilledImmigrant', () => { R.skilled += 1; });
+  }
   const g = window.game;
   const N = (window.__nov = { gold: { in: {}, out: {} }, daily: [], tiers: {}, zero: {}, zeroRun: {}, zeroLongest: {}, levy: [], foodMin5: Infinity, goals: [], decisions: 0 });
   const econ = g.scenes.current.economy;
@@ -722,6 +744,18 @@ await page.evaluate((passive) => {
         if (s.crown.statueRight && !s.buildings.some((b) => b.type === 'royalStatue') && res.stone >= 90 && res.gold >= 220) {
           const spot = sim.findSpot('royalStatue', 16);
           if (spot) scene.construction.placeSite('royalStatue', spot.x, spot.y);
+        }
+        // (32.3) Kraliyet Lütfu: açılan gizli yapıyı malı payıyla yetince kur (sıra: suçu düşüren çeşme, refah veren bahçe, arşiv);
+        // aynı anda tek şantiye
+        const RN = window.__renownMod;
+        if (RN && !s.buildings.some((b) => b.underConstruction && ['peaceFountain', 'royalRoseGarden', 'royalArchive'].includes(b.type))) {
+          for (const type of ['peaceFountain', 'royalRoseGarden', 'royalArchive']) {
+            if (!RN.royalGranted(s, type) || s.buildings.some((b) => b.type === type)) continue;
+            const cost = window.__buildingsData?.BUILDINGS?.[type]?.cost;
+            if (!cost || !Object.entries(cost).every(([r, v]) => (res[r] ?? 0) >= v + (r === 'gears' ? 0 : 20))) continue;
+            const spot = sim.findSpot(type, 18);
+            if (spot && scene.construction.placeSite(type, spot.x, spot.y).ok) break;
+          }
         }
       }
       // (23. aşama) Krizler: yangını söndür, hasarlıyı tamir et, haydut izine karşı püskürt / uzlaş
@@ -1488,6 +1522,27 @@ const courtStats = await page.evaluate(() => {
     loyaltyAvg: (() => { const a = s.characters.filter((c) => !c.role && !c.isChild); return a.length ? Math.round((a.reduce((t, c) => t + (c.loyalty ?? 0), 0) / a.length) * 10) / 10 : 0; })(),
   };
 });
+const renownStats = await page.evaluate(() => {
+  // (32.3) Kasaba Şöhreti: itibar seyri (G10/20/30/40/50, sonra her 10 gün), kademe günleri, hedefin en büyük katkıları, lütuflar
+  const s = window.game.state;
+  const R = window.__renown ?? { series: {}, tiers: [], grants: [], built: {}, targets: {} };
+  const at = {};
+  for (const [d, v] of Object.entries(R.series)) if (Number(d) % 10 === 0) at[d] = v;
+  const vals = Object.values(R.series);
+  const RN = window.__renownMod;
+  const t = RN ? RN.renownTarget(s) : null;
+  return {
+    on: Boolean(s.renown),
+    at, end: Math.round((s.crown?.reputation ?? 0) * 10) / 10,
+    min: vals.length ? Math.min(...vals) : null, max: vals.length ? Math.max(...vals) : null,
+    avg: vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null,
+    levelDays: Object.values(R.series).reduce((m, v) => { const k = RN ? RN.renownLevelOf(v).key : '?'; m[k] = (m[k] ?? 0) + 1; return m; }, {}),
+    tiers: R.tiers, targets: R.targets, target: t ? t.target : null, top: t ? t.parts.slice(0, 3).map((p) => `${p.label} ${p.value}`) : [],
+    grants: R.grants, built: R.built, streak: s.renown?.gozdeStreak ?? 0,
+    levyGold: R.levyGold, levyPaid: R.levyPaid, levyFailed: R.levyFailed, joined: R.joined, skilled: R.skilled,
+  };
+});
+console.log(`(32.3) itibar: ${renownStats.on ? 'açık' : 'kapalı'} · ${Object.entries(renownStats.at).map(([d, v]) => `G${d} %${v}`).join(' ')} · son %${renownStats.end} (ort ${renownStats.avg}, en az ${renownStats.min}, en çok ${renownStats.max}) · kademe günleri ${JSON.stringify(renownStats.levelDays)} · geçişler ${renownStats.tiers.map((x) => `G${x.day}${x.up ? '▲' : '▼'}${x.key}`).join(' ') || '-'} · hedef ${renownStats.target} (${renownStats.top.join(' · ')}) · lütuf ${renownStats.grants.map((g) => `${g.key}@G${g.day}`).join(' ') || '-'} kurulan ${JSON.stringify(renownStats.built)} · Krallık Vergisi ${renownStats.levyPaid}/${renownStats.levyPaid + renownStats.levyFailed} toplam ${renownStats.levyGold} altın · göçmen ${renownStats.joined} (Kalfa ${renownStats.skilled})`);
 console.log(`(32.2) saray: ${courtStats.built ? `kurulu (G${courtStats.builtDay ?? '-'})` : 'yok'} · hâkim ${courtStats.judge} · dava ${courtStats.cases} · bant ${JSON.stringify(courtStats.bands)} · sürüncemede ${courtStats.stale} · sürgün ${courtStats.exiled} · tanık konuştu ${courtStats.revealed} · Muhtar ${courtStats.elder} · ceza ${JSON.stringify(courtStats.sentences)} · ort. karar ${courtStats.avgDecisionHours ?? '-'} sa · cezasızlık en çok ×${courtStats.impunityMax} / son ×${courtStats.impunityEnd} · yakalanma %${Math.round(courtStats.solvedRatio * 100)} (saraydan sonra ${courtStats.after ? `${courtStats.after.caught}/${courtStats.after.committed}` : '-'}) · Halk tepkisi ${courtStats.feedback} · kararların güven etkisi ${courtStats.trustFx} · ort. sadakat ${courtStats.loyaltyAvg}`);
 console.log(`(32.1) suç: ${crimeStats.committed} işlendi · ${crimeStats.caught} yakalandı (bekçi ${crimeStats.guard}) · tür ${JSON.stringify(crimeStats.byType)} · motivasyon ${JSON.stringify(crimeStats.byMotive)} · günlük en çok ${crimeStats.maxPerDay} · ilk G${crimeStats.firstDay ?? '-'} · açık dava ${crimeStats.open} · beklenen ${crimeStats.expected} (${crimeStats.activeDays} etkin gün) · plan ${crimeStats.planned} / düşen ${crimeStats.dropped}${crimeStats.decisions ? ` · plan saatleri ${JSON.stringify(crimeStats.hours)} · vakti gelince ${JSON.stringify(crimeStats.busy)} · kararlar ${JSON.stringify(crimeStats.decisions)} · boş ${JSON.stringify(crimeStats.nulls)}` : ''}`);
 console.log(`(30.4b) olay: ${midStats.distinct} farklı (${midStats.log.length} karar; G20 sonrası ${midStats.freshAfter20}/${midStats.after20} yeni) · hedef ${midStats.milestones}/14 (${midStats.doneIds.join(',')}) · ${midStats.log.join(' ')}`);
@@ -1633,7 +1688,7 @@ const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
   const endState = await page.evaluate(() => ({ pop: window.game.state.characters.length, trust: Math.round(window.game.state.trust?.value ?? 0), trustMin: Math.round(window.game.state.trust?.min ?? 0), revolts: window.game.state.stats?.revolts ?? null })); // (32.2) ölçüm özeti
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, court: courtStats, gold: report.gold, golden: report.golden?.since ?? null, end: endState, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, court: courtStats, renown: renownStats, gold: report.gold, golden: report.golden?.since ?? null, end: endState, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();

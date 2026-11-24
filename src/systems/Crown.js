@@ -4,6 +4,7 @@
 import { doctrineLevyMultiplier } from './Doctrine.js';
 import { CIVIC_PROJECTS } from '../data/town.js';
 import { TAX, TAX_RATES, LEVY, LEVY_EASE, REPUTATION, DECREES, DECREE, EXODUS } from '../data/crown.js';
+import { RENOWN_LEVELS } from '../data/renown.js';
 import { engineOn } from './Engines.js';
 import { RESOURCES } from '../data/resources.js';
 import { trustValue } from './Citizens.js';
@@ -94,9 +95,10 @@ export function estimateTax(state, rateKey = state.tax?.rate) {
   return { gold, goods, payers };
 }
 
-/** Krallık İtibarı'nın seviyesi. */
+/** Krallık İtibarı'nın seviyesi. (32.3, ENGINES.renown) açıkken dört kademe: en üstte Kraliyet Gözdesi ('favored'); anahtarlar aynı. */
 export function reputationLevel(value) {
-  return REPUTATION.levels.find((l) => value >= l.min) ?? REPUTATION.levels[REPUTATION.levels.length - 1];
+  const levels = engineOn('renown') ? RENOWN_LEVELS : REPUTATION.levels;
+  return levels.find((l) => value >= l.min) ?? levels[levels.length - 1];
 }
 
 /** Bu kasabanın Krallık Vergisi (altın): seviye, nüfus, Altın Çağ ve itibarla ölçeklenir. */

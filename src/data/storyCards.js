@@ -1,7 +1,7 @@
 // (30.2 "Görünen Hikâye") Hikâye kartlarının veri tablosu: hangi olay kaç öncelikli, hangi eşikler, süzgeç kademeleri. Metinler
 // systems/StoryCards.js'te saf işlevlerle üretilir (aynı olay yükü aynı metni verir). Bu tablo yalnızca arayüzü etkiler;
 // simülasyona hiçbir şey yazmaz. Sayıları buradan ayarla (gün başına 2-8 kart hedefi: tools/sim/tests/30.2-stories.mjs).
-export const STORY_TABLE_VERSION = 5; // (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20; (32.1) 4: 'crime:caught' / 'crime:unsolved'; (32.2) 5: 'court:*' (karar, sürgün, tanık, sürüncemede)
+export const STORY_TABLE_VERSION = 6; // (32.3) 6: 'renown:tier' / 'renown:grant'; (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20; (32.1) 4: 'crime:caught' / 'crime:unsolved'; (32.2) 5: 'court:*' (karar, sürgün, tanık, sürüncemede)
 
 export const STORY_LIMITS = {
   visible: 2, // aynı anda görünen kart
@@ -49,6 +49,8 @@ export const STORY_PRIORITY = {
   'court:exiled': 4, // (32.2) sürgün
   'court:revealed': 3, // (32.2) susan tanık konuştu, dava açıldı
   'court:stale': 3, // (32.2) dava sürüncemede kaldı
+  'renown:tier': 3, // (32.3) Krallık İtibarı kademe değişti (Şüpheli'ye düşüş ve Gözde'ye çıkış 4)
+  'renown:grant': 5, // (32.3) Kraliyet Lütufnamesi (gizli yapı açıldı)
   'story:summary': 2,
 };
 
@@ -65,6 +67,7 @@ export const STORY_ACTIONS = {
   condolence: 'Taziye Sofrası Kur',
   gift: 'Armağan Gönder',
   case: 'Dava dosyası', // (32.2)
+  letter: 'Lütufnameyi oku', // (32.3)
 };
 
 export const STORY_TEXT = {

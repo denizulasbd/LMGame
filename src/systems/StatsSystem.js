@@ -6,6 +6,7 @@
 import { CONFIG } from '../config.js';
 import { RESOURCES } from '../data/resources.js';
 import { townHappiness } from './TownStatus.js';
+import { engineOn } from './Engines.js';
 
 /** Kasabanın şu anki özeti (arşiv satırı). */
 export function townSnapshot(state) {
@@ -18,6 +19,7 @@ export function townSnapshot(state) {
     stock,
     gold: state.resources.gold ?? 0,
     buildings: state.buildings.filter((b) => b.functional && b.definition.buildable).length,
+    ...(engineOn('renown') ? { reputation: Math.round(state.crown?.reputation ?? 50) } : {}), // (32.3) RenownSystem gün dönümü kaymasından sonra günceller
   };
 }
 

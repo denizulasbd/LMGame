@@ -10,7 +10,13 @@
 // (18. aşama) Yapı listesi üç sekmeye ayrılır: Yapılar, Yol & Zemin (fırçalar), Peyzaj & Dekorasyon. Sekme seçimi
 // tarayıcıda hatırlanır; bir öğe seçilince (ör. kısayolla) onun sekmesine geçilir.
 import { BUILD_MENU, getBuildDefinition, TILE_BUILDS, buildTabFor } from '../../data/buildings.js';
-import { BUILD_TABS } from '../../data/landscape.js';
+import { BUILD_TABS as BASE_TABS } from '../../data/landscape.js';
+import { engineOn } from '../../systems/Engines.js';
+import { royalGranted } from '../../systems/Renown.js';
+import { ROYAL_CATEGORY } from '../../data/renown.js';
+
+// (32.3) Kraliyet Lütfu sekmesi yalnızca şalter açıkken; bir lütuf gelene dek gizli (yapı düğmeleri de)
+const BUILD_TABS = engineOn('renown') ? [...BASE_TABS, { id: 'royal', name: ROYAL_CATEGORY, icon: 'crown' }] : BASE_TABS;
 import { TOWN_TIERS } from '../../data/town.js';
 import { RESOURCES } from '../../data/resources.js';
 import { getStructureSprite } from '../../art/sprites/index.js';
@@ -111,7 +117,10 @@ export class BuildMenu {
     this.tabRow = el('div', { className: 'build-tabs' }, this.tabButtons);
     this.itemList = el('div', { className: 'build-item-list' }, this.items.map((i) => i.button));
     this.itemRow = el('div', { className: 'panel build-items ui-interactive', hidden: true }, [this.tabRow, this.itemList]);
+    this.granted = new Set();
+    this.grantKey = null;
     this.setTab(this.tab);
+    this.syncGrants(game.state);
     this.hint = el('div', { className: 'build-hint', hidden: true });
     // (30.1) ince yapı şeridi: seçili yapının küçük resmi, adı, bedeli, durum metni ve "Listeyi aç"
     this.stripThumb = el('img', { className: 'build-strip-thumb', alt: '' });
@@ -177,11 +186,27 @@ export class BuildMenu {
     this.stripInfo.classList.remove('is-bad');
   }
 
+  /** (32.3) Açılmış Kraliyet Lütfu yapıları: sekme ve düğmeler yalnızca lütuf gelince görünür. */
+  syncGrants(state) {
+    const granted = new Set(this.items.filter((i) => i.def.royalGrant && royalGranted(state, i.type)).map((i) => i.type));
+    const key = [...granted].join(',');
+    if (this.granted && key === this.grantKey) return;
+    this.granted = granted;
+    this.grantKey = key;
+    const tab = this.tabButtons.find((b) => b.dataset.tab === 'royal');
+    if (tab) {
+      tab.hidden = granted.size === 0;
+      tab.querySelector('.build-tab-count').textContent = String(granted.size);
+    }
+    if (this.tab === 'royal' && granted.size === 0) this.setTab('buildings', false);
+    else this.setTab(this.tab, false);
+  }
+
   /** (18. aşama) Görünen sekmeyi seçer; remember: tarayıcıda hatırla. */
   setTab(id, remember = true) {
     this.tab = id;
     for (const b of this.tabButtons) b.classList.toggle('is-active', b.dataset.tab === id);
-    for (const item of this.items) item.button.hidden = item.tab !== id;
+    for (const item of this.items) item.button.hidden = item.tab !== id || (item.def.royalGrant && !this.granted?.has(item.type));
     if (!remember) return;
     try {
       localStorage.setItem(TAB_KEY, id);
@@ -237,7 +262,8 @@ export class BuildMenu {
     const tier = game.state.town?.tier ?? 1;
     const items = game.state.exploration?.items ?? {};
     const royal = Boolean(game.state.crown?.statueRight);
-    const key = `${tier}|${royal}|${Object.values(resources).join(',')}|${Object.values(items).join(',')}|${game.state.buildings.map((b) => `${b.type}${b.underConstruction ? '~' : ''}`).sort().join(',')}`;
+    this.syncGrants(game.state);
+    const key = `${tier}|${royal}|${[...this.granted].join(',')}|${Object.values(resources).join(',')}|${Object.values(items).join(',')}|${game.state.buildings.map((b) => `${b.type}${b.underConstruction ? '~' : ''}`).sort().join(',')}`;
     if (key === this.affordKey) return;
     this.affordKey = key;
     for (const { type, def, button } of this.items) {

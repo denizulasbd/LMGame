@@ -14,6 +14,7 @@ export const ENGINES = {
   traitScarcity: true, // (30.4a) kişilik çeşitliliği: yaygın özelliğe doğru evrim katkısı küçülür, nadire doğru büyür
   justice: true, // (32.1) Suç Motoru: küçük suçlar (handan aşırma, kese hafifletme, ufak haylazlık), tanık ve bekçi, dava kaydı, Muhtar uyarısı
   court: true, // (32.2) Adalet Sarayı ve Dava: dava penceresi, cezalar, orantılılık, cezasızlık, sürgün (justice kapalıyken etkisiz)
+  renown: true, // (32.3) Kasaba Şöhreti: Krallık İtibarı'nın günlük hedefe kayması, Kraliyet Gözdesi kademesi, rozet, Kraliyet Lütfu (gizli yapılar)
 };
 // (30.4a) Açılıştan ÖNCE bilinmesi gereken şalterler (kurucuların ageInDays değeri sahne kurulurken hesaplanır): modül yüklenirken
 // globalThis.__LMGAME_ENGINES_OFF dizisi okunur (anahtar adları; '*' hepsi). tools/sim/lib.mjs -> openGame({ enginesOff }) bunu sayfa

@@ -11,6 +11,7 @@
 //   (32.2, isteğe bağlı) court?: true (Adalet Sarayı'nın davası), revealed?: { day, witnessName } (sonradan konuşan tanık),
 //     statement?: { offender, plea?, pleaLine?, witness } (ifade değişkenleri; dava açılırken izole üreteçle bir kez seçilir),
 //     verdict: { kind, by: 'elder' | 'court', auto, day, at?, band?, harsh?, deserved?, stale?, restitution?, fine?, service?, served?, effects? }
+import { renownCrimeFactor } from './Renown.js'; // (32.3)
 import { JUSTICE, RISK, TRAIT_LEAN, QUIRK_LEAN, REMORSE, CATCH, CRIMES, CRIME_KEYS, VANDAL_GROUP, VANDAL_TEXT, LOOT_WORDS, CRIME_TEXT } from '../data/justice.js';
 import { COURT, SENTENCES, SENTENCE_KEYS, FINE, DESERVED, BANDS, IMPUNITY, STATEMENTS, VICTIM_PLEAS, PLEA_RULES, WITNESS_LINES, COURT_TEXT } from '../data/justice.js';
 import { PURSE, REVOLT } from '../data/citizens.js';
@@ -287,14 +288,15 @@ export function riskFactors(state, c) {
   let personality = c.lifeStage === 'youth' ? RISK.youthMul : 1;
   for (const t of c.traits ?? []) personality *= RISK.traits[t] ?? 1;
   if (c.quirk) personality *= RISK.quirks[c.quirk] ?? 1;
-  return { poverty, hunger, loyalty, town, personality, education: educationFactor(c), club: clubFactor(c), impunity: impunityFactor(state) };
+  // (32.3) renown: Barış Çeşmesi kasaba çapında riski düşürür (yoksa / şalter kapalıyken 1)
+  return { poverty, hunger, loyalty, town, personality, education: educationFactor(c), club: clubFactor(c), impunity: impunityFactor(state), renown: renownCrimeFactor(state) };
 }
 
 /** Kişi başı günlük risk (0-1 civarı küçük sayı): taban × bütün çarpanlar. Aday değilse 0. */
 export function crimeRisk(state, c, factors = null) {
   if (!crimeCandidate(state, c)) return 0;
   const f = factors ?? riskFactors(state, c);
-  return JUSTICE.baseDaily * f.poverty * f.hunger * f.loyalty * f.town * f.personality * f.education * f.club * f.impunity;
+  return JUSTICE.baseDaily * f.poverty * f.hunger * f.loyalty * f.town * f.personality * f.education * f.club * f.impunity * (f.renown ?? 1);
 }
 
 /** Motivasyon: riskin baskın çarpanından ('hunger' | 'poverty' | 'grudge' | 'temptation' | 'mischief'). Zar yok. */

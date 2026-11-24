@@ -24,6 +24,7 @@
 import { CLOCK_GEAR } from '../../data/goldenAge.js';
 import { decorKey, decorSection } from './decorCards.js';
 import { justiceKey, justiceSection } from './justiceCards.js'; // (32.2)
+import { royalKey, royalSection, renownLines, grantStatusText } from './renownCards.js'; // (32.3)
 import { BUILDINGS, mendSpec, PROJECT_WORDS } from '../../data/buildings.js';
 import { STORM } from '../../data/dilemmas.js';
 import { RESOURCES, RESOURCE_KEYS, formatCost } from '../../data/resources.js';
@@ -137,6 +138,7 @@ export class BuildingPanel {
     this.crisisBox = el('div', { className: 'building-decrees building-crisis' }); // (23. aşama) yangın, tamir, kuyu, kule
     this.decorBox = el('div', { className: 'building-decrees building-decor', hidden: true }); // (31. aşama) Kasaba Süsleri
     this.justiceBox = el('div', { className: 'building-decrees building-justice', hidden: true }); // (32.2) Adalet Sarayı
+    this.royalBox = el('div', { className: 'building-decrees building-royal', hidden: true }); // (32.3) Kraliyet Lütfu
     this.expedition = el('div', { className: 'building-decrees building-expedition' });
     this.inscriptions = el('div', { className: 'building-decrees building-inscriptions' });
     this.pickerFor = null; // "İşçi Ata" listesi açık olan yapı
@@ -189,6 +191,7 @@ export class BuildingPanel {
       this.crisisBox,
       this.decorBox,
       this.justiceBox,
+      this.royalBox,
       this.bell,
       this.expedition,
       this.inscriptions,
@@ -261,7 +264,7 @@ export class BuildingPanel {
         ? [JSON.stringify(state.luxury), state.resources.gold, Math.floor((state.buffs.spices ?? 0) / 60), Math.floor((state.buffs.goldBonus ?? 0) / 60), Math.floor((state.buffs.royalArchitects ?? 0) / 60), state.time.day, state.buildings.length].join(':')
         : '';
     const pickerKey = this.pickerFor === building.id ? this.workerCandidates(building, state).map((o) => `${o.character.id}:${o.character.name}:${o.level}:${o.pinnedTo}`).join(',') : '';
-    const crownKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.tax?.rate, state.tax?.lockedUntil, Math.floor(taxLockLeft(state) / 60), state.tax?.last, Math.floor(((state.tax?.nextAt ?? 0) - state.totalMinutes) / 60), state.crown, Math.floor((state.crown?.nextLevyAt - state.totalMinutes) / 60), levyAmount(state), state.crown?.decree ? decreeStatus(state, state.crown.decree) : null, estimateTax(state), state.resources, this.heavyArmed === true]) : '';
+    const crownKey = building.type === 'fountain' || building.definition.civic ? JSON.stringify([state.tax?.rate, state.tax?.lockedUntil, Math.floor(taxLockLeft(state) / 60), state.tax?.last, Math.floor(((state.tax?.nextAt ?? 0) - state.totalMinutes) / 60), state.crown, Math.floor((state.crown?.nextLevyAt - state.totalMinutes) / 60), levyAmount(state), state.crown?.decree ? decreeStatus(state, state.crown.decree) : null, estimateTax(state), state.resources, this.heavyArmed === true, state.renown ?? null, engineOn('renown') ? state.time.hour : 0]) : '';
     const bellKey = (building.type === 'fountain' || building.definition.civic ? crownKey : '') + (building.type === 'fountain' || building.definition.civic ? `${JSON.stringify(rallyStatus(state))}:${isRallyActive(state)}:${Math.round(trustValue(state))}:${JSON.stringify(state.trust?.revolt?.rioters ?? null)}:${state.trust?.revolt?.raids?.length ?? 0}:${JSON.stringify(reliefStatus(state, 'food'))}:${JSON.stringify(reliefStatus(state, 'gold'))}:${(state.petitions?.list ?? []).map((p) => `${p.id}${p.status}${Math.floor((p.deadline - state.totalMinutes) / 60)}`).join(',')}` : '');
     // (16. aşama) keşif seferi (liman, belediye) ve kadim yazıtlar (Bilgelik Evi)
     const exploreKey =
@@ -316,6 +319,7 @@ export class BuildingPanel {
       lines.join('|'),
       decorKey(building, state), // (31. aşama)
       justiceKey(building, state), // (32.2)
+      royalKey(building, state), // (32.3)
     ].join('/');
     if (key === this.lastKey) return;
     this.lastKey = key;
@@ -348,6 +352,7 @@ export class BuildingPanel {
     this.renderCrisis(building, state);
     this.renderDecor(building, state);
     { const nodes = justiceSection(building, state, { emit: (n, p) => this.events.emit(n, p) }); this.justiceBox.hidden = !nodes.length; this.justiceBox.replaceChildren(...nodes); } // (32.2) ui/components/justiceCards.js
+    { const nodes = royalSection(building, state); this.royalBox.hidden = !nodes.length; this.royalBox.replaceChildren(...nodes); } // (32.3) ui/components/renownCards.js
     this.renderBell(building, state);
     this.renderFeast(building, state);
     this.renderExpedition(building, state);
@@ -692,6 +697,8 @@ export class BuildingPanel {
       el('div', { className: 'building-section-title', text: 'Krallık' }),
       el('div', { className: `decree luxury-card crown-card${cr.notice && !plan.ok ? ' is-revolt' : ''}` }, [
         el('div', { className: 'decree-head' }, [el('img', { src: getAnyIconURL('crown'), alt: '' }), `Krallık İtibarı %${Math.round(cr.reputation)}`, el('span', { className: 'decree-state', text: rep.name })]),
+        // (32.3) hedef, bu gecenin kayması ve en büyük üç neden (rozetin ipucuyla aynı döküm)
+        ...(engineOn('renown') ? [...renownLines(state).slice(1), grantStatusText(state)].filter(Boolean).map((t, i) => el('div', { className: `upgrade-text renown-line${i === 1 ? ' renown-reasons' : ''}`, text: t })) : []),
         el('div', { className: `upgrade-text${cr.notice ? ' is-active' : ''}`, text: levyText }),
         el('div', { className: 'upgrade-text', text: `Ödenen vergi ${cr.paid}/${cr.levies} · teslim edilen ferman ${cr.delivered}${cr.statueRight ? " · Kraliyet Beratı: Aslanlı Heykel dikilebilir (İnşa Et → Peyzaj)" : ''}` }),
       ]),

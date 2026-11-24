@@ -5630,3 +5630,41 @@ kbd {
   .case-section { padding: 4px 6px; }
   .case-text, .case-quote { font-size: 12px; }
 }
+
+/* (32.3) Kasaba Şöhreti: Krallık İtibarı rozeti (Nabız'ın yanında), Lütufname, lütuf yapısı kartı, dava sonucundaki itibar satırı */
+.hud-renown { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 1px 5px; }
+.hud-renown[hidden] { display: none; }
+.hud-renown:hover { border-color: rgba(255, 214, 160, 0.35); }
+.hud.topbar .hud-renown .renown-crown { width: 16px; height: 16px; image-rendering: pixelated; }
+.hud-renown .renown-value { font-size: 13px; font-weight: 700; font-family: var(--ui-num-font); font-variant-numeric: tabular-nums; }
+.hud-renown .renown-name { font-size: 12px; font-weight: 700; white-space: nowrap; color: var(--ui-ink-soft); }
+.hud-renown .renown-arrow { font-size: 13px; font-weight: 700; min-width: 0.8em; text-align: center; }
+.hud-renown .renown-arrow.is-up { color: var(--ui-ok); }
+.hud-renown .renown-arrow.is-down { color: var(--ui-bad); }
+.hud-renown .renown-arrow.is-flat { color: var(--ui-ink-soft); }
+.hud-renown[data-level='favored'] .renown-name, .hud-renown[data-level='favored'] .renown-value { color: #e6c36a; }
+.hud-renown[data-level='good'] .renown-name { color: var(--ui-ok); }
+.hud-renown[data-level='bad'] .renown-name, .hud-renown[data-level='bad'] .renown-value { color: var(--ui-bad); }
+@media (max-width: 1500px) {
+  .hud-renown { display: inline-grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 2px; row-gap: 0; padding: 1px 3px; }
+  .hud-renown .renown-name { display: none; }
+  .hud.topbar .hud-renown .renown-crown { grid-column: 1; grid-row: 1; width: 14px; height: 14px; }
+  .hud-renown .renown-arrow { grid-column: 2; grid-row: 1; font-size: 13px; line-height: 14px; }
+  .hud-renown .renown-value { grid-column: 1 / 3; grid-row: 2; font-size: 13px; line-height: 13px; text-align: center; }
+}
+.building-royal .royal-card.is-weak .decree-state { color: var(--ui-bad); }
+.renown-line.renown-reasons { color: var(--ui-ink); }
+.case-effects .case-renown.is-down { color: var(--ui-bad); }
+.case-effects .case-renown.is-up { color: var(--ui-ok); }
+.modal-window.royal-letter { width: min(460px, 100%); }
+.royal-letter-body { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+.royal-letter-paper { position: relative; padding: 16px 18px 14px; background: linear-gradient(180deg, #f3e3bd, #e7d09e); color: #3b2616; border: 2px solid #a5793f; border-radius: 4px; box-shadow: inset 0 0 18px rgba(120, 80, 30, 0.35); }
+.royal-letter-lead { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+.royal-letter-text { font-size: 15px; line-height: 1.45; margin: 0 0 8px; font-style: italic; }
+.royal-letter-meta { font-size: 13px; color: #5b3f24; }
+.royal-letter-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.royal-letter-date { font-size: 13px; font-variant-numeric: tabular-nums; }
+.royal-letter-seal { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #d2473d, #8e1f1a); border: 2px solid #6b1511; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); }
+.royal-letter-seal img { width: 22px; height: 22px; image-rendering: pixelated; }
+.royal-letter-close { font-size: 13px; margin-top: 8px; color: #5b3f24; }
+.royal-letter-actions { display: flex; justify-content: flex-end; }

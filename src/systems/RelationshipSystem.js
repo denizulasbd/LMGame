@@ -18,6 +18,7 @@
 // Puanlar GameState.relationships içinde "küçükId-büyükId" anahtarıyla saklanır; kaydedilen
 // çift yoksa aynı evde yaşayanlar HOUSEMATE_START, aile (ebeveyn-çocuk, kardeş) FAMILY_START ile başlar.
 // Aşağıdaki saf yardımcılar arayüz ve diğer sistemler tarafından da kullanılır.
+import { renownRomanceFactor } from './Renown.js'; // (32.3) Kraliyet Gül Bahçesi
 import { ACTIVITIES } from '../data/activities.js';
 import {
   RELATIONSHIP_LEVELS,
@@ -287,7 +288,7 @@ export class RelationshipSystem {
     // (29.1) Aşk zarı kimyaya bakar: kimya 0 ya da eksiyse aşk yok; güçlü çekim daha düşük puanla ve daha hızlı aşık eder
     const chem = chemistryLevel(chemistryOf(this.state, a, b));
     if (chem.romance <= 0 || this.get(a, b) < chem.romanceScore) return;
-    if (this.rng.next() >= ROMANCE.chancePerMinute * chem.romance * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance')) return;
+    if (this.rng.next() >= ROMANCE.chancePerMinute * chem.romance * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance') * renownRomanceFactor(this.state)) return;
     const now = this.state.totalMinutes;
     a.partnerId = b.id;
     b.partnerId = a.id;
@@ -302,7 +303,7 @@ export class RelationshipSystem {
   tryMarriage(a, b, group, minutes) {
     if (!arePartners(a, b) || a.married) return;
     if (this.state.totalMinutes - a.partnerSince < MARRIAGE.minPartnerDays * 1440) return;
-    if (this.rng.next() >= MARRIAGE.chancePerMinute * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance')) return;
+    if (this.rng.next() >= MARRIAGE.chancePerMinute * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance') * renownRomanceFactor(this.state)) return;
     this.marry(a, b, this.world.getBuilding(group.buildingId), group.kind === 'festival');
   }
 

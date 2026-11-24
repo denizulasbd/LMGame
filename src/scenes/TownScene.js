@@ -112,6 +112,8 @@ import { currentFair, fairVenue } from '../systems/Fair.js';
 import { CrimeSystem } from '../systems/CrimeSystem.js';
 import { CourtSystem } from '../systems/CourtSystem.js';
 import { JUSTICE_SEED_OFFSET, COURT_SEED_OFFSET } from '../data/justice.js';
+import { RenownSystem } from '../systems/RenownSystem.js';
+import { RENOWN_SEED_OFFSET } from '../data/renown.js';
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -277,6 +279,9 @@ export class TownScene extends Scene {
     this.crime = new CrimeSystem(this.game, this.world, { economy: this.economy, relationships: this.relationships }, new Random(state.seed + JUSTICE_SEED_OFFSET));
     // (32.2) Adalet Sarayı ve Dava: yalnızca olay dinler (karar, saatlik süre / tanık / yasak, hizmet ve sürgün bitişi); izole üreteç seed + 43
     this.court = new CourtSystem(this.game, this.world, { crime: this.crime, economy: this.economy, trust: this.trust, loyalty: this.loyalty, chemistry: this.chemistry, moodlets: this.moodlets, relationships: this.relationships, jobs: this.jobs }, new Random(state.seed + COURT_SEED_OFFSET));
+    // (32.3) Kasaba Şöhreti: yalnızca olay dinler (gün dönümünde itibar hedefe kayar: öteki gün dinleyicilerinden SONRA kurulur);
+    // izole üreteç seed + 44 yalnızca Kraliyet Lütfu zarı
+    this.renown = new RenownSystem(this.game, new Random(state.seed + RENOWN_SEED_OFFSET), { attract: this.attract });
     this.systems = [
       this.weather,
       this.structures,

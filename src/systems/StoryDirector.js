@@ -19,6 +19,7 @@ const EVENTS = [
   'relationship:reconciled', 'pantry:low', 'dilemma:resolved', 'storm:struck', 'crisis:raidResolved',
   'crime:caught', 'crime:unsolved', // (32.1)
   'court:verdict', 'court:exiled', 'court:revealed', 'court:stale', // (32.2)
+  'renown:tier', 'renown:grant', // (32.3)
 ];
 
 export class StoryDirector {
@@ -275,6 +276,10 @@ export class StoryDirector {
     if (!st.enabled || card.used) return false;
     if (a.type === 'case') {
       this.events.emit('ui:openCase', { id: a.id }); // (32.2) dosya her basışta açılır (kart "kullanıldı" sayılmaz)
+      return true;
+    }
+    if (a.type === 'letter') {
+      this.events.emit('ui:openRoyalLetter', { key: a.id }); // (32.3) Lütufname her basışta açılır
       return true;
     }
     card.used = true;

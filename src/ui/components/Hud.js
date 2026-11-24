@@ -43,6 +43,7 @@ import {
 } from '../../systems/TownStatus.js';
 import { el } from '../dom.js';
 import { caseChips } from './justiceCards.js'; // (32.2)
+import { RenownBadge } from './renownCards.js'; // (32.3)
 import { trustValue, trustLevel } from '../../systems/Citizens.js';
 import { PETITION_KINDS, REVOLT } from '../../data/citizens.js';
 import { DECREES, TAX_RATES } from '../../data/crown.js';
@@ -209,6 +210,7 @@ export class Hud {
       this.populationWrap.title = `${population} sakin / ${capacity} yatak${venerable ? ` (+${venerable} Saygın Büyük: yatağı olmayan, nüfus kotasına sayılmayan bilgeler)` : ''}. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
     }
     this.renderPulse(state, false);
+    this.renownBadge.render(state); // (32.3)
     const buffs = activeBuffs(state);
     const heating = Math.round(heatingPerDay(state) * 10) / 10;
     const freezing = state.heating.cold && heating > 0;
@@ -629,6 +631,8 @@ export class Hud {
     this.pulseWrap.addEventListener('mousedown', (e) => e.preventDefault());
     this.pulseWrap.addEventListener('click', () => this.openHall());
     this.lastPulse = '';
+    // (32.3) Krallık İtibarı rozeti (Nabız'ın yanında; şalter kapalıyken gizli)
+    this.renownBadge = new RenownBadge(game, () => this.openHall());
     // (30.3) Anında geri bildirim: üst çubuğun altında 4 saniyelik tek satır ("Halk: 12 sakin hoşnutsuz (Ağır Vergi)")
     this.feedbackLine = el('div', { className: 'pulse-feedback', hidden: true, role: 'status' });
     this.feedbackTimer = 0;
@@ -700,7 +704,7 @@ export class Hud {
         this.pausedBadge,
         this.muteButton,
       ]),
-      zone('hud-zone-res', [...resourceBoxes, this.goodsWrap, this.welfareRow, this.pulseWrap, this.populationWrap]),
+      zone('hud-zone-res', [...resourceBoxes, this.goodsWrap, this.welfareRow, this.pulseWrap, this.renownBadge.element, this.populationWrap]),
       this.under,
     ]);
     // (30.3) üst çubuğun öteki ipuçları da özel ipucu bileşeniyle
