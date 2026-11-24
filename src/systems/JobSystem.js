@@ -23,6 +23,7 @@ import { BOND_RULES } from '../data/bonds.js';
 import { crewBond } from './Bonds.js';
 import { engineOn } from './Engines.js';
 import { educationLevel } from './University.js'; // (32.4)
+import { apprenticesOf } from './Apprenticeship.js'; // (32.4)
 import { UNIVERSITY } from '../data/university.js'; // (32.4)
 
 const PRODUCTION_PRIORITY = 2; // üretim binalarında çalışmak, emirli işlerden sonra gelir
@@ -304,7 +305,8 @@ export class JobSystem {
       if (!workers || (building.workerIds.size >= workers && !building.workerIds.has(c.id))) continue;
       if (building.frozen || building.idle) continue; // kışın donmuş tarlada, malzemesiz atölyede iş yok
       if (building.excludedWorkers.has(c.id)) continue; // oyuncu bu işten çıkardı
-      if (def.university && (c.lifeStage === 'youth' || c.higherStudy)) continue; // (32.4) Müderris yetişkindir (öğrenci ve Genç olmaz)
+      // (32.4) Müderris yetişkindir (öğrenci ve Genç olmaz); çırağı olan usta tezgâhından ayrılmaz (çırağın ilerlemesi ustaya bağlı)
+      if (def.university && (c.lifeStage === 'youth' || c.higherStudy || apprenticesOf(this.state, c).length > 0)) continue;
       if (!building.workerIds.has(c.id) && this.reservedForPinned(building) >= workers - building.workerIds.size) continue; // yuvalar sabit çalışanlara ayrılmış
       if (!building.workerIds.has(c.id) && this.expertWaiting(c, building)) continue;
       const spot = freeSpot(this.world.getSpots(building));
