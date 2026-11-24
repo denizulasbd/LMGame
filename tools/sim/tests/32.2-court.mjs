@@ -105,7 +105,7 @@ results.push(...(await page.evaluate(async () => {
     youth: dv({ context: { ageStage: 'youth' } }) < ref,
     forgive: dv({ statement: { plea: 'forgive' } }) < ref,
     lesson: dv({ statement: { plea: 'lesson' } }) > ref,
-    famine: J.deserved({ ...base, context: { ...base.context, hungry: true } }, st, { famine: true }) < dv({ context: { hungry: true } }),
+    famine: J.deserved({ ...base, severity: 3, context: { ...base.context, hungry: true } }, st, { famine: true }) < dv({ severity: 3, context: { hungry: true } }),
   };
   c('hak edilen sertlik: açlık / kıtlık, yoksulluk, özür, gençlik, "affedin" düşürür; inkâr + tanık, tekrar, "ders almalı" artırır', Object.values(dirs).every(Boolean), JSON.stringify(dirs));
   const unret = J.deserved(k1, st) - J.deserved(k1, st, { restitution: true });
@@ -166,7 +166,7 @@ results.push(...(await page.evaluate(async () => {
   c('hafif: kurban ve dostları −3, cezasızlık +1 · gevşek: kurban −6, güven −2, cezasızlık +2', lenOk && r?.band === 'lax' && b.loyalty === -6 && st.trust.value === tr - 2 && kk.verdict.impunity === 2 && J.impunityScore(st) >= imp0, `${lenOk} ${r?.band} ${b.loyalty} ${J.impunityScore(st)}`);
   const impHigh = J.impunityFactor(st);
   for (let i = 0; i < 4; i++) { const q = fresh(a, b); court$.decide(q, pickFor(q, 'fair')); }
-  c('impunityFactor yükselir (hafif / gevşek / sürüncemede) ve adil kararlarla söner; tavan 1,6', impHigh > 1.2 && J.impunityFactor(st) < impHigh && J.impunityFactor(st) >= 1 && J.impunityFactor({ ...st, justice: { log: Array.from({ length: 20 }, () => ({ closedDay: st.time.day, verdict: { by: 'court', impunity: 2 } })) } }) === 1.6, `${impHigh.toFixed(2)} → ${J.impunityFactor(st).toFixed(2)}`);
+  c('impunityFactor yükselir (hafif / gevşek / sürüncemede) ve adil kararlarla söner; tavanlı', impHigh > 1.2 && J.impunityFactor(st) < impHigh && J.impunityFactor(st) >= 1 && J.impunityFactor({ ...st, justice: { log: Array.from({ length: 20 }, () => ({ closedDay: st.time.day, verdict: { by: 'court', impunity: 2 } })) } }) === D.IMPUNITY.cap, `${impHigh.toFixed(2)} → ${J.impunityFactor(st).toFixed(2)}`);
   const rec = J.justiceRecord(st);
   c('justiceRecord: son kararlarda adil oranı, bantlar, cezasızlık; Muhtar ve sürüncemede ayrı sayılır', rec.verdicts >= 7 && rec.bands.fair >= 5 && rec.elder >= 1 && rec.fairRatio > 0 && rec.fairRatio < 1 && Number.isFinite(rec.impunityFactor), JSON.stringify(rec));
 

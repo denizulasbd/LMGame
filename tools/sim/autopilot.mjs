@@ -310,8 +310,8 @@ await page.evaluate((passive) => {
     PLAN.splice(PLAN.indexOf('mill') + 1, 0, 'well');
     PLAN.splice(PLAN.indexOf('townHall') + 1, 0, 'guardTower');
   }
-  // (32.2) Adalet Sarayı: Kasaba seviyesinden sonra, Belediye (ve Gözcü Kulesi) ardından; isteğe bağlı (kurulamazsa sıra beklemez)
-  PLAN.splice(PLAN.indexOf(window.__noSafety ? 'townHall' : 'guardTower') + 1, 0, 'courthouse');
+  // (32.2) Adalet Sarayı: Kasaba seviyesinden sonra, Kasaba Anıtı'nın ardından; isteğe bağlı (kurulamazsa sıra beklemez)
+  PLAN.splice(PLAN.indexOf('monument') + 1, 0, 'courthouse'); // ilk deneme: Belediye / Gözcü Kulesi'nin ardı (hazine −%14: limanı ve madeni geciktiriyordu)
   const UPGRADES = ['cabin', 'cabin', 'lumberHut', 'garden', 'cabin', 'quarry', 'cabin', 'garden', 'cabin', 'cabin', 'lumberHut', 'cabin'];
   const WOOD = { storage: 30, lumberHut: 20, garden: 15, cabin: 25, quarry: 35, inn: 45, workshop: 25, sheepFarm: 30, market: 40, ironMine: 40, mill: 40, fishingPier: 30, townHall: 60, monument: 40, healerHut: 30, flowerBed: 8, academy: 70, harbor: 120, well: 15, guardTower: 50, silo: 40, courthouse: 60 };
   const ESSENTIAL = ['storage', 'lumberHut', 'garden', 'cabin'];
@@ -412,6 +412,12 @@ await page.evaluate((passive) => {
   // üreteçten (oyunun üreteçlerine dokunmaz). Ölçüm: impunity zirvesi, karar süreleri.
   window.__court = { imp: [], impMax: 1, decided: 0, waitH: 0, byJudge: {} };
   game.events.on('building:completed', (b) => { if (b?.type === 'courthouse' && window.__courtDay === undefined) window.__courtDay = game.state.time.day; });
+  window.__court.feedback = 0;
+  window.__court.trustFx = 0;
+  game.events.on('pulse:feedback', (fb) => { if (String(fb?.reason ?? '').startsWith('verdict:') || fb?.reason === 'verdict') window.__court.feedback += 1; });
+  game.events.on('court:verdict', ({ kase }) => { window.__court.trustFx += kase?.verdict?.effects?.trust ?? 0; });
+  game.events.on('court:stale', ({ kase }) => { window.__court.trustFx += kase?.verdict?.effects?.trust ?? 0; });
+  game.events.on('court:revealed', () => { window.__court.revealedLog = (window.__court.revealedLog ?? 0) + 1; });
   {
     let x = (Number(game.state.seed) * 2654435761 + 97) >>> 0 || 1;
     const nrand = () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
@@ -1469,9 +1475,20 @@ const courtStats = await page.evaluate(() => {
     impunityEnd: J ? Math.round(J.impunityFactor(s) * 100) / 100 : 1,
     solvedRatio: J ? Math.round(J.solvedRatio(s) * 100) / 100 : 1,
     record: J ? J.justiceRecord(s) : null,
+    // saraydan sonra: işlenen / yakalanan (suçüstü + sonradan konuşan tanık), Halk tepkisi, kararların güven etkisi, son ortalama sadakat
+    after: (() => {
+      const d0 = window.__courtDay;
+      if (d0 === undefined) return null;
+      const L = (window.__crimeLog ?? []).filter((e) => e.day >= d0);
+      const caught = L.filter((e) => e.caught).length + (C.revealedLog ?? 0);
+      return { days: s.time.day - d0, committed: L.length, caught, ratio: L.length ? Math.round((caught / L.length) * 100) / 100 : null };
+    })(),
+    feedback: C.feedback ?? 0,
+    trustFx: C.trustFx ?? 0,
+    loyaltyAvg: (() => { const a = s.characters.filter((c) => !c.role && !c.isChild); return a.length ? Math.round((a.reduce((t, c) => t + (c.loyalty ?? 0), 0) / a.length) * 10) / 10 : 0; })(),
   };
 });
-console.log(`(32.2) saray: ${courtStats.built ? `kurulu (G${courtStats.builtDay ?? '-'})` : 'yok'} · hâkim ${courtStats.judge} · dava ${courtStats.cases} · bant ${JSON.stringify(courtStats.bands)} · sürüncemede ${courtStats.stale} · sürgün ${courtStats.exiled} · tanık konuştu ${courtStats.revealed} · Muhtar ${courtStats.elder} · ceza ${JSON.stringify(courtStats.sentences)} · ort. karar ${courtStats.avgDecisionHours ?? '-'} sa · cezasızlık en çok ×${courtStats.impunityMax} / son ×${courtStats.impunityEnd} · yakalanma %${Math.round(courtStats.solvedRatio * 100)}`);
+console.log(`(32.2) saray: ${courtStats.built ? `kurulu (G${courtStats.builtDay ?? '-'})` : 'yok'} · hâkim ${courtStats.judge} · dava ${courtStats.cases} · bant ${JSON.stringify(courtStats.bands)} · sürüncemede ${courtStats.stale} · sürgün ${courtStats.exiled} · tanık konuştu ${courtStats.revealed} · Muhtar ${courtStats.elder} · ceza ${JSON.stringify(courtStats.sentences)} · ort. karar ${courtStats.avgDecisionHours ?? '-'} sa · cezasızlık en çok ×${courtStats.impunityMax} / son ×${courtStats.impunityEnd} · yakalanma %${Math.round(courtStats.solvedRatio * 100)} (saraydan sonra ${courtStats.after ? `${courtStats.after.caught}/${courtStats.after.committed}` : '-'}) · Halk tepkisi ${courtStats.feedback} · kararların güven etkisi ${courtStats.trustFx} · ort. sadakat ${courtStats.loyaltyAvg}`);
 console.log(`(32.1) suç: ${crimeStats.committed} işlendi · ${crimeStats.caught} yakalandı (bekçi ${crimeStats.guard}) · tür ${JSON.stringify(crimeStats.byType)} · motivasyon ${JSON.stringify(crimeStats.byMotive)} · günlük en çok ${crimeStats.maxPerDay} · ilk G${crimeStats.firstDay ?? '-'} · açık dava ${crimeStats.open} · beklenen ${crimeStats.expected} (${crimeStats.activeDays} etkin gün) · plan ${crimeStats.planned} / düşen ${crimeStats.dropped}${crimeStats.decisions ? ` · plan saatleri ${JSON.stringify(crimeStats.hours)} · vakti gelince ${JSON.stringify(crimeStats.busy)} · kararlar ${JSON.stringify(crimeStats.decisions)} · boş ${JSON.stringify(crimeStats.nulls)}` : ''}`);
 console.log(`(30.4b) olay: ${midStats.distinct} farklı (${midStats.log.length} karar; G20 sonrası ${midStats.freshAfter20}/${midStats.after20} yeni) · hedef ${midStats.milestones}/14 (${midStats.doneIds.join(',')}) · ${midStats.log.join(' ')}`);
 console.log(`(29.5) Omuz Omuza ${bondStats.side} · Diken Üstünde ${bondStats.rub} · en az bir kez Omuz Omuza alan ${bondStats.ever}/${bondStats.pop} (%${Math.round((100 * bondStats.ever) / Math.max(1, bondStats.pop))}) · Diken Üstünde alan ${bondStats.everRub} · en çok birlikte çalışan çiftler: ${bondStats.pairs.join(', ') || '-'}`);

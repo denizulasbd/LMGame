@@ -334,10 +334,10 @@ export const VERDICT_EFFECTS = {
 };
 
 // Cezasızlık: son `days` gündeki hafif / gevşek / sürüncemede kararların puanı riski artırır, adil kararlar söndürür
-export const IMPUNITY = { days: 8, perPoint: 0.15, cap: 1.6, fairDamp: 1 };
+export const IMPUNITY = { days: 10, perPoint: 0.25, cap: 2, fairDamp: 1 }; // ilk ölçüm { 8, 0,15, 1,6 }: hafif hâkimde suç adilinkinin ×1,0'ı (hedef ≥ 1,3)
 
 // Saray varken yakalanmamış eski suçlar (son `days` gün): günde bir izole zar; tutarsa bir tanık konuşur ve dava açılır
-export const REVEAL = { hour: 9, days: 4, chance: 0.3, perDay: 1 };
+export const REVEAL = { hour: 9, days: 4, chance: 0.15, perDay: 1 }; // ilk ölçüm 0,3: yakalanma %80-93 (hedef %60-75)
 
 // Sürgün: yalnızca suçlu bohçasıyla harita kenarına yürür
 export const EXILE = { timeoutMinutes: 360, cruelKin: -6 };
