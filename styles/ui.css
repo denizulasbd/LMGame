@@ -5668,3 +5668,13 @@ kbd {
 .royal-letter-seal img { width: 22px; height: 22px; image-rendering: pixelated; }
 .royal-letter-close { font-size: 13px; margin-top: 8px; color: #5b3f24; }
 .royal-letter-actions { display: flex; justify-content: flex-end; }
+/* (32.3) telefon: rozet tek sütun (taç üstte, % altta, ok ipucunda); yer açmak için refah ve güven çubukları kısalır — nüfus satırı alta kaymasın */
+@media (max-width: 480px) {
+  .hud-renown { grid-template-columns: auto; padding: 0 2px; }
+  .hud-renown .renown-arrow { display: none; }
+  .hud.topbar .hud-renown .renown-crown { grid-column: 1; grid-row: 1; justify-self: center; }
+  .hud-renown .renown-value { grid-column: 1; font-size: 12px; }
+  .hud-welfare .welfare-bar { width: 22px; }
+  .hud-pulse .trust-mini-bar { min-width: 20px; }
+  .hud.topbar .hud-zone-res { gap: 2px; }
+}

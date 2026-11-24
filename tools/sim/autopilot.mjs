@@ -146,6 +146,10 @@ await page.evaluate(async () => {
     ev.on('time:newDay', (day) => {
       const s = window.game.state;
       R.series[day] = Math.round((s.crown?.reputation ?? 0) * 10) / 10;
+      const RN0 = window.__renownMod;
+      R.streakMax = Math.max(R.streakMax ?? 0, s.renown?.gozdeStreak ?? 0);
+      if (RN0?.grantTownReady(s)) R.readyDays = (R.readyDays ?? 0) + 1;
+      if (RN0?.grantEligible(s, day)) R.eligibleDays = (R.eligibleDays ?? 0) + 1;
       if (day % 10 === 0) {
         const t = window.__renownMod.renownTarget(s);
         R.targets[day] = { target: t.target, top: t.parts.slice(0, 4).map((p) => `${p.key}:${p.value}`) };
@@ -1538,7 +1542,7 @@ const renownStats = await page.evaluate(() => {
     avg: vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null,
     levelDays: Object.values(R.series).reduce((m, v) => { const k = RN ? RN.renownLevelOf(v).key : '?'; m[k] = (m[k] ?? 0) + 1; return m; }, {}),
     tiers: R.tiers, targets: R.targets, target: t ? t.target : null, top: t ? t.parts.slice(0, 3).map((p) => `${p.label} ${p.value}`) : [],
-    grants: R.grants, built: R.built, streak: s.renown?.gozdeStreak ?? 0,
+    grants: R.grants, built: R.built, streak: s.renown?.gozdeStreak ?? 0, streakMax: R.streakMax ?? 0, readyDays: R.readyDays ?? 0, eligibleDays: R.eligibleDays ?? 0, series: R.series,
     levyGold: R.levyGold, levyPaid: R.levyPaid, levyFailed: R.levyFailed, joined: R.joined, skilled: R.skilled,
   };
 });

@@ -26,7 +26,7 @@ export const RENOWN_TARGET = {
   solved: { pivot: 0.5, scale: 8, min: -4, max: 4 },
   // Adalet sicili (justiceRecord, yalnızca Adalet Sarayı kararları; Muhtar uyarıları sayılmaz)
   justice: {
-    fairPivot: 0.6, fairScale: 15, // (adil oran − 0,6) × 15: hepsi adil +6, hiçbiri adil değil −9
+    fairPivot: 0.6, fairScale: 20, // (adil oran − 0,6) × 20: hepsi adil +8, hiçbiri adil değil −12 (ölçüm: 15 → 20)
     cruelEach: -4, cruelMin: -12, // son 10 kararda her zalim karar
     impunityEach: -1.5, impunityMin: -6, // cezasızlık puanı başına
     staleEach: -1, staleMin: -3, // sürüncemede kalan dava başına (son 40 kayıt)
@@ -35,13 +35,13 @@ export const RENOWN_TARGET = {
   trust: { pivot: 60, scale: 0.15, min: -8, max: 6 },
   welfare: { pivot: 60, scale: 0.12, min: -6, max: 4 },
   // Halkın Nabzı: yetişkinlerde Homurdanan + Kırgın payı × scale (Kırgın iki kat sayılır)
-  pulse: { scale: -25, bitterWeight: 2, min: -10 },
+  pulse: { scale: -35, bitterWeight: 2, min: -14 }, // (ölçüm: −25 / −10 → −35 / −14)
   // (32.4) Eğitim payı ve (32.5) kulüp payı: renownEducation / renownClubs 0-1 döndürür, × weight. Bu adımda değer 0: etkisiz.
   education: { weight: 6 },
   clubs: { weight: 5 },
   // Kasaba seviyesi (1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir; dizin = seviye) ve Altın Çağ küçük taban artışı
   tier: [0, 0, 1, 2, 3],
-  goldenAge: 3,
+  goldenAge: 6, // (ölçüm: 3 → 6; geç oyun hedefi ~76'da Gözde serisi en çok 3 gün sürüyordu, lütuf hiç gelmiyordu)
 };
 
 export const RENOWN_PART_LABELS = {
@@ -99,8 +99,8 @@ export const RENOWN_TEXT = {
 export const RENOWN_GRANT = {
   minTier: 3,
   cityTier: 4,
-  streakDays: 6,
-  chance: 0.15,
+  streakDays: 4, // (ölçüm: 6 → 4)
+  chance: 0.2, // (ölçüm: 0,15 → 0,2)
   gapDays: 12,
   weakenedBelowRank: 1, // kurulduktan sonra itibar Şüpheli'ye (rank 0) düşerse etkiler yarıya iner
   weakenedShare: 0.5,

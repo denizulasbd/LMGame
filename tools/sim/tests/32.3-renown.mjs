@@ -180,9 +180,9 @@ results.push(...(await page.evaluate(async () => {
   st.renown.lastGrantDay = null;
   c('koşul: Kasaba seviyesi ve (Gelişmiş Şehir ya da Altın Çağ) yoksa zar yok', !R.grantEligible(st));
   st.town.tier = 4;
-  st.renown.gozdeStreak = 5;
-  c('koşul: art arda 6 gün Gözde yoksa zar yok', !R.grantEligible(st));
-  st.renown.gozdeStreak = 6;
+  st.renown.gozdeStreak = D.RENOWN_GRANT.streakDays - 1;
+  c(`koşul: art arda ${D.RENOWN_GRANT.streakDays} gün Gözde yoksa zar yok`, !R.grantEligible(st));
+  st.renown.gozdeStreak = D.RENOWN_GRANT.streakDays;
   c('koşullar tutunca zar atılabilir', R.grantEligible(st, 30));
   st.crown.reputation = 95;
   sc.renown.dice = fixed(0.5);
@@ -192,7 +192,7 @@ results.push(...(await page.evaluate(async () => {
   const offG = E.on('renown:grant', (p) => (grantEv = p));
   const g1 = sc.renown.rollGrant(30);
   offG();
-  c('zar (%15): 0,5 tutmaz, 0 tutar; lütuf yazılır, olay ve Lütufname kartı', miss === null && g1 && st.renown.grants.length === 1 && st.renown.lastGrantDay === 30 && grantEv?.key === g1.key && SC.makeCard('renown:grant', grantEv, { state: st })?.action?.type === 'letter', g1?.key);
+  c(`zar (%${Math.round(D.RENOWN_GRANT.chance * 100)}): 0,5 tutmaz, 0 tutar; lütuf yazılır, olay ve Lütufname kartı`, miss === null && g1 && st.renown.grants.length === 1 && st.renown.lastGrantDay === 30 && grantEv?.key === g1.key && SC.makeCard('renown:grant', grantEv, { state: st })?.action?.type === 'letter', g1?.key);
   c('aralık kuralı: 12 gün dolmadan ikinci lütuf yok', !R.grantEligible(st, 41) && sc.renown.rollGrant(41) === null && R.grantEligible(st, 42));
   for (const t of D.ROYAL_TYPES) if (!R.royalGranted(st, t)) sc.renown.grant(t, 42);
   st.crown.reputation = 10;

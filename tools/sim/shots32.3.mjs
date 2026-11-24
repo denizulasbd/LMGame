@@ -45,7 +45,8 @@ await page.evaluate(async () => {
     if (d >= 6) rep += Math.max(-4, Math.min(4, (84 - rep) * 0.2));
     s.history.push({ day: d, population: 14 + Math.floor(d / 3), children: 2, welfare: 70 + (d % 7), stock: 300 + d * 9, gold: 200 + d * 30, buildings: 10 + Math.floor(d / 2), reputation: Math.round(rep) });
   }
-  s.crown.reputation = rep;
+  s.history.at(-1).reputation = 86; // dün: rozetin 24 saatlik oku yükselişi göstersin
+  s.crown.reputation = 86;
   s.trust.value = 96;
   sc.renown.newDay(34);
   s.crown.reputation = 92;

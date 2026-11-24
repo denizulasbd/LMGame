@@ -347,6 +347,7 @@ export class TownScene extends Scene {
       this.townDecor,
       this.crime,
       this.court,
+      this.renown,
       this.milestones,
       this.relationships,
       this.chemistry,
