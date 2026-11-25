@@ -66,6 +66,7 @@
 //   --judge fair|harsh|lenient|novice : (32.2) Adalet Sarayı'nın hâkim politikası (varsayılan fair). fair: hak edilene en yakın ceza ve
 //               iade; harsh: bir-iki kademe sert (hak edilen + 1,5); lenient: hep Af ya da Uyarı; novice: rastgele (sürgün nadir; sayfa
 //               içi ayrı üreteç, oyunun üreteçlerine dokunmaz). Dava açıldıktan sonraki ilk saat başında (novice 6 saat sonra) karar verir.
+//               (32.6a) none: davalara hiç bakmaz (hepsi süresi dolup sürüncemede kalır; acemi oyuncunun en kötü hâli).
 //   --famine [gün=5] : (30.3) kıtlık senaryosu: o günden sonra bütün bahçeler yıkılır, toplama emri ve acil dağıtım yapılmaz (oyuncu tepkisiz)
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
 //               bulunursa çıkış kodu 1 olur
@@ -79,8 +80,8 @@ const { positional, options } = parseArgs();
 const seed = Number(positional[0] ?? 42);
 const days = Number(positional[1] ?? 32);
 const judge = options.judge ?? 'fair'; // (32.2)
-if (!['fair', 'harsh', 'lenient', 'novice'].includes(judge)) {
-  console.log(`bilinmeyen --judge: ${judge} (fair | harsh | lenient | novice)`);
+if (!['fair', 'harsh', 'lenient', 'novice', 'none'].includes(judge)) {
+  console.log(`bilinmeyen --judge: ${judge} (fair | harsh | lenient | novice | none)`);
   process.exit(2);
 }
 const speed = Number(options.speed ?? 4);
@@ -555,6 +556,7 @@ await page.evaluate((passive) => {
       if (!J || !Dj || !J.courtOf(s) || passive) return;
       const imp = J.impunityFactor(s);
       window.__court.impMax = Math.max(window.__court.impMax, imp);
+      if (window.__judge === 'none') return; // (32.6a) davalara hiç bakmayan hâkim: bütün davalar süresi dolup sürüncemede kalır
       for (const k of [...(s.justice?.cases ?? [])]) {
         if (!k.court || s.justice.cases.indexOf(k) < 0) continue;
         const age = s.totalMinutes - k.minute;
