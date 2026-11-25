@@ -5,6 +5,7 @@ import { RESOURCES } from '../data/resources.js';
 import { TOWN_TIERS } from '../data/town.js';
 import { CROPS } from '../data/crops.js';
 import { levyAmount } from './Crown.js';
+import { CLUB_KEYS } from '../data/clubs.js';
 
 const tierName = (t) => TOWN_TIERS[Math.max(1, Math.min(TOWN_TIERS.length, t)) - 1].name;
 const tierOf = (state) => state.town?.tier ?? 1;
@@ -153,6 +154,11 @@ export function milestoneBlocker(state, milestone, progress = null) {
     case 'streets': return 'Sokak Feneri ve Taş Yol: Yol & Zemin sekmesinden';
     case 'monument': return needBuilding(state, 'monument') ?? null;
     case 'wonder': return needBuilding(state, 'wonder') ?? null;
+    // (32.6b) geç oyun hedefleri
+    case 'justiceServed': return needBuilding(state, 'courthouse') ?? 'Suç yakalanınca dava açılır: dava penceresinde hak edilene yakın bir ceza seç (adil karar)';
+    case 'firstClub': return state.buildings.some((b) => CLUB_KEYS.includes(b.type) && b.functional) ? 'Üyeler 2 günde bir akşam kulüp evinin önünde buluşur: en az 3 uygun üye gerekir' : needBuilding(state, 'gardenClub');
+    case 'firstGraduate': return needBuilding(state, 'university') ?? 'Bilgelik Evi\'ni bitiren bir genç (18-20) Darülfünun\'a kabul edilir; 540 dakikalık dersle mezun olur';
+    case 'royalFavorite': return 'Adil kararlar, güven, refah, eğitim ve kulüpler itibarı yükseltir; Halkın Nabzı\'nı iyi tut';
     default: return null;
   }
 }

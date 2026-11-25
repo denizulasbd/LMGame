@@ -12,10 +12,12 @@ import { SKILL_KEYS } from '../data/skills.js';
 import { engineOn } from './Engines.js';
 import { chosenDoctrine } from './Doctrine.js';
 import { pulseStats, pulseFace } from './Loyalty.js';
+import { CLUB_KEYS } from '../data/clubs.js';
 
 /** (30.4b) Şu an geçerli hedef listesi: ENGINES.midgame kapalıyken eski dokuz hedef. */
 export function activeMilestones() {
-  return engineOn('midgame') ? MILESTONES : MILESTONES.filter((m) => !m.midgame);
+  // (32.6b) `engine` alanı olan geç oyun hedefleri o şalter kapalıyken listede yoktur
+  return MILESTONES.filter((m) => (!m.midgame || engineOn('midgame')) && (!m.engine || engineOn(m.engine)));
 }
 
 /** (30.4b) Tamamlanmamış ilk hedef ("Sıradaki") ya da null. */
@@ -73,6 +75,25 @@ export function milestoneProgress(milestone, state) {
       return { current: chosenDoctrine(state) ? 1 : 0, target: milestone.target };
     case 'heirloomPassed':
       return { current: state.chronicle?.firstHeirloom ? 1 : 0, target: milestone.target };
+    // (32.6b) geç oyun hedefleri: yalnızca okur
+    case 'justiceServed': {
+      const built = state.buildings.some((b) => b.type === 'courthouse' && b.functional) ? 1 : 0;
+      const fair = Math.min(milestone.fair, state.justice?.stats?.court?.fair ?? 0);
+      return { current: built + fair, target: milestone.target, detail: `Saray ${built}/1 · Adil karar ${fair}/${milestone.fair}` };
+    }
+    case 'firstClub': {
+      const built = state.buildings.some((b) => CLUB_KEYS.includes(b.type) && b.functional) ? 1 : 0;
+      const met = Object.values(state.clubs ?? {}).some((r) => (r?.realized ?? 0) > 0) ? 1 : 0;
+      return { current: built + met, target: milestone.target, detail: `Hobi evi ${built}/1 · İlk buluşma ${met}/1` };
+    }
+    case 'firstGraduate': {
+      const built = state.buildings.some((b) => b.type === 'university' && b.functional) ? 1 : 0;
+      return { current: Math.min(1, state.university?.graduated ?? 0), target: milestone.target, detail: `Darülfünun ${built}/1 · Mezun ${Math.min(1, state.university?.graduated ?? 0)}/1` };
+    }
+    case 'royalFavorite': {
+      const rep = Math.floor(state.crown?.reputation ?? 0);
+      return { current: Math.min(rep, milestone.target), target: milestone.target, detail: `Krallık İtibarı %${rep}/${milestone.target}` };
+    }
     default:
       return { current: 0, target: milestone.target };
   }

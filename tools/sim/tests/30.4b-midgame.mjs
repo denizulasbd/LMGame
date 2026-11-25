@@ -366,7 +366,7 @@ const open = async (opts) => {
     sim.step(60);
     const prog = (id) => MSys.milestoneProgress(MS.MILESTONES.find((m) => m.id === id), st);
     const ids = MSys.activeMilestones().map((m) => m.id);
-    c('hedef listesi: 14 hedef; beş yenisi artisans\'tan sonra (heardVoices, peoplesHeart, firstFarewell, chosenPath, legacy)', ids.length === 14 && ids.slice(4, 11).join() === 'artisans,heardVoices,peoplesHeart,firstFarewell,chosenPath,legacy,winterTrial', ids.join());
+    c('hedef listesi: 18 hedef (32.6b: +4 geç oyun); beş yenisi artisans\'tan sonra (heardVoices, peoplesHeart, firstFarewell, chosenPath, legacy)', ids.length === 18 && ids.slice(4, 11).join() === 'artisans,heardVoices,peoplesHeart,firstFarewell,chosenPath,legacy,winterTrial', ids.join());
     st.petitions.fulfilled = 4;
     const p1 = prog('heardVoices').current;
     st.petitions.fulfilled = 5;
@@ -407,12 +407,12 @@ const open = async (opts) => {
     game.ui.render();
     const rows = [...document.querySelectorAll('.goals-panel .goal-row[data-goal]')];
     const nextRows = rows.filter((r) => r.classList.contains('is-next'));
-    c('Hedefler penceresi: 14 hedef satırı, tamamlanmamış ilk hedefte (tek) "Sıradaki" etiketi', rows.length === 14 && nextRows.length === 1 && nextRows[0].dataset.goal === nxt.id && /Sıradaki/.test(nextRows[0].textContent), `${rows.length} ${nextRows.map((r) => r.dataset.goal)} ${nxt?.id}`);
+    c('Hedefler penceresi: 18 hedef satırı, tamamlanmamış ilk hedefte (tek) "Sıradaki" etiketi', rows.length === 18 && nextRows.length === 1 && nextRows[0].dataset.goal === nxt.id && /Sıradaki/.test(nextRows[0].textContent), `${rows.length} ${nextRows.map((r) => r.dataset.goal)} ${nxt?.id}`);
     game.events.emit('ui:toggleGoals');
     ENGINES.midgame = false;
     const off = MSys.activeMilestones().map((m) => m.id);
     ENGINES.midgame = true;
-    c('şalter kapalıyken hedef listesi eski dokuz hedeftir', off.length === 9 && off.join() === 'firstHome,warmTable,tradeRoutes,growingFamily,artisans,winterTrial,brightStreets,crown,pearl', off.join());
+    c('midgame şalteri kapalıyken ara hedefler yok (32.6b: dört geç oyun hedefi kendi şalterlerine bağlı, dokuz + 4)', off.length === 13 && off.join() === 'firstHome,warmTable,tradeRoutes,growingFamily,artisans,winterTrial,brightStreets,crown,pearl,justiceServed,firstClub,firstGraduate,royalFavorite', off.join());
     st.doctrine = { chosen: null, day: null };
     const ctx = () => ({ state: st, guide: { done: [] }, facts: {} });
     const hallOff = G.CONDITIONS.doctrine.when(ctx());

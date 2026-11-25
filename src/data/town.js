@@ -180,6 +180,18 @@ export const TOWN_TIERS = [
   }
 }
 
+// (32.6b) Seviye atlama penceresinin ödül listeleri: 32'nin yapıları (ilgili şalter kapalıyken satır yok; dizi her okumada süzülür)
+{
+  const extras = {
+    2: [['court', 'Adalet Sarayı kurulabilir: yakalanan suçlara sen karar verirsin'], ['clubs', 'Hobi evleri kurulabilir: Bahçecilik Kulübü, Dikiş-Nakış Evi, Resim Atölyesi']],
+    3: [['university', 'Darülfünun kurulabilir: Bilgelik Evi mezunları orada yüksek okul okur']],
+  };
+  for (const [index, list] of Object.entries(extras)) {
+    const own = TOWN_TIERS[index].perks;
+    Object.defineProperty(TOWN_TIERS[index], 'perks', { enumerable: true, configurable: true, get: () => [...own, ...list.filter(([key]) => engineOn(key)).map(([, text]) => text)] });
+  }
+}
+
 export const TOWN_LEVEL = {
   welfareHours: 12, // ortalama refahın zaman sabiti (oyun saati): yaklaşık yarım günlük yürüyen ortalama
   checkMinutes: 10, // seviye koşulları bu sıklıkla denetlenir
