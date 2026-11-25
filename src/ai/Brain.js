@@ -373,7 +373,7 @@ export class Brain {
       // süs yapılarının (çit, bank, fener) kullanım noktası yoksa çevresindeki yürünebilir karo
       const doors = this.world.getSpots(target);
       const around = doors.length ? doors : this.crimeRing(target);
-      if (!around.length) return null;
+      if (!around.length && plan.crime !== 'pettyVandal') return null; // (32.6a) haylazlıkta aşağıda yakındaki başka süs denenir
       // en yakın birkaç noktadan yolu olan ilki (çitle çevrili bahçe gibi yerlerde en yakın karo kopuk olabilir)
       const d2 = (p) => (p.x - origin.x) ** 2 + (p.y - origin.y) ** 2;
       spot = [...around].sort((p, q) => d2(p) - d2(q)).slice(0, 4).find((p) => this.world.findPath(origin, p)) ?? null;
