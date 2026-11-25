@@ -147,7 +147,11 @@ await page.evaluate((o) => {
   window.__crimeDiag = o.crimeDiag; // (32.1) tanı
   window.__judge = o.judge; // (32.2)
   window.__noClubs = o.noClubs; // (32.5)
-}, { judge, famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null, crimeDiag: Boolean(options['crime-diag']), noClubs: Boolean(options['no-clubs']) });
+  // (32.6b) --no-32-builds: 32'nin yapıları (saray, Darülfünun, hobi evleri, lütuf yapıları) hiç kurulmaz; --defer-32-builds: yalnızca Ulu Saat Kulesi
+  // (Altın Çağ) tamamlandıktan sonra kurulur. Şalterler açık kalır (mekaniği otopilotun inşa tercihinden ayırmak için).
+  window.__b32 = o.b32;
+  window.__allow32 = (st) => !window.__b32 || (window.__b32 === 'defer' && Boolean(st.goldenAge?.since));
+}, { judge, famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null, crimeDiag: Boolean(options['crime-diag']), noClubs: Boolean(options['no-clubs']), b32: options['no-32-builds'] ? 'none' : options['defer-32-builds'] ? 'defer' : null });
 if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent', 'repent2', 'novice'].includes(options.profile)) {
   console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent | repent2 | novice)`);
   process.exit(2);
@@ -883,7 +887,7 @@ await page.evaluate((passive) => {
           const def = window.__buildingsData?.BUILDINGS?.university;
           const lack = def ? Object.entries(def.cost).filter(([r, v]) => (res[r] ?? 0) < v + 20).map(([r]) => r) : [];
           if (def && s.town.tier >= def.requiresTier && !s.buildings.some((b) => b.type === 'university')) for (const r of lack) window.__uni.lack[r] = (window.__uni.lack[r] ?? 0) + 1;
-          if (def && s.town.tier >= def.requiresTier && !s.buildings.some((b) => b.type === 'university') && !lack.length) {
+          if (def && window.__allow32(s) && s.town.tier >= def.requiresTier && !s.buildings.some((b) => b.type === 'university') && !lack.length) {
             const spot = sim.findSpotNearHomes('university', 18) ?? sim.findSpot('university', 20); // (32.6a) konutlara yakın
             if (spot) scene.construction.placeSite('university', spot.x, spot.y);
             else window.__uni.noSpot = (window.__uni.noSpot ?? 0) + 1;
@@ -891,7 +895,7 @@ await page.evaluate((passive) => {
         }
         // (32.5) Hobi evleri: Kasaba seviyesinde Kasaba Anıtı bittikten sonra, sırayla (Bahçecilik → Resim → Dikiş), aynı anda tek şantiye,
         // ikisi arasında en az 2 gün; bedeli payıyla (odun +40, taş +20, yün +5) yetince. --no-clubs: hiç kurulmaz.
-        if (!window.__noClubs && window.__clubTypes && s.town.tier >= 3 && s.buildings.some((b) => b.type === 'monument' && b.functional)) {
+        if (!window.__noClubs && window.__allow32(s) && window.__clubTypes && s.town.tier >= 3 && s.buildings.some((b) => b.type === 'monument' && b.functional)) {
           const CL = window.__clubStats;
           const types = window.__clubTypes.filter((t) => !s.buildings.some((b) => b.type === t));
           const busy = s.buildings.some((b) => b.underConstruction && window.__clubTypes.includes(b.type));
@@ -906,7 +910,7 @@ await page.evaluate((passive) => {
         // (32.3) Kraliyet Lütfu: açılan gizli yapıyı malı payıyla yetince kur (sıra: suçu düşüren çeşme, refah veren bahçe, arşiv);
         // aynı anda tek şantiye
         const RN = window.__renownMod;
-        if (RN && !s.buildings.some((b) => b.underConstruction && ['peaceFountain', 'royalRoseGarden', 'royalArchive'].includes(b.type))) {
+        if (RN && window.__allow32(s) && !s.buildings.some((b) => b.underConstruction && ['peaceFountain', 'royalRoseGarden', 'royalArchive'].includes(b.type))) {
           for (const type of ['peaceFountain', 'royalRoseGarden', 'royalArchive']) {
             if (!RN.royalGranted(s, type) || s.buildings.some((b) => b.type === type)) continue;
             const cost = window.__buildingsData?.BUILDINGS?.[type]?.cost;
@@ -1219,6 +1223,7 @@ await page.evaluate((passive) => {
     let next = null;
     let nextSpot = null;
     for (const type of PLAN) {
+      if (type === 'courthouse' && !window.__allow32(s)) continue; // (32.6b)
       planned[type] = (planned[type] ?? 0) + 1;
       if ((counts[type] ?? 0) >= planned[type]) continue;
       if (planned[type] >= (OPTIONAL[type] ?? Infinity)) {
@@ -1885,8 +1890,24 @@ for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}
 const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0 && mon.social.stuck.length === 0;
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
+  // (32.6b) A/B özeti: hazine son gün ve son 5 günün ortalaması, 32 yapılarının kuruluş günleri, doyum, suç, itibar, Krallık Vergisi
+  const abStats = await page.evaluate(() => {
+    const s = window.game.state;
+    const daily = (window.__nov?.daily ?? []).slice(-5);
+    const adults = s.characters.filter((c) => !c.role && !c.isChild);
+    const types = ['courthouse', 'university', 'gardenClub', 'sewingClub', 'paintingClub', 'peaceFountain', 'royalRoseGarden', 'royalArchive'];
+    const built = Object.fromEntries(types.map((k) => [k, s.buildings.filter((b) => b.type === k && b.functional).length]));
+    return {
+      gold: Math.round(s.resources.gold), gold5: daily.length ? Math.round(daily.reduce((a, d) => a + d.gold, 0) / daily.length) : null,
+      golden: s.goldenAge?.since?.day ?? null, pop: s.characters.length,
+      satisfaction: adults.length ? Math.round((adults.reduce((a, c) => a + (c.satisfaction ?? 0), 0) / adults.length) * 10) / 10 : null,
+      crime: (window.__crimeLog ?? []).length, reputation: Math.round((s.crown?.reputation ?? 0) * 10) / 10, levyGold: window.__renown?.levyGold ?? 0,
+      built, buildings: s.buildings.filter((b) => b.functional || b.underConstruction).length,
+      courtDay: window.__courtDay ?? null, uniDay: window.__uni?.builtDay ?? null,
+    };
+  });
   const endState = await page.evaluate(() => ({ pop: window.game.state.characters.length, trust: Math.round(window.game.state.trust?.value ?? 0), trustMin: Math.round(window.game.state.trust?.min ?? 0), revolts: window.game.state.stats?.revolts ?? null })); // (32.2) ölçüm özeti
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, court: courtStats, renown: renownStats, university: uniStats, clubs: clubStats, ...(options['club-diag'] ? { clubDiag: await page.evaluate(() => window.__clubDiag) } : {}), gold: report.gold, golden: report.golden?.since ?? null, end: endState, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, court: courtStats, renown: renownStats, university: uniStats, clubs: clubStats, ...(options['club-diag'] ? { clubDiag: await page.evaluate(() => window.__clubDiag) } : {}), gold: report.gold, golden: report.golden?.since ?? null, ab: abStats, end: endState, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();
