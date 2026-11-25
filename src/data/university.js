@@ -39,7 +39,7 @@ export const UNIVERSITY = {
 
 // Eğitim seviyesinin suç riskine etkisi (Justice.educationFactor): 1 = Bilgelik Evi mezunu (educationMerit), 2 = Darülfünun mezunu.
 // Ders alan öğrenci (genç) ×0,8.
-export const EDUCATION_CRIME = { 1: 0.85, 2: 0.65, student: 0.8 };
+export const EDUCATION_CRIME = { 1: 0.8, 2: 0.65, student: 0.8 }; // (32.6a) 1: 0,85 → 0,8 (4 × 120 günde beklenen riskte Bilgelik Evi mezunu eğitimsizden yalnızca %8-12 düşüktü; hedef ≥ %10)
 
 // İtibar hedefindeki eğitim payı (Renown.renownEducation): yetişkinler içinde (Darülfünun mezunu payı + levelOneWeight × yalnızca
 // Bilgelik Evi mezunu payı), 0-1'e kırpılır. Beklenen 0-0,6 (ağırlık RENOWN_TARGET.education = 6).

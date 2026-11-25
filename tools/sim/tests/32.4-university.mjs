@@ -243,7 +243,7 @@ const errors = [];
 
     // ---- 10. suç ve itibar faktörleri
     const plain = { lifeStage: 'adult' };
-    c('educationFactor: eğitimsiz 1, Bilgelik Evi ×0,85, Darülfünun ×0,65, öğrenci ×0,8', J.educationFactor(plain) === 1 && J.educationFactor({ educated: true }) === 0.85 && J.educationFactor({ educated: true, graduate: { field: 'farming' } }) === 0.65 && J.educationFactor({ educated: true, higherStudy: { field: 'farming' } }) === 0.8);
+    c('educationFactor: eğitimsiz 1, Bilgelik Evi ×0,8 (32.6a), Darülfünun ×0,65, öğrenci ×0,8', J.educationFactor(plain) === 1 && J.educationFactor({ educated: true }) === 0.8 && J.educationFactor({ educated: true, graduate: { field: 'farming' } }) === 0.65 && J.educationFactor({ educated: true, higherStudy: { field: 'farming' } }) === 0.8);
     ENGINES.educationMerit = false;
     const meritOff = J.educationFactor({ educated: true });
     ENGINES.educationMerit = true;
