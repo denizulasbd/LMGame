@@ -73,6 +73,8 @@ import { genitive } from '../utils/turkish.js';
 import { TEMPERAMENT } from '../data/temperament.js';
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
+// (32.5) Kulüp zilinin kaldırdığı sade boş zaman uğraşları (öncelikli işler bunun dışında kalır)
+const CLUB_BELL_ACTS = new Set(['wait', 'petAnimal', 'readBench', 'readLibrary', 'music', 'viewpoint', 'shade', 'bench', 'river', 'flowers', 'monument', 'ancientSpring', 'campRest', 'stroll', 'campfire', 'fountain', 'gazebo', 'inn', 'clubHobby']);
 const TOWER_BUBBLES = ['hammer', 'hammer', 'sweat', 'sparkle']; // (20. aşama) Ulu Saat Kulesi şantiyesinde
 
 export class BehaviorSystem {
@@ -110,6 +112,9 @@ export class BehaviorSystem {
       }),
       // (32.4) Darülfünun ders zili (14:00): derse gidecek öğrencilerin yarıda kesilebilir işi biter (şalter kapalıyken olay yok)
       game.events.on('university:bell', ({ ids }) => this.interrupt(ids)),
+      // (32.5) Kulüp buluşması başladı: uygun üyelerin yalnızca sıradan boş zaman uğraşı biter (randevu, sohbet daveti, teselli, yas,
+      // aile yemeği, anma, konser, kamu hizmeti, suç kesilmez); şalter kapalıyken ya da hobi evi yokken olay yok
+      game.events.on('club:bell', ({ ids }) => this.interruptForClub(ids)),
       game.events.on('expedition:depart', ({ ids, until, exit }) => this.departExpedition(ids, until, exit)),
       // Şenlik başlayınca boş zamanı olanlar elindekini bırakıp şenliğe katılır
       // (14. aşama) Toplanma Zili: uyanık herkes elindekini bırakır (uyuyanlar uyanmaz)
@@ -189,6 +194,16 @@ export class BehaviorSystem {
       const kind = c.task ? ACTIVITIES[activity].kind : 'idle';
       const hit = extra.includes(activity) || (!only && INTERRUPTIBLE_KINDS.has(kind));
       if (hit) this.endTask(c);
+    }
+  }
+
+  /** (32.5) Kulüp zili: yalnızca sade boş zaman uğraşındaki (CLUB_BELL_ACTS) ve randevuda / davette olmayan üyeler kalkar. */
+  interruptForClub(ids) {
+    for (const id of ids ?? []) {
+      const c = this.world.getCharacter(id);
+      if (!c || !c.visible || c.away || !c.task) continue;
+      if (!CLUB_BELL_ACTS.has(c.task.activity) || c.task.dateWithId !== undefined || c.task.meetWithId !== undefined || c.task.onBreak) continue;
+      this.endTask(c);
     }
   }
 
@@ -410,6 +425,7 @@ export class BehaviorSystem {
       if (partner) return `${partner.name} ile ${task.dateWithId !== undefined ? 'randevuya' : 'buluşmaya'} gidiyor`;
     }
     let label = activity.travelLabel ?? activity.label;
+    if (task.clubTravel) label = task.clubTravel; // (32.5)
     if (task.consoleName) label = label.replace('{name}', task.consoleName); // (29.2)
     // (19. aşama) huyların etkinlikleri: hayvanın adı ve çalınan yer
     if (task.petName) label = label.replace('{pet}', task.petName);
@@ -440,6 +456,7 @@ export class BehaviorSystem {
     // (29.2) yas ve teselli
     if (task.grieve) label = task.grieveFor ? GRIEVE_LABEL.replace('{who}', genitive(task.grieveFor)) : GRIEVE_FALLBACK;
     if (task.consoleName) label = label.replace('{name}', task.consoleName);
+    if (task.clubLabel) label = task.clubLabel; // (32.5) "Bahçecilik Kulübü'nde fide dikiyor"
     if (task.petName) label = label.replace('{pet}', task.petName);
     if (task.placeAt) label = label.replace('{place}', task.placeAt);
     if (task.bagItem) label = label.replace('{bag}', ITEMS[task.bagItem].name.toLocaleLowerCase('tr'));
@@ -486,6 +503,9 @@ export class BehaviorSystem {
 
     c.tool = activity.tool ?? null;
     c.workEffect = activity.effect ?? null;
+    // (32.5) kulüp buluşması: poz ve alet kulübe göre (bahçede çapa, dikişte tabure, resimde şövale)
+    if (task.pose) c.pose = task.pose;
+    if (task.tool) c.tool = task.tool;
     if (task.facing) c.facing = task.facing;
     else if (task.faceTarget) c.faceToward(task.faceTarget.x, task.faceTarget.y);
     else if (building) c.faceToward(building.center.x, building.center.y);

@@ -37,6 +37,7 @@ import { getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
 import { getCourthouseSprite } from './structuresJustice.js';
 import { getPeaceFountainSprite, getRoseGardenSprite, getRoyalArchiveSprite } from './structuresRoyal.js';
 import { getUniversitySprite } from './structuresUniversity.js'; // (32.4)
+import { getGardenClubSprite, getSewingClubSprite, getPaintingClubSprite } from './structuresClubs.js'; // (32.5)
 import { getSiloSprite } from './structuresGranary.js';
 import { getLoomSprite, getBrewerySprite } from './structuresRefinery.js';
 import { getTradingPostSprite } from './structuresTrade.js';
@@ -681,6 +682,7 @@ const WINTER_ROOFS = {
   courthouse: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 22 }, // (32.2) alınlığın saçağı
   royalArchive: { light: ['c'], main: ['b'], dark: ['N'], maxRow: 13 }, // (32.3) kubbe
   university: { light: ['c', 'a', 'Z'], main: ['b', 'C'], dark: ['U'], maxRow: 32 }, // (32.4) kubbeler ve saçak
+  gardenClub: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 23 }, sewingClub: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 23 }, paintingClub: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 21 }, // (32.5) hobi evlerinin çatıları
 };
 
 export function getStructureSprite(type, state = {}) {
@@ -814,6 +816,13 @@ function getBaseStructureSprite(type, state) {
     // (32.4) Darülfünun: mevsim ağaçları; ders saatinde (state.look.lecture) ve akşam pencereler yanar
     case 'university':
       return getUniversitySprite(state.season ?? 'summer', Boolean(state.look?.lecture || state.windowsLit));
+    // (32.5) Hobi evleri: mevsim tarhları / saksıları; buluşmada (state.look.session) ve akşam pencereler yanar; ürün sayısı (look.works)
+    case 'gardenClub':
+      return getGardenClubSprite(state.season ?? 'summer', Boolean(state.look?.session && state.season === 'winter') || Boolean(state.windowsLit), state.look?.works ?? 0);
+    case 'sewingClub':
+      return getSewingClubSprite(state.season ?? 'summer', Boolean(state.look?.session || state.windowsLit));
+    case 'paintingClub':
+      return getPaintingClubSprite(state.season ?? 'summer', Boolean(state.look?.session || state.windowsLit), state.look?.works ?? 0);
     // 23. aşama: güvenlik yapıları
     case 'well':
       return getWellSprite(state.frame ?? 0);

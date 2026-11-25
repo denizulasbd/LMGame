@@ -47,6 +47,7 @@ import { VENERABLE } from '../data/lifeStages.js';
 import { SCHOOL } from '../data/research.js';
 import { UNIVERSITY } from '../data/university.js'; // (32.4)
 import { universityOf, isLectureHour } from '../systems/University.js'; // (32.4)
+import { CLUB } from '../data/clubs.js'; // (32.5)
 import { isRallyActive } from '../systems/RallySystem.js';
 import { healSpeedMultiplier } from '../systems/ResearchSystem.js';
 import { QUIRKS, QUIRK_RULES, DATING, HOME_DINNER } from '../data/social.js';
@@ -108,7 +109,8 @@ export class Brain {
    *   relationships: import('../systems/RelationshipSystem.js').RelationshipSystem,
    *   crafting: import('../systems/CraftingSystem.js').CraftingSystem }} services
    */
-  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null, apprenticeship = null, university = null }) {
+  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null, apprenticeship = null, university = null, clubs = null }) {
+    this.clubs = clubs; // (32.5) hobi evleri (kendi üreteci yok; zar çekmez)
     this.university = university; // (32.4) Darülfünun (kendi üreteci yok; zar çekmez)
     this.crisis = crisis; // (23. aşama) yangın ve yaralanma kararları
     this.apprenticeship = apprenticeship; // (25.2) çıraklık (kendi üreteci)
@@ -277,6 +279,13 @@ export class Brain {
     if (!c.isChild && (!isWorkHours(hour) || onBreak) && serviceDue(this.world.state, c)) {
       const plan = this.planService(c);
       if (plan) return { ...plan, onBreak };
+    }
+    // (32.5) Kulüp buluşması: ClubSystem buluşmayı kurduysa (en az 3 uygun üye) üye kulüp evine gider. Acil ihtiyaç, yangın, isyan,
+    // şenlik, Toplanma Zili / konser, anma, düğün, aile yemeği, yas, teselli, suç planı ve kamu hizmeti önce; yalnızca mesai dışında
+    // (uyku yukarıda önce gelir: mesai ve uyku bölünmez). Randevu, sohbet ve planLeisure'dan ÖNCE; zar çekmez. Üyesi yokken çalışmaz.
+    if (c.club && this.clubs && engineOn('clubs') && !c.isChild && !grieving && !isWorkHours(hour)) {
+      const plan = this.clubs.planSession(c);
+      if (plan) return plan;
     }
     // (19. aşama) Bekâr ve ilişkisi yüksek sakinler boş zamanlarında birbirleriyle vakit geçirmeye öncelik verir
     if (!c.isChild && !c.married && !grieving && (!isWorkHours(hour) || onBreak)) {
@@ -466,7 +475,7 @@ export class Brain {
 
   /** Keyfi düşen sakin çantasındaki hatırasına bakar (6 saatte bir). */
   planKeepsake(c) {
-    if (c.needs.fun >= SNACK.keepsakeBelowFun || countItem(c, 'souvenir') <= 0) return null;
+    if (c.needs.fun >= SNACK.keepsakeBelowFun || countItem(c, 'souvenir') + countItem(c, 'handkerchief') <= 0) return null; // (32.5) Nakışlı Mendil de
     const now = this.world.state.totalMinutes;
     if (c.lastKeepsakeAt !== undefined && c.lastKeepsakeAt !== null && now - c.lastKeepsakeAt < SNACK.keepsakeCooldownMinutes) return null;
     c.lastKeepsakeAt = now;
@@ -557,6 +566,7 @@ export class Brain {
     if (c.needs.social >= PARTNER_SOCIAL_LIMIT) return false;
     if (isWorkHours(hour) && !c.task?.onBreak) return false;
     if (!c.task) return true;
+    if (c.task.clubKey && c.task.activity !== 'clubHobby') return false; // (32.5) kulüp buluşmasındaki üye sohbet davetine kalkmaz
     const kind = ACTIVITIES[c.task.activity].kind;
     return kind === 'leisure' || kind === 'idle';
   }
@@ -1101,6 +1111,8 @@ export class Brain {
       // (32.4) Misafir hoca: Darülfünun varken ders saatinde düşük ağırlıklı "Darülfünun'da sohbet" (yapı yokken anahtar hiç eklenmez)
       if (this.university && universityOf(this.world.state) && isLectureHour(hour)) weights.uniTalk = ELDER.readLibraryBase * UNIVERSITY.guestWeight;
     }
+    // (32.5) Kulüp üyesi: kendi kulüp evinde tek başına uğraş (düşük ağırlık; kulübü ya da yapısı yokken anahtar hiç eklenmez)
+    if (c.club && this.clubs?.hobbyAvailable(c)) weights.clubHobby = CLUB.hobbyWeight;
 
     const options = Object.entries(weights).filter(([name, w]) => w > 0 && ACTIVITIES[name]);
     while (options.length > 0) {
@@ -1151,6 +1163,8 @@ export class Brain {
         if (!this.world.findPath(this.originTile(c), spot)) return null;
         return { activity, buildingId: uni.id, spot, finalPoint: uni.entrancePoint, duration };
       }
+      case 'clubHobby':
+        return this.clubs?.planHobby(c, duration) ?? null; // (32.5)
       case 'music':
         return this.planMusic(c, hour, duration);
       case 'viewpoint':
@@ -1443,6 +1457,7 @@ export class Brain {
     if (isWorkHours(hour) && !o.task?.onBreak) return false;
     if (!o.task) return true;
     if (o.task.dateWithId !== undefined && o.task.dateWithId !== c.id) return false;
+    if (o.task.clubKey && o.task.activity !== 'clubHobby') return false; // (32.5) kulüp buluşmasındaki üye randevuya kalkmaz
     const kind = ACTIVITIES[o.task.activity].kind;
     return kind === 'leisure' || kind === 'idle' || kind === 'social';
   }

@@ -115,6 +115,7 @@ import { JUSTICE_SEED_OFFSET, COURT_SEED_OFFSET } from '../data/justice.js';
 import { RenownSystem } from '../systems/RenownSystem.js';
 import { RENOWN_SEED_OFFSET } from '../data/renown.js';
 import { UniversitySystem } from '../systems/UniversitySystem.js'; // (32.4)
+import { ClubSystem } from '../systems/ClubSystem.js'; // (32.5)
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -248,6 +249,8 @@ export class TownScene extends Scene {
     this.lifecycle = new LifecycleSystem(this.game, this.world, { jobs: this.jobs });
     // (32.4) Darülfünun: üreteci yok; gün dönümü dinleyicisi yaşlanmadan (LifeStageSystem) SONRA kurulur (mezuniyet önce, kabul sonra)
     this.university = new UniversitySystem(this.game, this.world, { moodlets: this.moodlets, apprenticeship: this.apprenticeship });
+    // (32.5) Hobi evleri: üreteci yok; gün dönümü dinleyicisi Darülfünun'dan SONRA (üyelik), LandscapeSystem'den ÖNCE kurulur (ürün estetiği)
+    this.clubs = new ClubSystem(this.game, this.world, { moodlets: this.moodlets, relationships: this.relationships });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       crisis: this.crisis,
@@ -259,6 +262,7 @@ export class TownScene extends Scene {
       research: this.research,
       apprenticeship: this.apprenticeship,
       university: this.university,
+      clubs: this.clubs, // (32.5)
     });
     this.saves = new SaveSystem(this.game, {
       captureTerrain: () => diffTerrain(this.baseTerrain, this.map),
@@ -303,6 +307,7 @@ export class TownScene extends Scene {
       this.crisis,
       this.animals,
       this.relationships,
+      this.clubs, // (32.5) buluşma (arkadaşlık gruplarından sonra), ürünler, görünüm
       this.conflicts,
       this.chemistry,
       this.moodlets,
@@ -354,6 +359,7 @@ export class TownScene extends Scene {
       this.court,
       this.renown,
       this.university, // (32.4)
+      this.clubs, // (32.5)
       this.milestones,
       this.relationships,
       this.chemistry,

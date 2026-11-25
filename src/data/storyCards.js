@@ -1,7 +1,7 @@
 // (30.2 "Görünen Hikâye") Hikâye kartlarının veri tablosu: hangi olay kaç öncelikli, hangi eşikler, süzgeç kademeleri. Metinler
 // systems/StoryCards.js'te saf işlevlerle üretilir (aynı olay yükü aynı metni verir). Bu tablo yalnızca arayüzü etkiler;
 // simülasyona hiçbir şey yazmaz. Sayıları buradan ayarla (gün başına 2-8 kart hedefi: tools/sim/tests/30.2-stories.mjs).
-export const STORY_TABLE_VERSION = 7; // (32.4) 7: 'university:*' (kabul, mezuniyet, yarım bırakma); (32.3) 6: 'renown:tier' / 'renown:grant'; (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20; (32.1) 4: 'crime:caught' / 'crime:unsolved'; (32.2) 5: 'court:*' (karar, sürgün, tanık, sürüncemede)
+export const STORY_TABLE_VERSION = 8; // (32.5) 8: 'club:*' (kuruluş, ürün, sergi; clubPerDay); (32.4) 7: 'university:*' (kabul, mezuniyet, yarım bırakma); (32.3) 6: 'renown:tier' / 'renown:grant'; (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20; (32.1) 4: 'crime:caught' / 'crime:unsolved'; (32.2) 5: 'court:*' (karar, sürgün, tanık, sürüncemede)
 
 export const STORY_LIMITS = {
   visible: 2, // aynı anda görünen kart
@@ -15,6 +15,7 @@ export const STORY_LIMITS = {
   specialStartHour: 6, // özel gün sabahı kartı (RiteSystem 06:00'da işaretler)
   storyChars: 220, // "Öyküsünü oku" ile açılan metnin üst sınırı
   crimePerDay: 1, // (32.1) "Yalnızca önemli" süzgecinde günde en çok bu kadar suç kartı (fazlası gün özetine; izlenen sakinin kartı sayılmaz)
+  clubPerDay: 1, // (32.5) "Yalnızca önemli" süzgecinde günde en çok bu kadar kulüp kartı
 };
 
 // Olay -> öncelik (5 en önemli). Süzgeç: 'important' öncelik >= 3 olanları gösterir.
@@ -54,6 +55,10 @@ export const STORY_PRIORITY = {
   'university:admitted': 1, // (32.4) Darülfünun'a kabul (kısa)
   'university:graduated': 4, // (32.4) Darülfünun mezuniyeti (önemli)
   'university:dropped': 2, // (32.4) eşiğe ulaşamadan yetişkin oldu
+  'club:founded': 3, // (32.5) kulüp kuruldu (ilk üç üye)
+  'club:work': 2, // (32.5) kulübün küçük ürünü (tarh, mendil, tablo)
+  'club:milestone': 3, // (32.5) ürün kilometre taşı (ilk ürün, son tarh, kış giysisi): 'club:work' kartının önceliği
+  'club:exhibition': 4, // (32.5) Kasaba Sergisi (altıncı tablo, bir kez)
   'story:summary': 2,
 };
 

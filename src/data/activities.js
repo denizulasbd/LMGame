@@ -517,6 +517,32 @@ export const ACTIVITIES = {
     duration: [50, 80],
     effects: { fun: 0.5, social: 0.4 },
   },
+  // (32.5) Hobi evleri: akşam buluşması (kulüp evinin önünde; poz, alet ve etiket kulübe göre task.pose / task.tool / task.clubLabel),
+  // kışın Bahçecilik Kulübü'nün serasında (içeride; etki aynı) ve buluşma dışında kendi kulüp evinde tek başına uğraş
+  clubSession: {
+    kind: 'leisure',
+    travelLabel: 'Kulüp evine gidiyor',
+    label: 'Kulüp evinde arkadaşlarıyla uğraşıyor',
+    duration: [120, 120],
+    effects: { fun: 0.4, social: 0.5 },
+    bubbles: ['note', 'heart', 'sparkle'],
+  },
+  clubSessionIn: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: 'Kulüp evine gidiyor',
+    label: 'Kulüp evinde arkadaşlarıyla uğraşıyor',
+    duration: [120, 120],
+    effects: { fun: 0.4, social: 0.5 },
+  },
+  clubHobby: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: 'Kulüp evine gidiyor',
+    label: 'Kulüp evinde tek başına uğraşıyor',
+    duration: [50, 80],
+    effects: { fun: 0.5, social: 0.05 },
+  },
   // Keşif seferine çıkan sakin harita kenarına yürür ve bir gün ortadan kaybolur
   expedition: {
     kind: 'away',

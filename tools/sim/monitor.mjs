@@ -161,6 +161,8 @@ export async function installMonitor(page) {
         const s = game.state;
         // (32.4) ayrılan / sürgün edilen / ölen öğrencinin kaydı (UniversitySystem dinleyicisi bizden önce) silinmiş olmalı
         if (character?.higherStudy) broke(`${character.name}: kasabadan ayrıldı ama Darülfünun kaydı duruyor`);
+        // (32.5) ayrılan / sürgün edilen / ölen üyenin kulüp kaydı (ClubSystem dinleyicisi bizden önce) silinmiş olmalı
+        if (character?.club) broke(`${character.name}: kasabadan ayrıldı ama kulüp kaydı duruyor`);
         if (reason === 'exile') {
           m.exiles++;
           if ((s.exodus?.left ?? 0) !== exo.left || (s.stats?.emigrants ?? 0) !== exo.emigrants) broke(`sürgün ${character?.name}: terk ediş sayacı değişti`);
@@ -341,6 +343,19 @@ export async function installMonitor(page) {
             if (!c.educated) broke(`${c.name}: Bilgelik Evi mezunu değil ama öğrenci`);
             if (c.graduate) broke(`${c.name}: hem öğrenci hem mezun`);
           }
+        }
+        // (32.5) Hobi evleri: kulüp başına en çok 6 üye; üye çocuk / misafir / sürgünde değil; kulübünün evi var; katılım kayıtları yaşayan sakin
+        {
+          const per = {};
+          for (const c of s.characters) {
+            if (!c.club) continue;
+            per[c.club.key] = (per[c.club.key] ?? 0) + 1;
+            if (c.isChild || c.role) broke(`${c.name}: çocuk / misafir ama kulüp üyesi`);
+            if (c.sentence?.exile) broke(`${c.name}: sürgünde ama kulüp üyesi`);
+            if (!s.buildings.some((b) => b.type === c.club.key)) broke(`${c.name}: kulübünün evi (${c.club.key}) yok`);
+          }
+          for (const [k, n] of Object.entries(per)) if (n > 6) broke(`${k}: ${n} üye (kapasite 6)`);
+          for (const [k, r] of Object.entries(s.clubs ?? {})) for (const list of r.attendance ?? []) for (const id of list) if (!ids.has(id)) broke(`${k}: katılımda kopuk kişi ${id}`);
         }
         // (32.2) sürgün yolunda süresini aşan sakin kalmaz
         for (const c of s.characters) if (c.sentence?.exile && now - c.sentence.exile.since > 420) broke(`${c.name}: sürgün yolunda takıldı`);

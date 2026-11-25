@@ -7,6 +7,8 @@
 //   action : null | { type: 'story' | 'condolence' | 'gift' | 'case', label, id? }   ((32.2) 'case': dava penceresini açar)
 import { UNIVERSITY_TEXT } from '../data/university.js'; // (32.4)
 import { fieldName } from './University.js'; // (32.4)
+import { CLUB_TEXT } from '../data/clubs.js'; // (32.5)
+import { clubName } from './Clubs.js'; // (32.5)
 import { STORY_PRIORITY, STORY_LIMITS as L, STORY_FILTERS, STORY_DEFAULT_FILTER, STORY_ACTIONS, STORY_TEXT } from '../data/storyCards.js';
 import { SPECIAL_KIND_NAMES } from '../data/rites.js';
 import { wantName } from './Wants.js';
@@ -198,6 +200,26 @@ export function makeCard(event, p = {}, ctx = {}) {
       const t = UNIVERSITY_TEXT[event.slice(11)];
       const text = t.replace('{name}', p.character.name).replace('{field}', fieldName(p.field)).replace('{pct}', String(Math.floor((p.ratio ?? 0) * 100)));
       card = base(event, text, [p.character], { key: `uni:${event.slice(11, 13)}:${p.character.id}` });
+      break;
+    }
+    case 'club:founded':
+    case 'club:work':
+    case 'club:exhibition': {
+      // (32.5) Hobi evleri: kuruluş (ilk 3 üye), ürün kilometre taşları, Kasaba Sergisi. "Yalnızca önemli"de günde en çok bir kulüp kartı.
+      const people = (p.members ?? (p.ids ?? []).map((id) => state?.characters.find((c) => c.id === id))).filter(Boolean);
+      const go = p.building ? { kind: 'building', id: p.building.id } : null;
+      if (event === 'club:founded') {
+        if (!p.key || people.length < 3) return null;
+        const text = CLUB_TEXT.founded.replace('{club}', clubName(p.key)).replace('{names}', people.slice(0, 3).map((c) => c.name).join(', '));
+        card = base(event, text, people.slice(0, 3), { key: `club:f:${p.key}`, club: true, go });
+      } else if (event === 'club:work') {
+        if (!p.key || !p.text) return null;
+        const chars = [...(p.recipient ? [p.recipient] : []), ...people].slice(0, 3);
+        card = base(event, p.text, chars, { key: `club:w:${p.key}:${p.kind}:${p.n ?? 0}`, club: true, go, ...(p.milestone ? { priority: STORY_PRIORITY['club:milestone'] } : {}) });
+      } else {
+        if (!p.text) return null;
+        card = base(event, p.text, people.slice(0, 3), { key: `club:x:${p.key}`, club: true, go });
+      }
       break;
     }
     case 'apprentice:grandmaster':

@@ -36,7 +36,7 @@ export const RENOWN_TARGET = {
   welfare: { pivot: 60, scale: 0.12, min: -6, max: 4 },
   // Halkın Nabzı: yetişkinlerde Homurdanan + Kırgın payı × scale (Kırgın iki kat sayılır)
   pulse: { scale: -35, bitterWeight: 2, min: -14 }, // (ölçüm: −25 / −10 → −35 / −14)
-  // (32.4) Eğitim payı ve (32.5) kulüp payı: renownEducation / renownClubs 0-1 döndürür, × weight. Bu adımda değer 0: etkisiz.
+  // (32.4) Eğitim payı ve (32.5) kulüp payı: renownEducation / renownClubs 0-1 döndürür, × weight (şalter kapalıyken 0).
   education: { weight: 6 },
   clubs: { weight: 5 },
   // Kasaba seviyesi (1 Mezra, 2 Köy, 3 Kasaba, 4 Gelişmiş Şehir; dizin = seviye) ve Altın Çağ küçük taban artışı

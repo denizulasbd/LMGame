@@ -165,7 +165,7 @@ results.push(...(await page.evaluate(async () => {
   c('anılar: suçlu ve kurban (kurbanın anısının kişisi suçlu); kurbanla küçük ilişki düşüşü', a.memories.some((m) => /yakalandı/.test(m.text)) && b.memories.some((m) => /kesesinden/.test(m.text) && m.whoId === a.id) && sc.relationships.get(a, b) < rel0 && sc.relationships.get(a, b) >= rel0 + D.VICTIM_RELATION - 0.01, `${rel0} → ${sc.relationships.get(a, b)}`);
   const caughtCard = cards.find(([t]) => t === 'c')?.[1];
   const card = caughtCard && SC.makeCard('crime:caught', caughtCard, { state: st });
-  c('hikâye kartı: öncelik 3, suçlu ve tanık portresi, "Git" suçluya (tablo sürümü 7)', card && card.priority === 3 && card.ids[0] === a.id && card.ids.includes(b.id) && card.go?.id === a.id && SD.STORY_TABLE_VERSION === 7 && SD.STORY_PRIORITY['crime:unsolved'] === 3, card?.text);
+  c('hikâye kartı: öncelik 3, suçlu ve tanık portresi, "Git" suçluya (tablo sürümü 8)', card && card.priority === 3 && card.ids[0] === a.id && card.ids.includes(b.id) && card.go?.id === a.id && SD.STORY_TABLE_VERSION === 8 && SD.STORY_PRIORITY['crime:unsolved'] === 3, card?.text);
   // Yalnızca önemli süzgecinde günde en çok bir suç kartı
   const dir = sc.storyDirector;
   st.settings.storyCards = 'important';

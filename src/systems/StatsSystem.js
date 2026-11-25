@@ -20,6 +20,7 @@ export function townSnapshot(state) {
     gold: state.resources.gold ?? 0,
     buildings: state.buildings.filter((b) => b.functional && b.definition.buildable).length,
     ...(engineOn('university') ? { students: state.characters.filter((c) => c.higherStudy).length, graduates: state.characters.filter((c) => c.graduate).length } : {}), // (32.4) Darülfünun öğrencisi ve yaşayan mezun
+    ...(engineOn('clubs') && state.clubs ? { clubMembers: state.characters.filter((c) => c.club).length } : {}), // (32.5) kulüp üyesi (hobi evi kurulduktan sonra)
     ...(engineOn('renown') ? { reputation: Math.round(state.crown?.reputation ?? 50) } : {}), // (32.3) RenownSystem gün dönümü kaymasından sonra günceller
   };
 }

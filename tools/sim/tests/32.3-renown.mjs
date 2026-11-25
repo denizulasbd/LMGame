@@ -63,7 +63,7 @@ results.push(...(await page.evaluate(async () => {
 
   // ---- 1. veri
   c('veri: şalter renown açık, tohum + 44 izole (42 suç, 43 saray), dört kademe (Gözde ≥ 90), kart tablosu 7, kayıt sürümü 41',
-    ENGINES.renown === true && D.RENOWN_SEED_OFFSET === 44 && D.RENOWN_LEVELS.length === 4 && D.RENOWN_LEVELS[0].key === 'favored' && D.RENOWN_LEVELS[0].min === 90 && SD.STORY_TABLE_VERSION === 7 && CONFIG.SAVE_VERSION === 41 && sc.renown.dice !== sc.crime.dice && sc.renown.dice !== sc.court.dice);
+    ENGINES.renown === true && D.RENOWN_SEED_OFFSET === 44 && D.RENOWN_LEVELS.length === 4 && D.RENOWN_LEVELS[0].key === 'favored' && D.RENOWN_LEVELS[0].min === 90 && SD.STORY_TABLE_VERSION === 8 && CONFIG.SAVE_VERSION === 41 && sc.renown.dice !== sc.crime.dice && sc.renown.dice !== sc.court.dice);
 
   // ---- 2. katkıların yönü
   st.time.day = 20;

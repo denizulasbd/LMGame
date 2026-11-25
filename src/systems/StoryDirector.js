@@ -21,6 +21,7 @@ const EVENTS = [
   'court:verdict', 'court:exiled', 'court:revealed', 'court:stale', // (32.2)
   'renown:tier', 'renown:grant', // (32.3)
   'university:admitted', 'university:graduated', 'university:dropped', // (32.4)
+  'club:founded', 'club:work', 'club:exhibition', // (32.5)
 ];
 
 export class StoryDirector {
@@ -43,6 +44,7 @@ export class StoryDirector {
     this.summaryDay = -1;
     this.seenSpecial = new Set();
     this.crimeCards = { day: -1, n: 0 }; // (32.1) "Yalnızca önemli" süzgecinde bugünkü suç kartı sayısı
+    this.clubCards = { day: -1, n: 0 }; // (32.5) "Yalnızca önemli" süzgecinde bugünkü kulüp kartı sayısı
     this.paused = false;
     this.hovered = false;
     this.unsubscribers = [];
@@ -148,6 +150,16 @@ export class StoryDirector {
         return false;
       }
       this.crimeCards.n += 1;
+    }
+    // (32.5) "Yalnızca önemli" süzgecinde günde en çok bir kulüp kartı (izlenen sakinin kartı sayılmaz)
+    if (card.club && filter === 'important' && !isWatchedCard(card, this.watched)) {
+      if (this.clubCards.day !== card.day) this.clubCards = { day: card.day, n: 0 };
+      if (this.clubCards.n >= L.clubPerDay) {
+        this.missed.push(card);
+        this.record(card, false);
+        return false;
+      }
+      this.clubCards.n += 1;
     }
     const res = enqueue(this.queue, card);
     this.queue = res.queue;

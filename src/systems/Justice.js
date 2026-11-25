@@ -12,6 +12,7 @@
 //     statement?: { offender, plea?, pleaLine?, witness } (ifade değişkenleri; dava açılırken izole üreteçle bir kez seçilir),
 //     verdict: { kind, by: 'elder' | 'court', auto, day, at?, band?, harsh?, deserved?, stale?, restitution?, fine?, service?, served?, effects? }
 import { universityCrimeFactor } from './University.js'; // (32.4)
+import { clubCrimeFactor, clubPoverty } from './Clubs.js'; // (32.5)
 import { renownCrimeFactor } from './Renown.js'; // (32.3)
 import { JUSTICE, RISK, TRAIT_LEAN, QUIRK_LEAN, REMORSE, CATCH, CRIMES, CRIME_KEYS, VANDAL_GROUP, VANDAL_TEXT, LOOT_WORDS, CRIME_TEXT } from '../data/justice.js';
 import { COURT, SENTENCES, SENTENCE_KEYS, FINE, DESERVED, BANDS, IMPUNITY, STATEMENTS, VICTIM_PLEAS, PLEA_RULES, WITNESS_LINES, COURT_TEXT } from '../data/justice.js';
@@ -251,9 +252,12 @@ export function educationFactor(c) {
   return universityCrimeFactor(c);
 }
 
-/** (32.5) Hobi evleri ve kulüpler: kulübe üye sakinin riski düşecek. Bu adımda 1. */
-export function clubFactor(_c) {
-  return 1;
+/**
+ * (32.5) Hobi evleri ve kulüpler (systems/Clubs.js → clubCrimeFactor): üye ×0,9; son 4 buluşmanın en az ikisine katılmış etkin üye
+ * ×0,75 (data/clubs.js → CLUB_CRIME). Kulübü yoksa ya da şalter kapalıyken 1.
+ */
+export function clubFactor(c, state = null) {
+  return clubCrimeFactor(state, c);
 }
 
 /**
@@ -283,7 +287,7 @@ export function impunityScore(state, days = IMPUNITY.days) {
 
 /** Riskin çarpanları (hepsi 1 civarı): { poverty, hunger, loyalty, town, personality, education, club, impunity }. */
 export function riskFactors(state, c) {
-  const coins = c.coins ?? 0;
+  const coins = (c.coins ?? 0) + clubPoverty(c); // (32.5) çantadaki Nakışlı Mendil kese yanında değer sayılır (yoksa 0)
   const poverty = step(RISK.poverty, coins);
   let hunger = isHangry(c) ? RISK.hangryMul : step(RISK.hunger, c.needs?.hunger ?? 100);
   if (isFamine(state)) hunger = Math.max(hunger, RISK.famineMul);
@@ -293,7 +297,7 @@ export function riskFactors(state, c) {
   for (const t of c.traits ?? []) personality *= RISK.traits[t] ?? 1;
   if (c.quirk) personality *= RISK.quirks[c.quirk] ?? 1;
   // (32.3) renown: Barış Çeşmesi kasaba çapında riski düşürür (yoksa / şalter kapalıyken 1)
-  return { poverty, hunger, loyalty, town, personality, education: educationFactor(c), club: clubFactor(c), impunity: impunityFactor(state), renown: renownCrimeFactor(state) };
+  return { poverty, hunger, loyalty, town, personality, education: educationFactor(c), club: clubFactor(c, state), impunity: impunityFactor(state), renown: renownCrimeFactor(state) };
 }
 
 /** Kişi başı günlük risk (0-1 civarı küçük sayı): taban × bütün çarpanlar. Aday değilse 0. */

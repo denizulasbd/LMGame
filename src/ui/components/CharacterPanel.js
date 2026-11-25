@@ -19,6 +19,7 @@
 // ve Gururlu Usta etiketi.
 // (29.3) "Arzular, Korkular ve Yaşam Doyumu": doyum çubuğu ve kademesi, en çok 3 arzu ve 2 korku çipi (kalan süre, doyum etkisi); çocukta gizli.
 import { universityTag } from './universityCards.js'; // (32.4)
+import { clubTag } from './clubCards.js'; // (32.5)
 import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../../art/sprites/index.js';
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
@@ -1201,6 +1202,7 @@ export class CharacterPanel {
     }
     if (character.educated) tags.push({ text: 'Bilgelik Evi mezunu', icon: 'book', cls: 'is-vigor' });
     { const t = universityTag(character); if (t) tags.push(t); } // (32.4) Darülfünun öğrencisi / mezunu
+    { const t = clubTag(character); if (t) tags.push(t); } // (32.5) "Bahçecilik Kulübü üyesi"
     // 13. aşama: sabit iş yeri ve handaki baharatlı yemek
     if (character.workplaceId !== null) {
       const place = state.buildings.find((b) => b.id === character.workplaceId);

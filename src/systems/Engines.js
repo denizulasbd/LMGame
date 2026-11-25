@@ -16,6 +16,7 @@ export const ENGINES = {
   court: true, // (32.2) Adalet Sarayı ve Dava: dava penceresi, cezalar, orantılılık, cezasızlık, sürgün (justice kapalıyken etkisiz)
   university: true, // (32.4) Darülfünun: Bilgelik Evi mezunu gençlerin yüksek okulu (kabul, bölüm, ders, Müderris, mezuniyet, bölüm deneyimi)
   educationMerit: true, // (32.4) Bilgelik Evi mezunlarının (c.educated) suç riski ×0,85 ve itibardaki eğitim payı (Darülfünun kurulmasa da tarihi değiştirir; university'ye bağlı)
+  clubs: true, // (32.5) Hobi Evleri ve Kulüpler: Bahçecilik Kulübü, Dikiş-Nakış Evi, Resim Atölyesi (üyelik, akşam buluşmaları, küçük ürünler)
   renown: true, // (32.3) Kasaba Şöhreti: Krallık İtibarı'nın günlük hedefe kayması, Kraliyet Gözdesi kademesi, rozet, Kraliyet Lütfu (gizli yapılar)
 };
 // (30.4a) Açılıştan ÖNCE bilinmesi gereken şalterler (kurucuların ageInDays değeri sahne kurulurken hesaplanır): modül yüklenirken

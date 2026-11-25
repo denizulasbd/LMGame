@@ -5686,3 +5686,17 @@ kbd {
 .building-university .university-bar { height: 7px; border-radius: 4px; background: rgba(0, 0, 0, 0.28); overflow: hidden; }
 .building-university .university-fill { display: block; height: 100%; background: linear-gradient(90deg, #7fb3ff, #ffd23f); }
 .building-university .university-pct { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* (32.5) Hobi evleri paneli: üye / aday satırları, katılım işaretleri, tablo duvarı */
+.building-club .club-subtitle { margin: 6px 0 2px; font-size: 12px; font-weight: 700; color: var(--ui-ink); }
+.building-club .club-list { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
+.building-club .club-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; align-items: center; gap: 6px; font-size: 12px; }
+.building-club .club-row.is-candidate { grid-template-columns: 22px minmax(0, 1fr) auto; }
+.building-club .club-portrait { width: 20px; height: 20px; image-rendering: pixelated; border-radius: 4px; background: rgba(0, 0, 0, 0.2); }
+.building-club .club-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-ink); }
+.building-club .club-marks { display: flex; gap: 1px; font-size: 10px; color: rgba(255, 255, 255, 0.35); }
+.building-club .club-mark.is-on { color: #7fd08a; }
+.building-club .club-btn { font-size: 11px; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(0, 0, 0, 0.25); color: var(--ui-ink); cursor: pointer; }
+.building-club .club-btn:disabled { opacity: 0.45; cursor: default; }
+.building-club .club-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin: 3px 0; }
+.building-club .club-painting { font-size: 11px; padding: 2px 4px; border-radius: 3px; background: rgba(255, 210, 63, 0.12); border: 1px solid rgba(255, 184, 77, 0.45); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

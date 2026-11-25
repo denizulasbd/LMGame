@@ -27,6 +27,7 @@
     import { WeddingConfetti } from '../src/rendering/WeddingConfetti.js';
     import { ChimeWaves } from '../src/rendering/ChimeWaves.js';
     import { QUIRKS } from '../src/data/social.js';
+    import { getEaselSprite } from '../src/art/sprites/structuresClubs.js'; // (32.5)
     import { getStoolSprite } from '../src/art/ui/index.js';
     import { PROFESSIONS } from '../src/data/apprenticeship.js';
     import { HEIRLOOMS } from '../src/data/heirloom.js';
@@ -61,6 +62,29 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 32.5: Hobi evleri — Bahçecilik Kulübü (tarhlar, sera; ürünlerle saksılar), Dikiş-Nakış Evi (gergef, kumaş topları),
+    // Resim Atölyesi (kuzey penceresi, tablo duvarı); dört mevsim, buluşma (aydınlık pencere / kışın sera), şövale, şantiye ---
+    {
+      show('Bahçecilik Kulübü (2x2): dört mevsim, 3 / 6 ürün, kış buluşması (sera), şantiye', [
+        ...SEASONS.map((k) => [NAMES[k], getStructureSprite('gardenClub', { season: k })]),
+        ['3 tarh', getStructureSprite('gardenClub', { season: 'summer', look: { works: 3 } })],
+        ['6 tarh', getStructureSprite('gardenClub', { season: 'spring', look: { works: 6 } })],
+        ['kış buluşması', getStructureSprite('gardenClub', { season: 'winter', look: { session: true, works: 4 } })],
+        ['şantiye', getConstructionSiteSprite(2, 2, 1, 'gardenClub')],
+      ], 4);
+      show('Dikiş-Nakış Evi (2x2): dört mevsim, buluşma (aydınlık pencere)', [
+        ...SEASONS.map((k) => [NAMES[k], getStructureSprite('sewingClub', { season: k })]),
+        ['buluşma', getStructureSprite('sewingClub', { season: 'summer', look: { session: true } })],
+        ['kış akşamı', getStructureSprite('sewingClub', { season: 'winter', windowsLit: true })],
+      ], 4);
+      show('Resim Atölyesi (2x2): dört mevsim, tablo duvarı (0 / 3 / 6), buluşma, şövale', [
+        ...SEASONS.map((k) => [NAMES[k], getStructureSprite('paintingClub', { season: k })]),
+        ['3 tablo', getStructureSprite('paintingClub', { season: 'summer', look: { works: 3 } })],
+        ['6 tablo · buluşma', getStructureSprite('paintingClub', { season: 'autumn', look: { works: 6, session: true } })],
+        ['şövale', getEaselSprite()],
+      ], 4);
+    }
 
     // --- 32.4: Darülfünun — kubbeli, avlulu, kitaplıklı taş medrese; dört mevsim avlu ağaçları, ders saatinde aydınlık pencereler, kış ---
     {

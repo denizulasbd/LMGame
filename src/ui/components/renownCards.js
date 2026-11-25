@@ -9,6 +9,7 @@ import { modalHeader } from '../dockButton.js';
 import { getAnyIconURL } from '../../art/ui/index.js';
 import { adoptTip } from './HoverTip.js';
 import { educationRenownLine } from './universityCards.js'; // (32.4)
+import { clubRenownLine } from './clubCards.js'; // (32.5)
 import { UNIVERSITY } from '../../data/university.js'; // (32.4)
 import { BUILDINGS } from '../../data/buildings.js';
 import { ROYAL_LETTER, ROYAL_EFFECTS, RENOWN_GRANT, RENOWN_DRIFT, RENOWN_LEVELS } from '../../data/renown.js';
@@ -42,6 +43,7 @@ export function renownLines(state, s = renownSummary(state)) {
     early ? `Hedef %${Math.round(s.target)} · kayma ${RENOWN_DRIFT.minDay}. günden itibaren` : `Hedef %${Math.round(s.target)} · bu gece ${signed(s.step)} (boşluğun %${Math.round(RENOWN_DRIFT.share * 100)}'si, en çok ${RENOWN_DRIFT.maxStep})`,
     `Nedenler: ${s.reasons.length ? renownReasonsText(s.reasons) : 'henüz yok'}`,
     ...((t) => (t ? [t] : []))(educationRenownLine(state)), // (32.4) hedefteki Eğitim katkısı
+    ...((t) => (t ? [t] : []))(clubRenownLine(state)), // (32.5) hedefteki Kulüpler katkısı
     `Vergi ×${s.level.levy} · ferman ödülü ×${s.level.reward}${s.level.key === 'bad' ? ' · fermanlar 2 günlük' : rankOf(state) >= 2 ? ' · göçmenler Kalfa gelir' : ''}`,
   ];
 }

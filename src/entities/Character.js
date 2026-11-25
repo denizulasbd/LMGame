@@ -51,6 +51,8 @@ import { sanitizeWants, sanitizeWantLog, clampSatisfaction, sanitizeCount, neutr
 import { WANTS, FEARS, WANT_CAPS } from '../data/wants.js';
 import { sanitizeLoyalty } from '../systems/Loyalty.js';
 import { sanitizeHigherStudy, sanitizeGraduate } from '../systems/University.js'; // (32.4)
+import { sanitizeClub } from '../systems/Clubs.js'; // (32.5)
+import { getEaselSprite } from '../art/sprites/structuresClubs.js'; // (32.5)
 
 const HALF_WIDTH = CHARACTER_WIDTH / 2;
 const BUBBLE_POP_TIME = 0.15;
@@ -152,6 +154,7 @@ export class Character extends Entity {
     sentence = null,
     higherStudy = null,
     graduate = null,
+    club = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -259,6 +262,8 @@ export class Character extends Entity {
     // (32.4) Darülfünun (isteğe bağlı, kayda yalnızca doluyken girer): öğrencilik { field, minutes, today, day, since } ve mezuniyet { field, day }
     this.higherStudy = sanitizeHigherStudy(higherStudy);
     this.graduate = sanitizeGraduate(graduate);
+    // (32.5) Hobi evi üyeliği (isteğe bağlı, kayda yalnızca doluyken girer): { key, since, missed } — ClubSystem yazar
+    this.club = sanitizeClub(club);
     this.drive = neutralDrive();
     recomputeDrive(this);
     this.mood = neutralMood();
@@ -459,7 +464,9 @@ export class Character extends Entity {
     const x = Math.round(this.x) + offset.x;
     const y = Math.round(this.y) + offset.y;
     // (25.2) Çırak ustasının yanında küçük bir taburede oturur
-    if (this.task?.activity === 'apprentice' && this.pose === 'sit') queue.addImage(this.sortY - 0.01, getStoolSprite(), x - 4, y - 1); // ayakları taburenin önünde, bacakları altından görünür
+    if ((this.task?.activity === 'apprentice' || this.task?.activity === 'clubSession') && this.pose === 'sit') queue.addImage(this.sortY - 0.01, getStoolSprite(), x - 4, y - 1); // ayakları taburenin önünde, bacakları altından görünür ((32.5) Dikiş-Nakış Evi de)
+    // (32.5) Resim Atölyesi: baktığı yanda şövale (yalnızca çizim; durum yazılmaz)
+    if (this.task?.easel && this.task.phase === 'perform') queue.addImage(this.sortY + 0.01, getEaselSprite(), facing === 'left' ? x - 13 : x + 4, y - 15);
     queue.addImage(this.sortY, sprite, x - HALF_WIDTH, y - sprite.height + 1);
     // (14. aşama) Çiçek Şenliği: saçta küçük bir çiçek
     if (this.flowerCrown) {
@@ -708,6 +715,7 @@ export class Character extends Entity {
       ...(this.sentence ? { sentence: this.sentence } : {}), // (32.2)
       ...(this.higherStudy ? { higherStudy: this.higherStudy } : {}), // (32.4)
       ...(this.graduate ? { graduate: this.graduate } : {}), // (32.4)
+      ...(this.club ? { club: { key: this.club.key, since: this.club.since, missed: this.club.missed } } : {}), // (32.5)
     };
   }
 

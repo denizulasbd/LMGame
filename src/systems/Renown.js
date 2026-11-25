@@ -14,6 +14,7 @@ import { pulseStats } from './Loyalty.js';
 import { isGoldenAge } from './GoldenAge.js';
 import { SKILL_LEVELS } from '../data/skills.js';
 import { renownEducationShare } from './University.js'; // (32.4)
+import { renownClubShare } from './Clubs.js'; // (32.5)
 
 const clampTo = (v, min, max) => Math.max(min, Math.min(max, v));
 const round1 = (v) => Math.round(v * 10) / 10;
@@ -72,11 +73,11 @@ export function renownEducation(state) {
 }
 
 /**
- * (32.5) Kulüp payı: 0-1. Bir hobi evine / kulübe üye yetişkinlerin payı ve kulüplerin canlılığı (beklenen 0-0,7). Ağırlık
- * RENOWN_TARGET.clubs (5). Bu adımda kulüp yok: 0.
+ * (32.5) Kulüp payı: 0-1 = (etkin üye / yetişkin + Kıdemli Bilge) × canlılık (son buluşma günlerinin gerçekleşme oranı); beklenen
+ * 0-0,7. Ağırlık RENOWN_TARGET.clubs (5). Şalter kapalıyken ya da kulüp yokken 0 (systems/Clubs.js → renownClubShare).
  */
-export function renownClubs(_state) {
-  return 0;
+export function renownClubs(state) {
+  return renownClubShare(state);
 }
 
 /** Son `days` günde suç işlendi mi (çözülen oranı yalnızca o zaman sayılır). */

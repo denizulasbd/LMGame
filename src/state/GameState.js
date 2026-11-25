@@ -49,6 +49,7 @@ import { restorePulse } from '../systems/Loyalty.js'; // (30.3)
 import { restoreJustice, justiceEmpty } from '../systems/Justice.js'; // (32.1)
 import { restoreRenown } from '../systems/Renown.js'; // (32.3)
 import { restoreUniversity } from '../systems/University.js'; // (32.4)
+import { restoreClubs } from '../systems/Clubs.js'; // (32.5)
 import { STORY_FILTERS } from '../data/storyCards.js';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
@@ -220,6 +221,7 @@ export class GameState {
     this.justice = null; // (32.1) Suç Motoru (isteğe bağlı): { cases: [açık davalar], log: [son 40 kapanmış], records: { kimlik: { count, lastDay } }, stats, nextId } — boşsa kayda yazılmaz
     this.renown = null; // (32.3) Kasaba Şöhreti (isteğe bağlı; yalnızca ENGINES.renown açıkken kurulur): { reasons, daily, gozdeStreak, grants: [{ key, day }], lastGrantDay, rank, tiers, drift }
     this.university = null; // (32.4) Darülfünun sayaçları (isteğe bağlı; ilk kabulde kurulur): { admitted, graduated, dropped, left, studentDays, lectureMinutes, fields, apprentices, grandmasters }
+    this.clubs = null; // (32.5) Hobi evleri (isteğe bağlı; ilk buluşma / üyelikte kurulur): { [kulüp]: { sessions, lastSession, attendance: [[kimlik]] (son 4), recent: [0/1], works, products, paintings?, live?, out?, ... } }
     this.pulse = null; // (30.3) Halkın Nabzı (isteğe bağlı): { daily: [son 3 günün ortalaması], reasons: [{ day, totals }] (son 2 gün), eaten?: [günlük tüketim] }
     this.guide = emptyGuide(); // (30.1) rehber kartları: { done: [adım kimlikleri], off: bool, at?: { adım: oyun dakikası } }
     this.evolution = emptyEvolutionStats(); // (29.4) kişilik evrimi sayaçları: { turned, deepened, acquired (özellik -> adet), total }
@@ -344,6 +346,7 @@ export class GameState {
       ...(justiceEmpty(this.justice) ? {} : { justice: this.justice }), // (32.1)
       ...(this.renown ? { renown: this.renown } : {}), // (32.3)
       ...(this.university ? { university: this.university } : {}), // (32.4)
+      ...(this.clubs ? { clubs: this.clubs } : {}), // (32.5)
     };
   }
 
@@ -486,6 +489,7 @@ export class GameState {
     next.pulse = data.pulse ? restorePulse(data.pulse) : null; // (30.3) yoksa boş başlar
     next.renown = restoreRenown(data.renown); // (32.3) yoksa null
     next.university = restoreUniversity(data.university); // (32.4) yoksa null
+    next.clubs = restoreClubs(data.clubs, new Set(next.characters.map((c) => c.id))); // (32.5) yoksa null
     next.justice = data.justice ? restoreJustice(data.justice, new Set(next.characters.map((c) => c.id))) : null; // (32.1) yoksa boş
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);

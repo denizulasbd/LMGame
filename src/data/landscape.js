@@ -48,6 +48,7 @@ export const AESTHETIC = {
     courthouse: 3, // (32.2) Adalet Sarayı
     peaceFountain: 5, royalRoseGarden: 9, royalArchive: 3, // (32.3) Kraliyet Lütfu
     university: 3, // (32.4) Darülfünun
+    gardenClub: 1.5, sewingClub: 1, paintingClub: 1, // (32.5) hobi evleri (ürünleri Clubs.clubAesthetic ile tavanlı artar)
   },
   // Döşemeli zemin karoları: komşuluğuna küçük estetik katkı (taş plaka meydanı en şık zemindir)
   tileValues: { plaza: 0.35, cobble: 0.2 },

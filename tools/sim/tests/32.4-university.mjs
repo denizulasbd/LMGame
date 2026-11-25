@@ -69,7 +69,7 @@ const errors = [];
     c('veri: şalter açık, kapasite 6, ders 14-16 / 90 dk, eşik 540, Gelişmiş Şehir (4) ve tek, kart tablosu 7, kayıt 41, moodlet 33',
       ENGINES.university && ENGINES.educationMerit && UD.UNIVERSITY.capacity === 6 && UD.UNIVERSITY.hours.from === 14 && UD.UNIVERSITY.hours.to === 16 && UD.UNIVERSITY.minutesPerDay === 90 && UD.UNIVERSITY.graduateMinutes === 540 &&
       B.BUILDINGS.university.requiresTier === 4 && B.BUILDINGS.university.unique && B.BUILDINGS.university.category === 'Bilgi' && !B.BUILDINGS.university.cost.gold && B.BUILD_MENU.includes('university') &&
-      SD.STORY_TABLE_VERSION === 7 && CONFIG.SAVE_VERSION === 41 && Object.keys(MD.MOODLETS).length === 33);
+      SD.STORY_TABLE_VERSION === 8 && CONFIG.SAVE_VERSION === 41 && Object.keys(MD.MOODLETS).length === 33);
 
     // ---- 2. kilit
     st.town.tier = 3;

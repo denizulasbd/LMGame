@@ -36,6 +36,8 @@ export const ITEMS = {
   // (24.2) Pazar Yeri'nin terzisinden Dayanıklı Giysi (kışın soğuğa karşı korur) ve handan Şerbet Testisi (keyif)
   garment: { name: 'Dayanıklı Giysi', icon: 'cloth', stack: 1 },
   sherbetJug: { name: 'Şerbet Testisi', icon: 'sherbet', stack: 2, fun: 15 },
+  // (32.5) Dikiş-Nakış Evi'nin hediyesi: hatıra gibi keyif verir, satılmaz (değeri yok); yoksulluk hesabında kese yanında sayılır
+  handkerchief: { name: 'Nakışlı Mendil', icon: 'cloth', stack: 1, fun: 14, gift: true },
   // (25.5) Aile yadigârları: satılmaz, feda edilmez, yok edilmez (heirloom, locked); her biri tek ve adlı, hikâyesiyle (data/heirloom.js)
   heirloomHammer: { name: 'Ata Yadigârı Çekiç', icon: 'heirloomHammer', stack: 1, heirloom: true, locked: true },
   heirloomShuttle: { name: 'Ata Yadigârı Mekik', icon: 'heirloomShuttle', stack: 1, heirloom: true, locked: true },
