@@ -166,6 +166,66 @@ const out = await page.evaluate(async () => {
   return out;
 });
 results.push(...out);
+
+// ---- C1. suç planları daha az düşer: isyancının planı isyan saatinden sonra, şenlikten sıvışma, haylazlıkta yakın başka süs
+const out2 = await page.evaluate(async () => {
+  const out = [];
+  const c = (name, ok, detail = '') => out.push({ name, ok: Boolean(ok), detail });
+  const J = await import('/src/systems/Justice.js');
+  const D = await import('/src/data/justice.js');
+  const { REVOLT } = await import('/src/data/citizens.js');
+  const st = game.state;
+  const sc = game.scenes.current;
+  const T = 16;
+  st.town.tier = 3;
+  sim.give({ wood: 900, stone: 900, gold: 3000, food: 500, iron: 200 });
+  if (st.time.day < 8) st.time.day = 8;
+  const cands = st.characters.filter((x) => J.crimeCandidate(st, x));
+  // isyancı
+  const prevRevolt = st.trust.revolt;
+  st.trust.revolt = { rioters: cands.map((x) => x.id), raids: [] };
+  const hours = [];
+  for (let i = 0; i < 60 && hours.length < 8; i++) {
+    for (const p of sc.crime.planDay()) hours.push(Math.floor((p.crimePlan.at % 1440) / 60));
+  }
+  for (const x of st.characters) delete x.crimePlan;
+  st.trust.revolt = prevRevolt;
+  c('C1: isyancının suç planı isyan saatinin bitiminden (20:00) önce değil', D.JUSTICE.rioterAfterRiot && hours.length >= 3 && hours.every((h) => h >= REVOLT.hours[1]), hours.join(','));
+  // şenlikten sıvışma
+  const brain = sc.behavior.brain;
+  const a = cands.find((x) => !x.isChild && x.lifeStage === 'adult') ?? cands[0];
+  const market = st.buildings.find((b) => b.type === 'market' && b.functional) ?? sim.place('market') ?? sim.place('inn');
+  const venue = st.buildings.find((b) => b.type === 'fountain') ?? market;
+  a.task = null; a.needs.hunger = 90; a.needs.energy = 90; a.illness = null; a.mood.grief = false; a.visible = true; a.insideBuildingId = null;
+  const now = st.totalMinutes;
+  const crimeKey = market?.type === 'inn' ? 'innPilfer' : 'marketFruit';
+  a.crimePlan = { crime: crimeKey, variant: 'fruit', buildingId: market?.id, motive: 'temptation', at: now - 5, until: now + 300, duration: 10 };
+  const festPrev = { ...st.events.festival };
+  Object.assign(st.events.festival, { active: true, venueId: venue.id, endsAt: now + 120 });
+  const hr = 19;
+  const sneak = J.crimeReady(st, a, hr) ? brain.decide(a, hr)?.activity : 'notready';
+  a.crimePlan = { crime: 'marketFruit', variant: 'fruit', buildingId: market.id, motive: 'temptation', at: now + 600, until: now + 900, duration: 10 };
+  const later = brain.decide(a, hr)?.activity;
+  delete a.crimePlan;
+  Object.assign(st.events.festival, festPrev);
+  c('C1: vakti gelmiş suç planı olan sakin şenliğe değil hedefe gider; vakti gelmemişse şenliğe gider', sneak === 'pilfer' && later === 'festival', `${sneak} / ${later}`);
+  // haylazlık: hedefe yol yoksa yakındaki başka bir süs
+  const b1 = sim.place('bench');
+  const b2 = sim.place('planter') ?? sim.place('signpost') ?? sim.place('bench');
+  const fp = sc.world.findPath.bind(sc.world);
+  const ring1 = new Set([...sc.world.getSpots(b1), ...brain.crimeRing(b1)].map((p) => `${p.x},${p.y}`));
+  const ring2 = new Set([...sc.world.getSpots(b2), ...brain.crimeRing(b2)].map((p) => `${p.x},${p.y}`));
+  for (const k of ring2) ring1.delete(k); // ortak karolar ikinci hedefe açık kalsın
+  sc.world.findPath = (o, g, opt) => (ring1.has(`${g.x},${g.y}`) ? null : fp(o, g, opt));
+  a.task = null;
+  a.crimePlan = { crime: 'pettyVandal', variant: 'scuff', buildingId: b1.id, motive: 'mischief', at: now - 5, until: now + 300, duration: 10 };
+  const vp = brain.planCrime(a, hr);
+  sc.world.findPath = fp;
+  delete a.crimePlan;
+  c('C1: haylazlık hedefine yol yoksa yakındaki başka süse gider (plan düşmez)', D.JUSTICE.vandalRetarget > 0 && vp?.activity === 'pilfer' && vp.buildingId !== b1.id && vp.crime.buildingId === vp.buildingId, `${vp?.buildingId} ${b1.id} ${b2?.type}:${b2?.id} ${ring2.size}`);
+  return out;
+});
+results.push(...out2);
 const ok = report(errors);
 await browser.close();
 process.exit(ok ? 0 : 1);
