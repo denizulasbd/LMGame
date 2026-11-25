@@ -185,12 +185,16 @@ export function isSessionDay(key, day) {
   return Boolean(s) && ((day % 2) + 2) % 2 === s.parity;
 }
 
-/** Bugünün buluşma penceresi (oyun dakikası) ya da null. */
-export function sessionWindow(key, day) {
-  if (!isSessionDay(key, day)) return null;
+/**
+ * Bugünün buluşma penceresi (oyun dakikası) ya da null. (32.6a) `rec` (state.clubs[k], isteğe bağlı): dün düşen buluşmanın telafisi
+ * bugünse (rec.makeup === day) takvim dışı günde de aynı saatlerde pencere açılır ({ makeup: true }).
+ */
+export function sessionWindow(key, day, rec = null) {
+  const makeup = rec?.makeup === day;
+  if (!isSessionDay(key, day) && !makeup) return null;
   const s = CLUB_SCHEDULE[key];
   const base = (day - 1) * 1440;
-  return { start: base + s.from, end: base + s.to };
+  return { start: base + s.from, end: base + s.to, ...(makeup && !isSessionDay(key, day) ? { makeup: true } : {}) };
 }
 
 /** Bir gün kaç kulübün buluşma günü (takvim tasarımı: en çok iki). */
@@ -205,8 +209,8 @@ export const clock = (minuteOfDay) => `${String(Math.floor(minuteOfDay / 60)).pa
 export function nextSession(state, key) {
   const now = state.totalMinutes;
   for (let d = state.time.day; d < state.time.day + 3; d++) {
-    const w = sessionWindow(key, d);
-    if (w && now < w.end) return { day: d, from: CLUB_SCHEDULE[key].from, to: CLUB_SCHEDULE[key].to, today: d === state.time.day };
+    const w = sessionWindow(key, d, state.clubs?.[key]);
+    if (w && now < w.end) return { day: d, from: CLUB_SCHEDULE[key].from, to: CLUB_SCHEDULE[key].to, today: d === state.time.day, ...(w.makeup ? { makeup: true } : {}) };
   }
   return null;
 }
@@ -392,8 +396,12 @@ export function restoreClubs(data, ids) {
     if (Number.isInteger(r.fruitYear)) c.fruitYear = r.fruitYear;
     if (r.founded) c.founded = int(r.founded);
     if (Number.isInteger(r.evaluated)) c.evaluated = r.evaluated;
+    if (Number.isInteger(r.makeup)) c.makeup = r.makeup; // (32.6a) telafi buluşmasının günü
+    if (r.planned) c.planned = int(r.planned); // (32.6a) sayaçlar: takvimdeki buluşma günü, gerçekleşen (telafi dahil), telafi
+    if (r.realized) c.realized = int(r.realized);
+    if (r.madeUp) c.madeUp = int(r.madeUp);
     if (r.live && Number.isInteger(r.live.day) && Number.isInteger(r.live.until)) {
-      c.live = { day: r.live.day, until: r.live.until, ids: (r.live.ids ?? []).filter((id) => ids.has(id)), came: (r.live.came ?? []).filter((id) => ids.has(id)), excused: (r.live.excused ?? []).filter((id) => ids.has(id)) };
+      c.live = { day: r.live.day, until: r.live.until, ids: (r.live.ids ?? []).filter((id) => ids.has(id)), came: (r.live.came ?? []).filter((id) => ids.has(id)), excused: (r.live.excused ?? []).filter((id) => ids.has(id)), ...(r.live.makeup ? { makeup: 1 } : {}) };
     }
     if (r.out && typeof r.out === 'object') {
       c.out = {};

@@ -1,7 +1,7 @@
 // Aşama 32.6a testleri: düzeltmeler ve denge. A1 placementPlan saf (hata fırlasa da durum değişmez), A2 src/ altında izinsiz
 // döngüsel içe aktarma yok, A3 kulüp zilinin listesi ACTIVITIES'ten türer, A4 tek seferlik kartlar günlük kategori sınırından muaf,
 // A5 uzaklaştırılan sakin davet / randevu / sohbet planıyla da hana gidemez (ortak nokta Brain.planGathering), A6 uzak kulüp evi:
-// zil yürüme payı kadar erken (en çok 45 dk), panel uyarısı. Kullanım: node tools/sim/tests/32.6a-fixes.mjs [--verbose]
+// zil yürüme payı kadar erken (en çok 45 dk), panel uyarısı; B2 düşen buluşmanın ertesi akşam telafisi. Kullanım: node tools/sim/tests/32.6a-fixes.mjs [--verbose]
 //   ya da   node tools/sim/gate.mjs --quick --only 32.6a
 import { openGame, createChecks } from '../lib.mjs';
 import { scanImports, findCycles, ALLOW } from '../cycles.mjs';
@@ -133,6 +133,36 @@ const out = await page.evaluate(async () => {
   off();
   const early = rung !== null ? w.start - rung : null;
   c('A6: zil pencereden payı kadar önce çalar (30 dk pay → 27-31 dk önce)', early === null ? st.clubs.gardenClub.recent?.length > 0 : early >= 27 && early <= 31, `${early}`);
+
+  // ---- B2. düşen buluşma ertesi akşam bir kez telafi edilir
+  const gr = st.clubs.gardenClub;
+  const live0 = gr.live;
+  if (live0) sc.clubs.finish('gardenClub', gb);
+  let odd = st.time.day; // önümüzdeki, henüz değerlendirilmemiş bahçe günü (penceresi en az bir saat sonra)
+  while (!C.isSessionDay('gardenClub', odd) || gr.evaluated === odd || C.sessionWindow('gardenClub', odd).start - 60 < st.totalMinutes) odd += 1;
+  c('B2: takvim dışı günde pencere yalnızca telafi günüyse açılır', C.sessionWindow('gardenClub', odd + 1) === null && C.sessionWindow('gardenClub', odd + 1, { makeup: odd + 1 })?.makeup === true && !C.sessionWindow('gardenClub', odd, { makeup: odd })?.makeup);
+  const wOdd = C.sessionWindow('gardenClub', odd);
+  const stepTo = (m) => { for (let i = 0; i < 400 && st.totalMinutes < m; i++) sim.step(Math.max(1, Math.min(225, Math.ceil(((m - st.totalMinutes) / 60) * 225)))); };
+  stepTo(wOdd.start - 120);
+  st.clubs.gardenClub.lead = { day: odd, tiles: 0, minutes: 0 }; // pay 0: zil tam pencere başında
+  stepTo(wOdd.start - 5);
+  sc.clubs.blocked = () => true; // şenlik sürüyor say (örnek yöntem; sınıfınki geri gelir)
+  stepTo(wOdd.start + CD.CLUB.blockedGrace + 5);
+  delete sc.clubs.blocked;
+  const scheduled = gr.makeup;
+  const plannedA = gr.planned ?? 0;
+  let bell = 0;
+  const offB = game.events.on('club:bell', ({ key }) => { if (key === 'gardenClub') bell += 1; });
+  const wNext = C.sessionWindow('gardenClub', odd + 1, gr);
+  if (wNext) {
+    stepTo(wNext.start - 120);
+    st.clubs.gardenClub.lead = { day: odd + 1, tiles: 0, minutes: 0 };
+    stepTo(wNext.start + CD.CLUB.blockedGrace + 5); // o akşam gerçek bir şenlik / anma varsa en çok 30 dk beklenir
+  }
+  offB();
+  c('B2: şenlik yüzünden düşen buluşma ertesi akşama kayar (telafi günü zil çalar ya da değerlendirilir); planlanan sayacı yalnızca takvim gününde artar', scheduled === odd + 1 && gr.evaluated === odd + 1 && (bell === 1 || gr.recent.length > 0) && (gr.planned ?? 0) === plannedA, `${scheduled} ${gr.evaluated} ${bell} ${gr.planned} gün ${st.time.day} tek ${odd} üye ${C.membersOf(st, 'gardenClub').length} ${JSON.stringify(gr.recent)}`);
+  if (gr.live) sc.clubs.finish('gardenClub', gb);
+  c('B2: telafinin kendisi düşse de yeniden kaydırılmaz', gr.makeup === undefined || gr.makeup <= odd + 1, `${gr.makeup}`);
   return out;
 });
 results.push(...out);

@@ -19,7 +19,7 @@ import { ITEMS } from '../data/citizens.js';
 import { engineOn } from './Engines.js';
 import {
   clubBuilding, anyClubHouse, canJoin, membersOf, clubAffinity, placementPlan, sessionWindow, sessionSpots, giftOrder, paintingTitle, emptyClub,
-  clubName, isClubKey, memberHomeDistance, leadMinutes,
+  clubName, isClubKey, memberHomeDistance, leadMinutes, isSessionDay,
 } from './Clubs.js';
 import { serviceDue } from './Justice.js';
 import { isMemorialTime, memorialEligible, riteWindow } from './Rites.js';
@@ -224,7 +224,7 @@ export class ClubSystem {
         if (steps > 0) this.tickSession(key, b, live, steps);
         if (now >= live.until || live.day !== day) this.finish(key, b);
       } else {
-        const w = sessionWindow(key, day);
+        const w = sessionWindow(key, day, r);
         // (32.6a) zil, üyelerin tahmini yürüme süresi kadar erken çalar (en çok CLUB.leadMax): varış buluşma başına yakın olsun
         if (w && r?.evaluated !== day && now >= w.start - CLUB.leadMax && now < w.end && now >= w.start - this.leadFor(key, b, day)) this.evaluate(key, b, w);
       }
@@ -267,20 +267,39 @@ export class ClubSystem {
     if (this.blocked()) {
       if (s.totalMinutes < w.start + CLUB.blockedGrace) return;
       r.evaluated = s.time.day;
+      if (!w.makeup) r.planned = (r.planned ?? 0) + 1;
       r.recent = [...r.recent, 0].slice(-6);
-      this.events.emit('club:skipped', { key, reason: 'blocked', eligible: 0 });
+      this.events.emit('club:skipped', { key, reason: 'blocked', eligible: 0, makeup: Boolean(w.makeup) });
+      this.scheduleMakeup(key, r, w);
       return;
     }
     r.evaluated = s.time.day;
+    if (!w.makeup) r.planned = (r.planned ?? 0) + 1;
     const ids = members.filter((c) => this.eligibleNow(c, w.end)).map((c) => c.id);
     if (ids.length < CLUB.minSession) {
       r.recent = [...r.recent, 0].slice(-6);
-      this.events.emit('club:skipped', { key, reason: 'few', eligible: ids.length, members: members.length });
+      this.events.emit('club:skipped', { key, reason: 'few', eligible: ids.length, members: members.length, makeup: Boolean(w.makeup) });
+      this.scheduleMakeup(key, r, w);
       return;
     }
-    r.live = { day: s.time.day, until: w.end, ids, came: [], excused: members.filter((c) => !ids.includes(c.id)).map((c) => c.id) };
+    r.live = { day: s.time.day, until: w.end, ids, came: [], excused: members.filter((c) => !ids.includes(c.id)).map((c) => c.id), ...(w.makeup ? { makeup: 1 } : {}) };
     this.minutes = new Map();
     this.events.emit('club:bell', { key, ids });
+  }
+
+  /**
+   * (32.6a) Düşen buluşma (şenlik / konser / anma / düğün, az uygun üye ya da kimsenin gelmediği akşam) ertesi akşam BİR KEZ telafi
+   * edilir: aynı saatlerde, takvim dışı günde de. Telafinin kendisi düşerse yeniden kaydırılmaz; ertesi gün zaten takvim günüyse
+   * (kulübün kendi günü) telafi gerekmez.
+   */
+  scheduleMakeup(key, r, w) {
+    const day = this.state.time.day;
+    if (w.makeup || r.makeup === day) {
+      if (r.makeup === day) delete r.makeup;
+      return;
+    }
+    if (isSessionDay(key, day + 1)) return;
+    r.makeup = day + 1;
   }
 
   /** Şu an kulüp evinde buluşmada (perform) olan üyeler. */
@@ -319,7 +338,14 @@ export class ClubSystem {
       if (came.includes(c.id)) c.club.missed = 0;
       else if (live.ids.includes(c.id)) c.club.missed += 1;
     }
-    if (!held) this.events.emit('club:skipped', { key, reason: 'empty', eligible: live.ids.length, acts: this.sample?.[key] ?? [] });
+    if (!held) {
+      this.events.emit('club:skipped', { key, reason: 'empty', eligible: live.ids.length, acts: this.sample?.[key] ?? [], makeup: Boolean(live.makeup) });
+      if (live.day === s.time.day) this.scheduleMakeup(key, r, { makeup: Boolean(live.makeup) });
+    } else {
+      r.realized = (r.realized ?? 0) + 1; // (32.6a) gerçekleşen (telafi dahil)
+      if (live.makeup) r.madeUp = (r.madeUp ?? 0) + 1;
+    }
+    if (live.makeup && r.makeup === live.day) delete r.makeup;
     if (this.sample) delete this.sample[key];
     if (held) {
       r.sessions += 1;
