@@ -2,6 +2,12 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 20 satır. README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 32.7 — Kayıt güvenliği (kayıt sürümü 41 kalır)
+- Okunamayan kayıt (bozuk JSON, desteklenmeyen sürüm, restore hatası) artık silinmez: ham veri `lmgame.save.broken.<yuva>.<zaman>` anahtarına yedeklenir (en çok 3, en eskisi gider), sonra yuva temizlenir; öteki yuvadan ya da yeni oyunla devam edilir, açılışta "Bir kayıt okunamadı ve yedeklendi." uyarısı çıkar.
+- `validateSave` bilinmeyen yapı türünde kaydı reddetmez: o yapı atlanır, uyarı verilir.
+- Ayarlar: "Yedeklenen kayıtlar" (Yeniden dene / Dosya olarak indir; yalnızca yedek varsa görünür), "Kaydımı dosya olarak indir" ve "Dosyadan yükle" (içe aktarma mevcut ana kaydı yedeğe kopyalar, ezmez).
+- Test: `tools/sim/tests/32.7-save-safety.mjs` (`openGame` yeni `storage` seçeneği).
+
 ## Aşama 32 — Özet
 - Yeni sistemler: Suç Motoru (32.1), Adalet Sarayı ve Dava (32.2), Kasaba Şöhreti / Kraliyet Lütfu (32.3), Darülfünun (32.4), Hobi Evleri ve Kulüpler (32.5); düzeltme ve denge (32.6a); hedef / rehber / bütünleşme (32.6b). 8 yeni yapı, 1 yeni moodlet (33), 4 yeni hedef (18), rehber 21 adım.
 - Şalterler (`src/systems/Engines.js`): `justice`, `court` (justice'e bağlı), `renown`, `university`, `educationMerit` (university'ye bağlı), `clubs`. Hepsi kapalıyken 42 × 30 otopilot raporu ve 42 × 14 tam kayıt main (29f64fa) ile aynı; yeni mekanik kendi şalterinde, izole üreteçler tohum + 42 / 43 / 44.

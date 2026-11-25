@@ -353,9 +353,10 @@ export class GameState {
   /**
    * Kayıttan duruma yükler. Geçersiz kayıtta hata fırlatır ve durumu olduğu gibi bırakır.
    * Haritanın karo farkları pendingTerrain'e konur; TownScene.enter() uygular.
+   * (32.7) Dönüş: { skippedBuildings } — bilinmeyen türdeki yapılar atlanıp yüklenir.
    */
   restore(data) {
-    validateSave(data);
+    const warnings = validateSave(data);
     const next = new GameState();
     next.reset(data.seed);
     // 8. aşamadan eski kayıtlar: haritaları 48x48 ve biyomsuzdur
@@ -493,6 +494,7 @@ export class GameState {
     next.justice = data.justice ? restoreJustice(data.justice, new Set(next.characters.map((c) => c.id))) : null; // (32.1) yoksa boş
     next.pendingTerrain = data.terrain;
     Object.assign(this, next);
+    return warnings;
   }
 }
 
@@ -810,5 +812,12 @@ function validateSave(data) {
   if (data.map && !(Number.isInteger(data.map.width) && Number.isInteger(data.map.height) && data.map.width >= 16 && data.map.height >= 16)) {
     fail('harita boyutu');
   }
-  for (const b of data.buildings) if (!BUILDINGS[b.type]) fail(`bilinmeyen yapı ${b.type}`);
+  // (32.7) Bilinmeyen yapı türü (daha yeni sürümden kayıt) bütün kaydı reddettirmez: o yapı atlanır, uyarı döner
+  const skipped = [];
+  data.buildings = data.buildings.filter((b) => {
+    if (b && BUILDINGS[b.type]) return true;
+    skipped.push(b?.type ?? '?');
+    return false;
+  });
+  return { skippedBuildings: skipped };
 }

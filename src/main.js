@@ -23,16 +23,19 @@ function startNewGame(seed) {
   game.state.reset(seed);
 }
 
+// (32.7) Okunamayan kayıt asla silinmez: ham veri önce yedek anahtarına kopyalanır (SaveManager.quarantine), sonra yuva temizlenir
+let loadWarning = null;
 function resumeSavedGame(slots) {
   for (const slot of slots) {
-    const data = SaveManager.read(slot);
+    const data = SaveManager.read(slot); // bozuk JSON / desteklenmeyen sürüm: okurken yedeklenir
     if (!data) continue;
     try {
-      game.state.restore(data);
+      const warnings = game.state.restore(data);
+      if (warnings?.skippedBuildings?.length) loadWarning = `Kayıttaki ${warnings.skippedBuildings.length} yapı tanınmadı ve atlandı.`;
       return true;
     } catch (err) {
-      console.warn(`${slot} kaydı yüklenemedi, atlanıyor:`, err);
-      SaveManager.clear(slot);
+      console.warn(`${slot} kaydı yüklenemedi, yedeklenip atlanıyor:`, err);
+      SaveManager.quarantine(slot);
     }
   }
   return false;
@@ -52,6 +55,8 @@ if (Number.isFinite(seedParam)) {
 
 game.scenes.register('town', new TownScene(game));
 game.start('town', { attract });
+if (SaveManager.takeNotice()) game.events.emit('toast', { text: 'Bir kayıt okunamadı ve yedeklendi.', tone: 'warn', icon: 'demolish' });
+if (loadWarning) game.events.emit('toast', { text: loadWarning, tone: 'warn', icon: 'demolish' });
 if (resumedFromSeed) game.events.emit('toast', { text: 'Kayıtlı oyun sürdürülüyor. Baştan başlamak için Ayarlar > Yeni Harita.', tone: 'info', icon: 'sparkle' });
 
 // Geliştirme sırasında konsoldan erişim için

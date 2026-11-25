@@ -107,7 +107,29 @@ function migrate(data) {
   return data;
 }
 
+const BROKEN_PREFIX = 'lmgame.save.broken.';
+const MAX_BROKEN = 3;
+let brokenNotice = false; // (32.7) açılışta "Bir kayıt okunamadı ve yedeklendi." uyarısı için
+
+/** Ham metni kayda çevirir (JSON, sürüm, göç). Okunamazsa nedeniyle birlikte hata fırlatır. */
+function parseRaw(raw) {
+  const data = JSON.parse(raw);
+  const supported = data && typeof data === 'object' && data.version >= CONFIG.SAVE_MIN_VERSION && data.version <= CONFIG.SAVE_VERSION;
+  if (!supported) throw new Error(`desteklenmeyen kayıt sürümü ${data?.version}`);
+  return migrate(data);
+}
+
+const storageGet = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
 export const SaveManager = {
+  parseRaw,
+
   /** @param {object} snapshot GameState.toJSON() çıktısı + terrain */
   write(snapshot, slot = 'main') {
     try {
@@ -120,18 +142,90 @@ export const SaveManager = {
     }
   },
 
-  /** Yuvadaki kayıt ya da null (yok, bozuk ya da başka sürümden). */
+  /** Yuvadaki ham metin ya da null (yok / depolama erişilemez). */
+  readRaw(slot = 'main') {
+    return storageGet(SLOT_KEYS[slot]);
+  },
+
+  /**
+   * (32.7) Yuvadaki kayıt ya da null (yok, bozuk ya da desteklenmeyen sürümden). Okunamayan kayıt SİLİNMEZ:
+   * ham metin önce yedek anahtarına kopyalanır, yalnızca yedek yazıldıysa yuva temizlenir.
+   */
   read(slot = 'main') {
+    const raw = storageGet(SLOT_KEYS[slot]);
+    if (!raw) return null;
     try {
-      const raw = localStorage.getItem(SLOT_KEYS[slot]);
-      if (!raw) return null;
-      const data = JSON.parse(raw);
-      const supported = data && data.version >= CONFIG.SAVE_MIN_VERSION && data.version <= CONFIG.SAVE_VERSION;
-      return supported ? migrate(data) : null;
+      return parseRaw(raw);
     } catch (err) {
-      console.warn('Kayıt okunamadı:', err);
+      console.warn(`${slot} kaydı okunamadı:`, err);
+      this.quarantine(slot);
       return null;
     }
+  },
+
+  /**
+   * (32.7) Yuvanın ham verisini `lmgame.save.broken.<yuva>.<zaman damgası>` anahtarına kopyalar (en çok 3 yedek, en eskisi
+   * silinir), sonra yuvayı temizler. Yedek yazılamazsa yuva olduğu gibi kalır. Dönüş: yedek anahtarı ya da null.
+   */
+  quarantine(slot = 'main', { clear = true } = {}) {
+    const raw = storageGet(SLOT_KEYS[slot]);
+    if (raw === null) return null;
+    const key = this.backupRaw(slot, raw);
+    if (key === null) return null;
+    brokenNotice = true;
+    if (clear) this.clear(slot);
+    return key;
+  },
+
+  /** Ham metni yedek anahtarına yazar ve sınırı uygular. Dönüş: anahtar ya da null. */
+  backupRaw(slot, raw) {
+    try {
+      let ts = Date.now();
+      while (localStorage.getItem(`${BROKEN_PREFIX}${slot}.${ts}`) !== null) ts += 1;
+      const key = `${BROKEN_PREFIX}${slot}.${ts}`;
+      localStorage.setItem(key, raw);
+      const all = this.listBroken(); // eskiden yeniye
+      for (const old of all.slice(0, Math.max(0, all.length - MAX_BROKEN))) if (old.key !== key) this.removeBroken(old.key);
+      return key;
+    } catch (err) {
+      console.warn('Yedek yazılamadı:', err);
+      return null;
+    }
+  },
+
+  /** Yedekler, eskiden yeniye: [{ key, slot, ts, size }]. */
+  listBroken() {
+    const out = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key?.startsWith(BROKEN_PREFIX)) continue;
+        const [slot, ts] = key.slice(BROKEN_PREFIX.length).split('.');
+        out.push({ key, slot, ts: Number(ts) || 0, size: (localStorage.getItem(key) ?? '').length });
+      }
+    } catch {
+      /* depolama erişilemez */
+    }
+    return out.sort((a, b) => a.ts - b.ts || a.key.localeCompare(b.key));
+  },
+
+  readBroken(key) {
+    return key?.startsWith(BROKEN_PREFIX) ? storageGet(key) : null;
+  },
+
+  removeBroken(key) {
+    try {
+      if (key?.startsWith(BROKEN_PREFIX)) localStorage.removeItem(key);
+    } catch {
+      /* depolama erişilemez */
+    }
+  },
+
+  /** Yeni bir yedek oluştuysa true döner ve uyarıyı sıfırlar. */
+  takeNotice() {
+    const had = brokenNotice;
+    brokenNotice = false;
+    return had;
   },
 
   exists(slot = 'main') {
