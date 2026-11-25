@@ -152,7 +152,7 @@ export class BehaviorSystem {
       game.events.on('strike:started', ({ ids }) => engineOn('discontent') && this.interrupt(ids)),
       game.events.on('strike:ended', ({ ids }) => engineOn('discontent') && this.interrupt(ids, ['strike'], true)),
       // (32.1) Suç: vakti gelen planlı sakin süren boş zaman / sohbet görevini bırakır (CrimeSystem yalnızca bu türleri gönderir)
-      game.events.on('crime:nudge', ({ ids }) => engineOn('justice') && this.interrupt(ids)),
+      game.events.on('crime:nudge', ({ ids, extra = [] }) => engineOn('justice') && this.interrupt(ids, extra)), // (32.6a) extra: şenlikten sıvışma
       // (32.2) Adalet Sarayı: sürgün edilen yola çıkar, yasaklı hana / pazara giderken döner (force: her görev bırakılır)
       game.events.on('court:interrupt', ({ ids, activities = null }) => engineOn('court') && this.interrupt(ids, activities ?? Object.keys(ACTIVITIES), true)),
       // (23. aşama) Yangın: yanan yapıdaki çalışanlar ve koşacak sakinler elindeki (yarıda kesilebilen) işi bırakır

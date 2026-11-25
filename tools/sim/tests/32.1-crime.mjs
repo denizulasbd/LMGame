@@ -41,7 +41,7 @@ results.push(...(await page.evaluate(async () => {
   for (const x of st.characters) calm(x);
 
   // ---- 1. veri
-  c('veri: şalter açık, tohum + 42 izole (35-41 dolu), altı suç türü, ağırlıklar 1-5, moodlet sayısı 33', ENGINES.justice === true && D.JUSTICE_SEED_OFFSET === 42 && D.CRIME_KEYS.join() === 'innPilfer,marketFruit,pantryRation,woodpile,pursePinch,pettyVandal' && D.CRIME_KEYS.every((key) => D.CRIMES[key].severity.every((v) => v >= 1 && v <= 5)) && MD.MOODLET_KEYS.length === 33 && CONFIG.SAVE_VERSION === 41);
+  c('veri: şalter açık, tohum + 42 izole (35-41 dolu), yedi suç türü (32.6a: bahçeden koparma), ağırlıklar 1-5, moodlet sayısı 33', ENGINES.justice === true && D.JUSTICE_SEED_OFFSET === 42 && D.CRIME_KEYS.join() === 'innPilfer,marketFruit,gardenPick,pantryRation,woodpile,pursePinch,pettyVandal' && D.CRIME_KEYS.every((key) => D.CRIMES[key].severity.every((v) => v >= 1 && v <= 5)) && MD.MOODLET_KEYS.length === 33 && CONFIG.SAVE_VERSION === 41);
 
   // ---- 2. adaylar
   const elder = { ...a, lifeStage: 'elder', isChild: false };

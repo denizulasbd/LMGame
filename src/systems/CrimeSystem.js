@@ -19,7 +19,7 @@
 //               (state.justice.stats). Yakalanınca kurbanla küçük bir ilişki düşüşü (RelationshipSystem.add).
 //   Temizlik  : ayrılan / ölen sakinin açık davası düşer, kapanmış davalardaki kimliği null olur, sicilden silinir (Justice.pruneJustice).
 import { JUSTICE, CRIMES, CRIME_BUBBLES, CRIME_TEXT, VICTIM_RELATION } from '../data/justice.js';
-import { SOUVENIRS } from '../data/citizens.js';
+import { SOUVENIRS, REVOLT } from '../data/citizens.js';
 import { engineOn } from './Engines.js';
 import { ACTIVITIES } from '../data/activities.js';
 import { addItem, takeItem, addCoins } from './Citizens.js';
@@ -113,8 +113,11 @@ export class CrimeSystem {
       pool.splice(pool.indexOf(pick), 1);
       const motive = motiveOf(pick.c, pick.f);
       const option = this.dice.weighted(crimeOptions(s, pick.c, motive, rel));
-      const hour = this.dice.int(JUSTICE.hours[0], JUSTICE.hours[1] - 1);
-      const at = dayStart + hour * 60 + this.dice.int(0, 59);
+      let hour = this.dice.int(JUSTICE.hours[0], JUSTICE.hours[1] - 1);
+      const minute = this.dice.int(0, 59);
+      // (32.6a) isyancı isyan saatinde eyleme geçemez: plan isyan saatinin bitimine kayar (aynı zarlar, sıra değişmez)
+      if (JUSTICE.rioterAfterRiot && s.trust?.revolt?.rioters?.includes(pick.c.id)) hour = Math.max(hour, REVOLT.hours[1]);
+      const at = dayStart + hour * 60 + minute;
       const duration = this.dice.int(JUSTICE.duration[0], JUSTICE.duration[1]);
       if (!option) {
         this.events.emit('crime:noOption', { character: pick.c, motive }); // (32.6a) ölçüm: motivasyona uygun hedef yok, yuva boşa gitti
@@ -138,9 +141,9 @@ export class CrimeSystem {
       const p = c.crimePlan;
       if (!p || now < p.at || !c.visible || !c.task || !crimeReady(this.state, c, hour)) continue;
       const kind = ACTIVITIES[c.task.activity]?.kind;
-      if (JUSTICE.nudgeKinds.includes(kind)) ids.push(c.id);
+      if (JUSTICE.nudgeKinds.includes(kind) || (JUSTICE.festivalSneak && c.task.activity === 'festival')) ids.push(c.id);
     }
-    if (ids.length) this.events.emit('crime:nudge', { ids });
+    if (ids.length) this.events.emit('crime:nudge', { ids, ...(JUSTICE.festivalSneak ? { extra: ['festival'] } : {}) });
   }
 
   // ------------------------------------------------------------------------------------------------------------------- eylem

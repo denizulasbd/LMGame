@@ -520,8 +520,13 @@ await page.evaluate((passive) => {
   window.__crimeExpose = { edu: {}, club: {}, cross: {} };
   game.events.on('time:newDay', () => {
     const s = game.state;
+    const X0 = window.__crimeExpose;
+    if (window.__justiceMod.isFamine(s)) X0.famineDays = (X0.famineDays ?? 0) + 1; // (32.6a) kıtlık günleri (gün dönümünde)
     for (const c of s.characters) {
       if (!window.__justiceMod.crimeCandidate(s, c)) continue;
+      const f = window.__justiceMod.riskFactors(s, c);
+      X0.hungerSum = (X0.hungerSum ?? 0) + f.hunger;
+      X0.n = (X0.n ?? 0) + 1;
       const X = window.__crimeExpose;
       const e = eduOf(c);
       const k = clubOf(c);

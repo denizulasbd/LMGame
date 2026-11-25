@@ -68,7 +68,7 @@ import { isMemorialTime, memorialEligible, urgentNeed, riteWindow, riteVenue } f
 import { engineOn } from '../systems/Engines.js';
 import { shouldStrike } from '../systems/Loyalty.js';
 import { crimeReady, isBanned, banBlocks, serviceDue } from '../systems/Justice.js';
-import { COURT, SHAME } from '../data/justice.js';
+import { COURT, SHAME, JUSTICE, CRIMES } from '../data/justice.js';
 import { DISCONTENT } from '../data/loyalty.js';
 
 const COLD_SEASONS = ['autumn', 'winter']; // (29.3) "Soğukta üşümek" korkusunun sıcak mekân arayışı
@@ -179,7 +179,9 @@ export class Brain {
         if (nap) return nap;
       }
     }
-    if (!grieving && this.world.state.events.festival.active && needs.energy > FESTIVAL_MIN_ENERGY) {
+    // (32.6a) vakti gelmiş suç planı olan sakin şenliğe gitmez (JUSTICE.festivalSneak): aşağıdaki suç dalı onu hedefe götürür
+    const sneak = JUSTICE.festivalSneak && c.crimePlan && engineOn('justice') && !c.isChild && this.world.state.totalMinutes >= c.crimePlan.at && this.world.state.totalMinutes <= c.crimePlan.until && crimeReady(this.world.state, c, hour);
+    if (!grieving && !sneak && this.world.state.events.festival.active && needs.energy > FESTIVAL_MIN_ENERGY) {
       const plan = this.planFestival(c);
       if (plan) return plan;
     }
@@ -375,6 +377,22 @@ export class Brain {
       // en yakın birkaç noktadan yolu olan ilki (çitle çevrili bahçe gibi yerlerde en yakın karo kopuk olabilir)
       const d2 = (p) => (p.x - origin.x) ** 2 + (p.y - origin.y) ** 2;
       spot = [...around].sort((p, q) => d2(p) - d2(q)).slice(0, 4).find((p) => this.world.findPath(origin, p)) ?? null;
+      // (32.6a) haylazlık: hedefe yol yoksa yakındaki başka bir süs (en çok JUSTICE.vandalRetarget; zar yok, plan güncellenir)
+      if (!spot && plan.crime === 'pettyVandal' && JUSTICE.vandalRetarget) {
+        const others = this.world.buildings
+          .filter((b) => b !== target && b.functional && !b.damaged && !b.isBurning && CRIMES.pettyVandal.targets.includes(b.type))
+          .sort((a, b) => d2({ x: a.tileX, y: a.tileY }) - d2({ x: b.tileX, y: b.tileY }) || a.id - b.id)
+          .slice(0, JUSTICE.vandalRetarget);
+        for (const o of others) {
+          const ring = this.world.getSpots(o).length ? this.world.getSpots(o) : this.crimeRing(o);
+          spot = [...ring].sort((p, q) => d2(p) - d2(q)).slice(0, 2).find((p) => this.world.findPath(origin, p)) ?? null;
+          if (spot) {
+            target = o;
+            plan.buildingId = o.id;
+            break;
+          }
+        }
+      }
       if (!spot) return null;
     }
     // kurban bankta / havuz başında oturuyor olabilir (yürünemez karo): yanına kadar yürür

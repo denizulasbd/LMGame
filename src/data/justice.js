@@ -21,6 +21,13 @@ export const JUSTICE = {
   windowHours: 8, // sakin planlanan saatten sonra bu kadar saat içinde (en geç dayEndHour) boş zamanında eyleme geçer; geçerse plan düşer (ilk ölçüm 5)
   dayEndHour: 23, // pencere en geç bu saatte kapanır (gece yarısını aşan plan yok)
   nudgeKinds: ['leisure', 'social', 'idle'], // vakti gelince saat başı bölünen görev türleri (şenlik, iş, uyku bölünmez)
+  // (32.6a) Şenlikten sıvışma: vakti gelmiş suç planı olan sakin akşam şenliğinden kalkıp eyleme geçer (herkes meydandayken). Ölçüm:
+  // zorba 42 / 77'de vakti gelmiş planların saat örneklerinin %20'si şenlikteydi ve planların %35-47'si düşüyordu. false: eski kural.
+  festivalSneak: true,
+  // (32.6a) İsyancının planı isyan saatinden (REVOLT.hours) sonraya kayar (eskiden isyan saatine düşen plan çoğunlukla düşüyordu)
+  rioterAfterRiot: true,
+  // (32.6a) Haylazlık hedefine yol yoksa en yakın bu kadar başka süs denenir (plan düşmesin; zar çekmez)
+  vandalRetarget: 6,
   duration: [8, 14], // eylem süresi (oyun dakikası; izole üreteçten)
   closeAfterMinutes: 1440, // açık dava (Adalet Sarayı yokken) bir gün sonra Muhtar uyarısıyla kapanır
   logSize: 40, // kapanmış davaların son N'i
@@ -46,7 +53,7 @@ export const RISK = {
     { below: 45, mul: 1.2 },
     { below: Infinity, mul: 1 },
   ],
-  famineMul: 1.5,
+  famineMul: 2.4, // (32.6a) 1,5 → 2,4: kıtlıkta suç normalin ancak ×0,9-1,4'üydü (hedef ×2-3)
   // Sadakat kademesi (Loyalty.loyaltyLevel)
   loyalty: { bitter: 2.8, grumbling: 1.7, calm: 1, pleased: 0.8, loyal: 0.55 }, // ilk ölçüm bitter 2,2 / grumbling 1,5 (zorba ancak 1-1,8 kat)
   // Kasaba refahı (yürüyen ortalama) ve Yönetim Güveni: düşükse artar
@@ -71,7 +78,7 @@ export const RISK = {
 
 // Suç türüne kişilik eğilimi (ağırlık çarpanı)
 export const TRAIT_LEAN = {
-  glutton: { innPilfer: 1.6, marketFruit: 1.6, pantryRation: 1.6 },
+  glutton: { innPilfer: 1.6, marketFruit: 1.6, pantryRation: 1.6, gardenPick: 1.6 },
   grumpy: { pettyVandal: 1.8 },
   ambitious: { pursePinch: 1.3 },
   cheerful: { pettyVandal: 0.6 },
@@ -147,11 +154,27 @@ export const CRIMES = {
       fruit: { item: 'fruit', source: 'stall', amount: [1, 2], value: 2, severity: 1 },
       souvenir: { item: 'souvenir', source: 'stall', amount: [1, 1], value: 6, severity: 1 },
     },
-    motives: { hunger: 2, poverty: 1, temptation: 2, mischief: 1 },
+    motives: { hunger: 3, poverty: 1, temptation: 2, mischief: 1 }, // (32.6a) hunger 2 → 3: kıtlıkta açlığa uygun hedef
     text: {
       act: "Pazar Yeri'nden {loot} aşırırken",
       did: "Pazar Yeri'nden gizlice {loot} aşırdı",
       lost: "Pazar Yeri'nin tezgâhından {loot} kayboldu",
+    },
+  },
+  // (32.6a) Bahçeden koparma: kıtlıkta kiler boşken açlığa uygun hedef (erzak suçu çıkmıyordu). Mal stoktan düşmez (tezgâh gibi),
+  // iadede bahçeye döner sayılır.
+  gardenPick: {
+    name: 'Bahçeden koparma',
+    severity: [1, 1],
+    targets: ['garden'],
+    variants: {
+      produce: { item: 'fruit', source: 'stall', amount: [1, 2], value: 2, severity: 1 },
+    },
+    motives: { hunger: 3, poverty: 1 },
+    text: {
+      act: 'bahçeden {loot} koparırken',
+      did: 'bahçeden gizlice {loot} kopardı',
+      lost: 'Bahçeden {loot} kopartılmış',
     },
   },
   pantryRation: {

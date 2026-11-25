@@ -524,7 +524,7 @@ export const ACTIVITIES = {
     travelLabel: 'Kulüp evine gidiyor',
     label: 'Kulüp evinde arkadaşlarıyla uğraşıyor',
     duration: [120, 120],
-    effects: { fun: 0.4, social: 0.5 },
+    effects: { fun: 0.4, social: 1.0 }, // (32.6a) 0,5 → 1,0: buluşma yerini aldığı meydan / han sohbeti kadar sosyallik doldursun
     bubbles: ['note', 'heart', 'sparkle'],
   },
   clubSessionIn: {
@@ -533,7 +533,7 @@ export const ACTIVITIES = {
     travelLabel: 'Kulüp evine gidiyor',
     label: 'Kulüp evinde arkadaşlarıyla uğraşıyor',
     duration: [120, 120],
-    effects: { fun: 0.4, social: 0.5 },
+    effects: { fun: 0.4, social: 1.0 }, // (32.6a) 0,5 → 1,0: buluşma yerini aldığı meydan / han sohbeti kadar sosyallik doldursun
   },
   clubHobby: {
     kind: 'leisure',
