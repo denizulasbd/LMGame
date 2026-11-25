@@ -77,7 +77,10 @@ export const RENOWN_EFFECTS = {
   // kimlikten türer (zar yok), nüfusa / yatağa dokunmaz.
   // (32.6a) minReputation: itibar bu değerin üstündeyken (kademe yerine). Saygın (≥ 75) kuralı 4 × 120 günde 0-1 kez tetiklendi:
   // göçmenlerin çoğu itibar 75'e çıkmadan geliyor.
-  skilledImmigrant: { minRank: 2, minReputation: 70, skills: ['woodcutting', 'masonry', 'farming', 'building', 'crafting', 'cooking', 'fishing', 'baking'] },
+  // (32.6b) 70 → 75: 6 × 50 A/B'de (--no-32-builds) hazine farkının (−%13) kaynağı bu kuraldı: tohum 77 ve 101'de (itibar G11'de 74) 2 ve 3 Kalfa göçmen
+  // geldi, hazine −7k / −22k; kural kapalıyken (minReputation 1000) o tohumlar şalter kapalı koşuyla bayt bayt aynı hazineye döndü (93.611 / 93.466).
+  // 75 = Saygın eşiği (32.3'ün özgün tasarımı); kural gene tetiklenir ama G10-12'deki ilk dalgada değil
+  skilledImmigrant: { minRank: 2, minReputation: 75, skills: ['woodcutting', 'masonry', 'farming', 'building', 'crafting', 'cooking', 'fishing', 'baking'] },
   // Şüpheli: Kraliyet Fermanı'nın süresi 3 günden 2 güne iner (para cezası değil; ferman reddedilebilir)
   suspiciousDecreeMinutes: 2880,
 };

@@ -55,6 +55,9 @@
 //   --evo     : (29.4) evrim verisini bellekte geçersiz kılar (denge denemesi): "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
 //   --pushes  : (29.4) katkı kaynağı dökümü ve karakter başına günlük net katkı yüzdelikleri
 //   --no-agri : (24. aşama) Ürün Silosu kurulmaz ve bahçeler hep Buğday ekili kalır (mahsul bozulması yine işler)
+//   --no-32-builds : (32.6b) 32'nin yapıları (saray, Darülfünun, hobi evleri, lütuf yapıları) hiç kurulmaz; şalterler açık kalır (mekaniği otopilotun inşa tercihinden ayırmak için)
+//   --defer-32-builds : (32.6b) varsayılan: 32'nin yapıları yalnızca Ulu Saat Kulesi (Altın Çağ) tamamlandıktan sonra kurulur. --build-32-early: eski sıra (kuruldukları anda)
+//   --asama32-state : (32.6b) kayıttan önce 32'nin bütün yapılarını tamamlar ve ortada bırakılmış durumu kurar (fikstür save-v41-asama32.json)
 //   --no-clubs : (32.5) hobi evleri hiç kurulmaz (şalter açık ama yapı yokken tarihin aynı kaldığını göstermek için)
 //   --no-apprentice : (25.2) Çırak Kapısı hiç açılmaz (çıraklık katmanının kapalıyken oyunu hiç değiştirmediğini göstermek için)
 //   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
@@ -148,11 +151,11 @@ await page.evaluate((o) => {
   window.__crimeDiag = o.crimeDiag; // (32.1) tanı
   window.__judge = o.judge; // (32.2)
   window.__noClubs = o.noClubs; // (32.5)
-  // (32.6b) --no-32-builds: 32'nin yapıları (saray, Darülfünun, hobi evleri, lütuf yapıları) hiç kurulmaz; --defer-32-builds: yalnızca Ulu Saat Kulesi
-  // (Altın Çağ) tamamlandıktan sonra kurulur. Şalterler açık kalır (mekaniği otopilotun inşa tercihinden ayırmak için).
+  // (32.6b) b32: 'none' (hiç kurulmaz), 'defer' (varsayılan: yalnızca Ulu Saat Kulesi / Altın Çağ tamamlandıktan sonra), null (--build-32-early: eski sıra).
+  // Şalterler her durumda açık kalır; engines-off'ta yapılar zaten kurulamaz (öteki aşamaların ölçüm tabanları değişmez).
   window.__b32 = o.b32;
   window.__allow32 = (st) => !window.__b32 || (window.__b32 === 'defer' && Boolean(st.goldenAge?.since));
-}, { judge, famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null, crimeDiag: Boolean(options['crime-diag']), noClubs: Boolean(options['no-clubs']), b32: options['no-32-builds'] ? 'none' : options['defer-32-builds'] ? 'defer' : null });
+}, { judge, famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null, crimeDiag: Boolean(options['crime-diag']), noClubs: Boolean(options['no-clubs']), b32: options['no-32-builds'] ? 'none' : options['build-32-early'] ? null : 'defer' }); // (32.6b) varsayılan: 32'nin yapıları Ulu Saat Kulesi'nden sonra
 if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent', 'repent2', 'novice'].includes(options.profile)) {
   console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent | repent2 | novice)`);
   process.exit(2);
