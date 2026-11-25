@@ -97,12 +97,14 @@ export const CLUB_AFFINITY = {
     quirks: { natureEnthusiast: 3, animalLover: 1.5 },
     skills: { farming: 0.75, herbalism: 0.75 }, // beceri seviyesi başına (en çok skillCap seviye)
     work: ['garden', 'healerHut'], // bu yapıda çalışana +work
+    elder: 0.5, // Kıdemli Bilge (emekli; vakti bol)
   },
   sewingClub: {
-    traits: { hardworking: 2, introvert: 1, nightOwl: 0.5 },
+    traits: { hardworking: 2, introvert: 1, nightOwl: 1 },
     quirks: { craftsman: 3, entrepreneur: 1 },
     skills: { crafting: 1, building: 0.5 },
     work: ['loom'], // dokumacılık (Dokuma Tezgâhı)
+    elder: 1, // Kıdemli Bilge: gergef başında torunlarına öğreteceği çok şey var
   },
   paintingClub: {
     traits: { introvert: 1.5, cheerful: 1, ambitious: -0.5 },
@@ -160,4 +162,5 @@ export const CLUB_TEXT = {
   memoryPainting: 'Resim Atölyesi\'nin duvarına "{title}" asıldı',
   memoryExhibition: 'Kasaba Sergisi\'nde tablolarımız halka gösterildi',
   memoryJoined: '{club}\'ne katıldım',
+  memoryFruit: 'Bahar başında Bahçecilik Kulübü\'nün tarhlarından bir meyve topladım',
 };

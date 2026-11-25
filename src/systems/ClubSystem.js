@@ -10,7 +10,7 @@
 //             Buluşmada birlikte olan üyeler arasında arkadaşlık kazancı (RelationshipSystem.add), bitişte Tatlı Sohbet (neden 'club').
 //   Ürünler  : bahçe tarhları (estetik), Nakışlı Mendil / kışın Dayanıklı Giysi hediyesi, atölye tabloları ve Kasaba Sergisi.
 // Yayınladığı olaylar: 'club:joined' { character, key, reason }, 'club:left' { character, key, reason }, 'club:founded' { key, members },
-//   'club:bell' { key, ids }, 'club:session' { key, came, building }, 'club:work' { key, kind, text, ids, building, milestone, recipient? },
+//   'club:bell' { key, ids }, 'club:skipped' { key, reason: blocked | few | empty }, 'club:session' { key, came, building }, 'club:work' { key, kind, text, ids, building, milestone, recipient? },
 //   'club:exhibition' { key, building, ids, text }, 'club:works' (estetik yeniden hesaplanır), 'toast'.
 import { CLUB, CLUB_KEYS, CLUBS, CLUB_TEXT as TX } from '../data/clubs.js';
 import { RELATIONSHIP_RATES } from '../data/relationships.js';
@@ -22,7 +22,7 @@ import {
   clubName, isClubKey,
 } from './Clubs.js';
 import { serviceDue } from './Justice.js';
-import { isMemorialTime, memorialEligible } from './Rites.js';
+import { isMemorialTime, memorialEligible, riteWindow } from './Rites.js';
 import { isRallyActive } from './RallySystem.js';
 import { addItem, roomFor, countItem } from './Citizens.js';
 import { addMemory } from './MemorySystem.js';
@@ -110,6 +110,19 @@ export class ClubSystem {
     c.club = null;
     const r = this.state.clubs?.[key];
     if (r?.live) r.live.ids = r.live.ids.filter((id) => id !== c.id);
+    // kasabadan ayrılan / ölen / sürgün edilen: kimliği kulüp kayıtlarından da silinir (kopuk referans kalmasın)
+    if (reason === 'gone' || reason === 'exile') {
+      for (const k of CLUB_KEYS) {
+        const rr = this.state.clubs?.[k];
+        if (!rr) continue;
+        rr.attendance = rr.attendance.map((ids) => ids.filter((id) => id !== c.id));
+        if (rr.live) {
+          rr.live.came = rr.live.came.filter((id) => id !== c.id);
+          rr.live.excused = rr.live.excused.filter((id) => id !== c.id);
+        }
+        if (rr.out) delete rr.out[c.id];
+      }
+    }
     this.events.emit('club:left', { character: c, key, reason, silent });
   }
 
@@ -128,6 +141,7 @@ export class ClubSystem {
         r.fruitYear = season.year;
         const got = [];
         for (const c of membersOf(s, 'gardenClub')) if (roomFor(c, 'fruit') > 0 && addItem(c, 'fruit', CLUBS.gardenClub.springFruit) > 0) got.push(c);
+        for (const c of got) addMemory(s, c, TX.memoryFruit, 'apple', { kind: 'life' });
         if (got.length) this.events.emit('club:fruit', { key: 'gardenClub', ids: got.map((c) => c.id), text: TX.fruit });
       }
     }
@@ -173,13 +187,19 @@ export class ClubSystem {
     return Boolean(s.events?.festival?.active || isRallyActive(s) || isMemorialTime(s) || s.social?.party || s.goldenAge?.celebration);
   }
 
+  /** Bugünün anma töreni buluşma penceresiyle çakışıyor mu (tören önce gelir: çağrılı üye o akşam uygun sayılmaz)? */
+  memorialOverlaps(until = this.state.totalMinutes + 1) {
+    const w = riteWindow(this.state);
+    return Boolean(w) && w.end > this.state.totalMinutes && w.start < until;
+  }
+
   /** Buluşma başında uygun mu (uygun değilse kaçırma sayılmaz). */
-  eligibleNow(c) {
+  eligibleNow(c, until = null) {
     const s = this.state;
     if (!canJoin(s, c) || c.away || c.illness || c.isInjured || c.mood?.grief) return false;
     if (serviceDue(s, c)) return false; // (32.2) kamu hizmeti önce; borçlu üye o akşam gelmez
     if (c.task?.activity === 'sleep' && !c.task.nap) return false;
-    if (isMemorialTime(s) && memorialEligible(s, c)) return false;
+    if ((isMemorialTime(s) || (until !== null && this.memorialOverlaps(until))) && memorialEligible(s, c)) return false;
     return true;
   }
 
@@ -222,12 +242,14 @@ export class ClubSystem {
       if (s.totalMinutes < w.start + CLUB.blockedGrace) return;
       r.evaluated = s.time.day;
       r.recent = [...r.recent, 0].slice(-6);
+      this.events.emit('club:skipped', { key, reason: 'blocked', eligible: 0 });
       return;
     }
     r.evaluated = s.time.day;
-    const ids = members.filter((c) => this.eligibleNow(c)).map((c) => c.id);
+    const ids = members.filter((c) => this.eligibleNow(c, w.end)).map((c) => c.id);
     if (ids.length < CLUB.minSession) {
       r.recent = [...r.recent, 0].slice(-6);
+      this.events.emit('club:skipped', { key, reason: 'few', eligible: ids.length, members: members.length });
       return;
     }
     r.live = { day: s.time.day, until: w.end, ids, came: [], excused: members.filter((c) => !ids.includes(c.id)).map((c) => c.id) };
@@ -242,6 +264,11 @@ export class ClubSystem {
 
   tickSession(key, b, live, steps) {
     const here = this.present(key, b);
+    // ölçüm için (kaydedilmez): buluşmanın 45. dakikasında üyelerin ne yaptığı
+    if (!this.sample?.[key] && this.state.totalMinutes >= live.until - 75) {
+      this.sample ??= {};
+      this.sample[key] = membersOf(this.state, key).map((c) => (c.away ? 'away' : c.task?.activity ?? 'none'));
+    }
     for (const c of here) {
       if (!live.came.includes(c.id)) live.came.push(c.id);
       this.minutes.set(c.id, (this.minutes.get(c.id) ?? 0) + steps);
@@ -266,6 +293,8 @@ export class ClubSystem {
       if (came.includes(c.id)) c.club.missed = 0;
       else if (live.ids.includes(c.id)) c.club.missed += 1;
     }
+    if (!held) this.events.emit('club:skipped', { key, reason: 'empty', eligible: live.ids.length, acts: this.sample?.[key] ?? [] });
+    if (this.sample) delete this.sample[key];
     if (held) {
       r.sessions += 1;
       r.lastSession = s.time.day;

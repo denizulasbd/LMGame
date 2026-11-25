@@ -108,6 +108,10 @@ export function clubAffinity(state, c, key) {
       reasons.push(BUILDINGS[w.type]?.name ?? w.type);
     }
   }
+  if (t.elder && c.lifeStage === 'elder') {
+    score += t.elder;
+    reasons.push('Kıdemli Bilge');
+  }
   const friends = clubFriends(state, c, key).length;
   if (friends) {
     score += Math.min(AR.friendCap, friends * AR.friend);
