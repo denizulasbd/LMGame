@@ -36,9 +36,10 @@ export function parseArgs(argv = process.argv.slice(2)) {
  * Tarayıcıyı açar, oyunu verilen tohumla yükler ve döngüyü durdurur.
  * Dönüş: { browser, page, errors } — errors: sayfa hataları ve konsol uyarıları
  * (30.4a) enginesOff: kapatılacak ENGINES anahtarları (dizi ya da virgüllü metin; '*' hepsi). Sayfa açılmadan önce
+ * (32.7) storage: sayfa açılmadan önce localStorage'a yazılacak { anahtar: metin } (yalnızca ilk açılışta; yeniden yüklemede ezmez).
  * globalThis.__LMGAME_ENGINES_OFF olarak enjekte edilir: Engines.js modül yüklenirken okur (açılışta bilinmesi gereken şalterler).
  */
-export async function openGame({ seed = 42, path = '', viewport = { width: 1280, height: 800 }, randomSeed = seed, stopLoop = true, enginesOff = null } = {}) {
+export async function openGame({ seed = 42, path = '', viewport = { width: 1280, height: 800 }, randomSeed = seed, stopLoop = true, enginesOff = null, storage = null } = {}) {
   const { chromium } = require('playwright');
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport });
@@ -49,6 +50,15 @@ export async function openGame({ seed = 42, path = '', viewport = { width: 1280,
   });
   const off = Array.isArray(enginesOff) ? enginesOff : typeof enginesOff === 'string' ? enginesOff.split(',').map((k) => k.trim()).filter(Boolean) : [];
   if (off.length) await page.addInitScript((keys) => { globalThis.__LMGAME_ENGINES_OFF = keys; }, off);
+  if (storage) {
+    await page.addInitScript((items) => {
+      try {
+        if (sessionStorage.getItem('__seeded')) return;
+        sessionStorage.setItem('__seeded', '1');
+        for (const [k, v] of Object.entries(items)) localStorage.setItem(k, v);
+      } catch { /* depolama erişilemez */ }
+    }, storage);
+  }
   if (randomSeed !== null) {
     await page.addInitScript((s) => {
       let x = (s * 2654435761) >>> 0 || 1;
@@ -130,6 +140,35 @@ async function installHelpers(page, stopLoop) {
             for (let dx = -r; dx <= r; dx++) {
               if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
               if (scene.construction.checkPlacement(type, plaza.centerX + dx, plaza.centerY + dy).ok) return { x: plaza.centerX + dx, y: plaza.centerY + dy };
+            }
+          }
+        }
+        return null;
+      },
+      // (32.6a) Konutların (kulübe) ağırlık merkezine en yakın uygun yer: halka halka aranır; yapının önü (kapı sırası) kasabaya bağlı
+      // ve oradan meydana yol bulunabilmeli. Konut yoksa ya da yer bulunamazsa null (çağıran findSpot'a düşer).
+      findSpotNearHomes(type, maxRadius = 18) {
+        const scene = game.scenes.current;
+        const world = scene.world;
+        const homes = game.state.buildings.filter((b) => b.type === 'cabin' && !b.underConstruction);
+        if (!homes.length) return null;
+        const cx = Math.round(homes.reduce((a, b) => a + b.tileX + 1, 0) / homes.length);
+        const cy = Math.round(homes.reduce((a, b) => a + b.tileY + 1, 0) / homes.length);
+        const size = window.__buildingsData?.BUILDINGS?.[type]?.size ?? { w: 2, h: 2 };
+        const plaza = world.landmarks.plaza;
+        const goal = { x: plaza.centerX, y: plaza.centerY + 2 };
+        for (let r = 0; r <= maxRadius; r++) {
+          for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+              if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+              const x = cx + dx - Math.floor(size.w / 2);
+              const y = cy + dy - Math.floor(size.h / 2);
+              if (!scene.construction.checkPlacement(type, x, y).ok) continue;
+              const door = { x: x + Math.floor(size.w / 2), y: y + size.h };
+              if (!world.isReachable(door.x, door.y)) continue;
+              const target = world.map.isWalkable(goal.x, goal.y) ? goal : { x: plaza.centerX, y: plaza.centerY };
+              if (!world.findPath(door, target)) continue;
+              return { x, y };
             }
           }
         }

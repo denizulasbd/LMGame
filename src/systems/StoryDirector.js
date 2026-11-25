@@ -7,7 +7,7 @@
 // Olaylar: bkz. data/storyCards.js (STORY_PRIORITY). Ek olarak 'time:hour' (06:00 özel gün taraması, 22:00 özet; RiteSystem'den SONRA,
 // sync() içinde işlenir), 'ui:toggleWatch' { id }, 'ui:setStoryFilter' { filter }, 'ui:storyAction' { uid }, 'ui:storyGo' { uid }.
 import { STORY_LIMITS as L } from '../data/storyCards.js';
-import { makeCard, allows, enqueue, nextIndex, daySummary, toggleWatched, pruneWatched, filterKeyOf, actionStatus } from './StoryCards.js';
+import { makeCard, allows, enqueue, nextIndex, daySummary, toggleWatched, pruneWatched, filterKeyOf, actionStatus, isWatchedCard } from './StoryCards.js';
 import { epitaphStory } from './LifeStory.js';
 import { specialKindOf } from './Rites.js';
 import { engineOn } from './Engines.js';
@@ -17,6 +17,11 @@ const EVENTS = [
   'want:fulfilled', 'fear:realized', 'apprentice:grandmaster', 'masterwork:created', 'relationship:partnered', 'chemistry:kindred',
   'loyalty:changed', 'moodlet:mourning', 'moodlet:consoled', 'family:grownUp', 'venerable:became', 'relationship:quarrel',
   'relationship:reconciled', 'pantry:low', 'dilemma:resolved', 'storm:struck', 'crisis:raidResolved',
+  'crime:caught', 'crime:unsolved', // (32.1)
+  'court:verdict', 'court:exiled', 'court:revealed', 'court:stale', // (32.2)
+  'renown:tier', 'renown:grant', // (32.3)
+  'university:admitted', 'university:graduated', 'university:dropped', // (32.4)
+  'club:founded', 'club:work', 'club:exhibition', // (32.5)
 ];
 
 export class StoryDirector {
@@ -38,6 +43,8 @@ export class StoryDirector {
     this.pendingHour = null;
     this.summaryDay = -1;
     this.seenSpecial = new Set();
+    this.crimeCards = { day: -1, n: 0 }; // (32.1) "Yalnızca önemli" süzgecinde bugünkü suç kartı sayısı
+    this.clubCards = { day: -1, n: 0 }; // (32.5) "Yalnızca önemli" süzgecinde bugünkü kulüp kartı sayısı
     this.paused = false;
     this.hovered = false;
     this.unsubscribers = [];
@@ -134,6 +141,27 @@ export class StoryDirector {
       return false;
     }
     if (this.visible.some((c) => c.key === card.key)) return false;
+    // (32.1) "Yalnızca önemli" süzgecinde günde en çok bir suç kartı; fazlası gün özetine (izlenen sakinin kartı sayılmaz)
+    // (32.6a) tek seferlik kartlar (card.once) günlük kategori sınırından muaftır: gün özetine düşmez, günün hakkını da harcamaz
+    if (card.crime && !card.once && filter === 'important' && !isWatchedCard(card, this.watched)) {
+      if (this.crimeCards.day !== card.day) this.crimeCards = { day: card.day, n: 0 };
+      if (this.crimeCards.n >= L.crimePerDay) {
+        this.missed.push(card);
+        this.record(card, false);
+        return false;
+      }
+      this.crimeCards.n += 1;
+    }
+    // (32.5) "Yalnızca önemli" süzgecinde günde en çok bir kulüp kartı (izlenen sakinin kartı sayılmaz)
+    if (card.club && !card.once && filter === 'important' && !isWatchedCard(card, this.watched)) {
+      if (this.clubCards.day !== card.day) this.clubCards = { day: card.day, n: 0 };
+      if (this.clubCards.n >= L.clubPerDay) {
+        this.missed.push(card);
+        this.record(card, false);
+        return false;
+      }
+      this.clubCards.n += 1;
+    }
     const res = enqueue(this.queue, card);
     this.queue = res.queue;
     if (res.dropped) {
@@ -205,7 +233,7 @@ export class StoryDirector {
 
   /** (30.6) Eylem düğmesi olan kart (armağan / taziye), eylem hâlâ geçerliyken ve yapılmamışken solmaz; oyuncu kapatana dek kalır. */
   holds(card) {
-    if (!engineOn('novicePath') || !card.action || card.action.type === 'story' || card.used) return false;
+    if (!engineOn('novicePath') || !card.action || card.action.type === 'story' || card.action.type === 'case' || card.used) return false; // (32.2) dava kartı normal solar
     return actionStatus(this.state, card).enabled;
   }
 
@@ -260,6 +288,14 @@ export class StoryDirector {
     }
     const st = actionStatus(this.state, card);
     if (!st.enabled || card.used) return false;
+    if (a.type === 'case') {
+      this.events.emit('ui:openCase', { id: a.id }); // (32.2) dosya her basışta açılır (kart "kullanıldı" sayılmaz)
+      return true;
+    }
+    if (a.type === 'letter') {
+      this.events.emit('ui:openRoyalLetter', { key: a.id }); // (32.3) Lütufname her basışta açılır
+      return true;
+    }
     card.used = true;
     if (a.type === 'gift') this.events.emit('ui:giftSpecialDay', { id: a.id });
     else if (a.type === 'condolence') this.events.emit('ui:condolence');

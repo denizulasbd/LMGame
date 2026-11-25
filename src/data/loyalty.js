@@ -115,6 +115,13 @@ export const PULSE_REASONS = {
   'dilemma:travelingTheater': 'seyyar tiyatro',
   'dilemma:lostChild': 'kayıp çocuk',
   'dilemma:bumperHarvest': 'bereketli hasat',
+  // (32.2) Adalet Sarayı kararları (reasonKey: 'verdict:<bant>'); sürüncemede kalan dava güveni etkiler (sadakat değil)
+  'verdict:fair': 'adil karar',
+  'verdict:harsh': 'sert karar',
+  'verdict:cruel': 'zalim karar',
+  'verdict:lenient': 'hafif karar',
+  'verdict:lax': 'gevşek karar',
+  'verdict:exile': 'sürgün',
   other: 'öteki',
 };
 

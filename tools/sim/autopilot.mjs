@@ -55,11 +55,22 @@
 //   --evo     : (29.4) evrim verisini bellekte geçersiz kılar (denge denemesi): "EVOLUTION_RULES.decayPerDay=3;EVOLUTION_SOURCES.quarrel=[[1,-2]]"
 //   --pushes  : (29.4) katkı kaynağı dökümü ve karakter başına günlük net katkı yüzdelikleri
 //   --no-agri : (24. aşama) Ürün Silosu kurulmaz ve bahçeler hep Buğday ekili kalır (mahsul bozulması yine işler)
+//   --no-32-builds : (32.6b) 32'nin yapıları (saray, Darülfünun, hobi evleri, lütuf yapıları) hiç kurulmaz; şalterler açık kalır (mekaniği otopilotun inşa tercihinden ayırmak için)
+//   --defer-32-builds : (32.6b) varsayılan: 32'nin yapıları yalnızca Ulu Saat Kulesi (Altın Çağ) tamamlandıktan sonra kurulur. --build-32-early: eski sıra (kuruldukları anda)
+//   --asama32-state : (32.6b) kayıttan önce 32'nin bütün yapılarını tamamlar ve ortada bırakılmış durumu kurar (fikstür save-v41-asama32.json)
+//   --no-clubs : (32.5) hobi evleri hiç kurulmaz (şalter açık ama yapı yokken tarihin aynı kaldığını göstermek için)
 //   --no-apprentice : (25.2) Çırak Kapısı hiç açılmaz (çıraklık katmanının kapalıyken oyunu hiç değiştirmediğini göstermek için)
 //   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
 //               oyunun ana üretecini tüketmediğini göstermek için: --crisis huzurlu ile 22. aşamanın koşusunu bire bir verir)
+//   --set     : (32.6a) data/<modül>.js dışa aktarımını bellekte geçersiz kılar: --set "renown:RENOWN_GRANT.gapDays=12"
 //   --loy     : (30.3) data/loyalty.js'i bellekte geçersiz kılar (denge denemesi): "LOYALTY.bitterTrust.perHour=-0.5"
 //   --start-food N : (30.6) başlangıç yiyeceğini geçersiz kılar (denge denemesi)
+//   --club-diag : (32.6a) kulüplerin yan etkisi tanısı (yalnızca okur; JSON'a clubDiag: günlük doyum / sosyallik / keyif, saatlik etkinlik)
+//   --crime-diag : (32.1) suç planı vakti gelmiş sakinin kararlarını sayar (yalnızca okur; (32.1) satırına eklenir)
+//   --judge fair|harsh|lenient|novice : (32.2) Adalet Sarayı'nın hâkim politikası (varsayılan fair). fair: hak edilene en yakın ceza ve
+//               iade; harsh: bir-iki kademe sert (hak edilen + 1,5); lenient: hep Af ya da Uyarı; novice: rastgele (sürgün nadir; sayfa
+//               içi ayrı üreteç, oyunun üreteçlerine dokunmaz). Dava açıldıktan sonraki ilk saat başında (novice 6 saat sonra) karar verir.
+//               (32.6a) none: davalara hiç bakmaz (hepsi süresi dolup sürüncemede kalır; acemi oyuncunun en kötü hâli).
 //   --famine [gün=5] : (30.3) kıtlık senaryosu: o günden sonra bütün bahçeler yıkılır, toplama emri ve acil dağıtım yapılmaz (oyuncu tepkisiz)
 //   --json    : bekçinin (monitor.mjs) raporunu ve özet metrikleri dosyaya yazar; takılma ya da kopuk referans
 //               bulunursa çıkış kodu 1 olur
@@ -68,10 +79,16 @@ import { openGame, parseArgs, runHours, capOutput } from './lib.mjs';
 
 capOutput('autopilot');
 import { installMonitor, monitorReport } from './monitor.mjs';
+import { buildMidState32 } from './state32.mjs';
 
 const { positional, options } = parseArgs();
 const seed = Number(positional[0] ?? 42);
 const days = Number(positional[1] ?? 32);
+const judge = options.judge ?? 'fair'; // (32.2)
+if (!['fair', 'harsh', 'lenient', 'novice', 'none'].includes(judge)) {
+  console.log(`bilinmeyen --judge: ${judge} (fair | harsh | lenient | novice | none)`);
+  process.exit(2);
+}
 const speed = Number(options.speed ?? 4);
 
 const { browser, page, errors } = await openGame({ seed, enginesOff: typeof options['engines-off'] === 'string' ? options['engines-off'] : null }); // (30.4a) açılıştan önce
@@ -95,6 +112,22 @@ if (options.loy) {
     }
   }, options.loy);
 }
+// (32.6a) --set "renown:RENOWN_EFFECTS.skilledImmigrant.minReputation=null;justice:CATCH.resident=0.2" : herhangi bir data/<modül>.js
+// dışa aktarımını bellekte geçersiz kılar (A/B denemesi; dosyaya yazmaz)
+if (options.set) {
+  await page.evaluate(async (spec) => {
+    for (const part of String(spec).split(';')) {
+      const [lhs, raw] = part.split('=');
+      if (!lhs || raw === undefined) continue;
+      const [modName, path] = lhs.trim().split(':');
+      const mod = await import(`/src/data/${modName}.js`);
+      const keys = path.split('.');
+      let obj = mod;
+      for (const k of keys.slice(0, -1)) obj = obj[k];
+      obj[keys[keys.length - 1]] = JSON.parse(raw);
+    }
+  }, options.set);
+}
 if (options.evo) {
   await page.evaluate(async (spec) => {
     const mod = await import('/src/data/evolution.js');
@@ -115,15 +148,126 @@ await page.evaluate((o) => {
   if (o.crisis) window.game.state.crisis.difficulty = o.crisis; // doğrudan durumdan (bildirim / ses tüketmesin: huzurlu + --no-safety koşusu 22. aşamayla bire bir aynı olmalı)
   window.__profile = o.profile; // (29.10)
   window.__famine = o.famine; // (30.3)
-}, { famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null });
+  window.__crimeDiag = o.crimeDiag; // (32.1) tanı
+  window.__judge = o.judge; // (32.2)
+  window.__noClubs = o.noClubs; // (32.5)
+  // (32.6b) b32: 'none' (hiç kurulmaz), 'defer' (varsayılan: yalnızca Ulu Saat Kulesi / Altın Çağ tamamlandıktan sonra), null (--build-32-early: eski sıra).
+  // Şalterler her durumda açık kalır; engines-off'ta yapılar zaten kurulamaz (öteki aşamaların ölçüm tabanları değişmez).
+  window.__b32 = o.b32;
+  window.__allow32 = (st) => !window.__b32 || (window.__b32 === 'defer' && Boolean(st.goldenAge?.since));
+}, { judge, famine: options.famine ? Number(options.famine === true ? 5 : options.famine) : null,  noSafety: Boolean(options['no-safety']), noAgri: Boolean(options['no-agri']), noApprentice: Boolean(options['no-apprentice']), crisis: options.crisis ?? null, profile: options.profile ?? null, crimeDiag: Boolean(options['crime-diag']), noClubs: Boolean(options['no-clubs']), b32: options['no-32-builds'] ? 'none' : options['build-32-early'] ? null : 'defer' }); // (32.6b) varsayılan: 32'nin yapıları Ulu Saat Kulesi'nden sonra
 if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent', 'repent2', 'novice'].includes(options.profile)) {
   console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent | repent2 | novice)`);
   process.exit(2);
 }
 
+// (32.6a) --club-diag: kulüplerin yan etkisi tanısı (yalnızca dinler / okur; zar çekmez, durum yazmaz). Gün dönümünde her yetişkinin
+// doyum / sosyallik / keyif / kulübü, her saat başı yaptığı iş (etkinlik, yolda mı, randevu / davet), arzu gerçekleşmeleri. JSON: clubDiag.
+if (options['club-diag']) {
+  await page.evaluate(() => {
+    const D = (window.__clubDiag = { daily: [], hours: {}, wants: {}, bells: [] });
+    const ev = window.game.events;
+    const adults = () => window.game.state.characters.filter((c) => !c.role && !c.isChild && ['youth', 'adult', 'elder'].includes(c.lifeStage));
+    ev.on('time:newDay', (day) => {
+      for (const c of adults()) D.daily.push([day, c.id, Math.round(c.satisfaction ?? 0), Math.round(c.needs.social), Math.round(c.needs.fun), c.club?.key ?? null, c.club?.since ?? null, c.lifeStage, (c.traits ?? []).join('+'), c.quirk ?? '', c.partnerId != null ? 1 : 0, c.homeId ?? null]);
+    });
+    ev.on('time:hour', (h) => {
+      const day = window.game.state.time.day;
+      for (const c of adults()) {
+        const t = c.task;
+        const act = t ? t.activity : 'none';
+        const tag = `${act}${t?.phase === 'travel' ? '@yol' : ''}${t?.dateWithId !== undefined ? '#randevu' : t?.meetWithId !== undefined ? '#davet' : ''}`;
+        const k = `${c.id}`;
+        const rec = (D.hours[k] ??= {});
+        const slot = `${day}:${h}`;
+        (rec[tag] ??= []).push(slot);
+      }
+    });
+    ev.on('want:fulfilled', ({ character }) => { if (character) (D.wants[character.id] ??= []).push(window.game.state.time.day); });
+    ev.on('club:bell', ({ key, ids }) => D.bells.push([window.game.state.time.day, window.game.state.totalMinutes % 1440, key, ids.length]));
+  });
+}
+
 // (30.6) acemi profili ölçümü (yalnızca dinler; altın akışı çağıran yığınından etiketlenir, oyunun durumuna / üretecine dokunmaz)
 await page.evaluate(async () => {
   window.__townMetrics = (await import('/src/systems/TownStatus.js')).townMetrics;
+  window.__justiceMod = await import('/src/systems/Justice.js'); // (32.1) beklenen suç sayısı (saf risk toplamı; zar çekmez)
+  window.__justiceData = await import('/src/data/justice.js'); // (32.2) hâkim politikası
+  window.__renownMod = await import('/src/systems/Renown.js'); // (32.3) Kasaba Şöhreti ölçümü (saf; zar çekmez)
+  window.__buildingsData = await import('/src/data/buildings.js'); // (32.3) lütuf yapılarının bedeli
+  window.__relMod = await import('/src/systems/RelationshipSystem.js'); // (32.5) dost sayısı (yalnızca okur)
+  window.__clubsMod = await import('/src/systems/Clubs.js'); // (32.6a) etkin üye (yalnızca okur)
+  {
+    // (32.3) itibar seyri (gün dönümünden sonra), kademe günleri, lütuflar, Krallık Vergisi toplamı, göçmenler
+    const R = (window.__renown = { series: {}, tiers: [], grants: [], built: {}, levyGold: 0, levyPaid: 0, levyFailed: 0, joined: 0, skilled: 0, targets: {} });
+    const ev = window.game.events;
+    ev.on('time:newDay', (day) => {
+      const s = window.game.state;
+      R.series[day] = Math.round((s.crown?.reputation ?? 0) * 10) / 10;
+      const RN0 = window.__renownMod;
+      R.streakMax = Math.max(R.streakMax ?? 0, s.renown?.gozdeStreak ?? 0);
+      if (RN0?.grantTownReady(s)) R.readyDays = (R.readyDays ?? 0) + 1;
+      if (RN0?.grantEligible(s, day)) R.eligibleDays = (R.eligibleDays ?? 0) + 1;
+      if (day % 10 === 0) {
+        const t = window.__renownMod.renownTarget(s);
+        R.targets[day] = { target: t.target, top: t.parts.slice(0, 4).map((p) => `${p.key}:${p.value}`) };
+      }
+    });
+    ev.on('renown:tier', ({ key, up }) => R.tiers.push({ day: window.game.state.time.day, key, up }));
+    ev.on('renown:grant', ({ key, day }) => R.grants.push({ key, day }));
+    ev.on('building:completed', (b) => { if (['peaceFountain', 'royalRoseGarden', 'royalArchive'].includes(b?.type)) R.built[b.type] = window.game.state.time.day; });
+    ev.on('crown:levyPaid', ({ amount }) => { R.levyGold += amount; R.levyPaid += 1; });
+    ev.on('crown:levyFailed', () => { R.levyFailed += 1; });
+    ev.on('population:joined', ({ character } = {}) => { R.joined += 1; if (character && !character.isChild) (R.joinLog ??= []).push([window.game.state.time.day, Math.round(window.game.state.crown?.reputation ?? 0)]); }); // (32.6a) göçmen günü ve itibar
+    ev.on('renown:skilledImmigrant', () => { R.skilled += 1; });
+  }
+  {
+    // (32.5) Hobi evleri ölçümü (yalnızca dinler / okur): kurulum günleri, buluşmalar ve katılım, ürünler, akşam kalabalığı (17-21 arası
+    // handa, kamp ateşinde ve meydanda geçen sakin-saat; A/B'de de sayılır), yaşayan sakinlerin kulüplü / kulüpsüz doyum ve dost sayısı
+    window.__clubTypes = ['gardenClub', 'paintingClub', 'sewingClub'];
+    const CL = (window.__clubStats = { built: {}, sessions: [], works: [], exhibition: null, joined: 0, left: {}, crowd: 0, crowdBy: {}, founded: {} });
+    const ev = window.game.events;
+    ev.on('building:completed', (b) => { if (window.__clubTypes.includes(b?.type) && CL.built[b.type] === undefined) CL.built[b.type] = window.game.state.time.day; });
+    ev.on('club:session', ({ key, came }) => CL.sessions.push({ day: window.game.state.time.day, key, n: came.length, members: window.game.state.characters.filter((c) => c.club?.key === key).length }));
+    ev.on('club:work', ({ key, kind, recipient }) => CL.works.push({ day: window.game.state.time.day, key, kind, ...(recipient ? { to: recipient.id } : {}) }));
+    ev.on('club:exhibition', () => { CL.exhibition = window.game.state.time.day; });
+    CL.skipped = {};
+    CL.emptyActs = {};
+    ev.on('club:skipped', ({ key, reason, acts }) => { const k = `${key}:${reason}`; CL.skipped[k] = (CL.skipped[k] ?? 0) + 1; for (const a of acts ?? []) CL.emptyActs[a] = (CL.emptyActs[a] ?? 0) + 1; });
+    ev.on('club:founded', ({ key }) => { CL.founded[key] = window.game.state.time.day; });
+    ev.on('club:joined', () => { CL.joined += 1; });
+    ev.on('club:left', ({ reason }) => { CL.left[reason] = (CL.left[reason] ?? 0) + 1; });
+    const CROWD = { inn: 'inn', innMeal: 'inn', campfire: 'campfire', fountain: 'plaza' };
+    ev.on('time:hour', (h) => {
+      if (h < 17 || h > 20) return;
+      for (const c of window.game.state.characters) {
+        const k = CROWD[c.task?.activity];
+        if (!k || c.task.phase !== 'perform') continue;
+        CL.crowd += 1;
+        CL.crowdBy[k] = (CL.crowdBy[k] ?? 0) + 1;
+      }
+    });
+  }
+  {
+    // (32.4) Darülfünun ölçümü (yalnızca dinler): kurulum günü, kabul / mezuniyet / yarım bırakma günlüğü, Müderris içerideki dakikalar
+    const U = (window.__uni = { builtDay: null, log: [], professorMin: 0, lectureMin: 0, eduAt: {}, lack: {} });
+    const ev = window.game.events;
+    ev.on('building:completed', (b) => { if (b?.type === 'university' && U.builtDay === null) U.builtDay = window.game.state.time.day; });
+    // çıraklık mezuniyeti (A/B karşılaştırması için kişi bazında; öğrenci miydi?)
+    U.apLog = [];
+    ev.on('apprentice:graduated', ({ character, progress, grandmaster }) => U.apLog.push({ day: window.game.state.time.day, id: character.id, name: character.name, progress: Math.round(progress * 10) / 10, gm: Boolean(grandmaster), student: Boolean(character.higherStudy) }));
+    for (const kind of ['admitted', 'graduated', 'dropped']) ev.on(`university:${kind}`, ({ character, field, apprentice, grandmaster }) => U.log.push({ day: window.game.state.time.day, kind, id: character.id, field, ...(apprentice ? { ap: 1 } : {}), ...(grandmaster ? { gm: 1 } : {}) }));
+    U.apDaily = {};
+    ev.on('time:newDay', (day) => {
+      const s0 = window.game.state;
+      const aps = s0.characters.filter((c) => c.apprenticeship);
+      if (aps.length) U.apDaily[day] = Object.fromEntries(aps.map((c) => [c.id, Math.round(c.apprenticeship.progress * 10) / 10 + (c.higherStudy ? 's' : '')]));
+      if (day % 10 !== 0) return;
+      const s = window.game.state;
+      const RN = window.__renownMod;
+      U.eduAt[day] = RN ? Math.round(RN.renownEducation(s) * 1000) / 1000 : null;
+    });
+  }
   const g = window.game;
   const N = (window.__nov = { gold: { in: {}, out: {} }, daily: [], tiers: {}, zero: {}, zeroRun: {}, zeroLongest: {}, levy: [], foodMin5: Infinity, goals: [], decisions: 0 });
   const econ = g.scenes.current.economy;
@@ -297,8 +441,10 @@ await page.evaluate((passive) => {
     PLAN.splice(PLAN.indexOf('mill') + 1, 0, 'well');
     PLAN.splice(PLAN.indexOf('townHall') + 1, 0, 'guardTower');
   }
+  // (32.2) Adalet Sarayı: Kasaba seviyesinden sonra, Kasaba Anıtı'nın ardından; isteğe bağlı (kurulamazsa sıra beklemez)
+  PLAN.splice(PLAN.indexOf('monument') + 1, 0, 'courthouse'); // ilk deneme: Belediye / Gözcü Kulesi'nin ardı (hazine −%14: limanı ve madeni geciktiriyordu)
   const UPGRADES = ['cabin', 'cabin', 'lumberHut', 'garden', 'cabin', 'quarry', 'cabin', 'garden', 'cabin', 'cabin', 'lumberHut', 'cabin'];
-  const WOOD = { storage: 30, lumberHut: 20, garden: 15, cabin: 25, quarry: 35, inn: 45, workshop: 25, sheepFarm: 30, market: 40, ironMine: 40, mill: 40, fishingPier: 30, townHall: 60, monument: 40, healerHut: 30, flowerBed: 8, academy: 70, harbor: 120, well: 15, guardTower: 50, silo: 40 };
+  const WOOD = { storage: 30, lumberHut: 20, garden: 15, cabin: 25, quarry: 35, inn: 45, workshop: 25, sheepFarm: 30, market: 40, ironMine: 40, mill: 40, fishingPier: 30, townHall: 60, monument: 40, healerHut: 30, flowerBed: 8, academy: 70, harbor: 120, well: 15, guardTower: 50, silo: 40, courthouse: 60 };
   const ESSENTIAL = ['storage', 'lumberHut', 'garden', 'cabin'];
   // (23. aşama) Su Kuyusu ateşli yapıların (fırın, atölye) yanına, Gözcü Kulesi meydandan uzağa (kenar mahalleye) dikilir: meydana
   // yakın boş yerleri (Ulu Saat Kulesi gibi büyük yapılara lazım) kapatmasın
@@ -322,7 +468,7 @@ await page.evaluate((passive) => {
     return null;
   };
   // İsteğe bağlı yapılar: kaçıncı kopyasından itibaren (kurulamıyorsa sıra beklemeden atlanır)
-  const OPTIONAL = { academy: 1, harbor: 1, ironMine: 1, mill: 2, cherryTree: 1, gazebo: 1, marbleArch: 1, flowerFence: 1, well: 1, guardTower: 1, silo: 1 };
+  const OPTIONAL = { academy: 1, harbor: 1, ironMine: 1, mill: 2, cherryTree: 1, gazebo: 1, marbleArch: 1, flowerFence: 1, well: 1, guardTower: 1, silo: 1, courthouse: 1 };
 
   /** Karar politikası: kasabanın yararına olan ve gücü yeten seçenek. */
   const PREFER = {
@@ -333,6 +479,143 @@ await page.evaluate((passive) => {
     expedition: ['bigParty', 'scout', 'ignore'],
   };
   window.__midLog = []; // (30.4b) karar günlüğü: { day, id, midgame, option }
+  // (32.1) suç günlüğü (yalnızca dinler): { day, crime, caught, motive, guard }
+  window.__crimeLog = [];
+  // (32.1) 08:00'deki risk toplamından beklenen suç: yuva başına min(0,85, toplam) (ölçüm için; oyunu etkilemez)
+  window.__crimeExpect = { sum: 0, days: 0, maxRisk: 0, planned: 0, dropped: 0, started: 0, hours: {} };
+  game.events.on('crime:planned', ({ plan }) => { window.__crimeExpect.planned++; const h = Math.floor((plan.at % 1440) / 60); window.__crimeExpect.hours[h] = (window.__crimeExpect.hours[h] ?? 0) + 1; });
+  game.events.on('crime:dropped', () => window.__crimeExpect.dropped++);
+  // tanı (--crime-diag): planı vakti gelmiş sakinin her kararı (yalnızca okur; kararı değiştirmez)
+  if (window.__crimeDiag) {
+    const brain = game.scenes.current.behavior.brain;
+    const decide = brain.decide.bind(brain);
+    window.__crimeExpect.decisions = {};
+    const pc = brain.planCrime.bind(brain);
+    window.__crimeExpect.nulls = {};
+    brain.planCrime = (ch, hour) => {
+      const p = ch.crimePlan;
+      const r = pc(ch, hour);
+      if (!r && p) {
+        const w = game.scenes.current.world;
+        const s = game.state;
+        let why = 'time';
+        if (s.totalMinutes >= p.at && s.totalMinutes <= p.until) {
+          if (p.victimId !== undefined) { const v = w.getCharacter(p.victimId); why = !v ? 'novictim' : v.away ? 'away' : v.insideBuildingId ? 'inside' : 'victimPath'; }
+          else { const b = w.getBuilding(p.buildingId); why = !b?.functional ? 'nobuilding' : !w.getSpots(b).length ? 'nodoors' : 'path'; }
+          why = `${p.crime}:${why}`;
+        }
+        window.__crimeExpect.nulls[why] = (window.__crimeExpect.nulls[why] ?? 0) + 1;
+      }
+      return r;
+    };
+    brain.decide = (ch, hour) => {
+      const p = ch.crimePlan;
+      const due = p && game.state.totalMinutes >= p.at && game.state.totalMinutes <= p.until;
+      const ready = due ? window.__justiceMod.crimeReady(game.state, ch, hour) : null;
+      const plan = decide(ch, hour);
+      if (due) { const key = `${plan?.activity ?? 'null'}${ready ? '' : '!r'}${plan?.onBreak ? '~b' : ''}`; window.__crimeExpect.decisions[key] = (window.__crimeExpect.decisions[key] ?? 0) + 1; }
+      return plan;
+    };
+  }
+  // tanı: planı vakti gelmiş sakin o saat ne yapıyor
+  window.__crimeExpect.busy = {};
+  game.events.on('time:hour', () => {
+    const s = game.state;
+    for (const x of s.characters) if (x.crimePlan && s.totalMinutes >= x.crimePlan.at) { const k = x.task?.activity ?? 'none'; window.__crimeExpect.busy[k] = (window.__crimeExpect.busy[k] ?? 0) + 1; }
+  });
+  game.events.on('time:hour', (h) => {
+    const Jm = window.__justiceMod;
+    if (h !== 8 || !Jm?.justiceActive(game.state)) return;
+    const s = game.state;
+    const risks = s.characters.filter((x) => Jm.crimeCandidate(s, x)).map((x) => Jm.crimeRisk(s, x)).sort((p, q) => q - p);
+    let total = risks.reduce((p, q) => p + q, 0);
+    let e = 0;
+    for (let i = 0; i < Jm.slotsFor(s); i++) {
+      e += Math.min(0.85, total);
+      total -= risks[i] ?? 0;
+    }
+    window.__crimeExpect.sum += e;
+    window.__crimeExpect.days += 1;
+    window.__crimeExpect.maxRisk = Math.max(window.__crimeExpect.maxRisk, risks.reduce((p, q) => p + q, 0));
+  });
+  // (32.6a) suçlunun eğitim seviyesi (0/1/2, öğrenci 's') ve kulüp durumu (0 yok / 1 üye / 2 etkin üye), saraydan önce mi; maruziyet:
+  // her gün dönümünde suç adayı sakin-gün sayısı aynı gruplarla (C3: sakin başına suç). Yalnızca okur.
+  const eduOf = (c) => (c?.higherStudy ? 's' : c?.graduate ? 2 : c?.educated ? 1 : 0);
+  const clubOf = (c) => (!c?.club ? 0 : window.__clubsMod?.isActiveMember(game.state, c) ? 2 : 1);
+  window.__crimeExpose = { edu: {}, club: {}, cross: {} };
+  game.events.on('time:newDay', () => {
+    const s = game.state;
+    const X0 = window.__crimeExpose;
+    if (window.__justiceMod.isFamine(s)) X0.famineDays = (X0.famineDays ?? 0) + 1; // (32.6a) kıtlık günleri (gün dönümünde)
+    for (const c of s.characters) {
+      if (!window.__justiceMod.crimeCandidate(s, c)) continue;
+      const f = window.__justiceMod.riskFactors(s, c);
+      X0.hungerSum = (X0.hungerSum ?? 0) + f.hunger;
+      X0.n = (X0.n ?? 0) + 1;
+      // (32.6a) C3: beklenen risk (saf crimeRisk) eğitim / kulüp grubuna ve yaşam evresine göre: gürültüsüz karşılaştırma
+      const rk = window.__justiceMod.crimeRisk(s, c, f);
+      const gk = `${eduOf(c)}/${clubOf(c)}/${c.lifeStage}`;
+      (X0.risk ??= {})[gk] = [((X0.risk[gk]?.[0]) ?? 0) + rk, ((X0.risk[gk]?.[1]) ?? 0) + 1];
+      const X = window.__crimeExpose;
+      const e = eduOf(c);
+      const k = clubOf(c);
+      X.edu[e] = (X.edu[e] ?? 0) + 1;
+      X.club[k] = (X.club[k] ?? 0) + 1;
+      X.cross[`${e}/${k}`] = (X.cross[`${e}/${k}`] ?? 0) + 1;
+    }
+  });
+  game.events.on('crime:noOption', ({ motive }) => { const X = (window.__crimeExpect.noOption ??= {}); X[motive] = (X[motive] ?? 0) + 1; });
+  game.events.on('crime:recorded', ({ kase, caught }) => {
+    const c = game.state.characters.find((x) => x.id === kase.offenderId);
+    const court = game.state.buildings.some((b) => b.type === 'courthouse' && b.functional);
+    window.__crimeLog.push({ day: kase.day, crime: kase.crime, caught, motive: kase.motive, guard: kase.witnessIsGuard, amount: kase.stolen?.amount ?? 0, coins: Boolean(kase.stolen?.coins), edu: eduOf(c), club: clubOf(c), court });
+  });
+  // (32.2) Hâkim politikası: saraydaki açık davaya saat başında karar ('ui:courtVerdict', oyuncu gibi). Novice'in zarı sayfa içi ayrı
+  // üreteçten (oyunun üreteçlerine dokunmaz). Ölçüm: impunity zirvesi, karar süreleri.
+  window.__court = { imp: [], impMax: 1, decided: 0, waitH: 0, byJudge: {} };
+  game.events.on('building:completed', (b) => { if (b?.type === 'courthouse' && window.__courtDay === undefined) window.__courtDay = game.state.time.day; });
+  window.__court.feedback = 0;
+  window.__court.trustFx = 0;
+  game.events.on('pulse:feedback', (fb) => { if (String(fb?.reason ?? '').startsWith('verdict:') || fb?.reason === 'verdict') window.__court.feedback += 1; });
+  game.events.on('court:verdict', ({ kase }) => { window.__court.trustFx += kase?.verdict?.effects?.trust ?? 0; });
+  game.events.on('court:stale', ({ kase }) => { window.__court.trustFx += kase?.verdict?.effects?.trust ?? 0; });
+  game.events.on('court:revealed', () => { window.__court.revealedLog = (window.__court.revealedLog ?? 0) + 1; });
+  {
+    let x = (Number(game.state.seed) * 2654435761 + 97) >>> 0 || 1;
+    const nrand = () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+    game.events.on('time:hour', () => {
+      const s = game.state;
+      const J = window.__justiceMod;
+      const Dj = window.__justiceData;
+      if (!J || !Dj || !J.courtOf(s) || passive) return;
+      const imp = J.impunityFactor(s);
+      window.__court.impMax = Math.max(window.__court.impMax, imp);
+      if (window.__judge === 'none') return; // (32.6a) davalara hiç bakmayan hâkim: bütün davalar süresi dolup sürüncemede kalır
+      for (const k of [...(s.justice?.cases ?? [])]) {
+        if (!k.court || s.justice.cases.indexOf(k) < 0) continue;
+        const age = s.totalMinutes - k.minute;
+        if (age < (window.__judge === 'novice' ? 360 : 60)) continue;
+        const rs = J.restitutionStatus(s, k).possible;
+        const want = J.deserved(k, s, { restitution: rs && window.__judge !== 'lenient' });
+        const keys = Dj.SENTENCE_KEYS;
+        const nearest = (target) => keys.reduce((best, key) => (Math.abs(Dj.SENTENCES[key].harsh - target) < Math.abs(Dj.SENTENCES[best].harsh - target) - 1e-9 ? key : best), keys[0]);
+        let sentence;
+        let restitution = rs;
+        if (window.__judge === 'harsh') sentence = nearest(want + 1.5);
+        else if (window.__judge === 'lenient') { sentence = want >= 2 ? 'warning' : 'pardon'; restitution = false; }
+        else if (window.__judge === 'novice') {
+          const w = keys.map((key) => [key, key === 'exile' ? 0.05 : 1]);
+          let r = nrand() * w.reduce((a, [, v]) => a + v, 0);
+          sentence = w.find(([, v]) => (r -= v) < 0)?.[0] ?? 'warning';
+          restitution = rs && nrand() < 0.5;
+        } else sentence = nearest(want);
+        game.events.emit('ui:courtVerdict', { caseId: k.id, sentence, restitution });
+        window.__court.decided += 1;
+        window.__court.waitH += age / 60;
+        window.__court.byJudge[sentence] = (window.__court.byJudge[sentence] ?? 0) + 1;
+      }
+    });
+  }
   game.events.on('dilemma:resolved', ({ id, option, dilemma }) => window.__midLog.push({ day: game.state.time.day, id, midgame: Boolean(dilemma?.midgame), option: option.id }));
   window.__decide = () => {
     const scene = game.scenes.current;
@@ -602,6 +885,43 @@ await page.evaluate((passive) => {
         if (s.crown.statueRight && !s.buildings.some((b) => b.type === 'royalStatue') && res.stone >= 90 && res.gold >= 220) {
           const spot = sim.findSpot('royalStatue', 16);
           if (spot) scene.construction.placeSite('royalStatue', spot.x, spot.y);
+        }
+        // (32.4) Darülfünun: Gelişmiş Şehir'den sonra, bedeli payıyla (+20) yetince bir kez (Kraliyet Lütfu'ndan önce)
+        {
+          const def = window.__buildingsData?.BUILDINGS?.university;
+          const lack = def ? Object.entries(def.cost).filter(([r, v]) => (res[r] ?? 0) < v + 20).map(([r]) => r) : [];
+          if (def && s.town.tier >= def.requiresTier && !s.buildings.some((b) => b.type === 'university')) for (const r of lack) window.__uni.lack[r] = (window.__uni.lack[r] ?? 0) + 1;
+          if (def && window.__allow32(s) && s.town.tier >= def.requiresTier && !s.buildings.some((b) => b.type === 'university') && !lack.length) {
+            const spot = sim.findSpotNearHomes('university', 18) ?? sim.findSpot('university', 20); // (32.6a) konutlara yakın
+            if (spot) scene.construction.placeSite('university', spot.x, spot.y);
+            else window.__uni.noSpot = (window.__uni.noSpot ?? 0) + 1;
+          }
+        }
+        // (32.5) Hobi evleri: Kasaba seviyesinde Kasaba Anıtı bittikten sonra, sırayla (Bahçecilik → Resim → Dikiş), aynı anda tek şantiye,
+        // ikisi arasında en az 2 gün; bedeli payıyla (odun +40, taş +20, yün +5) yetince. --no-clubs: hiç kurulmaz.
+        if (!window.__noClubs && window.__allow32(s) && window.__clubTypes && s.town.tier >= 3 && s.buildings.some((b) => b.type === 'monument' && b.functional)) {
+          const CL = window.__clubStats;
+          const types = window.__clubTypes.filter((t) => !s.buildings.some((b) => b.type === t));
+          const busy = s.buildings.some((b) => b.underConstruction && window.__clubTypes.includes(b.type));
+          const type = types[0];
+          const def = type ? window.__buildingsData?.BUILDINGS?.[type] : null;
+          const pad = { wood: 40, stone: 20, wool: 5 };
+          if (def && !busy && s.time.day - (CL.lastPlaced ?? -9) >= 2 && Object.entries(def.cost).every(([r, v]) => (res[r] ?? 0) >= v + (pad[r] ?? 10))) {
+            const spot = sim.findSpotNearHomes(type, 18) ?? sim.findSpot(type, 18); // (32.6a) konutların ağırlık merkezine yakın, yola bağlı
+            if (spot && scene.construction.placeSite(type, spot.x, spot.y)?.ok) CL.lastPlaced = s.time.day;
+          }
+        }
+        // (32.3) Kraliyet Lütfu: açılan gizli yapıyı malı payıyla yetince kur (sıra: suçu düşüren çeşme, refah veren bahçe, arşiv);
+        // aynı anda tek şantiye
+        const RN = window.__renownMod;
+        if (RN && window.__allow32(s) && !s.buildings.some((b) => b.underConstruction && ['peaceFountain', 'royalRoseGarden', 'royalArchive'].includes(b.type))) {
+          for (const type of ['peaceFountain', 'royalRoseGarden', 'royalArchive']) {
+            if (!RN.royalGranted(s, type) || s.buildings.some((b) => b.type === type)) continue;
+            const cost = window.__buildingsData?.BUILDINGS?.[type]?.cost;
+            if (!cost || !Object.entries(cost).every(([r, v]) => (res[r] ?? 0) >= v + (r === 'gears' ? 0 : 20))) continue;
+            const spot = sim.findSpot(type, 18);
+            if (spot && scene.construction.placeSite(type, spot.x, spot.y).ok) break;
+          }
         }
       }
       // (23. aşama) Krizler: yangını söndür, hasarlıyı tamir et, haydut izine karşı püskürt / uzlaş
@@ -907,6 +1227,7 @@ await page.evaluate((passive) => {
     let next = null;
     let nextSpot = null;
     for (const type of PLAN) {
+      if (type === 'courthouse' && !window.__allow32(s)) continue; // (32.6b)
       planned[type] = (planned[type] ?? 0) + 1;
       if ((counts[type] ?? 0) >= planned[type]) continue;
       if (planned[type] >= (OPTIONAL[type] ?? Infinity)) {
@@ -1180,6 +1501,50 @@ if (options['crisis-state']) {
   });
   console.log('kriz durumu kuruldu:', JSON.stringify(made));
 }
+// (32.6b) --asama32-state: kayıttan hemen önce 32'nin bütün yapılarını (saray, Darülfünun, üç hobi evi, üç lütuf yapısı) tamamlar, bir sürgünü
+// bitirir (justice.exiles) ve ortada bırakılmış durumu kurar (state32.mjs: açık dava, kamu hizmeti, yasak, utanç, yürüyen sürgün, ders,
+// buluşma, telafi). Fikstür save-v41-asama32.json bu bayrakla üretilir (tohum 77, 90 gün).
+if (options['asama32-state']) {
+  const ensured = await page.evaluate(async () => {
+    const { sim, game } = window;
+    const s = game.state;
+    const sc = game.scenes.current;
+    const J = await import('/src/systems/Justice.js');
+    const R = await import('/src/systems/Renown.js');
+    const { Random } = await import('/src/utils/random.js');
+    sim.give({ wood: 800, stone: 800, iron: 150, cloth: 80, wool: 120, food: 300, gears: 4, gold: 900 });
+    const placed = [];
+    for (const type of ['courthouse', 'university', 'gardenClub', 'sewingClub', 'paintingClub']) {
+      if (!s.buildings.some((b) => b.type === type && b.functional)) placed.push(sim.place(type)?.type ?? `${type}:yok`);
+    }
+    for (const type of ['peaceFountain', 'royalRoseGarden', 'royalArchive']) {
+      if (!R.royalGranted(s, type)) sc.renown.grant(type);
+      if (!s.buildings.some((b) => b.type === type && b.functional)) placed.push(sim.place(type)?.type ?? `${type}:yok`);
+    }
+    return placed;
+  });
+  await page.evaluate(() => sim.step(225 * 24 * 2)); // yeni kurulanlarda üyelik / kabul gün dönümünde olur
+  const exiled = await page.evaluate(async () => {
+    const { game } = window;
+    const s = game.state;
+    const sc = game.scenes.current;
+    const J = await import('/src/systems/Justice.js');
+    const { Random } = await import('/src/utils/random.js');
+    const fixed = (v) => Object.assign(new Random(1), { next: () => v });
+    const bld = s.buildings.find((b) => b.type === 'storage' && b.functional);
+    const who = s.characters.filter((c) => !c.role && !c.isChild && J.crimeCandidate(s, c) && !c.sentence && !c.higherStudy && !c.club && !c.apprenticeship).sort((a, b) => a.id - b.id).at(-1);
+    if (!who || !bld) return null;
+    const real = sc.crime.dice;
+    sc.crime.dice = fixed(0);
+    const k = sc.crime.commit(who, { crime: { crime: 'pantryRation', variant: 'ration', buildingId: bld.id, motive: 'grudge' } }, bld);
+    sc.crime.dice = real;
+    if (!k || !sc.court.decide(k, 'exile')) return null;
+    sc.court.departExile(who);
+    return who.name;
+  });
+  const mid = await page.evaluate(buildMidState32);
+  console.log('Aşama 32 durumu kuruldu:', JSON.stringify({ ensured, exiled, mid }));
+}
 if (options.save) {
   const snapshot = await page.evaluate(async () => {
     const { CONFIG } = await import('/src/config.js');
@@ -1297,6 +1662,140 @@ if (options.profile === 'novice') {
   riteStats.weight = { heavyDay: W.heavyDay, firstGrum, strikeDays, revolts: W.revolts, left: W.left, g30, lastPop: last.pop, last, switchDay: W.switchDay, switchPop: W.switchPop, daily: d };
 }
 console.log(`(29.7) anma töreni ${riteStats.held} (vefat günü ${riteStats.deathDays}, töreni gelmiş ${riteStats.dueDeathDays}) · ortalama katılım ${riteStats.attendance.toFixed(1)} · 20:00'de süren tören görevi ${riteStats.late} · özel gün kutlanan ${riteStats.celebrated} / unutulan ${riteStats.forgotten} (%${Math.round((100 * riteStats.celebrated) / Math.max(1, riteStats.celebrated + riteStats.forgotten))})`);
+const crimeStats = await page.evaluate(() => {
+  // (32.1) suç motoru: işlenen / yakalanan / tür dağılımı / günlük en çok / ilk suç günü / kapanan dava
+  const log = window.__crimeLog ?? [];
+  const perDay = {};
+  const byType = {};
+  const byMotive = {};
+  for (const e of log) {
+    perDay[e.day] = (perDay[e.day] ?? 0) + 1;
+    byType[e.crime] = (byType[e.crime] ?? 0) + 1;
+    byMotive[e.motive] = (byMotive[e.motive] ?? 0) + 1;
+  }
+  const j = window.game.state.justice;
+  return {
+    committed: log.length,
+    caught: log.filter((e) => e.caught).length,
+    guard: log.filter((e) => e.guard).length,
+    byType,
+    byMotive,
+    maxPerDay: Math.max(0, ...Object.values(perDay)),
+    firstDay: log[0]?.day ?? null,
+    open: j?.cases.length ?? 0,
+    closed: j?.log.length ?? 0,
+    days: log.map((e) => e.day),
+    expected: Math.round((window.__crimeExpect?.sum ?? 0) * 10) / 10,
+    activeDays: window.__crimeExpect?.days ?? 0,
+    planned: window.__crimeExpect?.planned ?? 0,
+    dropped: window.__crimeExpect?.dropped ?? 0,
+    busy: window.__crimeExpect?.busy ?? {},
+    decisions: window.__crimeExpect?.decisions ?? null,
+    nulls: window.__crimeExpect?.nulls ?? null,
+    hours: window.__crimeExpect?.hours ?? {},
+    noOption: window.__crimeExpect?.noOption ?? {},
+    log: log.map((e) => [e.day, e.crime, e.motive, e.caught ? 1 : 0, e.guard ? 1 : 0, e.edu, e.club, e.court ? 1 : 0]), // (32.6a)
+    expose: window.__crimeExpose ?? null,
+  };
+});
+const courtStats = await page.evaluate(() => {
+  // (32.2) Adalet Sarayı: davalar, bantlar, sürgün, ortalama karar süresi, cezasızlık, yakalanma oranı
+  const s = window.game.state;
+  const J = window.__justiceMod;
+  const st = s.justice?.stats?.court ?? {};
+  const built = s.buildings.find((b) => b.type === 'courthouse' && b.functional);
+  const C = window.__court ?? { decided: 0, waitH: 0, impMax: 1, byJudge: {} };
+  const log = s.justice?.log ?? [];
+  const decided = log.filter((k) => k.verdict?.by === 'court');
+  return {
+    judge: window.__judge,
+    builtDay: window.__courtDay ?? null,
+    built: Boolean(built),
+    cases: decided.length + (s.justice?.cases ?? []).filter((k) => k.court).length,
+    bands: { fair: st.fair ?? 0, harsh: st.harsh ?? 0, cruel: st.cruel ?? 0, lenient: st.lenient ?? 0, lax: st.lax ?? 0 },
+    stale: st.stale ?? 0,
+    exiled: st.exiled ?? 0,
+    revealed: st.revealed ?? 0,
+    elder: log.filter((k) => k.verdict?.by === 'elder').length,
+    sentences: C.byJudge,
+    avgDecisionHours: C.decided ? Math.round((C.waitH / C.decided) * 10) / 10 : null,
+    impunityMax: Math.round(C.impMax * 100) / 100,
+    impunityEnd: J ? Math.round(J.impunityFactor(s) * 100) / 100 : 1,
+    solvedRatio: J ? Math.round(J.solvedRatio(s) * 100) / 100 : 1,
+    record: J ? J.justiceRecord(s) : null,
+    // saraydan sonra: işlenen / yakalanan (suçüstü + sonradan konuşan tanık), Halk tepkisi, kararların güven etkisi, son ortalama sadakat
+    after: (() => {
+      const d0 = window.__courtDay;
+      if (d0 === undefined) return null;
+      const L = (window.__crimeLog ?? []).filter((e) => e.day >= d0);
+      const caught = L.filter((e) => e.caught).length + (C.revealedLog ?? 0);
+      return { days: s.time.day - d0, committed: L.length, caught, ratio: L.length ? Math.round((caught / L.length) * 100) / 100 : null };
+    })(),
+    feedback: C.feedback ?? 0,
+    trustFx: C.trustFx ?? 0,
+    loyaltyAvg: (() => { const a = s.characters.filter((c) => !c.role && !c.isChild); return a.length ? Math.round((a.reduce((t, c) => t + (c.loyalty ?? 0), 0) / a.length) * 10) / 10 : 0; })(),
+  };
+});
+const renownStats = await page.evaluate(() => {
+  // (32.3) Kasaba Şöhreti: itibar seyri (G10/20/30/40/50, sonra her 10 gün), kademe günleri, hedefin en büyük katkıları, lütuflar
+  const s = window.game.state;
+  const R = window.__renown ?? { series: {}, tiers: [], grants: [], built: {}, targets: {} };
+  const at = {};
+  for (const [d, v] of Object.entries(R.series)) if (Number(d) % 10 === 0) at[d] = v;
+  const vals = Object.values(R.series);
+  const RN = window.__renownMod;
+  const t = RN ? RN.renownTarget(s) : null;
+  return {
+    on: Boolean(s.renown),
+    at, end: Math.round((s.crown?.reputation ?? 0) * 10) / 10,
+    min: vals.length ? Math.min(...vals) : null, max: vals.length ? Math.max(...vals) : null,
+    avg: vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null,
+    levelDays: Object.values(R.series).reduce((m, v) => { const k = RN ? RN.renownLevelOf(v).key : '?'; m[k] = (m[k] ?? 0) + 1; return m; }, {}),
+    tiers: R.tiers, targets: R.targets, target: t ? t.target : null, top: t ? t.parts.slice(0, 3).map((p) => `${p.label} ${p.value}`) : [],
+    grants: R.grants, built: R.built, streak: s.renown?.gozdeStreak ?? 0, streakMax: R.streakMax ?? 0, readyDays: R.readyDays ?? 0, eligibleDays: R.eligibleDays ?? 0, series: R.series,
+    levyGold: R.levyGold, levyPaid: R.levyPaid, levyFailed: R.levyFailed, joined: R.joined, skilled: R.skilled, joinLog: R.joinLog ?? [],
+  };
+});
+const uniStats = await page.evaluate(() => {
+  // (32.4) Darülfünun: öğrenci-gün, mezun, yarım bırakan, bölüm dağılımı, çırak mezun / Başusta, eğitimli payı, ders saatinde çalışmayan genç-saat
+  const s = window.game.state;
+  const U = window.__uni ?? { log: [], eduAt: {} };
+  const st = s.university ?? {};
+  const adults = s.characters.filter((c) => !c.role && !c.isChild && c.lifeStage !== 'youth');
+  const count = (k) => U.log.filter((e) => e.kind === k).length;
+  const RN = window.__renownMod;
+  return {
+    built: U.builtDay, noSpot: U.noSpot ?? 0, lack: U.lack ?? {}, admitted: count('admitted'), graduated: count('graduated'), dropped: count('dropped'),
+    studentDays: st.studentDays ?? 0, youthHoursLost: Math.round(((st.lectureMinutes ?? 0) / 60) * 10) / 10, fields: st.fields ?? {},
+    apprentices: st.apprentices ?? 0, grandmasters: st.grandmasters ?? 0, students: s.characters.filter((c) => c.higherStudy).length,
+    graduatesAlive: s.characters.filter((c) => c.graduate).length, educatedShare: adults.length ? Math.round((adults.filter((c) => c.educated || c.graduate).length / adults.length) * 100) / 100 : 0,
+    renownEducation: RN ? Math.round(RN.renownEducation(s) * 1000) / 1000 : 0, eduAt: U.eduAt,
+    firstGraduate: U.log.find((e) => e.kind === 'graduated')?.day ?? null,
+    apprentice: { graduated: s.apprenticeship?.graduated ?? 0, grandmasters: s.apprenticeship?.grandmasters ?? 0 },
+    apLog: U.apLog ?? [], log: U.log, apDaily: U.apDaily ?? {},
+  };
+});
+const clubStats = await page.evaluate(() => {
+  // (32.5) Hobi evleri: kulüp başına üye ve buluşma, ortalama katılım, ürünler; kulüplü / kulüpsüz yetişkinlerin ortalama doyumu ve dost sayısı
+  const s = window.game.state;
+  const CL = window.__clubStats ?? { built: {}, sessions: [], works: [], left: {}, crowdBy: {}, founded: {} };
+  const R = window.__relMod;
+  const adults = s.characters.filter((c) => !c.role && !c.isChild);
+  const friends = (c) => (R ? R.topFriends(s, c, 99, 'friend').length : 0);
+  const group = (list) => ({ n: list.length, satisfaction: list.length ? Math.round((list.reduce((a, c) => a + (c.satisfaction ?? 0), 0) / list.length) * 10) / 10 : null, friends: list.length ? Math.round((list.reduce((a, c) => a + friends(c), 0) / list.length) * 100) / 100 : null, social: list.length ? Math.round(list.reduce((a, c) => a + c.needs.social, 0) / list.length) : null });
+  const per = {};
+  for (const k of window.__clubTypes ?? []) {
+    const ses = CL.sessions.filter((x) => x.key === k);
+    per[k] = { built: CL.built[k] ?? null, founded: CL.founded[k] ?? null, members: s.characters.filter((c) => c.club?.key === k).length, sessions: ses.length, attendance: ses.length ? Math.round((ses.reduce((a, x) => a + x.n / Math.max(1, x.members), 0) / ses.length) * 100) / 100 : null, works: CL.works.filter((w) => w.key === k).length, planned: s.clubs?.[k]?.planned ?? null, realized: s.clubs?.[k]?.realized ?? null, madeUp: s.clubs?.[k]?.madeUp ?? 0, skips: Object.entries(CL.skipped ?? {}).filter(([x]) => x.startsWith(`${k}:`)).reduce((a, [, v]) => a + v, 0), lead: s.clubs?.[k]?.lead ?? null, kinds: CL.works.filter((w) => w.key === k).reduce((o, w) => ((o[w.kind] = (o[w.kind] ?? 0) + 1), o), {}) };
+  }
+  const RN = window.__renownMod;
+  return { per, skipped: CL.skipped ?? {}, emptyActs: CL.emptyActs ?? {}, exhibition: CL.exhibition, joined: CL.joined, left: CL.left, crowd: CL.crowd, crowdBy: CL.crowdBy, members: group(adults.filter((c) => c.club)), others: group(adults.filter((c) => !c.club)), all: group(adults), renownClubs: RN ? Math.round(RN.renownClubs(s) * 1000) / 1000 : 0 };
+});
+console.log(`(32.5) kulüpler: ${Object.entries(clubStats.per).map(([k, v]) => `${k} ${v.built ? `G${v.built}` : 'yok'} üye ${v.members} buluşma ${v.sessions} katılım ${v.attendance === null ? '-' : `%${Math.round(v.attendance * 100)}`}${v.planned !== null ? ` planlanan ${v.planned} gerçekleşen ${v.realized ?? 0} (telafi ${v.madeUp})` : ''}${v.lead ? ` yol ${v.lead.tiles} karo` : ''} ürün ${v.works}${Object.keys(v.kinds).length ? ` ${JSON.stringify(v.kinds)}` : ''}`).join(' · ')} · olmayan ${JSON.stringify(clubStats.skipped)} (boş buluşmada üyeler ${JSON.stringify(clubStats.emptyActs)}) · sergi ${clubStats.exhibition ? `G${clubStats.exhibition}` : '-'} · katılan ${clubStats.joined} ayrılan ${JSON.stringify(clubStats.left)} · akşam kalabalığı ${clubStats.crowd} sakin-saat ${JSON.stringify(clubStats.crowdBy)} · doyum / dost / sosyallik: kulüplü ${clubStats.members.n} (${clubStats.members.satisfaction} / ${clubStats.members.friends} / ${clubStats.members.social}) kulüpsüz ${clubStats.others.n} (${clubStats.others.satisfaction} / ${clubStats.others.friends} / ${clubStats.others.social}) hepsi (${clubStats.all.satisfaction} / ${clubStats.all.friends} / ${clubStats.all.social}) · itibar kulüp payı ${clubStats.renownClubs}`);
+console.log(`(32.4) Darülfünun: ${uniStats.built ? `kurulu (G${uniStats.built})` : `yok${uniStats.noSpot ? ` (yer yok ×${uniStats.noSpot})` : ''}${Object.keys(uniStats.lack).length ? ` (eksik ${JSON.stringify(uniStats.lack)} saat)` : ''}`} · kabul ${uniStats.admitted} · mezun ${uniStats.graduated}${uniStats.firstGraduate ? ` (ilk G${uniStats.firstGraduate})` : ''} · yarım ${uniStats.dropped} · şu an öğrenci ${uniStats.students} · öğrenci-gün ${uniStats.studentDays} · ders saatinde çalışmayan genç-saat ${uniStats.youthHoursLost} · bölüm ${JSON.stringify(uniStats.fields)} · çırak mezun ${uniStats.apprentices} (Başusta ${uniStats.grandmasters}) · eğitimli payı %${Math.round(uniStats.educatedShare * 100)} · itibar eğitim payı ${uniStats.renownEducation} · çıraklık mezunu ${uniStats.apprentice.graduated} / Başusta ${uniStats.apprentice.grandmasters}`);
+console.log(`(32.3) itibar: ${renownStats.on ? 'açık' : 'kapalı'} · ${Object.entries(renownStats.at).map(([d, v]) => `G${d} %${v}`).join(' ')} · son %${renownStats.end} (ort ${renownStats.avg}, en az ${renownStats.min}, en çok ${renownStats.max}) · kademe günleri ${JSON.stringify(renownStats.levelDays)} · geçişler ${renownStats.tiers.map((x) => `G${x.day}${x.up ? '▲' : '▼'}${x.key}`).join(' ') || '-'} · hedef ${renownStats.target} (${renownStats.top.join(' · ')}) · lütuf ${renownStats.grants.map((g) => `${g.key}@G${g.day}`).join(' ') || '-'} kurulan ${JSON.stringify(renownStats.built)} · Krallık Vergisi ${renownStats.levyPaid}/${renownStats.levyPaid + renownStats.levyFailed} toplam ${renownStats.levyGold} altın · göçmen ${renownStats.joined} (Kalfa ${renownStats.skilled})`);
+console.log(`(32.2) saray: ${courtStats.built ? `kurulu (G${courtStats.builtDay ?? '-'})` : 'yok'} · hâkim ${courtStats.judge} · dava ${courtStats.cases} · bant ${JSON.stringify(courtStats.bands)} · sürüncemede ${courtStats.stale} · sürgün ${courtStats.exiled} · tanık konuştu ${courtStats.revealed} · Muhtar ${courtStats.elder} · ceza ${JSON.stringify(courtStats.sentences)} · ort. karar ${courtStats.avgDecisionHours ?? '-'} sa · cezasızlık en çok ×${courtStats.impunityMax} / son ×${courtStats.impunityEnd} · yakalanma %${Math.round(courtStats.solvedRatio * 100)} (saraydan sonra ${courtStats.after ? `${courtStats.after.caught}/${courtStats.after.committed}` : '-'}) · Halk tepkisi ${courtStats.feedback} · kararların güven etkisi ${courtStats.trustFx} · ort. sadakat ${courtStats.loyaltyAvg}`);
+console.log(`(32.1) suç: ${crimeStats.committed} işlendi · ${crimeStats.caught} yakalandı (bekçi ${crimeStats.guard}) · tür ${JSON.stringify(crimeStats.byType)} · motivasyon ${JSON.stringify(crimeStats.byMotive)} · günlük en çok ${crimeStats.maxPerDay} · ilk G${crimeStats.firstDay ?? '-'} · açık dava ${crimeStats.open} · beklenen ${crimeStats.expected} (${crimeStats.activeDays} etkin gün) · plan ${crimeStats.planned} / düşen ${crimeStats.dropped}${crimeStats.decisions ? ` · plan saatleri ${JSON.stringify(crimeStats.hours)} · vakti gelince ${JSON.stringify(crimeStats.busy)} · kararlar ${JSON.stringify(crimeStats.decisions)} · boş ${JSON.stringify(crimeStats.nulls)}` : ''}`);
 console.log(`(30.4b) olay: ${midStats.distinct} farklı (${midStats.log.length} karar; G20 sonrası ${midStats.freshAfter20}/${midStats.after20} yeni) · hedef ${midStats.milestones}/14 (${midStats.doneIds.join(',')}) · ${midStats.log.join(' ')}`);
 console.log(`(29.5) Omuz Omuza ${bondStats.side} · Diken Üstünde ${bondStats.rub} · en az bir kez Omuz Omuza alan ${bondStats.ever}/${bondStats.pop} (%${Math.round((100 * bondStats.ever) / Math.max(1, bondStats.pop))}) · Diken Üstünde alan ${bondStats.everRub} · en çok birlikte çalışan çiftler: ${bondStats.pairs.join(', ') || '-'}`);
 const so = mon.social;
@@ -1439,7 +1938,24 @@ for (const w of mon.stalledWorkplaces.slice(0, 5)) console.log(`  iş yeri: ${w}
 const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount === 0 && mon.overfullCount === 0 && mon.outfitErrors.length === 0 && mon.social.stuck.length === 0;
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, gold: report.gold, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
+  // (32.6b) A/B özeti: hazine son gün ve son 5 günün ortalaması, 32 yapılarının kuruluş günleri, doyum, suç, itibar, Krallık Vergisi
+  const abStats = await page.evaluate(() => {
+    const s = window.game.state;
+    const daily = (window.__nov?.daily ?? []).slice(-5);
+    const adults = s.characters.filter((c) => !c.role && !c.isChild);
+    const types = ['courthouse', 'university', 'gardenClub', 'sewingClub', 'paintingClub', 'peaceFountain', 'royalRoseGarden', 'royalArchive'];
+    const built = Object.fromEntries(types.map((k) => [k, s.buildings.filter((b) => b.type === k && b.functional).length]));
+    return {
+      gold: Math.round(s.resources.gold), gold5: daily.length ? Math.round(daily.reduce((a, d) => a + d.gold, 0) / daily.length) : null,
+      golden: s.goldenAge?.since?.day ?? null, pop: s.characters.length,
+      satisfaction: adults.length ? Math.round((adults.reduce((a, c) => a + (c.satisfaction ?? 0), 0) / adults.length) * 10) / 10 : null,
+      crime: (window.__crimeLog ?? []).length, reputation: Math.round((s.crown?.reputation ?? 0) * 10) / 10, levyGold: window.__renown?.levyGold ?? 0,
+      built, buildings: s.buildings.filter((b) => b.functional || b.underConstruction).length,
+      courtDay: window.__courtDay ?? null, uniDay: window.__uni?.builtDay ?? null,
+    };
+  });
+  const endState = await page.evaluate(() => ({ pop: window.game.state.characters.length, trust: Math.round(window.game.state.trust?.value ?? 0), trustMin: Math.round(window.game.state.trust?.min ?? 0), revolts: window.game.state.stats?.revolts ?? null })); // (32.2) ölçüm özeti
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, court: courtStats, renown: renownStats, university: uniStats, clubs: clubStats, ...(options['club-diag'] ? { clubDiag: await page.evaluate(() => window.__clubDiag) } : {}), gold: report.gold, golden: report.golden?.since ?? null, ab: abStats, end: endState, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();

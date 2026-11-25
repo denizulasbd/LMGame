@@ -93,6 +93,9 @@ import { engineOn } from '../systems/Engines.js';
 //   ornamentalTree : { foliage } süs fidanı: dikildikten sonra iki günde büyür, ulu ağacın gölgesinde dinlenilir
 //   grownName    : büyüyünce aldığı ad (Huş Fidanı -> Huş Ağacı)
 //
+// 32.5 — Hobi evleri (gardenClub / sewingClub / paintingClub; data/clubs.js, systems/ClubSystem.js): clubHouse: true, işçisiz.
+// 32.4 — Darülfünun (university; data/university.js, systems/UniversitySystem.js): university: true, Müderris workActivity 'profess'.
+// 32.2 — Adalet Sarayı (courthouse; data/justice.js -> COURT, systems/CourtSystem.js): görünüm durumu building.look.cases (kaydedilmez).
 // 31. aşama — Kasaba Süsleri (data/townDecor.js): noticeBoard, woodpile, scarecrow, bandstand, heroStatue. Yapıya özgü kalıcı
 //   durum building.decor'da (konser zamanı, onurlandırılan sakin), görünüm durumu building.look'ta (kaydedilmez).
 //
@@ -969,6 +972,150 @@ export const BUILDINGS = {
     requiresTier: 4,
     funAura: { radius: 48, perMinute: 0.06 },
   },
+  // --- (32.2) Adalet Sarayı: hâkim oyuncudur (işçi yok). Kurallar data/justice.js (COURT), sistem systems/CourtSystem.js; şalter court ---
+  courthouse: {
+    name: 'Adalet Sarayı',
+    size: { w: 3, h: 3 },
+    spots: 'door',
+    doorTiles: [{ dx: 1, dy: 3 }],
+    entrance: { x: 24, y: 47 },
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Yönetim',
+    description:
+      'Sütunlu taş saray, alınlığında altın terazi. Yakalanan suçlar Muhtar\'a değil buraya düşer: dava dosyasını okur, cezayı sen verirsin. Her ceza her suça verilebilir; halk orantıya bakar. Saray varken susan tanıklar da zamanla konuşur.',
+    cost: { wood: 60, stone: 50, gold: 120 },
+    buildWork: 320,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 3,
+  },
+  // --- (32.3) Kraliyet Lütfu: Krallık İtibarı uzun süre Kraliyet Gözdesi kalınca nadiren açılan gizli yapılar (her biri tek). Kilitliyken
+  // inşa menüsünde hiç görünmez. Kurallar data/renown.js (ROYAL_EFFECTS, RENOWN_GRANT), saf hesaplar systems/Renown.js; şalter renown.
+  // Etkiler itibar Şüpheli'ye düşerse yarıya iner. Bedeller geç oyun malıdır (altınsız). Görseller art/sprites/structuresRoyal.js.
+  peaceFountain: {
+    name: 'Barış Çeşmesi',
+    size: { w: 2, h: 2 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    royalGrant: true,
+    category: 'Kraliyet Lütfu',
+    description: 'Krallığın lütfuyla kurulan, mavi çinili kaideli üç kademeli çeşme; tepesinde zeytin dalı tutan güvercin. Kasaba çapında suç riski %15 azalır, çevresinde dinlenenlerin keyfi dolar; akşamları suyu ışıl ışıl parlar.',
+    cost: { stone: 90, iron: 15, gears: 1 },
+    buildWork: 200,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    litHours: { from: 18, to: 23.5 },
+    funAura: { radius: 56, perMinute: 0.1 },
+  },
+  royalRoseGarden: {
+    name: 'Kraliyet Gül Bahçesi',
+    size: { w: 3, h: 3 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    royalGrant: true,
+    category: 'Kraliyet Lütfu',
+    description: 'Saray bahçıvanlarının bağışladığı gül fidanlarıyla, ortasında beyaz kameriyeli kraliyet bahçesi. Çevresine bolca güzellik yayar, kasaba refahına +2 verir; aşıklar burada daha kolay yakınlaşır (aşk ve evlilik olasılığı +%20).',
+    cost: { wood: 40, stone: 50, food: 60, cloth: 10 },
+    buildWork: 220,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    funAura: { radius: 64, perMinute: 0.08 },
+  },
+  royalArchive: {
+    name: 'Kraliyet Arşivi',
+    size: { w: 2, h: 3 },
+    spots: 'none',
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    royalGrant: true,
+    category: 'Kraliyet Lütfu',
+    description: "Kubbeli, sütunlu taş arşiv; saray defterlerinin kasabadaki kopyaları burada. Bilgelik Evi'nde araştırma ve yazıt çözme %15 hızlanır; Tarihçe'ye \"Kasabanın Kraliyet Defteri\" eklenir.",
+    cost: { wood: 80, stone: 100, iron: 10, cloth: 15 },
+    buildWork: 260,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+  },
+  // --- (32.4) Darülfünun: Bilgelik Evi'nin üst kademesi; yalnızca Bilgelik Evi mezunu gençler (18-20) okur. Tek çalışanı Müderris
+  // (workActivity 'profess'); ders 14:00-16:00. Kurallar data/university.js, sistem systems/UniversitySystem.js; şalter university.
+  university: {
+    name: 'Darülfünun',
+    size: { w: 4, h: 3 },
+    spots: 'door',
+    doorTiles: [{ dx: 1, dy: 3 }, { dx: 2, dy: 3 }],
+    entrance: { x: 32, y: 47 },
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Bilgi',
+    description:
+      "Kubbeli, avlulu taş medrese; revaklarında kitaplıklar. Bilgelik Evi'ni bitiren gençler (18-20) burada bir bölümde okur (en çok 6 öğrenci): ders 14:00-16:00, Müderris içerideyken iki kat hızlı. Mezun bölümünde en az Kalfa olur, o meslekte ömür boyu %15 hızlı ustalaşır; eğitimli halk suça daha az meyleder, Krallık İtibarı'nı yükseltir.",
+    cost: { wood: 80, stone: 110, iron: 20, wool: 30 },
+    buildWork: 380,
+    workers: 1,
+    workActivity: 'profess',
+    university: true,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 4,
+  },
+  // --- (32.5) Hobi evleri (data/clubs.js, systems/ClubSystem.js; şalter clubs): kulüp üyeleri 2 günde bir akşam kulüp evinin önünde
+  // buluşur (kışın Bahçecilik Kulübü serada). İşçi yok; her türden en çok bir. Görseller art/sprites/structuresClubs.js.
+  gardenClub: {
+    name: 'Bahçecilik Kulübü',
+    size: { w: 2, h: 2 },
+    spots: 'door',
+    doorTiles: [{ dx: 0, dy: 2 }, { dx: 1, dy: 2 }],
+    entrance: { x: 10, y: 31 },
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Sosyal',
+    clubHouse: true,
+    description:
+      'Camlı serası ve önünde tarhları olan küçük ev. Doğayı ve toprağı seven sakinler (en çok 6) tek günlerin akşamı 17:30-19:30 burada buluşup fide diker; kışın serada. Her üç buluşmada önüne yeni bir tarh ya da saksı ekler, baharda üyelere birer meyve verir.',
+    cost: { wood: 30, stone: 15, wool: 4 },
+    buildWork: 160,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 3,
+  },
+  sewingClub: {
+    name: 'Dikiş-Nakış Evi',
+    size: { w: 2, h: 2 },
+    spots: 'door',
+    doorTiles: [{ dx: 0, dy: 2 }, { dx: 1, dy: 2 }],
+    entrance: { x: 22, y: 31 },
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Sosyal',
+    clubHouse: true,
+    description:
+      'Penceresinde kumaş topları ve gergef duran sıcak bir ev. Elinin hünerini seven sakinler (en çok 6) çift günlerin akşamı 17:30-19:30 kapının önünde nakış işler. Her dört buluşmada bir Nakışlı Mendil işleyip kesesi en boş sakine hediye eder; kışın bir kez üşüyen birine Dayanıklı Giysi diker (hammaddesiz).',
+    cost: { wood: 28, stone: 12, wool: 8 },
+    buildWork: 160,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 3,
+  },
+  paintingClub: {
+    name: 'Resim Atölyesi',
+    size: { w: 2, h: 2 },
+    spots: 'door',
+    doorTiles: [{ dx: 0, dy: 2 }, { dx: 1, dy: 2 }],
+    entrance: { x: 10, y: 31 },
+    buildable: true,
+    demolishable: true,
+    unique: true,
+    category: 'Sosyal',
+    clubHouse: true,
+    description:
+      'Büyük kuzey penceresi olan aydınlık atölye. Kitap kurtları, düşünürler ve içine dönük ruhlar (en çok 6) tek günlerin akşamı 18:00-20:00 şövalelerinin başında manzara çizer. Her üç buluşmada duvara bir tablo asılır (en çok 6); altıncısında Kasaba Sergisi açılır.',
+    cost: { wood: 26, stone: 18, wool: 3 },
+    buildWork: 160,
+    allowedTiles: [...GROUND_TILES, 'plaza'],
+    requiresTier: 3,
+  },
   // (16. aşama) Keşif seferlerinden gelen egzotik ganimetlerle dikilen yapılar (item: harcanan ganimet; kaynak bedeli yok)
   grapeVine: {
     name: 'Üzüm Asması',
@@ -1189,12 +1336,21 @@ export const BUILD_MENU = [
   'guardTower',
   // (31. aşama) Kasaba Süsleri (şalter kapalıyken menüde yok)
   ...(engineOn('townDecor') ? ['noticeBoard', 'woodpile', 'scarecrow', 'heroStatue', 'bandstand'] : []),
+  // (32.2) Adalet Sarayı (şalter kapalıyken menüde yok)
+  ...(engineOn('court') ? ['courthouse'] : []),
+  // (32.3) Kraliyet Lütfu (şalter kapalıyken menüde yok; açıkken lütuf gelene dek düğmesi gizli)
+  ...(engineOn('renown') ? ['peaceFountain', 'royalRoseGarden', 'royalArchive'] : []),
+  // (32.4) Darülfünun (şalter kapalıyken menüde yok)
+  ...(engineOn('university') ? ['university'] : []),
+  // (32.5) Hobi evleri (şalter kapalıyken menüde yok)
+  ...(engineOn('clubs') ? ['gardenClub', 'sewingClub', 'paintingClub'] : []),
 ];
 
 /** (18. aşama) Menü öğesinin İnşa sekmesi: 'roads' (zemin fırçaları), 'decor' (süs ve sokak eşyaları), 'buildings'. */
 export function buildTabFor(type) {
   if (TILE_BUILDS[type]) return 'roads';
   const category = BUILDINGS[type]?.category;
+  if (category === 'Kraliyet Lütfu') return 'royal'; // (32.3)
   return category === 'Süsleme' || category === 'Peyzaj' ? 'decor' : 'buildings';
 }
 

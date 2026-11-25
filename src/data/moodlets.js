@@ -49,6 +49,8 @@ export const MOODLETS = {
   special_day: { name: 'Bugün Onun Günü', layer: 'action', tone: 'positive', icon: 'sparkle', hours: 16, weight: 2, priority: 4, feel: 'Keyifli', effects: { joyRateMul: 0.85 } },
   celebrated: { name: 'Hatırlandı', layer: 'action', tone: 'positive', icon: 'heart', hours: 12, weight: 2, priority: 4, feel: 'Keyifli', effects: { joyRateMul: 0.85 } },
   forgotten: { name: 'Unutuldu', layer: 'action', tone: 'negative', icon: 'sulk', hours: 12, weight: 2, priority: 4, feel: 'Kırgın', effects: { joyRateMul: 1.15 } },
+  // (32.2) Sürgün edilen sakinin geride kalan ailesi: keyif çabuk kaçar, sohbetten az tat alır, kalabalıktan hafifçe kaçınır (Brain)
+  shamed: { name: 'Mahcup', layer: 'action', tone: 'negative', icon: 'sulk', hours: 72, weight: 2, priority: 4, feel: 'Kederli', effects: { joyRateMul: 1.12, socialMul: 0.8 } },
   dread_realized: { name: 'Korktuğu Başına Geldi', layer: 'action', tone: 'negative', icon: 'sulk', hours: 12, weight: 3, priority: 5, feel: 'Sarsılmış', effects: { joyRateMul: 1.2, scareMul: 1.5 }, seek: true },
 
   // --- Katman B: ihtiyaç ve çevre ---
@@ -135,9 +137,14 @@ export const DOMINANT_THRESHOLD = 1;
 
 // Tetiklenme nedenleri (kartta görünür). {who}: kişi adı
 export const MOOD_REASONS = {
+  // (32.2) Adalet Sarayı: sürgün
+  shamed_exile: '{who} kasabadan sürüldü; komşuların yüzüne bakmaya çekiniyor',
+  heart_exile: 'Eşi {who} kasabadan sürüldü',
   // (31. aşama) Kasaba Süsleri: yeni moodlet yok, var olanlara yeni nedenler
   concert: 'Müzik Köşkü\'ndeki akşam konserinde komşularıyla eğlendi',
   ancestor_pride: 'Yakını {who} için dikilen heykelin önünden geçerken gururlandı',
+  child_graduate: "Evladı {who} Darülfünun'u bitirdi; göğsü kabardı", // (32.4)
+  club: '{who} buluşmasında dostlarıyla el emeğine daldı', // (32.5) kulüp buluşması (Tatlı Sohbet)
   proud_trait: 'Çalışkan doğası gereği üretimden gurur duydu',
   proud_ambitious: 'Hırsı işini bitirince tatmin oldu',
   proud_craft: 'Zanaatkâr ruhu tezgâh başında şevke geldi',
@@ -237,6 +244,7 @@ export const MOOD_LINES = {
   side_by_side: ['Böyle ekip olur!', 'Seninle çalışmak keyif.'],
   rubbing_wrong: ['Yine aynı tezgâh...', 'Şu yüzü görmesem.'],
   dread_realized: ['Korktuğum başıma geldi...', 'Bunu hiç istememiştim.'],
+  shamed: ['Kimsenin yüzüne bakamıyorum...', 'Onun yaptığını biz çekiyoruz.'], // (32.2)
   farewell: ['Hakkını helal et {who}.', 'Yolun açık olsun {who}.'],
   special_day: ['Bugün benim günüm!', 'Ne güzel bir sabah!'],
   celebrated: ['Beni unutmadınız!', 'İyi ki varsınız!'],

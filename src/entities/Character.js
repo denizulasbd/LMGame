@@ -50,6 +50,9 @@ import { sanitizeGrowth, sanitizeGrowthToday, sanitizeGrowthCause, sanitizeDeepT
 import { sanitizeWants, sanitizeWantLog, clampSatisfaction, sanitizeCount, neutralDrive, recomputeDrive } from '../systems/Wants.js';
 import { WANTS, FEARS, WANT_CAPS } from '../data/wants.js';
 import { sanitizeLoyalty } from '../systems/Loyalty.js';
+import { sanitizeHigherStudy, sanitizeGraduate } from '../systems/University.js'; // (32.4)
+import { sanitizeClub } from '../systems/Clubs.js'; // (32.5)
+import { getEaselSprite } from '../art/sprites/structuresClubs.js'; // (32.5)
 
 const HALF_WIDTH = CHARACTER_WIDTH / 2;
 const BUBBLE_POP_TIME = 0.15;
@@ -148,6 +151,10 @@ export class Character extends Entity {
     loyalty = 0,
     weddingDay = null,
     specialDay = null,
+    sentence = null,
+    higherStudy = null,
+    graduate = null,
+    club = null,
   }) {
     super({ id, x, y });
     this.name = name;
@@ -249,6 +256,14 @@ export class Character extends Entity {
     this.weddingDay = Number.isFinite(weddingDay) && weddingDay >= 1 ? Math.floor(weddingDay) : null;
     this.specialDay = sanitizeSpecialDay(specialDay);
     this.specialSeek = []; // (29.7) özel günde aranan kişiler (kaydedilmez; RiteSystem kurar)
+    // (32.2) Adalet Sarayı cezası (isteğe bağlı, kayda yalnızca doluyken girer): { service?: kalan saat, serviceDay?, serviceToday?,
+    // caseId?, banUntil?: oyun dakikası, exile?: { since, exit } } — CourtSystem yazar
+    this.sentence = sanitizeSentence(sentence);
+    // (32.4) Darülfünun (isteğe bağlı, kayda yalnızca doluyken girer): öğrencilik { field, minutes, today, day, since } ve mezuniyet { field, day }
+    this.higherStudy = sanitizeHigherStudy(higherStudy);
+    this.graduate = sanitizeGraduate(graduate);
+    // (32.5) Hobi evi üyeliği (isteğe bağlı, kayda yalnızca doluyken girer): { key, since, missed } — ClubSystem yazar
+    this.club = sanitizeClub(club);
     this.drive = neutralDrive();
     recomputeDrive(this);
     this.mood = neutralMood();
@@ -449,7 +464,9 @@ export class Character extends Entity {
     const x = Math.round(this.x) + offset.x;
     const y = Math.round(this.y) + offset.y;
     // (25.2) Çırak ustasının yanında küçük bir taburede oturur
-    if (this.task?.activity === 'apprentice' && this.pose === 'sit') queue.addImage(this.sortY - 0.01, getStoolSprite(), x - 4, y - 1); // ayakları taburenin önünde, bacakları altından görünür
+    if ((this.task?.activity === 'apprentice' || this.task?.activity === 'clubSession') && this.pose === 'sit') queue.addImage(this.sortY - 0.01, getStoolSprite(), x - 4, y - 1); // ayakları taburenin önünde, bacakları altından görünür ((32.5) Dikiş-Nakış Evi de)
+    // (32.5) Resim Atölyesi: baktığı yanda şövale (yalnızca çizim; durum yazılmaz)
+    if (this.task?.easel && this.task.phase === 'perform') queue.addImage(this.sortY + 0.01, getEaselSprite(), facing === 'left' ? x - 13 : x + 4, y - 15);
     queue.addImage(this.sortY, sprite, x - HALF_WIDTH, y - sprite.height + 1);
     // (14. aşama) Çiçek Şenliği: saçta küçük bir çiçek
     if (this.flowerCrown) {
@@ -695,6 +712,10 @@ export class Character extends Entity {
       loyalty: this.loyalty,
       weddingDay: this.weddingDay,
       specialDay: this.specialDay,
+      ...(this.sentence ? { sentence: this.sentence } : {}), // (32.2)
+      ...(this.higherStudy ? { higherStudy: this.higherStudy } : {}), // (32.4)
+      ...(this.graduate ? { graduate: this.graduate } : {}), // (32.4)
+      ...(this.club ? { club: { key: this.club.key, since: this.club.since, missed: this.club.missed } } : {}), // (32.5)
     };
   }
 
@@ -729,4 +750,24 @@ export class Character extends Entity {
 function sanitizeSpecialDay(d) {
   if (!d || typeof d !== 'object' || !Number.isFinite(d.day) || (d.kind !== 'birthday' && d.kind !== 'anniversary')) return null;
   return { day: Math.max(1, Math.floor(d.day)), kind: d.kind, celebrated: Boolean(d.celebrated), gifted: Boolean(d.gifted) };
+}
+
+/** (32.2) Kayıttaki ceza durumu: bozuk alanlar atılır; hiçbir şey kalmazsa null. */
+function sanitizeSentence(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const out = {};
+  if (Number.isFinite(raw.service) && raw.service > 0) {
+    out.service = Math.round(raw.service * 100) / 100;
+    if (Number.isInteger(raw.serviceDay)) out.serviceDay = raw.serviceDay;
+    if (Number.isFinite(raw.serviceToday)) out.serviceToday = Math.max(0, raw.serviceToday);
+    if (Number.isInteger(raw.caseId)) out.caseId = raw.caseId;
+  }
+  if (Number.isFinite(raw.banUntil) && raw.banUntil > 0) out.banUntil = Math.round(raw.banUntil);
+  if (raw.exile && Number.isFinite(raw.exile.since)) {
+    const e = raw.exile;
+    out.exile = { since: e.since, exit: e.exit && Number.isFinite(e.exit.x) ? { x: e.exit.x, y: e.exit.y } : null };
+    if (typeof e.band === 'string') out.exile.band = e.band.slice(0, 12);
+    if (typeof e.crime === 'string') out.exile.crime = e.crime.slice(0, 20);
+  }
+  return Object.keys(out).length ? out : null;
 }

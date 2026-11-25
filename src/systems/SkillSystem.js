@@ -2,6 +2,8 @@
 // girer. BehaviorSystem çalışma sırasında addExperience çağırır; kademe atlanınca 'skill:levelUp'
 // { character, skill, level } yayınlanır (günlük, ses ve bildirim dinler).
 import { SKILLS, SKILL_LEVELS, ACTIVITY_SKILLS, OUTFIT_KITS } from '../data/skills.js';
+import { UNIVERSITY } from '../data/university.js';
+import { engineOn } from './Engines.js';
 
 /** Deneyime göre kademe kaydı ({ level, name, xp, bonus }). */
 export function levelFor(xp) {
@@ -51,6 +53,8 @@ export function addExperience(events, character, activity, minutes, multiplier =
   const skill = skillForActivity(activity);
   if (!skill || minutes <= 0) return;
   minutes *= multiplier;
+  // (32.4) Darülfünun mezunu kendi bölümünde ömür boyu ×1,15 (deneyimin tek giriş noktası; çıraklığın Math.max yazımları buradan geçmez)
+  if (character.graduate?.field === skill && engineOn('university')) minutes *= UNIVERSITY.fieldXpMultiplier;
   const before = levelFor(character.skills[skill] ?? 0);
   character.skills[skill] = (character.skills[skill] ?? 0) + minutes;
   const after = levelFor(character.skills[skill]);

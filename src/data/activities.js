@@ -494,6 +494,55 @@ export const ACTIVITIES = {
     duration: [50, 80],
     effects: { social: 0.3, fun: 0.15 },
   },
+  // (32.4) Darülfünun: gençler 14:00-16:00 ders dinler (içeride); Müderris ders verir; misafir Kıdemli Bilge gençlerle sohbet eder
+  lecture: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: "Darülfünun'a derse gidiyor",
+    label: "Darülfünun'da ders dinliyor",
+    duration: [90, 90],
+    effects: { social: 0.2, fun: 0.05 },
+  },
+  profess: {
+    kind: 'work',
+    indoor: true,
+    travelLabel: "Darülfünun'a gidiyor",
+    label: "Darülfünun'da Müderris: ders veriyor",
+  },
+  uniTalk: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: "Darülfünun'a gençlerle sohbete gidiyor",
+    label: "Darülfünun'da gençlerle sohbet ediyor (misafir hoca)",
+    duration: [50, 80],
+    effects: { fun: 0.5, social: 0.4 },
+  },
+  // (32.5) Hobi evleri: akşam buluşması (kulüp evinin önünde; poz, alet ve etiket kulübe göre task.pose / task.tool / task.clubLabel),
+  // kışın Bahçecilik Kulübü'nün serasında (içeride; etki aynı) ve buluşma dışında kendi kulüp evinde tek başına uğraş
+  clubSession: {
+    kind: 'leisure',
+    travelLabel: 'Kulüp evine gidiyor',
+    label: 'Kulüp evinde arkadaşlarıyla uğraşıyor',
+    duration: [120, 120],
+    effects: { fun: 0.4, social: 1.0 }, // (32.6a) 0,5 → 1,0: buluşma yerini aldığı meydan / han sohbeti kadar sosyallik doldursun
+    bubbles: ['note', 'heart', 'sparkle'],
+  },
+  clubSessionIn: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: 'Kulüp evine gidiyor',
+    label: 'Kulüp evinde arkadaşlarıyla uğraşıyor',
+    duration: [120, 120],
+    effects: { fun: 0.4, social: 1.0 }, // (32.6a) 0,5 → 1,0: buluşma yerini aldığı meydan / han sohbeti kadar sosyallik doldursun
+  },
+  clubHobby: {
+    kind: 'leisure',
+    indoor: true,
+    travelLabel: 'Kulüp evine gidiyor',
+    label: 'Kulüp evinde tek başına uğraşıyor',
+    duration: [50, 80],
+    effects: { fun: 0.5, social: 0.05 },
+  },
   // Keşif seferine çıkan sakin harita kenarına yürür ve bir gün ortadan kaybolur
   expedition: {
     kind: 'away',
@@ -670,6 +719,42 @@ export const ACTIVITIES = {
     pose: 'gather',
     bubbles: ['torch', 'angry', 'loot'],
     finishEvent: 'riot:loot',
+  },
+  // (32.1) Suç: CrimeSystem'in planladığı sakin boş zamanında hedefin kapısına sinsi ama sevimli bir yürüyüşle gider (Brain.planCrime;
+  // süre plandan gelir, Brain zar çekmez). Bitince 'crime:committed' (CrimeSystem malı aktarır, tanık arar, davayı yazar).
+  pilfer: {
+    kind: 'leisure',
+    target: 'none',
+    travelLabel: 'Etrafına bakına bakına, ıslık çalarak yürüyor',
+    label: 'Kimse bakmıyor mu diye etrafı kolluyor',
+    duration: [8, 14],
+    effects: { fun: 0.1 },
+    bubbles: ['whisper', 'sparkle', 'laugh'],
+    finishEvent: 'crime:committed',
+  },
+  // (32.2) Kamu Hizmeti: Adalet Sarayı'nın cezası. Boş zamanında meydanda ve yollarda süpürge sallar (ücretsiz; mesai ve uykuyu
+  // bölmez, acil ihtiyaç önce gelir). Bitince 'court:served' (CourtSystem saat sayacını düşürür). Keyif hafifçe düşer.
+  publicService: {
+    kind: 'leisure',
+    target: 'none',
+    travelLabel: 'Süpürgesini omuzlamış, kamu hizmetine gidiyor',
+    label: 'Kamu hizmeti: meydanı ve yolları süpürüyor',
+    pose: 'work',
+    tool: 'broom',
+    duration: [60, 60],
+    effects: { fun: -0.04 },
+    bubbles: ['sweat', 'repair'],
+    finishEvent: 'court:served',
+  },
+  // (32.2) Sürgün: yalnızca suçlu, bohçasıyla harita kenarına yürür (Brain.planExile; işaret c.sentence.exile, terk edişten AYRI)
+  exile: {
+    kind: 'away',
+    travelLabel: 'Sürgün yolunda: bohçasıyla kasabadan ayrılıyor',
+    label: 'Son kez ardına bakıp kasabadan uzaklaşıyor',
+    duration: [0, 0],
+    effects: {},
+    bubbles: ['bundle'],
+    finishEvent: 'court:exileArrived',
   },
   // --- 22. aşama: köyü terk etme (kesesi ve çantasıyla harita kenarına yürür, orada kasabadan ayrılır) ---
   emigrate: {

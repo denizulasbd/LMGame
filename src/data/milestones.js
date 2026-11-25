@@ -123,6 +123,44 @@ export const MILESTONES = [
     kind: 'wonder',
     target: 3, // temel, gövde, kule
   },
+  // (32.6b) dört geç oyun hedefi (32'nin yapıları; ödülsüz). `engine`: o şalter kapalıyken hedef listede yoktur (MilestoneSystem.activeMilestones)
+  {
+    id: 'justiceServed',
+    name: 'Adaleti Tesis Et',
+    description: 'Adalet Sarayı kur ve 3 adil karar ver.',
+    icon: 'scales',
+    kind: 'justiceServed',
+    target: 4, // saray (1) + adil karar (3)
+    fair: 3,
+    engine: 'court',
+  },
+  {
+    id: 'firstClub',
+    name: 'Kasabanın İlk Kulübü',
+    description: 'Bir hobi evi kur ve kulübün ilk buluşmasını gör.',
+    icon: 'heart',
+    kind: 'firstClub',
+    target: 2, // hobi evi (1) + ilk buluşma (1)
+    engine: 'clubs',
+  },
+  {
+    id: 'firstGraduate',
+    name: 'İlk Darülfünun Mezunu',
+    description: 'Darülfünun kur; Bilgelik Evi\'ni bitiren bir genç orada mezun olsun.',
+    icon: 'book',
+    kind: 'firstGraduate',
+    target: 1,
+    engine: 'university',
+  },
+  {
+    id: 'royalFavorite',
+    name: 'Kraliyet Gözdesi',
+    description: 'Krallık İtibarı\'nı %90\'a çıkar: adil davalar, güven ve refah.',
+    icon: 'crown',
+    kind: 'royalFavorite',
+    target: 90,
+    engine: 'renown',
+  },
 ];
 
 // Kış sınavı: kış boyunca refah bunun altına düşmemeli

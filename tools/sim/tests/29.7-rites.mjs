@@ -195,7 +195,7 @@ const out = await page.evaluate(async (fixture) => {
   sc.lifecycle.die(victim, { cause: 'age' });
   S2().time.hour = 6; const before6 = people().map((c) => c.specialDay); game.events.emit('time:hour', 6); S2().time.hour = hb;
   ENGINES.rites = true;
-  check('ENGINES.rites=false: weddingDay yazılmaz, tören kuyruğu ve özel gün yok; dört yeni moodlet (toplam 32)', (!o1 || o1.weddingDay === null) && S2().rites.pending.length === pend0 && people().every((c, i) => c.specialDay === (before6[i] ?? null)) && MD.MOODLET_KEYS.length === 32 && ['farewell', 'special_day', 'celebrated', 'forgotten'].every((k) => MD.MOODLETS[k].layer === 'action' && MD.MOOD_LINES[k]?.length >= 2) && MD.MOODLETS.celebrated.hours === 12 && MD.MOODLETS.forgotten.tone === 'negative');
+  check('ENGINES.rites=false: weddingDay yazılmaz, tören kuyruğu ve özel gün yok; dört yeni moodlet (toplam 33)', (!o1 || o1.weddingDay === null) && S2().rites.pending.length === pend0 && people().every((c, i) => c.specialDay === (before6[i] ?? null)) && MD.MOODLET_KEYS.length === 33 && ['farewell', 'special_day', 'celebrated', 'forgotten'].every((k) => MD.MOODLETS[k].layer === 'action' && MD.MOOD_LINES[k]?.length >= 2) && MD.MOODLETS.celebrated.hours === 12 && MD.MOODLETS.forgotten.tone === 'negative');
 
   // 9. v39 -> v40 göç
   localStorage.setItem('lmgame.save.v2', fixture);

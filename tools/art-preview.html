@@ -27,6 +27,7 @@
     import { WeddingConfetti } from '../src/rendering/WeddingConfetti.js';
     import { ChimeWaves } from '../src/rendering/ChimeWaves.js';
     import { QUIRKS } from '../src/data/social.js';
+    import { getEaselSprite } from '../src/art/sprites/structuresClubs.js'; // (32.5)
     import { getStoolSprite } from '../src/art/ui/index.js';
     import { PROFESSIONS } from '../src/data/apprenticeship.js';
     import { HEIRLOOMS } from '../src/data/heirloom.js';
@@ -61,6 +62,73 @@
 
     const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
     const NAMES = { spring: 'ilkbahar', summer: 'yaz', autumn: 'sonbahar', winter: 'kış' };
+
+    // --- 32.5: Hobi evleri — Bahçecilik Kulübü (tarhlar, sera; ürünlerle saksılar), Dikiş-Nakış Evi (gergef, kumaş topları),
+    // Resim Atölyesi (kuzey penceresi, tablo duvarı); dört mevsim, buluşma (aydınlık pencere / kışın sera), şövale, şantiye ---
+    {
+      show('Bahçecilik Kulübü (2x2): dört mevsim, 3 / 6 ürün, kış buluşması (sera), şantiye', [
+        ...SEASONS.map((k) => [NAMES[k], getStructureSprite('gardenClub', { season: k })]),
+        ['3 tarh', getStructureSprite('gardenClub', { season: 'summer', look: { works: 3 } })],
+        ['6 tarh', getStructureSprite('gardenClub', { season: 'spring', look: { works: 6 } })],
+        ['kış buluşması', getStructureSprite('gardenClub', { season: 'winter', look: { session: true, works: 4 } })],
+        ['şantiye', getConstructionSiteSprite(2, 2, 1, 'gardenClub')],
+      ], 4);
+      show('Dikiş-Nakış Evi (2x2): dört mevsim, buluşma (aydınlık pencere)', [
+        ...SEASONS.map((k) => [NAMES[k], getStructureSprite('sewingClub', { season: k })]),
+        ['buluşma', getStructureSprite('sewingClub', { season: 'summer', look: { session: true } })],
+        ['kış akşamı', getStructureSprite('sewingClub', { season: 'winter', windowsLit: true })],
+      ], 4);
+      show('Resim Atölyesi (2x2): dört mevsim, tablo duvarı (0 / 3 / 6), buluşma, şövale', [
+        ...SEASONS.map((k) => [NAMES[k], getStructureSprite('paintingClub', { season: k })]),
+        ['3 tablo', getStructureSprite('paintingClub', { season: 'summer', look: { works: 3 } })],
+        ['6 tablo · buluşma', getStructureSprite('paintingClub', { season: 'autumn', look: { works: 6, session: true } })],
+        ['şövale', getEaselSprite()],
+      ], 4);
+    }
+
+    // --- 32.4: Darülfünun — kubbeli, avlulu, kitaplıklı taş medrese; dört mevsim avlu ağaçları, ders saatinde aydınlık pencereler, kış ---
+    {
+      show('Darülfünun (4x3): dört mevsim, ders saati (aydınlık pencereler) ve şantiye', [
+        ...SEASONS.map((k) => [NAMES[k], getStructureSprite('university', { season: k })]),
+        ['ders saati', getStructureSprite('university', { season: 'summer', look: { lecture: true } })],
+        ['kış akşamı', getStructureSprite('university', { season: 'winter', windowsLit: true })],
+        ['şantiye', getConstructionSiteSprite(4, 3, 1, 'university')],
+      ], 4);
+    }
+
+    // --- 32.3: Kraliyet Lütfu — Barış Çeşmesi (akşam ışıklı su), Kraliyet Gül Bahçesi (dört mevsim), Kraliyet Arşivi (akşam pencereleri) ---
+    {
+      show('Barış Çeşmesi (2x2): su kareleri, akşam ışığı, şantiye', [
+        ['kare 0', getStructureSprite('peaceFountain', { frame: 0 })],
+        ['kare 1', getStructureSprite('peaceFountain', { frame: 1 })],
+        ['akşam', getStructureSprite('peaceFountain', { frame: 0, lit: true })],
+        ['şantiye', getConstructionSiteSprite(2, 2, 1, 'peaceFountain')],
+      ], 5);
+      show('Kraliyet Gül Bahçesi (3x3): dört mevsim', SEASONS.map((k) => [NAMES[k], getStructureSprite('royalRoseGarden', { season: k })]), 4);
+      show('Kraliyet Arşivi (2x3): gündüz, akşam, kış', [
+        ['gündüz', getStructureSprite('royalArchive', {})],
+        ['akşam', getStructureSprite('royalArchive', { windowsLit: true })],
+        ['kış', getStructureSprite('royalArchive', { season: 'winter' })],
+        ['şantiye', getConstructionSiteSprite(2, 3, 1, 'royalArchive')],
+      ], 5);
+    }
+
+    // --- 32.2: Adalet Sarayı — sütunlu taş saray, alınlıkta altın terazi; mevsim saksıları, kışın kar, açık davada kapıda parşömen ---
+    {
+      show('Adalet Sarayı (3x3): dört mevsim, kış, açık dava (kapıda parşömen) ve şantiye', [
+        ['ilkbahar', getStructureSprite('courthouse', { season: 'spring' })],
+        ['yaz', getStructureSprite('courthouse', { season: 'summer' })],
+        ['sonbahar', getStructureSprite('courthouse', { season: 'autumn' })],
+        ['kış', getStructureSprite('courthouse', { season: 'winter' })],
+        ['açık dava', getStructureSprite('courthouse', { season: 'summer', look: { cases: 1 } })],
+        ['şantiye', getConstructionSiteSprite(3, 3, 1, 'courthouse')],
+      ], 5);
+      show('Terazi ve süpürge simgeleri, kamu hizmetinin süpürgesi', [
+        ['terazi', getIconSprite('scales')],
+        ['süpürge', getIconSprite('broom')],
+        ['elde süpürge', getHeldToolSprite('broom', false)],
+      ], 8);
+    }
 
     // --- 26.3: Gezgin konuklar — Seyyar Ozan (kep, lir, müzik notaları), Nadir Takasçı (geniş şapka, halı, çanta), Yaşlı Seyyah (kapüşonlu pelerin, kitap) ---
     {

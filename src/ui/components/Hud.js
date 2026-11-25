@@ -42,6 +42,8 @@ import {
   foodSupply,
 } from '../../systems/TownStatus.js';
 import { el } from '../dom.js';
+import { caseChips } from './justiceCards.js'; // (32.2)
+import { RenownBadge } from './renownCards.js'; // (32.3)
 import { trustValue, trustLevel } from '../../systems/Citizens.js';
 import { PETITION_KINDS, REVOLT } from '../../data/citizens.js';
 import { DECREES, TAX_RATES } from '../../data/crown.js';
@@ -208,6 +210,7 @@ export class Hud {
       this.populationWrap.title = `${population} sakin / ${capacity} yatak${venerable ? ` (+${venerable} Saygın Büyük: yatağı olmayan, nüfus kotasına sayılmayan bilgeler)` : ''}. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
     }
     this.renderPulse(state, false);
+    this.renownBadge.render(state); // (32.3)
     const buffs = activeBuffs(state);
     const heating = Math.round(heatingPerDay(state) * 10) / 10;
     const freezing = state.heating.cold && heating > 0;
@@ -246,9 +249,11 @@ export class Hud {
     const petitions = state.petitions?.list ?? [];
     const revoltNow = state.trust?.revolt ?? null;
     const buffKey = `${state.valley}|${state.doctrine?.chosen}|${lateGameActive(state)}|${missingLuxuries(state).join(',')}|${buffs.map((b) => `${b.key}:${Math.ceil(b.minutesLeft / 60)}`).join('|')}|${heating}|${freezing}|${sick}|${away}|${storm?.kind}|${damaged}|${festival?.theme}:${festival?.stage}|${fairNow?.type}:${fairNow?.phase}|${guestNow?.type}:${guestNow?.guest.name}:${guestNow?.guest.leaving}|${rally}|${petitions.map((p) => `${p.id}${p.status}`).join(',')}|${revoltNow ? `${revoltNow.rioters.length}:${revoltNow.raids.length}:${revoltNow.leaderId ?? ''}` : ''}|${Math.min(50, Math.round(trustValue(state)))}|${state.tax?.rate}|${state.crown?.notice ? `${state.crown.notice.amount}:${Math.ceil((state.crown.nextLevyAt - state.totalMinutes) / 60)}:${levyPlan(state, state.crown.notice.amount).ok}` : ''}|${state.crown?.decree ? `${state.crown.decree.id}:${Math.ceil((state.crown.decree.deadline - state.totalMinutes) / 60)}` : ''}|${state.exodus?.active}|${burning.map((b) => `${b.id}:${Math.floor(b.fireProgress / 10)}`).join(',')}|${raidLeft}|${injured}|${state.buildings.filter((b) => b.damaged && (b.damageKind === 'fire' || b.damageKind === 'raid')).length}|${state.rites?.active ? `${state.rites.active.names.join()}:${state.rites.active.condolence}` : ''}|${Math.floor(state.totalMinutes / 60)}`;
+    const cases = caseChips(state); // (32.2) Adalet Sarayı'nın açık davaları
+    const caseKey = cases.map((x) => `${x.id}${x.urgent ? '!' : ''}`).join(',');
     const griefKey = mourners * 10000 + shaken * 100 + (griefId % 97);
-    if (buffKey !== this.lastBuffs || griefKey !== this.lastGrief) {
-      this.lastBuffs = buffKey;
+    if (buffKey + caseKey !== this.lastBuffs || griefKey !== this.lastGrief) {
+      this.lastBuffs = buffKey + caseKey;
       this.lastGrief = griefKey;
       // (30.2) Çipler: öncelik grubu (0 kriz, 1 oyuncudan karar bekleyen, 2 süreli etki) ve ekleniş sırası; en çok CHIP_LIMIT çip
       // görünür, fazlası tek "Olaylar" listesinde. Her çipin ipucu dört şeyi söyler (ne, neden, süre, etki) ve HER çip tıklanınca bir şey yapar.
@@ -417,6 +422,8 @@ export class Hud {
           else openJournal();
         });
       }
+      // (32.2) Dava · {suçlu}: kriz ve karar bekleyenlerden sonra (grup 1,5); tıklayınca dava dosyası açılır, oyun durmaz
+      for (const ch of cases) add(1.5, 'scales', ch.text, ch.tip, ` is-case${ch.urgent ? ' is-short' : ''}`, () => ev.emit('ui:openCase', { id: ch.id }));
       list.sort((x, y) => x.group - y.group || x.seq - y.seq);
       const shownChips = list.slice(0, CHIP_LIMIT);
       const rest = list.slice(CHIP_LIMIT);
@@ -624,6 +631,8 @@ export class Hud {
     this.pulseWrap.addEventListener('mousedown', (e) => e.preventDefault());
     this.pulseWrap.addEventListener('click', () => this.openHall());
     this.lastPulse = '';
+    // (32.3) Krallık İtibarı rozeti (Nabız'ın yanında; şalter kapalıyken gizli)
+    this.renownBadge = new RenownBadge(game, () => this.openHall());
     // (30.3) Anında geri bildirim: üst çubuğun altında 4 saniyelik tek satır ("Halk: 12 sakin hoşnutsuz (Ağır Vergi)")
     this.feedbackLine = el('div', { className: 'pulse-feedback', hidden: true, role: 'status' });
     this.feedbackTimer = 0;
@@ -695,7 +704,7 @@ export class Hud {
         this.pausedBadge,
         this.muteButton,
       ]),
-      zone('hud-zone-res', [...resourceBoxes, this.goodsWrap, this.welfareRow, this.pulseWrap, this.populationWrap]),
+      zone('hud-zone-res', [...resourceBoxes, this.goodsWrap, this.welfareRow, this.pulseWrap, this.renownBadge.element, this.populationWrap]),
       this.under,
     ]);
     // (30.3) üst çubuğun öteki ipuçları da özel ipucu bileşeniyle

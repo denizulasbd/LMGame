@@ -57,6 +57,30 @@ export class SettingsPanel {
     this.loadButton = button('Yükle', 'Son kayda dön', () => this.events.emit('ui:load'), 'settings-load');
     this.newButton = button('Yeni Harita', 'Rastgele yeni bir harita ile baştan başla', () => this.setConfirming(true), 'settings-new');
     this.saveInfo = el('div', { className: 'settings-note settings-save-info' });
+    // (32.7) Dosya olarak indir / dosyadan yükle (bütün oyuncular) ve yedeklenen kayıtlar (yalnızca yedek varsa görünür)
+    this.exportButton = button('Kaydımı dosya olarak indir', 'Ana kayıt ve oturum kaydı tek JSON dosyası olarak iner', () => this.events.emit('ui:exportSave'), 'settings-export');
+    this.importInput = el('input', { className: 'settings-import-input', type: 'file', accept: '.json,application/json', hidden: true });
+    this.importInput.addEventListener('change', async () => {
+      const file = this.importInput.files?.[0];
+      this.importInput.value = '';
+      if (file) this.events.emit('ui:importSave', { text: await file.text() });
+    });
+    this.importButton = button('Dosyadan yükle', 'İndirdiğin kayıt dosyasını açar; mevcut ana kayıt yedeklenir', () => this.importInput.click(), 'settings-import');
+    this.fileRow = el('div', { className: 'settings-row' }, [this.exportButton, this.importButton, this.importInput]);
+    this.brokenList = el('div', { className: 'settings-broken-list' });
+    this.brokenRow = el('div', { className: 'settings-section settings-broken', hidden: true }, [el('div', { className: 'building-section-title', text: 'Yedeklenen kayıtlar' }), el('div', { className: 'settings-note', text: 'Okunamayan kayıtlar silinmez, burada saklanır.' }), this.brokenList]);
+    this.renderBroken = (broken = []) => {
+      this.brokenRow.hidden = broken.length === 0;
+      this.brokenList.replaceChildren(
+        ...broken.map((b) =>
+          el('div', { className: 'settings-row settings-broken-item', 'data-key': b.key }, [
+            el('span', { className: 'settings-note', text: `${b.slot === 'session' ? 'Oturum' : 'Ana'} kaydı · ${new Date(b.ts).toLocaleString('tr-TR')} · ${Math.max(1, Math.round(b.size / 1024))} KB` }),
+            button('Yeniden dene', 'Yüklemeyi tekrar dener; başarılıysa yedek silinir', () => this.events.emit('ui:retryBroken', { key: b.key }), 'settings-broken-retry'),
+            button('Dosya olarak indir', 'Yedeği JSON dosyası olarak indirir', () => this.events.emit('ui:downloadBroken', { key: b.key }), 'settings-broken-download'),
+          ])
+        )
+      );
+    };
     this.saveRow = el('div', { className: 'settings-row' }, [this.saveButton, this.loadButton, this.newButton]);
     const yes = button('Evet, baştan başla', 'Mevcut oyun silinir', () => {
       this.setConfirming(false);
@@ -100,7 +124,8 @@ export class SettingsPanel {
     const section = (title, ...children) => el('div', { className: 'settings-section' }, [el('div', { className: 'building-section-title', text: title }), ...children]);
     this.window = el('div', { className: 'panel settings-panel ui-interactive', hidden: true }, [
       modalHeader('Ayarlar', () => this.setOpen(false), { icon: 'gear' }),
-      section('Oyun', this.saveRow, this.confirmRow, this.saveInfo),
+      section('Oyun', this.saveRow, this.confirmRow, this.saveInfo, this.fileRow),
+      this.brokenRow,
       section('Tehlike Sıklığı', el('div', { className: 'settings-row' }, this.crisisButtons), this.crisisNote),
       section('Rehber', el('div', { className: 'settings-row settings-guide-row' }, [el('span', { className: 'settings-label', text: 'Rehber:' }), ...this.guideButtons, this.guideRestart])),
       section('Hikâye', el('div', { className: 'settings-row settings-story-row' }, [el('span', { className: 'settings-label', text: 'Hikâye kartları:' }), ...this.storyButtons]), el('div', { className: 'settings-row' }, [el('span', { className: 'settings-label', text: 'Duygu Katmanı açıklaması:' }), ...this.legendButtons])),
@@ -113,7 +138,16 @@ export class SettingsPanel {
 
     game.events.on('ui:toggleSettings', () => this.setOpen(!this.open));
     game.events.on('camera:zoom', (zoom) => (this.zoom = zoom));
-    game.events.on('save:changed', ({ exists, label }) => {
+    game.events.on('save:file', ({ name, text }) => {
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const a = el('a', { href: url, download: name });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+    game.events.on('save:changed', ({ exists, label, broken }) => {
+      this.renderBroken(broken);
       this.loadButton.disabled = !exists;
       this.saveInfo.textContent = exists ? `Son kayıt: ${label} (her sabah 06:00'da otomatik kaydedilir)` : 'Henüz kayıt yok';
       this.loadButton.title = exists ? `Son kayda dön (${label})` : 'Yüklenecek kayıt yok';

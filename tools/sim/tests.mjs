@@ -9012,7 +9012,7 @@ const pageResults = await page.evaluate(async () => {
 
     // --- Veri ve mimari ---
     const byLayer = (layer) => MD.MOODLET_KEYS.filter((k) => MD.MOODLETS[k].layer === layer);
-    check('29.2: üç katman ve tavanları: 1 çekirdek + 3 eylem + 2 ihtiyaç = en çok 6 moodlet', MD.MOODLET_CAPS.core === 1 && MD.MOODLET_CAPS.action === 3 && MD.MOODLET_CAPS.need === 2 && byLayer('core').length === 6 && byLayer('action').length === 19 && byLayer('need').length === 7);
+    check('29.2: üç katman ve tavanları: 1 çekirdek + 3 eylem + 2 ihtiyaç = en çok 6 moodlet', MD.MOODLET_CAPS.core === 1 && MD.MOODLET_CAPS.action === 3 && MD.MOODLET_CAPS.need === 2 && byLayer('core').length === 6 && byLayer('action').length === 20 && byLayer('need').length === 7);
     check('29.2: kademeler minor / major / critical etkinin sapmasını 1 / 1,5 / 2 ile çarpar', MD.TIER_SCALE.minor === 1 && MD.TIER_SCALE.major === 1.5 && MD.TIER_SCALE.critical === 2);
     check('29.2: süreler: Alın Teri 8, Angarya 6, Ustalık Akışı 10, Damak Şöleni 8, Kuru Tayın 6, Deliksiz Uyku 10, Üşüyerek Uyandı 8, Tatlı Sohbet 6, Tatsız Karşılaşma 8, İç Huzuru 8 saat', ['proud_work', 'drudgery', 'flow_state', 'feast_bliss', 'raw_ration', 'well_rested', 'cold_wake', 'warm_chat', 'sour_encounter', 'quiet_peace'].map((k) => MD.MOODLETS[k].hours).join() === '8,6,10,8,6,10,8,6,8,8');
     check('29.2: travma / zafer süreleri: Derin Yas 72, Sarsılmış 24, Kalbi Kırık 36, Sesimiz Duyulmadı 36, Hayatının Günü 48, İlham Dolu 24, Yüreği Ferahladı 24 saat', ['mourning', 'shaken', 'heartbroken', 'neglected', 'euphoric', 'inspired', 'comforted'].map((k) => MD.MOODLETS[k].hours).join() === '72,24,36,36,48,24,24');
@@ -9713,7 +9713,7 @@ const pageResults = await page.evaluate(async () => {
 
     // --- Veri ve kurulum ---
     check('29.3: 18 arzu ve 10 korku tanımlı (sıra = seçim sırası); her girdinin adı, puanı, ikonu var; izole üreteç tohum + 39', WD.WANT_KEYS.length === 18 && WD.FEAR_KEYS.length === 10 && WD.WANT_KEYS[0] === 'see_pupil_master' && WD.WANT_KEYS.at(-1) === 'be_heard' && [...Object.values(WD.WANTS), ...Object.values(WD.FEARS)].every((d) => d.name && d.points > 0 && d.icon && d.base > 0) && WD.WANT_SEED_OFFSET === 39 && ws.rng !== S().moodlets.rng && ws.rng !== brain.rng);
-    check('29.3: iki yeni moodlet (toplam 28): Dileği Oldu / Korktuğu Başına Geldi eylem katmanında (çekirdeği ezmez)', MD3.MOODLET_KEYS.length === 32 && MD3.MOODLETS.wish_come_true.layer === 'action' && MD3.MOODLETS.dread_realized.layer === 'action' && MD3.MOODLETS.dread_realized.seek === true && MD3.MOOD_REASONS.wish_get_married.includes('{who} ile evleneyim') && MD3.MOOD_LINES.wish_come_true.length >= 2);
+    check('29.3: iki yeni moodlet (toplam 28): Dileği Oldu / Korktuğu Başına Geldi eylem katmanında (çekirdeği ezmez)', MD3.MOODLET_KEYS.length === 33 && MD3.MOODLETS.wish_come_true.layer === 'action' && MD3.MOODLETS.dread_realized.layer === 'action' && MD3.MOODLETS.dread_realized.seek === true && MD3.MOOD_REASONS.wish_get_married.includes('{who} ile evleneyim') && MD3.MOOD_LINES.wish_come_true.length >= 2);
     check('29.3: WantSystem sahnede kurulur, olayları dinler; kayıt sürümü (güncel)', ws && ws.unsubscribers.length >= 25 && CONFIG.SAVE_VERSION >= 40 && S().disposables.includes(ws) && S().disposables.indexOf(ws) === S().disposables.indexOf(S().moodlets) + 1);
 
     // --- Durumsuz seçim ---

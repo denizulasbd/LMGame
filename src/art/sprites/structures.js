@@ -34,6 +34,10 @@ import { getGrapeVineSprite, getAncientTorchSprite } from './structuresExplore.j
 import { getMarbleFountainSprite, getGoldenLanternSprite, getRoyalStatueSprite } from './structuresGoldenAge.js';
 import { getNoticeBoardSprite, getWoodpileSprite, getScarecrowSprite, getBandstandSprite, getHeroStatueSprite } from './structuresDecor.js';
 import { getWellSprite, getGuardTowerSprite } from './structuresSafety.js';
+import { getCourthouseSprite } from './structuresJustice.js';
+import { getPeaceFountainSprite, getRoseGardenSprite, getRoyalArchiveSprite } from './structuresRoyal.js';
+import { getUniversitySprite } from './structuresUniversity.js'; // (32.4)
+import { getGardenClubSprite, getSewingClubSprite, getPaintingClubSprite } from './structuresClubs.js'; // (32.5)
 import { getSiloSprite } from './structuresGranary.js';
 import { getLoomSprite, getBrewerySprite } from './structuresRefinery.js';
 import { getTradingPostSprite } from './structuresTrade.js';
@@ -650,7 +654,7 @@ export function getConstructionSiteSprite(w, h, stage, type = null, orientation 
 // Kışın her yapı karla örtülür (çatılar beyazlar, tepelere kar yığılır); çalı ve bahçe kendi kış
 // çizimlerini kullanır (bahçenin Seviye 2'si Cam Sera ise kışın da yeşildir, yalnızca çatısı karlanır).
 // ---------------------------------------------------------------------------
-const OWN_WINTER_ART = new Set(['berryBush', 'garden', 'sheepFarm', 'mill', 'cherryTree', 'grapeVine', 'ancientTorch', 'birchTree', 'oakTree', 'pineTree']);
+const OWN_WINTER_ART = new Set(['berryBush', 'garden', 'sheepFarm', 'mill', 'cherryTree', 'grapeVine', 'ancientTorch', 'birchTree', 'oakTree', 'pineTree', 'royalRoseGarden']);
 
 // Kışın karla örtülen çatı renkleri (açık / ana / koyu ton) ve çatının bittiği satır.
 // Kulübenin üç çatı tonu (kiremit, arduvaz, yosun) hepsi listede; ahırın yalnızca saçakları.
@@ -675,6 +679,10 @@ const WINTER_ROOFS = {
   academy: { light: ['c'], main: ['B', 'b'], dark: ['n', 'N'], maxRow: 39 },
   harbor: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 22 },
   gazebo: { light: ['E'], main: ['X'], dark: ['w'], maxRow: 21 },
+  courthouse: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 22 }, // (32.2) alınlığın saçağı
+  royalArchive: { light: ['c'], main: ['b'], dark: ['N'], maxRow: 13 }, // (32.3) kubbe
+  university: { light: ['c', 'a', 'Z'], main: ['b', 'C'], dark: ['U'], maxRow: 32 }, // (32.4) kubbeler ve saçak
+  gardenClub: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 23 }, sewingClub: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 23 }, paintingClub: { light: ['Z'], main: ['C'], dark: ['U'], maxRow: 21 }, // (32.5) hobi evlerinin çatıları
 };
 
 export function getStructureSprite(type, state = {}) {
@@ -795,6 +803,26 @@ function getBaseStructureSprite(type, state) {
       return getHeroStatueSprite(state.look ? state.look.pose : 'hammer');
     case 'royalStatue':
       return getRoyalStatueSprite();
+    // (32.2) Adalet Sarayı: mevsim saksıları ve açık davada kapıda parşömen (state.look.cases; menü önizlemesinde yok)
+    case 'courthouse':
+      return getCourthouseSprite(state.season ?? 'summer', Boolean(state.look?.cases));
+    // (32.3) Kraliyet Lütfu yapıları
+    case 'peaceFountain':
+      return getPeaceFountainSprite(state.frame ?? 0, Boolean(state.lit));
+    case 'royalRoseGarden':
+      return getRoseGardenSprite(state.season ?? 'summer');
+    case 'royalArchive':
+      return getRoyalArchiveSprite(Boolean(state.windowsLit));
+    // (32.4) Darülfünun: mevsim ağaçları; ders saatinde (state.look.lecture) ve akşam pencereler yanar
+    case 'university':
+      return getUniversitySprite(state.season ?? 'summer', Boolean(state.look?.lecture || state.windowsLit));
+    // (32.5) Hobi evleri: mevsim tarhları / saksıları; buluşmada (state.look.session) ve akşam pencereler yanar; ürün sayısı (look.works)
+    case 'gardenClub':
+      return getGardenClubSprite(state.season ?? 'summer', Boolean(state.look?.session && state.season === 'winter') || Boolean(state.windowsLit), state.look?.works ?? 0);
+    case 'sewingClub':
+      return getSewingClubSprite(state.season ?? 'summer', Boolean(state.look?.session || state.windowsLit));
+    case 'paintingClub':
+      return getPaintingClubSprite(state.season ?? 'summer', Boolean(state.look?.session || state.windowsLit), state.look?.works ?? 0);
     // 23. aşama: güvenlik yapıları
     case 'well':
       return getWellSprite(state.frame ?? 0);

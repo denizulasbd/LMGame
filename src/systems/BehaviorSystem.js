@@ -71,6 +71,7 @@ import { hasTag } from './Chemistry.js';
 import { MOOD_RULES, GRIEVE_LABEL, GRIEVE_FALLBACK } from '../data/moodlets.js';
 import { genitive } from '../utils/turkish.js';
 import { TEMPERAMENT } from '../data/temperament.js';
+import { clubBellInterrupts } from './Clubs.js'; // (32.6a)
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
 const TOWER_BUBBLES = ['hammer', 'hammer', 'sweat', 'sparkle']; // (20. aşama) Ulu Saat Kulesi şantiyesinde
@@ -96,6 +97,7 @@ export class BehaviorSystem {
     this.research = services.research;
     this.crisis = services.crisis ?? null; // (23. aşama)
     this.apprenticeship = services.apprenticeship ?? null; // (25.2)
+    this.university = services.university ?? null; // (32.4)
     this.state = game.state;
     this.brain = new Brain(world, rng, services);
     this.unsubscribers = [
@@ -107,6 +109,11 @@ export class BehaviorSystem {
       game.events.on('building:removed', (building) => {
         for (const c of this.world.characters) if (c.workplaceId === building.id) c.workplaceId = null;
       }),
+      // (32.4) Darülfünun ders zili (14:00): derse gidecek öğrencilerin yarıda kesilebilir işi biter (şalter kapalıyken olay yok)
+      game.events.on('university:bell', ({ ids }) => this.interrupt(ids)),
+      // (32.5) Kulüp buluşması başladı: uygun üyelerin yalnızca sıradan boş zaman uğraşı biter (randevu, sohbet daveti, teselli, yas,
+      // aile yemeği, anma, konser, kamu hizmeti, suç kesilmez); şalter kapalıyken ya da hobi evi yokken olay yok
+      game.events.on('club:bell', ({ ids }) => this.interruptForClub(ids)),
       game.events.on('expedition:depart', ({ ids, until, exit }) => this.departExpedition(ids, until, exit)),
       // Şenlik başlayınca boş zamanı olanlar elindekini bırakıp şenliğe katılır
       // (14. aşama) Toplanma Zili: uyanık herkes elindekini bırakır (uyuyanlar uyanmaz)
@@ -144,6 +151,10 @@ export class BehaviorSystem {
       // (30.3) İş bırakma: 10:00'da Kırgın yetişkinler elindeki (yarıda kesilebilen) işi bırakıp meydana yürür; 12:00'de işe döner
       game.events.on('strike:started', ({ ids }) => engineOn('discontent') && this.interrupt(ids)),
       game.events.on('strike:ended', ({ ids }) => engineOn('discontent') && this.interrupt(ids, ['strike'], true)),
+      // (32.1) Suç: vakti gelen planlı sakin süren boş zaman / sohbet görevini bırakır (CrimeSystem yalnızca bu türleri gönderir)
+      game.events.on('crime:nudge', ({ ids, extra = [] }) => engineOn('justice') && this.interrupt(ids, extra)), // (32.6a) extra: şenlikten sıvışma
+      // (32.2) Adalet Sarayı: sürgün edilen yola çıkar, yasaklı hana / pazara giderken döner (force: her görev bırakılır)
+      game.events.on('court:interrupt', ({ ids, activities = null }) => engineOn('court') && this.interrupt(ids, activities ?? Object.keys(ACTIVITIES), true)),
       // (23. aşama) Yangın: yanan yapıdaki çalışanlar ve koşacak sakinler elindeki (yarıda kesilebilen) işi bırakır
       game.events.on('crisis:fireStarted', ({ building, responders }) => {
         this.interrupt([...building.workerIds, ...responders]);
@@ -182,6 +193,16 @@ export class BehaviorSystem {
       const kind = c.task ? ACTIVITIES[activity].kind : 'idle';
       const hit = extra.includes(activity) || (!only && INTERRUPTIBLE_KINDS.has(kind));
       if (hit) this.endTask(c);
+    }
+  }
+
+  /** (32.5) Kulüp zili: yalnızca sade boş zaman uğraşındaki (Clubs.clubBellInterrupts; 32.6a ACTIVITIES'ten türetilir) ve randevuda / davette olmayan üyeler kalkar. */
+  interruptForClub(ids) {
+    for (const id of ids ?? []) {
+      const c = this.world.getCharacter(id);
+      if (!c || !c.visible || c.away || !c.task) continue;
+      if (!clubBellInterrupts(c.task.activity) || c.task.dateWithId !== undefined || c.task.meetWithId !== undefined || c.task.onBreak) continue;
+      this.endTask(c);
     }
   }
 
@@ -403,6 +424,7 @@ export class BehaviorSystem {
       if (partner) return `${partner.name} ile ${task.dateWithId !== undefined ? 'randevuya' : 'buluşmaya'} gidiyor`;
     }
     let label = activity.travelLabel ?? activity.label;
+    if (task.clubTravel) label = task.clubTravel; // (32.5)
     if (task.consoleName) label = label.replace('{name}', task.consoleName); // (29.2)
     // (19. aşama) huyların etkinlikleri: hayvanın adı ve çalınan yer
     if (task.petName) label = label.replace('{pet}', task.petName);
@@ -433,6 +455,7 @@ export class BehaviorSystem {
     // (29.2) yas ve teselli
     if (task.grieve) label = task.grieveFor ? GRIEVE_LABEL.replace('{who}', genitive(task.grieveFor)) : GRIEVE_FALLBACK;
     if (task.consoleName) label = label.replace('{name}', task.consoleName);
+    if (task.clubLabel) label = task.clubLabel; // (32.5) "Bahçecilik Kulübü'nde fide dikiyor"
     if (task.petName) label = label.replace('{pet}', task.petName);
     if (task.placeAt) label = label.replace('{place}', task.placeAt);
     if (task.bagItem) label = label.replace('{bag}', ITEMS[task.bagItem].name.toLocaleLowerCase('tr'));
@@ -479,6 +502,9 @@ export class BehaviorSystem {
 
     c.tool = activity.tool ?? null;
     c.workEffect = activity.effect ?? null;
+    // (32.5) kulüp buluşması: poz ve alet kulübe göre (bahçede çapa, dikişte tabure, resimde şövale)
+    if (task.pose) c.pose = task.pose;
+    if (task.tool) c.tool = task.tool;
     if (task.facing) c.facing = task.facing;
     else if (task.faceTarget) c.faceToward(task.faceTarget.x, task.faceTarget.y);
     else if (building) c.faceToward(building.center.x, building.center.y);
@@ -546,6 +572,7 @@ export class BehaviorSystem {
       const school = this.world.getBuilding(task.buildingId);
       if (school) this.research.learn(c, school, minutes);
     }
+    if (task.activity === 'lecture' && task.phase === 'perform') this.university?.learn(c, this.world.getBuilding(task.buildingId), minutes); // (32.4)
     if (task.activity === 'sleep') this.applyHomeComfort(c, minutes);
 
     let bubbles = activity.bubbles;
@@ -694,6 +721,7 @@ export class BehaviorSystem {
     const building = this.world.getBuilding(task.workBuildingId);
     if (!building || building.frozen || building.damaged || building.isBurning) return false; // tarla dondu / fırtına yıktı / yapı yanıyor: iş biter
     if (building.definition.academy) return this.research.work(building, amount);
+    if (building.definition.university) return Boolean(this.university?.work(building)); // (32.4) Müderris
     // (23. aşama) Gözcü Kulesi: bekçi nöbet tutar (üretim yok; güven katkısı CrisisSystem'de saatliktir)
     if (building.definition.guard) return true;
     // (12. aşama) Gelişmiş Çarklar: oduncu, taş ocağı, maden ve değirmende verim +%20

@@ -86,6 +86,10 @@
 //   save-v31.json: 26.3'ün oyunu (kayıt sürümü 31): otopilotla 69 gün (--crisis-state); 68. gün 12:xx'de haritadaki Seyyar Ozan
 //                  (68. gün geldi, ayrılış 69. gün 09:00), konuk defterinde 6 ziyaret; çıraklar ve Çırak Kapıları da hâlâ açık. Eski kayıtlarda
 //                  (sürüm 2-30) activeGuest ve konuk defteri yoktur: null / boş defterle açılır
+//   save-v41-asama32.json: 32.6b'nin oyunu (kayıt sürümü 41, bugünkü; v41 ailesinin ikinci fikstürü): otopilotla 90 gün, tohum 77, --asama32-state.
+//                  Aşama 32'nin bütün durumu: Adalet Sarayı, Darülfünun, üç hobi evi, üç Kraliyet Lütfu yapısı; açık dava, süren kamu hizmeti,
+//                  uzaklaştırma, utanç, tamamlanmış ve yürüyen sürgün, süren ders, süren kulüp buluşması ve telafi buluşması, mezun, itibar.
+//                  Göç yok (sürüm 41): alan alan gidiş-dönüş denetimi (yükle → anlık görüntü → aynı alanlar) ve bir gün sonra tutarlılık
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks, capOutput } from './lib.mjs';
@@ -876,6 +880,96 @@ for (const { name, raw } of fixtures) {
     results.push({ name: `${tag}: seviye sessizce belirlendi`, ok: r.after.assessed && (r.log.includes('town:tierAssessed') || r.after.tier === 1), detail: `${r.title} · ${r.log.join(', ')}` });
   } else {
     results.push({ name: `${tag}: seviye korundu`, ok: r.after.tier === data.town.tier, detail: r.title });
+  }
+}
+
+// ---- (32.6b) v41 / Aşama 32 fikstürü: göç yok; alan alan gidiş-dönüş (yükle → anlık görüntü → aynı alanlar) ve bir gün sonra tutarlılık
+{
+  const fixName = 'save-v41-asama32.json';
+  const path = new URL(`./fixtures/${fixName}`, import.meta.url);
+  if (fs.existsSync(path)) {
+    const raw = fs.readFileSync(path, 'utf8');
+    const data = JSON.parse(raw);
+    const tag = fixName;
+    const r = await page.evaluate(async (raw) => {
+      const game = window.game;
+      localStorage.setItem('lmgame.save.v2', raw);
+      game.events.emit('ui:load');
+      const s = game.state;
+      const scene = game.scenes.current;
+      const snap = JSON.parse(JSON.stringify(scene.saves.snapshot()));
+      const original = JSON.parse(raw);
+      const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((q) => [q, x[q]])) : x));
+      const diffKeys = (a, b) => [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])].filter((k) => canon(a?.[k]) !== canon(b?.[k]));
+      const clubFields = ['lead', 'makeup', 'planned', 'realized', 'madeUp', 'live', 'attendance', 'recent', 'founded', 'evaluated', 'out', 'works', 'products', 'sessions', 'lastSession', 'paintings', 'exhibited', 'exhibitUntil', 'garmentSeason', 'fruitYear', 'gifts', 'garments'];
+      const clubDiff = {};
+      for (const k of Object.keys(original.clubs ?? {})) {
+        const bad = clubFields.filter((f) => canon(original.clubs[k]?.[f]) !== canon(snap.clubs?.[k]?.[f]));
+        if (bad.length) clubDiff[k] = bad;
+      }
+      const byId = new Map(snap.characters.map((c) => [c.id, c]));
+      const charFields = ['sentence', 'higherStudy', 'graduate', 'club', 'apprenticeship'];
+      const charDiff = [];
+      for (const c of original.characters) {
+        const b = byId.get(c.id);
+        if (!b) { charDiff.push(`${c.id}: yok`); continue; }
+        for (const f of charFields) if (canon(c[f]) !== canon(b[f])) charDiff.push(`${c.name}.${f}`);
+        const sh = (x) => canon((x.moodlets ?? []).filter((m) => m.key === 'shamed'));
+        if (sh(c) !== sh(b)) charDiff.push(`${c.name}.shamed`);
+      }
+      const types = ['courthouse', 'university', 'gardenClub', 'sewingClub', 'paintingClub', 'peaceFountain', 'royalRoseGarden', 'royalArchive'];
+      const count = (d) => Object.fromEntries(types.map((t) => [t, d.buildings.filter((b) => b.type === t).length]));
+      const guideKeep = canon(snap.guide) === canon(original.guide);
+      const out = {
+        top: diffKeys({ justice: original.justice, clubs: original.clubs, university: original.university, renown: original.renown, milestones: original.milestones, guide: original.guide, crown: original.crown }, { justice: snap.justice, clubs: snap.clubs, university: snap.university, renown: snap.renown, milestones: snap.milestones, guide: snap.guide, crown: snap.crown }),
+        clubDiff, charDiff, guideKeep, built: count(original), builtNow: count(snap),
+        reputation: [original.crown?.reputation, snap.crown?.reputation],
+        cover: {
+          openCase: (original.justice?.cases ?? []).filter((k) => k.status === 'open').length,
+          court: (original.justice?.cases ?? []).filter((k) => k.court).length + (original.justice?.log ?? []).filter((k) => k.verdict?.by === 'court').length,
+          service: original.characters.filter((c) => c.sentence?.service > 0).length,
+          ban: original.characters.filter((c) => Number.isFinite(c.sentence?.banUntil)).length,
+          exileWalking: original.characters.filter((c) => c.sentence?.exile).length,
+          exiled: original.justice?.exiles?.length ?? 0,
+          shamed: original.characters.filter((c) => (c.moodlets ?? []).some((m) => m.key === 'shamed')).length,
+          students: original.characters.filter((c) => c.higherStudy).length,
+          graduates: original.characters.filter((c) => c.graduate).length + (original.university?.graduated ?? 0),
+          members: original.characters.filter((c) => c.club).length,
+          live: Object.values(original.clubs ?? {}).filter((x) => x.live).length,
+          makeup: Object.values(original.clubs ?? {}).filter((x) => Number.isFinite(x.makeup)).length,
+          lead: Object.values(original.clubs ?? {}).filter((x) => x.lead).length,
+          planned: Object.values(original.clubs ?? {}).filter((x) => x.planned > 0).length,
+          realized: Object.values(original.clubs ?? {}).filter((x) => x.realized > 0).length,
+          madeUp: Object.values(original.clubs ?? {}).filter((x) => x.madeUp > 0).length,
+          grants: original.renown?.grants?.length ?? 0,
+        },
+        loadedDay: s.time.day,
+        pop: s.characters.length,
+      };
+      // bir gün yaşa: sürgün tamamlanır, ders / buluşma sürer; kopuk referans yok
+      const ids0 = new Set(s.characters.map((c) => c.id));
+      window.sim.step(225 * 24);
+      const ids = new Set(s.characters.map((c) => c.id));
+      const dangling = [];
+      for (const k of [...(s.justice?.cases ?? []), ...(s.justice?.log ?? [])]) if (Number.isInteger(k.offenderId) && !ids.has(k.offenderId) && k.status === 'open') dangling.push(`dava ${k.id}`);
+      for (const c of s.characters) {
+        if (c.higherStudy && !s.buildings.some((b) => b.type === 'university')) dangling.push(`${c.name} öğrenci ama yapı yok`);
+        if (c.club && !s.buildings.some((b) => b.type === c.club.key)) dangling.push(`${c.name} üye ama yapı yok`);
+      }
+      for (const kk of Object.keys(s.clubs ?? {})) for (const l of s.clubs[kk].attendance ?? []) for (const id of l) if (!ids.has(id)) dangling.push(`${kk} katılımda kopuk ${id}`);
+      out.after = { day: s.time.day, pop: s.characters.length, dangling, left: [...ids0].filter((id) => !ids.has(id)).length };
+      return out;
+    }, raw);
+    const need = ['openCase', 'service', 'ban', 'exileWalking', 'exiled', 'shamed', 'students', 'graduates', 'members', 'live', 'makeup', 'lead', 'planned', 'realized', 'madeUp', 'grants'];
+    const missing = need.filter((k) => !(r.cover[k] > 0));
+    results.push({ name: `${tag}: fikstür 32'nin bütün durumlarını içerir (açık dava, kamu hizmeti, yasak, yürüyen ve biten sürgün, utanç, öğrenci, mezun, üye, süren buluşma, telafi, lead, sayaçlar, lütuf)`, ok: missing.length === 0 && data.version === 41, detail: missing.length ? `eksik: ${missing.join(',')}` : JSON.stringify(r.cover) });
+    results.push({ name: `${tag}: sekiz yapı (saray, Darülfünun, üç hobi evi, üç lütuf) kayıtta ve yüklemede var`, ok: Object.keys(r.built).every((t) => r.built[t] === 1 && r.builtNow[t] === 1), detail: JSON.stringify(r.builtNow) });
+    results.push({ name: `${tag}: gidiş-dönüş — justice, clubs, university, renown, milestones, guide, crown alan alan aynı`, ok: r.top.length === 0, detail: `fark: ${r.top.join(',') || '-'}` });
+    results.push({ name: `${tag}: gidiş-dönüş — clubs[k] alanları (lead, makeup, planned, realized, madeUp, live, attendance, recent, ...) aynı`, ok: Object.keys(r.clubDiff).length === 0, detail: JSON.stringify(r.clubDiff) });
+    results.push({ name: `${tag}: gidiş-dönüş — sakin alanları (sentence, higherStudy, graduate, club, apprenticeship, Mahcup) aynı`, ok: r.charDiff.length === 0, detail: r.charDiff.slice(0, 5).join(', ') });
+    results.push({ name: `${tag}: bir gün sonra tutarlı (gün ilerledi, kopuk dava / üye / katılım yok)`, ok: r.after.day === r.loadedDay + 1 && r.after.dangling.length === 0, detail: JSON.stringify(r.after) });
+  } else {
+    results.push({ name: `save-v41-asama32.json: fikstür dosyası var`, ok: false, detail: 'fixtures/save-v41-asama32.json bulunamadı (autopilot 77 90 --asama32-state --save ...)' });
   }
 }
 const ok = report(errors);

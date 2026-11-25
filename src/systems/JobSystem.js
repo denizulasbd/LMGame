@@ -22,6 +22,9 @@ import { EMOTION_RULES } from '../data/chemistry.js';
 import { BOND_RULES } from '../data/bonds.js';
 import { crewBond } from './Bonds.js';
 import { engineOn } from './Engines.js';
+import { educationLevel } from './University.js'; // (32.4)
+import { apprenticesOf } from './Apprenticeship.js'; // (32.4)
+import { UNIVERSITY } from '../data/university.js'; // (32.4)
 
 const PRODUCTION_PRIORITY = 2; // üretim binalarında çalışmak, emirli işlerden sonra gelir
 const PATH_CHECKS = 5; // en yakın birkaç aday için gerçek yol aranır
@@ -302,13 +305,17 @@ export class JobSystem {
       if (!workers || (building.workerIds.size >= workers && !building.workerIds.has(c.id))) continue;
       if (building.frozen || building.idle) continue; // kışın donmuş tarlada, malzemesiz atölyede iş yok
       if (building.excludedWorkers.has(c.id)) continue; // oyuncu bu işten çıkardı
+      // (32.4) Müderris yetişkindir (öğrenci ve Genç olmaz); çırağı olan usta tezgâhından ayrılmaz (çırağın ilerlemesi ustaya bağlı)
+      if (def.university && (c.lifeStage === 'youth' || c.higherStudy || apprenticesOf(this.state, c).length > 0)) continue;
       if (!building.workerIds.has(c.id) && this.reservedForPinned(building) >= workers - building.workerIds.size) continue; // yuvalar sabit çalışanlara ayrılmış
       if (!building.workerIds.has(c.id) && this.expertWaiting(c, building)) continue;
       const spot = freeSpot(this.world.getSpots(building));
       // (23. aşama) Gözcü Kulesi'nde nöbet, üretim yuvaları dolunca boşta kalan yetişkinlerin işidir (üretimden daha az öncelikli)
       // (24.2) Dokuma Tezgâhı ve Şerbethane lüks / ticaret fazlası işlerdir: fırıncı, çiftçi ve inşaat yuvalarından sonra gelir
-      const priority = def.guard ? PRODUCTION_PRIORITY + 1 : def.luxury ? PRODUCTION_PRIORITY + LUXURY_WORK.priority : PRODUCTION_PRIORITY;
-      if (spot) candidates.push({ priority, d: dist(spot, origin) - preference(def.workActivity) - (bonds ? crewBond(this.state, c, building.workerIds) * BOND_RULES.tilesPerPoint : 0), building, spot });
+      // (32.4) Darülfünun'un Müderris yuvası yalnızca ders saatinde açıktır (yapı başka saatte boşta): üretimden önce gelir; eğitimli öne çıkar
+      const priority = def.guard ? PRODUCTION_PRIORITY + 1 : def.luxury ? PRODUCTION_PRIORITY + LUXURY_WORK.priority : def.university ? PRODUCTION_PRIORITY - 0.5 : PRODUCTION_PRIORITY;
+      const scholar = def.university ? educationLevel(c) * UNIVERSITY.professorEducatedTiles : 0;
+      if (spot) candidates.push({ priority, d: dist(spot, origin) - preference(def.workActivity) - scholar - (bonds ? crewBond(this.state, c, building.workerIds) * BOND_RULES.tilesPerPoint : 0), building, spot });
     }
 
     candidates.sort((a, b) => a.priority - b.priority || a.d - b.d);

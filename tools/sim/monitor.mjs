@@ -154,6 +154,28 @@ export async function installMonitor(page) {
         if (m.broken.length < 50) m.broken.push(`G${game.state.time.day} ${String(game.state.time.hour).padStart(2, '0')} ${text}`);
       };
 
+      // ---- (32.2) Sürgün: terk ediş sayaçlarına yazılmaz; geride kalan çocuk evsiz / kopuk kalmaz; sürgün yolunda takılan yok ----
+      m.exiles = 0;
+      const exo = { left: game.state.exodus?.left ?? 0, emigrants: game.state.stats?.emigrants ?? 0 };
+      game.events.on('population:left', ({ character, reason } = {}) => {
+        const s = game.state;
+        // (32.4) ayrılan / sürgün edilen / ölen öğrencinin kaydı (UniversitySystem dinleyicisi bizden önce) silinmiş olmalı
+        if (character?.higherStudy) broke(`${character.name}: kasabadan ayrıldı ama Darülfünun kaydı duruyor`);
+        // (32.5) ayrılan / sürgün edilen / ölen üyenin kulüp kaydı (ClubSystem dinleyicisi bizden önce) silinmiş olmalı
+        if (character?.club) broke(`${character.name}: kasabadan ayrıldı ama kulüp kaydı duruyor`);
+        if (reason === 'exile') {
+          m.exiles++;
+          if ((s.exodus?.left ?? 0) !== exo.left || (s.stats?.emigrants ?? 0) !== exo.emigrants) broke(`sürgün ${character?.name}: terk ediş sayacı değişti`);
+          const ids = new Set(s.characters.map((c) => c.id));
+          for (const c of s.characters) {
+            if (!c.isChild) continue;
+            if (c.homeId === null || !s.buildings.some((b) => b.id === c.homeId)) broke(`sürgün ${character?.name}: çocuk ${c.name} evsiz`);
+            if (c.parentIds.some((id) => !ids.has(id)) || (c.parents ?? []).some((id) => !ids.has(id))) broke(`sürgün ${character?.name}: çocuk ${c.name} kopuk ebeveyn`);
+          }
+        }
+        exo.left = s.exodus?.left ?? 0;
+        exo.emigrants = s.stats?.emigrants ?? 0;
+      });
       m.sample = () => {
         const scene = game.scenes.current;
         const world = scene.world;
@@ -304,6 +326,39 @@ export async function installMonitor(page) {
           const residents = homeCount.get(b.id) ?? 0;
           if (b.capacity && residents > b.capacity) m.overfull.push(`G${s.time.day} ${b.type}#${b.id} ${residents}/${b.capacity}`);
         }
+        // ---- (32.1) Dava kaydı: açık davanın suçlusu hayatta; dava ve sicilde kopuk kişi kimliği yok ----
+        if (s.justice) {
+          for (const k of s.justice.cases) if (!ids.has(k.offenderId)) broke(`dava #${k.id}: açık davanın suçlusu kayıp (${k.offenderId})`);
+          for (const k of [...s.justice.cases, ...s.justice.log]) {
+            for (const f of ['offenderId', 'victimId', 'witnessId']) if (k[f] !== null && k[f] !== undefined && !ids.has(k[f])) broke(`dava #${k.id}: ${f} kopuk (${k[f]})`);
+          }
+          for (const key of Object.keys(s.justice.records)) if (!ids.has(Number(key))) broke(`sicil: kopuk kişi ${key}`);
+        }
+        // (32.4) Darülfünun: öğrenci yalnızca Genç ve Bilgelik Evi mezunu; kapasite aşılmaz; öğrenci aynı anda mezun değildir
+        {
+          const studs = s.characters.filter((c) => c.higherStudy);
+          if (studs.length > 6) broke(`Darülfünun: ${studs.length} öğrenci (kapasite 6)`);
+          for (const c of studs) {
+            if (c.lifeStage !== 'youth') broke(`${c.name}: Genç değil ama Darülfünun öğrencisi`);
+            if (!c.educated) broke(`${c.name}: Bilgelik Evi mezunu değil ama öğrenci`);
+            if (c.graduate) broke(`${c.name}: hem öğrenci hem mezun`);
+          }
+        }
+        // (32.5) Hobi evleri: kulüp başına en çok 6 üye; üye çocuk / misafir / sürgünde değil; kulübünün evi var; katılım kayıtları yaşayan sakin
+        {
+          const per = {};
+          for (const c of s.characters) {
+            if (!c.club) continue;
+            per[c.club.key] = (per[c.club.key] ?? 0) + 1;
+            if (c.isChild || c.role) broke(`${c.name}: çocuk / misafir ama kulüp üyesi`);
+            if (c.sentence?.exile) broke(`${c.name}: sürgünde ama kulüp üyesi`);
+            if (!s.buildings.some((b) => b.type === c.club.key)) broke(`${c.name}: kulübünün evi (${c.club.key}) yok`);
+          }
+          for (const [k, n] of Object.entries(per)) if (n > 6) broke(`${k}: ${n} üye (kapasite 6)`);
+          for (const [k, r] of Object.entries(s.clubs ?? {})) for (const list of r.attendance ?? []) for (const id of list) if (!ids.has(id)) broke(`${k}: katılımda kopuk kişi ${id}`);
+        }
+        // (32.2) sürgün yolunda süresini aşan sakin kalmaz
+        for (const c of s.characters) if (c.sentence?.exile && now - c.sentence.exile.since > 420) broke(`${c.name}: sürgün yolunda takıldı`);
         // ---- (19. aşama) Evlilik akışı: taşınma, ortak ev, kutlama, huylar, dedikodu ----
         m.minPop = Math.min(m.minPop, s.characters.length);
         // (28.4) Geç oyun beklentisi: açıkken anlık refah ve eksik lüks örnekleri

@@ -101,8 +101,9 @@ export class PurseSystem {
 
   /** Hatırasına bakıp gülümser (hatıra yenmez). */
   keepsake(c) {
-    if (countItem(c, 'souvenir') <= 0) return false;
-    c.needs.fun = clamp(c.needs.fun + ITEMS.souvenir.fun, 0, 100);
+    const kind = countItem(c, 'souvenir') > 0 ? 'souvenir' : countItem(c, 'handkerchief') > 0 ? 'handkerchief' : null; // (32.5) Nakışlı Mendil
+    if (!kind) return false;
+    c.needs.fun = clamp(c.needs.fun + ITEMS[kind].fun, 0, 100);
     c.lastKeepsakeAt = this.state.totalMinutes;
     if (c.visible) c.showBubble('heart', 1.8);
     return true;

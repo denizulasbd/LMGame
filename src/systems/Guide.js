@@ -9,6 +9,7 @@ import { storageLimit } from './Granary.js';
 import { nextTownTier, tierChecks } from './TownStatus.js';
 
 import { engineOn } from './Engines.js';
+import { courtOf } from './Justice.js';
 import { foodSupply } from './TownStatus.js';
 import { foodDaysLeft } from './Loyalty.js';
 import { levyAmount } from './Crown.js';
@@ -16,6 +17,8 @@ import { easiestGoldWay, stoneSource } from './Money.js';
 import { LEVY } from '../data/crown.js';
 import { DISCONTENT } from '../data/loyalty.js';
 import { chosenDoctrine } from './Doctrine.js';
+const TOWN_GROWN_TYPES = ['courthouse', 'gardenClub', 'sewingClub', 'paintingClub'];
+const hasBuilt = (state, types) => state.buildings.some((b) => types.includes(b.type));
 export const emptyGuide = () => ({ done: [], off: false });
 
 /** Kayıttaki rehber durumu. Yoksa: nüfusu 8'den fazla olan kayıtta kapalı, yoksa açık. */
@@ -60,6 +63,11 @@ export const CONDITIONS = {
     when: ({ state }) => (state.lifeStages?.deaths ?? 0) - (state.lifeStages?.accidents ?? 0) >= 1,
     done: () => false,
   },
+  // (32.2) Adalet Sarayı varken ilk açık dava; yalnızca "Anladım" ile tamamlanır
+  court: {
+    when: ({ state }) => Boolean(courtOf(state)) && Boolean(state.justice?.cases?.some((k) => k.court)),
+    done: () => false,
+  },
   move: { when: () => true, done: ({ facts }) => Boolean(facts.moved) },
   meet: { when: ({ guide }) => isDone(guide, 'move'), done: ({ facts }) => Boolean(facts.selected) },
   harvest: {
@@ -94,6 +102,16 @@ export const CONDITIONS = {
   doctrine: {
     when: ({ state }) => engineOn('midgame') && !chosenDoctrine(state) && state.buildings.some((b) => b.type === 'townHall' && b.functional),
     done: ({ state }) => engineOn('midgame') && Boolean(chosenDoctrine(state)),
+  },
+  // (32.6b) Kasaba seviyesi (3): saray ve hobi evleri kurulabilir; biri kurulunca biter
+  townGrown: {
+    when: ({ state }) => (state.town?.tier ?? 1) >= 3 && (engineOn('court') || engineOn('clubs')) && !hasBuilt(state, TOWN_GROWN_TYPES),
+    done: ({ state }) => (engineOn('court') || engineOn('clubs')) && hasBuilt(state, TOWN_GROWN_TYPES), // şalterler kapalıyken hiç tamamlanmaz (kayıt aynı kalır)
+  },
+  // (32.6b) Gelişmiş Şehir (4): Darülfünun kurulabilir
+  cityGrown: {
+    when: ({ state }) => (state.town?.tier ?? 1) >= 4 && engineOn('university') && !hasBuilt(state, ['university']),
+    done: ({ state }) => engineOn('university') && hasBuilt(state, ['university']),
   },
   // (30.6) yapı adımından hemen sonra: yiyecek üreten bir yapı (bahçe, balıkçı, ağıl) yerleştirilene dek
   food: {

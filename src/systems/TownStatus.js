@@ -3,6 +3,7 @@
 // aynı hesabı kullansın diye tek yerde.
 // 10. aşama: kasabanın toplam yiyecek değeri (ekmek 2,5 sayılır), kasaba seviyesi (Mezra -> Gelişmiş
 // Şehir) ölçütleri ve unvanı, belediyenin iş verimi çarpanı.
+import { renownHappiness } from './RoyalEffects.js'; // (32.3; 32.6a döngüsüz modül)
 import { lateDiscontent } from './LateGame.js';
 import { engineOn } from './Engines.js';
 import { goldenWelfareMultiplier, goldenWorkMultiplier } from './GoldenAge.js';
@@ -57,6 +58,8 @@ export function townHappinessBonus(state) {
   bonus += clothWelfare(state);
   // (25.1) Emekli Kıdemli Bilgeler: her biri +1 (en çok +3); bilge yoksa 0
   bonus += elderWelfare(state);
+  // (32.3) Kraliyet Gül Bahçesi: +2 (Şüpheli'de +1; yoksa / şalter kapalıyken 0)
+  bonus += renownHappiness(state);
   return bonus;
 }
 

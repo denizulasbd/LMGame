@@ -2,11 +2,13 @@
 // söyler; görünme ve tamamlanma koşulları systems/Guide.js'te (saf işlevler, oyun durumundan okunur).
 // Her kart en çok iki kısa cümle; **kalın** sözcükler arayüzdeki düğme adlarıdır. target: karta eşlik eden düğmenin
 // CSS seçicisi (GuideCard yanıp söndürür; seçici hiçbir öğeye uymuyorsa kart yine görünür).
-export const GUIDE_TABLE_VERSION = 5; // (30.6) yiyecek, tahsildar, altın ve taş kartları (ENGINES.novicePath); // (30.2) hikâye kartı ve Yakından izle adımları eklendi; (30.4a) ilk doğal vefat kartı; (30.4b) Kasaba Doktrini kartı
+export const GUIDE_TABLE_VERSION = 7; // (32.6b) Kasaba ve Gelişmiş Şehir kartları; (32.2) Adalet Sarayı'nın ilk davası; (30.6) yiyecek, tahsildar, altın ve taş kartları (ENGINES.novicePath); // (30.2) hikâye kartı ve Yakından izle adımları eklendi; (30.4a) ilk doğal vefat kartı; (30.4b) Kasaba Doktrini kartı
 
 export const GUIDE_STEPS = [
   // (30.4a) kasabadaki ilk doğal vefatta bir kez (tablonun başında: bekleyen öteki adımların arkasında kalmasın; "Anladım" ile biter)
   { id: 'lifespan', text: 'Sakinlerin ömrü var. Vefat edenler anıtta anılır; öyküleri kitabede kalır.', target: null },
+  // (32.2, ENGINES.court) Adalet Sarayı varken ilk açık davada bir kez ("Anladım" ile biter)
+  { id: 'court', text: 'Dava dosyası açıldı. Her ceza her suça verilebilir; halk orantıya bakar.', target: '.buff-chip.is-case' },
   // (30.6) Kraliyet Tahsildarı ilk kez duyurulunca; hazine 3 gün 0'da kalınca; taş kalıcı kaynağı
   { id: 'levy', text: ({ amount, daysLeft, inKind }) => `Kraliyet Tahsildarı ${daysLeft} gün sonra ${amount} altın istiyor.${inKind ? ' Altın yetmezse tutarın yarısına dek malla (yiyecek, odun, taş) ödenir.' : ''} Altın vergiden gelir: sakinler çalıştıkça kesesi dolar.`, target: '.hud-chip.is-levy, .buff-chip.is-levy' },
   { id: 'gold', text: ({ way }) => `Altın için: ${way}`, target: null },
@@ -24,6 +26,10 @@ export const GUIDE_STEPS = [
   { id: 'petition', text: 'Bir sakinin senden isteği var. Üstteki çipe tıkla.', target: '.hud-buffs .is-petition' },
   // (30.4b, ENGINES.midgame) Belediye Konağı kurulunca, doktrin seçilene dek
   { id: 'doctrine', text: 'Belediye Konağı\'nda bir **Kasaba Doktrini** seçebilirsin; geri dönüşü yoktur.', target: null },
+  // (32.6b) Kasaba seviyesine ulaşınca bir kez (ENGINES.court / clubs); saray ya da bir hobi evi kurulunca ya da "Anladım" ile biter
+  { id: 'townGrown', text: 'Kasaban büyüdü: **Adalet Sarayı** ve hobi evleri artık kurulabilir.', target: '.tool-btn[data-tool="build"]' },
+  // (32.6b) Gelişmiş Şehir olunca bir kez (ENGINES.university); Darülfünun kurulunca ya da "Anladım" ile biter
+  { id: 'cityGrown', text: 'Gelişmiş Şehir oldun: **Darülfünun** artık kurulabilir. Bilgelik Evi mezunları orada okur.', target: '.tool-btn[data-tool="build"]' },
   // (30.2)
   { id: 'cards', text: 'Sol alttaki kartlar kasabada olup biteni anlatır. **Git** seni oraya götürür.', target: '.story-card .story-go' },
   { id: 'cardAction', text: 'Bazı kartlarda yapabileceğin bir şey vardır.', target: '.story-card .story-action' },

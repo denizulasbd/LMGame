@@ -10,6 +10,8 @@
 //   (16. aşama) Kadim yazıt: araştırma yokken Bilge çözülmeyi bekleyen yazıtın başına oturur
 //              (state.exploration.decoding); çözülünce kalıcı imar şeması: 'inscription:decoded' { id, inscription }.
 import { bookResearchMultiplier } from './GoldenAge.js';
+import { renownResearchFactor } from './RoyalEffects.js';
+import { scholarResearchFactor } from './University.js'; // (32.4)
 import { RESEARCH, SCHOOL } from '../data/research.js';
 import { SKILL_LEVELS, SKILL_KEYS } from '../data/skills.js';
 import { isWithinHours } from './StructureSystem.js';
@@ -156,14 +158,14 @@ export class ResearchSystem {
   work(building, amount) {
     const active = this.state.research.active;
     if (active) {
-      active.progress += amount * bookResearchMultiplier(this.state); // (20. aşama) antik kitaplar
+      active.progress += amount * bookResearchMultiplier(this.state) * renownResearchFactor(this.state) * scholarResearchFactor(this.state, building); // (20. aşama) antik kitaplar; (32.3) Kraliyet Arşivi; (32.4) Bilgelik bölümü mezunu Bilge
       const def = RESEARCH[active.id];
       if (active.progress >= def.work) this.complete(active.id);
       return true;
     }
     const decoding = this.state.exploration?.decoding;
     if (decoding) {
-      decoding.progress += amount;
+      decoding.progress += amount * renownResearchFactor(this.state); // (32.3) Kraliyet Arşivi
       if (decoding.progress >= INSCRIPTIONS[decoding.id].work) this.decode(decoding.id);
       return true;
     }

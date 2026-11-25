@@ -1285,6 +1285,9 @@ Object.assign(ICONS, {
   crown: ['.........', 'P...P...P', 'PP.PYP.PP', 'PYPYYYPYP', 'PYYYoYYYP', 'KPPPPPPPK', 'KYYYYYYYK', '.KKKKKKK.', '.........'],
   royalStatue: ['..P.P.P..', '..PYYYP..', '.KOOOOK..', 'KOYPYOKK.', 'KOYYYOYYK', '.KOOOKYYK', '.KKKKKKKK', 'KuuPPPuuK', 'KKKKKKKKK'],
   bundle: ['....K....', '...KoK...', '..KoooK..', '.KoBoBoK.', 'KoBoooBoK', 'KoooBoooK', '.KoBoBoK.', '..KoooK..', '...KKK...'],
+  // (32.2) Adalet Sarayı: terazi ve süpürge (kamu hizmeti)
+  scales: ['....Y....', 'KKKKPKKKK', '.K..P..K.', 'K.K.P.K.K', 'KYYKPKYYK', '.KK.P.KK.', '....P....', '...KPK...', '..KKKKK..'],
+  broom: ['......Kw.', '.....Kw..', '....Kw...', '...Kw....', '..KXK....', '.KXEXK...', 'KXEXEXK..', 'KEXEXEK..', '.KKKKK...'],
   // 21. aşama: dilekçe (parşömen), Yönetim Güveni (kalkan), isyan meşalesi, kişisel kese, hatıra, sokak feneri, yağma çuvalı
   scroll: ['.KKKKKKK.', 'KeSSSSSeK', '.KsSSSSK.', '.KsKKKsK.', '.KsSSSsK.', '.KsKKSsK.', '.KsSSSsK.', 'KeSSSSSeK', '.KKKKKKK.'],
   trust: ['.KKKKKKK.', 'KBBBuBBBK', 'KBBuPuBBK', 'KBBuPuBBK', 'KBuPPPuBK', '.KBuPuBK.', '.KBBuBBK.', '..KBBBK..', '...KKK...'],
@@ -1334,6 +1337,8 @@ const HELD_TOOLS = {
   axe: ['.KK..', 'KqqK.', 'KqKw.', '.K.w.', '...w.', '...x.'],
   pickaxe: ['.KKK.', 'KqwqK', 'K.w.K', '..w..', '..w..', '..x..'],
   hoe: ['KKKw.', 'Kq.w.', '...w.', '...w.', '...w.', '...x.'],
+  // (32.2) Kamu Hizmeti süpürgesi: uzun sap, altta saman demeti
+  broom: ['..w..', '..w..', '..w..', '..x..', '.XEX.', 'XEXEX'],
   // Havan eli (11. aşama, şifacı)
   pestle: ['..KK.', '.KqqK', '.KqK.', '..r..', '..r..', '..R..'],
   // (24.2) Dokuma mekiği (dokumacı) ve uzun saplı kepçe (mahzen ustası)

@@ -109,6 +109,13 @@ import { GuestEffects } from '../rendering/GuestEffects.js';
 import { currentFeastOf } from '../systems/Feast.js';
 import { FairDecor } from '../rendering/FairDecor.js';
 import { currentFair, fairVenue } from '../systems/Fair.js';
+import { CrimeSystem } from '../systems/CrimeSystem.js';
+import { CourtSystem } from '../systems/CourtSystem.js';
+import { JUSTICE_SEED_OFFSET, COURT_SEED_OFFSET } from '../data/justice.js';
+import { RenownSystem } from '../systems/RenownSystem.js';
+import { RENOWN_SEED_OFFSET } from '../data/renown.js';
+import { UniversitySystem } from '../systems/UniversitySystem.js'; // (32.4)
+import { ClubSystem } from '../systems/ClubSystem.js'; // (32.5)
 
 const SIGN_NAME_MAX_LENGTH = 24; // (18. aşama) mahalle tabelasının adı
 const FOLLOW_SMOOTHING = 5;      // büyük = kamera karaktere daha çabuk yetişir
@@ -240,6 +247,10 @@ export class TownScene extends Scene {
     this.lifeStages = new LifeStageSystem(this.game, this.world, new Random(state.seed + 27));
     // (28.3) Saygın Büyük, doğal vefat ve kazalar (ömür kimlikten türer: seed + 30 izole üreteci; rastgelelik tüketmez). Yaşlanmadan SONRA kayıt olur.
     this.lifecycle = new LifecycleSystem(this.game, this.world, { jobs: this.jobs });
+    // (32.4) Darülfünun: üreteci yok; gün dönümü dinleyicisi yaşlanmadan (LifeStageSystem) SONRA kurulur (mezuniyet önce, kabul sonra)
+    this.university = new UniversitySystem(this.game, this.world, { moodlets: this.moodlets, apprenticeship: this.apprenticeship });
+    // (32.5) Hobi evleri: üreteci yok; gün dönümü dinleyicisi Darülfünun'dan SONRA (üyelik), LandscapeSystem'den ÖNCE kurulur (ürün estetiği)
+    this.clubs = new ClubSystem(this.game, this.world, { moodlets: this.moodlets, relationships: this.relationships });
     this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
       citizens: this.purse,
       crisis: this.crisis,
@@ -250,6 +261,8 @@ export class TownScene extends Scene {
       health: this.health,
       research: this.research,
       apprenticeship: this.apprenticeship,
+      university: this.university,
+      clubs: this.clubs, // (32.5)
     });
     this.saves = new SaveSystem(this.game, {
       captureTerrain: () => diffTerrain(this.baseTerrain, this.map),
@@ -270,11 +283,19 @@ export class TownScene extends Scene {
     this.heating = new HeatingSystem(this.game, this.world, this.economy);
     // (31. aşama) Kasaba Süsleri: zar çekmez; görünüm durumu, konser, heykel gururu, ilan tahtasının dilekçe süresi
     this.townDecor = new TownDecorSystem(this.game, this.world, { economy: this.economy, trust: this.trust, moodlets: this.moodlets });
+    // (32.1) Suç Motoru: yalnızca olay dinler (08:00 planı, eylem bitişi, saatlik kapanış); izole üreteç seed + 42, ana üreteçlere dokunmaz
+    this.crime = new CrimeSystem(this.game, this.world, { economy: this.economy, relationships: this.relationships }, new Random(state.seed + JUSTICE_SEED_OFFSET));
+    // (32.2) Adalet Sarayı ve Dava: yalnızca olay dinler (karar, saatlik süre / tanık / yasak, hizmet ve sürgün bitişi); izole üreteç seed + 43
+    this.court = new CourtSystem(this.game, this.world, { crime: this.crime, economy: this.economy, trust: this.trust, loyalty: this.loyalty, chemistry: this.chemistry, moodlets: this.moodlets, relationships: this.relationships, jobs: this.jobs }, new Random(state.seed + COURT_SEED_OFFSET));
+    // (32.3) Kasaba Şöhreti: yalnızca olay dinler (gün dönümünde itibar hedefe kayar: öteki gün dinleyicilerinden SONRA kurulur);
+    // izole üreteç seed + 44 yalnızca Kraliyet Lütfu zarı
+    this.renown = new RenownSystem(this.game, new Random(state.seed + RENOWN_SEED_OFFSET), { attract: this.attract });
     this.systems = [
       this.weather,
       this.structures,
       this.landscape,
       this.research,
+      this.university, // (32.4) yalnızca yapının boşta durumu (şalter kapalıyken hiçbir şey yapmaz)
       this.harbor,
       this.economy,
       this.jobs,
@@ -286,6 +307,7 @@ export class TownScene extends Scene {
       this.crisis,
       this.animals,
       this.relationships,
+      this.clubs, // (32.5) buluşma (arkadaşlık gruplarından sonra), ürünler, görünüm
       this.conflicts,
       this.chemistry,
       this.moodlets,
@@ -333,6 +355,11 @@ export class TownScene extends Scene {
       this.structures,
       this.heating,
       this.townDecor,
+      this.crime,
+      this.court,
+      this.renown,
+      this.university, // (32.4)
+      this.clubs, // (32.5)
       this.milestones,
       this.relationships,
       this.chemistry,

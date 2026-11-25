@@ -18,14 +18,14 @@
 // Puanlar GameState.relationships içinde "küçükId-büyükId" anahtarıyla saklanır; kaydedilen
 // çift yoksa aynı evde yaşayanlar HOUSEMATE_START, aile (ebeveyn-çocuk, kardeş) FAMILY_START ile başlar.
 // Aşağıdaki saf yardımcılar arayüz ve diğer sistemler tarafından da kullanılır.
+import { renownRomanceFactor } from './RoyalEffects.js'; // (32.3) Kraliyet Gül Bahçesi (32.6a döngüsüz modül)
+import { pairKey, isFamily, getFriendship, levelIndexFor, levelForScore } from './Friendship.js';
 import { ACTIVITIES } from '../data/activities.js';
 import {
   RELATIONSHIP_LEVELS,
   RELATIONSHIP_RATES,
   MAX_FRIENDSHIP,
   MIN_FRIENDSHIP,
-  HOUSEMATE_START,
-  FAMILY_START,
   ROMANCE,
   MARRIAGE,
 } from '../data/relationships.js';
@@ -40,33 +40,8 @@ import { EMOTION_RULES } from '../data/chemistry.js';
 
 const FESTIVAL_NEAR_PIXELS = 34; // şenlikte iki karodan yakın olanlar
 
-export function pairKey(idA, idB) {
-  return idA < idB ? `${idA}-${idB}` : `${idB}-${idA}`;
-}
-
-/** Ebeveyn-çocuk ya da kardeş mi? (aşık olamazlar, dost başlarlar) */
-export function isFamily(a, b) {
-  if (a.parentIds.includes(b.id) || b.parentIds.includes(a.id)) return true;
-  return a.parentIds.some((id) => b.parentIds.includes(id));
-}
-
-/** İki karakter arasındaki ilişki puanı. */
-export function getFriendship(state, a, b) {
-  const stored = state.relationships[pairKey(a.id, b.id)];
-  if (stored !== undefined) return stored;
-  if (isFamily(a, b)) return FAMILY_START;
-  return a.homeId !== null && a.homeId === b.homeId ? HOUSEMATE_START : 0;
-}
-
-export function levelIndexFor(score) {
-  let index = 0;
-  for (let i = 0; i < RELATIONSHIP_LEVELS.length; i++) if (score >= RELATIONSHIP_LEVELS[i].min) index = i;
-  return index;
-}
-
-export function levelForScore(score) {
-  return RELATIONSHIP_LEVELS[levelIndexFor(score)];
-}
+// (32.6a) ilişki puanının saf yardımcıları Friendship.js'te (Clubs / Wants buradan değil oradan alır: içe aktarma döngüsü olmasın)
+export { pairKey, isFamily, getFriendship, levelIndexFor, levelForScore };
 
 /** Sakinin partneri ya da eşi (yoksa null). */
 export function partnerOf(state, character) {
@@ -287,7 +262,7 @@ export class RelationshipSystem {
     // (29.1) Aşk zarı kimyaya bakar: kimya 0 ya da eksiyse aşk yok; güçlü çekim daha düşük puanla ve daha hızlı aşık eder
     const chem = chemistryLevel(chemistryOf(this.state, a, b));
     if (chem.romance <= 0 || this.get(a, b) < chem.romanceScore) return;
-    if (this.rng.next() >= ROMANCE.chancePerMinute * chem.romance * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance')) return;
+    if (this.rng.next() >= ROMANCE.chancePerMinute * chem.romance * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance') * renownRomanceFactor(this.state)) return;
     const now = this.state.totalMinutes;
     a.partnerId = b.id;
     b.partnerId = a.id;
@@ -302,7 +277,7 @@ export class RelationshipSystem {
   tryMarriage(a, b, group, minutes) {
     if (!arePartners(a, b) || a.married) return;
     if (this.state.totalMinutes - a.partnerSince < MARRIAGE.minPartnerDays * 1440) return;
-    if (this.rng.next() >= MARRIAGE.chancePerMinute * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance')) return;
+    if (this.rng.next() >= MARRIAGE.chancePerMinute * minutes * romanceMultiplier(group) * buffMultiplier(this.state, 'romance') * renownRomanceFactor(this.state)) return;
     this.marry(a, b, this.world.getBuilding(group.buildingId), group.kind === 'festival');
   }
 

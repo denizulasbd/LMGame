@@ -5,7 +5,7 @@
 //                  gün dönümünde yetişkinlerin sadakat ortalaması state.pulse.daily'ye (son 3 gün). Yön oku: saatlik halka (kaydedilmez;
 //                  24 saat dolmadıysa günlük ortalamaya bakar). summary(): yüz, ad, yön, kademe sayıları, ilk üç neden, güven.
 //   Geri bildirim: oyuncunun yönetim eylemleri ('ui:setTaxRate', dilekçe kabul / karşılama / ret, 'ui:relief', 'ui:condolence',
-//                  'ui:giftSpecialDay', 'ui:chooseDilemma') aynı adımda sadakati değiştirirse 'pulse:feedback' { text, tone, count, reason }.
+//                  'ui:giftSpecialDay', 'ui:chooseDilemma', (32.2) 'ui:courtVerdict') aynı adımda sadakati değiştirirse 'pulse:feedback' { text, tone, count, reason }.
 //                  Ön dinleyiciler bu sistem kurulurken (eylemi işleyen sistemlerden ÖNCE), son dinleyiciler attachLate() ile (hepsinden SONRA)
 //                  bağlanır. Taziye Sofrası'nın etkisi törenin sonunda (19:00) gelir: 'rite:held' (condolence) aynı satırı yayınlar.
 //   İş bırakma   : 10:00'da en az 2 Kırgın yetişkin varsa 'strike:started' { ids } (BehaviorSystem işlerini keser; Brain.planStrike),
@@ -23,7 +23,7 @@ import { foodSupply } from './TownStatus.js';
 
 const on = () => engineOn('discontent');
 // Oyuncunun yönetim eylemleri (anında geri bildirim)
-const ACTIONS = ['ui:setTaxRate', 'ui:rejectPetition', 'ui:acceptPetition', 'ui:grantPetition', 'ui:relief', 'ui:condolence', 'ui:giftSpecialDay', 'ui:chooseDilemma'];
+const ACTIONS = ['ui:setTaxRate', 'ui:rejectPetition', 'ui:acceptPetition', 'ui:grantPetition', 'ui:relief', 'ui:condolence', 'ui:giftSpecialDay', 'ui:chooseDilemma', 'ui:courtVerdict']; // (32.2) dava kararı
 
 export class DiscontentSystem {
   /**

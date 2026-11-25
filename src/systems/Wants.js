@@ -16,7 +16,7 @@ import { SHOP } from '../data/citizens.js';
 import { CHILDREN } from '../data/family.js';
 import { RELATIONSHIP_LEVELS } from '../data/relationships.js';
 import { getSeason } from '../data/seasons.js';
-import { getFriendship } from './RelationshipSystem.js';
+import { getFriendship } from './Friendship.js'; // (32.6a) döngüsüz modül
 import { hasTag } from './Chemistry.js';
 import { skillLevel, primarySkill } from './SkillSystem.js';
 import { heirloomSlot, petitionOf } from './Citizens.js';

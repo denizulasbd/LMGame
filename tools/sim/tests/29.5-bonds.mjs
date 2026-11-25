@@ -151,7 +151,7 @@ const out = await page.evaluate(async () => {
   check('mesai dışında ve perform dışında verilmez', !has(duo[0], 'side_by_side') && !has(duo[1], 'side_by_side'));
   setup(...duo); duo[0].partnerId = duo[1].id; duo[1].partnerId = duo[0].id; ENGINES.bonds = false; sys.onHour(10); ENGINES.bonds = true;
   check('şalter kapalıyken moodlet verilmez', !has(duo[0], 'side_by_side'));
-  check('moodlet sayısı 32, sözler ve nedenler tamam', MD.MOODLET_KEYS.length === 32 && MD.MOOD_LINES.side_by_side.length === 2 && MD.MOOD_LINES.rubbing_wrong.length === 2 && MD.MOOD_REASONS.side_by_side.includes('{who}') && MD.MOODLETS.side_by_side.icon === 'handshake' && MD.MOODLETS.rubbing_wrong.icon === 'angry');
+  check('moodlet sayısı 33, sözler ve nedenler tamam', MD.MOODLET_KEYS.length === 33 && MD.MOOD_LINES.side_by_side.length === 2 && MD.MOOD_LINES.rubbing_wrong.length === 2 && MD.MOOD_REASONS.side_by_side.includes('{who}') && MD.MOODLETS.side_by_side.icon === 'handshake' && MD.MOODLETS.rubbing_wrong.icon === 'angry');
 
   // 5. evrim
   check('evrim kancası: company +1 / -1', EV.EVOLUTION_SOURCES.moodlets.side_by_side[0][1] === 1 && EV.EVOLUTION_SOURCES.moodlets.rubbing_wrong[0][1] === -1 && EV.EVOLUTION_SOURCES.moodlets.side_by_side[0][0] === 1);

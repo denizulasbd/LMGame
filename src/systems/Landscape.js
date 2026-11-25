@@ -5,6 +5,7 @@ import { doctrineAestheticMultiplier } from './Doctrine.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { AESTHETIC, DARKNESS, ORNAMENTAL_TREES, aestheticPercent } from '../data/landscape.js';
 import { CONFIG } from '../config.js';
+import { clubAesthetic } from './Clubs.js'; // (32.5) hobi evlerinin ürünleri (tavanlı)
 
 const T = CONFIG.TILE_SIZE;
 
@@ -21,6 +22,7 @@ export function aestheticValue(building) {
   const value = AESTHETIC.values[building.type];
   if (!value || !building.functional) return 0;
   if (BUILDINGS[building.type].ornamentalTree) return value * (0.35 + 0.65 * (building.growth ?? 1));
+  if (BUILDINGS[building.type].clubHouse) return value + clubAesthetic(building); // (32.5) tarh / tablo başına, tavanlı
   return value;
 }
 

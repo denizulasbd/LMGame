@@ -18,6 +18,8 @@
 // ('ui:releaseApprentice'); çırak olmayan Genç için "Çıraklığa Yaz" ('ui:enrollApprentice'); ustanın kartında "Çırağı: ..."
 // ve Gururlu Usta etiketi.
 // (29.3) "Arzular, Korkular ve Yaşam Doyumu": doyum çubuğu ve kademesi, en çok 3 arzu ve 2 korku çipi (kalan süre, doyum etkisi); çocukta gizli.
+import { universityTag } from './universityCards.js'; // (32.4)
+import { clubTag } from './clubCards.js'; // (32.5)
 import { getCharacterSprite, getCharacterPortraitURL, characterHeight, CHARACTER_WIDTH, CHARACTER_HEIGHT } from '../../art/sprites/index.js';
 import { NEEDS, NEED_KEYS, TRAITS } from '../../data/characters.js';
 import { PANEL_LIST_SIZE, PANEL_MIN_LEVEL, PANEL_RIVAL_BELOW, MIN_FRIENDSHIP } from '../../data/relationships.js';
@@ -37,6 +39,7 @@ import { SCHOOL } from '../../data/research.js';
 import { CHARACTER_NAME_MAX_LENGTH } from '../../data/characters.js';
 import { LUXURY_GOODS } from '../../data/luxury.js';
 import { el } from '../dom.js';
+import { sentenceKey, sentenceNodes } from './justiceCards.js'; // (32.2)
 import { QUIRKS } from '../../data/social.js';
 import { ITEMS, PETITION_KINDS } from '../../data/citizens.js';
 import { RESOURCES } from '../../data/resources.js';
@@ -776,7 +779,7 @@ export class CharacterPanel {
     const raid = rioter ? raidOf(state, character) : null;
     const inv = character.inventory ?? [];
     const leaving = Boolean(character.emigrating); // (22. aşama) köyü terk ediyor
-    const key = `${character.id}:${character.coins}:${capacity}:${rioter}:${leaving}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}${s.heirloom ? s.heirloom.chain.join('>') : ''}`).join(',')}`;
+    const key = `${sentenceKey(character, state)}:${character.id}:${character.coins}:${capacity}:${rioter}:${leaving}:${raid?.id ?? ''}:${inv.map((s) => `${s.kind}${s.qty}${s.name ?? ''}${s.heirloom ? s.heirloom.chain.join('>') : ''}`).join(',')}`;
     if (key === this.lastPurse) return;
     this.lastPurse = key;
     const coins = el('div', { className: 'purse-coins', title: 'Kişisel kese: yevmiyeler, usta eseri ödülleri ve alışveriş (kasaba hazinesinden ayrıdır)' }, [
@@ -788,6 +791,7 @@ export class CharacterPanel {
         : rioter
           ? [el('span', { className: 'purse-rioter', text: raid ? 'Yağmada' : 'İsyancı', title: 'Yönetime öfkeli: işi bıraktı, meydanda toplanıyor' })]
           : []),
+      ...sentenceNodes(character, state, (n, p) => this.events.emit(n, p)), // (32.2) ceza rozeti ve "Dava dosyası"
     ]);
     const slots = [];
     for (let i = 0; i < capacity; i++) {
@@ -1197,6 +1201,8 @@ export class CharacterPanel {
       tags.push({ text: ratio >= 1 ? 'Okulu bitirdi: büyüyünce Kalfa olacak' : `Okula gidiyor: %${Math.round(ratio * 100)}`, icon: 'book', cls: 'is-vigor' });
     }
     if (character.educated) tags.push({ text: 'Bilgelik Evi mezunu', icon: 'book', cls: 'is-vigor' });
+    { const t = universityTag(character); if (t) tags.push(t); } // (32.4) Darülfünun öğrencisi / mezunu
+    { const t = clubTag(character); if (t) tags.push(t); } // (32.5) "Bahçecilik Kulübü üyesi"
     // 13. aşama: sabit iş yeri ve handaki baharatlı yemek
     if (character.workplaceId !== null) {
       const place = state.buildings.find((b) => b.id === character.workplaceId);

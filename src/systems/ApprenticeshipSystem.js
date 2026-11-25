@@ -259,6 +259,22 @@ export class ApprenticeshipSystem {
     return true;
   }
 
+  /**
+   * (32.4) Darülfünun telafisi: dersteki öğrenci çırağın ders dakikası, ustası O AN tezgâhtaysa (ya da Tezgâh Pratiği koşulu varsa,
+   * practiceRate ile) çıraklık sayılır ("ustanın notları"). Yalnızca dersin gerçekten götürdüğü çıraklık telafi edilir; zar yok.
+   * Kazanılan ilerleme döner. UniversitySystem.learn çağırır; öğrenci değilse hiç çağrılmaz.
+   */
+  lectureCredit(c, minutes, scale = 1) {
+    const a = c?.apprenticeship;
+    if (!a || minutes <= 0 || !townCanSpare(this.state)) return 0;
+    const building = this.world.getBuilding(a.buildingId);
+    if (!building || !safeForApprentice(building)) return 0;
+    const k = this.masterAtWork(c) ? 1 : this.practiceMaster(c) ? APPRENTICE.practiceRate : 0;
+    const before = a.progress;
+    a.progress = Math.min(100, a.progress + APPRENTICE.perMinute * k * minutes * scale);
+    return a.progress - before;
+  }
+
   say(c, text) {
     c.speech = { text, at: -1, duration: APPRENTICE.speechSeconds }; // ilk çizimde gerçek zamanla başlar
   }

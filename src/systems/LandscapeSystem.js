@@ -36,7 +36,7 @@ export class LandscapeSystem {
     this.world.aesthetics = new Float32Array(world.map.width * world.map.height);
     const mark = () => (this.dirty = true);
     this.unsubscribers = [
-      ...['building:placed', 'building:completed', 'building:removed'].map((n) => game.events.on(n, mark)),
+      ...['building:placed', 'building:completed', 'building:removed', 'club:works'].map((n) => game.events.on(n, mark)),
       game.events.on('terrain:painted', ({ type }) => {
         this.dirty = true;
         if (type) this.state.landscape.roadsPainted += 1;

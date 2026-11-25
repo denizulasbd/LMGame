@@ -45,6 +45,9 @@ import { ILLNESS } from '../data/health.js';
 import { FIRE } from '../data/crisis.js';
 import { VENERABLE } from '../data/lifeStages.js';
 import { SCHOOL } from '../data/research.js';
+import { UNIVERSITY } from '../data/university.js'; // (32.4)
+import { universityOf, isLectureHour } from '../systems/University.js'; // (32.4)
+import { CLUB } from '../data/clubs.js'; // (32.5)
 import { isRallyActive } from '../systems/RallySystem.js';
 import { healSpeedMultiplier } from '../systems/ResearchSystem.js';
 import { QUIRKS, QUIRK_RULES, DATING, HOME_DINNER } from '../data/social.js';
@@ -64,6 +67,8 @@ import { TEMPERAMENT } from '../data/temperament.js';
 import { isMemorialTime, memorialEligible, urgentNeed, riteWindow, riteVenue } from '../systems/Rites.js';
 import { engineOn } from '../systems/Engines.js';
 import { shouldStrike } from '../systems/Loyalty.js';
+import { crimeReady, isBanned, banBlocks, serviceDue } from '../systems/Justice.js';
+import { COURT, SHAME, JUSTICE, CRIMES } from '../data/justice.js';
 import { DISCONTENT } from '../data/loyalty.js';
 
 const COLD_SEASONS = ['autumn', 'winter']; // (29.3) "Soğukta üşümek" korkusunun sıcak mekân arayışı
@@ -104,7 +109,9 @@ export class Brain {
    *   relationships: import('../systems/RelationshipSystem.js').RelationshipSystem,
    *   crafting: import('../systems/CraftingSystem.js').CraftingSystem }} services
    */
-  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null, apprenticeship = null }) {
+  constructor(world, rng, { economy, jobs, relationships, crafting, health, research, citizens = null, crisis = null, apprenticeship = null, university = null, clubs = null }) {
+    this.clubs = clubs; // (32.5) hobi evleri (kendi üreteci yok; zar çekmez)
+    this.university = university; // (32.4) Darülfünun (kendi üreteci yok; zar çekmez)
     this.crisis = crisis; // (23. aşama) yangın ve yaralanma kararları
     this.apprenticeship = apprenticeship; // (25.2) çıraklık (kendi üreteci)
 
@@ -123,6 +130,11 @@ export class Brain {
     const { needs, profile } = c;
     const bedtime = isBedtime(profile, hour);
 
+    // (32.2) Sürgün: yalnızca suçlu, her şeyden önce bohçasıyla harita kenarına yürür (terk edişten ayrı işaret: c.sentence.exile)
+    if (c.sentence?.exile && engineOn('court')) {
+      const plan = this.planExile(c);
+      if (plan) return plan;
+    }
     // (22. aşama) Köyü terk etmeye karar verdiyse her şeyden önce harita kenarına yürür
     if (c.emigrating) {
       const plan = this.planEmigrate(c);
@@ -167,7 +179,9 @@ export class Brain {
         if (nap) return nap;
       }
     }
-    if (!grieving && this.world.state.events.festival.active && needs.energy > FESTIVAL_MIN_ENERGY) {
+    // (32.6a) vakti gelmiş suç planı olan sakin şenliğe gitmez (JUSTICE.festivalSneak): aşağıdaki suç dalı onu hedefe götürür
+    const sneak = JUSTICE.festivalSneak && c.crimePlan && engineOn('justice') && !c.isChild && this.world.state.totalMinutes >= c.crimePlan.at && this.world.state.totalMinutes <= c.crimePlan.until && crimeReady(this.world.state, c, hour);
+    if (!grieving && !sneak && this.world.state.events.festival.active && needs.energy > FESTIVAL_MIN_ENERGY) {
       const plan = this.planFestival(c);
       if (plan) return plan;
     }
@@ -223,6 +237,12 @@ export class Brain {
         const plan = this.planStrike(c);
         if (plan) return plan;
       }
+      // (32.4) Darülfünun dersi: öğrenci (c.higherStudy) 14:00-16:00 derse gider. Mola zarı yine atıldı (üretecin sırası değişmez); acil
+      // ihtiyaç, yangın, isyan, iş bırakma ve yaralı önce. Çırak planından ve planWork'ten ÖNCE; öğrenci yokken bu dal hiç çalışmaz.
+      if (c.higherStudy && this.university && engineOn('university') && !urgentNeed(c) && !c.isInjured) {
+        const plan = this.university.planLecture(c, hour);
+        if (plan) return plan;
+      }
       if (breakRoll >= profile.work.breakChance || c.mood.focus || c.drive.focus) {
         // (25.2) Çırak: ustası tezgâhtaysa onun yanına (mola zarı her zamanki gibi atıldı; çırak planı kendi üretecini kullanır)
         const plan = (c.apprenticeship && this.apprenticeship?.planFor(c)) || this.planWork(c);
@@ -248,6 +268,27 @@ export class Brain {
       const plan = this.planGrieve(c);
       if (plan) return { ...plan, onBreak };
     }
+    // (32.1) Suç: CrimeSystem 08:00'da izole üreteçle (tohum + 42) planladıysa boş zamanda / molada, acil ihtiyaç, yangın, isyan, yara,
+    // teselli ve yas önceliklerinden SONRA (randevu, sohbet, alışveriş ve planLeisure'dan ÖNCE) hedefin kapısına gider; zar çekmez.
+    // Plan enjekte edildiğinde atlanan randevu / sohbet / alışveriş / planLeisure zarlarının kayması beklenen bir durumdur (suç
+    // işlenmedikçe kararlar ve zar sırası aynıdır). Ölçüm: planLeisure'ın hemen önünde planların ~%75'i sohbete (meydan) kaçıyordu.
+    // Buraya mesai saatinde gelen sakin ya moladadır ya da iş bulamamıştır (boşta): ikisi de boş zaman sayılır.
+    if (c.crimePlan && engineOn('justice') && !c.isChild) {
+      const plan = this.planCrime(c, hour);
+      if (plan) return { ...plan, onBreak };
+    }
+    // (32.2) Kamu Hizmeti: Adalet Sarayı'nın cezası, boş zamanda / molada (mesai ve uyku bölünmez, acil ihtiyaçlar önce); zar çekmez
+    if (!c.isChild && (!isWorkHours(hour) || onBreak) && serviceDue(this.world.state, c)) {
+      const plan = this.planService(c);
+      if (plan) return { ...plan, onBreak };
+    }
+    // (32.5) Kulüp buluşması: ClubSystem buluşmayı kurduysa (en az 3 uygun üye) üye kulüp evine gider. Acil ihtiyaç, yangın, isyan,
+    // şenlik, Toplanma Zili / konser, anma, düğün, aile yemeği, yas, teselli, suç planı ve kamu hizmeti önce; yalnızca mesai dışında
+    // (uyku yukarıda önce gelir: mesai ve uyku bölünmez). Randevu, sohbet ve planLeisure'dan ÖNCE; zar çekmez. Üyesi yokken çalışmaz.
+    if (c.club && this.clubs && engineOn('clubs') && !c.isChild && !grieving && !isWorkHours(hour)) {
+      const plan = this.clubs.planSession(c);
+      if (plan) return plan;
+    }
     // (19. aşama) Bekâr ve ilişkisi yüksek sakinler boş zamanlarında birbirleriyle vakit geçirmeye öncelik verir
     if (!c.isChild && !c.married && !grieving && (!isWorkHours(hour) || onBreak)) {
       const plan = this.planDate(c, hour);
@@ -271,6 +312,95 @@ export class Brain {
     }
     const leisure = this.planLeisure(c, hour);
     return leisure ? { ...leisure, onBreak } : this.planWait();
+  }
+
+  /** (32.2) Sürgün yolu: harita kenarındaki çıkış (yol yoksa null; CourtSystem süre dolunca çıkarır). */
+  planExile(c) {
+    const exit = c.sentence?.exile?.exit;
+    if (!exit || !this.world.findPath(this.originTile(c), exit)) return null;
+    return { activity: 'exile', spot: exit, duration: 0 };
+  }
+
+  /**
+   * (32.2) Kamu Hizmeti: meydanın çevresindeki yürüyüş karolarından biri (sakin kimliği ve saatten belirlenir: zar çekmez); yolu
+   * olan ilk aday. Bir oturum COURT.serviceMinutes sürer.
+   */
+  planService(c) {
+    const plaza = this.world.landmarks.plaza;
+    const center = { x: plaza.centerX, y: plaza.centerY };
+    const pool = this.world.strollSpots.filter((p) => distanceSq(p, center) <= 64);
+    const spots = pool.length ? pool : this.world.strollSpots;
+    if (!spots.length) return null;
+    const origin = this.originTile(c);
+    const start = (c.id * 7 + Math.floor(this.world.state.totalMinutes / 60)) % spots.length;
+    for (let i = 0; i < Math.min(4, spots.length); i++) {
+      const spot = spots[(start + i * 3) % spots.length];
+      if (this.world.findPath(origin, spot)) return { activity: 'publicService', spot, facing: 'down', duration: COURT.serviceMinutes };
+    }
+    return null;
+  }
+
+  /** (32.1) Yapının ayak izini çevreleyen yürünebilir ve kasabaya bağlı karolar (kapısı olmayan süsler için). */
+  crimeRing(b) {
+    const { w, h } = BUILDINGS[b.type]?.size ?? { w: 1, h: 1 };
+    const out = [];
+    for (let y = b.tileY - 1; y <= b.tileY + h; y++) {
+      for (let x = b.tileX - 1; x <= b.tileX + w; x++) {
+        const edge = x === b.tileX - 1 || x === b.tileX + w || y === b.tileY - 1 || y === b.tileY + h;
+        if (edge && this.world.map.isWalkable(x, y) && this.world.isReachable(x, y)) out.push({ x, y });
+      }
+    }
+    return out;
+  }
+
+  /** (32.1) Planlanan suçun hedefi: yapının kapısı ya da kurbanın yanı. Zamanı gelmediyse / uygun değilse null. Zar çekmez. */
+  planCrime(c, hour) {
+    const state = this.world.state;
+    const plan = c.crimePlan;
+    if (state.totalMinutes < plan.at || state.totalMinutes > plan.until || !crimeReady(state, c, hour)) return null;
+    const origin = this.originTile(c);
+    let spot = null;
+    let target = null;
+    if (plan.victimId !== undefined) {
+      const v = this.world.getCharacter(plan.victimId);
+      if (!v || v.away) return null;
+      const home = v.insideBuildingId ? this.world.getBuilding(v.insideBuildingId) : null;
+      const doors = home ? this.world.getSpots(home) : [];
+      spot = home ? (doors.length ? this.nearest(doors, c) : null) : { x: v.tileX, y: v.tileY };
+    } else {
+      target = this.world.getBuilding(plan.buildingId);
+      if (!target?.functional) return null;
+      // süs yapılarının (çit, bank, fener) kullanım noktası yoksa çevresindeki yürünebilir karo
+      const doors = this.world.getSpots(target);
+      const around = doors.length ? doors : this.crimeRing(target);
+      if (!around.length && plan.crime !== 'pettyVandal') return null; // (32.6a) haylazlıkta aşağıda yakındaki başka süs denenir
+      // en yakın birkaç noktadan yolu olan ilki (çitle çevrili bahçe gibi yerlerde en yakın karo kopuk olabilir)
+      const d2 = (p) => (p.x - origin.x) ** 2 + (p.y - origin.y) ** 2;
+      spot = [...around].sort((p, q) => d2(p) - d2(q)).slice(0, 4).find((p) => this.world.findPath(origin, p)) ?? null;
+      // (32.6a) haylazlık: hedefe yol yoksa yakındaki başka bir süs (en çok JUSTICE.vandalRetarget; zar yok, plan güncellenir)
+      if (!spot && plan.crime === 'pettyVandal' && JUSTICE.vandalRetarget) {
+        const others = this.world.buildings
+          .filter((b) => b !== target && b.functional && !b.damaged && !b.isBurning && CRIMES.pettyVandal.targets.includes(b.type))
+          .sort((a, b) => d2({ x: a.tileX, y: a.tileY }) - d2({ x: b.tileX, y: b.tileY }) || a.id - b.id)
+          .slice(0, JUSTICE.vandalRetarget);
+        for (const o of others) {
+          const ring = this.world.getSpots(o).length ? this.world.getSpots(o) : this.crimeRing(o);
+          spot = [...ring].sort((p, q) => d2(p) - d2(q)).slice(0, 2).find((p) => this.world.findPath(origin, p)) ?? null;
+          if (spot) {
+            target = o;
+            plan.buildingId = o.id;
+            break;
+          }
+        }
+      }
+      if (!spot) return null;
+    }
+    // kurban bankta / havuz başında oturuyor olabilir (yürünemez karo): yanına kadar yürür
+    if (!spot) return null;
+    const blocked = plan.victimId !== undefined && !this.world.map.isWalkable(spot.x, spot.y);
+    if (plan.victimId !== undefined && !this.world.findPath(origin, spot, { allowBlockedGoal: blocked })) return null;
+    delete c.crimePlan;
+    return { activity: 'pilfer', ...(target ? { buildingId: target.id, faceTarget: target.center } : {}), spot, ...(blocked ? { allowBlockedGoal: true } : {}), duration: plan.duration, crime: plan };
   }
 
   // ---------------------------------------------------------------------------
@@ -363,7 +493,7 @@ export class Brain {
 
   /** Keyfi düşen sakin çantasındaki hatırasına bakar (6 saatte bir). */
   planKeepsake(c) {
-    if (c.needs.fun >= SNACK.keepsakeBelowFun || countItem(c, 'souvenir') <= 0) return null;
+    if (c.needs.fun >= SNACK.keepsakeBelowFun || countItem(c, 'souvenir') + countItem(c, 'handkerchief') <= 0) return null; // (32.5) Nakışlı Mendil de
     const now = this.world.state.totalMinutes;
     if (c.lastKeepsakeAt !== undefined && c.lastKeepsakeAt !== null && now - c.lastKeepsakeAt < SNACK.keepsakeCooldownMinutes) return null;
     c.lastKeepsakeAt = now;
@@ -380,6 +510,7 @@ export class Brain {
     // (25.3) Girişimci ve Zanaatkâr Pazar'a daha sık uğrar (zar her sakinde aynı atılır)
     // (29.3) "Kendime bir şey alayım" arzusu: eşik shopMul kat (zar yine bir kez atılır)
     if (this.citizenRng.next() >= SHOP.chance * (TEMPERAMENT.shopBoost[c.quirk] ?? 1) * c.drive.shopMul) return null;
+    if (isBanned(this.world.state, c)) return null; // (32.2) Uzaklaştırma: Pazar yasağı (zar yine atıldı)
     const origin = this.originTile(c);
     for (const market of markets) {
       const doors = this.world.getSpots(market);
@@ -453,6 +584,7 @@ export class Brain {
     if (c.needs.social >= PARTNER_SOCIAL_LIMIT) return false;
     if (isWorkHours(hour) && !c.task?.onBreak) return false;
     if (!c.task) return true;
+    if (c.task.clubKey && c.task.activity !== 'clubHobby') return false; // (32.5) kulüp buluşmasındaki üye sohbet davetine kalkmaz
     const kind = ACTIVITIES[c.task.activity].kind;
     return kind === 'leisure' || kind === 'idle';
   }
@@ -547,7 +679,8 @@ export class Brain {
   planMeal(c) {
     const origin = this.originTile(c);
     const places = [];
-    for (const inn of this.world.getCompleted('inn')) if (inn.meals > 0) places.push({ place: inn, activity: 'innMeal' });
+    // (32.2) Uzaklaştırma cezalısı hana giremez; evde ve kilerde yemek her zaman serbest
+    if (!isBanned(this.world.state, c)) for (const inn of this.world.getCompleted('inn')) if (inn.meals > 0) places.push({ place: inn, activity: 'innMeal' });
     // Kilerde yiyecek ya da ekmek (2,5 yiyecek değerinde) varsa evde / kilerde oturup yenir
     if (this.economy.canFeed(MEAL_FOOD_COST)) {
       for (const storage of this.world.getCompleted('storage')) places.push({ place: storage, activity: 'meal' });
@@ -814,7 +947,8 @@ export class Brain {
   }
 
   planSocial(c, hour) {
-    const gatherings = this.availableGatherings();
+    const banned = isBanned(this.world.state, c); // (32.2) Han yasağı
+    const gatherings = banned ? this.availableGatherings().filter((b) => !COURT.banVenues.includes(b.type)) : this.availableGatherings();
 
     // Önce zaten insanların toplandığı yere katıl
     let best = null;
@@ -859,6 +993,7 @@ export class Brain {
    * - Ateş başında herkes ateşe döner: dolu yerlerin yanına ceza verilerek çember boyunca yayılırlar.
    */
   planGathering(c, building, nearSpot = null, mode = 'gather', fixedDuration = null) {
+    if (banBlocks(this.world.state, c, building)) return null; // (32.6a) Uzaklaştırma: davet / randevu / sohbet planı dahil, ortak nokta
     const spots = this.world.freeGatherSpots(building, c.id, mode);
     if (spots.length === 0) return null;
     const spread = mode === 'festival' || Boolean(ACTIVITIES[building.type]?.faceBuilding);
@@ -941,6 +1076,8 @@ export class Brain {
     const inn = this.world.getCompleted('inn').find((b) => b.lit);
     if (!inn) weights.inn = 0;
     else if (evening) weights.inn *= 5;
+    const banned = isBanned(this.world.state, c); // (32.2) Uzaklaştırma: han ağırlığı 0
+    if (banned) weights.inn = 0;
     // (16. aşama) Seferden dönen maceracı anlatacak hikâyesiyle hana koşar (han yoksa ateş başına / meydana)
     if (c.tale) {
       weights.inn = (weights.inn ?? 0) * 6;
@@ -954,6 +1091,7 @@ export class Brain {
     // (13. aşama) Çardak: meydandaki havuz kadar sevilir; sevgilisi / eşi olan için iki kat
     if (this.availableGatherings().some((b) => b.type === 'gazebo')) weights.gazebo = (weights.fountain ?? 1) * (c.partnerId !== null && c.partnerId !== undefined ? 1.8 : 0.9);
     for (const building of this.availableGatherings()) {
+      if (banned && COURT.banVenues.includes(building.type)) continue;
       const people = this.participants(building, c);
       if (people.length === 0) continue;
       // (29.1) kırgın olduğu kişinin oturduğu yerden kaçınır, minnettar olduğu kişinin olduğu yere meyleder
@@ -972,6 +1110,8 @@ export class Brain {
       for (const k of ['inn', 'campfire', 'bench', 'shade']) if (weights[k]) weights[k] *= 2;
       if (weights.stroll) weights.stroll *= 0.3;
     }
+    // (32.2) Mahcup (sürgün edilenin ailesi): kalabalık mekânlardan hafifçe kaçınır
+    if (engineOn('court') && getMoodlet(c, 'shamed')) for (const k of ['inn', 'fountain', 'campfire', 'gazebo']) if (weights[k]) weights[k] *= SHAME.crowdMul;
     if (c.mood.seek && c.traits.includes('introvert')) {
       for (const k of ['bench', 'river', 'readBench', 'readLibrary', 'viewpoint', 'shade', 'flowers']) if (weights[k]) weights[k] *= 3;
       for (const k of ['inn', 'fountain', 'campfire', 'gazebo']) if (weights[k]) weights[k] *= 0.3;
@@ -987,7 +1127,11 @@ export class Brain {
       if (weights.gazebo) weights.gazebo *= ELDER.leisure.gazebo;
       if (weights.shade) weights.shade *= ELDER.leisure.shade;
       if (this.world.getCompleted('academy').length > 0) weights.readLibrary = (weights.readLibrary ?? 0) + ELDER.readLibraryBase * ELDER.leisure.readLibrary;
+      // (32.4) Misafir hoca: Darülfünun varken ders saatinde düşük ağırlıklı "Darülfünun'da sohbet" (yapı yokken anahtar hiç eklenmez)
+      if (this.university && universityOf(this.world.state) && isLectureHour(hour)) weights.uniTalk = ELDER.readLibraryBase * UNIVERSITY.guestWeight;
     }
+    // (32.5) Kulüp üyesi: kendi kulüp evinde tek başına uğraş (düşük ağırlık; kulübü ya da yapısı yokken anahtar hiç eklenmez)
+    if (c.club && this.clubs?.hobbyAvailable(c)) weights.clubHobby = CLUB.hobbyWeight;
 
     const options = Object.entries(weights).filter(([name, w]) => w > 0 && ACTIVITIES[name]);
     while (options.length > 0) {
@@ -1029,6 +1173,17 @@ export class Brain {
         }
         return null;
       }
+      case 'uniTalk': {
+        // (32.4) misafir Kıdemli Bilge: Darülfünun'un kapısından içeri
+        const uni = universityOf(this.world.state);
+        const doors = uni ? this.world.getSpots(uni) : [];
+        if (!doors.length) return null;
+        const spot = this.nearest(doors, c);
+        if (!this.world.findPath(this.originTile(c), spot)) return null;
+        return { activity, buildingId: uni.id, spot, finalPoint: uni.entrancePoint, duration };
+      }
+      case 'clubHobby':
+        return this.clubs?.planHobby(c, duration) ?? null; // (32.5)
       case 'music':
         return this.planMusic(c, hour, duration);
       case 'viewpoint':
@@ -1192,7 +1347,7 @@ export class Brain {
   /** Müzisyen: akşamları handa (açıksa) ya da meydan havuzunun başında çalar. */
   planMusic(c, hour, duration) {
     if (!this.isMusicHour(hour)) return null;
-    const inn = this.world.getCompleted('inn').find((b) => b.lit);
+    const inn = isBanned(this.world.state, c) ? null : this.world.getCompleted('inn').find((b) => b.lit); // (32.2) Han yasağı
     const fountain = this.world.getCompleted('fountain')[0];
     const venues = [inn, fountain].filter(Boolean);
     if (inn && fountain && this.rng.next() < 0.45) venues.reverse();
@@ -1298,7 +1453,7 @@ export class Brain {
     const options = [];
     const gazebo = this.availableGatherings().find((b) => b.type === 'gazebo' && this.world.freeGatherSpots(b, c.id).length >= 2);
     if (gazebo) options.push(['gazebo', DATING.venues.gazebo]);
-    const inn = this.availableGatherings().find((b) => b.type === 'inn' && this.world.freeGatherSpots(b, c.id).length >= 2);
+    const inn = isBanned(this.world.state, c) ? null : this.availableGatherings().find((b) => b.type === 'inn' && this.world.freeGatherSpots(b, c.id).length >= 2); // (32.2) Han yasağı
     if (inn) options.push(['inn', DATING.venues.inn]);
     const benches = this.benchPair(c);
     if (benches) options.push(['bench', DATING.venues.bench]);
@@ -1321,6 +1476,7 @@ export class Brain {
     if (isWorkHours(hour) && !o.task?.onBreak) return false;
     if (!o.task) return true;
     if (o.task.dateWithId !== undefined && o.task.dateWithId !== c.id) return false;
+    if (o.task.clubKey && o.task.activity !== 'clubHobby') return false; // (32.5) kulüp buluşmasındaki üye randevuya kalkmaz
     const kind = ACTIVITIES[o.task.activity].kind;
     return kind === 'leisure' || kind === 'idle' || kind === 'social';
   }

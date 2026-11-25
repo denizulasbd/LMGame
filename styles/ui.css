@@ -2985,6 +2985,13 @@ button.relation-row:hover {
   text-shadow: none;
 }
 
+/* (32.6b) sarı zeminli ana eylem düğmeleri (Yükselt, Teslim Et, Kararı ver, Tamam): üstteki genel .hud-btn kuralı koyu metni açık parşömene çeviriyordu
+   (sarı üstünde açık metin okunmuyordu); koyu metin ve gölgesiz */
+.hud-btn.upgrade-button:not(:disabled) {
+  color: var(--ui-ink-dark);
+  text-shadow: none;
+}
+
 .hud-btn:disabled {
   opacity: 0.45;
   cursor: default;
@@ -5580,3 +5587,123 @@ kbd {
   gap: 4px;
   margin-top: 4px;
 }
+
+/* (32.2) Adalet Sarayı: dava penceresi (oyunu durdurmaz), saray paneli, sakin kartındaki bağlantı */
+.case-panel[hidden] { display: none; }
+.modal-window.case-panel { width: min(600px, 100%); }
+.case-body { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.case-head { display: flex; align-items: center; gap: 10px; }
+.case-portrait { width: 40px; height: 40px; image-rendering: pixelated; border: 2px solid var(--ui-line); border-radius: 4px; background: var(--ui-card); flex: none; }
+.case-title { font-size: 16px; font-weight: 600; color: var(--ui-highlight); }
+.case-meta { font-size: 12px; color: var(--ui-ink-soft); }
+.case-deadline { font-size: 12px; color: var(--ui-ink-soft); }
+.case-deadline.is-urgent { color: var(--ui-bad); }
+.case-section { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border: 1px solid var(--ui-line); border-radius: 3px; background: var(--ui-card); }
+.case-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ui-ink-soft); }
+.case-text, .case-quote { margin: 0; font-size: 13px; line-height: 1.35; }
+.case-quote { font-style: italic; }
+.case-facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2px 12px; }
+.case-fact { display: flex; gap: 6px; font-size: 12px; min-width: 0; }
+.case-fact-label { color: var(--ui-ink-soft); white-space: nowrap; }
+.case-fact-value { min-width: 0; }
+.case-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.case-option { display: grid; grid-template-columns: 16px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 6px; align-items: center; padding: 4px 6px; border: 1px solid var(--ui-line); border-radius: 3px; background: var(--ui-paper); color: var(--ui-ink); font: inherit; text-align: left; cursor: pointer; }
+.case-option img { width: 16px; height: 16px; image-rendering: pixelated; grid-row: span 2; }
+.case-option-name { font-size: 12px; font-weight: 600; }
+.case-option-detail { font-size: 10px; color: var(--ui-ink-soft); }
+.case-option:hover { background: var(--ui-card-hi); }
+.case-option.is-chosen { background: var(--ui-card-hi); outline: 2px solid var(--ui-highlight); outline-offset: -2px; }
+.case-restitution { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; cursor: pointer; }
+.case-restitution.is-off { color: var(--ui-ink-soft); cursor: default; }
+.case-warn { font-size: 12px; color: var(--ui-warn); padding: 4px 6px; border-radius: 3px; background: var(--ui-card-bad); }
+.case-decide { margin-top: 6px; align-self: flex-start; }
+.case-result { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--ui-line); border-radius: 3px; background: var(--ui-card); }
+.case-result-band { font-size: 16px; font-weight: 600; }
+.case-result-sentence { font-size: 12px; color: var(--ui-ink-soft); }
+.case-result.is-fair { background: var(--ui-card-ok); }
+.case-result.is-harsh, .case-result.is-cruel { background: var(--ui-card-bad); }
+.case-result.is-lenient, .case-result.is-lax, .case-result.is-stale { background: var(--ui-card-info); }
+.case-effects { margin: 2px 0 0; padding-left: 18px; font-size: 12px; }
+.case-empty { padding: 10px 0; color: var(--ui-ink-soft); }
+.case-band { font-size: 11px; white-space: nowrap; padding: 0 4px; border-radius: 3px; }
+.case-band.is-fair { color: var(--ui-ok); }
+.case-band.is-harsh, .case-band.is-cruel { color: var(--ui-bad); }
+.case-band.is-lenient, .case-band.is-lax, .case-band.is-stale { color: var(--ui-info); }
+.case-link { margin-left: 6px; padding: 0 5px; border: 1px solid var(--ui-line); border-radius: 3px; background: var(--ui-card-hi); color: var(--ui-ink); font: inherit; font-size: 11px; cursor: pointer; }
+.purse-rioter.is-service { background: var(--ui-card-info); }
+.upgrade-text.is-warn { color: var(--ui-warn); }
+@media (max-width: 1100px), (max-height: 700px) {
+  .case-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .case-section { padding: 4px 6px; }
+  .case-text, .case-quote { font-size: 12px; }
+}
+
+/* (32.3) Kasaba Şöhreti: Krallık İtibarı rozeti (Nabız'ın yanında), Lütufname, lütuf yapısı kartı, dava sonucundaki itibar satırı */
+.hud-renown { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 1px 5px; }
+.hud-renown[hidden] { display: none; }
+.hud-renown:hover { border-color: rgba(255, 214, 160, 0.35); }
+.hud.topbar .hud-renown .renown-crown { width: 16px; height: 16px; image-rendering: pixelated; }
+.hud-renown .renown-value { font-size: 13px; font-weight: 700; font-family: var(--ui-num-font); font-variant-numeric: tabular-nums; }
+.hud-renown .renown-name { font-size: 12px; font-weight: 700; white-space: nowrap; color: var(--ui-ink-soft); }
+.hud-renown .renown-arrow { font-size: 13px; font-weight: 700; min-width: 0.8em; text-align: center; }
+.hud-renown .renown-arrow.is-up { color: var(--ui-ok); }
+.hud-renown .renown-arrow.is-down { color: var(--ui-bad); }
+.hud-renown .renown-arrow.is-flat { color: var(--ui-ink-soft); }
+.hud-renown[data-level='favored'] .renown-name, .hud-renown[data-level='favored'] .renown-value { color: #e6c36a; }
+.hud-renown[data-level='good'] .renown-name { color: var(--ui-ok); }
+.hud-renown[data-level='bad'] .renown-name, .hud-renown[data-level='bad'] .renown-value { color: var(--ui-bad); }
+@media (max-width: 1500px) {
+  .hud-renown { display: inline-grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 2px; row-gap: 0; padding: 1px 3px; }
+  .hud-renown .renown-name { display: none; }
+  .hud.topbar .hud-renown .renown-crown { grid-column: 1; grid-row: 1; width: 14px; height: 14px; }
+  .hud-renown .renown-arrow { grid-column: 2; grid-row: 1; font-size: 13px; line-height: 14px; }
+  .hud-renown .renown-value { grid-column: 1 / 3; grid-row: 2; font-size: 13px; line-height: 13px; text-align: center; }
+}
+.building-royal .royal-card.is-weak .decree-state { color: var(--ui-bad); }
+.renown-line.renown-reasons { color: var(--ui-ink); }
+.case-effects .case-renown.is-down { color: var(--ui-bad); }
+.case-effects .case-renown.is-up { color: var(--ui-ok); }
+.modal-window.royal-letter { width: min(460px, 100%); }
+.royal-letter-body { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+.royal-letter-paper { position: relative; padding: 16px 18px 14px; background: linear-gradient(180deg, #f3e3bd, #e7d09e); color: #3b2616; border: 2px solid #a5793f; border-radius: 4px; box-shadow: inset 0 0 18px rgba(120, 80, 30, 0.35); }
+.royal-letter-lead { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+.royal-letter-text { font-size: 15px; line-height: 1.45; margin: 0 0 8px; font-style: italic; }
+.royal-letter-meta { font-size: 13px; color: #5b3f24; }
+.royal-letter-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.royal-letter-date { font-size: 13px; font-variant-numeric: tabular-nums; }
+.royal-letter-seal { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #d2473d, #8e1f1a); border: 2px solid #6b1511; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); }
+.royal-letter-seal img { width: 22px; height: 22px; image-rendering: pixelated; }
+.royal-letter-close { font-size: 13px; margin-top: 8px; color: #5b3f24; }
+.royal-letter-actions { display: flex; justify-content: flex-end; }
+/* (32.3) telefon: rozet tek sütun (taç üstte, % altta, ok ipucunda); yer açmak için refah ve güven çubukları kısalır — nüfus satırı alta kaymasın */
+@media (max-width: 480px) {
+  .hud-renown { grid-template-columns: auto; padding: 0 2px; }
+  .hud-renown .renown-arrow { display: none; }
+  .hud.topbar .hud-renown .renown-crown { grid-column: 1; grid-row: 1; justify-self: center; }
+  .hud-renown .renown-value { grid-column: 1; font-size: 12px; }
+  .hud-welfare .welfare-bar { width: 22px; }
+  .hud-pulse .trust-mini-bar { min-width: 20px; }
+  .hud.topbar .hud-zone-res { gap: 2px; }
+}
+
+/* (32.4) Darülfünun paneli: öğrenci satırları ve ilerleme çubukları */
+.building-university .university-list { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
+.building-university .university-row { display: grid; grid-template-columns: minmax(0, 1fr) 72px 34px; align-items: center; gap: 6px; font-size: 12px; }
+.building-university .university-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-ink); }
+.building-university .university-bar { height: 7px; border-radius: 4px; background: rgba(0, 0, 0, 0.28); overflow: hidden; }
+.building-university .university-fill { display: block; height: 100%; background: linear-gradient(90deg, #7fb3ff, #ffd23f); }
+.building-university .university-pct { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* (32.5) Hobi evleri paneli: üye / aday satırları, katılım işaretleri, tablo duvarı */
+.building-club .club-subtitle { margin: 6px 0 2px; font-size: 12px; font-weight: 700; color: var(--ui-ink); }
+.building-club .club-list { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
+.building-club .club-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; align-items: center; gap: 6px; font-size: 12px; }
+.building-club .club-row.is-candidate { grid-template-columns: 22px minmax(0, 1fr) auto; }
+.building-club .club-portrait { width: 20px; height: 20px; image-rendering: pixelated; border-radius: 4px; background: rgba(0, 0, 0, 0.2); }
+.building-club .club-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ui-ink); }
+.building-club .club-marks { display: flex; gap: 1px; font-size: 10px; color: rgba(255, 255, 255, 0.35); }
+.building-club .club-mark.is-on { color: #7fd08a; }
+.building-club .club-btn { font-size: 11px; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(0, 0, 0, 0.25); color: var(--ui-ink); cursor: pointer; }
+.building-club .club-btn:disabled { opacity: 0.45; cursor: default; }
+.building-club .club-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin: 3px 0; }
+.building-club .club-painting { font-size: 11px; padding: 2px 4px; border-radius: 3px; background: rgba(255, 210, 63, 0.12); border: 1px solid rgba(255, 184, 77, 0.45); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

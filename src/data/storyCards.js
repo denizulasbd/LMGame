@@ -1,7 +1,7 @@
 // (30.2 "Görünen Hikâye") Hikâye kartlarının veri tablosu: hangi olay kaç öncelikli, hangi eşikler, süzgeç kademeleri. Metinler
 // systems/StoryCards.js'te saf işlevlerle üretilir (aynı olay yükü aynı metni verir). Bu tablo yalnızca arayüzü etkiler;
 // simülasyona hiçbir şey yazmaz. Sayıları buradan ayarla (gün başına 2-8 kart hedefi: tools/sim/tests/30.2-stories.mjs).
-export const STORY_TABLE_VERSION = 3; // (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20
+export const STORY_TABLE_VERSION = 8; // (32.5) 8: 'club:*' (kuruluş, ürün, sergi; clubPerDay); (32.4) 7: 'university:*' (kabul, mezuniyet, yarım bırakma); (32.3) 6: 'renown:tier' / 'renown:grant'; (30.3) 2: 'pantry:low' (Kiler boşalıyor); (30.6) 3: 'storm:struck' / 'crisis:raidResolved' (hasar kartı), fadeSeconds 20; (32.1) 4: 'crime:caught' / 'crime:unsolved'; (32.2) 5: 'court:*' (karar, sürgün, tanık, sürüncemede)
 
 export const STORY_LIMITS = {
   visible: 2, // aynı anda görünen kart
@@ -14,6 +14,8 @@ export const STORY_LIMITS = {
   fearMin: 12, // korku kartı için en düşük puan
   specialStartHour: 6, // özel gün sabahı kartı (RiteSystem 06:00'da işaretler)
   storyChars: 220, // "Öyküsünü oku" ile açılan metnin üst sınırı
+  crimePerDay: 1, // (32.1) "Yalnızca önemli" süzgecinde günde en çok bu kadar suç kartı (fazlası gün özetine; izlenen sakinin kartı sayılmaz)
+  clubPerDay: 1, // (32.5) "Yalnızca önemli" süzgecinde günde en çok bu kadar kulüp kartı
 };
 
 // Olay -> öncelik (5 en önemli). Süzgeç: 'important' öncelik >= 3 olanları gösterir.
@@ -42,6 +44,21 @@ export const STORY_PRIORITY = {
   'storm:struck': 4, // (30.6) fırtına / kurt sonrası hasar kartı
   'crisis:raidResolved': 4, // (30.6) baskın sonrası hasar kartı (yalnızca yapı hasar gördüyse)
   'dilemma:resolved': 4, // (30.4b) orta oyun kararının sonucu (yalnızca yeni kartlar)
+  'crime:caught': 3, // (32.1) suçüstü yakalanan küçük suç ("Yalnızca önemli" süzgecinde günde en çok bir suç kartı: crimePerDay)
+  'crime:unsolved': 3, // (32.1) kimsenin görmediği kayıp
+  'court:verdict': 2, // (32.2) Adalet Sarayı kararı: adil / hafif kısa kart (2); sert ve zalim karar önemli (kartın kendi önceliği 4)
+  'court:exiled': 4, // (32.2) sürgün
+  'court:revealed': 3, // (32.2) susan tanık konuştu, dava açıldı
+  'court:stale': 3, // (32.2) dava sürüncemede kaldı
+  'renown:tier': 3, // (32.3) Krallık İtibarı kademe değişti (Şüpheli'ye düşüş ve Gözde'ye çıkış 4)
+  'renown:grant': 5, // (32.3) Kraliyet Lütufnamesi (gizli yapı açıldı)
+  'university:admitted': 1, // (32.4) Darülfünun'a kabul (kısa)
+  'university:graduated': 4, // (32.4) Darülfünun mezuniyeti (önemli)
+  'university:dropped': 2, // (32.4) eşiğe ulaşamadan yetişkin oldu
+  'club:founded': 3, // (32.5) kulüp kuruldu (ilk üç üye)
+  'club:work': 2, // (32.5) kulübün küçük ürünü (tarh, mendil, tablo)
+  'club:milestone': 3, // (32.5) ürün kilometre taşı (ilk ürün, son tarh, kış giysisi): 'club:work' kartının önceliği
+  'club:exhibition': 4, // (32.5) Kasaba Sergisi (altıncı tablo, bir kez)
   'story:summary': 2,
 };
 
@@ -57,6 +74,8 @@ export const STORY_ACTIONS = {
   story: 'Öyküsünü oku',
   condolence: 'Taziye Sofrası Kur',
   gift: 'Armağan Gönder',
+  case: 'Dava dosyası', // (32.2)
+  letter: 'Lütufnameyi oku', // (32.3)
 };
 
 export const STORY_TEXT = {
