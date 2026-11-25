@@ -170,6 +170,7 @@ await page.evaluate(async () => {
   window.__renownMod = await import('/src/systems/Renown.js'); // (32.3) Kasaba Şöhreti ölçümü (saf; zar çekmez)
   window.__buildingsData = await import('/src/data/buildings.js'); // (32.3) lütuf yapılarının bedeli
   window.__relMod = await import('/src/systems/RelationshipSystem.js'); // (32.5) dost sayısı (yalnızca okur)
+  window.__clubsMod = await import('/src/systems/Clubs.js'); // (32.6a) etkin üye (yalnızca okur)
   {
     // (32.3) itibar seyri (gün dönümünden sonra), kademe günleri, lütuflar, Krallık Vergisi toplamı, göçmenler
     const R = (window.__renown = { series: {}, tiers: [], grants: [], built: {}, levyGold: 0, levyPaid: 0, levyFailed: 0, joined: 0, skilled: 0, targets: {} });
@@ -511,7 +512,29 @@ await page.evaluate((passive) => {
     window.__crimeExpect.days += 1;
     window.__crimeExpect.maxRisk = Math.max(window.__crimeExpect.maxRisk, risks.reduce((p, q) => p + q, 0));
   });
-  game.events.on('crime:recorded', ({ kase, caught }) => window.__crimeLog.push({ day: kase.day, crime: kase.crime, caught, motive: kase.motive, guard: kase.witnessIsGuard, amount: kase.stolen?.amount ?? 0, coins: Boolean(kase.stolen?.coins) }));
+  // (32.6a) suçlunun eğitim seviyesi (0/1/2, öğrenci 's') ve kulüp durumu (0 yok / 1 üye / 2 etkin üye), saraydan önce mi; maruziyet:
+  // her gün dönümünde suç adayı sakin-gün sayısı aynı gruplarla (C3: sakin başına suç). Yalnızca okur.
+  const eduOf = (c) => (c?.higherStudy ? 's' : c?.graduate ? 2 : c?.educated ? 1 : 0);
+  const clubOf = (c) => (!c?.club ? 0 : window.__clubsMod?.isActiveMember(game.state, c) ? 2 : 1);
+  window.__crimeExpose = { edu: {}, club: {}, cross: {} };
+  game.events.on('time:newDay', () => {
+    const s = game.state;
+    for (const c of s.characters) {
+      if (!window.__justiceMod.crimeCandidate(s, c)) continue;
+      const X = window.__crimeExpose;
+      const e = eduOf(c);
+      const k = clubOf(c);
+      X.edu[e] = (X.edu[e] ?? 0) + 1;
+      X.club[k] = (X.club[k] ?? 0) + 1;
+      X.cross[`${e}/${k}`] = (X.cross[`${e}/${k}`] ?? 0) + 1;
+    }
+  });
+  game.events.on('crime:noOption', ({ motive }) => { const X = (window.__crimeExpect.noOption ??= {}); X[motive] = (X[motive] ?? 0) + 1; });
+  game.events.on('crime:recorded', ({ kase, caught }) => {
+    const c = game.state.characters.find((x) => x.id === kase.offenderId);
+    const court = game.state.buildings.some((b) => b.type === 'courthouse' && b.functional);
+    window.__crimeLog.push({ day: kase.day, crime: kase.crime, caught, motive: kase.motive, guard: kase.witnessIsGuard, amount: kase.stolen?.amount ?? 0, coins: Boolean(kase.stolen?.coins), edu: eduOf(c), club: clubOf(c), court });
+  });
   // (32.2) Hâkim politikası: saraydaki açık davaya saat başında karar ('ui:courtVerdict', oyuncu gibi). Novice'in zarı sayfa içi ayrı
   // üreteçten (oyunun üreteçlerine dokunmaz). Ölçüm: impunity zirvesi, karar süreleri.
   window.__court = { imp: [], impMax: 1, decided: 0, waitH: 0, byJudge: {} };
@@ -1589,6 +1612,9 @@ const crimeStats = await page.evaluate(() => {
     decisions: window.__crimeExpect?.decisions ?? null,
     nulls: window.__crimeExpect?.nulls ?? null,
     hours: window.__crimeExpect?.hours ?? {},
+    noOption: window.__crimeExpect?.noOption ?? {},
+    log: log.map((e) => [e.day, e.crime, e.motive, e.caught ? 1 : 0, e.guard ? 1 : 0, e.edu, e.club, e.court ? 1 : 0]), // (32.6a)
+    expose: window.__crimeExpose ?? null,
   };
 });
 const courtStats = await page.evaluate(() => {

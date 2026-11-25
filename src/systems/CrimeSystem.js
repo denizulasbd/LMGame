@@ -116,7 +116,10 @@ export class CrimeSystem {
       const hour = this.dice.int(JUSTICE.hours[0], JUSTICE.hours[1] - 1);
       const at = dayStart + hour * 60 + this.dice.int(0, 59);
       const duration = this.dice.int(JUSTICE.duration[0], JUSTICE.duration[1]);
-      if (!option) continue;
+      if (!option) {
+        this.events.emit('crime:noOption', { character: pick.c, motive }); // (32.6a) ölçüm: motivasyona uygun hedef yok, yuva boşa gitti
+        continue;
+      }
       const until = Math.min(at + JUSTICE.windowHours * 60, dayStart + JUSTICE.dayEndHour * 60);
       pick.c.crimePlan = { ...option, motive, at, until, duration, factors: pick.f };
       planned.push(pick.c);
