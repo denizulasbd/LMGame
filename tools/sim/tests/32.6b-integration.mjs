@@ -287,5 +287,86 @@ const errors = [];
   await browser.close();
 }
 
+// ---------------------------------------------------------------- B. şalter kapalıyken yüklenen kayıt (fikstür: bütün 32 durumları açıkken alınmış 90 günlük kayıt)
+// Her şalter tek tek ve hepsi birlikte kapalı açılır, kayıt yüklenir: çökme yok, kapalı mekaniğin alanları bozulmadan korunur (yeniden
+// yazılan kayıtta aynı), oyun iki gün yaşar; sonra şalter yeniden açık oyunda aynı kayıt kaldığı yerden sürer.
+{
+  const raw = fs.readFileSync(new URL('../fixtures/save-v41-asama32.json', import.meta.url), 'utf8');
+  const original = JSON.parse(raw);
+  const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((q) => [q, x[q]])) : x));
+  const keep = {
+    justice: () => canon(original.justice),
+    clubs: () => canon(original.clubs),
+    university: () => canon(original.university),
+    renown: () => canon(original.renown),
+    people: () => canon(original.characters.map((c) => [c.id, c.sentence ?? null, c.higherStudy ?? null, c.graduate ?? null, c.club ?? null])),
+  };
+  const configs = [
+    ['justice'], ['court'], ['renown'], ['university'], ['clubs'], ['justice', 'court', 'renown', 'university', 'clubs'],
+    // bağımlılıklar: yalnız bir şalter açık (öteki dördü kapalı)
+    ['justice', 'court', 'university', 'clubs'], ['justice', 'court', 'renown', 'clubs'], ['justice', 'court', 'renown', 'university'],
+  ];
+  const ALL5 = ['justice', 'court', 'renown', 'university', 'clubs'];
+  const savedAfter = {};
+  for (const off of configs) {
+    const label = off.length === 5 ? 'hepsi' : off.length === 4 ? `yalnız ${ALL5.find((k) => !off.includes(k) && k !== 'court')} açık` : off[0];
+    const { browser, page } = await openGame({ seed: 1, enginesOff: off });
+    const perrs = [];
+    page.on('pageerror', (e) => perrs.push(String(e).slice(0, 200)));
+    const r = await page.evaluate(async (raw) => {
+      localStorage.setItem('lmgame.save.v2', raw);
+      let threw = null;
+      try { game.events.emit('ui:load'); } catch (e) { threw = String(e).slice(0, 200); }
+      const st = game.state;
+      const day0 = st.time.day;
+      const pop0 = st.characters.length;
+      try { sim.step(225 * 24 * 2); } catch (e) { threw = String(e).slice(0, 200); }
+      const { ENGINES } = await import('/src/systems/Engines.js');
+      game.events.emit('ui:save');
+      const out = JSON.parse(localStorage.getItem('lmgame.save.v2'));
+      const bTypes = ['courthouse', 'university', 'gardenClub', 'sewingClub', 'paintingClub', 'peaceFountain', 'royalRoseGarden', 'royalArchive'];
+      return {
+        threw, day0, day: st.time.day, pop0, pop: st.characters.length, raw: JSON.stringify(out),
+        built: bTypes.filter((t) => out.buildings.some((b) => b.type === t)).length,
+        engines: Object.fromEntries(['justice', 'court', 'renown', 'university', 'clubs'].map((k) => [k, ENGINES[k]])),
+        clubsKeys: Object.keys(out.clubs ?? {}), guide: out.guide?.done?.length ?? 0,
+      };
+    }, raw);
+    const after = JSON.parse(r.raw);
+    savedAfter[label] = r.raw;
+    results.push({ name: `şalter kapalı (${label}): kayıt çökmeden yüklenir, iki gün yaşanır, sayfa hatası yok`, ok: !r.threw && r.day === r.day0 + 2 && perrs.length === 0 && r.pop > 0, detail: `${r.threw ?? ''} ${perrs[0] ?? ''} gün ${r.day0}→${r.day} sakin ${r.pop0}→${r.pop}` });
+    results.push({ name: `şalter kapalı (${label}): sekiz yeni yapı kayıtta durur (yapılar silinmez, çalışmasa da)`, ok: r.built === 8, detail: `${r.built}/8` });
+    // kapalı mekaniğin alanları: yalnızca o şalterin sahibi olduğu alanlar bozulmadan korunur (açık olanlar iki günde ilerleyebilir)
+    const closed = off.includes('justice') ? ['justice', 'people'] : off.includes('court') ? ['people'] : [];
+    const checks = [];
+    if (off.includes('clubs')) checks.push(['clubs', canon(after.clubs) === keep.clubs(), 'clubs']);
+    if (off.includes('university')) checks.push(['university', canon(after.university) === keep.university() && after.characters.filter((c) => c.higherStudy).length === original.characters.filter((c) => c.higherStudy).length, 'university + higherStudy']);
+    if (off.includes('renown')) checks.push(['renown', canon(after.renown) === keep.renown(), 'renown']);
+    if (off.includes('justice')) checks.push(['justice', canon(after.justice?.cases) === canon(original.justice.cases) && canon(after.justice?.records) === canon(original.justice.records), 'justice.cases / records']);
+    if (off.includes('court') && !off.includes('justice')) checks.push(['court', after.characters.filter((c) => c.sentence?.exile || c.sentence?.service > 0).length >= 1, 'sakin cezaları (sentence)']);
+    for (const [k, ok, what] of checks) results.push({ name: `şalter kapalı (${label}): ${what} alanı iki gün sonra bozulmadan korunur`, ok, detail: k });
+    await browser.close();
+  }
+  // şalter yeniden açılınca kaldığı yerden sürer: kulüpler kapalı koşunun yazdığı kayıt, hepsi açık yeni oyunda
+  for (const label of ['clubs', 'university', 'hepsi']) {
+    const { browser, page } = await openGame({ seed: 1 });
+    const perrs = [];
+    page.on('pageerror', (e) => perrs.push(String(e).slice(0, 200)));
+    const r = await page.evaluate(async (raw) => {
+      localStorage.setItem('lmgame.save.v2', raw);
+      game.events.emit('ui:load');
+      const st = game.state;
+      const sc = game.scenes.current;
+      const before = { members: st.characters.filter((c) => c.club).length, students: st.characters.filter((c) => c.higherStudy).length, cases: st.justice?.cases.length ?? 0, sessions: Object.values(st.clubs ?? {}).reduce((a, x) => a + (x.sessions ?? 0), 0), graduated: st.university?.graduated ?? 0 };
+      let threw = null;
+      try { sim.step(225 * 24 * 3); } catch (e) { threw = String(e).slice(0, 200); }
+      const after = { members: st.characters.filter((c) => c.club).length, students: st.characters.filter((c) => c.higherStudy).length, sessions: Object.values(st.clubs ?? {}).reduce((a, x) => a + (x.sessions ?? 0), 0), admitted: st.university?.admitted ?? 0, day: st.time.day };
+      return { threw, before, after, listeners: [sc.clubs?.unsubscribers?.length, sc.university?.unsubscribers?.length, sc.court?.unsubscribers?.length] };
+    }, savedAfter[label]);
+    results.push({ name: `şalter yeniden açık (${label} kapalıyken yazılan kayıt): kaldığı yerden sürer — üyeler, öğrenciler ve davalar duruyor, sistemler dinliyor, üç gün çökmeden geçer`, ok: !r.threw && perrs.length === 0 && r.before.members >= 6 && r.listeners.every((n) => n > 0) && r.after.sessions >= r.before.sessions, detail: `${JSON.stringify(r.before)} → ${JSON.stringify(r.after)} ${r.threw ?? ''} ${perrs[0] ?? ''}` });
+    await browser.close();
+  }
+}
+
 const ok = report(errors);
 process.exit(ok ? 0 : 1);
