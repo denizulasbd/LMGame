@@ -114,7 +114,9 @@ export class RenownSystem {
   /** Saygın ve üstünde yeni gelen bir meslekte Kalfa gelir. */
   welcome(c) {
     if (!engineOn('renown') || !c || c.role || c.isChild) return;
-    if (rankOf(this.state) < RENOWN_EFFECTS.skilledImmigrant.minRank) return;
+    // (32.6a) eşik veriden: minReputation sayıysa itibar değeri (ör. ≥ 70), değilse kademe (minRank)
+    const rule = RENOWN_EFFECTS.skilledImmigrant;
+    if (Number.isFinite(rule.minReputation) ? (this.state.crown?.reputation ?? 0) < rule.minReputation : rankOf(this.state) < rule.minRank) return;
     const skill = immigrantSkillFor(c);
     c.skills ??= {};
     c.skills[skill] = Math.max(c.skills[skill] ?? 0, KALFA_XP());

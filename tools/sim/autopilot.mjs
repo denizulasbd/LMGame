@@ -527,6 +527,10 @@ await page.evaluate((passive) => {
       const f = window.__justiceMod.riskFactors(s, c);
       X0.hungerSum = (X0.hungerSum ?? 0) + f.hunger;
       X0.n = (X0.n ?? 0) + 1;
+      // (32.6a) C3: beklenen risk (saf crimeRisk) eğitim / kulüp grubuna ve yaşam evresine göre: gürültüsüz karşılaştırma
+      const rk = window.__justiceMod.crimeRisk(s, c, f);
+      const gk = `${eduOf(c)}/${clubOf(c)}/${c.lifeStage}`;
+      (X0.risk ??= {})[gk] = [((X0.risk[gk]?.[0]) ?? 0) + rk, ((X0.risk[gk]?.[1]) ?? 0) + 1];
       const X = window.__crimeExpose;
       const e = eduOf(c);
       const k = clubOf(c);
