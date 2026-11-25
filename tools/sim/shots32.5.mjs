@@ -115,6 +115,11 @@ await page.evaluate(async () => {
   const pr = sc.clubs.rec('paintingClub');
   const pb = C.clubBuilding(s, 'paintingClub');
   const painters = C.membersOf(s, 'paintingClub');
+  // kart alanını boşalt (eski kartlar kapanır; "Yalnızca önemli"nin günlük kulüp kartı sayacı sıfırlanır: yalnızca arayüz)
+  const dir = sc.storyDirector;
+  dir.queue = [];
+  for (const card of [...dir.visible]) dir.dismiss(card.uid);
+  dir.clubCards = { day: -1, n: 0 };
   pr.sessions = 15;
   sc.clubs.product('paintingClub', pb, pr, painters);
   pr.sessions = 18;
