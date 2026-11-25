@@ -2985,6 +2985,13 @@ button.relation-row:hover {
   text-shadow: none;
 }
 
+/* (32.6b) sarı zeminli ana eylem düğmeleri (Yükselt, Teslim Et, Kararı ver, Tamam): üstteki genel .hud-btn kuralı koyu metni açık parşömene çeviriyordu
+   (sarı üstünde açık metin okunmuyordu); koyu metin ve gölgesiz */
+.hud-btn.upgrade-button:not(:disabled) {
+  color: var(--ui-ink-dark);
+  text-shadow: none;
+}
+
 .hud-btn:disabled {
   opacity: 0.45;
   cursor: default;
