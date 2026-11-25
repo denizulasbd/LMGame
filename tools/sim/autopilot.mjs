@@ -193,7 +193,7 @@ await page.evaluate(async () => {
     ev.on('building:completed', (b) => { if (['peaceFountain', 'royalRoseGarden', 'royalArchive'].includes(b?.type)) R.built[b.type] = window.game.state.time.day; });
     ev.on('crown:levyPaid', ({ amount }) => { R.levyGold += amount; R.levyPaid += 1; });
     ev.on('crown:levyFailed', () => { R.levyFailed += 1; });
-    ev.on('population:joined', () => { R.joined += 1; });
+    ev.on('population:joined', ({ character } = {}) => { R.joined += 1; if (character && !character.isChild) (R.joinLog ??= []).push([window.game.state.time.day, Math.round(window.game.state.crown?.reputation ?? 0)]); }); // (32.6a) göçmen günü ve itibar
     ev.on('renown:skilledImmigrant', () => { R.skilled += 1; });
   }
   {
@@ -1679,7 +1679,7 @@ const renownStats = await page.evaluate(() => {
     levelDays: Object.values(R.series).reduce((m, v) => { const k = RN ? RN.renownLevelOf(v).key : '?'; m[k] = (m[k] ?? 0) + 1; return m; }, {}),
     tiers: R.tiers, targets: R.targets, target: t ? t.target : null, top: t ? t.parts.slice(0, 3).map((p) => `${p.label} ${p.value}`) : [],
     grants: R.grants, built: R.built, streak: s.renown?.gozdeStreak ?? 0, streakMax: R.streakMax ?? 0, readyDays: R.readyDays ?? 0, eligibleDays: R.eligibleDays ?? 0, series: R.series,
-    levyGold: R.levyGold, levyPaid: R.levyPaid, levyFailed: R.levyFailed, joined: R.joined, skilled: R.skilled,
+    levyGold: R.levyGold, levyPaid: R.levyPaid, levyFailed: R.levyFailed, joined: R.joined, skilled: R.skilled, joinLog: R.joinLog ?? [],
   };
 });
 const uniStats = await page.evaluate(() => {
