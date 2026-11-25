@@ -712,7 +712,10 @@ export function caseFacts(state, k, tierName = (t) => t) {
 
 /** Suçlunun ifadesi (motivasyon × pişmanlık; değişken davada yazılı). */
 export function statementText(k) {
-  const lines = STATEMENTS[k.motive]?.[k.remorse] ?? STATEMENTS.temptation.confess;
+  // (32.6b) plan sabah 08:00'da açlığa göre yapılır, suç saatler sonra işlenir: o an karnı doyduysa (dosyada "Aç mıydı: Hayır") ifade
+  // açlıktan söz etmez (oyun günlüğü 6: "midem kazınıyordu" ile "Aç mıydı: Hayır" çelişiyordu). Yalnızca metin: motivasyon, zar ve hak edilen aynı.
+  const motive = k.motive === 'hunger' && !k.context?.hungry ? 'temptation' : k.motive;
+  const lines = STATEMENTS[motive]?.[k.remorse] ?? STATEMENTS.temptation.confess;
   const line = lines[(k.statement?.offender ?? 0) % lines.length];
   return fill(line, { loot: k.stolen ? lootText(k.stolen) : 'onu' });
 }

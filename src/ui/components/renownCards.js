@@ -17,7 +17,8 @@ import { engineOn } from '../../systems/Engines.js';
 import { renownTarget, renownStep, renownLevelOf, renownReasonsText, royalWeakened, grantTownReady, rankOf } from '../../systems/Renown.js';
 
 const ARROWS = { up: '▲', flat: '▬', down: '▼' };
-const ARROW_TEXT = { up: 'yükseliyor', flat: 'durgun', down: 'düşüyor' };
+// (32.6b) ok son 24 saatin yönünü gösterir (geçmiş); "bu gece" satırı ise önümüzdeki gece kaymasıdır: iki ayrı zaman, metin ayırır
+const ARROW_TEXT = { up: 'yükseldi', flat: 'durgun kaldı', down: 'düştü' };
 const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(Math.round(v * 10) / 10)}`;
 
 /** Ortak özet: { value, level, target, step, dir, reasons, parts }. */
@@ -39,7 +40,7 @@ export function renownSummary(state) {
 export function renownLines(state, s = renownSummary(state)) {
   const early = state.time.day < RENOWN_DRIFT.minDay;
   return [
-    `Krallık İtibarı: %${Math.round(s.value)} · ${s.level.name} ${ARROWS[s.dir]} (24 saatte ${ARROW_TEXT[s.dir]})`,
+    `Krallık İtibarı: %${Math.round(s.value)} · ${s.level.name} ${ARROWS[s.dir]} (son 24 saatte ${ARROW_TEXT[s.dir]})`,
     early ? `Hedef %${Math.round(s.target)} · kayma ${RENOWN_DRIFT.minDay}. günden itibaren` : `Hedef %${Math.round(s.target)} · bu gece ${signed(s.step)} (boşluğun %${Math.round(RENOWN_DRIFT.share * 100)}'si, en çok ${RENOWN_DRIFT.maxStep})`,
     `Nedenler: ${s.reasons.length ? renownReasonsText(s.reasons) : 'henüz yok'}`,
     ...((t) => (t ? [t] : []))(educationRenownLine(state)), // (32.4) hedefteki Eğitim katkısı

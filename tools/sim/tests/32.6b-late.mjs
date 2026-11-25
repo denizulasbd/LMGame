@@ -145,6 +145,19 @@ results.push(...(await page.evaluate(async () => {
   c('B3: şalterler kapalıyken satırlar yok (eski ödül listeleri aynen): Kasaba 7, Gelişmiş Şehir 5 (açıkken 9 ve 6)', townOff.length === 7 && cityOff.length === 5 && town.length === 9 && city.length === 6, `${townOff.length} ${cityOff.length} ${town.length} ${city.length}`);
   c('B3: ilk ödül satırı değişmedi (seviye atlama bildirimi perks[0]\'ı okur)', town[0] === townOff[0] && city[0] === cityOff[0], '');
 
+  // ---- E. oyun günlüğü 6'dan küçük düzeltmeler (metin / ipucu)
+  const JU = await import('/src/systems/Justice.js');
+  const JD = await import('/src/data/justice.js');
+  const RC = await import('/src/ui/components/renownCards.js');
+  const baseCase = { crime: 'marketFruit', motive: 'hunger', remorse: 'confess', statement: { offender: 0 }, stolen: null, context: { hungry: false } };
+  const fedText = JU.statementText(baseCase);
+  const hungryText = JU.statementText({ ...baseCase, context: { hungry: true } });
+  const hungerLines = JD.STATEMENTS.hunger.confess;
+  const temptLines = JD.STATEMENTS.temptation.confess;
+  c('E: ifade açlıktan söz ederken dosyada "Aç mıydı: Hayır" olmaz — karnı doymuş sanığın ifadesi açlık satırlarından seçilmez', temptLines.some((l) => l.replace(/\{loot\}/g, 'onu') === fedText) && !hungerLines.includes(fedText) && hungerLines.some((l) => l.replace(/\{loot\}/g, 'onu') === hungryText), `${fedText} | ${hungryText}`);
+  const lines = RC.renownLines(st);
+  c('E: itibar ipucunda ok geçmişi söyler ("son 24 saatte yükseldi / düştü / durgun kaldı"), "bu gece" ayrı satırda gelecektir', /son 24 saatte (yükseldi|düştü|durgun kaldı)/.test(lines[0]) && /bu gece|kayma/.test(lines[1]), lines.slice(0, 2).join(' / '));
+
   // ---- kayıt
   st.milestones.justiceServed = { day: 12, hour: 9, minute: 0 };
   const json = JSON.parse(JSON.stringify({ ...st.toJSON(), version: CONFIG.SAVE_VERSION, terrain: [] }));
