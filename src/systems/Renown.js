@@ -3,11 +3,13 @@
 //   renownStep(rep, target)  : bir günlük kayma
 //   renownLevels / renownLevelOf : kademeler (şalter kapalıyken REPUTATION.levels'in üç kademesi aynen)
 //   royal*                   : Kraliyet Lütfu yapılarının kilidi ve etkileri (Şüpheli'de yarıya iner)
-// Justice.js ve TownStatus.js bu dosyanın yalnızca işlevlerini çağırır (döngüsel içe aktarma işlev bildirimleriyle güvenli).
-import { RENOWN_DRIFT, RENOWN_TARGET as T, RENOWN_PART_LABELS, RENOWN_LEVELS, RENOWN_RANK, RENOWN_EFFECTS, RENOWN_GRANT, ROYAL_TYPES, ROYAL_EFFECTS } from '../data/renown.js';
-import { REPUTATION } from '../data/crown.js';
+// (32.6a) TownStatus / Justice / RelationshipSystem / ResearchSystem kademe ve lütuf çarpanlarını RoyalEffects.js'ten alır (döngüsüz).
+import { RENOWN_DRIFT, RENOWN_TARGET as T, RENOWN_PART_LABELS, RENOWN_RANK, RENOWN_EFFECTS, RENOWN_GRANT, ROYAL_TYPES } from '../data/renown.js';
 import { JUSTICE } from '../data/justice.js';
 import { engineOn } from './Engines.js';
+// (32.6a) kademe ve lütuf etkisi işlevleri döngü yaratmasın diye RoyalEffects.js'te (TownStatus / Justice / RelationshipSystem oradan alır)
+import { renownLevels, renownRank, renownLevelOf, rankOf, royalGranted, royalWeakened, renownCrimeFactor, renownRomanceFactor, renownResearchFactor, renownHappiness } from './RoyalEffects.js';
+export { renownLevels, renownRank, renownLevelOf, rankOf, royalGranted, royalWeakened, renownCrimeFactor, renownRomanceFactor, renownResearchFactor, renownHappiness };
 import { crimeRate, solvedRatio, justiceRecord, trustOf } from './Justice.js';
 import { trustWelfare } from './TrustSystem.js';
 import { pulseStats } from './Loyalty.js';
@@ -41,26 +43,6 @@ export function restoreRenown(data) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------- kademeler
-
-/** Geçerli kademe tablosu: renown açıkken dört kademe (en üstte Kraliyet Gözdesi), kapalıyken REPUTATION.levels aynen. */
-export function renownLevels() {
-  return engineOn('renown') ? RENOWN_LEVELS : REPUTATION.levels;
-}
-
-/** Kademenin sırası (Şüpheli 0, Sadık 1, Saygın 2, Gözde 3). */
-export function renownRank(levelOrKey) {
-  return RENOWN_RANK[typeof levelOrKey === 'string' ? levelOrKey : levelOrKey?.key] ?? 1;
-}
-
-export function renownLevelOf(value) {
-  const levels = renownLevels();
-  return levels.find((l) => value >= l.min) ?? levels[levels.length - 1];
-}
-
-/** Kasabanın şu anki itibar sırası. */
-export function rankOf(state) {
-  return renownRank(renownLevelOf(state.crown?.reputation ?? REPUTATION.start));
-}
 
 // ---------------------------------------------------------------------------------------------------------------------- hedef
 
@@ -178,11 +160,6 @@ export const KALFA_XP = () => SKILL_LEVELS[1].xp;
 
 // ---------------------------------------------------------------------------------------------------------------------- Kraliyet Lütfu
 
-/** Lütfu açılmış mı (kalıcı)? */
-export function royalGranted(state, type) {
-  return engineOn('renown') && Boolean(state.renown?.grants?.some((g) => g.key === type));
-}
-
 /** Kilidin genel koşulu: Kasaba seviyesi ve (Gelişmiş Şehir ya da Altın Çağ). */
 export function grantTownReady(state) {
   const tier = state.town?.tier ?? 1;
@@ -196,43 +173,4 @@ export function grantEligible(state, day = state.time.day) {
   if (r.gozdeStreak < RENOWN_GRANT.streakDays) return false;
   if (Number.isFinite(r.lastGrantDay) && day - r.lastGrantDay < RENOWN_GRANT.gapDays) return false;
   return ROYAL_TYPES.some((t) => !royalGranted(state, t));
-}
-
-/** Kurulmuş (bitmiş) lütuf yapısı. */
-function royalBuilt(state, type) {
-  return state.buildings.some((b) => b.functional && b.type === type);
-}
-
-/** Kurulduktan sonra itibar Şüpheli'ye düştüyse etkiler zayıflar. */
-export function royalWeakened(state) {
-  return engineOn('renown') && rankOf(state) < RENOWN_GRANT.weakenedBelowRank;
-}
-
-/** Bir çarpan etkisinin bugünkü değeri (1 = etkisiz): kurulu değilse 1, Şüpheli'de sapmanın yarısı. */
-function royalMul(state, type, field) {
-  if (!engineOn('renown') || !royalBuilt(state, type)) return 1;
-  const m = ROYAL_EFFECTS[type][field];
-  return royalWeakened(state) ? 1 + (m - 1) * RENOWN_GRANT.weakenedShare : m;
-}
-
-/** Barış Çeşmesi: kasaba çapında suç riski çarpanı (Justice.riskFactors → renown). */
-export function renownCrimeFactor(state) {
-  return royalMul(state, 'peaceFountain', 'crimeRisk');
-}
-
-/** Kraliyet Gül Bahçesi: aşk ve evlilik olasılığı çarpanı (RelationshipSystem). */
-export function renownRomanceFactor(state) {
-  return royalMul(state, 'royalRoseGarden', 'romance');
-}
-
-/** Kraliyet Arşivi: araştırma ve yazıt çözme hızı çarpanı (ResearchSystem.work). */
-export function renownResearchFactor(state) {
-  return royalMul(state, 'royalArchive', 'research');
-}
-
-/** Kraliyet Gül Bahçesi: refah puanı (TownStatus.townHappinessBonus; Şüpheli'de yarısı). */
-export function renownHappiness(state) {
-  if (!engineOn('renown') || !royalBuilt(state, 'royalRoseGarden')) return 0;
-  const h = ROYAL_EFFECTS.royalRoseGarden.happiness;
-  return royalWeakened(state) ? h * RENOWN_GRANT.weakenedShare : h;
 }

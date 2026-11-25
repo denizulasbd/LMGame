@@ -13,7 +13,7 @@
 //     verdict: { kind, by: 'elder' | 'court', auto, day, at?, band?, harsh?, deserved?, stale?, restitution?, fine?, service?, served?, effects? }
 import { universityCrimeFactor } from './University.js'; // (32.4)
 import { clubCrimeFactor, clubPoverty } from './Clubs.js'; // (32.5)
-import { renownCrimeFactor } from './Renown.js'; // (32.3)
+import { renownCrimeFactor } from './RoyalEffects.js'; // (32.3; 32.6a döngüsüz modül)
 import { JUSTICE, RISK, TRAIT_LEAN, QUIRK_LEAN, REMORSE, CATCH, CRIMES, CRIME_KEYS, VANDAL_GROUP, VANDAL_TEXT, LOOT_WORDS, CRIME_TEXT } from '../data/justice.js';
 import { COURT, SENTENCES, SENTENCE_KEYS, FINE, DESERVED, BANDS, IMPUNITY, STATEMENTS, VICTIM_PLEAS, PLEA_RULES, WITNESS_LINES, COURT_TEXT } from '../data/justice.js';
 import { PURSE, REVOLT } from '../data/citizens.js';
@@ -195,6 +195,14 @@ export function crimeCandidate(state, c) {
 /** (32.2) Uzaklaştırma cezası sürüyor mu (Han ve Pazar yasağı)? */
 export function isBanned(state, c) {
   return engineOn('court') && Number.isFinite(c?.sentence?.banUntil) && state.totalMinutes < c.sentence.banUntil;
+}
+
+/**
+ * (32.6a) Yasak bu planı engeller mi: uzaklaştırılmış sakin yasaklı yapıda (COURT.banVenues) yasaklı etkinliğe (COURT.banActivities)
+ * plan alamaz. Plan üretilen ortak noktada (Brain.planGathering) çağrılır: davet edilen / randevuya çağrılan yasaklı sakin de kapsanır.
+ */
+export function banBlocks(state, c, building, activity = building?.type) {
+  return Boolean(building) && COURT.banVenues.includes(building.type) && COURT.banActivities.includes(activity) && isBanned(state, c);
 }
 
 /** (32.2) Bugün kamu hizmetine çıkabilir mi: kalan saat var ve günlük tavan dolmadı. */

@@ -61,6 +61,7 @@
 //               oyunun ana üretecini tüketmediğini göstermek için: --crisis huzurlu ile 22. aşamanın koşusunu bire bir verir)
 //   --loy     : (30.3) data/loyalty.js'i bellekte geçersiz kılar (denge denemesi): "LOYALTY.bitterTrust.perHour=-0.5"
 //   --start-food N : (30.6) başlangıç yiyeceğini geçersiz kılar (denge denemesi)
+//   --club-diag : (32.6a) kulüplerin yan etkisi tanısı (yalnızca okur; JSON'a clubDiag: günlük doyum / sosyallik / keyif, saatlik etkinlik)
 //   --crime-diag : (32.1) suç planı vakti gelmiş sakinin kararlarını sayar (yalnızca okur; (32.1) satırına eklenir)
 //   --judge fair|harsh|lenient|novice : (32.2) Adalet Sarayı'nın hâkim politikası (varsayılan fair). fair: hak edilene en yakın ceza ve
 //               iade; harsh: bir-iki kademe sert (hak edilen + 1,5); lenient: hep Af ya da Uyarı; novice: rastgele (sürgün nadir; sayfa
@@ -132,6 +133,33 @@ await page.evaluate((o) => {
 if (options.profile && !['tyrant', 'benevolent', 'careless', 'repent', 'repent2', 'novice'].includes(options.profile)) {
   console.log(`bilinmeyen --profile: ${options.profile} (tyrant | benevolent | careless | repent | repent2 | novice)`);
   process.exit(2);
+}
+
+// (32.6a) --club-diag: kulüplerin yan etkisi tanısı (yalnızca dinler / okur; zar çekmez, durum yazmaz). Gün dönümünde her yetişkinin
+// doyum / sosyallik / keyif / kulübü, her saat başı yaptığı iş (etkinlik, yolda mı, randevu / davet), arzu gerçekleşmeleri. JSON: clubDiag.
+if (options['club-diag']) {
+  await page.evaluate(() => {
+    const D = (window.__clubDiag = { daily: [], hours: {}, wants: {}, bells: [] });
+    const ev = window.game.events;
+    const adults = () => window.game.state.characters.filter((c) => !c.role && !c.isChild && ['youth', 'adult', 'elder'].includes(c.lifeStage));
+    ev.on('time:newDay', (day) => {
+      for (const c of adults()) D.daily.push([day, c.id, Math.round(c.satisfaction ?? 0), Math.round(c.needs.social), Math.round(c.needs.fun), c.club?.key ?? null, c.club?.since ?? null, c.lifeStage, (c.traits ?? []).join('+'), c.quirk ?? '', c.partnerId != null ? 1 : 0, c.homeId ?? null]);
+    });
+    ev.on('time:hour', (h) => {
+      const day = window.game.state.time.day;
+      for (const c of adults()) {
+        const t = c.task;
+        const act = t ? t.activity : 'none';
+        const tag = `${act}${t?.phase === 'travel' ? '@yol' : ''}${t?.dateWithId !== undefined ? '#randevu' : t?.meetWithId !== undefined ? '#davet' : ''}`;
+        const k = `${c.id}`;
+        const rec = (D.hours[k] ??= {});
+        const slot = `${day}:${h}`;
+        (rec[tag] ??= []).push(slot);
+      }
+    });
+    ev.on('want:fulfilled', ({ character }) => { if (character) (D.wants[character.id] ??= []).push(window.game.state.time.day); });
+    ev.on('club:bell', ({ key, ids }) => D.bells.push([window.game.state.time.day, window.game.state.totalMinutes % 1440, key, ids.length]));
+  });
 }
 
 // (30.6) acemi profili ölçümü (yalnızca dinler; altın akışı çağıran yığınından etiketlenir, oyunun durumuna / üretecine dokunmaz)
@@ -805,7 +833,7 @@ await page.evaluate((passive) => {
           const lack = def ? Object.entries(def.cost).filter(([r, v]) => (res[r] ?? 0) < v + 20).map(([r]) => r) : [];
           if (def && s.town.tier >= def.requiresTier && !s.buildings.some((b) => b.type === 'university')) for (const r of lack) window.__uni.lack[r] = (window.__uni.lack[r] ?? 0) + 1;
           if (def && s.town.tier >= def.requiresTier && !s.buildings.some((b) => b.type === 'university') && !lack.length) {
-            const spot = sim.findSpot('university', 20);
+            const spot = sim.findSpotNearHomes('university', 18) ?? sim.findSpot('university', 20); // (32.6a) konutlara yakın
             if (spot) scene.construction.placeSite('university', spot.x, spot.y);
             else window.__uni.noSpot = (window.__uni.noSpot ?? 0) + 1;
           }
@@ -820,7 +848,7 @@ await page.evaluate((passive) => {
           const def = type ? window.__buildingsData?.BUILDINGS?.[type] : null;
           const pad = { wood: 40, stone: 20, wool: 5 };
           if (def && !busy && s.time.day - (CL.lastPlaced ?? -9) >= 2 && Object.entries(def.cost).every(([r, v]) => (res[r] ?? 0) >= v + (pad[r] ?? 10))) {
-            const spot = sim.findSpot(type, 18);
+            const spot = sim.findSpotNearHomes(type, 18) ?? sim.findSpot(type, 18); // (32.6a) konutların ağırlık merkezine yakın, yola bağlı
             if (spot && scene.construction.placeSite(type, spot.x, spot.y)?.ok) CL.lastPlaced = s.time.day;
           }
         }
@@ -1804,7 +1832,7 @@ const healthy = errors.length === 0 && mon.stuck.length === 0 && mon.brokenCount
 for (const o of mon.outfitErrors.slice(0, 5)) console.log(`  kıyafet: ${o}`);
 if (options.json) {
   const endState = await page.evaluate(() => ({ pop: window.game.state.characters.length, trust: Math.round(window.game.state.trust?.value ?? 0), trustMin: Math.round(window.game.state.trust?.min ?? 0), revolts: window.game.state.stats?.revolts ?? null })); // (32.2) ölçüm özeti
-  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, court: courtStats, renown: renownStats, university: uniStats, clubs: clubStats, gold: report.gold, golden: report.golden?.since ?? null, end: endState, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
+  fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, court: courtStats, renown: renownStats, university: uniStats, clubs: clubStats, ...(options['club-diag'] ? { clubDiag: await page.evaluate(() => window.__clubDiag) } : {}), gold: report.gold, golden: report.golden?.since ?? null, end: endState, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
 await browser.close();

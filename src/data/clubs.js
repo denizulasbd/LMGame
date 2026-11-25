@@ -25,6 +25,27 @@ export const CLUB = {
   hobbyWeight: 0.6,
   // Buluşmaya gelen üyeye (bitişte, en az bu kadar dakika kaldıysa) Tatlı Sohbet (warm_chat, neden 'club')
   moodletMinutes: 30,
+  // (32.6a) Uzak kulüp evi: zil, üyelerin evinden kulüp evine tahmini yürüme süresi kadar erken çalar (en çok leadMax dakika);
+  // tahmin = ortalama yol uzunluğu (karo) × walkMinutesPerTile (28 px/sn, 16 px karo, 1 oyun-sn = 4 oyun dakikası ≈ 2,3; yolda biraz hızlı).
+  // Ortalama yol farTiles karoyu aşarsa panel uyarır.
+  leadMax: 45,
+  walkMinutesPerTile: 2.2,
+  farTiles: 24,
+};
+
+// (32.6a) Kulüp zili: buluşmaya çağrılan üye, etkinliğinin türü (ACTIVITIES[k].kind) `kinds` içindeyse elindekini bırakır;
+// `keep` açık dışlama listesidir (öncelikli ya da başkasına bağlı uğraşlar: tören, teselli, anma, ders, alışveriş, kamu hizmeti...).
+// Yeni bir leisure / idle / social etkinliği eklenirse buraya yazılmadıkça zil onu da kaldırır. Randevu / davet / mola ayrıca korunur.
+export const CLUB_BELL = {
+  kinds: ['leisure', 'idle', 'social'],
+  keep: [
+    'rally', 'weddingParty', 'ageCelebration', // Toplanma Zili / konser, düğün, Çağ Kutlaması
+    'memorial', 'grieve', 'console', // anma, yas, teselli
+    'protest', 'strike', 'pilfer', 'publicService', // isyan, iş bırakma, suç, kamu hizmeti
+    'school', 'lecture', 'uniTalk', // Bilgelik Evi, Darülfünun
+    'clubSession', 'clubSessionIn', // buluşmanın kendisi
+    'play', 'keepsake', 'shop', // çocuk oyunu, hatıra (kısa), alışveriş
+  ],
 };
 
 // Takvim (oyun günü tek / çift; dakika gün içinde). Aynı akşam en çok iki kulüp: tek günlerde bahçe ve resim (yarım saat
@@ -142,6 +163,7 @@ export const PAINTING_TITLES = {
 };
 
 export const CLUB_TEXT = {
+  farHouse: 'Kulüp evi evlerden uzak: üyeler yolda vakit kaybediyor (ortalama {tiles} karo, ~{min} dk yürüyüş)',
   founded: '{club} kuruldu: {names} ilk buluşmayı bekliyor.',
   joined: '{name} {club}\'ne katıldı',
   left: '{name} {club}\'nden ayrıldı',

@@ -190,7 +190,7 @@ export function makeCard(event, p = {}, ctx = {}) {
     }
     case 'renown:grant':
       if (!p.key || !p.name) return null;
-      card = base(event, `Kraliyet Lütufnamesi geldi: ${p.name} kurma izni! (İnşa Et → Kraliyet Lütfu)`, [], { key: `renown:g:${p.key}`, action: { type: 'letter', id: p.key, label: STORY_ACTIONS.letter } });
+      card = base(event, `Kraliyet Lütufnamesi geldi: ${p.name} kurma izni! (İnşa Et → Kraliyet Lütfu)`, [], { key: `renown:g:${p.key}`, once: true, action: { type: 'letter', id: p.key, label: STORY_ACTIONS.letter } });
       break;
     case 'university:admitted':
     case 'university:graduated':
@@ -199,7 +199,7 @@ export function makeCard(event, p = {}, ctx = {}) {
       if (!p.character || !p.field) return null;
       const t = UNIVERSITY_TEXT[event.slice(11)];
       const text = t.replace('{name}', p.character.name).replace('{field}', fieldName(p.field)).replace('{pct}', String(Math.floor((p.ratio ?? 0) * 100)));
-      card = base(event, text, [p.character], { key: `uni:${event.slice(11, 13)}:${p.character.id}` });
+      card = base(event, text, [p.character], { key: `uni:${event.slice(11, 13)}:${p.character.id}`, ...(p.first ? { once: true } : {}) }); // (32.6a) ilk mezun tek seferlik
       break;
     }
     case 'club:founded':
@@ -211,14 +211,14 @@ export function makeCard(event, p = {}, ctx = {}) {
       if (event === 'club:founded') {
         if (!p.key || people.length < 3) return null;
         const text = CLUB_TEXT.founded.replace('{club}', clubName(p.key)).replace('{names}', people.slice(0, 3).map((c) => c.name).join(', '));
-        card = base(event, text, people.slice(0, 3), { key: `club:f:${p.key}`, club: true, go });
+        card = base(event, text, people.slice(0, 3), { key: `club:f:${p.key}`, club: true, once: true, go });
       } else if (event === 'club:work') {
         if (!p.key || !p.text) return null;
         const chars = [...(p.recipient ? [p.recipient] : []), ...people].slice(0, 3);
         card = base(event, p.text, chars, { key: `club:w:${p.key}:${p.kind}:${p.n ?? 0}`, club: true, go, ...(p.milestone ? { priority: STORY_PRIORITY['club:milestone'] } : {}) });
       } else {
         if (!p.text) return null;
-        card = base(event, p.text, people.slice(0, 3), { key: `club:x:${p.key}`, club: true, go });
+        card = base(event, p.text, people.slice(0, 3), { key: `club:x:${p.key}`, club: true, once: true, go });
       }
       break;
     }
@@ -300,8 +300,13 @@ export function enqueue(queue, card, limit = L.queue) {
   if (queue.some((c) => c.key === card.key)) return { queue, dropped: null, added: false };
   const next = [...queue, card];
   if (next.length <= limit) return { queue: next, dropped: null, added: true };
-  let worst = 0;
-  for (let i = 1; i < next.length; i++) if (next[i].priority < next[worst].priority) worst = i;
+  // (32.6a) tek seferlik kart (once: kuruluş, sergi, lütuf, ilk mezun) atılacak kart olarak seçilmez (hepsi tek seferlikse eski kural)
+  let worst = -1;
+  for (let i = 0; i < next.length; i++) if (!next[i].once && (worst < 0 || next[i].priority < next[worst].priority)) worst = i;
+  if (worst < 0) {
+    worst = 0;
+    for (let i = 1; i < next.length; i++) if (next[i].priority < next[worst].priority) worst = i;
+  }
   const dropped = next.splice(worst, 1)[0];
   return { queue: next, dropped, added: dropped !== card };
 }

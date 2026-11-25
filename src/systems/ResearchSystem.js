@@ -10,7 +10,7 @@
 //   (16. aşama) Kadim yazıt: araştırma yokken Bilge çözülmeyi bekleyen yazıtın başına oturur
 //              (state.exploration.decoding); çözülünce kalıcı imar şeması: 'inscription:decoded' { id, inscription }.
 import { bookResearchMultiplier } from './GoldenAge.js';
-import { renownResearchFactor } from './Renown.js';
+import { renownResearchFactor } from './RoyalEffects.js';
 import { scholarResearchFactor } from './University.js'; // (32.4)
 import { RESEARCH, SCHOOL } from '../data/research.js';
 import { SKILL_LEVELS, SKILL_KEYS } from '../data/skills.js';

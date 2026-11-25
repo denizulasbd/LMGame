@@ -299,8 +299,11 @@ const historyRun = async (enginesOff) => {
     // ---- 9. "Yalnızca önemli" süzgecinde günde en çok bir kulüp kartı
     const dir = sc.storyDirector;
     dir.clubCards = { day: -1, n: 0 };
-    const shown = ['club:founded', 'club:exhibition'].map((ev, i) => dir.offer({ ...SC.makeCard(ev, ev === 'club:founded' ? { key: 'gardenClub', members: garden, building: gb } : exhib[0], { state: st }), key: `t${i}` }));
-    c('"Yalnızca önemli": günde en çok bir kulüp kartı (ikincisi gün özetine)', dir.filter !== 'important' || (shown[0] === true && shown[1] === false), JSON.stringify(shown));
+    // (32.6a) kuruluş ve sergi tek seferlik (sınırdan muaf); sınır sıradan ürün kartlarıyla sınanır
+    const wk = works.find((w) => w.kind === 'bed' && w.n === 2) ?? works[0];
+    const shown = [0, 1].map((i) => dir.offer({ ...SC.makeCard('club:work', wk, { state: st }), priority: 3, key: `t${i}` }));
+    shown.push(dir.offer({ ...SC.makeCard('club:exhibition', exhib[0], { state: st }), key: 't2' }));
+    c('"Yalnızca önemli": günde en çok bir sıradan kulüp kartı (ikincisi gün özetine); tek seferlik sergi kartı yine gösterilir (32.6a)', dir.filter !== 'important' || (shown[0] === true && shown[1] === false && shown[2] === true), JSON.stringify(shown));
 
     // ---- 10. clubFactor ve renownClubs
     const outsider = st.characters.find((x) => !x.role && !x.isChild && !x.club);

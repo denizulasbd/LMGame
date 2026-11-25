@@ -135,6 +135,35 @@ async function installHelpers(page, stopLoop) {
         }
         return null;
       },
+      // (32.6a) Konutların (kulübe) ağırlık merkezine en yakın uygun yer: halka halka aranır; yapının önü (kapı sırası) kasabaya bağlı
+      // ve oradan meydana yol bulunabilmeli. Konut yoksa ya da yer bulunamazsa null (çağıran findSpot'a düşer).
+      findSpotNearHomes(type, maxRadius = 18) {
+        const scene = game.scenes.current;
+        const world = scene.world;
+        const homes = game.state.buildings.filter((b) => b.type === 'cabin' && !b.underConstruction);
+        if (!homes.length) return null;
+        const cx = Math.round(homes.reduce((a, b) => a + b.tileX + 1, 0) / homes.length);
+        const cy = Math.round(homes.reduce((a, b) => a + b.tileY + 1, 0) / homes.length);
+        const size = window.__buildingsData?.BUILDINGS?.[type]?.size ?? { w: 2, h: 2 };
+        const plaza = world.landmarks.plaza;
+        const goal = { x: plaza.centerX, y: plaza.centerY + 2 };
+        for (let r = 0; r <= maxRadius; r++) {
+          for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+              if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+              const x = cx + dx - Math.floor(size.w / 2);
+              const y = cy + dy - Math.floor(size.h / 2);
+              if (!scene.construction.checkPlacement(type, x, y).ok) continue;
+              const door = { x: x + Math.floor(size.w / 2), y: y + size.h };
+              if (!world.isReachable(door.x, door.y)) continue;
+              const target = world.map.isWalkable(goal.x, goal.y) ? goal : { x: plaza.centerX, y: plaza.centerY };
+              if (!world.findPath(door, target)) continue;
+              return { x, y };
+            }
+          }
+        }
+        return null;
+      },
       place(type, { instant = true, maxRadius = 30 } = {}) {
         const scene = game.scenes.current;
         const spot = sim.findSpot(type, maxRadius);

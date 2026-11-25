@@ -74,7 +74,7 @@ results.push(...(await page.evaluate(async () => {
   const inc = (arr) => arr.every((v, i) => i === 0 || v > arr[i - 1]);
   c('risk yoksullukla, açlıkla ve sadakat düştükçe monoton artar', inc(pov) && inc(hun) && inc(loy), `${pov.map((v) => v.toFixed(4))} | ${hun.map((v) => v.toFixed(4))} | ${loy.map((v) => v.toFixed(4))}`);
   const f = J.riskFactors(st, a);
-  c('eğitim / kulüp / cezasızlık çarpanları bu adımda 1 (imzalar hazır)', f.education === 1 && f.club === 1 && f.impunity === 1 && J.educationFactor(a) === 1 && J.clubFactor(a) === 1 && J.impunityFactor(st) === 1);
+  c('eğitimsiz, kulüpsüz sakinde ve suçsuz geçmişte eğitim / kulüp / cezasızlık çarpanları 1 (32.4 / 32.5 / 32.2 bağlantıları etkisiz)', f.education === 1 && f.club === 1 && f.impunity === 1 && J.educationFactor(a) === 1 && J.clubFactor(a) === 1 && J.impunityFactor(st) === 1);
   const mot = (mut) => { calm(a); mut(a); const m = J.motiveOf(a, J.riskFactors(st, a)); calm(a); return m; };
   c('motivasyon baskın çarpandan: aç → hunger, meteliksiz → poverty, Kırgın → grudge, hiçbiri → temptation', mot((x) => (x.needs.hunger = 10)) === 'hunger' && mot((x) => (x.coins = 2)) === 'poverty' && mot((x) => (x.loyalty = -60)) === 'grudge' && mot(() => {}) === 'temptation');
   const kurul = st.trust.value;

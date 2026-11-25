@@ -201,7 +201,7 @@ export class UniversitySystem {
     // Ebeveynlerin gururu: var olan Hatırlandı moodlet'i (yeni moodlet yok)
     const parents = new Set([...(c.parentIds ?? []), ...(c.parents ?? [])]);
     for (const p of s.characters) if (parents.has(p.id)) this.moodlets?.apply(p, 'celebrated', { reason: 'child_graduate', whoId: c.id, whoName: c.name });
-    this.events.emit('university:graduated', { character: c, field: h.field, apprentice, grandmaster });
+    this.events.emit('university:graduated', { character: c, field: h.field, apprentice, grandmaster, first: st.graduated === 1 }); // (32.6a) first: ilk mezun (tek seferlik kart)
     this.events.emit('toast', { text: fill(TX.graduated, vars), tone: 'success', icon: 'star' });
   }
 }

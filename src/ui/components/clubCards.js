@@ -7,7 +7,7 @@ import { getCharacterPortraitURL } from '../../art/sprites/index.js';
 import { CLUB, CLUB_KEYS, CLUBS } from '../../data/clubs.js';
 import { RENOWN_TARGET } from '../../data/renown.js';
 import { engineOn } from '../../systems/Engines.js';
-import { membersOf, candidatesFor, nextSession, clock, clubName, isClubKey, renownClubShare, clubAdults, isActiveMember, clubVitality } from '../../systems/Clubs.js';
+import { membersOf, candidatesFor, nextSession, clock, clubName, isClubKey, renownClubShare, clubAdults, isActiveMember, clubVitality, farHouseWarning } from '../../systems/Clubs.js';
 
 const text = (t, cls = '') => el('div', { className: `upgrade-text${cls ? ` ${cls}` : ''}`, text: t });
 const pct = (r) => `%${Math.round(r * 100)}`;
@@ -54,6 +54,9 @@ export function clubSection(building, state, { emit = () => {} } = {}) {
       text(`Buluşma ${r.sessions ?? 0} · ürün ${r.products ?? 0}${key === 'gardenClub' ? ` · tarh ${r.works ?? 0}/${def.maxWorks}` : ''}${key === 'sewingClub' ? ` · mendil ${r.gifts ?? 0} · kış giysisi ${r.garments ?? 0}` : ''}${key === 'paintingClub' ? ` · tablo ${(r.paintings ?? []).length}/${def.maxWorks}` : ''}`),
     ]),
   ];
+  // (32.6a) uzak kulüp evi uyarısı (üyelerin evlerine ortalama yol CLUB.farTiles karoyu aşarsa)
+  const far = farHouseWarning(state, key, building);
+  if (far) nodes.push(text(far, 'is-warn'));
   // üyeler: portre, ad, son 4 buluşmanın katılım işaretleri, Çıkar
   const att = r.attendance ?? [];
   if (members.length) {

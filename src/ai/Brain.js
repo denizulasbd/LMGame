@@ -67,7 +67,7 @@ import { TEMPERAMENT } from '../data/temperament.js';
 import { isMemorialTime, memorialEligible, urgentNeed, riteWindow, riteVenue } from '../systems/Rites.js';
 import { engineOn } from '../systems/Engines.js';
 import { shouldStrike } from '../systems/Loyalty.js';
-import { crimeReady, isBanned, serviceDue } from '../systems/Justice.js';
+import { crimeReady, isBanned, banBlocks, serviceDue } from '../systems/Justice.js';
 import { COURT, SHAME } from '../data/justice.js';
 import { DISCONTENT } from '../data/loyalty.js';
 
@@ -975,6 +975,7 @@ export class Brain {
    * - Ateş başında herkes ateşe döner: dolu yerlerin yanına ceza verilerek çember boyunca yayılırlar.
    */
   planGathering(c, building, nearSpot = null, mode = 'gather', fixedDuration = null) {
+    if (banBlocks(this.world.state, c, building)) return null; // (32.6a) Uzaklaştırma: davet / randevu / sohbet planı dahil, ortak nokta
     const spots = this.world.freeGatherSpots(building, c.id, mode);
     if (spots.length === 0) return null;
     const spread = mode === 'festival' || Boolean(ACTIVITIES[building.type]?.faceBuilding);

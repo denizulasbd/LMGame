@@ -71,10 +71,9 @@ import { hasTag } from './Chemistry.js';
 import { MOOD_RULES, GRIEVE_LABEL, GRIEVE_FALLBACK } from '../data/moodlets.js';
 import { genitive } from '../utils/turkish.js';
 import { TEMPERAMENT } from '../data/temperament.js';
+import { clubBellInterrupts } from './Clubs.js'; // (32.6a)
 
 const INTERRUPTIBLE_KINDS = new Set(['social', 'leisure', 'idle', 'work']);
-// (32.5) Kulüp zilinin kaldırdığı sade boş zaman uğraşları (öncelikli işler bunun dışında kalır)
-const CLUB_BELL_ACTS = new Set(['wait', 'petAnimal', 'readBench', 'readLibrary', 'music', 'viewpoint', 'shade', 'bench', 'river', 'flowers', 'monument', 'ancientSpring', 'campRest', 'stroll', 'campfire', 'fountain', 'gazebo', 'inn', 'clubHobby']);
 const TOWER_BUBBLES = ['hammer', 'hammer', 'sweat', 'sparkle']; // (20. aşama) Ulu Saat Kulesi şantiyesinde
 
 export class BehaviorSystem {
@@ -197,12 +196,12 @@ export class BehaviorSystem {
     }
   }
 
-  /** (32.5) Kulüp zili: yalnızca sade boş zaman uğraşındaki (CLUB_BELL_ACTS) ve randevuda / davette olmayan üyeler kalkar. */
+  /** (32.5) Kulüp zili: yalnızca sade boş zaman uğraşındaki (Clubs.clubBellInterrupts; 32.6a ACTIVITIES'ten türetilir) ve randevuda / davette olmayan üyeler kalkar. */
   interruptForClub(ids) {
     for (const id of ids ?? []) {
       const c = this.world.getCharacter(id);
       if (!c || !c.visible || c.away || !c.task) continue;
-      if (!CLUB_BELL_ACTS.has(c.task.activity) || c.task.dateWithId !== undefined || c.task.meetWithId !== undefined || c.task.onBreak) continue;
+      if (!clubBellInterrupts(c.task.activity) || c.task.dateWithId !== undefined || c.task.meetWithId !== undefined || c.task.onBreak) continue;
       this.endTask(c);
     }
   }

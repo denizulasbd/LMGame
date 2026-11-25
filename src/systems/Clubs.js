@@ -7,13 +7,15 @@
 //   clubCrimeFactor / renownClubShare / clubPoverty : öteki sistemlerin kancaları
 //   giftOrder                    : Nakışlı Mendil / Dayanıklı Giysi alıcısının sırası (zarsız)
 // Character.js bu dosyanın yalnızca sanitizeClub işlevini, Justice.js ve Renown.js faktör işlevlerini çağırır.
-import { CLUB, CLUB_KEYS, CLUBS, CLUB_SCHEDULE, CLUB_AFFINITY, AFFINITY_RULES as AR, CLUB_CRIME, CLUB_RENOWN, HANDKERCHIEF, PAINTING_TITLES } from '../data/clubs.js';
+import { CLUB_BELL } from '../data/clubs.js';
+import { ACTIVITIES } from '../data/activities.js';
+import { CLUB, CLUB_KEYS, CLUBS, CLUB_SCHEDULE, CLUB_AFFINITY, AFFINITY_RULES as AR, CLUB_CRIME, CLUB_RENOWN, HANDKERCHIEF, PAINTING_TITLES, CLUB_TEXT } from '../data/clubs.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TRAITS } from '../data/characters.js';
 import { QUIRKS } from '../data/social.js';
 import { SKILLS } from '../data/skills.js';
 import { levelFor } from './SkillSystem.js';
-import { getFriendship, levelIndexFor } from './RelationshipSystem.js';
+import { getFriendship, levelIndexFor } from './Friendship.js'; // (32.6a) döngüsüz modül
 import { RELATIONSHIP_LEVELS } from '../data/relationships.js';
 import { engineOn } from './Engines.js';
 
@@ -51,15 +53,19 @@ export function canJoin(state, c) {
   return true;
 }
 
-/** Kulübün üyeleri (kimlik sırası). */
-export function membersOf(state, key) {
-  return state.characters.filter((c) => c.club?.key === key).sort((a, b) => a.id - b.id);
+/**
+ * Kulübün üyeleri (kimlik sırası). (32.6a) `placed` (isteğe bağlı Map kimlik → kulüp anahtarı): yerleşme planındaki geçici üyelikler;
+ * sakin nesnesine yazmadan "bu plan uygulanırsa" üyeleri verir (placementPlan saf kalsın diye).
+ */
+export function membersOf(state, key, placed = null) {
+  const keyOf = placed ? (c) => placed.get(c.id) ?? c.club?.key : (c) => c.club?.key;
+  return state.characters.filter((c) => keyOf(c) === key).sort((a, b) => a.id - b.id);
 }
 
 /** Üyenin kulüpteki yakın dostları (topFriends: en yüksek puanlı AR.friendCount kişi, en az AR.friendLevel). */
-export function clubFriends(state, c, key) {
+export function clubFriends(state, c, key, placed = null) {
   const minIndex = RELATIONSHIP_LEVELS.findIndex((l) => l.key === AR.friendLevel);
-  const members = membersOf(state, key).filter((o) => o !== c);
+  const members = membersOf(state, key, placed).filter((o) => o !== c);
   return members
     .map((o) => ({ o, score: getFriendship(state, c, o) }))
     .filter((e) => levelIndexFor(e.score) >= minIndex)
@@ -72,7 +78,7 @@ export function clubFriends(state, c, key) {
  * Yakınlık puanı: { score, reasons: [kısa ad, ...] } (zar yok). Özellik + huy + beceri (seviye başına, en çok skillCap) + iş yeri +
  * kulüpteki yakın dost başına (en çok friendCap) + kalabalığı seven özellik − zıt eğilim. Nedenler panelde gösterilir.
  */
-export function clubAffinity(state, c, key) {
+export function clubAffinity(state, c, key, placed = null) {
   const t = CLUB_AFFINITY[key];
   if (!t || !c) return { score: 0, reasons: [] };
   let score = 0;
@@ -112,7 +118,7 @@ export function clubAffinity(state, c, key) {
     score += t.elder;
     reasons.push('Kıdemli Bilge');
   }
-  const friends = clubFriends(state, c, key).length;
+  const friends = clubFriends(state, c, key, placed).length;
   if (friends) {
     score += Math.min(AR.friendCap, friends * AR.friend);
     reasons.push(friends > 1 ? `${friends} dostu üye` : 'dostu üye');
@@ -141,7 +147,9 @@ export function candidatesFor(state, key) {
 
 /**
  * Gün dönümü yerleşmesi: işleyen kulüplere eşiği geçen en yüksek puanlı sakini sırayla yerleştirir (her adımda yeniden puanlar:
- * dost çekimi yeni üyeyle değişir). Dönüş: [{ c, key, score }] (durum yazmaz; ClubSystem uygular).
+ * dost çekimi yeni üyeyle değişir). Dönüş: [{ c, key, score }] (durum yazmaz; ClubSystem uygular). (32.6a) Planlanan üyelikler
+ * geçici bir haritada (`taken`) tutulur ve dost çekimi oradan hesaplanır: sakin nesnesine hiç yazılmaz (eskiden c.club geçici yazılıp
+ * geri alınıyordu; arada hata fırlarsa durum bozuk kalabilirdi).
  */
 export function placementPlan(state) {
   const keys = activeClubKeys(state);
@@ -156,8 +164,7 @@ export function placementPlan(state) {
       if (taken.has(c.id)) continue;
       for (const k of keys) {
         if (counts[k] >= CLUB.capacity || kickedFrom(state, k, c)) continue;
-        // planlanan üyeler dost çekiminde sayılsın diye geçici olarak işaretlenir
-        const score = clubAffinity(state, c, k).score;
+        const score = clubAffinity(state, c, k, taken).score; // planlanan üyeler dost çekiminde sayılır (yalnızca haritada)
         if (score < CLUB.threshold) continue;
         if (!best || score > best.score || (score === best.score && (c.id < best.c.id || (c.id === best.c.id && keys.indexOf(k) < keys.indexOf(best.key))))) best = { c, key: k, score };
       }
@@ -166,9 +173,7 @@ export function placementPlan(state) {
     taken.set(best.c.id, best.key);
     counts[best.key] += 1;
     plan.push(best);
-    best.c.club = { key: best.key, since: state.time.day, missed: 0, planned: true }; // dost çekimi için geçici
   }
-  for (const p of plan) p.c.club = null; // geçici işaretler geri alınır (ClubSystem yazar)
   return plan;
 }
 
@@ -204,6 +209,48 @@ export function nextSession(state, key) {
     if (w && now < w.end) return { day: d, from: CLUB_SCHEDULE[key].from, to: CLUB_SCHEDULE[key].to, today: d === state.time.day };
   }
   return null;
+}
+
+/**
+ * (32.6a) Kulüp zili bu etkinliği kaldırır mı: türü CLUB_BELL.kinds içinde ve CLUB_BELL.keep dışında. Elle yazılmış liste yerine
+ * ACTIVITIES'ten türetilir (yeni bir boş zaman etkinliği kendiliğinden girer). `acts` test içindir.
+ */
+export function clubBellInterrupts(activity, acts = ACTIVITIES) {
+  const a = acts[activity];
+  return Boolean(a) && CLUB_BELL.kinds.includes(a.kind) && !CLUB_BELL.keep.includes(activity);
+}
+
+/**
+ * (32.6a) Üyelerin evinden kulüp evine ortalama uzaklık (karo, Manhattan; evsiz üye sayılmaz) ya da null. Yol bulma yapılmaz:
+ * panel uyarısının yedeği ve ClubSystem'in yol bulamadığı üye için tahmin.
+ */
+export function memberHomeDistance(state, key, building) {
+  if (!building) return null;
+  const def = BUILDINGS[building.type];
+  const cx = building.tileX + (def?.size?.w ?? 1) / 2;
+  const cy = building.tileY + (def?.size?.h ?? 1);
+  const d = [];
+  for (const c of membersOf(state, key)) {
+    const home = Number.isInteger(c.homeId) ? state.buildings.find((b) => b.id === c.homeId) : null;
+    if (!home) continue;
+    const hd = BUILDINGS[home.type];
+    d.push(Math.abs(home.tileX + (hd?.size?.w ?? 1) / 2 - cx) + Math.abs(home.tileY + (hd?.size?.h ?? 1) - cy));
+  }
+  return d.length ? d.reduce((a, b) => a + b, 0) / d.length : null;
+}
+
+/** (32.6a) Ortalama yürüyüş (karo) → zilin erken çalma payı (dakika, 0-leadMax). */
+export function leadMinutes(tiles) {
+  if (!Number.isFinite(tiles) || tiles <= 0) return 0;
+  return Math.min(CLUB.leadMax, Math.round(tiles * CLUB.walkMinutesPerTile));
+}
+
+/** (32.6a) Panel uyarısı: kulüp evi üyelerin evlerinden uzaksa metin, değilse null (ClubSystem'in yol ölçümü varsa o kullanılır). */
+export function farHouseWarning(state, key, building) {
+  const r = state.clubs?.[key];
+  const tiles = Number.isFinite(r?.lead?.tiles) ? r.lead.tiles : memberHomeDistance(state, key, building);
+  if (!Number.isFinite(tiles) || tiles < CLUB.farTiles) return null;
+  return CLUB_TEXT.farHouse.replace('{tiles}', String(Math.round(tiles))).replace('{min}', String(Math.round(tiles * CLUB.walkMinutesPerTile)));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------- buluşma karoları
@@ -352,6 +399,7 @@ export function restoreClubs(data, ids) {
       c.out = {};
       for (const [id, until] of Object.entries(r.out)) if (ids.has(Number(id)) && Number.isInteger(until)) c.out[id] = until;
     }
+    if (r.lead && Number.isInteger(r.lead.day) && Number.isFinite(r.lead.tiles)) c.lead = { day: r.lead.day, tiles: Math.max(0, Math.round(r.lead.tiles * 10) / 10), minutes: int(r.lead.minutes) }; // (32.6a)
     if (r.gifts) c.gifts = int(r.gifts);
     if (r.garments) c.garments = int(r.garments);
     out[k] = c;

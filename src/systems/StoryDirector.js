@@ -142,7 +142,8 @@ export class StoryDirector {
     }
     if (this.visible.some((c) => c.key === card.key)) return false;
     // (32.1) "Yalnızca önemli" süzgecinde günde en çok bir suç kartı; fazlası gün özetine (izlenen sakinin kartı sayılmaz)
-    if (card.crime && filter === 'important' && !isWatchedCard(card, this.watched)) {
+    // (32.6a) tek seferlik kartlar (card.once) günlük kategori sınırından muaftır: gün özetine düşmez, günün hakkını da harcamaz
+    if (card.crime && !card.once && filter === 'important' && !isWatchedCard(card, this.watched)) {
       if (this.crimeCards.day !== card.day) this.crimeCards = { day: card.day, n: 0 };
       if (this.crimeCards.n >= L.crimePerDay) {
         this.missed.push(card);
@@ -152,7 +153,7 @@ export class StoryDirector {
       this.crimeCards.n += 1;
     }
     // (32.5) "Yalnızca önemli" süzgecinde günde en çok bir kulüp kartı (izlenen sakinin kartı sayılmaz)
-    if (card.club && filter === 'important' && !isWatchedCard(card, this.watched)) {
+    if (card.club && !card.once && filter === 'important' && !isWatchedCard(card, this.watched)) {
       if (this.clubCards.day !== card.day) this.clubCards = { day: card.day, n: 0 };
       if (this.clubCards.n >= L.clubPerDay) {
         this.missed.push(card);

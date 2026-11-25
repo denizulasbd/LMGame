@@ -19,7 +19,7 @@ import { ITEMS } from '../data/citizens.js';
 import { engineOn } from './Engines.js';
 import {
   clubBuilding, anyClubHouse, canJoin, membersOf, clubAffinity, placementPlan, sessionWindow, sessionSpots, giftOrder, paintingTitle, emptyClub,
-  clubName, isClubKey,
+  clubName, isClubKey, memberHomeDistance, leadMinutes,
 } from './Clubs.js';
 import { serviceDue } from './Justice.js';
 import { isMemorialTime, memorialEligible, riteWindow } from './Rites.js';
@@ -225,14 +225,40 @@ export class ClubSystem {
         if (now >= live.until || live.day !== day) this.finish(key, b);
       } else {
         const w = sessionWindow(key, day);
-        if (w && now >= w.start && now < w.end && r?.evaluated !== day) this.evaluate(key, b, w);
+        // (32.6a) zil, üyelerin tahmini yürüme süresi kadar erken çalar (en çok CLUB.leadMax): varış buluşma başına yakın olsun
+        if (w && r?.evaluated !== day && now >= w.start - CLUB.leadMax && now < w.end && now >= w.start - this.leadFor(key, b, day)) this.evaluate(key, b, w);
       }
       this.exhibitAura(key, b, steps);
       this.refreshLook(key, b);
     }
   }
 
-  /** Pencerenin başında: uygun üyeleri say, en az 3 ise buluşmayı kur. */
+  /**
+   * (32.6a) Bu günün erken çalma payı (dakika): üyelerin evinin kapısından buluşma karosuna yol uzunluğunun ortalaması × dakika / karo
+   * (yol bulunamazsa Manhattan uzaklığı). Gün başına bir kez hesaplanır ve state.clubs[k].lead'e yazılır (panel uyarısı da onu okur).
+   */
+  leadFor(key, b, day) {
+    const s = this.state;
+    const prev = s.clubs?.[key]?.lead;
+    if (prev?.day === day) return prev.minutes;
+    const members = membersOf(s, key);
+    if (!members.length) return 0;
+    const target = sessionSpots(this.world, b)[0] ?? this.world.getSpots(b)[0] ?? null;
+    const lengths = [];
+    for (const c of members) {
+      const home = Number.isInteger(c.homeId) ? this.world.getBuilding(c.homeId) : null;
+      const door = home ? this.world.getSpots(home)[0] : null;
+      if (!door || !target) continue;
+      const path = this.world.findPath(door, target);
+      lengths.push(path ? path.length : Math.abs(door.x - target.x) + Math.abs(door.y - target.y));
+    }
+    const tiles = lengths.length ? lengths.reduce((a, v) => a + v, 0) / lengths.length : memberHomeDistance(s, key, b) ?? 0;
+    const minutes = leadMinutes(tiles);
+    this.rec(key).lead = { day, tiles: Math.round(tiles * 10) / 10, minutes };
+    return minutes;
+  }
+
+  /** Pencerenin başında (32.6a: yürüme payı kadar önce): uygun üyeleri say, en az 3 ise buluşmayı kur. */
   evaluate(key, b, w) {
     const s = this.state;
     const members = membersOf(s, key);
