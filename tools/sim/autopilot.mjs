@@ -76,6 +76,7 @@ import { openGame, parseArgs, runHours, capOutput } from './lib.mjs';
 
 capOutput('autopilot');
 import { installMonitor, monitorReport } from './monitor.mjs';
+import { buildMidState32 } from './state32.mjs';
 
 const { positional, options } = parseArgs();
 const seed = Number(positional[0] ?? 42);
@@ -1496,6 +1497,50 @@ if (options['crisis-state']) {
     return { burning: burning?.name, damaged: wrecked?.name, injured: hurt?.name, raid: Boolean(s.crisis.raid) };
   });
   console.log('kriz durumu kuruldu:', JSON.stringify(made));
+}
+// (32.6b) --asama32-state: kayıttan hemen önce 32'nin bütün yapılarını (saray, Darülfünun, üç hobi evi, üç lütuf yapısı) tamamlar, bir sürgünü
+// bitirir (justice.exiles) ve ortada bırakılmış durumu kurar (state32.mjs: açık dava, kamu hizmeti, yasak, utanç, yürüyen sürgün, ders,
+// buluşma, telafi). Fikstür save-v41-asama32.json bu bayrakla üretilir (tohum 77, 90 gün).
+if (options['asama32-state']) {
+  const ensured = await page.evaluate(async () => {
+    const { sim, game } = window;
+    const s = game.state;
+    const sc = game.scenes.current;
+    const J = await import('/src/systems/Justice.js');
+    const R = await import('/src/systems/Renown.js');
+    const { Random } = await import('/src/utils/random.js');
+    sim.give({ wood: 800, stone: 800, iron: 150, cloth: 80, wool: 120, food: 300, gears: 4, gold: 900 });
+    const placed = [];
+    for (const type of ['courthouse', 'university', 'gardenClub', 'sewingClub', 'paintingClub']) {
+      if (!s.buildings.some((b) => b.type === type && b.functional)) placed.push(sim.place(type)?.type ?? `${type}:yok`);
+    }
+    for (const type of ['peaceFountain', 'royalRoseGarden', 'royalArchive']) {
+      if (!R.royalGranted(s, type)) sc.renown.grant(type);
+      if (!s.buildings.some((b) => b.type === type && b.functional)) placed.push(sim.place(type)?.type ?? `${type}:yok`);
+    }
+    return placed;
+  });
+  await page.evaluate(() => sim.step(225 * 24 * 2)); // yeni kurulanlarda üyelik / kabul gün dönümünde olur
+  const exiled = await page.evaluate(async () => {
+    const { game } = window;
+    const s = game.state;
+    const sc = game.scenes.current;
+    const J = await import('/src/systems/Justice.js');
+    const { Random } = await import('/src/utils/random.js');
+    const fixed = (v) => Object.assign(new Random(1), { next: () => v });
+    const bld = s.buildings.find((b) => b.type === 'storage' && b.functional);
+    const who = s.characters.filter((c) => !c.role && !c.isChild && J.crimeCandidate(s, c) && !c.sentence && !c.higherStudy && !c.club && !c.apprenticeship).sort((a, b) => a.id - b.id).at(-1);
+    if (!who || !bld) return null;
+    const real = sc.crime.dice;
+    sc.crime.dice = fixed(0);
+    const k = sc.crime.commit(who, { crime: { crime: 'pantryRation', variant: 'ration', buildingId: bld.id, motive: 'grudge' } }, bld);
+    sc.crime.dice = real;
+    if (!k || !sc.court.decide(k, 'exile')) return null;
+    sc.court.departExile(who);
+    return who.name;
+  });
+  const mid = await page.evaluate(buildMidState32);
+  console.log('Aşama 32 durumu kuruldu:', JSON.stringify({ ensured, exiled, mid }));
 }
 if (options.save) {
   const snapshot = await page.evaluate(async () => {
