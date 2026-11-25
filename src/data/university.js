@@ -30,7 +30,7 @@ export const UNIVERSITY = {
   // Öğrenci çırağın telafisi (ApprenticeshipSystem.lectureCredit): ders dakikası, ustası o an tezgâhtaysa çıraklık sayılır, bu çarpanla
   // (derse gidiş-dönüş yürüyüşünü de karşılar). Ölçüm: sabit ×1,2 yetmiyordu (ustanın tezgâh saatleri öğleden sonraya yığılıyor,
   // ders o günün çıraklığının yarısını götürüyordu: 6,3 / 11,7).
-  apprenticeCredit: 1.3,
+  apprenticeCredit: 1.25, // (32.6a) 1,3 → 1,25 (1,2 kontrollü mesai gününde −%4,8, ±%3 dışı): 4 tohum × 120 günde Başusta farkı (açık − kapalı) +3 / 0 / −1 / −2, ortalama mutlak 1,5 (> 1)
   // Misafir hoca: Kıdemli Bilgenin boş zaman ağırlığı (ELDER.readLibraryBase ile çarpılır; yalnızca yapı varken ve ders saatinde)
   guestWeight: 0.6,
   // Müderris seçimi (JobSystem): eğitim seviyesi başına yapı bu kadar karo yakınmış gibi görünür (Bilgelik becerisi zaten sayılır)

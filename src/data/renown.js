@@ -75,7 +75,9 @@ export const RENOWN_RANK = { bad: 0, ok: 1, good: 2, favored: 3 };
 export const RENOWN_EFFECTS = {
   // Göç (Saygın ve üstü): yeni gelen sakin bir meslekte Kalfa olarak gelir (o meslekte SKILL_LEVELS[1].xp deneyim). Meslek
   // kimlikten türer (zar yok), nüfusa / yatağa dokunmaz.
-  skilledImmigrant: { minRank: 2, skills: ['woodcutting', 'masonry', 'farming', 'building', 'crafting', 'cooking', 'fishing', 'baking'] },
+  // (32.6a) minReputation: itibar bu değerin üstündeyken (kademe yerine). Saygın (≥ 75) kuralı 4 × 120 günde 0-1 kez tetiklendi:
+  // göçmenlerin çoğu itibar 75'e çıkmadan geliyor.
+  skilledImmigrant: { minRank: 2, minReputation: 70, skills: ['woodcutting', 'masonry', 'farming', 'building', 'crafting', 'cooking', 'fishing', 'baking'] },
   // Şüpheli: Kraliyet Fermanı'nın süresi 3 günden 2 güne iner (para cezası değil; ferman reddedilebilir)
   suspiciousDecreeMinutes: 2880,
 };
@@ -100,8 +102,8 @@ export const RENOWN_GRANT = {
   minTier: 3,
   cityTier: 4,
   streakDays: 4, // (ölçüm: 6 → 4)
-  chance: 0.2, // (ölçüm: 0,15 → 0,2)
-  gapDays: 12,
+  chance: 0.12, // (ölçüm: 0,15 → 0,2; 32.6a 0,2 → 0,12: 4 tohum × 120 günde lütuf 1 / 3 / 3 / 3, ortalama 2,5; hedef 1-2)
+  gapDays: 24, // (32.6a 12 → 24: ikinci ve üçüncü lütuf 15-24 gün arayla geliyordu)
   weakenedBelowRank: 1, // kurulduktan sonra itibar Şüpheli'ye (rank 0) düşerse etkiler yarıya iner
   weakenedShare: 0.5,
 };

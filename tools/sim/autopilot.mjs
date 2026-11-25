@@ -59,6 +59,7 @@
 //   --no-apprentice : (25.2) Çırak Kapısı hiç açılmaz (çıraklık katmanının kapalıyken oyunu hiç değiştirmediğini göstermek için)
 //   --no-safety : (23. aşama) Su Kuyusu ve Gözcü Kulesi kurulmaz, yangın / hasar / baskın politikası da kapalıdır (kriz sisteminin
 //               oyunun ana üretecini tüketmediğini göstermek için: --crisis huzurlu ile 22. aşamanın koşusunu bire bir verir)
+//   --set     : (32.6a) data/<modül>.js dışa aktarımını bellekte geçersiz kılar: --set "renown:RENOWN_GRANT.gapDays=12"
 //   --loy     : (30.3) data/loyalty.js'i bellekte geçersiz kılar (denge denemesi): "LOYALTY.bitterTrust.perHour=-0.5"
 //   --start-food N : (30.6) başlangıç yiyeceğini geçersiz kılar (denge denemesi)
 //   --club-diag : (32.6a) kulüplerin yan etkisi tanısı (yalnızca okur; JSON'a clubDiag: günlük doyum / sosyallik / keyif, saatlik etkinlik)
@@ -106,6 +107,22 @@ if (options.loy) {
       obj[keys[keys.length - 1]] = JSON.parse(raw);
     }
   }, options.loy);
+}
+// (32.6a) --set "renown:RENOWN_EFFECTS.skilledImmigrant.minReputation=null;justice:CATCH.resident=0.2" : herhangi bir data/<modül>.js
+// dışa aktarımını bellekte geçersiz kılar (A/B denemesi; dosyaya yazmaz)
+if (options.set) {
+  await page.evaluate(async (spec) => {
+    for (const part of String(spec).split(';')) {
+      const [lhs, raw] = part.split('=');
+      if (!lhs || raw === undefined) continue;
+      const [modName, path] = lhs.trim().split(':');
+      const mod = await import(`/src/data/${modName}.js`);
+      const keys = path.split('.');
+      let obj = mod;
+      for (const k of keys.slice(0, -1)) obj = obj[k];
+      obj[keys[keys.length - 1]] = JSON.parse(raw);
+    }
+  }, options.set);
 }
 if (options.evo) {
   await page.evaluate(async (spec) => {

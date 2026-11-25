@@ -185,7 +185,7 @@ const errors = [];
     sc.university.learn(ap, uni, 60); // usta tezgâhta değil: telafi yok (öğrenci olmasaydı da ilerlemeyecekti)
     const gainAway = ap.apprenticeship.progress - 10;
     master.task = { activity: 'brew', workBuildingId: wsBuilding.id, buildingId: wsBuilding.id, phase: 'perform', elapsed: 0, duration: 60 };
-    c('çırak öğrenci: ders dakikası yalnızca ustası o an tezgâhtaysa çıraklık sayılır (×1,3, yürüyüşü karşılar); öğrenci değilken çıraklık hızı aynı', Math.abs(gainLecture / gainWork - UD.UNIVERSITY.apprenticeCredit) < 1e-6 && gainAway === 0 && Math.abs(gainWork - 60 / 18) < 1e-6, `${gainWork.toFixed(3)} ${gainLecture.toFixed(3)} ${gainAway}`);
+    c('çırak öğrenci: ders dakikası yalnızca ustası o an tezgâhtaysa çıraklık sayılır (×apprenticeCredit, yürüyüşü karşılar); öğrenci değilken çıraklık hızı aynı', Math.abs(gainLecture / gainWork - UD.UNIVERSITY.apprenticeCredit) < 1e-6 && gainAway === 0 && Math.abs(gainWork - 60 / 18) < 1e-6, `${gainWork.toFixed(3)} ${gainLecture.toFixed(3)} ${gainAway}`);
     ap.apprenticeship.progress = 100;
     ap.higherStudy.field = 'herbalism'; // kabul anında çırak olsaydı bölümü bu olurdu (fieldFor: çırak mesleği önce)
     ap.higherStudy.minutes = 600;

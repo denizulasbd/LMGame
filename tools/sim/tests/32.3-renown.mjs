@@ -193,7 +193,8 @@ results.push(...(await page.evaluate(async () => {
   const g1 = sc.renown.rollGrant(30);
   offG();
   c(`zar (%${Math.round(D.RENOWN_GRANT.chance * 100)}): 0,5 tutmaz, 0 tutar; lütuf yazılır, olay ve Lütufname kartı`, miss === null && g1 && st.renown.grants.length === 1 && st.renown.lastGrantDay === 30 && grantEv?.key === g1.key && SC.makeCard('renown:grant', grantEv, { state: st })?.action?.type === 'letter', g1?.key);
-  c('aralık kuralı: 12 gün dolmadan ikinci lütuf yok', !R.grantEligible(st, 41) && sc.renown.rollGrant(41) === null && R.grantEligible(st, 42));
+  const gap = D.RENOWN_GRANT.gapDays; // (32.6a) 12 → 24
+  c(`aralık kuralı: ${gap} gün dolmadan ikinci lütuf yok`, !R.grantEligible(st, 30 + gap - 1) && sc.renown.rollGrant(30 + gap - 1) === null && R.grantEligible(st, 30 + gap));
   for (const t of D.ROYAL_TYPES) if (!R.royalGranted(st, t)) sc.renown.grant(t, 42);
   st.crown.reputation = 10;
   c('kalıcılık: itibar düşse de lütuf geri alınmaz; üçü açılınca zar yok', D.ROYAL_TYPES.every((t) => R.royalGranted(st, t)) && !R.grantEligible(st, 80));
