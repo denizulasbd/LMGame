@@ -12,6 +12,7 @@ import {
   recolorRows,
 } from '../PixelSprite.js';
 import { seasonalGroundRows, seasonalFoliageRows, snowCapRows } from '../seasons.js';
+import { mod } from '../../utils/math.js';
 
 // ---------------------------------------------------------------------------
 // Küçük desenler (damga olarak kullanılır, '.' = alttaki pikseli koru)
@@ -562,7 +563,8 @@ export function getCornerSprite(kind, corner, season = 'summer') {
 
 /** (18. aşama) Yağmurda çamurlu patikanın birikintileri (variant 0/1). */
 export function getMudSprite(variant = 0) {
-  return getSprite(`mud:${variant % MUD_ART.length}`, () => MUD_ART[variant % MUD_ART.length]);
+  const v = mod(variant, MUD_ART.length);
+  return getSprite(`mud:${v}`, () => MUD_ART[v]);
 }
 
 // Mevsimde görünümü değişen nesneler: ağaçlar ve fidan yaprak döker / karlanır; kaya ve kütük karlanır

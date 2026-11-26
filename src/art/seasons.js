@@ -5,6 +5,7 @@
 //     her sütunun en üstüne iki piksellik kar yığılır. Böylece her yapı için ayrı kış çizimi gerekmez.
 import { recolorRows, composeRows } from './PixelSprite.js';
 import { PALETTE } from './palette.js';
+import { mod } from '../utils/math.js';
 
 // Çimen harfleri: G gölge, g çimen, h ışık, H parlak uç. Biyom zeminleri de aynı tablodan boyanır:
 // bereketli toprak (! = ~), kayalık (boz ) ( :) ve orman zemini (yosun [ ], döküntü ^)
@@ -56,7 +57,7 @@ export function seasonalGroundRows(rows, season, { plainGrass = false } = {}) {
  * ilkbaharda çiçekli. kind: 'oak' (yapraklı) | 'pine' (iğne yapraklı, sonbaharda yeşil kalır)
  */
 export function seasonalFoliageRows(rows, season, kind = 'oak', variant = 0) {
-  if (season === 'autumn' && kind === 'oak') return recolorRows(rows, AUTUMN_FOLIAGE[variant % AUTUMN_FOLIAGE.length]);
+  if (season === 'autumn' && kind === 'oak') return recolorRows(rows, AUTUMN_FOLIAGE[mod(variant, AUTUMN_FOLIAGE.length)]);
   if (season === 'winter') return snowCapRows(recolorRows(rows, kind === 'pine' ? WINTER_PINE : WINTER_FOLIAGE));
   if (season === 'spring' && kind === 'oak') return stampOnLeaves(rows, SPRING_TREE_BLOSSOMS);
   return rows;

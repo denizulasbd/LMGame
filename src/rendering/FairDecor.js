@@ -4,6 +4,7 @@
 // ve ateşi. Hiçbir şey harita matrisine ya da yapı listesine yazılmaz: panayır bitince çizilmeyi bırakır, geriye iz kalmaz.
 // Yalnızca renderer.fillRect(x, y, w, h, renk) kullanır (tools/art-preview.html bir tuvale aynı arayüzle çizdirir).
 import { FAIRS } from '../data/fair.js';
+import { mod } from '../utils/math.js';
 
 const POLE = '#6b4a2a';
 const OUTLINE = '#1b1423';
@@ -105,14 +106,14 @@ export class FairDecor {
         renderer.fillRect(x, t.y + 1, 4, 6, OUTLINE);
         renderer.fillRect(x + 1, t.y + 2, 2, 4, '#8a5524');
         renderer.fillRect(x + 1, t.y + 3, 2, 1, '#c0c0c0'); // çember
-        renderer.fillRect(x + 1, t.y, 2, 1, Math.floor(time * 3 + x) % 2 ? '#ffffff' : '#f4f0e0'); // köpük
+        renderer.fillRect(x + 1, t.y, 2, 1, mod(Math.floor(time * 3 + x), 2) ? '#ffffff' : '#f4f0e0'); // köpük
       }
     }
     // Mumlar
     for (let k = 0; k < 2; k++) {
       const x = k === 0 ? t.x + 5 : t.x + t.w - 7;
       renderer.fillRect(x, t.y + 1, 1, 2, '#f4f0e0');
-      renderer.fillRect(x, t.y - 1 + (Math.floor(time * 6 + x) % 2), 1, 2, '#ffd23f');
+      renderer.fillRect(x, t.y - 1 + mod(Math.floor(time * 6 + x), 2), 1, 2, '#ffd23f');
     }
   }
 

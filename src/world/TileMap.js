@@ -6,6 +6,7 @@ import { getTileSprite, getEdgeSprite, getObjectSprite, getCornerSprite, getMudS
 import { MUD } from '../data/landscape.js';
 import { AUTUMN_FOLIAGE_VARIANTS } from '../art/seasons.js';
 import { LOCKED_VIEW } from '../data/parcels.js';
+import { mod } from '../utils/math.js';
 
 // Kenar yönleri: 0 üst, 1 sağ, 2 alt, 3 sol (art/tiles döndürme sırasıyla aynı)
 const NEIGHBOR_OFFSETS = [
@@ -313,7 +314,7 @@ export class TileMap {
           if (overlay) renderer.drawImage(getEdgeSprite(overlay.sprite, dir, time, season), px, py);
         }
         if (isRoad(tile)) this.drawRoadCorners(renderer, x, y, px, py, season);
-        if (wet && MUDDY.has(tile) && (x * 3 + y * 5) % 3 !== 0) renderer.drawImage(getMudSprite((x + y * 7) % 2), px, py);
+        if (wet && MUDDY.has(tile) && mod(x * 3 + y * 5, 3) !== 0) renderer.drawImage(getMudSprite(mod(x + y * 7, 2)), px, py);
       }
     }
   }
@@ -353,7 +354,7 @@ export class TileMap {
         const object = this.getObject(x, y);
         if (!object) continue;
         // Sonbaharda her meşe konumuna göre turuncu, kızıl ya da altın olur
-        const sprite = getObjectSprite(object, season, (x * 7 + y * 13) % AUTUMN_FOLIAGE_VARIANTS);
+        const sprite = getObjectSprite(object, season, mod(x * 7 + y * 13, AUTUMN_FOLIAGE_VARIANTS));
         const px = x * size + Math.floor((size - sprite.width) / 2);
         const py = (y + 1) * size - sprite.height;
         // Taban, gölgenin biraz üstü: karonun alt kenarından 3 piksel yukarısı

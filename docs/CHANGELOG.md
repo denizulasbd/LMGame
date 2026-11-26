@@ -2,6 +2,11 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 10 satır (33.0'da 20'den indirildi). README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 34.3b — Eksi koordinatta donma (kayıt sürümü 42 kalır)
+- Hata: 34.1'den beri sol / üst toprakların koordinatı eksi. Sonbaharda meşe rengi (`TileMap.queueObjects`) ve yağmurda çamur görseli (`TileMap.renderGround`) konumdan `%` ile seçiliyordu; eksi koordinatta -1 çıkıp çizimde hata fırlatıyor, oyun döngüsü duruyordu (sonbaharda harita donuyor, yağmurda ekran kararıyordu). İki oyuncu kaydıyla yeniden üretildi; tarayıcıya özgü değil.
+- Düzeltme: `utils/math.js` `mod(a, n)` (her zaman 0..n-1); TileMap'teki iki yer, görsel seçiciler (`seasons.js`, `getMudSprite`) ve panayır süsündeki piksel konumu. Dünya koordinatından `%` ile dizi seçen başka yer bulunmadı.
+- Test `tests/34.3b-negative.mjs` (5): dört köşe × dört mevsim × yağmurda zemin ve ağaç çizimi, sonbahar + yağmurda sol üstte tam kare. Düzeltmesiz kodda 2 kontrol kalıyor.
+
 ## Aşama 34.3 — Alan açma (kayıt sürümü 42 kalır)
 - Kalıntısız toplama (`data/tiles.js`): ağaç kütük, kaya çakıl bırakmaz; kaya 7 + 2 = 9 taş (`ROCK_STONE`, `PEBBLE_STONE`). Haritadaki doğal çakıllar kalır. Eski kayıt: açılışta açık alandaki kütükler kalkar, "kütük" aşamasındaki yeniden büyüme kayıtları düşer, "fidan" olanlar sürer (`purgeStumps`; bir kerelik ve tekrar çalışması zararsız, kayıt sürümü gerekmedi; eski fikstürlerdeki kütük hücreleri boşa döner).
 - Orman yenilenmesi (`data/forest.js`, `systems/Forest.js`, `ForestSystem.js`): gün dönümünde açık alandaki ağaç (fidan dahil) / haritanın üretildiği andaki ağaç < %70 ise günde 6, < %100 ise günde 2 fidan, ≥ %100'de hiç; var olan ağacın en çok 2 karo yanına, yapı / yol / köprü / meydandan ≥ 4 karo uzağa; fidan 36 saatte ağaç (`NatureSystem`). Ölçüm (`tools/sim/forest34.mjs`, tohum 42, 1.237 ağaç): %30 kesilince 20 günde 40 fidan (+36 ağaç), %50 kesilince 120 fidan (+108 ağaç).
