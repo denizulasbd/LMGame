@@ -2,6 +2,16 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 10 satır (33.0'da 20'den indirildi). README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 33.0 — Hafifletme (kayıt sürümü 41 kalır)
+- Kural değişikliği: determinizm, izole üreteç (tohum + N), bayt eşitliği (sha1) ve "her yeni mekanik şalter ekler" şartları kalktı (README / CHANGELOG'daki eski cümlelere not düşüldü). Mevcut `ENGINES` şalterleri silinmedi; CHANGELOG sınırı aşama başına 10 satır. Kurallar yeni `CLAUDE.md`'de.
+- Testler: aşama testlerinden üreteç durumu / `Math.random` sızıntısı, sha1, determinizm ve "tohum + N" ezber denetimleri çıkarıldı (işlevsel kontroller korundu). `32.6b-integration` kısaldı (şalter matrisi 9 → 5 yapılandırma, 62 test).
+- Dondurulmuş `tools/sim/tests.mjs` (1614 test) `tools/sim/archive/`'e taşındı (kapıda değil; elle koşulur, hâlâ yeşil). audit, stress ve determinizm kapıdan çıktı, araç olarak duruyor.
+- `gate.mjs`: `--quick` (varsayılan): cycles + bütün aşama testleri + 1 tohum × 15 gün otopilot + `compat --sample`. `--full`: quick + `compat --all` + 3 tohum × 30 gün otopilot (yalnızca çökme / monitor). 30.1 (gerçek fare) kalırsa bir kez yeniden denenir.
+- Kapı süresi (4 çekirdek): quick eski 286 sn → yeni ~190 sn; full eski ≈ 25-30 dk (parçaların ölçülen toplamı: stress 923 sn + determinizm 446 sn + ötekiler) → yeni 528 sn, hepsi yeşil.
+- Ek 1: Darülfünun'a gençliğinin bitmesine 6 günden az kalan genç alınmaz (`UNIVERSITY.minYouthDaysLeft`); panelde "Zamanı yetmeyen" satırı nedeniyle yazılır.
+- Ek 2: dava sonuç ekranında karardan SONRA "Halkın beklediği: X ile Y arası" (hak edilen sertliğin adil penceresindeki cezalar); karardan önce hiçbir şey gösterilmez.
+- Ek 3: ferman / tahsildar çipi Belediye panelini açar ve Krallık bölümüne kaydırır. Ek 4: kulüpten çıkarılan kişi aday listesinin sonuna gider; Davet et düğmeleri satırdaki kişiyi hedefler. Test: `tests/33.0-fixes.mjs` (+ 32.2 / 32.4'e birer kontrol).
+
 ## Aşama 32.7 — Kayıt güvenliği (kayıt sürümü 41 kalır)
 - Okunamayan kayıt (bozuk JSON, desteklenmeyen sürüm, restore hatası) artık silinmez: ham veri `lmgame.save.broken.<yuva>.<zaman>` anahtarına yedeklenir (en çok 3, en eskisi gider), sonra yuva temizlenir; öteki yuvadan ya da yeni oyunla devam edilir, açılışta "Bir kayıt okunamadı ve yedeklendi." uyarısı çıkar.
 - `validateSave` bilinmeyen yapı türünde kaydı reddetmez: o yapı atlanır, uyarı verilir.
