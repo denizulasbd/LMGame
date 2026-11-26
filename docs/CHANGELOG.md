@@ -12,7 +12,7 @@ Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 10 sat�
 - Taramalar açık alana kırpıldı (ulaşılabilirlik, buluşma noktaları, estetik, ateşböceği, yol listesi, uygun karo boyaması, yol bulma ızgarası); yürünebilirlik ve taşma dizi tabanlı hızlı yola geçti.
 - Test: `tests/34.1-map.mjs` (40); `compat --all` 2040/2040 (v42 dahil; v41 fikstürlerinde yollar, kütükler ve yapılar karo karo aynı yerde). Eski 7 testte kayıt sürümü 41 → 42, 30.1 / 30.6'da dünya kökenli indeks. Ekran: `docs/playtest/img34.1/` (`tools/sim/shots34.1.mjs`).
 - Performans (tohum 42, 15 gün otopilot): parselsiz 29 sn, bütün parseller açık 32 sn (×1,11). Yerleşim kontrolü yerel bağlantı denetimine geçti (tam taramaya yalnızca gerekirse düşer): parselsiz durum da 41 → 29 sn.
-- Kapı: `--full` yeşil, 312 sn (quick + compat --all + 3 × 30 gün).
+- Kapı: `--quick` yeşil 161 sn; `--full` yeşil 312 sn (quick + compat --all + 3 × 30 gün).
 
 ## Aşama 33.1 — Rastgele Kadro ve Hayat Tohumu (kayıt sürümü 41 kalır)
 - İki tohum: `state.seed` harita tohumu (aynı tohum aynı harita); yeni `state.lifeSeed` hayat tohumu, her yeni oyunda rastgele (Yeni Kasaba Kur, Yeni Harita, `?seed=`). `lifeSeedOf(state)` (`utils/lifeSeed.js`): alan yoksa harita tohumu. Haritanın dışındaki ~40 üreteç ve hesap (TownScene `seed + N`, hava, hayvanlar, kimya, ömür, arzu, çatışma) buna geçti.
