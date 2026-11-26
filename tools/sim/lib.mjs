@@ -144,6 +144,7 @@ async function installHelpers(page, stopLoop) {
             }
           }
         }
+        sim.noSpotDay = game.state.time.day; // (34.2) yer bulunamadı: otopilot parsel almayı düşünür
         return null;
       },
       // (32.6a) Konutların (kulübe) ağırlık merkezine en yakın uygun yer: halka halka aranır; yapının önü (kapı sırası) kasabaya bağlı

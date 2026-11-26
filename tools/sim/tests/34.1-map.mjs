@@ -150,7 +150,7 @@ for (const name of ['save-v41.json', 'save-v41-asama32.json', 'save-v8.json', 's
 
 // 8. v42 fikstürü: açılmış parseller ve eksi koordinatlı arazi farkları yerinde
 {
-  const raw = fs.readFileSync(new URL('../fixtures/save-v42.json', import.meta.url), 'utf8');
+  const raw = fs.readFileSync(new URL('../fixtures/save-v42-asama34.1.json', import.meta.url), 'utf8');
   const data = JSON.parse(raw);
   const r = await page.evaluate((raw) => {
     const { game } = window;
@@ -163,8 +163,8 @@ for (const name of ['save-v41.json', 'save-v41-asama32.json', 'save-v8.json', 's
     return { wrong, lockedBuild, parcels: [...game.state.parcels], neg: src.terrain.filter((c) => c[0] < 0 || c[1] < 0).length };
   }, raw);
   // (34.2) Eski (34.1) parsel kimlikleri yeni bölünmeye çevrilir: eski dikdörtgenlere değen bütün yeni parseller açık, arazi ve yapı yerinde
-  check('save-v42.json: arazi farkları yerinde, eski parseller yeni kimliğe çevrildi', r.wrong === 0 && r.neg > 0 && r.parcels.length >= data.parcels.length && r.parcels.every((id) => id.startsWith('p')), `${r.neg} eksi koordinatlı hücre, parseller ${r.parcels.join(',')}`);
-  check('save-v42.json: bütün yapılar açık alanda', r.lockedBuild === 0);
+  check('save-v42-asama34.1.json: arazi farkları yerinde, eski parseller yeni kimliğe çevrildi', r.wrong === 0 && r.neg > 0 && r.parcels.length >= data.parcels.length && r.parcels.every((id) => id.startsWith('p')), `${r.neg} eksi koordinatlı hücre, parseller ${r.parcels.join(',')}`);
+  check('save-v42-asama34.1.json: bütün yapılar açık alanda', r.lockedBuild === 0);
 }
 
 function check(name, ok, detail = '') {

@@ -90,9 +90,12 @@
 //                  Aşama 32'nin bütün durumu: Adalet Sarayı, Darülfünun, üç hobi evi, üç Kraliyet Lütfu yapısı; açık dava, süren kamu hizmeti,
 //                  uzaklaştırma, utanç, tamamlanmış ve yürüyen sürgün, süren ders, süren kulüp buluşması ve telafi buluşması, mezun, itibar.
 //                  Göç yok (sürüm 41): alan alan gidiş-dönüş denetimi (yükle → anlık görüntü → aynı alanlar) ve bir gün sonra tutarlılık
-//   save-v42.json: 34.1'in oyunu (kayıt sürümü 42, bugünkü): save-v41.json yüklenip iki parsel açıldı (r1n1, r1w0), açılan parselde yol,
-//                  kütükler ve bir çiçek tarhı. Arazi farkları dünya koordinatıyla (eksi koordinatlı hücreler). Eski kayıtlarda (sürüm 2-41)
-//                  indeksli hücreler çekirdek genişliğiyle koordinata çevrilir, parsel açılmamıştır
+//   save-v42.json: 34.2'nin oyunu (kayıt sürümü 42, bugünkü): save-v41.json yüklenip iki parsel SATIN ALINDI (p1n0, p1w0; 34.2 bölünmesi),
+//                  açılan parselde yol, kütükler ve bir çiçek tarhı. Arazi farkları dünya koordinatıyla (eksi koordinatlı hücreler). Eski
+//                  kayıtlarda (sürüm 2-41) indeksli hücreler çekirdek genişliğiyle koordinata çevrilir, parsel açılmamıştır
+//   save-v42-asama34.1.json: 34.1'in oyunu (kayıt sürümü 42; v42 ailesinin ikinci fikstürü): aynı kayıt, ESKİ parsel kimlikleriyle (r1n1, r1w0:
+//                  34.1 bölünmesi, 51 parsel). 34.2'de parseller büyüdü: eski kimlikler açılışta yeni parsellere çevrilir (eski dikdörtgene
+//                  değen bütün yeni parseller açılır); hiçbir arazi farkı ve yapı kilitli kalmaz (aşağıda özel kontrol)
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks, capOutput } from './lib.mjs';
@@ -883,6 +886,33 @@ for (const { name, raw } of fixtures) {
     results.push({ name: `${tag}: seviye sessizce belirlendi`, ok: r.after.assessed && (r.log.includes('town:tierAssessed') || r.after.tier === 1), detail: `${r.title} · ${r.log.join(', ')}` });
   } else {
     results.push({ name: `${tag}: seviye korundu`, ok: r.after.tier === data.town.tier, detail: r.title });
+  }
+}
+
+// ---- (34.2) v42 / Aşama 34.1 fikstürü: eski parsel kimlikleri yeni bölünmeye çevrilir; arazi ve yapı kaybolmaz
+{
+  const fixName = 'save-v42-asama34.1.json';
+  const path = new URL(`./fixtures/${fixName}`, import.meta.url);
+  if (fs.existsSync(path)) {
+    const raw = fs.readFileSync(path, 'utf8');
+    const r = await page.evaluate((raw) => {
+      const game = window.game;
+      localStorage.setItem('lmgame.save.v2', raw);
+      game.events.emit('ui:load');
+      const scene = game.scenes.current;
+      const map = scene.map;
+      const src = JSON.parse(raw);
+      const wrong = src.terrain.filter(([x, y, t, v, o]) => map.get(x, y) === null || map.tiles[map.index(x, y)] !== t || map.variants[map.index(x, y)] !== v || map.objects[map.index(x, y)] !== o).length;
+      const lockedTerrain = src.terrain.filter(([x, y]) => !map.isOpen(x, y)).length;
+      const lockedBuildings = game.state.buildings.filter((b) => !map.isOpen(b.tileX, b.tileY)).length;
+      const snapIds = scene.saves.snapshot().parcels;
+      window.sim.step(225);
+      return { old: src.parcels, now: [...game.state.parcels], wrong, lockedTerrain, lockedBuildings, snapIds, alive: game.state.characters.length };
+    }, raw);
+    results.push({ name: `${fixName}: eski parsel kimlikleri yeni bölünmeye çevrildi`, ok: r.now.length >= r.old.length && r.now.every((id) => /^p\d[nesw]\d+$/.test(id)) && r.snapIds.join() === r.now.join(), detail: `${r.old} → ${r.now}` });
+    results.push({ name: `${fixName}: arazi farkları ve yapılar yerinde, kilitli kalan yok`, ok: r.wrong === 0 && r.lockedTerrain === 0 && r.lockedBuildings === 0 && r.alive > 0, detail: `${r.wrong} farklı, ${r.lockedTerrain} kilitli arazi, ${r.lockedBuildings} kilitli yapı` });
+  } else {
+    results.push({ name: `${fixName}: fikstür var`, ok: false, detail: 'yok' });
   }
 }
 

@@ -56,7 +56,7 @@ results.push(...(await page.evaluate(async () => {
   const harsh = D.SENTENCE_KEYS.map((k) => D.SENTENCES[k].harsh).join();
   c('veri: şalter court açık, tohum + 43 izole, sekiz ceza (sertlik 0-6), Mahcup eylem katmanında (moodlet sayısı 33), kartlar sürüm 6 (32.3), rehber sürüm 6',
     ENGINES.court === true && D.COURT_SEED_OFFSET === 43 && D.SENTENCE_KEYS.length === 8 && harsh === '0,1,2,2,3,3.5,3.5,6' && MD.MOODLET_KEYS.length === 33 && MD.MOODLETS.shamed.layer === 'action' &&
-    SD.STORY_TABLE_VERSION === 8 && GD.GUIDE_TABLE_VERSION === 7 && GD.GUIDE_STEPS.some((s) => s.id === 'court') && CONFIG.SAVE_VERSION === 42 && B.BUILDINGS.courthouse.requiresTier === 3 && B.BUILDINGS.courthouse.unique && B.BUILD_MENU.includes('courthouse'), harsh);
+    SD.STORY_TABLE_VERSION === 8 && GD.GUIDE_TABLE_VERSION === 8 && GD.GUIDE_STEPS.some((s) => s.id === 'court') && CONFIG.SAVE_VERSION === 42 && B.BUILDINGS.courthouse.requiresTier === 3 && B.BUILDINGS.courthouse.unique && B.BUILD_MENU.includes('courthouse'), harsh);
 
   // ---- 2. saray yokken Muhtar kuralı aynen
   const [a, b, k3, d4] = adults();

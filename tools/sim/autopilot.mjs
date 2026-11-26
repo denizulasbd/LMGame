@@ -102,6 +102,7 @@ if (cdp) {
   await cdp.send('Profiler.start');
 }
 if (options.parcels === 'all') console.log(`(34.1) açılan parsel: ${await page.evaluate(() => window.sim.unlockAllParcels())}`); // performans ölçümü: bütün harita açık
+if (options['no-parcels']) await page.evaluate(() => { window.__noParcels = true; }); // (34.2) otopilot parsel almasın (karşılaştırma)
 if (options['start-food'] !== undefined) await page.evaluate((v) => { window.game.state.resources.food = v; }, Number(options['start-food'])); // (30.6) denge denemesi: başlangıç yiyeceği
 if (options.stories) await page.evaluate((f) => { window.game.scenes.current.storyDirector.autoTick = true; if (f) window.game.events.emit('ui:setStoryFilter', { filter: f }); }, typeof options['story-filter'] === 'string' ? options['story-filter'] : null); // (30.2)
 // (29.4) --evo "rules.decayPerDay=3;sources.moodlets.quarrel=..." : denge denemeleri için evrim verisini bellekte geçersiz kılar (dosyaya yazmaz).
@@ -815,6 +816,19 @@ await page.evaluate((passive) => {
     const cy = plaza.centerY;
     const res = s.resources;
     window.__decide();
+    // (34.2) Parsel: nüfus sınırına 2 kişi kalınca ya da yer bulunamadığında; altın fiyatın 3 katından fazlaysa en ucuz alınabilir parseli al
+    if (!window.__noParcels) {
+      const limit = window.__town.immigrationLimit(s);
+      const noSpot = Number.isFinite(window.sim.noSpotDay) && window.sim.noSpotDay >= s.time.day - 1;
+      if (window.__lifeStages.activePopulation(s) >= limit - 2 || noSpot) {
+        const pick = scene.parcelSystem.buyable()[0];
+        if (pick && s.resources.gold > pick.price * 3 && scene.parcelSystem.buy(pick.parcel.id).ok) {
+          window.__stats.parcelsBought = (window.__stats.parcelsBought ?? 0) + 1;
+          (window.__stats.parcelLog ??= []).push(`G${s.time.day} ${pick.parcel.name} ${pick.price}`);
+          window.sim.noSpotDay = null;
+        }
+      }
+    }
     // (30.3) --famine [gün=5] : kıtlık senaryosu. O günden sonra bütün bahçeler (şantiyeleri de) her saat yıkılır; Nabız ve kiler ölçülür
     if (window.__famine && s.time.day >= window.__famine) {
       for (const b of [...s.buildings]) if (b.type === 'garden') scene.construction.demolish(b, { quiet: true });
@@ -1298,6 +1312,8 @@ await page.evaluate(async () => {
   window.__tradePost = await import('/src/systems/TradePost.js');
   window.__appr = await import('/src/systems/Apprenticeship.js'); // (25.2)
   window.__foodSupply = (await import('/src/systems/TownStatus.js')).foodSupply;
+  window.__town = await import('/src/systems/TownStatus.js'); // (34.2)
+  window.__lifeStages = await import('/src/systems/LifeStages.js'); // (34.2)
 });
 
 function summary() {
@@ -1585,6 +1601,7 @@ const midStats = await page.evaluate(() => {
     after20: after.length,
     freshAfter20: after.filter((e) => e.midgame).length,
     milestones: Object.keys(s.milestones).length,
+    parcels: { bought: s.parcels.length, log: (window.__stats?.parcelLog ?? []).slice(0, 12), limit: window.__town?.immigrationLimit(s) }, // (34.2)
     doneIds: Object.keys(s.milestones),
     goldenSince: s.goldenAge?.since?.day ?? null,
     gold: s.resources.gold,

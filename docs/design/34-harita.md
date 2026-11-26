@@ -34,8 +34,10 @@ Kesme (`| 0`) ya da `x >= 0` varsayan koordinat kodu bulunmadı; `Math.floor(x /
 
 ## 4. Parsel üretimi
 - **Çekirdek** bugünkü üretimle (80×80; eski 48×48 haritalarda 48×48) **aynen** üretilir, sonra dünyaya (0,0)'dan kopyalanır.
-- Çekirdeğin çevresinde **iki halka**: kalınlıklar tohumdan (1. halka 14–18, 2. halka 18–24 karo). Her halka dört şeride bölünür
-  (kuzey ve güney şeritleri köşeleri de kapsar), her şerit boyunca 12–24 karoluk parçalara kesilir. Parsel: `{ id, ring, side, x, y, w, h, area, neighbors }`.
+- Çekirdeğin çevresinde **iki halka**: kalınlıklar tohumdan (34.2: 1. halka 20–22, 2. halka 22–24 karo; 34.1: 14–18 ve 18–24). Her halka dört
+  şeride bölünür (kuzey ve güney şeritleri köşeleri de kapsar), her şerit boyunca 24–40 karoluk parçalara kesilir (34.2: parça sayısı
+  uzunluk / 36'ya en yakın sayı; tohum başına **26–30 parsel**, eskiden 51). Parsel: `{ id, ring, side, x, y, w, h, area, neighbors }`, kimlik `p1n0`
+  (34.1'de `r1n0`).
   Bölünme kendi üretecinden (harita tohumu karması); çekirdeğin üretecine dokunmaz.
 - **İçerik** harita tohumu ve **dünya koordinatından** üretilir (konuma bağlı gürültü + karo karması): hangi parselin önce açıldığı içeriği değiştirmez.
   Orman, kaya kümeleri, çayır (bereketli toprak), küçük göller, nehrin devamı, ana yolların dış dünyaya devamı.
@@ -53,5 +55,16 @@ Kesme (`| 0`) ya da `x >= 0` varsayan koordinat kodu bulunmadı; `Math.floor(x /
 - Göçmen, tüccar ve konuk yalnızca **açık alanın kenarından** gelir (açık karonun komşusu kilitli ya da dünya dışıysa kenardır; yol karosu tercih edilir).
 - Tekne nehirde dünyanın kenarından gelir (yalnızca çizim, kilitli sudan geçebilir).
 - Kamera açık alanın 6 karo ötesine kadar gider (dünya sınırında durur). Kilitli alan soluk ve sisli çizilir, sınırında ince açık renk çizgi.
-- 34.1'de açmanın tek yolu geliştirici yoludur: `sim.unlockParcel(id)`, `sim.parcels()` ve adreste `?parcels=all` (yalnızca araçlar).
-  34.2: fiyat, nüfus kotası ve satın alma arayüzü (`parcel.area`, `ring`, `neighbors` hazır).
+- 34.1'de açmanın tek yolu geliştirici yoludur: `sim.unlockParcel(id)`, `sim.parcels()` ve adreste `?parcels=all` (yalnızca araçlar; altın istemez).
+
+## 6. Parsel satın alma (34.2)
+- **Bölünme küçüldü, kayıt uyumu**: 34.1 kayıtlarındaki `r1n1` gibi kimlikler açılışta (`reconcileParcels`) eski bölünme yeniden üretilip eski
+  dikdörtgene değen bütün yeni parseller açılarak çevrilir; kayıtlı arazi ya da yapı kilitli bir parselde kalırsa o parsel de açılır. Yeni halka
+  toplamı (≥ 42 karo) 34.1 dünyasını içerdiği için hiçbir hücre dünya dışında kalmaz. Kayıt sürümü 42 kalır.
+- **İçerik** (`systems/ParcelMarket.js`, temiz haritadan): göl > kaya > orman > çayır (oranlar `PARCEL_MARKET.content`); ad = yön + içerik
+  ("Kuzey Çam Ormanı", "Göl Kıyısı Çayırı", "Kayalık Yamaç"; aynıysa yön, sonra sıra sayısı). **İşe yarar alan** = parsel alanı − su − kaya nesnesi.
+- **Fiyat** = işe yarar karo × 0,09 × 60 ^ (alınan / (toplam − 1)); 5'e yuvarlanır, en az 40. İlk parsel 40-80, orta 300-800, son 3.000-6.000.
+- **Kota** = (işe yarar − 300) / 150, 1-4 arası. Göç sınırı = seviye sınırı + açık parsellerin kotası, en çok 60, seviye sınırının altına inmez.
+  Doğum sınırı da (`FamilySystem.birthLimit`) max(30, göç sınırı): yoksa 30'dan sonra çocuk doğmazdı.
+- **Kapı**: Mezra toplam ≤ 2, Köy ≤ 6 parsel (ikisi de yalnızca ilk halka), Kasaba ilk halkanın hepsi, Gelişmiş Şehir hepsi. Alınabilir: kilitli ve
+  çekirdeğe ya da açık parsele değen. Pasif düğme nedenleri sırası: komşu → seviye → altın.

@@ -30,6 +30,7 @@ haritayı verir, ama sakinler (ad, görünüş, kişilik) her yeni kasabada rast
 | Girdi | Eylem |
 |---|---|
 | Sol tık (karakterin / yapının üstüne) | Sakini ya da yapıyı (harabe dahil) seç, bilgi panelini aç |
+| (34.2) Kilitli (soluk) toprağın üstüne gel / tıkla | Üstüne gelince parsel çerçevesi vurgulanır ve ipucu çıkar (ad, boyut, içerik, fiyat, nüfus kotası); tıklayınca parsel kartı: fiyatın dökümü ve **Satın Al**. Alınamıyorsa düğme pasiftir ve nedeni yazılıdır (komşu toprak, kasaba seviyesi, altın). Her parsel nüfus kotası ekler: Hud'da nüfus çipinin ipucu göç sınırının dökümünü gösterir |
 | Yapı panelinde bir isme tık | O sakini seç ve kamerayı ona kaydır |
 | İnşa Et → **Yol & Zemin** fırçasıyla sürükle | Patika / parke / taş plaka kesintisiz çizilir; virajlar ve kavşaklar kendiliğinden köşelenir |
 | İnşa Et → çit, saksı ya da fidanla sürükle | Art arda dikilir |
@@ -4610,6 +4611,7 @@ geçer); `--all` bütün fikstürleri koşar (29.10'da ve elle). Aşama notları
 | Yeni kasaba hedefi | `data/milestones.js` (+ ölçümü `systems/MilestoneSystem.js` → `milestoneProgress`) |
 | Harita boyutu | `config.js` → `MAP_WIDTH`, `MAP_HEIGHT` (çekirdek; yalnızca yeni oyunlar; kayıt kendi boyutunu saklar) |
 | (34.1) Genişleyen harita: halka kalınlığı, parsel boyu, parsel içeriği, kilitli alan görünümü | `data/parcels.js` (+ bölünme `world/Parcels.js`, içerik `world/Expansion.js`; tasarım `docs/design/34-harita.md`) |
+| (34.2) Parsel fiyatı, nüfus kotası, seviye kapısı, en çok nüfus (60), parsel adları ve metinleri | `data/parcels.js` → `PARCEL_MARKET`, `PARCEL_NAMES`, `PARCEL_TEXT` (+ saf hesap `systems/ParcelMarket.js`, satın alma `systems/ParcelSystem.js`, kart `ui/components/ParcelCard.js`) |
 | Yeni biyom ya da biyom bonusu | `data/tiles.js` (`biome.buildingBonus`, `GROUND_TILES`) + `art/tiles/index.js` + `world/WorldGenerator.js` → `paintBiomes` |
 | Yükseltme maliyeti / etkileri | `data/buildings.js` → ilgili yapının `upgrade` alanı (+ görsel `art/sprites/structuresTier2.js`) |
 | Yeni harabe | `data/buildings.js` (`ruin` alanı, `RUIN_TYPES`) + `art/sprites/structuresTier2.js` |

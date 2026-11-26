@@ -23,7 +23,7 @@ const tools = (page, fn, arg) => page.evaluate(fn, arg);
     const G = await import('/src/systems/Guide.js');
     const D = await import('/src/data/guide.js');
     const { GameState } = await import('/src/state/GameState.js');
-    c('rehber: tablo sürümlü, 21 adım (30.2: +3 hikâye adımı; 30.4a: +1 ilk vefat; 30.4b: +1 doktrin; 30.6: +4 yiyecek / tahsildar / altın / taş; 32.2: +1 ilk dava; 32.6b: +2 Kasaba / Gelişmiş Şehir), her adımın görünme ve tamamlanma koşulu var', D.GUIDE_TABLE_VERSION === 7 && D.GUIDE_STEPS.length === 21 &&
+    c('rehber: tablo sürümlü, 21 adım (30.2: +3 hikâye adımı; 30.4a: +1 ilk vefat; 30.4b: +1 doktrin; 30.6: +4 yiyecek / tahsildar / altın / taş; 32.2: +1 ilk dava; 32.6b: +2 Kasaba / Gelişmiş Şehir; 34.2: +1 parsel satın alma), her adımın görünme ve tamamlanma koşulu var', D.GUIDE_TABLE_VERSION === 8 && D.GUIDE_STEPS.length === 22 &&
       D.GUIDE_STEPS.every((s) => typeof G.CONDITIONS[s.id]?.when === 'function' && typeof G.CONDITIONS[s.id]?.done === 'function' && (typeof s.text === 'function' || s.text.split(/[.?!]\s/).length <= 3)));
     const st = game.state;
     const ids = (guide, facts) => G.currentStep(st, guide, facts)?.id ?? null;
