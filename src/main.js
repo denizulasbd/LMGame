@@ -1,7 +1,8 @@
 // Giriş noktası: oyunu kurar ve başlatır. Burada oyun mantığı olmamalı.
 //
 // Hangi oyunla başlanır:
-//   1. Adreste ?seed=12345 varsa o tohumla yeni bir oyun (aynı haritayı tekrar görmek için); (30.1) ama oturum kaydı aynı
+//   1. Adreste ?seed=12345 varsa o harita tohumuyla yeni bir oyun (aynı haritayı tekrar görmek için; (33.1) sakinler her seferinde farklıdır,
+//      ?life= yalnızca araçlar için hayat tohumunu sabitler); (30.1) ama oturum kaydı aynı
 //      tohumlu bir oyunsa yeni oyun başlatılmaz, kayıt sürdürülür: adres çubuğundaki ?seed= bağlantısını yeniden açmak (tarayıcıyı
 //      kapatıp açmak) eskiden ilerlemeyi Gün 1'e sıfırlıyor ve oturum kaydının üstüne yazıyordu. Tohum adresten silinir, F5 bu oyunu sürdürür
 //   2. Aksi halde son oturumun kaydı varsa oyun doğrudan kaldığı yerden sürer (F5)
@@ -16,11 +17,13 @@ const uiRoot = document.getElementById('ui-layer');
 
 const params = new URLSearchParams(window.location.search);
 const seedParam = Number.parseInt(params.get('seed'), 10);
+// (33.1) ?life= hayat tohumunu sabitler (yalnızca araçlar kullanır: testler, otopilot). Adreste yoksa her yeni oyunda rastgele
+const lifeParam = Number.parseInt(params.get('life'), 10);
 
 const game = new Game({ canvas, uiRoot });
 
-function startNewGame(seed) {
-  game.state.reset(seed);
+function startNewGame(seed, lifeSeed = null) {
+  game.state.reset(seed, null, lifeSeed); // (33.1) lifeSeed boşsa rastgele: ?seed=42 aynı haritayı açar, insanlar her seferinde farklıdır
 }
 
 // (32.7) Okunamayan kayıt asla silinmez: ham veri önce yedek anahtarına kopyalanır (SaveManager.quarantine), sonra yuva temizlenir
@@ -45,8 +48,10 @@ let attract = false;
 let resumedFromSeed = false;
 if (Number.isFinite(seedParam)) {
   // (30.1) Aynı tohumlu oturum kaydı varsa sürdür; yoksa (ya da başka tohumsa) istenen tohumla yeni oyun
-  resumedFromSeed = SaveManager.read('session')?.seed === seedParam && resumeSavedGame(['session']);
-  if (!resumedFromSeed) startNewGame(seedParam);
+  const saved = SaveManager.read('session');
+  const sameLife = !Number.isFinite(lifeParam) || (saved?.lifeSeed ?? saved?.seed) === lifeParam;
+  resumedFromSeed = saved?.seed === seedParam && sameLife && resumeSavedGame(['session']);
+  if (!resumedFromSeed) startNewGame(seedParam, Number.isFinite(lifeParam) ? lifeParam : null);
   window.history.replaceState(null, '', window.location.pathname);
 } else if (!resumeSavedGame(['session'])) {
   attract = true;

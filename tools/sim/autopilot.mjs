@@ -44,6 +44,7 @@
 // isyanlar (elebaşı ve sadakati, isyancıların en düşüğü), terk edenler (sadakat kademesiyle).
 // Kullanım: node tools/sim/autopilot.mjs [tohum=42] [gün=32] [--speed 1|2|4] [--save kayit.json] [--json rapor.json] [--passive] [--quiet] [--profile tyrant|benevolent|careless|repent]
 //                                         [--crisis huzurlu|dengeli|cetin] [--no-safety] [--crisis-state]
+//   --life N : (33.1) hayat tohumu (sakinler, hava, hayvanlar...); verilmezse tohumla aynı (harita tohumu kalır, böylece eski ölçümler değişmez)
 //   --passive : karar pencerelerine dokunmaz (30 sn sonra varsayılan seçenek uygulanır)
 //   --speed   : oyun hızı (varsayılan 4); 1x'te aynı oyun günü dört kat çok, daha küçük adımla geçer
 //   --stories : (30.2) hikâye kartı günlüğünü dosyaya yazar (gün başına kart sayımı); --story-filter all|important|off süzgeci seçer
@@ -91,7 +92,7 @@ if (!['fair', 'harsh', 'lenient', 'novice', 'none'].includes(judge)) {
 }
 const speed = Number(options.speed ?? 4);
 
-const { browser, page, errors } = await openGame({ seed, enginesOff: typeof options['engines-off'] === 'string' ? options['engines-off'] : null }); // (30.4a) açılıştan önce
+const { browser, page, errors } = await openGame({ seed, life: options.life !== undefined && options.life !== true ? Number(options.life) : seed, enginesOff: typeof options['engines-off'] === 'string' ? options['engines-off'] : null }); // (30.4a) açılıştan önce
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
 if (options['start-food'] !== undefined) await page.evaluate((v) => { window.game.state.resources.food = v; }, Number(options['start-food'])); // (30.6) denge denemesi: başlangıç yiyeceği

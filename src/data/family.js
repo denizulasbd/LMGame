@@ -33,8 +33,7 @@ export const CHILD_SPEED = 1.15; // koşuşturarak yürür
 // Oynayan çocukların yanındaki yetişkinlerin keyfi (dakika başına) artar
 export const CHILD_JOY = { radius: 44, perMinute: 0.05 };
 
-// Çocuk adları (kasabada henüz olmayan biri seçilir)
-export const CHILD_NAMES = ['Duru', 'Ada', 'Aras', 'Elif Naz', 'Poyraz', 'Masal', 'Çınar', 'Lina', 'Ege', 'Defne Su', 'Kuzey', 'Mira', 'Atlas', 'Nehir', 'Yaz', 'Toprak'];
+// (33.1) Çocuk adları artık data/names.js -> RESIDENT_NAMES büyük havuzundan gelir (FamilySystem.pickName)
 // Çocukların gömlek renkleri (canlı tonlar; saç ve ten ebeveynlerden gelir)
 export const CHILD_SHIRTS = ['rose', 'sky', 'mustard', 'mint', 'red', 'lavender'];
 export const CHILD_HAIR_STYLES = ['short', 'long', 'bun', 'spiky'];

@@ -140,9 +140,11 @@ export function candidatesFor(state, key) {
   return state.characters
     .filter((c) => !c.club && canJoin(state, c))
     .map((c) => ({ c, ...clubAffinity(state, c, key) }))
-    .map((e) => ({ ...e, auto: e.score >= CLUB.threshold && !kickedFrom(state, key, e.c) }))
+    .map((e) => ({ ...e, kicked: kickedFrom(state, key, e.c) }))
+    .map((e) => ({ ...e, auto: e.score >= CLUB.threshold && !e.kicked }))
     .filter((e) => e.score > 0)
-    .sort((a, b) => b.score - a.score || a.c.id - b.c.id);
+    // (33.0) bu kulüpten çıkarılan (ve süresi dolmayan) kişi puanı yüksek olsa da listenin sonuna gider
+    .sort((a, b) => Number(a.kicked) - Number(b.kicked) || b.score - a.score || a.c.id - b.c.id);
 }
 
 /**

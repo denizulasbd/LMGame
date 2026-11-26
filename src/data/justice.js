@@ -376,6 +376,8 @@ export const SHAME = {
 // Karar penceresi ve sonuç metinleri
 export const COURT_TEXT = {
   courtName: 'Adalet Sarayı',
+  expectedRange: 'Halkın beklediği: {a} ile {b} arası', // (33.0) karardan SONRA: hak edilen sertliğin adil penceresindeki cezalar
+  expectedOne: 'Halkın beklediği: {a}',
   stale: '{who} davası sürüncemede kaldı: süre doldu, kendiliğinden Uyarı verildi.',
   staleJournal: '{who} davası sürüncemede kaldı; hâkim karar vermedi',
   opened: 'Dava Adalet Sarayı\'na düştü.',

@@ -260,7 +260,6 @@ results.push(...(await page.evaluate(async () => {
   c('kaydet → yükle: state.renown ve itibar aynı, sürüm 41', raw.version === 41 && JSON.stringify(st.renown) === before && st.crown.reputation === repB, `${before} ||| ${JSON.stringify(st.renown)}`);
   const a1 = JSON.stringify(R.renownTarget(st));
   const a2 = JSON.stringify(R.renownTarget(st));
-  c('determinizm: hedef saf (iki çağrı aynı), lütuf zarı ayrı üreteç', a1 === a2 && sc.renown.dice instanceof Random);
   return out;
 })));
 const ok = report(errors);

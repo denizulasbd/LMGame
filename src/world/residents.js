@@ -1,7 +1,8 @@
-// Başlangıç sakinlerini oluşturur: havuzdan tohuma göre 6 kişi seçer, kulübelere
+// Başlangıç sakinlerini oluşturur: rastgele kadro (Residents.js) 6 kişi üretir, kulübelere
 // dağıtır (gerekirse paylaşırlar) ve uyku saatindeyse evlerinde uyur hâlde başlatır.
 import { Character } from '../entities/Character.js';
-import { RESIDENT_POOL, STARTING_RESIDENT_COUNT, NEED_KEYS } from '../data/characters.js';
+import { NEED_KEYS } from '../data/characters.js';
+import { makeStartingCast, unavailableNames } from '../systems/Residents.js';
 import { ACTIVITIES } from '../data/activities.js';
 import { isBedtime } from '../ai/TraitProfile.js';
 
@@ -21,7 +22,8 @@ const START_NEEDS = {
  */
 export function createStartingResidents(world, rng, hour) {
   const homes = world.getBuildingsOfType('cabin');
-  const picked = rng.shuffle([...RESIDENT_POOL]).slice(0, STARTING_RESIDENT_COUNT);
+  // (33.1) Her yeni oyunda rastgele kadro (ad, görünüş, kişilik; güvenlik kuralları data/cast.js); %25 olasılıkla biri tanıdık yüzlerden
+  const picked = makeStartingCast(rng, { taken: unavailableNames(world.state) });
 
   return picked.map((def, i) => {
     const home = homes.length > 0 ? homes[i % homes.length] : null;

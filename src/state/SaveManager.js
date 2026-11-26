@@ -13,6 +13,7 @@ import { migrateMoodlets } from '../systems/Moodlets.js';
 import { migrateWants } from '../systems/Wants.js';
 import { migrateEvolution } from '../systems/Evolution.js';
 import { rescaleAgeDays } from '../systems/LifeStages.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
 const SLOT_KEYS = {
   main: CONFIG.SAVE_KEY,
@@ -67,7 +68,7 @@ function migrate(data) {
       for (const c of data.characters) {
         if (c && typeof c === 'object') {
           c.isVenerable = false;
-          c.lifespan = lifespanFor(data.seed, c.id);
+          c.lifespan = lifespanFor(lifeSeedOf(data), c.id);
         }
       }
     }

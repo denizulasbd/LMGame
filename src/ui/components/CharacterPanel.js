@@ -71,6 +71,7 @@ import { EVOLUTION_AXES } from '../../data/evolution.js';
 import { lifeStory, statusSentence } from '../../systems/LifeStory.js';
 import { grandmasterTitle as gmTitleOf } from '../../systems/Grandmaster.js';
 import { engineOn } from '../../systems/Engines.js';
+import { lifeSeedOf } from '../../utils/lifeSeed.js';
 
 // (29.9) Kartın dört sekmesi; seçim tarayıcıda hatırlanır. Yalnızca etkin sekmenin gövdesi DOM'a takılır ve yalnızca o sekmenin bölümleri yenilenir.
 const TAB_KEY = 'lmgame.ui.cardTab';
@@ -1005,7 +1006,7 @@ export class CharacterPanel {
       entries.push({ character: other, score, level: levelForScore(score), kind: score < 0 ? 'rival' : 'friend' });
     }
     for (const e of entries) {
-      e.chemistry = character.relationships?.[e.character.id]?.chemistry ?? chemistryFor(state.seed, character, e.character);
+      e.chemistry = character.relationships?.[e.character.id]?.chemistry ?? chemistryFor(lifeSeedOf(state), character, e.character);
       e.tags = tagsOf(character, e.character.id);
     }
     const rulerTags = tagsOf(character, RULER_ID);

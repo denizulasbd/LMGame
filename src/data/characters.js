@@ -144,8 +144,8 @@ export const OPPOSING_TRAITS = [
   ['cheerful', 'grumpy'],
 ];
 
-// Sakin havuzu. Başlangıçta tohuma göre içlerinden 6'sı seçilir; kalanlar boş ev
-// açıldıkça göçmen olarak gelir. Havuz biterse ad ve görünüm rastgele birleştirilir.
+// Tanıdık yüzler: elle yazılmış 14 karakter. (33.1) Artık her yeni oyunda rastgele kadro üretilir (Residents.js); bu havuzdan yalnızca
+// ara sıra biri döner (data/cast.js -> FAMILIAR: başlangıçta %25, her göçmen için %10).
 // Görünüm renkleri src/art/palette.js -> CHARACTER_COLORS içindeki adlardır.
 export const RESIDENT_POOL = [
   {
@@ -236,12 +236,11 @@ export const RESIDENT_POOL = [
 
 export const STARTING_RESIDENT_COUNT = 6;
 
-// (30.4a) Havuz bitince gelen adsız göçmenlerin yaş aralığı (tek zar: rng.int(min, max); sınırlar dışında çağrı değişmez).
+// (30.4a) Rastgele göçmenlerin yaş aralığı (tek zar: rng.int(min, max); sınırlar dışında çağrı değişmez).
 // 60 -> 66: her mevsim bir yaşla 50 günlük koşuda vefat 2-6 bandına girsin (tohum 77'de 60 ile 1 vefat)
 export const IMMIGRANT_AGE = { min: 18, max: SWIFT ? 66 : 60 };
 
-// Havuz tükenince göçmenler için ad ve görünüm parçaları
-export const EXTRA_NAMES = ['Bora', 'Ece', 'Kaan', 'Yağmur', 'Arda', 'Duru', 'Efe', 'Lale', 'Tolga', 'Sude'];
+// Rastgele sakinlerin görünüm parçaları (33.1: adlar data/names.js'te; üretici src/systems/Residents.js)
 export const APPEARANCE_PARTS = {
   hair: ['short', 'long', 'bun', 'spiky', 'hat'],
   hairColor: ['black', 'brown', 'auburn', 'blonde', 'ginger'],

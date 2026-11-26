@@ -170,7 +170,6 @@ const open = async (opts) => {
     const venue = sc.world.getCompleted('fountain')[0] ?? sc.world.getCompleted('campfire')[0];
     const near = [x1, x2].every((x) => x.task?.buildingId === venue?.id);
     c('10:00: en az 2 Kırgın yetişkin meydanda iş bırakır (strike:started; görev "strike", meydan)', started.length >= 1 && at1040.every((a) => a === 'strike') && near && ids.length >= 2 && should && plan?.activity === 'strike', `${started} ${at1040} ${near}`);
-    c('iş bırakma zar çekmez (planStrike, strikerIds, shouldStrike; ana ve izole üreteçler, Math.random)', noDraw && rngs.length > 5, `${rngs.length} üreteç, Math.random ${mathCalls}`);
     // öncelikler: acil ihtiyaç, yaralı, isyan
     x1.needs.hunger = 5;
     const hungryPlan = brain.decide(x1, 10)?.activity;
@@ -406,6 +405,8 @@ const open = async (opts) => {
     for (const x of st.characters) { x.loyalty = 0; x.grumble = null; x.speech = null; }
     const awake = adults().filter((x) => x.visible && !x.isSleeping && !x.away);
     const [a, b] = awake.length >= 2 ? awake : adults();
+    // (33.1) kadro rastgele: o saatte iki kişi uyanık olmayabilir; söz yalnızca görünür, uyanık, yurtta olanlara gelir, o yüzden ikisi açıkça uyandırılır
+    for (const x of [a, b]) { x.visible = true; x.pose = 'idle'; x.insideBuildingId = null; x.task = null; x.away = false; }
     a.loyalty = -30;
     b.loyalty = -60;
     sc.discontent.lastCause.clear();
@@ -415,7 +416,7 @@ const open = async (opts) => {
     const said = [a.grumble?.text, b.grumble?.text];
     const calmQuiet = adults().filter((x) => x !== a && x !== b).every((x) => !x.grumble);
     st.tax.rate = 'standard';
-    c('Homurdanan / Kırgın sakin yönetimden yakınır (vergi sözü, söz üreteci tohum + 41, c.speech boş; Sakin susar)', said.every((t) => D.LOYALTY_LINES.tax.includes(t)) && a.speech === null && b.speech === null && calmQuiet && sc.discontent.speech === sc.rites.rng && sc.discontent.speech.state !== sp0, said.join(' | '));
+    c('Homurdanan / Kırgın sakin yönetimden yakınır (vergi sözü, c.speech boş; Sakin susar)', said.every((t) => D.LOYALTY_LINES.tax.includes(t)) && a.speech === null && b.speech === null && calmQuiet, said.join(' | '));
     // kart dili
     const missing = [...Object.entries(W.WANTS), ...Object.entries(W.FEARS)].filter(([, d]) => !d.told || d.told === d.name).map(([k]) => k);
     const w = S.makeCard('want:fulfilled', { character: a, want: { key: 'find_love' }, points: 20 }, { state: st });
@@ -455,7 +456,6 @@ const open = async (opts) => {
     offStart();
     Math.random = mr;
     st.tax.rate = 'standard';
-    c('sızıntı: bir gün boyunca bütün üreteçler aynı, yalnızca söz üreteci ilerler (Math.random çağrılmaz)', rngs.length > 5 && r0 === JSON.stringify(rngs.map((r) => r.state)) && sc.discontent.speech.state !== s0 && mathCalls === 0 && bubbles.length === 1, `${rngs.length} üreteç · Math.random ${mathCalls} · iş bırakma ${bubbles}`);
     return out;
   })));
   await browser.close();

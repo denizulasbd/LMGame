@@ -13,6 +13,7 @@ import { drawTileCursor, drawAreaCursor } from '../rendering/TileCursor.js';
 import { drawJobMarkers } from '../rendering/JobMarkers.js';
 import { generateTown } from '../world/WorldGenerator.js';
 import { World } from '../world/World.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 import { captureTerrain, diffTerrain, applyTerrain } from '../world/TerrainSnapshot.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { fireflyIntensity, isRainActive } from '../data/weather.js';
@@ -137,6 +138,7 @@ export class TownScene extends Scene {
       state.time.paused = false;
     }
     const { width, height, generator } = state.map;
+    const life = lifeSeedOf(state); // (33.1) haritanın DIŞINDAKİ bütün üreteçler hayat tohumundan; harita yalnızca state.seed'den
     const { map, landmarks, structures } = generateTown(width, height, new Random(state.seed), { biomes: generator >= 2 });
     this.map = map;
     this.baseTerrain = captureTerrain(map); // kayıtta yalnızca bundan farklı karolar saklanır
@@ -154,7 +156,7 @@ export class TownScene extends Scene {
     }
     this.world = new World(map, state, landmarks);
     if (restoring) this.reattachResidents();
-    else state.characters = createStartingResidents(this.world, new Random(state.seed + 1), this.currentHour());
+    else state.characters = createStartingResidents(this.world, new Random(life + 1), this.currentHour());
 
     // Servisler: birbirine ihtiyaç duyan sistemler
     this.timeSystem = new TimeSystem(this.game);
@@ -170,25 +172,25 @@ export class TownScene extends Scene {
       baseTileAt: (x, y) => TILE_BY_ID[this.baseTerrain.tiles[map.index(x, y)]] ?? null,
     });
     this.nature = new NatureSystem(this.game, this.world);
-    this.population = new PopulationSystem(this.game, this.world, new Random(state.seed + 3));
+    this.population = new PopulationSystem(this.game, this.world, new Random(life + 3));
     this.townEvents = new EventSystem(this.game, this.world, { population: this.population, economy: this.economy });
     this.audio = new AudioSystem(this.game, this.world, () => {
       const { width, height } = this.game.renderer;
       return this.camera.screenToWorld(width / 2, height / 2);
     });
     this.weather = new WeatherSystem(this.game);
-    this.relationships = new RelationshipSystem(this.game, this.world, new Random(state.seed + 5));
-    this.conflicts = new ConflictSystem(this.game, this.world, this.relationships, new Random(state.seed + 6));
-    this.family = new FamilySystem(this.game, this.world, new Random(state.seed + 7));
+    this.relationships = new RelationshipSystem(this.game, this.world, new Random(life + 5));
+    this.conflicts = new ConflictSystem(this.game, this.world, this.relationships, new Random(life + 6));
+    this.family = new FamilySystem(this.game, this.world, new Random(life + 7));
     // (29.1) Sosyal kimya ve duygusal etiketler (üreteci yok: kıvılcım kimlik çiftinden ve tohumdan türer, seed + 37 izole)
     this.chemistry = new ChemistrySystem(this.game, this.world, { relationships: this.relationships });
     // (29.2) Moodlet motoru, yas ve teselli (izole üreteç seed + 38: yalnızca sözler)
-    this.moodlets = new MoodletSystem(this.game, this.world, new Random(state.seed + 38), { relationships: this.relationships });
+    this.moodlets = new MoodletSystem(this.game, this.world, new Random(life + 38), { relationships: this.relationships });
     // (29.3) Arzular, korkular ve yaşam doyumu (moodlet dinleyicilerinden SONRA kurulur; izole üreteç seed + 39: yalnızca sözler,
     // günlük seçim tohum / kimlik / gün karmasından durumsuz)
-    this.wants = new WantSystem(this.game, this.world, new Random(state.seed + 39), { moodlets: this.moodlets, relationships: this.relationships });
+    this.wants = new WantSystem(this.game, this.world, new Random(life + 39), { moodlets: this.moodlets, relationships: this.relationships });
     // (29.4) Kalıcı kişilik evrimi (WantSystem'den hemen sonra; izole üreteç seed + 40: yalnızca sözler, evrim zar çekmez)
-    this.evolution = new EvolutionSystem(this.game, this.world, new Random(state.seed + 40), { moodlets: this.moodlets, relationships: this.relationships });
+    this.evolution = new EvolutionSystem(this.game, this.world, new Random(life + 40), { moodlets: this.moodlets, relationships: this.relationships });
     // (29.5) Omuz Omuza: yan yana çalışma moodlet'leri (üreteci yok)
     this.bonds = new BondSystem(this.game, this.world, { moodlets: this.moodlets, relationships: this.relationships });
     // (29.6) Vefa ve Husumet: sadakat, isyan elebaşı, yağma kırgınlığı, anının kişisi (üreteci yok)
@@ -196,35 +198,35 @@ export class TownScene extends Scene {
     // (29.7) Anma Töreni ve özel günler (izole üreteç seed + 41: yalnızca sözler; tören ve özel günler zar çekmez)
     // (30.3) Kararın Ağırlığı: Halkın Nabzı, anında geri bildirim, iş bırakma, homurdanma (söz üreteci RiteSystem ile ortak: tohum + 41).
     // Yönetim eylemlerinin ön dinleyicileri için eylemi işleyen sistemlerden (RiteSystem, Trust, Petition, Tax, Dilemma) ÖNCE kurulur.
-    const speech41 = new Random(state.seed + LOYALTY_SEED_OFFSET);
+    const speech41 = new Random(life + LOYALTY_SEED_OFFSET);
     this.discontent = new DiscontentSystem(this.game, this.world, speech41, { economy: this.economy });
     this.rites = new RiteSystem(this.game, this.world, speech41, { economy: this.economy, relationships: this.relationships, loyalty: this.loyalty });
-    this.social = new SocialSystem(this.game, this.world, new Random(state.seed + 19), { relationships: this.relationships });
+    this.social = new SocialSystem(this.game, this.world, new Random(life + 19), { relationships: this.relationships });
     this.crafting = new CraftingSystem(this.game, this.world, this.economy);
-    this.health = new HealthSystem(this.game, this.world, new Random(state.seed + 8));
-    this.animals = new AnimalSystem(this.game, this.world, new Random(state.seed + 9));
+    this.health = new HealthSystem(this.game, this.world, new Random(life + 8));
+    this.animals = new AnimalSystem(this.game, this.world, new Random(life + 9));
     this.civic = new CivicSystem(this.game, this.world, this.economy);
     this.journal = new JournalSystem(this.game);
-    this.research = new ResearchSystem(this.game, this.world, this.economy, new Random(state.seed + 12));
-    this.harbor = new HarborSystem(this.game, this.world, this.economy, new Random(state.seed + 13));
+    this.research = new ResearchSystem(this.game, this.world, this.economy, new Random(life + 12));
+    this.harbor = new HarborSystem(this.game, this.world, this.economy, new Random(life + 13));
     this.luxury = new LuxurySystem(this.game, this.economy);
     this.stats = new StatsSystem(this.game);
-    this.seasonFestivals = new SeasonFestivalSystem(this.game, this.world, new Random(state.seed + 14), { attract: this.attract });
-    this.memories = new MemorySystem(this.game, this.world, new Random(state.seed + 15));
+    this.seasonFestivals = new SeasonFestivalSystem(this.game, this.world, new Random(life + 14), { attract: this.attract });
+    this.memories = new MemorySystem(this.game, this.world, new Random(life + 15));
     // (20. aşama) Altın Çağ: anılardan sonra kurulur (Tarihçe'nin kurucuları ilk sakinlerin anısından çıkarılır)
     this.goldenAge = new GoldenAgeSystem(this.game, this.world, { attract: this.attract });
     this.rally = new RallySystem(this.game);
-    this.craftsmanship = new CraftsmanshipSystem(this.game, this.world, this.economy, new Random(state.seed + 16));
+    this.craftsmanship = new CraftsmanshipSystem(this.game, this.world, this.economy, new Random(life + 16));
     // (21. aşama) Vatandaşlık katmanı: kişisel kese ve çanta, Yönetim Güveni ve isyan, vatandaş dilekçeleri (kendi üreteçleri)
-    this.purse = new PurseSystem(this.game, this.world, this.economy, new Random(state.seed + 21));
-    this.trust = new TrustSystem(this.game, this.world, { economy: this.economy }, new Random(state.seed + 22), { attract: this.attract });
-    this.petitions = new PetitionSystem(this.game, this.world, { economy: this.economy, construction: this.construction, crafting: this.crafting, trust: this.trust }, new Random(state.seed + 23), { attract: this.attract });
+    this.purse = new PurseSystem(this.game, this.world, this.economy, new Random(life + 21));
+    this.trust = new TrustSystem(this.game, this.world, { economy: this.economy }, new Random(life + 22), { attract: this.attract });
+    this.petitions = new PetitionSystem(this.game, this.world, { economy: this.economy, construction: this.construction, crafting: this.crafting, trust: this.trust }, new Random(life + 23), { attract: this.attract });
     // (22. aşama) Krallık katmanı: iç vergi ve öşür, Krallık Vergisi ve Kraliyet Fermanları, köyü terk etme
     this.tax = new TaxSystem(this.game, this.world, { economy: this.economy, trust: this.trust });
-    this.crown = new CrownSystem(this.game, this.world, { economy: this.economy, trust: this.trust }, new Random(state.seed + 24), { attract: this.attract });
-    this.desertion = new DesertionSystem(this.game, this.world, { jobs: this.jobs }, new Random(state.seed + 25), { attract: this.attract });
+    this.crown = new CrownSystem(this.game, this.world, { economy: this.economy, trust: this.trust }, new Random(life + 24), { attract: this.attract });
+    this.desertion = new DesertionSystem(this.game, this.world, { jobs: this.jobs }, new Random(life + 25), { attract: this.attract });
     // (23. aşama) Yönetilebilir krizler: yangın ve itfaiye, haydut baskınları, hasar / tamir, yaralanma (ana üretece dokunmaz)
-    this.crisis = new CrisisSystem(this.game, this.world, { economy: this.economy, trust: this.trust, construction: this.construction, social: this.social }, new Random(state.seed + 26), { attract: this.attract });
+    this.crisis = new CrisisSystem(this.game, this.world, { economy: this.economy, trust: this.trust, construction: this.construction, social: this.social }, new Random(life + 26), { attract: this.attract });
     // (24. aşama) Tarımsal çeşitlilik: bahçenin ekim tercihi, Ürün Silosu ve silosuz kasabada mahsul bozulması (rastgelelik yok)
     this.granary = new GranarySystem(this.game, this.world, { economy: this.economy });
     // (24.2) Katma değerli üretim: handa fıçı şerbeti, Şerbet Testisi (tezgâh ve mahzen işleme yapısıdır; rastgelelik yok)
@@ -232,26 +234,26 @@ export class TownScene extends Scene {
     // (24.3) Dış ticaret: Ticaret İskelesi / Kervan Konağı, ihracat sözleşmeleri, pazar doygunluğu, ithalat (rastgelelik yok)
     this.tradePost = new TradePostSystem(this.game, this.world, { economy: this.economy });
     // (25.2) Usta-Çırak sistemi: çıraklık, Gururlu Usta, çırak işi, mezuniyet (kendi üreteci; çırak yokken hiçbir şeyi değiştirmez)
-    this.apprenticeship = new ApprenticeshipSystem(this.game, this.world, new Random(state.seed + 28));
+    this.apprenticeship = new ApprenticeshipSystem(this.game, this.world, new Random(life + 28));
     // (25.4) Aile Kütüğü, 2. kuşak düğünleri, Yeni Yuva ve Ocak Devri (kendi üreteci; ev değişiklikleri Altın Çağ'da)
-    this.lineageSystem = new LineageSystem(this.game, this.world, new Random(state.seed + 30), { petitions: this.petitions });
+    this.lineageSystem = new LineageSystem(this.game, this.world, new Random(life + 30), { petitions: this.petitions });
     // (25.5) Aile yadigârları, miras intikali ve Kuşak Şöleni (kendi üreteci; Altın Çağ'da)
-    this.heirloomSystem = new HeirloomSystem(this.game, this.world, new Random(state.seed + 31), { economy: this.economy });
+    this.heirloomSystem = new HeirloomSystem(this.game, this.world, new Random(life + 31), { economy: this.economy });
     // (26.1) Mevsimlik panayırlar (kendi üreteci seed + 32; Altın Çağ'dan sonra, mevsimin son günü)
-    this.fairSystem = new FairSystem(this.game, this.world, new Random(state.seed + 32), { attract: this.attract });
+    this.fairSystem = new FairSystem(this.game, this.world, new Random(life + 32), { attract: this.attract });
     // (26.2) Büyük Ziyafet Sofrası (kendi üreteci seed + 33; panayır günlerinde)
-    this.feastSystem = new FeastSystem(this.game, this.world, new Random(state.seed + 33), { crisis: this.crisis, attract: this.attract });
+    this.feastSystem = new FeastSystem(this.game, this.world, new Random(life + 33), { crisis: this.crisis, attract: this.attract });
     // (25.3) Mizaç kalıtımı ve yeni nesil huylar (kendi üreteci; Altın Çağ'da açılır)
-    this.temperament = new TemperamentSystem(this.game, this.world, new Random(state.seed + 29));
+    this.temperament = new TemperamentSystem(this.game, this.world, new Random(life + 29));
     // (25.1) Yaşam evreleri: yaşlanma (rastgelelik yok), Kıdemli Bilge emekliliği ve Bilge Nasihati (kendi üreteci, yalnızca süs)
-    this.lifeStages = new LifeStageSystem(this.game, this.world, new Random(state.seed + 27));
+    this.lifeStages = new LifeStageSystem(this.game, this.world, new Random(life + 27));
     // (28.3) Saygın Büyük, doğal vefat ve kazalar (ömür kimlikten türer: seed + 30 izole üreteci; rastgelelik tüketmez). Yaşlanmadan SONRA kayıt olur.
     this.lifecycle = new LifecycleSystem(this.game, this.world, { jobs: this.jobs });
     // (32.4) Darülfünun: üreteci yok; gün dönümü dinleyicisi yaşlanmadan (LifeStageSystem) SONRA kurulur (mezuniyet önce, kabul sonra)
     this.university = new UniversitySystem(this.game, this.world, { moodlets: this.moodlets, apprenticeship: this.apprenticeship });
     // (32.5) Hobi evleri: üreteci yok; gün dönümü dinleyicisi Darülfünun'dan SONRA (üyelik), LandscapeSystem'den ÖNCE kurulur (ürün estetiği)
     this.clubs = new ClubSystem(this.game, this.world, { moodlets: this.moodlets, relationships: this.relationships });
-    this.behavior = new BehaviorSystem(this.game, this.world, new Random(state.seed + 2), {
+    this.behavior = new BehaviorSystem(this.game, this.world, new Random(life + 2), {
       citizens: this.purse,
       crisis: this.crisis,
       economy: this.economy,
@@ -271,25 +273,25 @@ export class TownScene extends Scene {
     });
     this.milestones = new MilestoneSystem(this.game, this.world, TILE_TYPES.cobble.id);
     this.townLevel = new TownLevelSystem(this.game, this.world, this.economy, { attract: this.attract });
-    this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(state.seed + 10), { economy: this.economy, population: this.population, loyalty: this.loyalty, chemistry: this.chemistry, moodlets: this.moodlets, health: this.health, desertion: this.desertion, relationships: this.relationships }, { attract: this.attract });
-    this.expeditions = new ExpeditionSystem(this.game, this.world, { economy: this.economy, health: this.health, dilemmas: this.dilemmas }, new Random(state.seed + 17));
+    this.dilemmas = new DilemmaSystem(this.game, this.world, new Random(life + 10), { economy: this.economy, population: this.population, loyalty: this.loyalty, chemistry: this.chemistry, moodlets: this.moodlets, health: this.health, desertion: this.desertion, relationships: this.relationships }, { attract: this.attract });
+    this.expeditions = new ExpeditionSystem(this.game, this.world, { economy: this.economy, health: this.health, dilemmas: this.dilemmas }, new Random(life + 17));
     // (26.3) Gezgin Konuklar: Seyyar Ozan, Nadir Takasçı, Yaşlı Seyyah (kendi üreteci seed + 34; Altın Çağ'dan sonra)
-    this.guestSystem = new GuestSystem(this.game, this.world, new Random(state.seed + 34), { expeditions: this.expeditions, attract: this.attract });
+    this.guestSystem = new GuestSystem(this.game, this.world, new Random(life + 34), { expeditions: this.expeditions, attract: this.attract });
 
     // Sıra önemlidir: hava, yapı durumu ve kapasite, Bilgelik Evi ve liman durumu, iş temizliği, atölye durumu, ihtiyaç azalması,
     // yürüme, kararlar, ilişkiler (gruplar), atışma / barışma, aile, sonra olaylar, kasaba seviyesi ve doğa
     this.structures = new StructureSystem(this.game, this.world);
-    this.landscape = new LandscapeSystem(this.game, this.world, new Random(state.seed + 18));
+    this.landscape = new LandscapeSystem(this.game, this.world, new Random(life + 18));
     this.heating = new HeatingSystem(this.game, this.world, this.economy);
     // (31. aşama) Kasaba Süsleri: zar çekmez; görünüm durumu, konser, heykel gururu, ilan tahtasının dilekçe süresi
     this.townDecor = new TownDecorSystem(this.game, this.world, { economy: this.economy, trust: this.trust, moodlets: this.moodlets });
     // (32.1) Suç Motoru: yalnızca olay dinler (08:00 planı, eylem bitişi, saatlik kapanış); izole üreteç seed + 42, ana üreteçlere dokunmaz
-    this.crime = new CrimeSystem(this.game, this.world, { economy: this.economy, relationships: this.relationships }, new Random(state.seed + JUSTICE_SEED_OFFSET));
+    this.crime = new CrimeSystem(this.game, this.world, { economy: this.economy, relationships: this.relationships }, new Random(life + JUSTICE_SEED_OFFSET));
     // (32.2) Adalet Sarayı ve Dava: yalnızca olay dinler (karar, saatlik süre / tanık / yasak, hizmet ve sürgün bitişi); izole üreteç seed + 43
-    this.court = new CourtSystem(this.game, this.world, { crime: this.crime, economy: this.economy, trust: this.trust, loyalty: this.loyalty, chemistry: this.chemistry, moodlets: this.moodlets, relationships: this.relationships, jobs: this.jobs }, new Random(state.seed + COURT_SEED_OFFSET));
+    this.court = new CourtSystem(this.game, this.world, { crime: this.crime, economy: this.economy, trust: this.trust, loyalty: this.loyalty, chemistry: this.chemistry, moodlets: this.moodlets, relationships: this.relationships, jobs: this.jobs }, new Random(life + COURT_SEED_OFFSET));
     // (32.3) Kasaba Şöhreti: yalnızca olay dinler (gün dönümünde itibar hedefe kayar: öteki gün dinleyicilerinden SONRA kurulur);
     // izole üreteç seed + 44 yalnızca Kraliyet Lütfu zarı
-    this.renown = new RenownSystem(this.game, new Random(state.seed + RENOWN_SEED_OFFSET), { attract: this.attract });
+    this.renown = new RenownSystem(this.game, new Random(life + RENOWN_SEED_OFFSET), { attract: this.attract });
     this.systems = [
       this.weather,
       this.structures,
@@ -416,7 +418,7 @@ export class TownScene extends Scene {
     this.queue = new RenderQueue();
     this.dayNight = new DayNightOverlay();
     this.weatherFx = new WeatherEffects();
-    this.fireflies = new FireflyField(state.seed);
+    this.fireflies = new FireflyField(life);
     this.festivalFx = new FestivalEffects();
     this.confetti = new WeddingConfetti(); // (19. aşama) meydandaki düğün kutlaması
     this.ageConfetti = new WeddingConfetti(); // (20. aşama) Çağ Kutlaması

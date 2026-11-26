@@ -1,6 +1,26 @@
 # Değişiklik günlüğü
 
-Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 20 satır. README'ye yeni aşama bölümü eklenmez.
+Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 10 satır (33.0'da 20'den indirildi). README'ye yeni aşama bölümü eklenmez.
+
+## Aşama 33.1 — Rastgele Kadro ve Hayat Tohumu (kayıt sürümü 41 kalır)
+- İki tohum: `state.seed` harita tohumu (aynı tohum aynı harita); yeni `state.lifeSeed` hayat tohumu, her yeni oyunda rastgele (Yeni Kasaba Kur, Yeni Harita, `?seed=`). `lifeSeedOf(state)` (`utils/lifeSeed.js`): alan yoksa harita tohumu. Haritanın dışındaki ~40 üreteç ve hesap (TownScene `seed + N`, hava, hayvanlar, kimya, ömür, arzu, çatışma) buna geçti.
+- Harita tohumunda kalanlar: arazi / işaretler / başlangıç yapıları (WorldGenerator), kayıtta yeniden üretilen taban arazi (TerrainSnapshot; bozulursa kayıtlar bozulur), Vadi Karakteri, varsayılan kasaba adı.
+- Eski kayıt: `lifeSeed` yoksa harita tohumu kullanılır, kayıt eskisi gibi sürer. Yeni kayıt `lifeSeed` yazar (isteğe bağlı alan). Araçlar: `?life=`, `openGame({ seed, life = seed })`, autopilot `--life`.
+- Kadro: `data/names.js` (177 ad, ≤8 harf), `systems/Residents.js` (saf `makeResident`, `makeStartingCast`), `data/cast.js` (kurallar, olasılıklar). Başlangıç altılısı: ≥4 kişi 20-45 yaş, ≤1 kişi 55 üstü, 50-58 arası biri, aynı özellik ≤2, ≥2 işe yarar özellik; tutmazsa yeniden dener.
+- Tanıdık yüzler (14 elle yazılmış karakter): başlangıçta %25, her göçmen için %10. Göçmen (`pickResident`) ve yeni doğan (`pickName`) büyük havuzdan; kasabadakilerle ve son ayrılanlarla (`state.recentNames`, en çok 12, isteğe bağlı) ad çakışmaz.
+- Arayüz: başlangıç ekranında "Harita tohumu (isteğe bağlı)" ve not; hayat tohumu görünmez. Kararlara ek şans yok.
+- Test: `tests/33.1-cast.mjs` (43). Kadroya bağlı 5 eski testin kurulumu düzeltildi (29.6, 29.7, 30.3, 32.4 ölçümü hayat tohumu 7'ye sabit, 32.5). Ekran: `docs/playtest/img33.1/` (`tools/sim/shots33.1.mjs`).
+- Kapı (`--quick`) yeşil, 177 sn; `compat --all` 1990/1990 yeşil (2 dk 13 sn).
+
+## Aşama 33.0 — Hafifletme (kayıt sürümü 41 kalır)
+- Kural değişikliği: determinizm, izole üreteç (tohum + N), bayt eşitliği (sha1) ve "her yeni mekanik şalter ekler" şartları kalktı (README / CHANGELOG'daki eski cümlelere not düşüldü). Mevcut `ENGINES` şalterleri silinmedi; CHANGELOG sınırı aşama başına 10 satır. Kurallar yeni `CLAUDE.md`'de.
+- Testler: aşama testlerinden üreteç durumu / `Math.random` sızıntısı, sha1, determinizm ve "tohum + N" ezber denetimleri çıkarıldı (işlevsel kontroller korundu). `32.6b-integration` kısaldı (şalter matrisi 9 → 5 yapılandırma, 62 test).
+- Dondurulmuş `tools/sim/tests.mjs` (1614 test) `tools/sim/archive/`'e taşındı (kapıda değil; elle koşulur, hâlâ yeşil). audit, stress ve determinizm kapıdan çıktı, araç olarak duruyor.
+- `gate.mjs`: `--quick` (varsayılan): cycles + bütün aşama testleri + 1 tohum × 15 gün otopilot + `compat --sample`. `--full`: quick + `compat --all` + 3 tohum × 30 gün otopilot (yalnızca çökme / monitor). 30.1 (gerçek fare) kalırsa bir kez yeniden denenir.
+- Kapı süresi (4 çekirdek): quick eski 286 sn → yeni ~190 sn; full eski ≈ 25-30 dk (parçaların ölçülen toplamı: stress 923 sn + determinizm 446 sn + ötekiler) → yeni 528 sn, hepsi yeşil.
+- Ek 1: Darülfünun'a gençliğinin bitmesine 6 günden az kalan genç alınmaz (`UNIVERSITY.minYouthDaysLeft`); panelde "Zamanı yetmeyen" satırı nedeniyle yazılır.
+- Ek 2: dava sonuç ekranında karardan SONRA "Halkın beklediği: X ile Y arası" (hak edilen sertliğin adil penceresindeki cezalar); karardan önce hiçbir şey gösterilmez.
+- Ek 3: ferman / tahsildar çipi Belediye panelini açar ve Krallık bölümüne kaydırır. Ek 4: kulüpten çıkarılan kişi aday listesinin sonuna gider; Davet et düğmeleri satırdaki kişiyi hedefler. Test: `tests/33.0-fixes.mjs` (+ 32.2 / 32.4'e birer kontrol).
 
 ## Aşama 32.7 — Kayıt güvenliği (kayıt sürümü 41 kalır)
 - Okunamayan kayıt (bozuk JSON, desteklenmeyen sürüm, restore hatası) artık silinmez: ham veri `lmgame.save.broken.<yuva>.<zaman>` anahtarına yedeklenir (en çok 3, en eskisi gider), sonra yuva temizlenir; öteki yuvadan ya da yeni oyunla devam edilir, açılışta "Bir kayıt okunamadı ve yedeklendi." uyarısı çıkar.
@@ -192,7 +212,7 @@ Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 20 sat�
 - `tools/sim/lib.mjs`: `createChecks().report()` varsayılan olarak yalnızca kalan testleri, toplamı ve sayfa hatalarını basar; `--verbose` / `LMGAME_VERBOSE=1` eski çıktıyı verir. `capOutput`: 60 satırı aşan çıktı son 40 satıra kısaltılır, tam günlük `tools/sim/out/<ad>.log` dosyasına yazılır (autopilot, stress, audit, compat, tests).
 - `tools/sim/tests/`: aşama başına bir test dosyası (`_template.mjs` iskeleti); taze `openGame`, bütün mekanikler açık. `tests.mjs` DONDURULDU, yeni test eklenmez.
 - `tools/sim/gate.mjs`: `--quick` (tests/* + autopilot 42 12 + audit) ve `--full` (tests, tests/*, audit, compat --sample, stress 4x 50 gün, determinizm); paralel, en çok 40 satır çıktı, günlükler `tools/sim/out/gate/`.
-- `src/systems/Engines.js`: `ENGINES` / `engineOn(key)` şalterleri. Kural (29.5'ten): her yeni mekanik anahtarını `true` ekler, kancalarını `engineOn` ile sarar. `tests.mjs` hepsini kapatır; audit açılışta hepsinin açık olduğunu denetler. Bugün liste boş.
+- `src/systems/Engines.js`: `ENGINES` / `engineOn(key)` şalterleri. Kural (29.5'ten; 33.0'da kaldırıldı): her yeni mekanik anahtarını `true` ekler, kancalarını `engineOn` ile sarar. `tests.mjs` hepsini kapatır; audit açılışta hepsinin açık olduğunu denetler. Bugün liste boş.
 - `compat.mjs --sample` (v2, v6, v10, v14, v18, v22, v26, v30, v33, v36 + son üç sürüm); `--all` bütün fikstürler (29.10'da ve elle).
 
 ## Aşama 29.5 — Sosyal iş seçimi ve "Omuz Omuza" (kayıt sürümü 39 kalır)

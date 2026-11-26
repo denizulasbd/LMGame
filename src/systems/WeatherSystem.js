@@ -14,6 +14,7 @@ import { WEATHER_TYPES, WEATHER_TIMING, WEATHER_SPECIALS } from '../data/weather
 import { Random } from '../utils/random.js';
 import { getSeason } from '../data/seasons.js';
 import { approach } from '../utils/math.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
 export class WeatherSystem {
   /** @param {import('../core/Game.js').Game} game */
@@ -35,7 +36,7 @@ export class WeatherSystem {
     for (const [type, spec] of Object.entries(WEATHER_SPECIALS)) {
       if (hour !== spec.rollHour || !spec.from.includes(this.weather.type)) continue;
       const chance = spec.seasons[season] ?? 0;
-      const rng = new Random(this.state.seed * 13 + this.state.time.day * 101 + spec.rollHour);
+      const rng = new Random(lifeSeedOf(this.state) * 13 + this.state.time.day * 101 + spec.rollHour);
       if (chance > 0 && rng.next() < chance) {
         this.force(type);
         return type;
@@ -50,7 +51,7 @@ export class WeatherSystem {
 
   /** Değişim sayısına bağlı, kayıttan sonra da aynı sonucu veren rastgelelik. */
   rngFor(salt) {
-    return new Random(this.state.seed * 31 + this.weather.changes * 7919 + salt);
+    return new Random(lifeSeedOf(this.state) * 31 + this.weather.changes * 7919 + salt);
   }
 
   scheduleNext() {

@@ -270,6 +270,7 @@ export class Hud {
       const openJournal = () => ev.emit('ui:toggleJournal');
       const hallB = state.buildings.find((x) => x.functional && BUILDINGS[x.type].civic) ?? state.buildings.find((x) => x.functional && x.type === 'fountain');
       const openHall = () => (hallB ? ev.emit('ui:selectBuilding', hallB.id) : openGoals());
+      const openCrown = () => { openHall(); if (hallB) ev.emit('ui:scrollToCrown'); }; // (33.0) ferman / tahsildar çipi: Belediye paneli, Krallık bölümüne kaydırılır
       const selectChar = (id) => () => (Number.isFinite(id) && id >= 0 ? ev.emit('ui:selectCharacter', id) : openJournal());
       for (const bf of buffs) {
         add(2, bf.icon, `${bf.name} · ${Math.ceil(bf.minutesLeft / 60)} sa`, {
@@ -395,11 +396,11 @@ export class Hud {
           why: 'Krallık düzenli vergi toplar.',
           left: `${formatRemaining(cr.nextLevyAt - state.totalMinutes)} sonra ödenir.`,
           effect: ok ? 'Hazine yetiyor: vakti gelince ödenecek.' : 'Hazine yetmiyor! Ödenemezse Krallık el koyar ve "Kraliyet Cezası" gelir. İç vergiyi ayarla. Tıkla: Belediye.',
-        }, ok ? ' is-crown' : ' is-crown is-short', openHall);
+        }, ok ? ' is-crown' : ' is-crown is-short', openCrown);
       }
       if (cr?.decree) {
         const def = DECREES[cr.decree.kind];
-        add(1, 'decree', `Ferman · ${def.name} · ${formatRemaining(cr.decree.deadline - state.totalMinutes)}`, { what: `Kraliyet Fermanı: "${def.text}"`, why: 'Krallık senden bir teslimat istiyor.', left: `${formatRemaining(cr.decree.deadline - state.totalMinutes)} içinde teslim edilmeli.`, effect: "Teslim edilirse itibar ve ödül kazanılır. Tıkla: Belediye Konağı'ndan teslim et." }, ' is-crown', openHall);
+        add(1, 'decree', `Ferman · ${def.name} · ${formatRemaining(cr.decree.deadline - state.totalMinutes)}`, { what: `Kraliyet Fermanı: "${def.text}"`, why: 'Krallık senden bir teslimat istiyor.', left: `${formatRemaining(cr.decree.deadline - state.totalMinutes)} içinde teslim edilmeli.`, effect: "Teslim edilirse itibar ve ödül kazanılır. Tıkla: Belediye Konağı'ndan teslim et." }, ' is-crown', openCrown);
       }
       for (const pt of petitions) {
         add(1, 'scroll', `Dilekçe · ${pt.name}`, {

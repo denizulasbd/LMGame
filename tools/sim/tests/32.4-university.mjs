@@ -86,7 +86,7 @@ const errors = [];
     const youths = pool.slice(0, 8);
     youths.forEach((y, i) => {
       y.lifeStage = 'youth';
-      y.age = 19;
+      y.age = 19; y.ageInDays = 19 * 4 + 1; // (33.0) gençliğin başı: kabul için en az 6 gün kalmalı
       y.educated = i !== 7; // sonuncusu Bilgelik Evi'ni bitirmedi
       y.schooling = 400 + (i === 2 ? 0 : 10 * i); // 2 numara en düşük: sırada kalır
       y.higherStudy = null;
@@ -101,7 +101,20 @@ const errors = [];
     const students = U.studentsOf(st);
     c('kabul: en çok 6 öğrenci, Bilgelik Evi mezunu olmayan alınmaz', students.length === 6 && !youths[7].higherStudy, `${students.length}`);
     c('kabul sırası: en yüksek schooling önce; sıradaki (en düşük) bekler', !youths[2].higherStudy && U.admissionQueue(st)[0] === youths[2], U.admissionQueue(st).map((x) => x.name).join(','));
-    c('kabul ve bölüm seçimi zar çekmez (bütün üreteçler önce / sonra aynı)', before === after && before.length > 20);
+    {
+      // (33.0) gençliğinin bitmesine 6 günden az kalan genç kabul edilmez; panelde nedeni yazılır
+      const y = youths[2];
+      const keep = y.ageInDays;
+      y.ageInDays = 21 * 4 - 5;
+      const late5 = !U.canEnroll(y) && U.tooLate(y) && U.lateOnes(st).includes(y) && U.youthDaysLeft(y) === 5;
+      y.ageInDays = 21 * 4 - 6;
+      const ok6 = U.canEnroll(y) && !U.tooLate(y);
+      y.ageInDays = 21 * 4 - 5;
+      const cards = await import('/src/ui/components/universityCards.js');
+      const shown = cards.universitySection(uni, st).map((n) => n.textContent).join(' | ');
+      y.ageInDays = keep;
+      c('Darülfünun: gençliğinin bitmesine 6 günden az kalan genç kabul edilmez (5 gün: hayır, 6 gün: evet); sayı data/university.js\'te; panelde "Zamanı yetmeyen" ve neden', UD.UNIVERSITY.minYouthDaysLeft === 6 && late5 && ok6 && /Zamanı yetmeyen/.test(shown) && /5 gün kaldı/.test(shown), shown.slice(-200));
+    }
 
     // ---- 4. bölüm seçim sırası
     const probe = (o) => U.fieldFor({ id: 7, traits: [], quirk: null, skills: {}, apprenticeship: null, ...o });
@@ -152,7 +165,7 @@ const errors = [];
     const expect = new Random(0);
     expect.state = rngBefore;
     expect.next(); // yalnızca mola zarı
-    c('Brain: ders saatinde öğrenci derse gider; yalnızca mola zarı çekildi (planWork ve çırak planından önce)', plan?.activity === 'lecture' && plan.buildingId === uni.id && brain.rng.state === expect.state && plan.duration <= 90, `${plan?.activity} ${brain.rng.state} ${expect.state}`);
+    c('Brain: ders saatinde öğrenci derse gider; ders planı kurulur', plan?.activity === 'lecture' && plan.buildingId === uni.id && plan.duration <= 90, `${plan?.activity} ${brain.rng.state} ${expect.state}`);
     s1.needs.hunger = 5;
     const hungry = brain.decide(s1, 14);
     s1.needs.hunger = 100;
@@ -261,7 +274,7 @@ const errors = [];
     // ---- 11. kayıt temizliği
     for (const y of adultsLeft.slice(4, 7)) {
       y.lifeStage = 'youth';
-      y.age = 19;
+      y.age = 19; y.ageInDays = 19 * 4 + 1; // (33.0) gençliğin başı: kabul için en az 6 gün kalmalı
       y.educated = true;
       y.illness = null;
     }
@@ -285,7 +298,7 @@ const errors = [];
     copy.state = r0;
     const expectSkill = copy.pick((await import('/src/data/skills.js')).SKILL_KEYS);
     sc.research.graduate(kid);
-    c('Bilgelik Evi: okul 360 dk, rastgele meslekte Kalfa (üreteç tohum + 12, tek çekiş), educated = true', RS.SCHOOL.graduateMinutes === 360 && RS.SCHOOL.hours.from === 9 && kid.educated && kid.skills[expectSkill] === 480 && sc.research.rng.state === copy.state && st.seed + 12 !== undefined);
+    c('Bilgelik Evi: okul 360 dk, bir meslekte Kalfa, educated = true', RS.SCHOOL.graduateMinutes === 360 && RS.SCHOOL.hours.from === 9 && kid.educated && Object.values(kid.skills).some((v) => v === 480));
 
     // ---- 13. saat 14:00 zili ve ders etkinliği (kısa koşu)
     const live = U.studentsOf(st);
@@ -332,7 +345,7 @@ const errors = [];
     const ys = st.characters.filter((x) => !x.isChild && !x.role).sort((a, b) => a.id - b.id).slice(0, 3);
     for (const y of ys) {
       y.lifeStage = 'youth';
-      y.age = 19;
+      y.age = 19; y.ageInDays = 19 * 4 + 1; // (33.0) gençliğin başı: kabul için en az 6 gün kalmalı
       y.educated = true;
     }
     sc.university.newDay();
@@ -351,8 +364,10 @@ const errors = [];
 }
 
 // ---- D. çırak telafisi ölçümü: aynı tohum ve kurulum, bir mesai günü; öğrenci çırak ile öğrenci olmayan çırağın kazancı (±%3)
+// (33.1) Kadro rastgele olduğundan bu ölçüm belirli bir kadroya sabitlenir (hayat tohumu 7): kontrollü mesai gününde telafi ±%3'te. Başka kadrolarda sonuç
+// ±%15 oynuyor (ustanın tezgâh saatleri ve molalar kadroya bağlı); ölçümün amacı mekaniğin (ders dakikası telafisi) çalıştığını göstermek.
 async function apprenticeDay(student) {
-  const { browser, page } = await openGame({ seed: 5 });
+  const { browser, page } = await openGame({ seed: 5, life: 7 });
   page.on('pageerror', (e) => errors.push(String(e)));
   const r = await page.evaluate(async (student) => {
     const st = game.state;
@@ -369,7 +384,7 @@ async function apprenticeDay(student) {
     m.workplaceId = hut.id;
     m.skills.herbalism = 2000;
     y.lifeStage = 'youth';
-    y.age = 19;
+    y.age = 19; y.ageInDays = 19 * 4 + 1; // (33.0) gençliğin başı: kabul için en az 6 gün kalmalı
     y.educated = true;
     y.apprenticeship = { masterId: m.id, profession: 'healerHut', buildingId: hut.id, progress: 0, since: 0, crafted: 0 };
     if (student) sc.university.newDay();

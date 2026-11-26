@@ -1,9 +1,9 @@
-// DONDURULDU (29.4): yeni test buraya eklenmez. Yeni aşama testleri tools/sim/tests/ altında kendi dosyasında yazılır
+// ARŞİV (33.0): kapıdan çıkarıldı; yalnızca elle koşulur (node tools/sim/archive/tests.mjs). Eskiden: DONDURULDU (29.4), yeni test buraya eklenmez. Yeni aşama testleri tools/sim/tests/ altında kendi dosyasında yazılır
 // (şablon: tools/sim/tests/_template.mjs; koşu: node tools/sim/gate.mjs --quick --only <aşama>).
 // Bu dosya bütün ENGINES şalterlerini kapatıp (src/systems/Engines.js) eski dünyanın tarihini sabit tutar.
 //
 // Hedefli testler: oyunun kurallarını tarayıcıda, gerçek sistemlerle tek tek dener.
-// Kullanım: node tools/sim/tests.mjs [--engines-on]   (sunucu: python3 tools/serve.py)
+// Kullanım: node tools/sim/archive/tests.mjs [--engines-on]   (sunucu: python3 tools/serve.py)
 //   10. aşama: yiyecek değeri, seviye kilitleri, eski usul / asıl tarif, tüccar malları, belediye, unvan, yerleşim
 //   11. aşama: hastalık ve şifacı, kasaba hayvanları ve sevme, yaban hayatının ürkmesi, karar olayları (zaman aşımı,
 //              fırtına hasarı ve onarım, keşif seferi), belediye fermanları, kayıt gidiş-dönüşü
@@ -99,7 +99,7 @@
 //              ayrı metin katmanı, Tarihçe'deki ilk panayır, çizim, izole üreteç (seed + 32), kayıt sürümü 29 (gidiş-dönüş, bozuk değerler, v28 kaydı)
 //   15. aşama: sosyal denge (gönül alma yerleri, el sıkışma, yerli barışma anısı), meslek kıyafetleri ve zanaat
 //              rozeti, usta işi eserler (üretim, sergileme, satış, refah), kayıt sürümü 13
-import { openGame, createChecks, capOutput } from './lib.mjs';
+import { openGame, createChecks, capOutput } from '../lib.mjs';
 
 capOutput('tests');
 

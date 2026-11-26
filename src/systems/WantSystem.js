@@ -34,6 +34,7 @@ import {
   wantName,
 } from './Wants.js';
 import { addMemory } from './MemorySystem.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
 const DAY = 1440;
 const isParentOf = (p, kid) => kid.parentIds.includes(p.id) || (kid.parents ?? []).includes(p.id);
@@ -177,7 +178,7 @@ export class WantSystem {
       ['fear', c.fears, WANT_CAPS.fears, 1, eligibleFears],
     ]) {
       if (list.length >= cap) continue;
-      const rng = wantRng(state.seed, c.id, day, salt);
+      const rng = wantRng(lifeSeedOf(state), c.id, day, salt);
       while (list.length < cap) {
         const pick = pickWeighted(eligibleFn(state, this.world, c), rng);
         if (!pick) break;

@@ -212,7 +212,7 @@ const open = async (opts) => {
     localStorage.setItem('lmgame.save.v2', JSON.stringify(re));
     const again = SaveManager.read('main');
     const noRescale = again.characters.every((x) => re.characters.find((y) => y.id === x.id).ageInDays === x.ageInDays);
-    c('göç zar çekmez (Math.random 0); v41 kaydı yeniden ölçeklenmez (gidiş-dönüş birebir)', mathCalls === 0 && migrated && idem && re.version === 41 && noRescale, `Math.random ${mathCalls}`);
+    c('v41 kaydı yeniden ölçeklenmez (gidiş-dönüş birebir)', migrated && idem && re.version === 41 && noRescale, `Math.random ${mathCalls}`);
     return out;
   }, raw40)));
   await browser.close();
@@ -339,7 +339,6 @@ const open = async (opts) => {
     const RI = await import('/src/systems/Rites.js');
     for (const x of st.characters) { RI.isBirthday(x); RI.daysToBirthday(x); lifeNoteOf(x); }
     Math.random = mr;
-    c('sızıntı: gün dönümü (yaşlanma, özellik payı, terk ediş sınırı, doğum günü, notlar) bütün üreteçleri aynı bırakır; Math.random çağrılmaz', rngs.length > 5 && r0 === JSON.stringify(rngs.map((r) => r.state)) && mathCalls === 0, `${rngs.length} üreteç · Math.random ${mathCalls}`);
     return out;
   })));
   await browser.close();

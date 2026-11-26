@@ -21,8 +21,9 @@ Ardından tarayıcıda `http://localhost:8080` adresini aç.
 ortada "Kaldığın Yerden Devam Et" (son elle / otomatik kayıt) ve "Yeni Kasaba Kur" (kasaba adı ve
 isteğe bağlı tohum) düğmeleri vardır. Oyun sırasında sayfayı yenilediğinde (F5) ya da sekmeyi kapatıp
 açtığında kasaba tam olduğu gibi geri gelir (bkz. *Kayıt ve yükleme*). Aynı haritayı baştan görmek için
-tohum verilebilir: `http://localhost:8080/?seed=42` (mevcut tohum dock'taki **Ayarlar** penceresinde yazar);
-tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler, böylece F5 o oyunu sürdürür.
+harita tohumu verilebilir: `http://localhost:8080/?seed=42` (mevcut harita tohumu dock'taki **Ayarlar** penceresinde yazar);
+tohumlu adres yeni oyun başlatır ve tohumu adres çubuğundan siler, böylece F5 o oyunu sürdürür. (33.1) Aynı harita tohumu aynı
+haritayı verir, ama sakinler (ad, görünüş, kişilik) her yeni kasabada rastgeledir; araçlar için `?life=` hayat tohumunu sabitler.
 
 **Kontroller**
 
@@ -524,14 +525,14 @@ kayıtlarda kurulmuş ya da yarım kalmış lambalar yüklenince Sokak Feneri ol
 Işıltılı Sokaklar hedefine sayılır).
 Başlangıç ekranının arkasındaki tanıtım kasabası hiçbir şey kaydetmez.
 
-Kayda şunlar girer: harita tohumu, boyutu ve **haritadaki değişiklikler** (kesilen ağaçlar, kütükler, döşenen
+Kayda şunlar girer: harita tohumu (ve isteğe bağlı hayat tohumu `lifeSeed`; eski kayıtta yoksa harita tohumu kullanılır), boyutu ve **haritadaki değişiklikler** (kesilen ağaçlar, kütükler, döşenen
 yollar ve köprüler; harita her seferinde tohumdan üretilir, yalnızca farklı karolar saklanır),
 yapılar ve şantiyeler (inşaat ilerlemesi, iskele yönü, çalıdaki meyveler), tüm sakinler (konum, ihtiyaçlar,
 kişilik, ev, sırtındaki yük, evde uyuyor mu), kaynak stokları, iş emirleri, yeniden büyüyen ağaçlar, oyun
 zamanı ve hızı, hava, arkadaşlık puanları ve günlük. Sakinlerin o anki görevi kaydedilmez; yüklenince
 yapay zekâ ihtiyaçlarına bakıp yeniden karar verir (uyuyanlar uyumaya devam eder).
 
-**Yeni Harita** düğmesi önce onay ister (6 saniye içinde onaylanmazsa vazgeçilir), rastgele bir tohumla
+**Yeni Harita** düğmesi önce onay ister (6 saniye içinde onaylanmazsa vazgeçilir), rastgele tohumlarla
 sıfırdan başlar ve `session` yuvasını temizler; `main` kaydın **Yükle** ile açılabilir kalır.
 Bozuk ya da başka sürümden bir kayıt oyunu açmaz: atlanır ve yeni oyun başlar (`config.js` →
 `SAVE_VERSION`).
@@ -2790,6 +2791,8 @@ ve bir sonraki doğum gününe kalan günü gösterir. `tools/art-preview.html` 
 
 ### Determinizm ve izole üreteç
 
+> (33.0'da kaldırıldı: determinizm, izole üreteç ve bayt eşitliği artık şart değil; aşağıdaki metin tarihsel kayıttır.)
+
 Yaşlanma ve evre geçişleri **hiçbir rastgele sayı üretecini tüketmez**; katmanın kendi tohumlanmış üreteci (`seed + 27`) yalnızca süs
 için (kutlama cümlesi, nasihat baloncuğu) kullanılır. Emekli bilgenin mola zarı da atılır (`breakChance`), böylece bilge varken bile
 ana üretecin sırası değişmez. Test, 20 günlük yaşlanma + bilgeleşme + emeklilik + nasihat boyunca 24 üretecin ve `Math.random`'un
@@ -2892,6 +2895,8 @@ Unvan bildirime, Kasaba Günlüğü'ne ve anılara yazılır.
 
 ### Determinizm ve iş gücü
 
+> (33.0'da kaldırıldı: determinizm, izole üreteç ve bayt eşitliği artık şart değil; aşağıdaki metin tarihsel kayıttır.)
+
 - Çıraklık **kendi tohumlanmış üretecini** (`seed + 28`) kullanır: plan süresi, konuşma, çırak işi ve satış. Brain mola zarını her
   zamanki gibi attıktan sonra çırak planına bakar; böylece ana üretecin sırası değişmez. Test, kapı kapalıyken 24 saatlik bakımın ve
   mesai sonunun 24 üreteci ve `Math.random`'u hiç ilerletmediğini doğrular.
@@ -2980,6 +2985,8 @@ Kasabanın Altın Çağı başladıktan sonra (Ulu Saat Kulesi tamamlanınca) ev
 - `tools/art-preview.html`: dört rozet (9x9), her huyun portresi ve sözü, meydan havuzunda dans eden Şenlik Neşesi (üç kare).
 
 ### Determinizm
+
+> (33.0'da kaldırıldı: determinizm, izole üreteç ve bayt eşitliği artık şart değil; aşağıdaki metin tarihsel kayıttır.)
 
 - Katman **kendi tohumlanmış üretecini** (`seed + 29`) kullanır: kalıtım zarları, özgün gelişim, sözler. Test, gelişim, aura ve sözler
   boyunca 24 üretecin ve `Math.random`'un hiç ilerlemediğini doğrular.
@@ -3075,6 +3082,8 @@ belirlenmemişse evin en yaşlı yetişkinidir.
 
 ### Determinizm
 
+> (33.0'da kaldırıldı: determinizm, izole üreteç ve bayt eşitliği artık şart değil; aşağıdaki metin tarihsel kayıttır.)
+
 - Katman **kendi tohumlanmış üretecini** (`seed + 30`) kullanır ve onu yalnızca eşit uzaklıktaki boş kulübeler arasında seçmek için
   tüketir. Kütüğün kurulması ve yeniden kurulması rastgelelik kullanmaz.
 - Altın Çağ öncesinde katman yalnızca **veri** yazar (kütük, Tarihçe, günlük, sayaç). Hiçbir sakinin evini ya da davranışını değiştirmez.
@@ -3163,6 +3172,8 @@ yadigârını [Genç] adlı mirasçısına teslim etti!" yazılır.
 - `tools/art-preview.html`: altı yadigâr ikonu altın çerçevede ve üç karelik devir teslim sahnesi (veda sözü, söz, konfeti).
 
 ### Determinizm
+
+> (33.0'da kaldırıldı: determinizm, izole üreteç ve bayt eşitliği artık şart değil; aşağıdaki metin tarihsel kayıttır.)
 
 - Katman **kendi tohumlanmış üretecini** (`seed + 31`) kullanır ve onu yalnızca veda sözlerini seçmek için tüketir. Yadigâr türü, hikâyesi
   ve mirasçı seçimi rastgelelik kullanmaz.
@@ -4158,6 +4169,8 @@ sıcak yollar (`MovementSystem`, `NeedsSystem`, `BehaviorSystem.performWork` / `
 
 ### Determinizm ve performans
 
+> (33.0'da kaldırıldı: determinizm, izole üreteç ve bayt eşitliği artık şart değil; aşağıdaki metin tarihsel kayıttır.)
+
 Moodlet'ler olay ve saat kancalarıyla oluşur; ana üreteci, öteki sistemlerin üreteçlerini ve `Math.random`'ı **hiç** tüketmez (testte sayılır: 0 çağrı). Sistemin izole üreteci (tohum + 38) yalnızca söz seçimi ve söz olasılığı içindir.
 Yeni olaylar: `task:finished`, `population:dying`, `feast:served`, `chemistry:unrequited`, `moodlet:added`, `moodlet:mourning`, `moodlet:consoled`.
 
@@ -4414,7 +4427,7 @@ On adımda sakinler duygu, bağ, arzu, kişilik ve hafıza kazandı. Ayrıntıla
 **Şalterler** (`src/systems/Engines.js`): `bonds` (29.5), `loyalty` (29.6, 29.10'daki Kırgın-güven bağı dahil), `rites` (29.7). Oyunda, aşama
 testlerinde, audit, compat, autopilot ve stress'te hepsi açıktır; dondurulmuş `tests.mjs` hepsini kapatır (`--engines-on` yalnızca teşhis için).
 
-**Kapı komutları:**
+**Kapı komutları:** **(33.0'da kaldırıldı)** güncel komutlar için `CLAUDE.md` ve `tools/sim/gate.mjs` başlığı.
 - `node tools/sim/gate.mjs --quick --only 29.10` — aşama testleri, duman koşusu (autopilot 42 12), audit.
 - `node tools/sim/gate.mjs --full` — dondurulmuş testler, tests/*, audit, `compat --sample`, stress 6 tohum x 50 gün x 4x, determinizm 42x50.
 - `node tools/sim/compat.mjs --all` — bütün kayıt fikstürleri (sürüm 40).
@@ -4487,11 +4500,12 @@ fermanları ve terk edenleri raporlar; 23. aşamadan beri yanan / hasarlı yapı
 varken 48 saat ayrı evlerde kalan evli çift, bitiş vaktini aşan kutlama, huyu olmayan sakin, kayıp sakine işaret eden haber) ve en
 düşük nüfusu, evsizleri ve sosyal sayaçları raporlar.
 
-**Hafif test altyapısı (29.4b).** Tek kapı komutu: `node tools/sim/gate.mjs --quick [--only <desen>]` (aşama testleri + duman koşusu
+**Hafif test altyapısı (29.4b).** **(33.0'da kaldırıldı)** Aşağıdaki "dondurulmuş `tests.mjs`", "her yeni mekanik şalter ekler" ve determinizm / bayt eşitliği kuralları 33.0'da kaldırıldı: kapı artık `--quick` (varsayılan) ve `--full`, dondurulmuş takım `tools/sim/archive/`'te (kapıda değil); güncel kurallar `CLAUDE.md`'de. Eski metin:
+Tek kapı komutu: `node tools/sim/gate.mjs --quick [--only <desen>]` (aşama testleri + duman koşusu
 `autopilot 42 12` + audit) ve `--full` (dondurulmuş `tests.mjs`, `tests/*`, audit, `compat.mjs --sample`, `stress.mjs --speeds 4 --days 50`,
 tohum 42 × 50 gün determinizm karşılaştırması); araçlar paralel koşar (`--jobs`), çıktı en çok 40 satırdır, günlükler `tools/sim/out/gate/`
 altına yazılır. Her aşama testini kendi dosyasında yazar (`tools/sim/tests/29.5-ad.mjs`, iskelet: `_template.mjs`); `tests.mjs` DONDURULDU, yeni
-test eklenmez. Her yeni mekanik anahtarını `src/systems/Engines.js` içindeki `ENGINES`'e `true` ekler ve kancalarını `engineOn(key)` ile sarar:
+test eklenmez. (33.0'da kaldırıldı:) Her yeni mekanik anahtarını `src/systems/Engines.js` içindeki `ENGINES`'e `true` ekler ve kancalarını `engineOn(key)` ile sarar:
 `tests.mjs` hepsini kapatıp eski dünyanın tarihini sabit tutar, diğer araçlar hepsi açık koşar (audit denetler). Araçlar varsayılan olarak
 sessizdir (yalnızca kalan testler ve toplam; `--verbose` ya da `LMGAME_VERBOSE=1` her satırı basar). `compat.mjs --sample` v2, v6, v10, v14, v18,
 v22, v26, v30, v33, v36 ve son üç sürümü koşar (göç adımları bağımsız `version < N` blokları olduğundan örneklenen kayıt bütün sonraki adımlardan

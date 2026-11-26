@@ -35,11 +35,12 @@ export function parseArgs(argv = process.argv.slice(2)) {
 /**
  * Tarayıcıyı açar, oyunu verilen tohumla yükler ve döngüyü durdurur.
  * Dönüş: { browser, page, errors } — errors: sayfa hataları ve konsol uyarıları
+ * (33.1) life: hayat tohumu (sakinler ve haritanın dışındaki üreteçler; adreste ?life=). Verilmezse seed ile aynıdır, böylece eski testler ve fikstürler değişmez.
  * (30.4a) enginesOff: kapatılacak ENGINES anahtarları (dizi ya da virgüllü metin; '*' hepsi). Sayfa açılmadan önce
  * (32.7) storage: sayfa açılmadan önce localStorage'a yazılacak { anahtar: metin } (yalnızca ilk açılışta; yeniden yüklemede ezmez).
  * globalThis.__LMGAME_ENGINES_OFF olarak enjekte edilir: Engines.js modül yüklenirken okur (açılışta bilinmesi gereken şalterler).
  */
-export async function openGame({ seed = 42, path = '', viewport = { width: 1280, height: 800 }, randomSeed = seed, stopLoop = true, enginesOff = null, storage = null } = {}) {
+export async function openGame({ seed = 42, life = seed, path = '', viewport = { width: 1280, height: 800 }, randomSeed = seed, stopLoop = true, enginesOff = null, storage = null } = {}) {
   const { chromium } = require('playwright');
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport });
@@ -87,7 +88,7 @@ export async function openGame({ seed = 42, path = '', viewport = { width: 1280,
       };
     });
   }
-  await page.goto(path ? `${BASE_URL}/${path}` : `${BASE_URL}/?seed=${seed}`);
+  await page.goto(path ? `${BASE_URL}/${path}` : `${BASE_URL}/?seed=${seed}&life=${life}`);
   if (!path) {
     await page.waitForFunction(() => window.game?.scenes?.current?.world);
     await installHelpers(page, stopLoop);

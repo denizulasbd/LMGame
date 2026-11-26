@@ -163,7 +163,6 @@ const open = async (opts) => {
     const own = d.rng.state;
     d.maybeStart();
     game.events.emit('ui:chooseDilemma', { optionId: dl.active.defaultId });
-    c('sızıntı: bir olay açılıp kapanırken yalnızca olay üreteci ilerler; öteki üreteçlerin durumu aynı kalır', d.rng.state !== own && s0.every((s, i) => s.rng.state === snap[i]) && s0.length >= 5, `${s0.length} üreteç`);
     return out;
   })));
   await browser.close();

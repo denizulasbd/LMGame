@@ -17,6 +17,7 @@ import { heirloomSlot } from './Citizens.js';
 import { pickHeir } from './Heirloom.js';
 import { addMemory } from './MemorySystem.js';
 import { VENERABLE } from '../data/lifeStages.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
 const CAUSE_TEXT = {
   fire: 'yangın söndürürken kahramanca can verdi',
@@ -56,7 +57,7 @@ export class LifecycleSystem {
 
   /** Ömrü olmayan her sakine kimliğinden ve tohumdan türeyen ömrü atar (kayıttan gelen geçerli ömür korunur). */
   ensureLifespans() {
-    for (const c of this.state.characters) if (c.lifespan === null || c.lifespan === undefined) c.lifespan = lifespanFor(this.state.seed, c.id);
+    for (const c of this.state.characters) if (c.lifespan === null || c.lifespan === undefined) c.lifespan = lifespanFor(lifeSeedOf(this.state), c.id);
   }
 
   // ---------------------------------------------------------------------------

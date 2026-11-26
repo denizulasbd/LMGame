@@ -45,6 +45,7 @@ export class TitleMenu {
       el('div', { className: 'title-row' }, [this.nameInput, dice]),
       el('label', { className: 'title-label', text: 'Harita tohumu (isteğe bağlı)' }),
       el('div', { className: 'title-row' }, [this.seedInput]),
+      el('p', { className: 'title-hint title-seed-note', text: 'Aynı tohum aynı haritayı verir; sakinler her yeni kasabada farklıdır.' }),
       el('div', { className: 'title-row title-actions' }, [back, start]),
     ]);
 
