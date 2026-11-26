@@ -365,7 +365,7 @@ const open = async (opts) => {
     sim.step(60);
     const prog = (id) => MSys.milestoneProgress(MS.MILESTONES.find((m) => m.id === id), st);
     const ids = MSys.activeMilestones().map((m) => m.id);
-    c('hedef listesi: 18 hedef (32.6b: +4 geç oyun); beş yenisi artisans\'tan sonra (heardVoices, peoplesHeart, firstFarewell, chosenPath, legacy)', ids.length === 18 && ids.slice(4, 11).join() === 'artisans,heardVoices,peoplesHeart,firstFarewell,chosenPath,legacy,winterTrial', ids.join());
+    c('hedef listesi: 19 hedef (32.6b: +4 geç oyun; 34.2: +1 İlk Genişleme); beş yenisi İlk Genişleme\'den sonra (heardVoices, peoplesHeart, firstFarewell, chosenPath, legacy)', ids.length === 19 && ids.slice(4, 12).join() === 'artisans,firstExpansion,heardVoices,peoplesHeart,firstFarewell,chosenPath,legacy,winterTrial', ids.join());
     st.petitions.fulfilled = 4;
     const p1 = prog('heardVoices').current;
     st.petitions.fulfilled = 5;
@@ -396,7 +396,7 @@ const open = async (opts) => {
     const json = JSON.parse(JSON.stringify({ ...st.toJSON(), version: CONFIG.SAVE_VERSION, terrain: [] }));
     const back = new GameState();
     back.restore(json);
-    c('kayıt: sayaçlar (pleasedStreak, condolences) ve tamamlanan hedefler gidiş-dönüşte korunur; sürüm 41 kalır', done && back.stats.pleasedStreak === 2 && back.stats.condolences === 1 && Boolean(back.milestones.legacy) && CONFIG.SAVE_VERSION === 41, `${done} ${back.stats.pleasedStreak} ${back.stats.condolences}`);
+    c('kayıt: sayaçlar (pleasedStreak, condolences) ve tamamlanan hedefler gidiş-dönüşte korunur; sürüm 42 (34.1)', done && back.stats.pleasedStreak === 2 && back.stats.condolences === 1 && Boolean(back.milestones.legacy) && CONFIG.SAVE_VERSION === 42, `${done} ${back.stats.pleasedStreak} ${back.stats.condolences}`);
     for (const id of Object.keys(st.milestones)) delete st.milestones[id];
     st.milestones.firstHome = { day: 1, hour: 8, minute: 0 };
     st.milestones.warmTable = { day: 1, hour: 9, minute: 0 };
@@ -406,12 +406,12 @@ const open = async (opts) => {
     game.ui.render();
     const rows = [...document.querySelectorAll('.goals-panel .goal-row[data-goal]')];
     const nextRows = rows.filter((r) => r.classList.contains('is-next'));
-    c('Hedefler penceresi: 18 hedef satırı, tamamlanmamış ilk hedefte (tek) "Sıradaki" etiketi', rows.length === 18 && nextRows.length === 1 && nextRows[0].dataset.goal === nxt.id && /Sıradaki/.test(nextRows[0].textContent), `${rows.length} ${nextRows.map((r) => r.dataset.goal)} ${nxt?.id}`);
+    c('Hedefler penceresi: 19 hedef satırı, tamamlanmamış ilk hedefte (tek) "Sıradaki" etiketi', rows.length === 19 && nextRows.length === 1 && nextRows[0].dataset.goal === nxt.id && /Sıradaki/.test(nextRows[0].textContent), `${rows.length} ${nextRows.map((r) => r.dataset.goal)} ${nxt?.id}`);
     game.events.emit('ui:toggleGoals');
     ENGINES.midgame = false;
     const off = MSys.activeMilestones().map((m) => m.id);
     ENGINES.midgame = true;
-    c('midgame şalteri kapalıyken ara hedefler yok (32.6b: dört geç oyun hedefi kendi şalterlerine bağlı, dokuz + 4)', off.length === 13 && off.join() === 'firstHome,warmTable,tradeRoutes,growingFamily,artisans,winterTrial,brightStreets,crown,pearl,justiceServed,firstClub,firstGraduate,royalFavorite', off.join());
+    c('midgame şalteri kapalıyken ara hedefler yok (32.6b: dört geç oyun hedefi kendi şalterlerine bağlı, dokuz + 4 + İlk Genişleme)', off.length === 14 && off.join() === 'firstHome,warmTable,tradeRoutes,growingFamily,artisans,firstExpansion,winterTrial,brightStreets,crown,pearl,justiceServed,firstClub,firstGraduate,royalFavorite', off.join());
     st.doctrine = { chosen: null, day: null };
     const ctx = () => ({ state: st, guide: { done: [] }, facts: {} });
     const hallOff = G.CONDITIONS.doctrine.when(ctx());

@@ -44,7 +44,7 @@ const CONFIRM_MS = 4000; // yıkım onayı süresi
 const PAINT_COLOR = 'rgba(126, 224, 110, 0.34)';
 const PAINT_EDGE = 'rgba(206, 255, 160, 0.5)'; // (30.2) her uygun karonun içinde ince (1 px) çerçeve: soluk dolguyu seçilir kılar
 // Önbelleği düşüren olaylar (harita, yapılar, seviye, nüfus); saatlik yenileme geri kalanını yakalar
-const INVALIDATE_EVENTS = ['building:placed', 'building:removed', 'building:completed', 'building:upgraded', 'building:damaged', 'world:blocked', 'terrain:painted', 'job:completed', 'town:tierUp', 'population:joined', 'population:died', 'time:hour', 'exploration:itemGained'];
+const INVALIDATE_EVENTS = ['building:placed', 'building:removed', 'building:completed', 'building:upgraded', 'building:damaged', 'world:blocked', 'terrain:painted', 'job:completed', 'town:tierUp', 'population:joined', 'population:died', 'time:hour', 'exploration:itemGained', 'map:parcelOpened'];
 
 export class ToolController {
   /**
@@ -351,11 +351,12 @@ export class ToolController {
   viewRect() {
     const { camera, width, height } = this.view;
     const map = this.world.map;
+    const open = map.openBounds; // (34.1) yalnızca açık alan taranır (kilitli parsele kurulmaz)
     return {
-      x0: Math.max(0, Math.floor(camera.x / T)),
-      y0: Math.max(0, Math.floor(camera.y / T)),
-      x1: Math.min(map.width - 1, Math.floor((camera.x + width / camera.zoom) / T)),
-      y1: Math.min(map.height - 1, Math.floor((camera.y + height / camera.zoom) / T)),
+      x0: Math.max(open.x0, Math.floor(camera.x / T)),
+      y0: Math.max(open.y0, Math.floor(camera.y / T)),
+      x1: Math.min(open.x1 - 1, Math.floor((camera.x + width / camera.zoom) / T)),
+      y1: Math.min(open.y1 - 1, Math.floor((camera.y + height / camera.zoom) / T)),
     };
   }
 
@@ -397,21 +398,24 @@ export class ToolController {
       p.searching = null;
       const cx = (rect.x0 + rect.x1) / 2;
       const cy = (rect.y0 + rect.y1) / 2;
-      for (let y = rect.y0; y <= rect.y1; y++) for (let x = rect.x0; x <= rect.x1; x++) if (!p.results.has(y * this.world.map.width + x)) p.queue.push(y * this.world.map.width + x);
-      const w = this.world.map.width;
-      p.queue.sort((a, b) => Math.hypot((a % w) - cx, Math.floor(a / w) - cy) - Math.hypot((b % w) - cx, Math.floor(b / w) - cy));
+      const map = this.world.map;
+      for (let y = rect.y0; y <= rect.y1; y++) for (let x = rect.x0; x <= rect.x1; x++) if (!p.results.has(map.index(x, y))) p.queue.push(map.index(x, y));
+      const dist = (i) => {
+        const t = map.coordOf(i);
+        return Math.hypot(t.x - cx, t.y - cy);
+      };
+      p.queue.sort((a, b) => dist(a) - dist(b));
     }
-    const w = this.world.map.width;
+    const map = this.world.map;
     for (let n = 0; n < SCAN_BUDGET && p.queueAt < p.queue.length; n++) {
       const index = p.queue[p.queueAt++];
-      const x = index % w;
-      const y = (index - x) / w;
+      const { x, y } = map.coordOf(index);
       const anchor = this.construction.anchorFor(this.buildType, x, y);
       p.results.set(index, this.check(this.buildType, anchor.x, anchor.y).ok);
     }
     p.complete = p.queueAt >= p.queue.length;
     let ok = 0;
-    for (let y = rect.y0; y <= rect.y1; y++) for (let x = rect.x0; x <= rect.x1; x++) if (p.results.get(y * w + x)) ok++;
+    for (let y = rect.y0; y <= rect.y1; y++) for (let x = rect.x0; x <= rect.x1; x++) if (p.results.get(map.index(x, y))) ok++;
     p.visibleOk = ok;
     // Ekranda hiç uygun karo yoksa görünen alanın merkezinden dışa doğru halka halka en yakın uygun karo aranır
     if (p.complete && ok === 0 && p.nearest === undefined) {
@@ -446,7 +450,7 @@ export class ToolController {
       const dy = side === 0 ? -r : side === 1 ? -r + k : side === 2 ? r : r - k;
       const x = s.cx + dx;
       const y = s.cy + dy;
-      if (!map.inBounds(x, y)) continue;
+      if (!map.isOpen(x, y)) continue; // (34.1) kilitli parsel
       const inView = x >= s.rect.x0 && x <= s.rect.x1 && y >= s.rect.y0 && y <= s.rect.y1;
       if (inView) continue;
       n++;
@@ -560,11 +564,11 @@ export class ToolController {
   renderPaint(renderer) {
     const p = this.paint;
     if (!p.rect) return;
-    const w = this.world.map.width;
+    const map = this.world.map;
     const r = p.rect;
     for (let y = r.y0; y <= r.y1; y++) {
       for (let x = r.x0; x <= r.x1; x++) {
-        if (!p.results.get(y * w + x)) continue;
+        if (!p.results.get(map.index(x, y))) continue;
         const px = x * T;
         const py = y * T;
         renderer.fillRect(px, py, T, T, PAINT_COLOR);

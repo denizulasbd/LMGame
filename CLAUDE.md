@@ -32,8 +32,9 @@ Sakin, sıcak, hafif mizahi. Metinler Türkçe, kısa ve güler yüzlü. Şiddet
 Kullanıcının arkadaşları oyunu oynuyor; **kayıt kaybı kabul edilemez.**
 - Eski kayıtlar açılmaya devam etmeli (`tools/sim/fixtures/`, `compat.mjs`).
 - Okunamayan kayıt asla silinmez, yedeklenir (32.7: `lmgame.save.broken.*`).
-- Yeni alanlar isteğe bağlı olsun. Gerekirse kayıt sürümü artırılır (`SAVE_VERSION`, şu an 41) ve göç yazılır; yeni fikstür eklenir.
+- Yeni alanlar isteğe bağlı olsun. Gerekirse kayıt sürümü artırılır (`SAVE_VERSION`, şu an 42) ve göç yazılır; yeni fikstür eklenir.
 - Kayda dokunan her adımda `compat.mjs` yeşil kalmalı.
+- (34.1) Harita çekirdek + kilitli parsel halkalarıdır; koordinatlar eksi olabilir (`map.x0/y0`). Haritayı tararken `0..width` değil `map.openBounds` (açık alan) ya da `map.x0..x1`; indeks yalnızca `map.index(x, y)` / `map.coordOf(i)`. Arazi farkları koordinatla kaydedilir.
 
 ## Test politikası
 - Yeni özellik için **kısa** bir aşama testi: `tools/sim/tests/_template.mjs` kopyala (`<aşama>-<ad>.mjs`). Eski `archive/tests.mjs`'e test ekleme.

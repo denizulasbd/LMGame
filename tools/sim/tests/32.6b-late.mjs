@@ -32,11 +32,11 @@ results.push(...(await page.evaluate(async () => {
 
   // ---- B1 hedefler
   const ids = MSys.activeMilestones().map((m) => m.id);
-  c('B1: hedef listesinin sonunda dört geç oyun hedefi (Pearl\'ün ardından: Adalet, Kulüp, Mezun, Gözde); toplam 18', ids.length === 18 && ids.slice(-5).join() === 'pearl,justiceServed,firstClub,firstGraduate,royalFavorite', ids.slice(-5).join());
+  c('B1: hedef listesinin sonunda dört geç oyun hedefi (Pearl\'ün ardından: Adalet, Kulüp, Mezun, Gözde); toplam 19', ids.length === 19 && ids.slice(-5).join() === 'pearl,justiceServed,firstClub,firstGraduate,royalFavorite', ids.slice(-5).join());
   c('B1: ödül alanı yok (altın değil, hiçbir ödül), her biri kendi şalterine bağlı', NEW.every((id) => !('reward' in goal(id)) && !('gold' in goal(id)) && typeof goal(id).engine === 'string'), NEW.map((id) => goal(id).engine).join());
-  c('B1: şalter kapalıyken ilgili hedef listede yok (court / clubs / university / renown)', [['court', 'justiceServed'], ['clubs', 'firstClub'], ['university', 'firstGraduate'], ['renown', 'royalFavorite']].every(([k, id]) => withEngines([k], () => !MSys.activeMilestones().some((m) => m.id === id) && MSys.activeMilestones().length === 17)), '');
+  c('B1: şalter kapalıyken ilgili hedef listede yok (court / clubs / university / renown)', [['court', 'justiceServed'], ['clubs', 'firstClub'], ['university', 'firstGraduate'], ['renown', 'royalFavorite']].every(([k, id]) => withEngines([k], () => !MSys.activeMilestones().some((m) => m.id === id) && MSys.activeMilestones().length === 18)), '');
   c('B1: justice kapalıysa court da kapalı sayılır; hedef gizlenir', withEngines(['justice'], () => !MSys.activeMilestones().some((m) => m.id === 'justiceServed')), '');
-  c('B1: bütün 32 şalterleri kapalıyken liste 14 (eski dört + ara hedefler)', withEngines(['justice', 'court', 'university', 'clubs', 'renown'], () => MSys.activeMilestones().length === 14), '');
+  c('B1: bütün 32 şalterleri kapalıyken liste 14 (eski dört + ara hedefler)', withEngines(['justice', 'court', 'university', 'clubs', 'renown'], () => MSys.activeMilestones().length === 15), '');
 
   // Adaleti Tesis Et: saray + 3 adil karar
   st.buildings = st.buildings.filter((b) => b.type !== 'courthouse');
@@ -103,18 +103,18 @@ results.push(...(await page.evaluate(async () => {
   };
   c('B1: "Sıradaki" engel satırı dört hedefte de dolu (yapı bedeli ya da ne yapılacağı)', Object.values(blockers).every((b) => typeof b === 'string' && b.length > 10) && /Adalet Sarayı/.test(blockers.justice) && /Bahçecilik Kulübü/.test(blockers.club), JSON.stringify(blockers));
 
-  // Hedefler penceresi: 18 satır, yeni hedefler çizilir
+  // Hedefler penceresi: 19 satır, yeni hedefler çizilir
   for (const id of Object.keys(st.milestones)) delete st.milestones[id];
   game.events.emit('ui:toggleGoals');
   await new Promise((r) => setTimeout(r, 700));
   game.ui.render();
   const rows = [...document.querySelectorAll('.goals-panel .goal-row[data-goal]')];
   const late = NEW.map((id) => rows.find((r) => r.dataset.goal === id));
-  c('B1: Hedefler penceresinde 18 satır; dört geç oyun hedefi satırda ad, açıklama ve ilerleme ayrıntısıyla', rows.length === 18 && late.every(Boolean) && late.every((r) => r.querySelector('.goal-name')?.textContent.length > 5 && r.querySelector('.goal-description')?.textContent.length > 10), rows.length);
+  c('B1: Hedefler penceresinde 19 satır; dört geç oyun hedefi satırda ad, açıklama ve ilerleme ayrıntısıyla', rows.length === 19 && late.every(Boolean) && late.every((r) => r.querySelector('.goal-name')?.textContent.length > 5 && r.querySelector('.goal-description')?.textContent.length > 10), rows.length);
   game.events.emit('ui:toggleGoals');
 
   // ---- B2 rehber
-  c('B2: rehber tablo sürümü 7, 21 adım; iki yeni adım tabloda', GD.GUIDE_TABLE_VERSION === 7 && GD.GUIDE_STEPS.length === 21 && ['townGrown', 'cityGrown'].every((id) => GD.GUIDE_STEPS.some((s) => s.id === id)), '');
+  c('B2: rehber tablo sürümü 8 (34.2), 22 adım; iki yeni adım tabloda', GD.GUIDE_TABLE_VERSION === 8 && GD.GUIDE_STEPS.length === 22 && ['townGrown', 'cityGrown'].every((id) => GD.GUIDE_STEPS.some((s) => s.id === id)), '');
   const tg = GD.GUIDE_STEPS.find((s) => s.id === 'townGrown');
   const cg = GD.GUIDE_STEPS.find((s) => s.id === 'cityGrown');
   c('B2: Kasaba kartının metni tam ("Kasaban büyüdü: Adalet Sarayı ve hobi evleri artık kurulabilir."), tek cümleye yakın', tg.text.replace(/\*\*/g, '') === 'Kasaban büyüdü: Adalet Sarayı ve hobi evleri artık kurulabilir.' && /Darülfünun/.test(cg.text), tg.text);
@@ -163,7 +163,7 @@ results.push(...(await page.evaluate(async () => {
   const json = JSON.parse(JSON.stringify({ ...st.toJSON(), version: CONFIG.SAVE_VERSION, terrain: [] }));
   const back = new GameState();
   back.restore(json);
-  c('Kayıt: tamamlanan geç oyun hedefi gidiş-dönüşte korunur; sürüm 41 kalır', back.milestones.justiceServed?.day === 12 && CONFIG.SAVE_VERSION === 41, '');
+  c('Kayıt: tamamlanan geç oyun hedefi gidiş-dönüşte korunur; sürüm 42 (34.1)', back.milestones.justiceServed?.day === 12 && CONFIG.SAVE_VERSION === 42, '');
   return out;
 })));
 const ok = report(errors);

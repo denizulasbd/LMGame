@@ -2,11 +2,13 @@
 // değiştirir), zar çekmez. Bağlam: { state, facts }; facts bu oturumda gözlenen eylemlerdir ({ moved, selected, speedChanged,
 // goalsOpened, upgraded, placed, petitionSelected }) ve kaydedilmez; kalıcı olan yalnızca state.guide.done'dır.
 //   state.guide = { done: [adım kimlikleri], off: bool, at?: { adım: oyun dakikası } }   (isteğe bağlı alanlar)
-import { GUIDE_STEPS, GUIDE_GOLD_DRY_DAYS, GUIDE_STONE_DRY_DAYS, GUIDE_STORAGE_RATIO, GUIDE_SPEED_DELAY_MINUTES, GUIDE_OLD_SAVE_POPULATION, GUIDE_WATCH_POPULATION } from '../data/guide.js';
+import { GUIDE_EXPAND_MARGIN, GUIDE_STEPS, GUIDE_GOLD_DRY_DAYS, GUIDE_STONE_DRY_DAYS, GUIDE_STORAGE_RATIO, GUIDE_SPEED_DELAY_MINUTES, GUIDE_OLD_SAVE_POPULATION, GUIDE_WATCH_POPULATION } from '../data/guide.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { RESOURCES } from '../data/resources.js';
 import { storageLimit } from './Granary.js';
-import { nextTownTier, tierChecks } from './TownStatus.js';
+import { nextTownTier, tierChecks, immigrationLimit } from './TownStatus.js';
+import { activePopulation } from './LifeStages.js';
+import { buyableParcels, registeredParcels } from './ParcelMarket.js';
 
 import { engineOn } from './Engines.js';
 import { courtOf } from './Justice.js';
@@ -132,6 +134,11 @@ export const CONDITIONS = {
   stone: {
     when: ({ facts }) => engineOn('novicePath') && (facts.rocksGone === true || (facts.stoneDry ?? 0) >= GUIDE_STONE_DRY_DAYS),
     done: ({ state }) => engineOn('novicePath') && state.buildings.some((b) => b.type === 'quarry'),
+  },
+  // (34.2) Kasaba sıkıştı: nüfus göç sınırına 2 kişi kalınca ya da göç sınırda kalınca (alınabilir parsel varken); parsel alınınca biter
+  expand: {
+    when: ({ state, facts }) => (facts.capped === true || activePopulation(state) >= immigrationLimit(state) - GUIDE_EXPAND_MARGIN) && buyableParcels(state, registeredParcels()).length > 0,
+    done: ({ state }) => (state.parcels?.length ?? 0) > 0,
   },
   watch: { when: ({ state }) => state.characters.length >= GUIDE_WATCH_POPULATION, done: ({ state }) => (state.watched?.length ?? 0) > 0 },
 };

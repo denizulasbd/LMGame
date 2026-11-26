@@ -144,6 +144,7 @@ async function installHelpers(page, stopLoop) {
             }
           }
         }
+        sim.noSpotDay = game.state.time.day; // (34.2) yer bulunamadı: otopilot parsel almayı düşünür
         return null;
       },
       // (32.6a) Konutların (kulübe) ağırlık merkezine en yakın uygun yer: halka halka aranır; yapının önü (kapı sırası) kasabaya bağlı
@@ -174,6 +175,13 @@ async function installHelpers(page, stopLoop) {
           }
         }
         return null;
+      },
+      // (34.1) Genişleyen harita: parsel listesi ve geliştirici yoluyla açma (34.2'ye kadar tek açma yolu)
+      parcels: () => game.scenes.current.parcels.map((p) => ({ ...p, open: game.state.parcels.includes(p.id) })),
+      unlockParcel: (id) => game.scenes.current.unlockParcel(id),
+      unlockAllParcels() {
+        const scene = game.scenes.current;
+        return scene.parcels.filter((p) => scene.unlockParcel(p.id)).length;
       },
       place(type, { instant = true, maxRadius = 30 } = {}) {
         const scene = game.scenes.current;

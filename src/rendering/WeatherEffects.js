@@ -105,10 +105,10 @@ export class WeatherEffects {
   /** Görünür alanda rastgele bir karoya sıçrama ekler; suya daha sık düşer. */
   spawnSplash(camera, renderer, map) {
     const view = camera.getViewBounds(renderer.width, renderer.height);
-    const x0 = Math.max(0, Math.floor(view.left / T));
-    const y0 = Math.max(0, Math.floor(view.top / T));
-    const x1 = Math.min(map.width - 1, Math.floor(view.right / T));
-    const y1 = Math.min(map.height - 1, Math.floor(view.bottom / T));
+    const x0 = Math.max(map.x0, Math.floor(view.left / T));
+    const y0 = Math.max(map.y0, Math.floor(view.top / T));
+    const x1 = Math.min(map.x1 - 1, Math.floor(view.right / T));
+    const y1 = Math.min(map.y1 - 1, Math.floor(view.bottom / T));
     if (x1 < x0 || y1 < y0) return;
 
     let tileX = 0;
@@ -167,8 +167,8 @@ export class WeatherEffects {
     const alpha = (0.22 * cover).toFixed(3);
 
     for (const cloud of this.clouds) {
-      const cx = ((cloud.x * span + time * cloud.speed) % span) - 100;
-      const cy = cloud.y * map.pixelHeight;
+      const cx = ((cloud.x * span + time * cloud.speed) % span) - 100 + map.pixelLeft; // (34.1) dünyanın sol kenarından
+      const cy = cloud.y * map.pixelHeight + map.pixelTop;
       if (cx + cloud.rx < view.left || cx - cloud.rx > view.right) continue;
       if (cy + cloud.ry < view.top || cy - cloud.ry > view.bottom) continue;
       // Her şerit ayrı çizilir; üst üste binmediği için koyu kenar oluşmaz
@@ -221,10 +221,10 @@ export class WeatherEffects {
       }
     }
     // Nehrin üstünde süzülen pus
-    const x0 = Math.max(0, Math.floor(view.left / T));
-    const y0 = Math.max(0, Math.floor(view.top / T));
-    const x1 = Math.min(map.width - 1, Math.floor(view.right / T));
-    const y1 = Math.min(map.height - 1, Math.floor(view.bottom / T));
+    const x0 = Math.max(map.x0, Math.floor(view.left / T));
+    const y0 = Math.max(map.y0, Math.floor(view.top / T));
+    const x1 = Math.min(map.x1 - 1, Math.floor(view.right / T));
+    const y1 = Math.min(map.y1 - 1, Math.floor(view.bottom / T));
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         if (map.get(x, y) !== 'water') continue;

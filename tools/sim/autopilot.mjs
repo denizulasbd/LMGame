@@ -95,6 +95,14 @@ const speed = Number(options.speed ?? 4);
 const { browser, page, errors } = await openGame({ seed, life: options.life !== undefined && options.life !== true ? Number(options.life) : seed, enginesOff: typeof options['engines-off'] === 'string' ? options['engines-off'] : null }); // (30.4a) açılıştan önce
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
+// (34.1) --cpuprofile: koşu boyunca CPU profili; sonunda en pahalı 15 işlev (kendi süresi) basılır
+const cdp = options.cpuprofile ? await page.context().newCDPSession(page) : null;
+if (cdp) {
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.start');
+}
+if (options.parcels === 'all') console.log(`(34.1) açılan parsel: ${await page.evaluate(() => window.sim.unlockAllParcels())}`); // performans ölçümü: bütün harita açık
+if (options['no-parcels']) await page.evaluate(() => { window.__noParcels = true; }); // (34.2) otopilot parsel almasın (karşılaştırma)
 if (options['start-food'] !== undefined) await page.evaluate((v) => { window.game.state.resources.food = v; }, Number(options['start-food'])); // (30.6) denge denemesi: başlangıç yiyeceği
 if (options.stories) await page.evaluate((f) => { window.game.scenes.current.storyDirector.autoTick = true; if (f) window.game.events.emit('ui:setStoryFilter', { filter: f }); }, typeof options['story-filter'] === 'string' ? options['story-filter'] : null); // (30.2)
 // (29.4) --evo "rules.decayPerDay=3;sources.moodlets.quarrel=..." : denge denemeleri için evrim verisini bellekte geçersiz kılar (dosyaya yazmaz).
@@ -689,7 +697,7 @@ await page.evaluate((passive) => {
   /** Bir karodan en yakın yol karosuna en kısa yürünebilir rota (BFS, en çok 30 adım); rota üzerindeki doğal zemin. */
   const routeToRoad = (world, sx, sy) => {
     const map = world.map;
-    const key = (x, y) => y * map.width + x;
+    const key = (x, y) => map.index(x, y); // (34.1) dünya kökeni eksi olabilir
     const prev = new Map([[key(sx, sy), null]]);
     const queue = [[sx, sy, 0]];
     while (queue.length) {
@@ -698,9 +706,7 @@ await page.evaluate((passive) => {
         const tiles = [];
         let k = prev.get(key(x, y));
         while (k !== null && k !== undefined) {
-          const tx = k % map.width;
-          const ty = Math.floor(k / map.width);
-          tiles.push({ x: tx, y: ty });
+          tiles.push(map.coordOf(k));
           k = prev.get(k);
         }
         return tiles;
@@ -810,6 +816,19 @@ await page.evaluate((passive) => {
     const cy = plaza.centerY;
     const res = s.resources;
     window.__decide();
+    // (34.2) Parsel: nüfus sınırına 2 kişi kalınca ya da yer bulunamadığında; altın fiyatın 3 katından fazlaysa en ucuz alınabilir parseli al
+    if (!window.__noParcels) {
+      const limit = window.__town.immigrationLimit(s);
+      const noSpot = Number.isFinite(window.sim.noSpotDay) && window.sim.noSpotDay >= s.time.day - 1;
+      if (window.__lifeStages.activePopulation(s) >= limit - 2 || noSpot) {
+        const pick = scene.parcelSystem.buyable()[0];
+        if (pick && s.resources.gold > pick.price * 3 && scene.parcelSystem.buy(pick.parcel.id).ok) {
+          window.__stats.parcelsBought = (window.__stats.parcelsBought ?? 0) + 1;
+          (window.__stats.parcelLog ??= []).push(`G${s.time.day} ${pick.parcel.name} ${pick.price}`);
+          window.sim.noSpotDay = null;
+        }
+      }
+    }
     // (30.3) --famine [gün=5] : kıtlık senaryosu. O günden sonra bütün bahçeler (şantiyeleri de) her saat yıkılır; Nabız ve kiler ölçülür
     if (window.__famine && s.time.day >= window.__famine) {
       for (const b of [...s.buildings]) if (b.type === 'garden') scene.construction.demolish(b, { quiet: true });
@@ -1293,6 +1312,8 @@ await page.evaluate(async () => {
   window.__tradePost = await import('/src/systems/TradePost.js');
   window.__appr = await import('/src/systems/Apprenticeship.js'); // (25.2)
   window.__foodSupply = (await import('/src/systems/TownStatus.js')).foodSupply;
+  window.__town = await import('/src/systems/TownStatus.js'); // (34.2)
+  window.__lifeStages = await import('/src/systems/LifeStages.js'); // (34.2)
 });
 
 function summary() {
@@ -1580,6 +1601,7 @@ const midStats = await page.evaluate(() => {
     after20: after.length,
     freshAfter20: after.filter((e) => e.midgame).length,
     milestones: Object.keys(s.milestones).length,
+    parcels: { bought: s.parcels.length, log: (window.__stats?.parcelLog ?? []).slice(0, 12), limit: window.__town?.immigrationLimit(s) }, // (34.2)
     doneIds: Object.keys(s.milestones),
     goldenSince: s.goldenAge?.since?.day ?? null,
     gold: s.resources.gold,
@@ -1959,5 +1981,16 @@ if (options.json) {
   fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, court: courtStats, renown: renownStats, university: uniStats, clubs: clubStats, ...(options['club-diag'] ? { clubDiag: await page.evaluate(() => window.__clubDiag) } : {}), gold: report.gold, golden: report.golden?.since ?? null, ab: abStats, end: endState, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
+if (cdp) {
+  const { profile } = await cdp.send('Profiler.stop');
+  const self = new Map();
+  const byId = new Map(profile.nodes.map((n) => [n.id, n]));
+  profile.samples.forEach((id, i) => {
+    const f = byId.get(id).callFrame;
+    const k = `${f.functionName || '(anonim)'} ${f.url.split('/').pop()}:${f.lineNumber + 1}`;
+    self.set(k, (self.get(k) ?? 0) + (profile.timeDeltas[i] ?? 0));
+  });
+  console.log([...self].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `${Math.round(v / 1000)} ms ${k}`).join('\n'));
+}
 await browser.close();
 process.exit(healthy ? 0 : 1);

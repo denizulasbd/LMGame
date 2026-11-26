@@ -28,11 +28,12 @@ export class Camera {
   }
 
   /** Kamerayı dünya içinde tutar; dünya ekrandan küçükse ortalar. */
-  clamp(worldWidth, worldHeight, screenWidth, screenHeight) {
+  clamp(worldWidth, worldHeight, screenWidth, screenHeight, left = 0, top = 0) {
+    // (34.1) left / top: gezilebilir alanın sol üst köşesi (genişleyen haritada eksi olabilir); worldWidth / worldHeight onun boyutu
     const viewW = screenWidth / this.zoom;
     const viewH = screenHeight / this.zoom;
-    this.x = viewW >= worldWidth ? (worldWidth - viewW) / 2 : clamp(this.x, 0, worldWidth - viewW);
-    this.y = viewH >= worldHeight ? (worldHeight - viewH) / 2 : clamp(this.y, 0, worldHeight - viewH);
+    this.x = viewW >= worldWidth ? left + (worldWidth - viewW) / 2 : clamp(this.x, left, left + worldWidth - viewW);
+    this.y = viewH >= worldHeight ? top + (worldHeight - viewH) / 2 : clamp(this.y, top, top + worldHeight - viewH);
   }
 
   centerOn(worldX, worldY, screenWidth, screenHeight) {

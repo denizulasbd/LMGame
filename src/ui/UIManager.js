@@ -31,6 +31,7 @@ import { StatsPanel } from './components/StatsPanel.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
 import { CrisisModal } from './components/CrisisModal.js';
 import { MapTooltip } from './components/MapTooltip.js';
+import { ParcelCard } from './components/ParcelCard.js'; // (34.2)
 import { GuideCard } from './components/GuideCard.js';
 import { ScrollArrows } from './components/ScrollArrows.js';
 import { StoryFeed } from './components/StoryFeed.js';
@@ -80,6 +81,7 @@ export class UIManager {
       new DilemmaModal(game),
       new TitleMenu(game),
       new MapTooltip(game),
+      new ParcelCard(game), // (34.2) kilitli toprağa tıklayınca parsel kartı
       new StoryFeed(game), // (30.2)
       new GuideCard(game), // (30.1)
       new ScrollArrows(game), // (Erişilebilirlik) kayan panellerin yanında ▲ / ▼ düğmeleri; Ayarlar'dan açılır

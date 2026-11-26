@@ -13,6 +13,7 @@ const CARDINALS = [
   [-1, 0],
 ];
 
+const LOCAL_MARGIN = 10; // (34.1) yerel bağlantı denetiminin kapanan karoların çevresindeki kutu payı (karo)
 const MIN_MOVE_COST = 0.35; // en ucuz karo maliyeti (parke taş yol); A* tahmininin doğru kalması için
 
 export class World {
@@ -30,7 +31,10 @@ export class World {
     this.guests = []; // (26.3) geçici gezgin konuk (Seyyar Ozan / Nadir Takasçı / Yaşlı Seyyah; GuestSystem): nüfusa, konuta, iş gücüne sayılmaz
     this.boats = []; // nehirdeki ticaret teknesi (HarborSystem, 12. aşama; yalnızca çizim)
 
+    // (34.1) Yol bulma ızgarası açık alanın sınır dikdörtgenine kırpılır (kilitli parseller aranmaz); refreshStaticData günceller
     this.pathGrid = {
+      x0: 0,
+      y0: 0,
       width: map.width,
       height: map.height,
       minCost: MIN_MOVE_COST,
@@ -51,6 +55,8 @@ export class World {
 
   /** Harita veya yapılar değiştiğinde ulaşılabilirlik ve buluşma noktalarını yeniden hesaplar. */
   refreshStaticData() {
+    const open = this.map.openBounds;
+    Object.assign(this.pathGrid, { x0: open.x0, y0: open.y0, width: open.x1 - open.x0, height: open.y1 - open.y0 });
     const seed = this.findReachabilitySeed();
     this.reachable = seed ? this.map.computeReachable(seed.x, seed.y) : new Uint8Array(this.map.width * this.map.height);
     this.spotCache = new Map();
@@ -59,8 +65,8 @@ export class World {
     this.riverbankSpots = [];
     this.flowerSpots = [];
     this.strollSpots = [];
-    for (let y = 0; y < this.map.height; y++) {
-      for (let x = 0; x < this.map.width; x++) {
+    for (let y = open.y0; y < open.y1; y++) {
+      for (let x = open.x0; x < open.x1; x++) {
         if (!this.isReachable(x, y)) continue;
         const tile = this.map.get(x, y);
         if (tile === 'sand') {
@@ -112,7 +118,65 @@ export class World {
     const blocked = new Set(tiles.filter((t) => this.map.inBounds(t.x, t.y)).map((t) => this.map.index(t.x, t.y)));
     if (blocked.size === 0) return this.reachable;
     const seed = this.findReachabilitySeed();
+    if (seed && !blocked.has(this.map.index(seed.x, seed.y))) {
+      const local = this.localReachabilityWithout(blocked);
+      if (local) return local;
+    }
     return seed ? this.map.computeReachable(seed.x, seed.y, blocked) : new Uint8Array(this.map.width * this.map.height);
+  }
+
+  /**
+   * (34.1) Hızlı yol: kapanan karoların kasabaya bağlı komşuları, kapananların çevresindeki küçük bir kutuda (LOCAL_MARGIN) birbirine
+   * hâlâ bağlıysa hiçbir bölge kopmaz: sonuç bugünkü ulaşılabilirlikten yalnızca kapanan karoların çıkarılmasıdır (bütün açık alanı
+   * yeniden taramaya gerek yok). Kutuda bağlantı bulunamazsa null (çağıran tam taramaya düşer). this.reachable güncel olmalı
+   * (harita / yapı değişince refreshStaticData çağrılır).
+   */
+  localReachabilityWithout(blocked) {
+    const map = this.map;
+    const w = map.width;
+    const reach = this.reachable;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    const targets = new Set();
+    for (const i of blocked) {
+      const lx = i % w;
+      const ly = (i - lx) / w;
+      x0 = Math.min(x0, lx);
+      y0 = Math.min(y0, ly);
+      x1 = Math.max(x1, lx);
+      y1 = Math.max(y1, ly);
+      for (const n of [ly > 0 ? i - w : -1, lx < w - 1 ? i + 1 : -1, ly < map.height - 1 ? i + w : -1, lx > 0 ? i - 1 : -1]) {
+        if (n >= 0 && !blocked.has(n) && reach[n] === 1 && map.walkableAt(n)) targets.add(n);
+      }
+    }
+    const done = () => {
+      const out = reach.slice();
+      for (const i of blocked) out[i] = 0;
+      return out;
+    };
+    if (targets.size <= 1) return done();
+    const bx0 = Math.max(0, x0 - LOCAL_MARGIN);
+    const by0 = Math.max(0, y0 - LOCAL_MARGIN);
+    const bx1 = Math.min(w - 1, x1 + LOCAL_MARGIN);
+    const by1 = Math.min(map.height - 1, y1 + LOCAL_MARGIN);
+    const [start] = targets;
+    const seen = new Set([start]);
+    const stack = [start];
+    let found = 1;
+    while (stack.length) {
+      const i = stack.pop();
+      const lx = i % w;
+      const ly = (i - lx) / w;
+      for (const n of [ly > by0 ? i - w : -1, lx < bx1 ? i + 1 : -1, ly < by1 ? i + w : -1, lx > bx0 ? i - 1 : -1]) {
+        if (n < 0 || seen.has(n) || blocked.has(n) || reach[n] !== 1 || !map.walkableAt(n)) continue;
+        seen.add(n);
+        if (targets.has(n) && ++found === targets.size) return done();
+        stack.push(n);
+      }
+    }
+    return null;
   }
 
   /**
@@ -224,10 +288,12 @@ export class World {
   findEntryTile(rng) {
     const border = [];
     const roads = [];
-    const { width, height } = this.map;
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (x !== 0 && y !== 0 && x !== width - 1 && y !== height - 1) continue;
+    // (34.1) Açık alanın kenarı: komşularından biri kilitli ya da dünya dışı olan ulaşılabilir karo (parselsiz haritada harita kenarı)
+    const map = this.map;
+    const { x0, y0, x1, y1 } = map.openBounds;
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        if (map.isOpen(x, y - 1) && map.isOpen(x, y + 1) && map.isOpen(x - 1, y) && map.isOpen(x + 1, y)) continue;
         if (!this.isReachable(x, y)) continue;
         border.push({ x, y });
         if (this.map.get(x, y) === 'path' || this.map.get(x, y) === 'cobble') roads.push({ x, y });

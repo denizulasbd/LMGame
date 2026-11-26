@@ -62,8 +62,8 @@ results.push(...(await page.evaluate(async () => {
   sim.give({ wood: 999, stone: 999, food: 400, gold: 3000, iron: 200, cloth: 60, gears: 5 });
 
   // ---- 1. veri
-  c('veri: şalter renown açık, tohum + 44 izole (42 suç, 43 saray), dört kademe (Gözde ≥ 90), kart tablosu 7, kayıt sürümü 41',
-    ENGINES.renown === true && D.RENOWN_SEED_OFFSET === 44 && D.RENOWN_LEVELS.length === 4 && D.RENOWN_LEVELS[0].key === 'favored' && D.RENOWN_LEVELS[0].min === 90 && SD.STORY_TABLE_VERSION === 8 && CONFIG.SAVE_VERSION === 41 && sc.renown.dice !== sc.crime.dice && sc.renown.dice !== sc.court.dice);
+  c('veri: şalter renown açık, tohum + 44 izole (42 suç, 43 saray), dört kademe (Gözde ≥ 90), kart tablosu 7, kayıt sürümü 42 (34.1)',
+    ENGINES.renown === true && D.RENOWN_SEED_OFFSET === 44 && D.RENOWN_LEVELS.length === 4 && D.RENOWN_LEVELS[0].key === 'favored' && D.RENOWN_LEVELS[0].min === 90 && SD.STORY_TABLE_VERSION === 8 && CONFIG.SAVE_VERSION === 42 && sc.renown.dice !== sc.crime.dice && sc.renown.dice !== sc.court.dice);
 
   // ---- 2. katkıların yönü
   st.time.day = 20;
@@ -257,7 +257,7 @@ results.push(...(await page.evaluate(async () => {
   E.emit('ui:load');
   st = game.state;
   sc = game.scenes.current;
-  c('kaydet → yükle: state.renown ve itibar aynı, sürüm 41', raw.version === 41 && JSON.stringify(st.renown) === before && st.crown.reputation === repB, `${before} ||| ${JSON.stringify(st.renown)}`);
+  c('kaydet → yükle: state.renown ve itibar aynı, sürüm 42 (34.1)', raw.version === 42 && JSON.stringify(st.renown) === before && st.crown.reputation === repB, `${before} ||| ${JSON.stringify(st.renown)}`);
   const a1 = JSON.stringify(R.renownTarget(st));
   const a2 = JSON.stringify(R.renownTarget(st));
   return out;

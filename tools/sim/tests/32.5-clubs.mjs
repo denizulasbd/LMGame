@@ -80,9 +80,9 @@ const historyRun = async (enginesOff) => {
     const rngStates = () => Object.entries(sc).filter(([, v]) => v && typeof v === 'object' && (v.rng instanceof Random || v.dice instanceof Random)).map(([k, v]) => `${k}:${(v.rng ?? v.dice).state}`).join(',') + `|beh:${sc.behavior.brain.rng.state}`;
 
     // ---- 1. veri ve kilit
-    c('veri: kapasite 6, eşik 3, en az 3 üye, Kasaba (3), Sosyal, altınsız, tek, menüde; kart tablosu 8, kayıt 41, moodlet 33',
+    c('veri: kapasite 6, eşik 3, en az 3 üye, Kasaba (3), Sosyal, altınsız, tek, menüde; kart tablosu 8, kayıt 42, moodlet 33',
       CD.CLUB.capacity === 6 && CD.CLUB.threshold === 3 && CD.CLUB.minSession === 3 && CD.CLUB_KEYS.every((k) => B.BUILDINGS[k].requiresTier === 3 && B.BUILDINGS[k].category === 'Sosyal' && !B.BUILDINGS[k].cost.gold && B.BUILDINGS[k].unique && !B.BUILDINGS[k].workers && B.BUILD_MENU.includes(k)) &&
-      SD.STORY_TABLE_VERSION === 8 && CONFIG.SAVE_VERSION === 41 && Object.keys(MD.MOODLETS).length === 33 && IT.ITEMS.handkerchief && !IT.ITEMS.handkerchief.value);
+      SD.STORY_TABLE_VERSION === 8 && CONFIG.SAVE_VERSION === 42 && Object.keys(MD.MOODLETS).length === 33 && IT.ITEMS.handkerchief && !IT.ITEMS.handkerchief.value);
     st.town.tier = 2;
     const locked = sc.construction.globalBlock('gardenClub');
     st.town.tier = 3;
@@ -350,7 +350,7 @@ const historyRun = async (enginesOff) => {
     st = game.state;
     sc = game.scenes.current;
     const mKey2 = JSON.stringify(st.characters.filter((x) => x.club).map((x) => [x.id, x.club]));
-    c('kaydet → yükle: üyelik ve kulüp kayıtları aynı; sürüm 41; kulübü olmayanda alan yazılmaz', raw.version === 41 && mKey === mKey2 && canon(st.clubs) === cKey && raw.characters.some((x) => !('club' in x)), `${mKey.slice(0, 80)} | ${mKey2.slice(0, 80)}`);
+    c('kaydet → yükle: üyelik ve kulüp kayıtları aynı; sürüm 42 (34.1); kulübü olmayanda alan yazılmaz', raw.version === 42 && mKey === mKey2 && canon(st.clubs) === cKey && raw.characters.some((x) => !('club' in x)), `${mKey.slice(0, 80)} | ${mKey2.slice(0, 80)}`);
     c('yüklemeden sonra ürünler yapıya geri yazılır (estetik) ve tek sistem dinler', C.clubBuilding(st, 'gardenClub').clubWorks === 6 && sc.clubs.unsubscribers.length === 7);
     return out;
   })));

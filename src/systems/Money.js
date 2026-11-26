@@ -143,6 +143,7 @@ export function milestoneBlocker(state, milestone, progress = null) {
     case 'buildingsCompleted': return null;
     case 'mealsCooked': return needBuilding(state, 'inn') ?? 'Handa yemek pişirilmesini bekle: aşçı için bir sakin işe girmeli';
     case 'trades': return needBuilding(state, 'market') ?? 'Gezgin tüccar tezgâha gelince ona tıkla ve takas yap';
+    case 'parcels': return 'Kasabanın kenarındaki bir toprağa tıkla ve Satın Al · altın gerekir'; // (34.2)
     case 'population': return left ? `${left} sakin daha gerekir · yatak (Kulübe) ve yiyecek` : null;
     case 'masters': return left ? `${left} sakin daha ustalaşmalı · aynı mesleği çalıştır` : null;
     case 'petitionsMet': return left ? `${left} dilekçe daha karşıla · üstteki çipe tıkla` : null;

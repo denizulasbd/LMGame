@@ -191,13 +191,14 @@ export class HarborSystem {
     const start = this.mooringTiles(harbor).find((t) => this.navigable(t.x, t.y));
     if (!start) return null;
     const prev = new Map();
-    const key = (x, y) => y * map.width + x;
+    const key = (x, y) => map.index(x, y);
     const queue = [start];
     prev.set(key(start.x, start.y), null);
     const edges = [];
     while (queue.length) {
       const t = queue.shift();
-      if (t.x === 0 || t.y === 0 || t.x === map.width - 1 || t.y === map.height - 1) edges.push(t);
+      // (34.1) dünyanın kenarı (genişleyen haritada tekne kilitli parsellerin nehrinden gelir: yalnızca çizim)
+      if (t.x === map.x0 || t.y === map.y0 || t.x === map.x1 - 1 || t.y === map.y1 - 1) edges.push(t);
       for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
         const nx = t.x + dx;
         const ny = t.y + dy;
@@ -212,8 +213,8 @@ export class HarborSystem {
       for (let t = edge; t; t = prev.get(key(t.x, t.y))) tiles.push(t);
       return tiles.map((t) => ({ x: t.x * T + 8, y: t.y * T + 9 })); // uçtan rıhtıma
     };
-    const top = edges.filter((e) => e.y === 0).sort((a, b) => a.x - b.x)[0];
-    const bottom = edges.filter((e) => e.y === map.height - 1).sort((a, b) => a.x - b.x)[0];
+    const top = edges.filter((e) => e.y === map.y0).sort((a, b) => a.x - b.x)[0];
+    const bottom = edges.filter((e) => e.y === map.y1 - 1).sort((a, b) => a.x - b.x)[0];
     const from = top ?? edges[0];
     const to = bottom ?? edges[edges.length - 1];
     if (!from) return null; // rıhtımdan nehrin uçlarına su yolu yok

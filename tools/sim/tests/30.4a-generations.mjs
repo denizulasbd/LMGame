@@ -199,7 +199,7 @@ const open = async (opts) => {
     const s = game.state;
     const live = s.characters.filter((x) => before.has(x.id) && Number.isFinite(before.get(x.id).ageInDays));
     const same = live.every((x) => x.age === Math.floor(before.get(x.id).ageInDays / 16) && x.lifeStage === before.get(x.id).lifeStage);
-    c('v40 -> v41: her sakinin yaşı (yıl) ve evresi aynı', CONFIG.SAVE_VERSION === 41 && data.version === 40 && live.length >= 20 && same, `${live.length} sakin`);
+    c('v40 -> v41: her sakinin yaşı (yıl) ve evresi aynı', CONFIG.SAVE_VERSION === 42 && data.version === 40 && live.length >= 20 && same, `${live.length} sakin`);
     const ratio = live.every((x) => {
       const old = before.get(x.id);
       const cohortOld = old.ageInDays - (old.agedDays ?? 0);
@@ -212,7 +212,7 @@ const open = async (opts) => {
     localStorage.setItem('lmgame.save.v2', JSON.stringify(re));
     const again = SaveManager.read('main');
     const noRescale = again.characters.every((x) => re.characters.find((y) => y.id === x.id).ageInDays === x.ageInDays);
-    c('v41 kaydı yeniden ölçeklenmez (gidiş-dönüş birebir)', migrated && idem && re.version === 41 && noRescale, `Math.random ${mathCalls}`);
+    c('v41 kaydı yeniden ölçeklenmez (gidiş-dönüş birebir)', migrated && idem && re.version === 42 && noRescale, `Math.random ${mathCalls}`);
     return out;
   }, raw40)));
   await browser.close();

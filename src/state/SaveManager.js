@@ -9,6 +9,7 @@ import { LEGACY_BUILDING_TYPES } from '../data/buildings.js';
 import { lifespanFor } from '../systems/Venerable.js';
 import { valleyFor } from '../systems/Valley.js';
 import { migrateChemistry } from '../systems/Chemistry.js';
+import { legacyTerrainToCoords, savedCoreSize } from '../world/TerrainSnapshot.js';
 import { migrateMoodlets } from '../systems/Moodlets.js';
 import { migrateWants } from '../systems/Wants.js';
 import { migrateEvolution } from '../systems/Evolution.js';
@@ -25,6 +26,12 @@ const SLOT_KEYS = {
  * türe çevrilir; kurulmuş ya da yarım kalmış lambalar yüklenince Sokak Feneri olarak çalışır.
  */
 function migrate(data) {
+  // (34.1) v41 -> v42: arazi farkları indeks yerine dünya koordinatıyla (harita genişleyince indeks kayardı). Çekirdek boyutu kayıttan
+  // (8. aşamadan eski kayıtta 48x48). GameState.restore aynı dönüşümü bir kez daha (zararsızca) yapar.
+  if (data.version < 42) {
+    const size = savedCoreSize(data);
+    data.terrain = legacyTerrainToCoords(data.terrain, size.width, size.height);
+  }
   // (29.1) v35 -> v36: mevcut her ilişkiye (puanı olan çiftler, sevgililer / eşler) kimlik çiftinden ve tohumdan türeyen deterministik
   // kimya ve boş duygusal etiket yapısı bağlanır (rastgelelik tüketmez). Daha eski sürümlerin aşağıdaki göçleri sakin alanlarını
   // değiştirmediği için (kimya yalnızca özellik, huy, çıraklık ve Başusta bilgisine bakar) sıra önemli değildir.

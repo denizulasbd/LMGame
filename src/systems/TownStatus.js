@@ -17,6 +17,7 @@ import { clothWelfare } from './Refinery.js';
 import { aestheticWelfareMultiplier } from './Landscape.js';
 import { taxWorkMultiplier, reputationForImmigration } from './Crown.js';
 import { elderWelfare, activePopulation } from './LifeStages.js';
+import { populationLimitBreakdown } from './ParcelMarket.js'; // (34.2)
 
 /** Bir sakinin mutluluğu 0-100: ihtiyaçlarının ağırlıklı ortalaması. */
 export function happinessOf(character) {
@@ -160,9 +161,14 @@ export function quarantined(state) {
   return engineOn('midgame') && (state.dilemma?.quarantineUntil ?? 0) > state.totalMinutes;
 }
 
-/** Göçle ulaşılabilecek en yüksek nüfus (Gelişmiş Şehir'de artar). */
+/** Göçle ulaşılabilecek en yüksek nüfus (Gelişmiş Şehir'de artar; 34.2: açık parseller kota ekler). */
 export function immigrationLimit(state) {
-  return townTier(state).maxPopulation ?? IMMIGRATION.maxPopulation;
+  return immigrationBreakdown(state).total;
+}
+
+/** (34.2) Göç sınırının dökümü: seviye sınırı + açık parsellerin kotası (en çok PARCEL_MARKET.maxPopulation; seviye sınırının altına inmez). */
+export function immigrationBreakdown(state) {
+  return populationLimitBreakdown(state, townTier(state).maxPopulation ?? IMMIGRATION.maxPopulation);
 }
 
 // ---------------------------------------------------------------------------

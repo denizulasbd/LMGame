@@ -26,8 +26,9 @@ export class FireflyField {
   refresh(map) {
     const forest = [];
     const river = [];
-    for (let y = 0; y < map.height; y++) {
-      for (let x = 0; x < map.width; x++) {
+    const open = map.openBounds; // (34.1) yalnızca açık alan
+    for (let y = open.y0; y < open.y1; y++) {
+      for (let x = open.x0; x < open.x1; x++) {
         const object = map.getObject(x, y);
         if (object === 'oak' || object === 'pine') forest.push({ x, y });
         else if (map.get(x, y) === 'sand' && nearWater(map, x, y)) river.push({ x, y });

@@ -33,6 +33,8 @@ export function milestoneProgress(milestone, state) {
   switch (milestone.kind) {
     case 'buildingsCompleted':
       return { current: state.stats.buildingsCompleted, target: milestone.target };
+    case 'parcels': // (34.2) satın alınan (açık) parsel sayısı
+      return { current: state.parcels?.length ?? 0, target: milestone.target };
     case 'mealsCooked':
       return { current: state.stats.mealsCooked, target: milestone.target };
     case 'trades':
@@ -128,6 +130,7 @@ export class MilestoneSystem {
         this.check();
       }),
       on('wonder:stageCompleted', () => this.check()),
+      on('parcel:bought', () => this.check()), // (34.2)
       on('petition:resolved', () => engineOn('midgame') && this.check()),
       on('doctrine:chosen', () => engineOn('midgame') && this.check()),
       on('heirloom:passed', () => engineOn('midgame') && this.check()),

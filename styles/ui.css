@@ -5707,3 +5707,30 @@ kbd {
 .building-club .club-btn:disabled { opacity: 0.45; cursor: default; }
 .building-club .club-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin: 3px 0; }
 .building-club .club-painting { font-size: 11px; padding: 2px 4px; border-radius: 3px; background: rgba(255, 210, 63, 0.12); border: 1px solid rgba(255, 184, 77, 0.45); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- (34.2) Parsel kartı: kilitli toprağa tıklayınca ---------- */
+.parcel-card {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 70;
+  width: 250px;
+  box-sizing: border-box;
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: auto;
+}
+.parcel-card[hidden] { display: none; }
+.parcel-title { font-size: 15px; font-weight: 700; color: var(--ui-highlight); }
+.parcel-sub { font-size: 12px; color: var(--ui-ink-soft); }
+.parcel-rows { display: flex; flex-direction: column; gap: 2px; font-size: 12px; line-height: 1.35; }
+.parcel-quota { color: #9ad77a; font-weight: 600; }
+.parcel-price-line { color: var(--ui-ink-soft); font-size: 11px; }
+.parcel-price { font-size: 14px; font-weight: 700; }
+.parcel-reason { font-size: 12px; color: #f0a090; }
+.parcel-reason[hidden] { display: none; }
+.parcel-actions { display: flex; gap: 6px; margin-top: 2px; }
+.parcel-buy:disabled { opacity: 0.45; cursor: not-allowed; }
+.parcel-buy:not(:disabled) { border-color: var(--ui-highlight); }

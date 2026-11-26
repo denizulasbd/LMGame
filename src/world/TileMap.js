@@ -5,6 +5,7 @@ import { TILE_TYPES, TILE_BY_ID, OBJECT_TYPES, OBJECT_BY_ID } from '../data/tile
 import { getTileSprite, getEdgeSprite, getObjectSprite, getCornerSprite, getMudSprite } from '../art/tiles/index.js';
 import { MUD } from '../data/landscape.js';
 import { AUTUMN_FOLIAGE_VARIANTS } from '../art/seasons.js';
+import { LOCKED_VIEW } from '../data/parcels.js';
 
 // Kenar yönleri: 0 üst, 1 sağ, 2 alt, 3 sol (art/tiles döndürme sırasıyla aynı)
 const NEIGHBOR_OFFSETS = [
@@ -31,25 +32,94 @@ const CORNER_DIAGONALS = [
 const isRoad = (tile) => Boolean(tile && TILE_TYPES[tile].road && tile !== 'bridge');
 const isGroundTile = (tile) => Boolean(tile && TILE_TYPES[tile].ground);
 const MUDDY = new Set(MUD.tiles);
+// (34.1) Hızlı yürünebilirlik tabloları (kimliğe göre): genişleyen haritada taşma ve yol bulma çok daha çok karo dolaşır
+const TILE_WALK = new Uint8Array(256);
+for (const def of Object.values(TILE_TYPES)) TILE_WALK[def.id] = def.walkable ? 1 : 0;
+const OBJECT_WALK = new Uint8Array(256);
+OBJECT_WALK[0] = 1;
+for (const def of Object.values(OBJECT_TYPES)) OBJECT_WALK[def.id] = def.walkable ? 1 : 0;
 
 // Ağaç gibi uzun nesneler üstteki karolara taşar; görünür alanın altına bu kadar
 // fazladan satır eklenir ki ekranın altından taşan tepeler kesilmesin.
 const OBJECT_OVERDRAW_ROWS = 1;
 
 export class TileMap {
-  constructor(width, height, fillTile = 'grass') {
+  /**
+   * (34.1) x0 / y0: dünyanın sol üst karosu (genişleyen haritada eksi olabilir; çekirdek her zaman 0,0'dan başlar).
+   * Bütün katmanlar dünya boyutundadır; indeks = (y - y0) * width + (x - x0).
+   */
+  constructor(width, height, fillTile = 'grass', { x0 = 0, y0 = 0 } = {}) {
     this.width = width;
     this.height = height;
+    this.x0 = x0;
+    this.y0 = y0;
     this.tiles = new Uint8Array(width * height).fill(TILE_TYPES[fillTile].id);
     this.variants = new Uint8Array(width * height);
     this.objects = new Uint8Array(width * height); // 0 = nesne yok
     this.occupants = new Uint16Array(width * height); // üzerindeki yapının kimliği, 0 = boş
     this.passable = new Uint8Array(width * height); // 1: üzerindeki yapının altından / içinden geçilebilir (kemer)
     this.wet = false; // (18. aşama) yağmur yağıyor: toprak patika çamurlu (LandscapeSystem her adımda yazar)
+    // (34.1) Açık (kasabanın) karolar: 1. Kilitli karo yürünmez, inşa edilmez, toplanmaz. openBounds: açık alanın sınır dikdörtgeni
+    // (x1 / y1 hariç); haritayı tarayan sistemler yalnızca bu dikdörtgende döner.
+    this.open = new Uint8Array(width * height).fill(1);
+    this.openBounds = { x0, y0, x1: x0 + width, y1: y0 + height };
+    this.version = 0; // açık alan değişince artar
+  }
+
+  /** Dünyanın sağ / alt sınırı (hariç). */
+  get x1() {
+    return this.x0 + this.width;
+  }
+
+  get y1() {
+    return this.y0 + this.height;
+  }
+
+  /** (34.1) Karo açık (satın alınmış ya da çekirdek) mı? */
+  isOpen(x, y) {
+    return this.inBounds(x, y) && this.open[this.index(x, y)] === 1;
+  }
+
+  /** (34.1) Bir dikdörtgeni açar ya da kilitler; sınır dikdörtgeni yeniden hesaplanır. */
+  setOpenRect(rx, ry, w, h, value) {
+    for (let y = ry; y < ry + h; y++) for (let x = rx; x < rx + w; x++) if (this.inBounds(x, y)) this.open[this.index(x, y)] = value ? 1 : 0;
+    this.refreshOpenBounds();
+  }
+
+  refreshOpenBounds() {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let i = 0; i < this.open.length; i++) {
+      if (!this.open[i]) continue;
+      const { x, y } = this.coordOf(i);
+      if (x < x0) x0 = x;
+      if (y < y0) y0 = y;
+      if (x + 1 > x1) x1 = x + 1;
+      if (y + 1 > y1) y1 = y + 1;
+    }
+    this.openBounds = x0 === Infinity ? { x0: 0, y0: 0, x1: 0, y1: 0 } : { x0, y0, x1, y1 };
+    this.version++;
+  }
+
+  /** İndeksin dünya koordinatı. */
+  coordOf(i) {
+    const lx = i % this.width;
+    return { x: lx + this.x0, y: (i - lx) / this.width + this.y0 };
   }
 
   get pixelWidth() {
     return this.width * CONFIG.TILE_SIZE;
+  }
+
+  /** (34.1) Dünyanın sol / üst kenarı (piksel; genişleyen haritada eksi). */
+  get pixelLeft() {
+    return this.x0 * CONFIG.TILE_SIZE;
+  }
+
+  get pixelTop() {
+    return this.y0 * CONFIG.TILE_SIZE;
   }
 
   get pixelHeight() {
@@ -57,11 +127,11 @@ export class TileMap {
   }
 
   inBounds(x, y) {
-    return x >= 0 && y >= 0 && x < this.width && y < this.height;
+    return x >= this.x0 && y >= this.y0 && x < this.x0 + this.width && y < this.y0 + this.height;
   }
 
   index(x, y) {
-    return y * this.width + x;
+    return (y - this.y0) * this.width + (x - this.x0);
   }
 
   // ---- Zemin ----
@@ -114,16 +184,18 @@ export class TileMap {
   // ---- Kurallar ----
 
   isWalkable(x, y) {
-    const tile = this.get(x, y);
-    if (!tile || !TILE_TYPES[tile].walkable) return false;
-    if (this.getOccupant(x, y) !== 0 && !this.passable[this.index(x, y)]) return false;
-    const object = this.getObject(x, y);
-    return !object || OBJECT_TYPES[object].walkable;
+    return this.inBounds(x, y) && this.walkableAt(this.index(x, y));
+  }
+
+  /** (34.1) İndeksle yürünebilirlik: açık, zemini yürünür, yapı yok (ya da kemer), nesnesi yürünür. */
+  walkableAt(i) {
+    return this.open[i] === 1 && TILE_WALK[this.tiles[i]] === 1 && (this.occupants[i] === 0 || this.passable[i] === 1) && OBJECT_WALK[this.objects[i]] === 1;
   }
 
   isBuildable(x, y) {
     const tile = this.get(x, y);
     if (!tile || !TILE_TYPES[tile].buildable) return false;
+    if (!this.open[this.index(x, y)]) return false; // (34.1) kilitli toprak
     if (this.getOccupant(x, y) !== 0) return false;
     const object = this.getObject(x, y);
     return !object || OBJECT_TYPES[object].buildable;
@@ -150,20 +222,28 @@ export class TileMap {
    * Dönüş: her karo için 1 (ulaşılabilir) / 0 içeren dizi.
    */
   computeReachable(seedX, seedY, blocked = null) {
-    const reachable = new Uint8Array(this.width * this.height);
+    const { width, height } = this;
+    const reachable = new Uint8Array(width * height);
     if (!this.isWalkable(seedX, seedY) || blocked?.has(this.index(seedX, seedY))) return reachable;
-    const stack = [[seedX, seedY]];
-    reachable[this.index(seedX, seedY)] = 1;
-    while (stack.length > 0) {
-      const [x, y] = stack.pop();
-      for (const [dx, dy] of NEIGHBOR_OFFSETS) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (!this.inBounds(nx, ny)) continue;
-        const i = this.index(nx, ny);
-        if (reachable[i] || !this.isWalkable(nx, ny) || blocked?.has(i)) continue;
-        reachable[i] = 1;
-        stack.push([nx, ny]);
+    // (34.1) İndeks yığınıyla taşma (genişleyen haritada çok karo): komşu karolar yerel sütun / satırla sınırlanır
+    const stack = new Int32Array(width * height);
+    let top = 0;
+    const start = this.index(seedX, seedY);
+    reachable[start] = 1;
+    stack[top++] = start;
+    while (top > 0) {
+      const i = stack[--top];
+      const lx = i % width;
+      const ly = (i - lx) / width;
+      for (let k = 0; k < 4; k++) {
+        let n;
+        if (k === 0) n = ly > 0 ? i - width : -1;
+        else if (k === 1) n = lx < width - 1 ? i + 1 : -1;
+        else if (k === 2) n = ly < height - 1 ? i + width : -1;
+        else n = lx > 0 ? i - 1 : -1;
+        if (n < 0 || reachable[n] || !this.walkableAt(n) || blocked?.has(n)) continue;
+        reachable[n] = 1;
+        stack[top++] = n;
       }
     }
     return reachable;
@@ -188,6 +268,7 @@ export class TileMap {
       occupantId: this.getOccupant(x, y),
       walkable: this.isWalkable(x, y),
       buildable: this.isBuildable(x, y),
+      locked: !this.isOpen(x, y), // (34.1)
     };
   }
 
@@ -198,10 +279,10 @@ export class TileMap {
     const size = CONFIG.TILE_SIZE;
     const view = camera.getViewBounds(renderer.width, renderer.height);
     return {
-      x0: Math.max(0, Math.floor(view.left / size)),
-      y0: Math.max(0, Math.floor(view.top / size)),
-      x1: Math.min(this.width, Math.ceil(view.right / size)),
-      y1: Math.min(this.height, Math.ceil(view.bottom / size) + extraRowsBelow),
+      x0: Math.max(this.x0, Math.floor(view.left / size)),
+      y0: Math.max(this.y0, Math.floor(view.top / size)),
+      x1: Math.min(this.x1, Math.ceil(view.right / size)),
+      y1: Math.min(this.y1, Math.ceil(view.bottom / size) + extraRowsBelow),
     };
   }
 
@@ -277,6 +358,34 @@ export class TileMap {
         const py = (y + 1) * size - sprite.height;
         // Taban, gölgenin biraz üstü: karonun alt kenarından 3 piksel yukarısı
         queue.addImage((y + 1) * size - 3, sprite, px, py);
+      }
+    }
+  }
+
+  /** (34.1) Kilitli (satın alınmamış) karoları soluk bir sisle örter; açık alanın kenarına ince bir çizgi çeker. */
+  renderLocked(renderer, camera) {
+    const size = CONFIG.TILE_SIZE;
+    const { x0, y0, x1, y1 } = this.getVisibleRange(camera, renderer, OBJECT_OVERDRAW_ROWS);
+    for (let y = y0; y < y1; y++) {
+      let run = null; // koşunun ilk karosu (eksi koordinat olabilir)
+      for (let x = x0; x <= x1; x++) {
+        const locked = x < x1 && !this.open[this.index(x, y)];
+        if (locked && run === null) run = x;
+        if (!locked && run !== null) {
+          renderer.fillRect(run * size, y * size, (x - run) * size, size, LOCKED_VIEW.fog);
+          run = null;
+        }
+      }
+    }
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        if (this.open[this.index(x, y)]) continue;
+        const px = x * size;
+        const py = y * size;
+        if (this.isOpen(x, y - 1)) renderer.fillRect(px, py, size, 1, LOCKED_VIEW.border);
+        if (this.isOpen(x, y + 1)) renderer.fillRect(px, py + size - 1, size, 1, LOCKED_VIEW.border);
+        if (this.isOpen(x - 1, y)) renderer.fillRect(px, py, 1, size, LOCKED_VIEW.border);
+        if (this.isOpen(x + 1, y)) renderer.fillRect(px + size - 1, py, 1, size, LOCKED_VIEW.border);
       }
     }
   }
