@@ -13,6 +13,7 @@ const CARDINALS = [
   [-1, 0],
 ];
 
+const LOCAL_MARGIN = 10; // (34.1) yerel bağlantı denetiminin kapanan karoların çevresindeki kutu payı (karo)
 const MIN_MOVE_COST = 0.35; // en ucuz karo maliyeti (parke taş yol); A* tahmininin doğru kalması için
 
 export class World {
@@ -117,7 +118,65 @@ export class World {
     const blocked = new Set(tiles.filter((t) => this.map.inBounds(t.x, t.y)).map((t) => this.map.index(t.x, t.y)));
     if (blocked.size === 0) return this.reachable;
     const seed = this.findReachabilitySeed();
+    if (seed && !blocked.has(this.map.index(seed.x, seed.y))) {
+      const local = this.localReachabilityWithout(blocked);
+      if (local) return local;
+    }
     return seed ? this.map.computeReachable(seed.x, seed.y, blocked) : new Uint8Array(this.map.width * this.map.height);
+  }
+
+  /**
+   * (34.1) Hızlı yol: kapanan karoların kasabaya bağlı komşuları, kapananların çevresindeki küçük bir kutuda (LOCAL_MARGIN) birbirine
+   * hâlâ bağlıysa hiçbir bölge kopmaz: sonuç bugünkü ulaşılabilirlikten yalnızca kapanan karoların çıkarılmasıdır (bütün açık alanı
+   * yeniden taramaya gerek yok). Kutuda bağlantı bulunamazsa null (çağıran tam taramaya düşer). this.reachable güncel olmalı
+   * (harita / yapı değişince refreshStaticData çağrılır).
+   */
+  localReachabilityWithout(blocked) {
+    const map = this.map;
+    const w = map.width;
+    const reach = this.reachable;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    const targets = new Set();
+    for (const i of blocked) {
+      const lx = i % w;
+      const ly = (i - lx) / w;
+      x0 = Math.min(x0, lx);
+      y0 = Math.min(y0, ly);
+      x1 = Math.max(x1, lx);
+      y1 = Math.max(y1, ly);
+      for (const n of [ly > 0 ? i - w : -1, lx < w - 1 ? i + 1 : -1, ly < map.height - 1 ? i + w : -1, lx > 0 ? i - 1 : -1]) {
+        if (n >= 0 && !blocked.has(n) && reach[n] === 1 && map.walkableAt(n)) targets.add(n);
+      }
+    }
+    const done = () => {
+      const out = reach.slice();
+      for (const i of blocked) out[i] = 0;
+      return out;
+    };
+    if (targets.size <= 1) return done();
+    const bx0 = Math.max(0, x0 - LOCAL_MARGIN);
+    const by0 = Math.max(0, y0 - LOCAL_MARGIN);
+    const bx1 = Math.min(w - 1, x1 + LOCAL_MARGIN);
+    const by1 = Math.min(map.height - 1, y1 + LOCAL_MARGIN);
+    const [start] = targets;
+    const seen = new Set([start]);
+    const stack = [start];
+    let found = 1;
+    while (stack.length) {
+      const i = stack.pop();
+      const lx = i % w;
+      const ly = (i - lx) / w;
+      for (const n of [ly > by0 ? i - w : -1, lx < bx1 ? i + 1 : -1, ly < by1 ? i + w : -1, lx > bx0 ? i - 1 : -1]) {
+        if (n < 0 || seen.has(n) || blocked.has(n) || reach[n] !== 1 || !map.walkableAt(n)) continue;
+        seen.add(n);
+        if (targets.has(n) && ++found === targets.size) return done();
+        stack.push(n);
+      }
+    }
+    return null;
   }
 
   /**

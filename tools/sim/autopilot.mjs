@@ -95,6 +95,12 @@ const speed = Number(options.speed ?? 4);
 const { browser, page, errors } = await openGame({ seed, life: options.life !== undefined && options.life !== true ? Number(options.life) : seed, enginesOff: typeof options['engines-off'] === 'string' ? options['engines-off'] : null }); // (30.4a) açılıştan önce
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
+// (34.1) --cpuprofile: koşu boyunca CPU profili; sonunda en pahalı 15 işlev (kendi süresi) basılır
+const cdp = options.cpuprofile ? await page.context().newCDPSession(page) : null;
+if (cdp) {
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.start');
+}
 if (options.parcels === 'all') console.log(`(34.1) açılan parsel: ${await page.evaluate(() => window.sim.unlockAllParcels())}`); // performans ölçümü: bütün harita açık
 if (options['start-food'] !== undefined) await page.evaluate((v) => { window.game.state.resources.food = v; }, Number(options['start-food'])); // (30.6) denge denemesi: başlangıç yiyeceği
 if (options.stories) await page.evaluate((f) => { window.game.scenes.current.storyDirector.autoTick = true; if (f) window.game.events.emit('ui:setStoryFilter', { filter: f }); }, typeof options['story-filter'] === 'string' ? options['story-filter'] : null); // (30.2)
@@ -1958,5 +1964,16 @@ if (options.json) {
   fs.writeFileSync(options.json, JSON.stringify({ seed, days, speed, errors, monitor: mon, bonds: bondStats, rites: riteStats, mid: midStats, crime: crimeStats, court: courtStats, renown: renownStats, university: uniStats, clubs: clubStats, ...(options['club-diag'] ? { clubDiag: await page.evaluate(() => window.__clubDiag) } : {}), gold: report.gold, golden: report.golden?.since ?? null, ab: abStats, end: endState, healthy, ...(checkpointDays.length ? { longRun } : {}) }, null, 1));
 }
 console.log('Sayfa hataları:', errors.length ? `\n${errors.slice(0, 20).join('\n')}` : 'yok');
+if (cdp) {
+  const { profile } = await cdp.send('Profiler.stop');
+  const self = new Map();
+  const byId = new Map(profile.nodes.map((n) => [n.id, n]));
+  profile.samples.forEach((id, i) => {
+    const f = byId.get(id).callFrame;
+    const k = `${f.functionName || '(anonim)'} ${f.url.split('/').pop()}:${f.lineNumber + 1}`;
+    self.set(k, (self.get(k) ?? 0) + (profile.timeDeltas[i] ?? 0));
+  });
+  console.log([...self].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `${Math.round(v / 1000)} ms ${k}`).join('\n'));
+}
 await browser.close();
 process.exit(healthy ? 0 : 1);

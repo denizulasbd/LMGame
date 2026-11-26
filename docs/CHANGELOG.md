@@ -2,6 +2,18 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 10 satır (33.0'da 20'den indirildi). README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 34.1 — Genişleyen Harita: altyapı (kayıt sürümü 42)
+- Yaklaşım (A): çekirdek koordinatlar sabit, dünya eksiye uzar (`TileMap.x0/y0`, `index`, `coordOf`, `openBounds`, `isOpen`). Yapı, sakin, hayvan, iş koordinatları hiç kaymaz. Tasarım: `docs/design/34-harita.md`.
+- Çekirdek bugünkü üretimle aynen (80×80; eski 48×48) üretilir, çevresine iki halka parsel (`world/Parcels.js`: halka 14-18 ve 18-24 karo, parsel kenarı 12-24, tohum 42'de 51 parsel, dünya 144×144; en çok 164×164).
+- Parsel içeriği (`world/Expansion.js`) harita tohumu + dünya koordinatından: çekirdek kenarının biyomunu devralan geçiş, orman / kaya / çayır, küçük göller, nehrin ve ana yolların devamı. Sayılar `data/parcels.js`.
+- Kilitli alan: yürünmez, kurulmaz, yol döşenmez, toplanmaz; soluk sisle çizilir, kenarında ince çizgi; kamera 6 karo ötesine gider. Göçmen / tüccar / konuk açık alanın kenarından gelir.
+- Kayıt v42: `terrain` hücreleri `[x, y, zemin, varyasyon, nesne]`, `parcels: [kimlik]` (isteğe bağlı). v41 → v42 göçü indeksleri çekirdek genişliğiyle koordinata çevirir (`GameState.restore` da). Fikstür `save-v42.json`.
+- Geliştirici yolu: `sim.unlockParcel(id)`, `sim.parcels()`, `sim.unlockAllParcels()`, adreste `?parcels=all`, otopilot `--parcels all`. Satın alma, fiyat, kota: 34.2.
+- Taramalar açık alana kırpıldı (ulaşılabilirlik, buluşma noktaları, estetik, ateşböceği, yol listesi, uygun karo boyaması, yol bulma ızgarası); yürünebilirlik ve taşma dizi tabanlı hızlı yola geçti.
+- Test: `tests/34.1-map.mjs` (40); `compat --all` PLACEHOLDER_COMPAT. Ekran: `docs/playtest/img34.1/` (`tools/sim/shots34.1.mjs`).
+- PLACEHOLDER_PERF
+- PLACEHOLDER_GATE
+
 ## Aşama 33.1 — Rastgele Kadro ve Hayat Tohumu (kayıt sürümü 41 kalır)
 - İki tohum: `state.seed` harita tohumu (aynı tohum aynı harita); yeni `state.lifeSeed` hayat tohumu, her yeni oyunda rastgele (Yeni Kasaba Kur, Yeni Harita, `?seed=`). `lifeSeedOf(state)` (`utils/lifeSeed.js`): alan yoksa harita tohumu. Haritanın dışındaki ~40 üreteç ve hesap (TownScene `seed + N`, hava, hayvanlar, kimya, ömür, arzu, çatışma) buna geçti.
 - Harita tohumunda kalanlar: arazi / işaretler / başlangıç yapıları (WorldGenerator), kayıtta yeniden üretilen taban arazi (TerrainSnapshot; bozulursa kayıtlar bozulur), Vadi Karakteri, varsayılan kasaba adı.
