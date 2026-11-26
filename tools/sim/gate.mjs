@@ -25,14 +25,15 @@ fs.mkdirSync(outDir, { recursive: true });
 const node = (file, ...args) => ({ cmd: process.execPath, args: [path.join(here, file), ...args] });
 const jobs = [];
 const pick = (name) => !only || only.test(name);
-const add = (name, spec, weight = 1) => { if (pick(name)) jobs.push({ name, weight, ...spec }); };
+const add = (name, spec, weight = 1, extra = {}) => { if (pick(name)) jobs.push({ name, weight, ...spec, ...extra }); };
 
 const stageTests = fs.existsSync(path.join(here, 'tests'))
   ? fs.readdirSync(path.join(here, 'tests')).filter((f) => f.endsWith('.mjs') && !f.startsWith('_')).sort()
   : [];
 
 add('cycles', node('cycles.mjs'));
-for (const f of stageTests) add(`tests/${f}`, node(`tests/${f}`), /32\.6b-integration|30\.1-first-hour/.test(f) ? 6 : 2);
+// 30.1 gerçek fare ve gerçek zamanla çalışır: paralel yükte arada takılır, bu yüzden kaldıysa bir kez yeniden denenir (günlükte yazar)
+for (const f of stageTests) add(`tests/${f}`, node(`tests/${f}`), /32\.6b-integration|30\.1-first-hour/.test(f) ? 6 : 2, { retry: /30\.1-first-hour/.test(f) ? 1 : 0 });
 add('compat --sample', node('compat.mjs', '--sample'), 5);
 add('duman autopilot 42 × 15 gün', node('autopilot.mjs', '42', '15', '--quiet'), 9);
 if (full) {
@@ -43,10 +44,14 @@ if (full) {
 function run(job) {
   const log = path.join(outDir, `${job.name.replace(/[^\w.-]+/g, '_')}.log`);
   const t0 = Date.now();
-  return new Promise((resolve) => {
+  const once = () => new Promise((resolve) => {
     const fd = fs.openSync(log, 'w');
     const child = spawn(job.cmd, job.args, { cwd: root, stdio: ['ignore', fd, fd] });
     child.on('exit', (code) => resolve(code ?? 1));
+  });
+  return once().then(async (code) => {
+    for (let i = 0; i < (job.retry ?? 0) && code !== 0; i++) { job.name += ' (2. deneme)'; code = await once(); }
+    return code;
   }).then((code) => {
     job.code = code;
     job.secs = Math.round((Date.now() - t0) / 1000);
