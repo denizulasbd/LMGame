@@ -261,7 +261,7 @@ await second.browser.close();
     const old = layoutParcels(80, 80, src.seed, true).parcels.filter((p) => src.parcels.includes(p.id));
     const covered = old.every((o) => scene.parcels.filter((p) => game.state.parcels.includes(p.id)).some((p) => Math.min(o.x + o.w, p.x + p.w) > Math.max(o.x, p.x) && Math.min(o.y + o.h, p.y + p.h) > Math.max(o.y, p.y)));
     const lostTerrain = src.terrain.filter(([x, y, t, v, o]) => !map.isOpen(x, y) && (x < 0 || y < 0 || x >= 80 || y >= 80)).length;
-    const wrong = src.terrain.filter(([x, y, t, v, o]) => map.get(x, y) === null || map.tiles[map.index(x, y)] !== t || map.variants[map.index(x, y)] !== v || map.objects[map.index(x, y)] !== o).length;
+    const wrong = src.terrain.filter(([x, y, t, v, o]) => map.get(x, y) === null || map.tiles[map.index(x, y)] !== t || map.variants[map.index(x, y)] !== v || map.objects[map.index(x, y)] !== (o === 5 ? 0 : o)).length;
     const lockedBuildings = game.state.buildings.filter((b) => !map.isOpen(b.tileX, b.tileY)).length;
     const buildings = src.buildings.filter((b) => !game.state.buildings.some((n) => n.id === b.id && n.tileX === b.tileX && n.tileY === b.tileY)).length;
     // dönüştürülmüş kimlikler kaydedilince yeni biçimde
@@ -286,7 +286,7 @@ await second.browser.close();
       game.events.emit('ui:load');
       const scene = game.scenes.current;
       const src = JSON.parse(raw);
-      return { ids: [...game.state.parcels], open: src.parcels.every((id) => { const p = scene.parcels.find((q) => q.id === id); return p && scene.map.isOpen(p.x + 1, p.y + 1); }), wrong: src.terrain.filter(([x, y, t, v, o]) => scene.map.tiles[scene.map.index(x, y)] !== t || scene.map.objects[scene.map.index(x, y)] !== o).length };
+      return { ids: [...game.state.parcels], open: src.parcels.every((id) => { const p = scene.parcels.find((q) => q.id === id); return p && scene.map.isOpen(p.x + 1, p.y + 1); }), wrong: src.terrain.filter(([x, y, t, v, o]) => scene.map.tiles[scene.map.index(x, y)] !== t || scene.map.objects[scene.map.index(x, y)] !== (o === 5 ? 0 : o)).length };
     }, raw);
     results.push({ name: 'save-v42.json (34.2 bölünmesi): parseller aynen açık, arazi yerinde', ok: r.ids.join() === data.parcels.join() && r.open && r.wrong === 0, detail: `${r.ids}` });
   } else {

@@ -902,7 +902,7 @@ for (const { name, raw } of fixtures) {
       const scene = game.scenes.current;
       const map = scene.map;
       const src = JSON.parse(raw);
-      const wrong = src.terrain.filter(([x, y, t, v, o]) => map.get(x, y) === null || map.tiles[map.index(x, y)] !== t || map.variants[map.index(x, y)] !== v || map.objects[map.index(x, y)] !== o).length;
+      const wrong = src.terrain.filter(([x, y, t, v, o]) => map.get(x, y) === null || map.tiles[map.index(x, y)] !== t || map.variants[map.index(x, y)] !== v || map.objects[map.index(x, y)] !== (o === 5 ? 0 : o)).length; // (34.3) kütük (5) açılışta temizlenir
       const lockedTerrain = src.terrain.filter(([x, y]) => !map.isOpen(x, y)).length;
       const lockedBuildings = game.state.buildings.filter((b) => !map.isOpen(b.tileX, b.tileY)).length;
       const snapIds = scene.saves.snapshot().parcels;

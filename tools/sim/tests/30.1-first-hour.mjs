@@ -220,7 +220,7 @@ const live = await open({ seed: 42, stopLoop: false });
     const r = p.rect;
     for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) {
       const a = sc.construction.anchorFor('cabin', x, y);
-      const fresh = sc.construction.checkPlacement('cabin', a.x, a.y).ok;
+      const fresh = sc.construction.checkPlacement('cabin', a.x, a.y, { roads: true }).ok; // (34.3) yerleşim aracı yol üstüne de kurar
       n++; if (fresh) ok++; if (Boolean(p.results.get(sc.map.index(x, y))) !== fresh) diff++;
     }
     return { complete: p.complete, diff, n, ok };
@@ -246,7 +246,7 @@ const live = await open({ seed: 42, stopLoop: false });
     const r = await page.evaluate(() => {
       const sc = game.scenes.current; const t = sc.tools; const h = t.hovered; if (!h) return null;
       const a = sc.construction.anchorFor(t.buildType, h.tileX, h.tileY);
-      const c = sc.construction.checkPlacement(t.buildType, a.x, a.y);
+      const c = sc.construction.checkPlacement(t.buildType, a.x, a.y, { roads: true });
       return { ok: t.preview.ok, fresh: c.ok, cls: document.querySelector('.build-strip-info').classList.contains('is-bad'), text: t.preview.text, reason: c.reason };
     });
     if (!r) continue;

@@ -97,7 +97,7 @@ const out = await page.evaluate(async () => {
   const road = { x: free.x + 3, y: free.y };
   while (!(scene.construction.checkPaint('path', road.x, road.y).ok) && road.x < parcel.x + parcel.w - 1) road.x++;
   const painted = scene.construction.paintTile('path', road.x, road.y).ok;
-  if (map.getObject(tree.x, tree.y)) map.setObject(tree.x, tree.y, 'stump');
+  if (map.getObject(tree.x, tree.y)) map.setObject(tree.x, tree.y, null); // (34.3) kesilen ağaç kalıntı bırakmaz
   const res = scene.construction.placeSite('flowerBed', free.x, free.y);
   if (res.ok) {
     const job = scene.jobs.jobs.find((j) => j.buildingId === res.building.id);
@@ -114,7 +114,7 @@ const out = await page.evaluate(async () => {
   const bed2 = game.state.buildings.find((b) => b.type === 'flowerBed' && b.tileX === free.x && b.tileY === free.y);
   check('yükleme: parsel açık', game.state.parcels.includes(parcel.id) && m2.isOpen(free.x, free.y));
   check('yükleme: yol aynı yerde', painted && m2.get(road.x, road.y) === 'path' && before.road === 'path', JSON.stringify(road));
-  check('yükleme: kesilen ağaç aynı yerde', m2.getObject(tree.x, tree.y) === before.tree && before.tree !== 'oak' && before.tree !== 'pine', `${before.tree}`);
+  check('yükleme: kesilen ağaç aynı yerde (boş karo)', m2.getObject(tree.x, tree.y) === before.tree && before.tree === null, `${before.tree}`);
   check('yükleme: yapı aynı yerde', Boolean(bed2) && m2.getOccupant(free.x, free.y) === bed2.id, JSON.stringify(before.bed));
   sim.step(225);
   check('yüklemeden sonra bir saat sorunsuz', game.state.characters.length > 0);
@@ -136,7 +136,7 @@ for (const name of ['save-v41.json', 'save-v41-asama32.json', 'save-v8.json', 's
     let wrong = 0;
     for (const [x, y, t, v, o] of expected) {
       const i = map.index(x, y);
-      if (map.tiles[i] !== t || map.variants[i] !== v || map.objects[i] !== o) wrong++;
+      if (map.tiles[i] !== t || map.variants[i] !== v || map.objects[i] !== (o === 5 ? 0 : o)) wrong++; // (34.3) eski kayıttaki kütük (5) açılışta temizlenir
     }
     const src = JSON.parse(raw);
     const moved = src.buildings.filter((b) => !game.state.buildings.some((n) => n.id === b.id && n.tileX === b.tileX && n.tileY === b.tileY)).length;
@@ -158,7 +158,7 @@ for (const name of ['save-v41.json', 'save-v41-asama32.json', 'save-v8.json', 's
     game.events.emit('ui:load');
     const map = game.scenes.current.map;
     const src = JSON.parse(raw);
-    const wrong = src.terrain.filter(([x, y, t, v, o]) => map.get(x, y) === null || map.tiles[map.index(x, y)] !== t || map.variants[map.index(x, y)] !== v || map.objects[map.index(x, y)] !== o).length;
+    const wrong = src.terrain.filter(([x, y, t, v, o]) => map.get(x, y) === null || map.tiles[map.index(x, y)] !== t || map.variants[map.index(x, y)] !== v || map.objects[map.index(x, y)] !== (o === 5 ? 0 : o)).length;
     const lockedBuild = game.state.buildings.filter((b) => !map.isOpen(b.tileX, b.tileY)).length;
     return { wrong, lockedBuild, parcels: [...game.state.parcels], neg: src.terrain.filter((c) => c[0] < 0 || c[1] < 0).length };
   }, raw);

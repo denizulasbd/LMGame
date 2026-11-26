@@ -31,6 +31,8 @@ haritayı verir, ama sakinler (ad, görünüş, kişilik) her yeni kasabada rast
 |---|---|
 | Sol tık (karakterin / yapının üstüne) | Sakini ya da yapıyı (harabe dahil) seç, bilgi panelini aç |
 | (34.2) Kilitli (soluk) toprağın üstüne gel / tıkla | Üstüne gelince parsel çerçevesi vurgulanır ve ipucu çıkar (ad, boyut, içerik, fiyat, nüfus kotası); tıklayınca parsel kartı: fiyatın dökümü ve **Satın Al**. Alınamıyorsa düğme pasiftir ve nedeni yazılıdır (komşu toprak, kasaba seviyesi, altın). Her parsel nüfus kotası ekler: Hud'da nüfus çipinin ipucu göç sınırının dökümünü gösterir |
+| (34.3) Yapı seçiliyken ağaçlı / kayalı yere gel | Karolar turuncu işaretlenir, altta "Önce 3 ağaç ve 1 kaya temizlenecek (+24 odun, +9 taş)" yazar; tıklayınca şantiye kurulur, içindeki ağaç ve kayalar için öncelikli toplama işleri açılır, alan temizlenince inşaat başlar (şantiye iptalinde işler de iptal) |
+| (34.3) Yapı seçiliyken yol (patika, parke, taş plaka) üstüne gel / tıkla | Yol karoları mavi işaretlenir, "2 yol karosu sökülecek" yazar; ilk tıklama işaretler, 4 sn içinde ikinci tıklama onaylar (iade yıkımdaki gibi %50). Meydan ve köprü sökülmez; yapının ya da başka bir yapının yolunu kesen söküm reddedilir |
 | Yapı panelinde bir isme tık | O sakini seç ve kamerayı ona kaydır |
 | İnşa Et → **Yol & Zemin** fırçasıyla sürükle | Patika / parke / taş plaka kesintisiz çizilir; virajlar ve kavşaklar kendiliğinden köşelenir |
 | İnşa Et → çit, saksı ya da fidanla sürükle | Art arda dikilir |
@@ -268,7 +270,7 @@ LMGame/
     │   ├── JobSystem.js    İş kuyruğu: toplama ve inşaat emirleri, kime hangi iş, tamamlanma
     │   ├── ConstructionSystem.js Yerleşim kontrolü, şantiye, yol/köprü döşeme, yıkım; yükseltme ve
     │   │                   harabe onarımı (proje başlat / iptal / tamamla, erzak hazinesi)
-    │   ├── NatureSystem.js Kesilen ağaç: kütük → fidan → ağaç
+    │   ├── NatureSystem.js Fidan → ağaç (34.3: kütük yok; eski kayıtta kütük temizliği). ForestSystem.js orman yenilenmesi, ClearingSystem.js alan açma
     │   ├── PopulationSystem.js Göçmen üretir, boş eve yerleştirir ve harita kenarından yürütür
     │   ├── EventSystem.js  Dinamik olaylar: göç koşulları, gezgin tüccar ve takas, akşam şenliği
     │   ├── TownStatus.js   Saf hesaplar: refah (anıt ve gözetleme kulesi bonusu dahil), konut kapasitesi,
@@ -402,7 +404,7 @@ hayvancılık ve kasaba seviyesi*); onların da depo kapasitesi aynıdır.
 (08:00–17:00) acil ihtiyaçları yoksa kendileri iş seçer:
 
 1. Şantiyeler (aynı anda en fazla 2 inşaatçı, ilerledikçe iskele yükselir)
-2. Toplama emirleri (ağaç → odun + kütük, kaya → taş, böğürtlen → yiyecek)
+2. Toplama emirleri (ağaç → odun, kaya → 9 taş; kalıntı kalmaz (34.3), böğürtlen → yiyecek)
 3. Üretim binalarındaki boş yer (Oduncu Kulübesi, Sebze Bahçesi)
 
 Yükseltme ve harabe onarımı da birer inşaat işidir (1. sırada): inşaatçılar yapının çevresinde çalışır.
@@ -425,7 +427,7 @@ doludur. Boş yatak olduğu hâlde göçmen gelmezse nedeni bildirim ve günlük
 9. aşamadan beri evli çiftlerin evlerindeki boş yataklar çocuklara ayrılır: göçmenler oraya yerleşmez
 (bkz. *Aile, drama ve zanaat*).
 
-**Doğa:** Kesilen ağacın yerinde kütük kalır; 24 saat sonra fidan, 36 saat sonra yeniden ağaç olur.
+**Doğa:** (34.3) Kesilen ağaç ve kırılan kaya kalıntı (kütük, çakıl) bırakmaz; karo boşalır. Orman kendiliğinden yenilenir: açık alandaki ağaç sayısı başlangıçtakinin %70'inin altına inerse günde 4, %100'ün altındaysa günde 1 fidan, kasabadan (yapı, yol, meydan) en az 4 karo uzakta ve var olan ağaçların yanında çıkar; fidan 36 saatte ağaç olur.
 
 ## Kayıt ve yükleme
 
@@ -4612,6 +4614,7 @@ geçer); `--all` bütün fikstürleri koşar (29.10'da ve elle). Aşama notları
 | Harita boyutu | `config.js` → `MAP_WIDTH`, `MAP_HEIGHT` (çekirdek; yalnızca yeni oyunlar; kayıt kendi boyutunu saklar) |
 | (34.1) Genişleyen harita: halka kalınlığı, parsel boyu, parsel içeriği, kilitli alan görünümü | `data/parcels.js` (+ bölünme `world/Parcels.js`, içerik `world/Expansion.js`; tasarım `docs/design/34-harita.md`) |
 | (34.2) Parsel fiyatı, nüfus kotası, seviye kapısı, en çok nüfus (60), parsel adları ve metinleri | `data/parcels.js` → `PARCEL_MARKET`, `PARCEL_NAMES`, `PARCEL_TEXT` (+ saf hesap `systems/ParcelMarket.js`, satın alma `systems/ParcelSystem.js`, kart `ui/components/ParcelCard.js`) |
+| (34.3) Orman yenilenmesi (en az uzaklık, oran eşikleri, günlük fidan), alan açma / yol söküm yazıları | `data/forest.js`, `data/clearing.js`; kaya verimi `data/tiles.js` → `ROCK_STONE`, `PEBBLE_STONE` (+ saf hesaplar `systems/Forest.js`, `systems/Clearing.js`) |
 | Yeni biyom ya da biyom bonusu | `data/tiles.js` (`biome.buildingBonus`, `GROUND_TILES`) + `art/tiles/index.js` + `world/WorldGenerator.js` → `paintBiomes` |
 | Yükseltme maliyeti / etkileri | `data/buildings.js` → ilgili yapının `upgrade` alanı (+ görsel `art/sprites/structuresTier2.js`) |
 | Yeni harabe | `data/buildings.js` (`ruin` alanı, `RUIN_TYPES`) + `art/sprites/structuresTier2.js` |
