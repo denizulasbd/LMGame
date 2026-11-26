@@ -26,6 +26,8 @@
 import { BUILDINGS, TILE_BUILDS, buildTabFor } from '../data/buildings.js';
 import { OBJECT_TYPES } from '../data/tiles.js';
 import { formatCost } from '../data/resources.js';
+import { CLEARING_TEXT, ROAD_CONFIRM_MS } from '../data/clearing.js';
+import { clearingNote } from '../systems/Clearing.js';
 import { biomeBonus, biomeFor } from '../systems/StructureSystem.js';
 import { drawAreaCursor } from '../rendering/TileCursor.js';
 import { getStructureSprite } from '../art/sprites/index.js';
@@ -38,6 +40,7 @@ import { drawHintLabel, wrapText, DANGER_COLOR } from '../rendering/MapLabels.js
 
 const GHOST_ALPHA = 0.6;
 const T = CONFIG.TILE_SIZE;
+const ROAD_COLOR = 'rgba(70, 150, 240, 0.5)'; // (34.3) sökülecek yol karosu
 const CLEAR_COLOR = 'rgba(240, 160, 40, 0.5)'; // (34.3) temizlenecek ağaç / kaya
 const SCAN_BUDGET = 24; // kare başına en çok bu kadar checkPlacement (boyama taraması)
 const NEAREST_RADIUS = 60; // "uygun yer yok" okunun arayacağı en büyük halka (karo)
@@ -72,6 +75,7 @@ export class ToolController {
     this.previewCache = null;
     this.paint = { key: '', results: new Map(), queue: [], queueAt: 0, rect: null, visibleOk: 0, complete: false, blocked: false, nearest: undefined, searching: null };
     this.demolishArm = null; // (30.1) { id, until } yıkım onayı bekleyen yapı
+    this.roadArm = null; // (34.3) { key, until } yol sökümü onayı bekleyen yerleşim
     this.wrapCache = new Map();
     this.checks = 0; // (30.1) sayaç: yapılan checkPlacement çağrıları (test ve ölçüm için)
     this.view = null;
@@ -99,6 +103,7 @@ export class ToolController {
     // (30.1) Listeden bir yapı seçmek listeyi şeride indirir; aracı düğmeyle / B ile açmak listeyi açar
     this.listOpen = !(tool === 'build' && buildType);
     this.demolishArm = null;
+    this.roadArm = null;
     this.preview = { ok: false, text: '' };
     this.previewKey = '';
     this.emitChanged();
@@ -168,7 +173,15 @@ export class ToolController {
   beginStroke(tile) {
     if (this.tool === 'build' && !this.isTileBuild() && !this.isBrushBuild()) {
       const anchor = this.construction.anchorFor(this.buildType, tile.tileX, tile.tileY);
-      const result = this.construction.placeSite(this.buildType, anchor.x, anchor.y);
+      // (34.3) Yol üstüne inşa: ilk tıklama işaretler, 4 sn içinde aynı yere ikinci tıklama sökümü onaylar (31'deki yıkım onayı gibi)
+      const check = this.check(this.buildType, anchor.x, anchor.y);
+      if (check.ok && check.roads.length > 0 && !this.roadArmed(anchor)) {
+        this.roadArm = { key: this.roadKey(anchor), until: performance.now() + ROAD_CONFIRM_MS };
+        this.previewKey = '';
+        return;
+      }
+      this.roadArm = null;
+      const result = this.construction.placeSite(this.buildType, anchor.x, anchor.y, { roads: true });
       if (!result.ok) this.events.emit('toast', { text: result.reason, tone: 'warn', icon: 'demolish' });
       return;
     }
@@ -191,6 +204,16 @@ export class ToolController {
       this.stroke.first = true;
     }
     this.continueStroke(tile);
+  }
+
+  roadKey(anchor) {
+    return `${this.buildType}|${anchor.x},${anchor.y}`;
+  }
+
+  /** (34.3) Bu yerleşim için yol söküm onayı işaretlendi mi (süresi dolmadan)? */
+  roadArmed(anchor) {
+    const arm = this.roadArm;
+    return Boolean(arm && arm.key === this.roadKey(anchor) && performance.now() <= arm.until);
   }
 
   /** Fare bir karodan uzaktaki karoya sıçrasa da aradaki karolar sırayla işlenir (4 yönlü bağlı çizgi). */
@@ -305,7 +328,7 @@ export class ToolController {
       // (30.1) Yapı yerleştirme önizlemesi pahalıdır (ulaşılabilirlik taraması): yalnızca fare karosu, yapı türü, harita sürümü ya da
       // karşılanabilirlik değişince hesaplanır; durağan fareyle kare başına checkPlacement çağrılmaz
       const tile = this.hovered;
-      const key = `${this.buildType}|${tile ? `${tile.tileX},${tile.tileY}` : '-'}|${this.version}|${this.affordable()}`;
+      const key = `${this.buildType}|${tile ? `${tile.tileX},${tile.tileY}` : '-'}|${this.version}|${this.affordable()}|${this.roadArm ? 1 : 0}`;
       if (key !== this.previewKey || !this.previewCache) {
         this.previewKey = key;
         this.previewCache = this.computePreview();
@@ -317,6 +340,10 @@ export class ToolController {
       this.previewCache = null;
     }
     if (this.demolishArm && performance.now() > this.demolishArm.until) this.demolishArm = null;
+    if (this.roadArm && performance.now() > this.roadArm.until) {
+      this.roadArm = null;
+      this.previewKey = '';
+    }
     if (next.ok !== this.preview.ok || next.text !== this.preview.text) {
       this.preview = next;
       this.events.emit('tool:preview', next);
@@ -337,7 +364,7 @@ export class ToolController {
   /** Sayaçlı checkPlacement: boyama taramasının ve önizlemenin tek giriş noktası. */
   check(type, x, y) {
     this.checks++;
-    return this.construction.checkPlacement(type, x, y);
+    return this.construction.checkPlacement(type, x, y, { roads: true }); // (34.3) oyuncu yol üstüne de kurabilir (onayla)
   }
 
   // ---------------------------------------------------------------------------
@@ -489,12 +516,16 @@ export class ToolController {
       const beauty = value ? ` · Çevre estetiği +${value}${level ? ` (burası: ${level})` : ''}` : '';
       const how = this.isBrushBuild() ? 'tıkla ya da sürükleyerek diz' : 'tıkla ve kur';
       // (34.3) Ağaç ve kaya olan yere kurulabilir: işaretli karolar ve "Önce 3 ağaç ve 1 kaya temizlenecek (+24 odun, +9 taş)" notu
-      const note = check.ok ? check.note : '';
+      // (34.3) Yol üstüne inşa: "2 yol karosu sökülecek"; işaretlenmişse "onaylamak için yeniden tıkla"
+      const armed = check.ok && check.roads.length > 0 && this.roadArmed(anchor);
+      const note = !check.ok ? '' : armed ? [clearingNote(check.clears), CLEARING_TEXT.roadsConfirm(check.roads.length)].filter(Boolean).join(' · ') : check.note;
       return {
         ok: check.ok,
         text: check.ok ? `${def.name} · ${formatCost(def.cost)}${biome}${beauty}${note ? ` · ${note}` : ''} · ${how}` : check.reason,
         note,
         clears: check.ok ? check.clears.tiles : null,
+        roads: check.ok ? check.roads : null,
+        armed,
         anchor,
         doors: check.doors,
         orientation: check.orientation,
@@ -557,6 +588,15 @@ export class ToolController {
       }
       // (34.3) Temizlenecek ağaç ve kayalar farklı renkle işaretlenir
       for (const t of this.preview.clears ?? []) renderer.fillRect(t.x * T, t.y * T, T, T, CLEAR_COLOR);
+      for (const t of this.preview.roads ?? []) renderer.fillRect(t.x * T, t.y * T, T, T, ROAD_COLOR);
+      if (this.preview.armed) {
+        const x = anchor.x * T;
+        const y = anchor.y * T;
+        renderer.fillRect(x - 2, y - 2, def.size.w * T + 4, 2, DANGER_COLOR);
+        renderer.fillRect(x - 2, y + def.size.h * T, def.size.w * T + 4, 2, DANGER_COLOR);
+        renderer.fillRect(x - 2, y, 2, def.size.h * T, DANGER_COLOR);
+        renderer.fillRect(x + def.size.w * T, y, 2, def.size.h * T, DANGER_COLOR);
+      }
       if (camera) this.renderBuildLabel(renderer, camera, anchor, def.size);
       return;
     }

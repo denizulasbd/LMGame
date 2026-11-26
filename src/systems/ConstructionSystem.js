@@ -25,6 +25,7 @@ import { itemCount } from './Exploration.js';
 import { DECOR_TYPES } from '../data/townDecor.js';
 import { royalGranted } from './Renown.js';
 import { engineOn } from './Engines.js';
+import { genitive } from '../utils/turkish.js';
 import { PARCEL_TEXT } from '../data/parcels.js';
 import { CLEARING_TEXT } from '../data/clearing.js';
 import { clearingInfo, clearingNote } from './Clearing.js';
@@ -105,7 +106,7 @@ export class ConstructionSystem {
    * Bir yapının (sol üst köşesi tileX, tileY) buraya kurulup kurulamayacağı.
    * Dönüş: { ok, reason, footprint: [{x,y}], doors: [{x,y}], orientation? }
    */
-  checkPlacement(type, tileX, tileY) {
+  checkPlacement(type, tileX, tileY, { roads: removeRoads = false } = {}) {
     const def = BUILDINGS[type];
     const map = this.world.map;
     const allowed = def.allowedTiles ?? GROUND_TILES;
@@ -113,6 +114,7 @@ export class ConstructionSystem {
     // Kasabada tek olabilen yapı, kasaba seviyesi, nüfus, Altın Çağ, Kraliyet Beratı, ganimet: konumdan bağımsız nedenler önce söylenir
     let reason = this.globalBlock(type);
     let orientation = 'right';
+    const roads = []; // (34.3) üstüne kurulursa sökülecek yol karoları (yalnızca removeRoads: oyuncunun yerleşim aracı)
 
     for (let y = tileY; y < tileY + def.size.h; y++) {
       for (let x = tileX; x < tileX + def.size.w; x++) {
@@ -121,8 +123,9 @@ export class ConstructionSystem {
         if (!map.inBounds(x, y)) reason = 'Harita dışına taşıyor';
         else if (!map.isOpen(x, y)) reason = LOCKED_REASON; // (34.1)
         else if (map.getOccupant(x, y) !== 0) reason = 'Başka bir yapının üstüne kurulamaz';
-        else if (!allowed.includes(map.get(x, y))) reason = `${TILE_TYPES[map.get(x, y)].name} üzerine kurulamaz`;
+        else if (!allowed.includes(map.get(x, y)) && !(removeRoads && this.removableRoad(def, x, y))) reason = `${TILE_TYPES[map.get(x, y)].name} üzerine kurulamaz`;
         else {
+          if (!allowed.includes(map.get(x, y))) roads.push({ x, y }); // (34.3) yol üstüne inşa: onaylanınca sökülür
           // (34.3) Ağaç ve kaya engel değil: şantiye kurulur, içindekiler öncelikli toplanır. Fırçayla dizilen süslerde eski kural sürer.
           const object = map.getObject(x, y);
           if (object && !OBJECT_TYPES[object].clearable && (def.brush || !this.world.hasHarvestable(x, y))) reason = `Önce ${OBJECT_TYPES[object].name.toLowerCase()} temizlenmeli`;
@@ -177,6 +180,7 @@ export class ConstructionSystem {
     if (!reason && def.doorTiles && !doors.every((d) => approachable(d.x, d.y))) {
       reason = 'Kapının önü yola bağlı ve açık olmalı';
     }
+    const roadCut = (name) => (roads.length > 0 ? CLEARING_TEXT.roadCutDoor(genitive(name)) : null);
     // Şantiyede herkes yapının çevresinde çalıştığı için çevresine ulaşılabilmesi her yapıda şarttır
     if (!reason && !def.doorTiles && !doors.some((d) => approachable(d.x, d.y))) {
       reason = def.spots === 'front' ? 'Önü açık ve yola bağlı olmalı' : def.spots === 'pier' ? 'Kıyıya ulaşılamıyor' : 'Çevresine ulaşılamıyor';
@@ -188,12 +192,12 @@ export class ConstructionSystem {
         (b) => hasAccessRule(BUILDINGS[b.type]) &&
           accessTiles(b.type, b.tileX, b.tileY, b.orientation).some((t) => covered.has(`${t.x},${t.y}`))
       );
-      if (blocked) reason = `${blocked.name} girişinin önüne kurulamaz`;
+      if (blocked) reason = roadCut(blocked.name) ?? `${blocked.name} girişinin önüne kurulamaz`;
     }
     // Başka bir yapıyı (ve onun önündeki yolu) kasabadan tamamen koparıp kapalı bir cepte bırakmasın
     if (!reason) {
       const isolated = this.world.wouldIsolate(footprint, reachableAfter());
-      if (isolated) reason = `${isolated.name} kasabadan kopar: aradaki geçidi kapatma`;
+      if (isolated) reason = roadCut(isolated.name) ?? `${isolated.name} kasabadan kopar: aradaki geçidi kapatma`;
     }
     // (29.2b) Yakındaki bir şantiyenin ya da iş yerinin SON açık çalışma karosunu kapatmasın (iş sonsuza dek beklemesin)
     if (!reason && !def.walkable) {
@@ -203,7 +207,21 @@ export class ConstructionSystem {
     if (!reason && !this.economy.canAfford(def.cost)) {
       reason = this.economy.shortfall(def.cost);
     }
-    return { ok: !reason, reason, footprint, doors, orientation, clears, note: reason ? '' : clearingNote(clears) };
+    const note = reason ? '' : [clearingNote(clears), roads.length ? CLEARING_TEXT.roads(roads.length) : ''].filter(Boolean).join(' · ');
+    return { ok: !reason, reason, footprint, doors, orientation, clears, roads: reason ? [] : roads, note };
+  }
+
+  /**
+   * (34.3) Bu karodaki yol yeni yapının altında sökülebilir mi? Toprak patika, parke ve taş plaka (sökülebilenler: tileAfterRemoval)
+   * sökülür; köprü ve meydan (haritanın merkez plazası) sökülmez. Yalnızca zemin kısıtı olmayan, fırçasız yapılar yol üstüne kurulur.
+   */
+  removableRoad(def, x, y) {
+    if (def.allowedTiles || def.brush) return false;
+    const tile = this.world.map.get(x, y);
+    if (tile !== 'path' && tile !== 'cobble' && tile !== 'plaza') return false;
+    const { plaza } = this.world.landmarks;
+    if (plaza && x >= plaza.x && x < plaza.x + plaza.w && y >= plaza.y && y < plaza.y + plaza.h) return false;
+    return this.tileAfterRemoval(x, y) !== null;
   }
 
   /**
@@ -290,11 +308,20 @@ export class ConstructionSystem {
   }
 
   /** Şantiye kurar. quiet: (18. aşama fırçası) bildirim çıkmaz. Dönüş: { ok, reason, building } */
-  placeSite(type, tileX, tileY, { quiet = false } = {}) {
-    const check = this.checkPlacement(type, tileX, tileY);
+  placeSite(type, tileX, tileY, { quiet = false, roads = false } = {}) {
+    const check = this.checkPlacement(type, tileX, tileY, { roads });
     if (!check.ok) return check;
     const def = BUILDINGS[type];
     this.economy.spend(def.cost);
+    // (34.3) Yol üstüne inşa: alttaki yol karoları sökülür, iade yıkımdaki oranla (küsurat birikir)
+    const refund = {};
+    for (const { x, y } of check.roads) {
+      const tile = this.world.map.get(x, y);
+      const removed = this.tileAfterRemoval(x, y);
+      for (const [r, v] of Object.entries(this.refundFractional(this.tileRefund(x, y)))) refund[r] = (refund[r] ?? 0) + v;
+      this.world.map.set(x, y, removed);
+      this.events.emit('terrain:painted', { x, y, type: null, tile: removed, removed: tile });
+    }
     if (def.item) this.world.state.exploration.items[def.item] -= 1; // (16. aşama) egzotik ganimet harcanır
 
     const cabins = this.world.getBuildingsOfType('cabin').length;
@@ -311,7 +338,11 @@ export class ConstructionSystem {
     this.events.emit('building:placed', { building });
     if (!quiet) this.events.emit('toast', { text: `Şantiye kuruldu: ${def.name} (${formatCost(def.cost)})`, tone: 'info', icon: 'hammer' });
     if (!quiet && cleared > 0) this.events.emit('toast', { text: CLEARING_TEXT.toastClearing(cleared), tone: 'info', icon: 'axe' });
-    return { ok: true, building, cleared };
+    if (!quiet && check.roads.length > 0) {
+      const back = Object.keys(refund).length ? ` (iade: ${formatCost(refund)})` : '';
+      this.events.emit('toast', { text: `${CLEARING_TEXT.toastRoads(check.roads.length)}${back}`, tone: 'info', icon: 'demolish' });
+    }
+    return { ok: true, building, cleared, roads: check.roads.length, refund };
   }
 
   /** Kasabada henüz kullanılmayan ilk sokak adı (hepsi kullanıldıysa numaralı). */
