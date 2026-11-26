@@ -90,6 +90,9 @@
 //                  Aşama 32'nin bütün durumu: Adalet Sarayı, Darülfünun, üç hobi evi, üç Kraliyet Lütfu yapısı; açık dava, süren kamu hizmeti,
 //                  uzaklaştırma, utanç, tamamlanmış ve yürüyen sürgün, süren ders, süren kulüp buluşması ve telafi buluşması, mezun, itibar.
 //                  Göç yok (sürüm 41): alan alan gidiş-dönüş denetimi (yükle → anlık görüntü → aynı alanlar) ve bir gün sonra tutarlılık
+//   save-v42.json: 34.1'in oyunu (kayıt sürümü 42, bugünkü): save-v41.json yüklenip iki parsel açıldı (r1n1, r1w0), açılan parselde yol,
+//                  kütükler ve bir çiçek tarhı. Arazi farkları dünya koordinatıyla (eksi koordinatlı hücreler). Eski kayıtlarda (sürüm 2-41)
+//                  indeksli hücreler çekirdek genişliğiyle koordinata çevrilir, parsel açılmamıştır
 // Kullanım: node tools/sim/compat.mjs
 import fs from 'fs';
 import { openGame, createChecks, capOutput } from './lib.mjs';
@@ -100,7 +103,7 @@ capOutput('compat');
 // Göç zinciri (SaveManager.migrate) bağımsız `if (version < N)` adımlarının sırayla her yüklemede uygulanmasıdır: örneklenen eski
 // kayıt yine bütün sonraki göç adımlarından geçer. Sürüme özgü kontroller yalnızca o fikstür koşulunca eklenir; toplam sayı ona göre değişir.
 const SAMPLE = [2, 6, 10, 14, 18, 22, 26, 30, 33, 36];
-const ALL_VERSIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41];
+const ALL_VERSIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42];
 const latest = ALL_VERSIONS.slice(-3);
 const wanted = process.argv.includes('--sample') && !process.argv.includes('--all') ? new Set([...SAMPLE, ...latest]) : null;
 const fixtures = ALL_VERSIONS.filter((v) => !wanted || wanted.has(v)).map((v) => `save-v${v}.json`).filter((name) => fs.existsSync(new URL(`./fixtures/${name}`, import.meta.url))).map((name) => ({
