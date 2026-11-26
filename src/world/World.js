@@ -232,14 +232,38 @@ export class World {
     }
   }
 
-  /** Haritaya yapı ekler ve kapladığı karoları doldurur (üzerindeki çakıl/kütük temizlenir). */
+  /**
+   * (34.3) Şantiye alan açılırken (ayak izinde hâlâ ağaç / kaya var, ya da temizlenip yapıya kapanmayı bekliyor) içinden geçilebilir:
+   * toplayıcılar iç karolardaki ağaçlara ulaşabilsin. Yapı bittikten sonra ClearingSystem karoları kapatır.
+   */
+  isClearing(building) {
+    if (!building.underConstruction || BUILDINGS[building.type].walkable) return false;
+    const { w, h } = BUILDINGS[building.type].size;
+    for (let y = building.tileY; y < building.tileY + h; y++) {
+      for (let x = building.tileX; x < building.tileX + w; x++) {
+        if (this.map.passable[this.map.index(x, y)] === 1 || this.hasHarvestable(x, y)) return true;
+      }
+    }
+    return false;
+  }
+
+  /** Karoda ağaç ya da kaya var mı (çakıl, fidan, kütük sayılmaz: onları inşaat kendiliğinden siler)? */
+  hasHarvestable(x, y) {
+    const object = this.map.getObject(x, y);
+    return object === 'oak' || object === 'pine' || object === 'rock';
+  }
+
+  /** Haritaya yapı ekler ve kapladığı karoları doldurur (üzerindeki çakıl / fidan / kütük temizlenir; ağaç ve kaya toplanana kadar durur). */
   addBuilding(building) {
     const { w, h } = BUILDINGS[building.type].size;
-    const passable = Boolean(BUILDINGS[building.type].walkable);
+    let passable = Boolean(BUILDINGS[building.type].walkable);
+    if (!passable && building.underConstruction) {
+      for (let y = building.tileY; y < building.tileY + h; y++) for (let x = building.tileX; x < building.tileX + w; x++) passable ||= this.hasHarvestable(x, y);
+    }
     for (let y = building.tileY; y < building.tileY + h; y++) {
       for (let x = building.tileX; x < building.tileX + w; x++) {
         this.map.setOccupant(x, y, building.id, passable);
-        this.map.setObject(x, y, null);
+        if (!this.hasHarvestable(x, y)) this.map.setObject(x, y, null);
       }
     }
     this.buildings.push(building);

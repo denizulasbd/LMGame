@@ -38,6 +38,7 @@ import { drawHintLabel, wrapText, DANGER_COLOR } from '../rendering/MapLabels.js
 
 const GHOST_ALPHA = 0.6;
 const T = CONFIG.TILE_SIZE;
+const CLEAR_COLOR = 'rgba(240, 160, 40, 0.5)'; // (34.3) temizlenecek ağaç / kaya
 const SCAN_BUDGET = 24; // kare başına en çok bu kadar checkPlacement (boyama taraması)
 const NEAREST_RADIUS = 60; // "uygun yer yok" okunun arayacağı en büyük halka (karo)
 const CONFIRM_MS = 4000; // yıkım onayı süresi
@@ -172,7 +173,8 @@ export class ToolController {
       return;
     }
     let mode = 'add';
-    if (this.tool === 'harvest' && this.jobs.jobAt(tile.tileX, tile.tileY)) mode = 'remove';
+    const marked = this.tool === 'harvest' ? this.jobs.jobAt(tile.tileX, tile.tileY) : null;
+    if (marked && marked.type !== 'build') mode = 'remove';
     // (30.6) Topla: sürüklemenin ilk karosundaki tür (ağaç / kaya / çalı) belirler; karışık alanda ötekiler işaretlenmez
     const kind = this.tool === 'harvest' && mode === 'add' ? this.jobs.harvestKind(tile.tileX, tile.tileY) : null;
     this.stroke = { kind, mode, visited: new Set(), changed: false, failure: null, last: null, placed: 0, removed: { tiles: 0, buildings: 0, names: [] }, refund: {} };
@@ -219,7 +221,7 @@ export class ToolController {
     } else if (this.tool === 'harvest') {
       const job = this.jobs.jobAt(x, y);
       if (this.stroke.mode === 'remove' && job && job.type !== 'build') this.jobs.cancel(job);
-      if (this.stroke.mode === 'add' && !job && (!this.stroke.kind || this.jobs.harvestKind(x, y) === this.stroke.kind)) this.jobs.designate(x, y);
+      if (this.stroke.mode === 'add' && (!job || job.type === 'build') && (!this.stroke.kind || this.jobs.harvestKind(x, y) === this.stroke.kind)) this.jobs.designate(x, y);
     } else if (this.tool === 'demolish') {
       this.demolishTile(x, y);
     }
@@ -486,9 +488,13 @@ export class ToolController {
       const level = aestheticLevel(here);
       const beauty = value ? ` · Çevre estetiği +${value}${level ? ` (burası: ${level})` : ''}` : '';
       const how = this.isBrushBuild() ? 'tıkla ya da sürükleyerek diz' : 'tıkla ve kur';
+      // (34.3) Ağaç ve kaya olan yere kurulabilir: işaretli karolar ve "Önce 3 ağaç ve 1 kaya temizlenecek (+24 odun, +9 taş)" notu
+      const note = check.ok ? check.note : '';
       return {
         ok: check.ok,
-        text: check.ok ? `${def.name} · ${formatCost(def.cost)}${biome}${beauty} · ${how}` : check.reason,
+        text: check.ok ? `${def.name} · ${formatCost(def.cost)}${biome}${beauty}${note ? ` · ${note}` : ''} · ${how}` : check.reason,
+        note,
+        clears: check.ok ? check.clears.tiles : null,
         anchor,
         doors: check.doors,
         orientation: check.orientation,
@@ -549,6 +555,8 @@ export class ToolController {
       for (const door of this.preview.doors ?? []) {
         renderer.fillRect(door.x * T + 4, door.y * T + 4, T - 8, T - 8, ok ? 'rgba(255, 243, 176, 0.45)' : 'rgba(232, 70, 60, 0.4)');
       }
+      // (34.3) Temizlenecek ağaç ve kayalar farklı renkle işaretlenir
+      for (const t of this.preview.clears ?? []) renderer.fillRect(t.x * T, t.y * T, T, T, CLEAR_COLOR);
       if (camera) this.renderBuildLabel(renderer, camera, anchor, def.size);
       return;
     }
@@ -604,6 +612,10 @@ export class ToolController {
     if (!this.preview.ok && this.preview.text) {
       this.drawLabel(renderer, camera, this.preview.text, anchor.x, anchor.y, size.w, size.h, 'bad');
       dy = this.wrapCache.get(this.preview.text).lines.length * 15 + 14;
+    }
+    if (this.preview.ok && this.preview.note) {
+      this.drawLabel(renderer, camera, this.preview.note, anchor.x, anchor.y, size.w, size.h, 'info', null, dy);
+      dy += this.wrapCache.get(this.preview.note).lines.length * 15 + 14;
     }
     if (this.paintActive() && !p.blocked && p.complete && p.visibleOk === 0) {
       const tile = this.hovered;

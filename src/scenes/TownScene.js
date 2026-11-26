@@ -33,6 +33,7 @@ import { StructureSystem } from '../systems/StructureSystem.js';
 import { EconomySystem } from '../systems/EconomySystem.js';
 import { JobSystem } from '../systems/JobSystem.js';
 import { ConstructionSystem } from '../systems/ConstructionSystem.js';
+import { ClearingSystem } from '../systems/ClearingSystem.js';
 import { ForestSystem } from '../systems/ForestSystem.js';
 import { FOREST_SEED_OFFSET } from '../data/forest.js';
 import { NatureSystem, purgeStumps } from '../systems/NatureSystem.js';
@@ -199,6 +200,7 @@ export class TownScene extends Scene {
       baseTileAt: (x, y) => TILE_BY_ID[this.baseTerrain.tiles[map.index(x, y)]] ?? null,
     });
     this.nature = new NatureSystem(this.game, this.world);
+    this.clearing = new ClearingSystem(this.game, this.world, this.jobs); // (34.3) ağaç / kaya olan yere kurulan şantiyenin alan açması
     // (34.3) Orman kendiliğinden yenilenir (gün dönümü); başlangıç ağaç sayısı haritanın üretildiği hâlinden gelir
     this.forest = new ForestSystem(this.game, this.world, new Random(life + FOREST_SEED_OFFSET), { baseObjects: () => this.baseTerrain.objects });
     this.population = new PopulationSystem(this.game, this.world, new Random(life + 3));
@@ -358,6 +360,7 @@ export class TownScene extends Scene {
       this.dilemmas,
       this.expeditions,
       this.nature,
+      this.clearing,
       this.tradePost,
       this.lifeStages,
       this.temperament,
@@ -378,6 +381,7 @@ export class TownScene extends Scene {
       this.construction,
       this.nature,
       this.forest,
+      this.clearing,
       this.population,
       this.behavior,
       this.tools,
@@ -566,8 +570,18 @@ export class TownScene extends Scene {
   /** Kayıttan gelen yapının kapladığı karoları haritada işaretler. */
   occupyFootprint(building) {
     const { w, h } = BUILDINGS[building.type].size;
+    // (34.3) Ağaç / kaya temizlenen şantiyenin karoları açık alan temizlenene kadar geçilebilir kalır (World.addBuilding ile aynı kural)
+    let passable = Boolean(BUILDINGS[building.type].walkable);
+    if (!passable && building.underConstruction) {
+      for (let y = building.tileY; y < building.tileY + h; y++) {
+        for (let x = building.tileX; x < building.tileX + w; x++) {
+          const object = this.map.getObject(x, y);
+          passable ||= object === 'oak' || object === 'pine' || object === 'rock';
+        }
+      }
+    }
     for (let y = building.tileY; y < building.tileY + h; y++) {
-      for (let x = building.tileX; x < building.tileX + w; x++) this.map.setOccupant(x, y, building.id, Boolean(BUILDINGS[building.type].walkable));
+      for (let x = building.tileX; x < building.tileX + w; x++) this.map.setOccupant(x, y, building.id, passable);
     }
   }
 

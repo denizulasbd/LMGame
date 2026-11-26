@@ -26,6 +26,8 @@ import { DECOR_TYPES } from '../data/townDecor.js';
 import { royalGranted } from './Renown.js';
 import { engineOn } from './Engines.js';
 import { PARCEL_TEXT } from '../data/parcels.js';
+import { CLEARING_TEXT } from '../data/clearing.js';
+import { clearingInfo, clearingNote } from './Clearing.js';
 
 const DEMOLISH_REFUND = 0.5;
 const LOCKED_REASON = PARCEL_TEXT.locked; // (34.1) kilitli parsel
@@ -121,14 +123,16 @@ export class ConstructionSystem {
         else if (map.getOccupant(x, y) !== 0) reason = 'Başka bir yapının üstüne kurulamaz';
         else if (!allowed.includes(map.get(x, y))) reason = `${TILE_TYPES[map.get(x, y)].name} üzerine kurulamaz`;
         else {
+          // (34.3) Ağaç ve kaya engel değil: şantiye kurulur, içindekiler öncelikli toplanır. Fırçayla dizilen süslerde eski kural sürer.
           const object = map.getObject(x, y);
-          if (object && !OBJECT_TYPES[object].clearable) reason = `Önce ${OBJECT_TYPES[object].name.toLowerCase()} temizlenmeli`;
+          if (object && !OBJECT_TYPES[object].clearable && (def.brush || !this.world.hasHarvestable(x, y))) reason = `Önce ${OBJECT_TYPES[object].name.toLowerCase()} temizlenmeli`;
         }
       }
     }
+    const clears = clearingInfo(map, footprint);
 
     // Yakınında kaya gibi doğal nesneler isteyen yapılar (taş ocağı, demir madeni)
-    if (!reason && def.requires) reason = this.checkRequirements(def, tileX, tileY);
+    if (!reason && def.requires) reason = this.checkRequirements(def, tileX, tileY, footprint);
     // Önce başka bir yapı gerektirenler (pazar yeri -> kiler)
     if (!reason && def.requiresBuilding && this.world.getCompleted(def.requiresBuilding.type).length === 0) {
       reason = def.requiresBuilding.reason;
@@ -199,7 +203,7 @@ export class ConstructionSystem {
     if (!reason && !this.economy.canAfford(def.cost)) {
       reason = this.economy.shortfall(def.cost);
     }
-    return { ok: !reason, reason, footprint, doors, orientation };
+    return { ok: !reason, reason, footprint, doors, orientation, clears, note: reason ? '' : clearingNote(clears) };
   }
 
   /**
@@ -229,7 +233,7 @@ export class ConstructionSystem {
    * Yakında yeterince kaya / çakıl var mı? Yoksa gerekçe metni döner. requires.biome verilmişse ayak izinin
    * en az min karosu o biyomdaysa (demir madeni: kayalık tepe) yakında nesne aranmaz.
    */
-  checkRequirements(def, tileX, tileY) {
+  checkRequirements(def, tileX, tileY, footprint = []) {
     const { nearObjects, radius, min, reason, biome } = def.requires;
     if (biome) {
       let tiles = 0;
@@ -241,9 +245,10 @@ export class ConstructionSystem {
     const cx = tileX + Math.floor(def.size.w / 2);
     const cy = tileY + Math.floor(def.size.h / 2);
     let count = 0;
+    const covered = new Set(footprint.map((t) => `${t.x},${t.y}`)); // (34.3) ayak izindeki kayalar alan açılırken yok olur: sayılmaz
     for (let y = cy - radius; y <= cy + radius; y++) {
       for (let x = cx - radius; x <= cx + radius; x++) {
-        if (nearObjects.includes(this.world.map.getObject(x, y))) count++;
+        if (nearObjects.includes(this.world.map.getObject(x, y)) && !covered.has(`${x},${y}`)) count++;
       }
     }
     return count >= min ? null : reason;
@@ -300,10 +305,13 @@ export class ConstructionSystem {
     const building = new Building({ type, tileX, tileY, tone, orientation: check.orientation, underConstruction: true, label });
     this.world.addBuilding(building);
     this.jobs.createBuildJob(building);
+    // (34.3) Ayak izindeki ağaç ve kayalar için öncelikli toplama işleri açılır; temizlenince inşaat başlar
+    const cleared = this.jobs.designateSite(building, check.clears.tiles);
     this.events.emit('world:blocked', { tiles: check.footprint });
     this.events.emit('building:placed', { building });
     if (!quiet) this.events.emit('toast', { text: `Şantiye kuruldu: ${def.name} (${formatCost(def.cost)})`, tone: 'info', icon: 'hammer' });
-    return { ok: true, building };
+    if (!quiet && cleared > 0) this.events.emit('toast', { text: CLEARING_TEXT.toastClearing(cleared), tone: 'info', icon: 'axe' });
+    return { ok: true, building, cleared };
   }
 
   /** Kasabada henüz kullanılmayan ilk sokak adı (hepsi kullanıldıysa numaralı). */

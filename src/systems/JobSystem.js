@@ -50,8 +50,28 @@ export class JobSystem {
 
   /** Bir karodaki nesneyi ya da yapıyı hedefleyen iş. */
   jobAt(x, y) {
+    // (34.3) Şantiye alanındaki ağaç / kaya kendi toplama işiyle önce gelir (şantiyenin inşaat işi aynı karoyu da kapsar)
+    const own = this.jobs.find((j) => !j.buildingId && j.x === x && j.y === y);
+    if (own) return own;
     const occupant = this.world.map.getOccupant(x, y);
-    return this.jobs.find((j) => (j.buildingId ? j.buildingId === occupant && occupant !== 0 : j.x === x && j.y === y)) ?? null;
+    return this.jobs.find((j) => j.buildingId && j.buildingId === occupant && occupant !== 0) ?? null;
+  }
+
+  /**
+   * (34.3) Alan açma: şantiyenin ayak izindeki her ağaç ve kaya için öncelikli toplama işi açar (job.siteId = şantiye kimliği).
+   * Dönüş: açılan iş sayısı.
+   */
+  designateSite(building, tiles) {
+    let opened = 0;
+    for (const { x, y } of tiles) {
+      const job = this.jobs.find((j) => !j.buildingId && j.x === x && j.y === y) ?? this.designate(x, y);
+      if (!job) continue;
+      job.urgent = true;
+      job.siteId = building.id;
+      opened++;
+    }
+    if (opened > 0) this.events.emit('job:urgent', { job: this.jobs.find((j) => j.siteId === building.id) });
+    return opened;
   }
 
   /**
@@ -70,7 +90,8 @@ export class JobSystem {
   isHarvestable(x, y) {
     if (!this.world.map.isOpen(x, y)) return false; // (34.1) kilitli parselde toplama yok
     const building = this.world.getBuilding(this.world.map.getOccupant(x, y));
-    if (building) return !building.underConstruction && Boolean(BUILDINGS[building.type].harvest) && building.berries > 0;
+    // (34.3) Şantiyenin içindeki ağaç / kaya toplanabilir (alan açma); tamamlanmış ya da başka yapıda yalnızca çalı
+    if (building && !building.underConstruction) return !building.underConstruction && Boolean(BUILDINGS[building.type].harvest) && building.berries > 0;
     const object = this.world.map.getObject(x, y);
     return Boolean(object && OBJECT_TYPES[object].harvest);
   }
@@ -79,15 +100,16 @@ export class JobSystem {
   harvestKind(x, y) {
     if (!this.isHarvestable(x, y)) return null;
     const building = this.world.getBuilding(this.world.map.getOccupant(x, y));
-    if (building) return BUILDINGS[building.type].harvest.job;
+    if (building && !building.underConstruction) return BUILDINGS[building.type].harvest.job;
     return OBJECT_TYPES[this.world.map.getObject(x, y)].harvest.job;
   }
 
   /** Toplama emri verir. Başarılıysa iş döner. */
   designate(x, y) {
-    if (this.jobAt(x, y) || !this.isHarvestable(x, y)) return null;
+    const existing = this.jobAt(x, y);
+    if ((existing && existing.type !== 'build') || !this.isHarvestable(x, y)) return null;
     const building = this.world.getBuilding(this.world.map.getOccupant(x, y));
-    if (building) {
+    if (building && !building.underConstruction) {
       const harvest = BUILDINGS[building.type].harvest;
       return this.addJob({
         type: harvest.job,
@@ -137,9 +159,9 @@ export class JobSystem {
     if (index >= 0) this.jobs.splice(index, 1);
   }
 
-  /** Bir yapıya bağlı tüm işleri siler (yıkım). */
+  /** Bir yapıya bağlı tüm işleri siler (yıkım). (34.3) Şantiyenin alan açma işleri de (siteId) düşer. */
   cancelForBuilding(buildingId) {
-    for (const job of [...this.jobs]) if (job.buildingId === buildingId) this.cancel(job);
+    for (const job of [...this.jobs]) if (job.buildingId === buildingId || job.siteId === buildingId) this.cancel(job);
   }
 
   assign(job, characterId) {
@@ -160,6 +182,12 @@ export class JobSystem {
       return true;
     }
     return this.world.map.getObject(job.x, job.y) === job.object;
+  }
+
+  /** (34.3) Bu inşaat işinin şantiyesi hâlâ alan açıyor mu? */
+  isSiteClearing(job) {
+    const building = this.world.getBuilding(job.buildingId);
+    return Boolean(building && this.world.isClearing(building));
   }
 
   /** Hedef geçersizleşen işleri temizler. */
@@ -294,6 +322,8 @@ export class JobSystem {
     for (const job of this.jobs) {
       const full = job.assignees.length >= JOBS[job.type].maxWorkers && !job.assignees.includes(c.id);
       if (full || !this.isValid(job)) continue;
+      // (34.3) Ağaç / kaya temizlenen şantiyede inşaat, alan açılana kadar başlamaz
+      if (job.type === 'build' && !job.project && this.isSiteClearing(job)) continue;
       const spot = freeSpot(this.spotsFor(job));
       // Öncelikli işaretlenen hedef her işten önce gelir
       // (29.1) minnettar olduğu biri o işte çalışıyorsa yardıma koşar (iş daha yakınmış gibi görünür)
