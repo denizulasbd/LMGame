@@ -1,6 +1,7 @@
-// Mekanik şalterleri (29.4b). Kural (29.5'ten itibaren): her yeni mekanik kendi anahtarını buraya `true` olarak ekler ve
-// kancalarını `engineOn(key)` ile sarar. Dondurulmuş test takımı (tools/sim/tests.mjs) bütün anahtarları kapatıp eski dünyanın
-// tarihini sabit tutar; aşama testleri, audit, compat, autopilot ve stress her zaman hepsi açık koşar.
+// Mekanik şalterleri (29.4b). (33.0) Eski kural ("her yeni mekanik kendi şalterini ekler, eski dünyanın tarihi bozulmaz") KALDIRILDI:
+// determinizm artık şart değil, yeni mekanik şalter eklemek zorunda değildir. Buradaki mevcut şalterler SİLİNMEZ (kayıtlar ve
+// testler onlara dayanır); yeni bir şalter yalnızca gerçekten kapatılabilir bir özellik için, istenirse eklenir. Aşama testleri,
+// audit, compat ve autopilot hepsi açık koşar. Dondurulmuş takım tools/sim/archive/tests.mjs kapıdan çıktı (elle koşulur).
 export const ENGINES = {
   bonds: true, // (29.5) Omuz Omuza: bağ puanlı iş seçimi ve yan yana çalışma moodlet'leri
   loyalty: true, // (29.6) Vefa ve Husumet: sadakat, isyan elebaşı, yangın minneti, yağma kırgınlığı, anının kişisi

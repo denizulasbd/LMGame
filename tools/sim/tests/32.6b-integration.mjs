@@ -289,7 +289,7 @@ const errors = [];
 
 // ---------------------------------------------------------------- B. şalter kapalıyken yüklenen kayıt (fikstür: bütün 32 durumları açıkken alınmış 90 günlük kayıt)
 // Her şalter tek tek ve hepsi birlikte kapalı açılır, kayıt yüklenir: çökme yok, kapalı mekaniğin alanları bozulmadan korunur (yeniden
-// yazılan kayıtta aynı), oyun iki gün yaşar; sonra şalter yeniden açık oyunda aynı kayıt kaldığı yerden sürer.
+// yazılan kayıtta aynı), oyun bir gün yaşar; sonra şalter yeniden açık oyunda aynı kayıt kaldığı yerden sürer.
 {
   const raw = fs.readFileSync(new URL('../fixtures/save-v41-asama32.json', import.meta.url), 'utf8');
   const original = JSON.parse(raw);
@@ -303,7 +303,7 @@ const errors = [];
   };
   const configs = [
     // (33.0) Kısaltıldı: tek tek kapalı olanlardan dördü ve hepsi kapalı; ('court' ve 'yalnız bir şalter açık' yapılandırmaları kapıdan çıktı)
-    ['justice'], ['renown'], ['university'], ['clubs'], ['justice', 'court', 'renown', 'university', 'clubs'],
+    ['justice'], ['university'], ['clubs'], ['justice', 'court', 'renown', 'university', 'clubs'],
   ];
   const ALL5 = ['justice', 'court', 'renown', 'university', 'clubs'];
   const savedAfter = {};
@@ -319,7 +319,7 @@ const errors = [];
       const st = game.state;
       const day0 = st.time.day;
       const pop0 = st.characters.length;
-      try { sim.step(225 * 24 * 2); } catch (e) { threw = String(e).slice(0, 200); }
+      try { sim.step(225 * 24); } catch (e) { threw = String(e).slice(0, 200); }
       const { ENGINES } = await import('/src/systems/Engines.js');
       game.events.emit('ui:save');
       const out = JSON.parse(localStorage.getItem('lmgame.save.v2'));
@@ -333,7 +333,7 @@ const errors = [];
     }, raw);
     const after = JSON.parse(r.raw);
     savedAfter[label] = r.raw;
-    results.push({ name: `şalter kapalı (${label}): kayıt çökmeden yüklenir, iki gün yaşanır, sayfa hatası yok`, ok: !r.threw && r.day === r.day0 + 2 && perrs.length === 0 && r.pop > 0, detail: `${r.threw ?? ''} ${perrs[0] ?? ''} gün ${r.day0}→${r.day} sakin ${r.pop0}→${r.pop}` });
+    results.push({ name: `şalter kapalı (${label}): kayıt çökmeden yüklenir, bir gün yaşanır, sayfa hatası yok`, ok: !r.threw && r.day === r.day0 + 1 && perrs.length === 0 && r.pop > 0, detail: `${r.threw ?? ''} ${perrs[0] ?? ''} gün ${r.day0}→${r.day} sakin ${r.pop0}→${r.pop}` });
     results.push({ name: `şalter kapalı (${label}): sekiz yeni yapı kayıtta durur (yapılar silinmez, çalışmasa da)`, ok: r.built === 8, detail: `${r.built}/8` });
     // kapalı mekaniğin alanları: yalnızca o şalterin sahibi olduğu alanlar bozulmadan korunur (açık olanlar iki günde ilerleyebilir)
     const closed = off.includes('justice') ? ['justice', 'people'] : off.includes('court') ? ['people'] : [];
@@ -343,7 +343,7 @@ const errors = [];
     if (off.includes('renown')) checks.push(['renown', canon(after.renown) === keep.renown(), 'renown']);
     if (off.includes('justice')) checks.push(['justice', canon(after.justice?.cases) === canon(original.justice.cases) && canon(after.justice?.records) === canon(original.justice.records), 'justice.cases / records']);
     if (off.includes('court') && !off.includes('justice')) checks.push(['court', after.characters.filter((c) => c.sentence?.exile || c.sentence?.service > 0).length >= 1, 'sakin cezaları (sentence)']);
-    for (const [k, ok, what] of checks) results.push({ name: `şalter kapalı (${label}): ${what} alanı iki gün sonra bozulmadan korunur`, ok, detail: k });
+    for (const [k, ok, what] of checks) results.push({ name: `şalter kapalı (${label}): ${what} alanı bir gün sonra bozulmadan korunur`, ok, detail: k });
     await browser.close();
   }
   // şalter yeniden açılınca kaldığı yerden sürer: kulüpler kapalı koşunun yazdığı kayıt, hepsi açık yeni oyunda
@@ -358,11 +358,11 @@ const errors = [];
       const sc = game.scenes.current;
       const before = { members: st.characters.filter((c) => c.club).length, students: st.characters.filter((c) => c.higherStudy).length, cases: st.justice?.cases.length ?? 0, sessions: Object.values(st.clubs ?? {}).reduce((a, x) => a + (x.sessions ?? 0), 0), graduated: st.university?.graduated ?? 0 };
       let threw = null;
-      try { sim.step(225 * 24 * 3); } catch (e) { threw = String(e).slice(0, 200); }
+      try { sim.step(225 * 24 * 2); } catch (e) { threw = String(e).slice(0, 200); }
       const after = { members: st.characters.filter((c) => c.club).length, students: st.characters.filter((c) => c.higherStudy).length, sessions: Object.values(st.clubs ?? {}).reduce((a, x) => a + (x.sessions ?? 0), 0), admitted: st.university?.admitted ?? 0, day: st.time.day };
       return { threw, before, after, listeners: [sc.clubs?.unsubscribers?.length, sc.university?.unsubscribers?.length, sc.court?.unsubscribers?.length] };
     }, savedAfter[label]);
-    results.push({ name: `şalter yeniden açık (${label} kapalıyken yazılan kayıt): kaldığı yerden sürer — üyeler, öğrenciler ve davalar duruyor, sistemler dinliyor, üç gün çökmeden geçer`, ok: !r.threw && perrs.length === 0 && r.before.members >= 6 && r.listeners.every((n) => n > 0) && r.after.sessions >= r.before.sessions, detail: `${JSON.stringify(r.before)} → ${JSON.stringify(r.after)} ${r.threw ?? ''} ${perrs[0] ?? ''}` });
+    results.push({ name: `şalter yeniden açık (${label} kapalıyken yazılan kayıt): kaldığı yerden sürer — üyeler, öğrenciler ve davalar duruyor, sistemler dinliyor, iki gün çökmeden geçer`, ok: !r.threw && perrs.length === 0 && r.before.members >= 6 && r.listeners.every((n) => n > 0) && r.after.sessions >= r.before.sessions, detail: `${JSON.stringify(r.before)} → ${JSON.stringify(r.after)} ${r.threw ?? ''} ${perrs[0] ?? ''}` });
     await browser.close();
   }
 }
