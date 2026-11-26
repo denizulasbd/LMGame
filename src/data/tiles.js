@@ -142,29 +142,33 @@ export function isGround(tile) {
 // Zeminin üzerinde duran doğal nesneler. Bir karoda en fazla bir nesne bulunur.
 // id 0 "nesne yok" anlamına gelir.
 //   harvest   : toplama emriyle ne kazanılır { job, work (oyun dakikası), yields, leaves }
-//               leaves: iş bitince yerinde kalan nesne (ağaç -> kütük)
+//               leaves: iş bitince yerinde kalan nesne (34.3'ten beri ağaç ve kaya kalıntı bırakmaz: null)
 //   clearable : üzerine inşaat yapılırken kendiliğinden temizlenir (çakıl, kütük, fidan)
+// (34.3) Kayanın kendi taşı ve eskiden geride kalan çakılın taşı (kaya artık ikisini birden verir)
+export const ROCK_STONE = 7;
+export const PEBBLE_STONE = 2;
+
 export const OBJECT_TYPES = {
   oak: {
     id: 1,
     name: 'Meşe Ağacı',
     walkable: false,
     buildable: false,
-    harvest: { job: 'chop', work: 45, yields: { wood: 8 }, leaves: 'stump' },
+    harvest: { job: 'chop', work: 45, yields: { wood: 8 }, leaves: null },
   },
   pine: {
     id: 2,
     name: 'Çam Ağacı',
     walkable: false,
     buildable: false,
-    harvest: { job: 'chop', work: 40, yields: { wood: 7 }, leaves: 'stump' },
+    harvest: { job: 'chop', work: 40, yields: { wood: 7 }, leaves: null },
   },
   rock: {
     id: 3,
     name: 'Kaya',
     walkable: false,
     buildable: false,
-    harvest: { job: 'mine', work: 60, yields: { stone: 7 }, leaves: 'pebbles' },
+    harvest: { job: 'mine', work: 60, yields: { stone: ROCK_STONE + PEBBLE_STONE }, leaves: null }, // (34.3) çakıl bırakmaz: çakılın taşı verime eklenir (7 + 2 = 9)
   },
   pebbles: {
     id: 4,
@@ -173,14 +177,15 @@ export const OBJECT_TYPES = {
     buildable: false,
     clearable: true,
     extraMoveCost: 0.3,
-    harvest: { job: 'mine', work: 15, yields: { stone: 2 }, leaves: null },
+    harvest: { job: 'mine', work: 15, yields: { stone: PEBBLE_STONE }, leaves: null },
   },
+  // (34.3) Kütük artık oluşmaz; yalnızca eski kayıtlarda bulunur ve açılışta temizlenir (TownScene -> purgeStumps)
   stump: { id: 5, name: 'Ağaç Kütüğü', walkable: true, buildable: false, clearable: true, extraMoveCost: 0.5 },
   sapling: { id: 6, name: 'Fidan', walkable: true, buildable: false, clearable: true, extraMoveCost: 0.3 },
 };
 
-// Kesilen ağacın yeniden büyümesi (oyun saati): kütük -> fidan -> ağaç
-export const TREE_REGROWTH = { stumpHours: 24, saplingHours: 36 };
+// Fidanın ağaca dönüşme süresi (oyun saati). (34.3) kütük aşaması kalktı: yeni fidanlar orman yenilenmesiyle gelir (data/forest.js)
+export const TREE_REGROWTH = { saplingHours: 36 };
 
 const byId = (types) => Object.fromEntries(Object.entries(types).map(([key, def]) => [def.id, key]));
 

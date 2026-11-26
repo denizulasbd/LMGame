@@ -33,7 +33,7 @@ import { StructureSystem } from '../systems/StructureSystem.js';
 import { EconomySystem } from '../systems/EconomySystem.js';
 import { JobSystem } from '../systems/JobSystem.js';
 import { ConstructionSystem } from '../systems/ConstructionSystem.js';
-import { NatureSystem } from '../systems/NatureSystem.js';
+import { NatureSystem, purgeStumps } from '../systems/NatureSystem.js';
 import { PopulationSystem } from '../systems/PopulationSystem.js';
 import { WeatherSystem } from '../systems/WeatherSystem.js';
 import { RelationshipSystem } from '../systems/RelationshipSystem.js';
@@ -172,6 +172,7 @@ export class TownScene extends Scene {
     if (restoring) {
       applyTerrain(map, state.pendingTerrain);
       state.pendingTerrain = null;
+      purgeStumps(map, state); // (34.3) eski kayıttaki kütükler kalkar, "kütük" aşamasındaki yeniden büyüme kayıtları düşer
       map.occupants.fill(0);
       map.passable.fill(0);
       for (const building of state.buildings) this.occupyFootprint(building);
