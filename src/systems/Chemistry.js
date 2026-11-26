@@ -27,6 +27,7 @@ import {
   EMOTION_TAG_KEYS,
   RULER_ID,
 } from '../data/chemistry.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
 const SPARK_TOTAL = SPARK_WEIGHTS.reduce((sum, [, w]) => sum + w, 0);
 
@@ -150,7 +151,7 @@ export function chemistryOf(state, a, b) {
 
 /** Kimyayı yeniden hesaplayıp iki yöne yazar. */
 export function refreshChemistry(state, a, b) {
-  const total = chemistryFor(state.seed, a, b);
+  const total = chemistryFor(lifeSeedOf(state), a, b);
   ensure(a, b.id).chemistry = total;
   ensure(b, a.id).chemistry = total;
   return total;
@@ -292,7 +293,7 @@ export function migrateChemistry(data) {
   let bound = 0;
   const bind = (a, b) => {
     if (!a || !b || a === b) return;
-    const total = chemistryFor(data.seed, a, b);
+    const total = chemistryFor(lifeSeedOf(data), a, b);
     for (const [x, y] of [[a, b], [b, a]]) {
       const rel = (x.relationships[y.id] ??= emptyRelation());
       rel.chemistry = total;

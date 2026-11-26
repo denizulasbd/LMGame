@@ -19,6 +19,7 @@ import { Random } from '../utils/random.js';
 import { isWithinHours } from './StructureSystem.js';
 import { townTier } from './TownStatus.js';
 import { clamp } from '../utils/math.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
 const T = 16;
 const PET_NIGHT = { from: 21.5, to: 6.5 };
@@ -92,7 +93,7 @@ export class AnimalSystem {
   /** Tavşan ve geyikleri haritanın sakin köşelerine yerleştirir (tohumdan, hep aynı). */
   seedWildlife() {
     this.state.animalMeta.wildlifeSeeded = true;
-    const rng = new Random(this.state.seed + 11);
+    const rng = new Random(lifeSeedOf(this.state) + 11);
     const map = this.world.map;
     const scale = (map.width * map.height) / (80 * 80);
     for (const [kind, def] of Object.entries(WILDLIFE)) {

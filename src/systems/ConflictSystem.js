@@ -17,6 +17,7 @@ import { pairKey, arePartners } from './RelationshipSystem.js';
 import { clamp } from '../utils/math.js';
 import { chemistryLevel, chemistryFor } from './Chemistry.js';
 import { CHEMISTRY_QUARREL_SHARE } from '../data/chemistry.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
 const QUARREL_RATES = {
   work: CONFLICT.workChancePerMinute,
@@ -101,7 +102,7 @@ export class ConflictSystem {
     // (zıt özelliği olmayan çiftte yalnızca kayıtlı kimyaya bakılır: kayıt, sohbet etmiş / bağ kurmuş çiftlerde vardır)
     const stored = a.relationships[b.id]?.chemistry;
     if (!clash && !(stored < 0)) return;
-    const chemistry = chemistryLevel(stored ?? chemistryFor(this.state.seed, a, b)).quarrel * (clash ? 1 : CHEMISTRY_QUARREL_SHARE);
+    const chemistry = chemistryLevel(stored ?? chemistryFor(lifeSeedOf(this.state), a, b)).quarrel * (clash ? 1 : CHEMISTRY_QUARREL_SHARE);
     const key = pairKey(a.id, b.id);
     const now = this.state.totalMinutes;
     if ((this.cooldowns.get(key) ?? -1) > now) return;

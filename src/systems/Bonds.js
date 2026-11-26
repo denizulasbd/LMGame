@@ -2,8 +2,9 @@
 import { BOND_POINTS as P } from '../data/bonds.js';
 import { getFriendship, arePartners } from './RelationshipSystem.js';
 import { chemistryFor, hasTag } from './Chemistry.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
-const peekChemistry = (state, a, b) => a.relationships?.[b.id]?.chemistry ?? chemistryFor(state.seed, a, b);
+const peekChemistry = (state, a, b) => a.relationships?.[b.id]?.chemistry ?? chemistryFor(lifeSeedOf(state), a, b);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /** c'nin o ile çalışma isteği: tam sayı, -4..+4. */

@@ -36,7 +36,7 @@ if (options.save) {
   const raw = fs.readFileSync(String(options.save), 'utf8');
   await page.addInitScript((r) => { if (!localStorage.getItem('lmgame.__seeded')) { localStorage.setItem('lmgame.save.v2', r); localStorage.setItem('lmgame.__seeded', '1'); } }, raw);
 }
-await page.goto(options.save ? `${BASE_URL}/` : `${BASE_URL}/?seed=${options.seed ?? 42}`);
+await page.goto(options.save ? `${BASE_URL}/` : `${BASE_URL}/?seed=${options.seed ?? 42}&life=${options.life ?? options.seed ?? 42}`);
 await page.waitForFunction(() => window.game?.scenes?.current?.world);
 
 const visible = async (q, text, i = 0) => {

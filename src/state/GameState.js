@@ -51,8 +51,8 @@ import { restoreRenown } from '../systems/Renown.js'; // (32.3)
 import { restoreUniversity } from '../systems/University.js'; // (32.4)
 import { restoreClubs } from '../systems/Clubs.js'; // (32.5)
 import { STORY_FILTERS } from '../data/storyCards.js';
+import { randomSeed } from '../utils/lifeSeed.js'; // (33.1)
 
-const randomSeed = () => Math.floor(Math.random() * 1_000_000_000);
 
 /** Tohuma göre önerilen kasaba adı (aynı tohum aynı adı önerir). */
 export function defaultTownName(seed) {
@@ -65,8 +65,13 @@ export class GameState {
     this.reset();
   }
 
-  reset(seed = randomSeed(), townName = null) {
+  /**
+   * (33.1) seed: HARİTA tohumu (aynı tohum aynı harita); lifeSeed: HAYAT tohumu (sakinler ve haritanın dışındaki üreteçler).
+   * lifeSeed verilmezse her yeni oyunda rastgele; geçersiz (sayı olmayan) değer de rastgele sayılır.
+   */
+  reset(seed = randomSeed(), townName = null, lifeSeed = null) {
     this.seed = seed;
+    this.lifeSeed = Number.isFinite(lifeSeed) ? Math.floor(lifeSeed) : randomSeed();
     this.townName = townName ?? defaultTownName(seed);
     // Harita tohumdan yeniden üretilir; boyutu ve üretici sürümü kayda girer ki eski 48x48 haritalar
     // kendi boyutunda, biyomsuz olarak açılsın (yeni oyunlar 80x80 ve biyomlu)
@@ -278,6 +283,7 @@ export class GameState {
   toJSON() {
     return {
       seed: this.seed,
+      ...(Number.isFinite(this.lifeSeed) ? { lifeSeed: this.lifeSeed } : {}), // (33.1) isteğe bağlı: eski kayıtlarda yok (harita tohumu kullanılır)
       townName: this.townName,
       map: this.map,
       time: this.time,
@@ -358,7 +364,11 @@ export class GameState {
   restore(data) {
     const warnings = validateSave(data);
     const next = new GameState();
-    next.reset(data.seed);
+    // (33.1) hayat tohumu isteğe bağlı: eski kayıtta yok, o zaman null kalır ve lifeSeedOf harita tohumunu verir (kayıt eskisi gibi devam eder).
+    // reset'e sayı verilir ki yüklemek Math.random tüketmesin.
+    const lifeSeed = Number.isFinite(data.lifeSeed) ? Math.floor(data.lifeSeed) : null;
+    next.reset(data.seed, null, lifeSeed ?? data.seed);
+    next.lifeSeed = lifeSeed;
     // 8. aşamadan eski kayıtlar: haritaları 48x48 ve biyomsuzdur
     next.map = data.map
       ? { width: data.map.width, height: data.map.height, generator: data.map.generator }

@@ -1286,7 +1286,7 @@ const PAGE_HELPERS = () => {
   await page.evaluate(() => {
     localStorage.setItem('lmgame.audio.muted', '1');
   });
-  await page.goto(`${BASE_URL}/?seed=8`);
+  await page.goto(`${BASE_URL}/?seed=8&life=8`);
   await page.waitForFunction(() => window.game?.scenes?.current?.world);
   await page.mouse.click(400, 300);
   await page.keyboard.press('KeyQ');

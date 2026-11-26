@@ -42,6 +42,7 @@ import { addMemory } from './MemorySystem.js';
 import { clamp } from '../utils/math.js';
 import { engineOn } from './Engines.js';
 import { DEBT_RULES, DEBT_MEMORIES } from '../data/loyalty.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
 // Selamda öne çıkan etiket (ilk bulunan söylenir)
 const GREETING_ORDER = ['resentful', 'jealous', 'grateful', 'admiration', 'kindred'];
@@ -90,7 +91,7 @@ export class ChemistrySystem {
 
   /** Kayıt açmadan kimya (yolda karşılaşan her çift için kayıt birikmesin). */
   peek(a, b) {
-    return a.relationships?.[b.id]?.chemistry ?? chemistryFor(this.state.seed, a, b);
+    return a.relationships?.[b.id]?.chemistry ?? chemistryFor(lifeSeedOf(this.state), a, b);
   }
 
   /**

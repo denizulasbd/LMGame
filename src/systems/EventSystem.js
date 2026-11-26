@@ -26,6 +26,7 @@ import { immigrationStatus, townFun, townTier, quarantined } from './TownStatus.
 import { Random } from '../utils/random.js';
 import { clamp } from '../utils/math.js';
 import { merchantIntervalMultiplier } from './Exploration.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
 const MERCHANT_BUBBLE_SECONDS = 2.4;
 
@@ -130,7 +131,7 @@ export class EventSystem {
   }
 
   rngFor(salt) {
-    return new Random(this.state.seed * 13 + this.merchantState.visits * 101 + salt);
+    return new Random(lifeSeedOf(this.state) * 13 + this.merchantState.visits * 101 + salt);
   }
 
   tryMerchantVisit() {

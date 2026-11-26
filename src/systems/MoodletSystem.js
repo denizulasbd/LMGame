@@ -33,8 +33,9 @@ import { getSeason } from '../data/seasons.js';
 import { foodSupply } from './TownStatus.js';
 import { addMemory } from './MemorySystem.js';
 import { genitive } from '../utils/turkish.js';
+import { lifeSeedOf } from '../utils/lifeSeed.js';
 
-const peekChemistry = (state, a, b) => a.relationships?.[b.id]?.chemistry ?? chemistryFor(state.seed, a, b);
+const peekChemistry = (state, a, b) => a.relationships?.[b.id]?.chemistry ?? chemistryFor(lifeSeedOf(state), a, b);
 
 /** B, acılı A'yı teselli edebilecek kadar yakın mı: eşi / sevgilisi, ailesi, ruh ikizi ya da kimyası eksi olmayan dostu. */
 export function canConsole(state, consoler, sufferer) {
