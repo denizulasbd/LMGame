@@ -656,6 +656,13 @@ export function deservedParts(k, state, { restitution = false, famine = null, pl
   return parts;
 }
 
+/** (33.0) Hak edilen sertliğin adil penceresine (± BANDS.fairWithin) düşen ceza adları, sertlik sırasıyla (en hafif → en ağır). */
+export function fairSentenceNames(want) {
+  const fair = SENTENCE_KEYS.filter((key) => verdictBand(SENTENCES[key].harsh - want) === 'fair');
+  fair.sort((a, b) => SENTENCES[a].harsh - SENTENCES[b].harsh || SENTENCE_KEYS.indexOf(a) - SENTENCE_KEYS.indexOf(b));
+  return fair.map((key) => SENTENCES[key].name);
+}
+
 /** Bant: fark = seçilen − hak edilen. 'fair' | 'harsh' | 'cruel' | 'lenient' | 'lax'. */
 export function verdictBand(diff) {
   if (Math.abs(diff) <= BANDS.fairWithin) return 'fair';

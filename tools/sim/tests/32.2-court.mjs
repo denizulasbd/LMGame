@@ -330,11 +330,15 @@ results.push(...(await page.evaluate(async () => {
   const opts = [...document.querySelectorAll('.case-option')].map((x) => x.dataset.sentence);
   const paused = game.state.time.minute;
   const chip = [...document.querySelectorAll('.buff-chip.is-case, .hud-more-list .is-case')].length;
+  const beforeTxt = document.querySelector('.case-panel')?.textContent ?? ''; // (33.0) karardan önce "Halkın beklediği" yok
   document.querySelector('.case-option[data-sentence="warning"]')?.click();
   game.ui.render();
   document.querySelector('.case-decide')?.click();
   game.ui.render();
   const resultText = document.querySelector('.case-result-band')?.textContent ?? '';
+  const expectedLine = document.querySelector('.case-expected')?.textContent ?? '';
+  c('(33.0) "Halkın beklediği" satırı yalnızca karardan SONRA görünür ve hak edilen sertliğin adil penceresindeki cezaları söyler',
+    !/Halkın beklediği/.test(beforeTxt) && /^Halkın beklediği: .+/.test(expectedLine) && kw.verdict.deserved !== undefined && (() => { const n = J.fairSentenceNames(kw.verdict.deserved); return expectedLine.includes(n[0]) && expectedLine.includes(n[n.length - 1]); })() && J.fairSentenceNames(2).length === 2 && J.fairSentenceNames(1).join() === 'Uyarı', `${expectedLine} | ${kw.verdict.deserved}`);
   c('dava penceresi açılır (oyun durmaz), sekiz ceza düğmesi; karar verilince sonuç ekranı (halkın tepkisi); çip ve İlan Tahtası\'nda dava', panel && !panel.hidden && opts.length === 8 && kw.status === 'closed' && /Halk kararı/.test(resultText) && notice && chip >= 1 && Boolean(board), `${opts.join(',')} · ${resultText} · çip ${chip} · dur ${paused}`);
   E.emit('ui:openCase', { id: -5 });
   document.querySelector('.case-panel .modal-close')?.click();

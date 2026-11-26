@@ -12,7 +12,7 @@ import { CRIMES, SENTENCES, BANDS, BAND_REASONS, COURT_TEXT } from '../../data/j
 import { LIFE_STAGES } from '../../data/lifeStages.js';
 import { LOYALTY_TIERS } from '../../data/loyalty.js';
 import { engineOn } from '../../systems/Engines.js';
-import { caseText, caseFacts, statementText, witnessText, pleaText, sentenceOptions, restitutionStatus, kinOf, fill, courtOf, lootText } from '../../systems/Justice.js';
+import { fairSentenceNames, caseText, caseFacts, statementText, witnessText, pleaText, sentenceOptions, restitutionStatus, kinOf, fill, courtOf, lootText } from '../../systems/Justice.js';
 import { verdictLines } from '../../systems/CourtSystem.js';
 import { leftText } from './justiceCards.js';
 import { verdictRenownImpact } from '../../systems/Renown.js'; // (32.3)
@@ -168,6 +168,11 @@ export class CaseModal {
     // (32.3) Kararın Krallık İtibarı hedefine etkisi (sicilde bu kararın olduğu ve olmadığı hâlin farkı)
     const impact = !stale && v.by === 'court' ? verdictRenownImpact(state, k) : 0;
     if (impact) lines.push(el('li', { className: `case-renown is-${impact < 0 ? 'down' : 'up'}`, text: `Krallık İtibarı'na etkisi: yarından itibaren hedef ${impact > 0 ? '+' : '−'}${Math.abs(impact)}` }));
+    // (33.0) Karardan SONRA: halkın beklediği ceza aralığı (karardan önce hiçbir şey gösterilmez; bu yalnızca sonuç ekranındadır)
+    if (!stale && v.by === 'court' && Number.isFinite(v.deserved)) {
+      const names = fairSentenceNames(v.deserved);
+      if (names.length) lines.push(el('li', { className: 'case-expected', text: fill(names.length > 1 ? COURT_TEXT.expectedRange : COURT_TEXT.expectedOne, { a: names[0], b: names[names.length - 1] }) }));
+    }
     const close = el('button', { className: 'hud-btn upgrade-button case-decide', type: 'button', tabIndex: -1, text: 'Tamam' });
     close.addEventListener('mousedown', (e) => e.preventDefault());
     close.addEventListener('click', () => this.setOpen(false));
