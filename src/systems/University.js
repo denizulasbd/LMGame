@@ -10,6 +10,7 @@ import { PROFESSIONS } from '../data/apprenticeship.js';
 import { SKILLS, SKILL_LEVELS } from '../data/skills.js';
 import { primarySkill } from './SkillSystem.js';
 import { engineOn } from './Engines.js';
+import { AGING } from '../data/lifeStages.js';
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const byId = (list, id) => list[((Number(id) || 0) % list.length + list.length) % list.length];
@@ -63,17 +64,38 @@ export function lectureLeft(c, day) {
 
 // ---------------------------------------------------------------------------------------------------------------------- kabul
 
-/** Kabul edilebilir mi: Genç, Bilgelik Evi mezunu, öğrenci / mezun değil; seferde, ayrılırken, sürgünde, hastalıkta değil. */
-export function canEnroll(c) {
+/** (33.0) Gençliğinin bitmesine kalan oyun günü (yaşlanma 21'e ulaşınca yetişkin olur); yaş günü bilinmiyorsa sonsuz. */
+export function youthDaysLeft(c) {
+  if (!Number.isFinite(c?.ageInDays)) return Infinity;
+  return Math.max(0, AGING.youthUntil * AGING.daysPerAge - Math.floor(c.ageInDays));
+}
+
+/** Zaman dışındaki kabul koşulları: Genç, Bilgelik Evi mezunu, öğrenci / mezun değil; seferde, ayrılırken, sürgünde, hastalıkta değil. */
+function enrollable(c) {
   if (!c || c.role || c.isChild || c.lifeStage !== 'youth') return false;
   if (c.educated !== true || c.higherStudy || c.graduate) return false;
   if (c.away || c.emigrating || c.sentence?.exile || c.illness) return false;
   return true;
 }
 
+/** (33.0) Her şey uygun ama gençliğinin bitmesine minYouthDaysLeft günden az kaldı: kabul edilmez (panelde nedeni yazılır). */
+export function tooLate(c) {
+  return enrollable(c) && youthDaysLeft(c) < U.minYouthDaysLeft;
+}
+
+/** Kabul edilebilir mi: enrollable koşulları + (33.0) gençliğinin bitmesine en az minYouthDaysLeft gün var. */
+export function canEnroll(c) {
+  return enrollable(c) && youthDaysLeft(c) >= U.minYouthDaysLeft;
+}
+
 /** Bekleme sırası (en yüksek Bilgelik Evi ilerlemesi önce, eşitlikte küçük kimlik). */
 export function admissionQueue(state) {
   return state.characters.filter(canEnroll).sort((a, b) => (b.schooling ?? 0) - (a.schooling ?? 0) || a.id - b.id);
+}
+
+/** (33.0) Zamanı yetmediği için kabul edilmeyen gençler (panelde neden yazılır). */
+export function lateOnes(state) {
+  return state.characters.filter(tooLate).sort((a, b) => a.id - b.id);
 }
 
 export function studentsOf(state) {

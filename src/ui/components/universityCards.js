@@ -7,7 +7,7 @@ import { UNIVERSITY as U, UNIVERSITY_TEXT as TX } from '../../data/university.js
 import { RENOWN_TARGET } from '../../data/renown.js';
 import { engineOn } from '../../systems/Engines.js';
 import {
-  universityOf, studentsOf, admissionQueue, fieldName, studyRatio, lectureMultiplier, archiveFactor, educationLevel, educationAdults,
+  universityOf, studentsOf, admissionQueue, lateOnes, youthDaysLeft, fieldName, studyRatio, lectureMultiplier, archiveFactor, educationLevel, educationAdults,
   renownEducationShare, isLectureHour,
 } from '../../systems/University.js';
 
@@ -39,7 +39,7 @@ function professorOf(state, building) {
 export function universityKey(building, state) {
   if (!engineOn('university') || building.type !== 'university') return '';
   const students = studentsOf(state).map((c) => `${c.id}:${Math.floor(studyRatio(c) * 100)}:${c.task?.activity === 'lecture' ? 1 : 0}`).join(',');
-  const queue = admissionQueue(state).map((c) => c.id).join(',');
+  const queue = `${admissionQueue(state).map((c) => c.id).join(',')}/${lateOnes(state).map((c) => `${c.id}:${youthDaysLeft(c)}`).join(',')}`;
   const prof = professorOf(state, building);
   return `${students}|${queue}|${prof ? `${prof.c.id}${prof.inside ? 'i' : ''}` : '-'}|${JSON.stringify(state.university ?? null)}|${lectureMultiplier(state, building).total}|${state.time.hour}`;
 }
@@ -72,6 +72,9 @@ export function universitySection(building, state) {
     ]))));
   } else nodes.push(text('Öğrenci yok: Bilgelik Evi mezunu gençler (18-20) gün dönümünde kabul edilir'));
   nodes.push(text(queue.length ? `Sırada: ${queue.slice(0, 5).map((c) => c.name).join(', ')}${queue.length > 5 ? ` (+${queue.length - 5})` : ''}` : 'Sırada bekleyen yok'));
+  // (33.0) Gençliği bitmek üzere olanlar kabul edilmez; nedeni yazılır
+  const late = lateOnes(state);
+  if (late.length) nodes.push(text(`${TX.lateTitle}: ${late.slice(0, 4).map((c) => `${c.name} (${TX.lateReason.replace('{days}', youthDaysLeft(c)).replace('{min}', U.minYouthDaysLeft)})`).join('; ')}${late.length > 4 ? ` (+${late.length - 4})` : ''}`, 'is-muted'));
   nodes.push(text(`Mezun ${st.graduated ?? 0} · yarım bırakan ${st.dropped ?? 0} · toplam kabul ${st.admitted ?? 0}`));
   return nodes;
 }

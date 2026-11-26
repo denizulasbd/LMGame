@@ -86,7 +86,7 @@ const errors = [];
     const youths = pool.slice(0, 8);
     youths.forEach((y, i) => {
       y.lifeStage = 'youth';
-      y.age = 19;
+      y.age = 19; y.ageInDays = 19 * 4 + 1; // (33.0) gençliğin başı: kabul için en az 6 gün kalmalı
       y.educated = i !== 7; // sonuncusu Bilgelik Evi'ni bitirmedi
       y.schooling = 400 + (i === 2 ? 0 : 10 * i); // 2 numara en düşük: sırada kalır
       y.higherStudy = null;
@@ -101,6 +101,20 @@ const errors = [];
     const students = U.studentsOf(st);
     c('kabul: en çok 6 öğrenci, Bilgelik Evi mezunu olmayan alınmaz', students.length === 6 && !youths[7].higherStudy, `${students.length}`);
     c('kabul sırası: en yüksek schooling önce; sıradaki (en düşük) bekler', !youths[2].higherStudy && U.admissionQueue(st)[0] === youths[2], U.admissionQueue(st).map((x) => x.name).join(','));
+    {
+      // (33.0) gençliğinin bitmesine 6 günden az kalan genç kabul edilmez; panelde nedeni yazılır
+      const y = youths[2];
+      const keep = y.ageInDays;
+      y.ageInDays = 21 * 4 - 5;
+      const late5 = !U.canEnroll(y) && U.tooLate(y) && U.lateOnes(st).includes(y) && U.youthDaysLeft(y) === 5;
+      y.ageInDays = 21 * 4 - 6;
+      const ok6 = U.canEnroll(y) && !U.tooLate(y);
+      y.ageInDays = 21 * 4 - 5;
+      const cards = await import('/src/ui/components/universityCards.js');
+      const shown = cards.universitySection(uni, st).map((n) => n.textContent).join(' | ');
+      y.ageInDays = keep;
+      c('Darülfünun: gençliğinin bitmesine 6 günden az kalan genç kabul edilmez (5 gün: hayır, 6 gün: evet); sayı data/university.js\'te; panelde "Zamanı yetmeyen" ve neden', UD.UNIVERSITY.minYouthDaysLeft === 6 && late5 && ok6 && /Zamanı yetmeyen/.test(shown) && /5 gün kaldı/.test(shown), shown.slice(-200));
+    }
 
     // ---- 4. bölüm seçim sırası
     const probe = (o) => U.fieldFor({ id: 7, traits: [], quirk: null, skills: {}, apprenticeship: null, ...o });
@@ -260,7 +274,7 @@ const errors = [];
     // ---- 11. kayıt temizliği
     for (const y of adultsLeft.slice(4, 7)) {
       y.lifeStage = 'youth';
-      y.age = 19;
+      y.age = 19; y.ageInDays = 19 * 4 + 1; // (33.0) gençliğin başı: kabul için en az 6 gün kalmalı
       y.educated = true;
       y.illness = null;
     }
@@ -331,7 +345,7 @@ const errors = [];
     const ys = st.characters.filter((x) => !x.isChild && !x.role).sort((a, b) => a.id - b.id).slice(0, 3);
     for (const y of ys) {
       y.lifeStage = 'youth';
-      y.age = 19;
+      y.age = 19; y.ageInDays = 19 * 4 + 1; // (33.0) gençliğin başı: kabul için en az 6 gün kalmalı
       y.educated = true;
     }
     sc.university.newDay();
@@ -368,7 +382,7 @@ async function apprenticeDay(student) {
     m.workplaceId = hut.id;
     m.skills.herbalism = 2000;
     y.lifeStage = 'youth';
-    y.age = 19;
+    y.age = 19; y.ageInDays = 19 * 4 + 1; // (33.0) gençliğin başı: kabul için en az 6 gün kalmalı
     y.educated = true;
     y.apprenticeship = { masterId: m.id, profession: 'healerHut', buildingId: hut.id, progress: 0, since: 0, crafted: 0 };
     if (student) sc.university.newDay();

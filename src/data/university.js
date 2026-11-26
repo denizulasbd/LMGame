@@ -11,6 +11,8 @@
 // (en yüksek Bilgelik Evi ilerlemesi `schooling` önce, eşitlikte küçük kimlik).
 export const UNIVERSITY = {
   capacity: 6,
+  // (33.0) Gençliğinin bitmesine bu kadar günden az kalan genç kabul edilmez (mezuniyet en az 6 ders günü ister: 540 dk / 90)
+  minYouthDaysLeft: 6,
   // Ders: 14:00-16:00 arası, günde en çok 90 dakika (ham dakika; çarpanlar ilerlemeye uygulanır)
   hours: { from: 14, to: 16 },
   minutesPerDay: 90,
@@ -77,5 +79,7 @@ export const UNIVERSITY_TEXT = {
   memoryAdmitted: "Darülfünun'a {field} bölümüne kabul edildi",
   memoryGraduated: "Darülfünun'u {field} bölümünden bitirdi",
   memoryDropped: "Darülfünun'u yarım bıraktı",
+  lateTitle: 'Zamanı yetmeyen',
+  lateReason: 'gençliği bitmeden mezun olamaz ({days} gün kaldı; en az {min} gün gerekir)',
   academyLine: "Mezunlar Darülfünun'a devam edebilir (Gelişmiş Şehir)",
 };
