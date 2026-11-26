@@ -396,7 +396,7 @@ const open = async (opts) => {
     const json = JSON.parse(JSON.stringify({ ...st.toJSON(), version: CONFIG.SAVE_VERSION, terrain: [] }));
     const back = new GameState();
     back.restore(json);
-    c('kayıt: sayaçlar (pleasedStreak, condolences) ve tamamlanan hedefler gidiş-dönüşte korunur; sürüm 41 kalır', done && back.stats.pleasedStreak === 2 && back.stats.condolences === 1 && Boolean(back.milestones.legacy) && CONFIG.SAVE_VERSION === 41, `${done} ${back.stats.pleasedStreak} ${back.stats.condolences}`);
+    c('kayıt: sayaçlar (pleasedStreak, condolences) ve tamamlanan hedefler gidiş-dönüşte korunur; sürüm 42 (34.1)', done && back.stats.pleasedStreak === 2 && back.stats.condolences === 1 && Boolean(back.milestones.legacy) && CONFIG.SAVE_VERSION === 42, `${done} ${back.stats.pleasedStreak} ${back.stats.condolences}`);
     for (const id of Object.keys(st.milestones)) delete st.milestones[id];
     st.milestones.firstHome = { day: 1, hour: 8, minute: 0 };
     st.milestones.warmTable = { day: 1, hour: 9, minute: 0 };

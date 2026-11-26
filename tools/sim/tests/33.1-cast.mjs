@@ -219,7 +219,10 @@ const namesKey = (cast) => cast.map((c) => c.name).sort().join(',');
     check('eski kayıt: yapılar ve kaynaklar aynen geldi', fixture.buildings.length === s.buildings.length && fixture.resources.gold === s.resources.gold);
     // arazi farkı: yükledikten sonra kayıt anındaki fark, fikstürdekiyle aynı
     const diff = scene.saves.snapshot().terrain;
-    check('eski kayıt: yükledikten sonra arazi farkı fikstürdekiyle aynı', JSON.stringify(diff) === JSON.stringify(fixture.terrain), `${diff.length} / ${fixture.terrain.length} karo`);
+    // (34.1) kayıt sürümü 42: hücreler [x, y, ...]; fikstürün [indeks, ...] hücreleri çekirdek genişliğiyle koordinata çevrilip karşılaştırılır
+    const width = fixture.map?.width ?? 48;
+    const expected = fixture.terrain.map(([i, ...rest]) => [i % width, Math.floor(i / width), ...rest]);
+    check('eski kayıt: yükledikten sonra arazi farkı fikstürdekiyle aynı', JSON.stringify(diff) === JSON.stringify(expected), `${diff.length} / ${fixture.terrain.length} karo`);
     check('eski kayıt: yeniden kaydedilince lifeSeed yazılmaz (harita tohumu kullanılmaya devam eder)', !('lifeSeed' in scene.saves.snapshot()));
     sim.step(225 * 6);
     check('eski kayıt: bir süre yaşar, sakin sayısı korunur', game.state.characters.length >= fixture.characters.length - 1);
@@ -240,7 +243,7 @@ const namesKey = (cast) => cast.map((c) => c.name).sort().join(',');
     const diffBefore = JSON.stringify(scene.saves.snapshot().terrain);
     game.events.emit('ui:save');
     const saved = JSON.parse(localStorage.getItem('lmgame.save.v2'));
-    check('yeni kayıt: lifeSeed yazılır, sürüm artmaz', saved.lifeSeed === life && saved.seed === 31 && saved.version === 41, `lifeSeed ${saved.lifeSeed} sürüm ${saved.version}`);
+    check('yeni kayıt: lifeSeed yazılır, sürüm artmaz', saved.lifeSeed === life && saved.seed === 31 && saved.version === 42, `lifeSeed ${saved.lifeSeed} sürüm ${saved.version}`);
     game.events.emit('ui:newGame'); // başka bir oyuna geç
     game.events.emit('ui:load');
     s = game.state;

@@ -167,9 +167,9 @@ const live = await open({ seed: 42, stopLoop: false });
       await page.mouse.move(400, 300); await page.mouse.wheel(0, 400); await page.waitForTimeout(200); await page.mouse.wheel(0, 400); await page.waitForTimeout(300);
       const spots = await page.evaluate(() => {
         const sc = game.scenes.current; const cam = sc.camera; const map = sc.map; const T = 16;
-        sc.camera.centerOn(sc.world.landmarks.plaza.centerX * T, sc.world.landmarks.plaza.centerY * T, innerWidth, innerHeight); sc.camera.clamp(map.pixelWidth, map.pixelHeight, innerWidth, innerHeight);
+        sc.camera.centerOn(sc.world.landmarks.plaza.centerX * T, sc.world.landmarks.plaza.centerY * T, innerWidth, innerHeight); sc.clampCamera(sc.camera); // (34.1)
         const out = [];
-        for (let y = 0; y < map.height; y++) for (let x = 0; x < map.width; x++) {
+        for (let y = map.y0; y < map.y1; y++) for (let x = map.x0; x < map.x1; x++) {
           if (!sc.jobs.isHarvestable(x, y)) continue;
           const o = map.getObject(x, y); if (o !== 'rock' && o !== 'pebbles' && !String(o).includes('rock')) continue;
           const sx = (x * T + 8 - cam.x) * cam.zoom; const sy = (y * T + 8 - cam.y) * cam.zoom;
@@ -186,8 +186,8 @@ const live = await open({ seed: 42, stopLoop: false });
       await page.waitForTimeout(1500);
       const spot = await page.evaluate(() => {
         const t = game.scenes.current.tools; const cam = game.scenes.current.camera; const T = 16;
-        const w = game.scenes.current.map.width; let best = null;
-        for (const [k, v] of t.paint.results) if (v) { const x = k % w, y = Math.floor(k / w); const sx = (x * T + 8 - cam.x) * cam.zoom, sy = (y * T + 8 - cam.y) * cam.zoom; if (sx > 20 && sx < innerWidth - 340 && sy > 80 && sy < innerHeight - 160) { best = { x: sx, y: sy }; break; } }
+        const m34 = game.scenes.current.map; let best = null;
+        for (const [k, v] of t.paint.results) if (v) { const { x, y } = m34.coordOf(k); const sx = (x * T + 8 - cam.x) * cam.zoom, sy = (y * T + 8 - cam.y) * cam.zoom; if (sx > 20 && sx < innerWidth - 340 && sy > 80 && sy < innerHeight - 160) { best = { x: sx, y: sy }; break; } }
         return best;
       });
       if (spot) { await page.mouse.move(spot.x, spot.y); await page.waitForTimeout(120); await page.mouse.click(spot.x, spot.y); }
@@ -221,7 +221,7 @@ const live = await open({ seed: 42, stopLoop: false });
     for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) {
       const a = sc.construction.anchorFor('cabin', x, y);
       const fresh = sc.construction.checkPlacement('cabin', a.x, a.y).ok;
-      n++; if (fresh) ok++; if (Boolean(p.results.get(y * w + x)) !== fresh) diff++;
+      n++; if (fresh) ok++; if (Boolean(p.results.get(sc.map.index(x, y))) !== fresh) diff++;
     }
     return { complete: p.complete, diff, n, ok };
   });
@@ -287,7 +287,8 @@ const live = await open({ seed: 42, stopLoop: false });
     const bar = document.querySelector(mode === 'list' ? '.build-items' : '.build-strip').getBoundingClientRect();
     let best = null;
     for (const [k, v] of sc.tools.paint.results) if (v) {
-      const x = k % w, y = Math.floor(k / w); const sx = (x * T + 8 - cam.x) * cam.zoom, sy = (y * T + 8 - cam.y) * cam.zoom;
+      const { x, y } = sc.map.coordOf(k); // (34.1) dünya kökeni
+      const sx = (x * T + 8 - cam.x) * cam.zoom, sy = (y * T + 8 - cam.y) * cam.zoom;
       if (sx > 20 && sx < innerWidth - 340 && sy > 80 && sy < bar.top - 6 && (!best || sy > best.y)) best = { x: sx, y: sy };
     }
     return best;

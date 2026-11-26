@@ -176,7 +176,7 @@ const open = async (opts) => {
     c('rehber: taş 2 gün 0\'da kalınca taşın kalıcı kaynağı (hangi yapı, hangi seviye)', sStone?.id === 'stone' && /Taş Ocağı/.test(sStone.text) && !hasQuarry, sStone?.text);
     st.resources.stone = 100;
     const map = sc.world.map;
-    for (let y = 0; y < map.height; y++) for (let x = 0; x < map.width; x++) if (map.getObject(x, y) === 'rock') map.setObject(x, y, null);
+    for (let y = map.y0; y < map.y1; y++) for (let x = map.x0; x < map.x1; x++) if (map.getObject(x, y) === 'rock') map.setObject(x, y, null); // (34.1) bütün dünya
     gs.facts = {};
     gs.dailyFacts();
     c('rehber: çevredeki kayalar tükenince de taş kartı (stoktan bağımsız)', gs.facts.rocksGone === true && G.CONDITIONS.stone.when({ facts: gs.facts }) === true);
@@ -230,7 +230,7 @@ const open = async (opts) => {
     const offVals = [JSON.stringify(BUILDINGS.quarry.cost), TOWN_TIERS[1].requires.population, TOWN_TIERS[2].requires.buildings, TOWN_TIERS[2].requires.upgraded, Cr.coinTax(probe, 20)];
     ENGINES.novicePath = true;
     c('denge ayarları: Taş Ocağı yalnızca odunla (50; eski odun 35 + taş 15), Köy nüfus 12 (13), Kasaba yapı 15 / yükseltme 2 (17 / 3), 4 altınlık keseden %20 vergi 1 (0); şalter kapalıyken eski değerler', onVals.join() === '{"wood":50},12,15,2,1' && offVals.join() === '{"wood":35,"stone":15},13,17,3,0', `${onVals} | ${offVals}`);
-    c('kayıt sürümü 41 kalır, yeni alan yalnızca çalışma anında', CONFIG.SAVE_VERSION === 41 && !JSON.stringify(sc.saves.snapshot()).includes('goldDry'));
+    c('kayıt sürümü 42 (34.1), yeni alan yalnızca çalışma anında', CONFIG.SAVE_VERSION === 42 && !JSON.stringify(sc.saves.snapshot()).includes('goldDry'));
     return out;
   })));
   await browser.close();

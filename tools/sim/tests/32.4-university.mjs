@@ -66,10 +66,10 @@ const errors = [];
     const rngStates = () => Object.entries(sc).filter(([, v]) => v && typeof v === 'object' && (v.rng instanceof Random || v.dice instanceof Random)).map(([k, v]) => `${k}:${(v.rng ?? v.dice).state}`).join(',');
 
     // ---- 1. veri
-    c('veri: şalter açık, kapasite 6, ders 14-16 / 90 dk, eşik 540, Gelişmiş Şehir (4) ve tek, kart tablosu 7, kayıt 41, moodlet 33',
+    c('veri: şalter açık, kapasite 6, ders 14-16 / 90 dk, eşik 540, Gelişmiş Şehir (4) ve tek, kart tablosu 7, kayıt 42, moodlet 33',
       ENGINES.university && ENGINES.educationMerit && UD.UNIVERSITY.capacity === 6 && UD.UNIVERSITY.hours.from === 14 && UD.UNIVERSITY.hours.to === 16 && UD.UNIVERSITY.minutesPerDay === 90 && UD.UNIVERSITY.graduateMinutes === 540 &&
       B.BUILDINGS.university.requiresTier === 4 && B.BUILDINGS.university.unique && B.BUILDINGS.university.category === 'Bilgi' && !B.BUILDINGS.university.cost.gold && B.BUILD_MENU.includes('university') &&
-      SD.STORY_TABLE_VERSION === 8 && CONFIG.SAVE_VERSION === 41 && Object.keys(MD.MOODLETS).length === 33);
+      SD.STORY_TABLE_VERSION === 8 && CONFIG.SAVE_VERSION === 42 && Object.keys(MD.MOODLETS).length === 33);
 
     // ---- 2. kilit
     st.town.tier = 3;
@@ -322,7 +322,7 @@ const errors = [];
     st = game.state;
     sc = game.scenes.current;
     const sKey2 = JSON.stringify(st.characters.filter((x) => x.higherStudy || x.graduate).map((x) => [x.id, x.higherStudy, x.graduate]));
-    c('kaydet → yükle: öğrencilik, mezuniyet ve sayaçlar aynı; sürüm 41; boş alan yazılmaz', raw.version === 41 && sKey === sKey2 && JSON.stringify(st.university) === uKey && raw.characters.some((x) => x.higherStudy) && raw.characters.some((x) => !('higherStudy' in x) && !('graduate' in x)), `${sKey.slice(0, 120)} | ${sKey2.slice(0, 120)}`);
+    c('kaydet → yükle: öğrencilik, mezuniyet ve sayaçlar aynı; sürüm 42 (34.1); boş alan yazılmaz', raw.version === 42 && sKey === sKey2 && JSON.stringify(st.university) === uKey && raw.characters.some((x) => x.higherStudy) && raw.characters.some((x) => !('higherStudy' in x) && !('graduate' in x)), `${sKey.slice(0, 120)} | ${sKey2.slice(0, 120)}`);
     c('yüklemeden sonra tek sistem dinler (çift kabul yok)', sc.university.unsubscribers.length === 5 && U.studentsOf(st).length <= 6);
     return out;
   })));

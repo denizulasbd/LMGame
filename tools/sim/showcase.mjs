@@ -45,7 +45,7 @@ async function shoot(name, focus, zoom = 4) {
     if (target) {
       scene.camera.zoom = zoom;
       scene.camera.centerOn(target.x, target.y, game.renderer.width, game.renderer.height);
-      scene.camera.clamp(scene.map.pixelWidth, scene.map.pixelHeight, game.renderer.width, game.renderer.height);
+      scene.clampCamera(scene.camera); // (34.1)
     }
     game.render(0);
   }, { focus, zoom });
@@ -212,7 +212,7 @@ async function festival(theme) {
     const scene = game.scenes.current;
     scene.camera.zoom = 3;
     scene.camera.centerOn(venue.center.x, venue.center.y + 12, game.renderer.width, game.renderer.height);
-    scene.camera.clamp(scene.map.pixelWidth, scene.map.pixelHeight, game.renderer.width, game.renderer.height);
+    scene.clampCamera(scene.camera); // (34.1)
     game.render(0);
   });
   await page.screenshot({ path: `${out}/vitrin-festival-${theme}.png` });

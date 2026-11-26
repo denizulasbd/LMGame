@@ -41,7 +41,7 @@ results.push(...(await page.evaluate(async () => {
   for (const x of st.characters) calm(x);
 
   // ---- 1. veri
-  c('veri: şalter açık, tohum + 42 izole (35-41 dolu), yedi suç türü (32.6a: bahçeden koparma), ağırlıklar 1-5, moodlet sayısı 33', ENGINES.justice === true && D.JUSTICE_SEED_OFFSET === 42 && D.CRIME_KEYS.join() === 'innPilfer,marketFruit,gardenPick,pantryRation,woodpile,pursePinch,pettyVandal' && D.CRIME_KEYS.every((key) => D.CRIMES[key].severity.every((v) => v >= 1 && v <= 5)) && MD.MOODLET_KEYS.length === 33 && CONFIG.SAVE_VERSION === 41);
+  c('veri: şalter açık, tohum + 42 izole (35-41 dolu), yedi suç türü (32.6a: bahçeden koparma), ağırlıklar 1-5, moodlet sayısı 33', ENGINES.justice === true && D.JUSTICE_SEED_OFFSET === 42 && D.CRIME_KEYS.join() === 'innPilfer,marketFruit,gardenPick,pantryRation,woodpile,pursePinch,pettyVandal' && D.CRIME_KEYS.every((key) => D.CRIMES[key].severity.every((v) => v >= 1 && v <= 5)) && MD.MOODLET_KEYS.length === 33 && CONFIG.SAVE_VERSION === 42);
 
   // ---- 2. adaylar
   const elder = { ...a, lifeStage: 'elder', isChild: false };
@@ -198,7 +198,7 @@ results.push(...(await page.evaluate(async () => {
   E.emit('ui:load');
   const st2 = game.state;
   const sc2 = game.scenes.current;
-  c('kaydet → yükle: state.justice aynı, kayıt sürümü 41, c.crimePlan kaydedilmez', raw.version === 41 && JSON.stringify(raw.justice) === before && JSON.stringify(st2.justice) === before && st2.characters.every((x) => x.crimePlan === undefined) && !raw.characters.some((x) => 'crimePlan' in x), `${k3?.id}`);
+  c('kaydet → yükle: state.justice aynı, kayıt sürümü 42 (34.1), c.crimePlan kaydedilmez', raw.version === 42 && JSON.stringify(raw.justice) === before && JSON.stringify(st2.justice) === before && st2.characters.every((x) => x.crimePlan === undefined) && !raw.characters.some((x) => 'crimePlan' in x), `${k3?.id}`);
 
   // ---- 9. ayrılan / ölen suçlunun davası düşer, kopuk referans kalmaz
   const a2 = st2.characters.find((x) => x.id === a.id);

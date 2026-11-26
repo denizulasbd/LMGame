@@ -163,7 +163,7 @@ results.push(...(await page.evaluate(async () => {
   const json = JSON.parse(JSON.stringify({ ...st.toJSON(), version: CONFIG.SAVE_VERSION, terrain: [] }));
   const back = new GameState();
   back.restore(json);
-  c('Kayıt: tamamlanan geç oyun hedefi gidiş-dönüşte korunur; sürüm 41 kalır', back.milestones.justiceServed?.day === 12 && CONFIG.SAVE_VERSION === 41, '');
+  c('Kayıt: tamamlanan geç oyun hedefi gidiş-dönüşte korunur; sürüm 42 (34.1)', back.milestones.justiceServed?.day === 12 && CONFIG.SAVE_VERSION === 42, '');
   return out;
 })));
 const ok = report(errors);
