@@ -33,6 +33,8 @@ import { StructureSystem } from '../systems/StructureSystem.js';
 import { EconomySystem } from '../systems/EconomySystem.js';
 import { JobSystem } from '../systems/JobSystem.js';
 import { ConstructionSystem } from '../systems/ConstructionSystem.js';
+import { ForestSystem } from '../systems/ForestSystem.js';
+import { FOREST_SEED_OFFSET } from '../data/forest.js';
 import { NatureSystem, purgeStumps } from '../systems/NatureSystem.js';
 import { PopulationSystem } from '../systems/PopulationSystem.js';
 import { WeatherSystem } from '../systems/WeatherSystem.js';
@@ -197,6 +199,8 @@ export class TownScene extends Scene {
       baseTileAt: (x, y) => TILE_BY_ID[this.baseTerrain.tiles[map.index(x, y)]] ?? null,
     });
     this.nature = new NatureSystem(this.game, this.world);
+    // (34.3) Orman kendiliğinden yenilenir (gün dönümü); başlangıç ağaç sayısı haritanın üretildiği hâlinden gelir
+    this.forest = new ForestSystem(this.game, this.world, new Random(life + FOREST_SEED_OFFSET), { baseObjects: () => this.baseTerrain.objects });
     this.population = new PopulationSystem(this.game, this.world, new Random(life + 3));
     this.townEvents = new EventSystem(this.game, this.world, { population: this.population, economy: this.economy });
     this.audio = new AudioSystem(this.game, this.world, () => {
@@ -373,6 +377,7 @@ export class TownScene extends Scene {
       this.timeSystem,
       this.construction,
       this.nature,
+      this.forest,
       this.population,
       this.behavior,
       this.tools,
