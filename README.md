@@ -21,8 +21,9 @@ Ardından tarayıcıda `http://localhost:8080` adresini aç.
 ortada "Kaldığın Yerden Devam Et" (son elle / otomatik kayıt) ve "Yeni Kasaba Kur" (kasaba adı ve
 isteğe bağlı tohum) düğmeleri vardır. Oyun sırasında sayfayı yenilediğinde (F5) ya da sekmeyi kapatıp
 açtığında kasaba tam olduğu gibi geri gelir (bkz. *Kayıt ve yükleme*). Aynı haritayı baştan görmek için
-tohum verilebilir: `http://localhost:8080/?seed=42` (mevcut tohum dock'taki **Ayarlar** penceresinde yazar);
-tohumlu adres her zaman yeni oyun başlatır ve tohumu adres çubuğundan siler, böylece F5 o oyunu sürdürür.
+harita tohumu verilebilir: `http://localhost:8080/?seed=42` (mevcut harita tohumu dock'taki **Ayarlar** penceresinde yazar);
+tohumlu adres yeni oyun başlatır ve tohumu adres çubuğundan siler, böylece F5 o oyunu sürdürür. (33.1) Aynı harita tohumu aynı
+haritayı verir, ama sakinler (ad, görünüş, kişilik) her yeni kasabada rastgeledir; araçlar için `?life=` hayat tohumunu sabitler.
 
 **Kontroller**
 
@@ -524,14 +525,14 @@ kayıtlarda kurulmuş ya da yarım kalmış lambalar yüklenince Sokak Feneri ol
 Işıltılı Sokaklar hedefine sayılır).
 Başlangıç ekranının arkasındaki tanıtım kasabası hiçbir şey kaydetmez.
 
-Kayda şunlar girer: harita tohumu, boyutu ve **haritadaki değişiklikler** (kesilen ağaçlar, kütükler, döşenen
+Kayda şunlar girer: harita tohumu (ve isteğe bağlı hayat tohumu `lifeSeed`; eski kayıtta yoksa harita tohumu kullanılır), boyutu ve **haritadaki değişiklikler** (kesilen ağaçlar, kütükler, döşenen
 yollar ve köprüler; harita her seferinde tohumdan üretilir, yalnızca farklı karolar saklanır),
 yapılar ve şantiyeler (inşaat ilerlemesi, iskele yönü, çalıdaki meyveler), tüm sakinler (konum, ihtiyaçlar,
 kişilik, ev, sırtındaki yük, evde uyuyor mu), kaynak stokları, iş emirleri, yeniden büyüyen ağaçlar, oyun
 zamanı ve hızı, hava, arkadaşlık puanları ve günlük. Sakinlerin o anki görevi kaydedilmez; yüklenince
 yapay zekâ ihtiyaçlarına bakıp yeniden karar verir (uyuyanlar uyumaya devam eder).
 
-**Yeni Harita** düğmesi önce onay ister (6 saniye içinde onaylanmazsa vazgeçilir), rastgele bir tohumla
+**Yeni Harita** düğmesi önce onay ister (6 saniye içinde onaylanmazsa vazgeçilir), rastgele tohumlarla
 sıfırdan başlar ve `session` yuvasını temizler; `main` kaydın **Yükle** ile açılabilir kalır.
 Bozuk ya da başka sürümden bir kayıt oyunu açmaz: atlanır ve yeni oyun başlar (`config.js` →
 `SAVE_VERSION`).

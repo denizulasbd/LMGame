@@ -2,6 +2,16 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 10 satır (33.0'da 20'den indirildi). README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 33.1 — Rastgele Kadro ve Hayat Tohumu (kayıt sürümü 41 kalır)
+- İki tohum: `state.seed` harita tohumu (aynı tohum aynı harita); yeni `state.lifeSeed` hayat tohumu, her yeni oyunda rastgele (Yeni Kasaba Kur, Yeni Harita, `?seed=`). `lifeSeedOf(state)` (`utils/lifeSeed.js`): alan yoksa harita tohumu. Haritanın dışındaki ~40 üreteç ve hesap (TownScene `seed + N`, hava, hayvanlar, kimya, ömür, arzu, çatışma) buna geçti.
+- Harita tohumunda kalanlar: arazi / işaretler / başlangıç yapıları (WorldGenerator), kayıtta yeniden üretilen taban arazi (TerrainSnapshot; bozulursa kayıtlar bozulur), Vadi Karakteri, varsayılan kasaba adı.
+- Eski kayıt: `lifeSeed` yoksa harita tohumu kullanılır, kayıt eskisi gibi sürer. Yeni kayıt `lifeSeed` yazar (isteğe bağlı alan). Araçlar: `?life=`, `openGame({ seed, life = seed })`, autopilot `--life`.
+- Kadro: `data/names.js` (177 ad, ≤8 harf), `systems/Residents.js` (saf `makeResident`, `makeStartingCast`), `data/cast.js` (kurallar, olasılıklar). Başlangıç altılısı: ≥4 kişi 20-45 yaş, ≤1 kişi 55 üstü, 50-58 arası biri, aynı özellik ≤2, ≥2 işe yarar özellik; tutmazsa yeniden dener.
+- Tanıdık yüzler (14 elle yazılmış karakter): başlangıçta %25, her göçmen için %10. Göçmen (`pickResident`) ve yeni doğan (`pickName`) büyük havuzdan; kasabadakilerle ve son ayrılanlarla (`state.recentNames`, en çok 12, isteğe bağlı) ad çakışmaz.
+- Arayüz: başlangıç ekranında "Harita tohumu (isteğe bağlı)" ve not; hayat tohumu görünmez. Kararlara ek şans yok.
+- Test: `tests/33.1-cast.mjs` (43). Kadroya bağlı 5 eski testin kurulumu düzeltildi (29.6, 29.7, 30.3, 32.4 ölçümü hayat tohumu 7'ye sabit, 32.5). Ekran: `docs/playtest/img33.1/` (`tools/sim/shots33.1.mjs`).
+- Kapı (`--quick`) yeşil, 177 sn; `compat --all` 1990/1990 yeşil (2 dk 13 sn).
+
 ## Aşama 33.0 — Hafifletme (kayıt sürümü 41 kalır)
 - Kural değişikliği: determinizm, izole üreteç (tohum + N), bayt eşitliği (sha1) ve "her yeni mekanik şalter ekler" şartları kalktı (README / CHANGELOG'daki eski cümlelere not düşüldü). Mevcut `ENGINES` şalterleri silinmedi; CHANGELOG sınırı aşama başına 10 satır. Kurallar yeni `CLAUDE.md`'de.
 - Testler: aşama testlerinden üreteç durumu / `Math.random` sızıntısı, sha1, determinizm ve "tohum + N" ezber denetimleri çıkarıldı (işlevsel kontroller korundu). `32.6b-integration` kısaldı (şalter matrisi 9 → 5 yapılandırma, 62 test).

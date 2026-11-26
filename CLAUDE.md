@@ -23,7 +23,7 @@ Sakin, sıcak, hafif mizahi. Metinler Türkçe, kısa ve güler yüzlü. Şiddet
 
 ## Rastgelelik (33.0'dan beri)
 - **Harita yalnızca harita tohumundan gelir**; aynı tohum aynı haritayı verir.
-- **İnsanlar (isim, görünüş, kişilik) her oyunda rastgele olabilir** (33.1'de uygulanacak).
+- **İnsanlar (isim, görünüş, kişilik) her yeni oyunda rastgeledir** (33.1): `state.lifeSeed` hayat tohumu, `lifeSeedOf(state)` (`src/utils/lifeSeed.js`) haritanın DIŞINDAKİ her üretecin tohumudur; eski kayıtta yoksa harita tohumu kullanılır. Kadro: `src/systems/Residents.js` + `data/names.js` + `data/cast.js`. Testlerde `openGame({ seed, life })` (`life` verilmezse seed), adreste `?life=`.
 - Sakinlerin kararları kişiliklerine göre **kuralla** verilir. Kullanıcı kararlara ayrıca "şans" eklenmesini istemiyor.
 - **Determinizm şartı yok:** bayt bayt eşitlik, "şalter kapalıyken tarih aynı", izole üreteç (tohum + N) zorunlu değil. Yeni kod
   sistemin mevcut üretecini normal biçimde kullanabilir. `ENGINES` şalterleri durur ama yeni mekanik şalter eklemek zorunda değil.
