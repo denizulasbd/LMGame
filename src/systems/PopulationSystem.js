@@ -2,9 +2,8 @@
 // haritanın kenarındaki yoldan yürüterek getirir. NE ZAMAN geleceğine EventSystem karar verir
 // (sabah 08:00, boş yatak + yeterli yiyecek + yüksek refah; bkz. data/town.js -> IMMIGRATION).
 import { Character } from '../entities/Character.js';
-import { compoundName } from '../utils/names.js';
-import { RESIDENT_POOL, EXTRA_NAMES, APPEARANCE_PARTS, TRAITS, NEED_KEYS, IMMIGRANT_AGE } from '../data/characters.js';
-import { clashesWithOwn } from '../ai/TraitProfile.js';
+import { NEED_KEYS } from '../data/characters.js';
+import { pickImmigrant, unavailableNames, rememberDeparted } from './Residents.js';
 
 const ARRIVAL_SPACING_MINUTES = 12; // aynı sabah gelenler üst üste yürümesin
 
@@ -19,9 +18,15 @@ export class PopulationSystem {
     this.state = game.state;
     this.world = world;
     this.rng = rng;
+    // (33.1) Vefat eden, köyden ayrılan ya da sürgün edilenlerin adı bir süre yeni gelenlere verilmez (state.recentNames)
+    this.off = game.events.on('population:left', ({ character } = {}) => {
+      if (character?.name) this.state.recentNames = rememberDeparted(this.state.recentNames ?? [], character.name);
+    });
   }
 
-  destroy() {}
+  destroy() {
+    this.off?.();
+  }
 
   /** count kişiyi aralıklı olarak yola çıkarır; gelen sakinleri döndürür. */
   welcomeNewcomers(count) {
@@ -74,20 +79,11 @@ export class PopulationSystem {
     return character;
   }
 
-  /** Havuzda henüz kasabada olmayan biri; havuz bittiyse rastgele bir kişi. */
+  /**
+   * (33.1) Göçmen: %10 olasılıkla elle yazılmış tanıdık yüzlerden boştaki biri, yoksa yepyeni biri (ad, kişilik ve görünüş büyük havuzdan;
+   * kasabadakilerle ve son ayrılanlarla ad çakışmaz). Kararlara şans eklenmez: çeşitlilik yalnızca farklı insanlardan gelir.
+   */
   pickResident() {
-    const taken = new Set(this.state.characters.map((c) => c.name));
-    const available = RESIDENT_POOL.filter((r) => !taken.has(r.name));
-    if (available.length > 0) return structuredClone(this.rng.pick(available));
-
-    const freeNames = EXTRA_NAMES.filter((n) => !taken.has(n));
-    const name = freeNames.length ? this.rng.pick(freeNames) : compoundName(this.rng, EXTRA_NAMES, taken);
-    // İki özellik; birbirinin zıddı olanlar (Çalışkan ve Uykucu gibi) aynı kişide bulunmaz
-    const traitKeys = [];
-    for (const key of this.rng.shuffle(Object.keys(TRAITS))) {
-      if (traitKeys.length < 2 && !clashesWithOwn(traitKeys, key)) traitKeys.push(key);
-    }
-    const appearance = Object.fromEntries(Object.entries(APPEARANCE_PARTS).map(([k, options]) => [k, this.rng.pick(options)]));
-    return { name, age: this.rng.int(IMMIGRANT_AGE.min, IMMIGRANT_AGE.max), traits: traitKeys, appearance };
+    return pickImmigrant(this.rng, unavailableNames(this.state));
   }
 }

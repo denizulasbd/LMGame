@@ -13,12 +13,12 @@
 // Yayınladığı olaylar: 'family:homeShared' { a, b, home, swapped?, vacated? (boşalan evler) }, 'family:madeRoom' { character, from, to },
 //   'family:childBorn' { child, parents, home }, 'family:grownUp' { character }, 'population:changed'.
 import { activePopulation } from './LifeStages.js';
-import { compoundName } from '../utils/names.js';
+import { pickName, unavailableNames } from './Residents.js';
 import { Character } from '../entities/Character.js';
-import { HAPPY_HOME, CHILDREN, CHILD_NAMES, CHILD_SHIRTS, CHILD_HAIR_STYLES } from '../data/family.js';
+import { HAPPY_HOME, CHILDREN, CHILD_SHIRTS, CHILD_HAIR_STYLES } from '../data/family.js';
 import { MARRIAGE } from '../data/relationships.js';
 import { ACTIVITIES } from '../data/activities.js';
-import { EXTRA_NAMES, APPEARANCE_PARTS, NEED_KEYS, TRAITS } from '../data/characters.js';
+import { APPEARANCE_PARTS, NEED_KEYS, TRAITS } from '../data/characters.js';
 import { partnerOf, childrenOf } from './RelationshipSystem.js';
 import { townHappiness } from './TownStatus.js';
 import { clashesWithOwn } from '../ai/TraitProfile.js';
@@ -280,13 +280,9 @@ export class FamilySystem {
     return traits;
   }
 
+  /** (33.1) Yeni doğana büyük ad havuzundan boştaki bir ad (kasabadakilerle ve son ayrılanlarla çakışmaz). */
   pickName() {
-    const taken = new Set(this.state.characters.map((c) => c.name));
-    const free = CHILD_NAMES.filter((n) => !taken.has(n));
-    if (free.length) return this.rng.pick(free);
-    const extra = EXTRA_NAMES.filter((n) => !taken.has(n));
-    if (extra.length) return this.rng.pick(extra);
-    return compoundName(this.rng, [...CHILD_NAMES, ...EXTRA_NAMES], taken);
+    return pickName(this.rng, unavailableNames(this.state));
   }
 
   growUp(c) {
