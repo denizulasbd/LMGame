@@ -8,6 +8,8 @@ const check = (name, ok, detail = '') => results.push({ name, ok: Boolean(ok), d
 const open = async (opts) => {
   const g = await openGame(opts);
   g.page.on('pageerror', (e) => errors.push(String(e)));
+  // (34.3) Yol üstüne kurmak onaylı (ikinci tık); gerçek tıklama testleri yola değmeyen uygun karoyu seçer
+  await g.page.evaluate(() => { window.plainSpot = (sc, x, y) => { const a = sc.construction.anchorFor('cabin', x, y); return sc.construction.checkPlacement('cabin', a.x, a.y, { roads: true }).roads.length === 0; }; });
   return g;
 };
 const pause = (page) => page.evaluate(() => { game.state.time.paused = true; });
@@ -187,7 +189,7 @@ const live = await open({ seed: 42, stopLoop: false });
       const spot = await page.evaluate(() => {
         const t = game.scenes.current.tools; const cam = game.scenes.current.camera; const T = 16;
         const m34 = game.scenes.current.map; let best = null;
-        for (const [k, v] of t.paint.results) if (v) { const { x, y } = m34.coordOf(k); const sx = (x * T + 8 - cam.x) * cam.zoom, sy = (y * T + 8 - cam.y) * cam.zoom; if (sx > 20 && sx < innerWidth - 340 && sy > 80 && sy < innerHeight - 160) { best = { x: sx, y: sy }; break; } }
+        for (const [k, v] of t.paint.results) if (v) { const { x, y } = m34.coordOf(k); if (!plainSpot(game.scenes.current, x, y)) continue; const sx = (x * T + 8 - cam.x) * cam.zoom, sy = (y * T + 8 - cam.y) * cam.zoom; if (sx > 20 && sx < innerWidth - 340 && sy > 80 && sy < innerHeight - 160) { best = { x: sx, y: sy }; break; } }
         return best;
       });
       if (spot) { await page.mouse.move(spot.x, spot.y); await page.waitForTimeout(120); await page.mouse.click(spot.x, spot.y); }
@@ -289,7 +291,7 @@ const live = await open({ seed: 42, stopLoop: false });
     for (const [k, v] of sc.tools.paint.results) if (v) {
       const { x, y } = sc.map.coordOf(k); // (34.1) dünya kökeni
       const sx = (x * T + 8 - cam.x) * cam.zoom, sy = (y * T + 8 - cam.y) * cam.zoom;
-      if (sx > 20 && sx < innerWidth - 340 && sy > 80 && sy < bar.top - 6 && (!best || sy > best.y)) best = { x: sx, y: sy };
+      if (sx > 20 && sx < innerWidth - 340 && sy > 80 && sy < bar.top - 6 && (!best || sy > best.y) && plainSpot(sc, x, y)) best = { x: sx, y: sy };
     }
     return best;
   }, mode);
