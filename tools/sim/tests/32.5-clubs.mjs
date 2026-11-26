@@ -219,6 +219,7 @@ const historyRun = async (enginesOff) => {
     const pairAfter = pa && pb2 ? rel.get(pa, pb2) : 0;
     c('arkadaşlık: birlikte olanlar yakınlaşır, gelmeyenle ilişki değişmez', still && pairAfter > pairBefore + 2 && rel.get(pa, absent) === absentBefore, `${pairBefore} → ${pairAfter} (${still})`);
     c('buluşma sırasında üye sohbet / randevu davetine kalkmaz', pa && !brain.isAvailableForChat(pa, 18));
+    for (const x of here) x.moodlets = []; // (33.1) kadro rastgele: buluşma öncesi sıradan bir sohbetten kalan Tatlı Sohbet / Ekşi karşılaşma, kulüp bitişinin verdiği moodlet'i gölgelemesin
     for (let i = 0; i < 60 && st.clubs.gardenClub.live; i++) sim.step(30);
     const gr = st.clubs.gardenClub;
     c('bitiş: buluşma sayılır, katılım listesi, seferdeki (uygun değil) üyeye kaçırma sayılmaz', gr.sessions === 1 && gr.attendance.at(-1).length >= 3 && absent.club.missed === 0 && gr.recent.at(-1) === 1 && garden.every((x) => x === absent || x.club.missed === (gr.attendance.at(-1).includes(x.id) ? 0 : 1)), JSON.stringify({ att: gr.attendance, missed: garden.map((x) => x.club?.missed) }));

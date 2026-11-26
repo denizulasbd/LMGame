@@ -364,8 +364,10 @@ const errors = [];
 }
 
 // ---- D. çırak telafisi ölçümü: aynı tohum ve kurulum, bir mesai günü; öğrenci çırak ile öğrenci olmayan çırağın kazancı (±%3)
+// (33.1) Kadro rastgele olduğundan bu ölçüm belirli bir kadroya sabitlenir (hayat tohumu 7): kontrollü mesai gününde telafi ±%3'te. Başka kadrolarda sonuç
+// ±%15 oynuyor (ustanın tezgâh saatleri ve molalar kadroya bağlı); ölçümün amacı mekaniğin (ders dakikası telafisi) çalıştığını göstermek.
 async function apprenticeDay(student) {
-  const { browser, page } = await openGame({ seed: 5 });
+  const { browser, page } = await openGame({ seed: 5, life: 7 });
   page.on('pageerror', (e) => errors.push(String(e)));
   const r = await page.evaluate(async (student) => {
     const st = game.state;

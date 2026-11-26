@@ -135,7 +135,7 @@ const out = await page.evaluate(async () => {
   check('terk ediş: Kırgın önce yola çıkar, Sadık başka aday varken seçilmez', group && group[0] === bitter && !group.includes(saddest), group?.map((c) => c.name).join());
 
   // 9. yangın minneti (en çok 3, kimlik sırası) ve anının kişisi
-  const site = s.buildings.find((x) => x.functional && x.occupants?.size && s.characters.some((c) => c.homeId === x.id));
+  const site = s.buildings.find((x) => x.functional && x.occupants?.size && s.characters.some((c) => c.homeId === x.id)) ?? s.buildings.find((x) => x.functional && s.characters.some((c) => c.homeId === x.id && !c.role)); // (33.1) kadro rastgele: o saatte evde biri olmayabilir; olay yalnızca yapıyı ve sakini ister
   const owner = s.characters.find((c) => c.homeId === site.id && !c.role);
   const helpers = adults().filter((c) => c !== owner && c.homeId !== site.id).map((c) => c.id).sort((x, y) => x - y).slice(0, 5);
   for (const id of helpers) { if (owner.relationships?.[id]) owner.relationships[id].tags = []; }

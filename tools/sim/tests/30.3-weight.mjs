@@ -405,6 +405,8 @@ const open = async (opts) => {
     for (const x of st.characters) { x.loyalty = 0; x.grumble = null; x.speech = null; }
     const awake = adults().filter((x) => x.visible && !x.isSleeping && !x.away);
     const [a, b] = awake.length >= 2 ? awake : adults();
+    // (33.1) kadro rastgele: o saatte iki kişi uyanık olmayabilir; söz yalnızca görünür, uyanık, yurtta olanlara gelir, o yüzden ikisi açıkça uyandırılır
+    for (const x of [a, b]) { x.visible = true; x.pose = 'idle'; x.insideBuildingId = null; x.task = null; x.away = false; }
     a.loyalty = -30;
     b.loyalty = -60;
     sc.discontent.lastCause.clear();

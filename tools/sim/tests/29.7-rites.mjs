@@ -68,6 +68,9 @@ const out = await page.evaluate(async (fixture) => {
     const m = getMoodlet(m1, 'mourning'); m.until = now() + 600;
     return m;
   };
+  // (33.1) kadro rastgele: özellik çeşitliliği çarpanı (30.4a) kadroya göre değişir; beklenen katkı ona göre hesaplanır (kural aynı: 3 x evre x çeşitlilik)
+  const spiritShares = scene().evolution.refreshShares();
+  const scarcity = spiritShares ? EVX.scarcityMul(spiritShares[EVX.poles(3, 1).target] ?? 0) : 1;
   let mm = setRite(false); const g0 = m1.growth[3];
   scene().rites.finish();
   const r07 = mm.until === now() + 420;
@@ -76,7 +79,7 @@ const out = await page.evaluate(async (fixture) => {
   mm = setRite(true);
   scene().rites.finish();
   const r05 = mm.until === now() + 300;
-  check('yasın kalan süresi x0,7, Taziye Sofrası\'yla x0,5 (Helalleşti major, sadakat +condolence); evrim spirit +3', r07 && r05 && getMoodlet(m1, 'farewell')?.tier === 'major' && m1.loyalty === (await import('/src/data/loyalty.js')).LOYALTY_SOURCES.condolence && fw?.tier === 'minor' && EV.EVOLUTION_SOURCES.moodlets.farewell[0].join() === '3,3' && Math.abs(spirit - 3 * (EV.EVOLUTION_RULES.stageMul[m1.lifeStage] ?? 1)) <= 0.5, `${r07} ${r05} ${m1.loyalty} · spirit ${spirit}`);
+  check('yasın kalan süresi x0,7, Taziye Sofrası\'yla x0,5 (Helalleşti major, sadakat +condolence); evrim spirit +3', r07 && r05 && getMoodlet(m1, 'farewell')?.tier === 'major' && m1.loyalty === (await import('/src/data/loyalty.js')).LOYALTY_SOURCES.condolence && fw?.tier === 'minor' && EV.EVOLUTION_SOURCES.moodlets.farewell[0].join() === '3,3' && Math.abs(spirit - 3 * (EV.EVOLUTION_RULES.stageMul[m1.lifeStage] ?? 1) * scarcity) <= 0.5, `${r07} ${r05} ${m1.loyalty} · spirit ${spirit}`);
   const day = s().time.day;
   rites().active = { names: ['Y'], day, place: null, condolence: false, attendees: [], ids: [], dead: [] };
   const hourBack = s().time.hour; s().time.hour = 10;
