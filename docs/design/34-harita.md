@@ -45,7 +45,8 @@ Kesme (`| 0`) ya da `x >= 0` varsayan koordinat kodu bulunmadı; `Math.floor(x /
 - **En büyük dünya**: 80 + 2 × (18 + 24) = **164×164** (26 896 karo, çekirdeğin ×4,2'si); 48'lik çekirdekte 132×132. Bellek: karo katmanları
   ~160 KB, estetik ~110 KB, taban kopyası ~80 KB: toplam 1 MB'ın altında. Üretim bir kez, sahne açılışında (~birkaç on ms).
 - **Performans**: harita tarayan her döngü yalnızca **açık alanın sınır dikdörtgeninde** (`map.openBounds`), çizim yalnızca kamera içinde çalışır;
-  yol bulma ızgarası açık alana kırpılır. Parsel açılmadıkça iş yükü bugünküyle aynıdır.
+  yol bulma ızgarası açık alana kırpılır. Parsel açılmadıkça iş yükü bugünküyle aynıdır. Ölçüm (tohum 42: 51 parsel, 144×144, 15 gün otopilot):
+  parselsiz 29 sn, hepsi açık 32 sn (×1,11); yerleşim kontrolü önce kapanan karoların çevresinde yerel bağlantıya bakar.
 
 ## 5. Kilitli alan kuralları
 - `map.isOpen(x, y)` yanlışsa: yürünemez, inşa edilemez, yol döşenemez, toplama / ot toplama emri verilemez (sakin ve hayvan zaten giremez).
