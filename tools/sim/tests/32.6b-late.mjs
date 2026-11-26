@@ -103,14 +103,14 @@ results.push(...(await page.evaluate(async () => {
   };
   c('B1: "Sıradaki" engel satırı dört hedefte de dolu (yapı bedeli ya da ne yapılacağı)', Object.values(blockers).every((b) => typeof b === 'string' && b.length > 10) && /Adalet Sarayı/.test(blockers.justice) && /Bahçecilik Kulübü/.test(blockers.club), JSON.stringify(blockers));
 
-  // Hedefler penceresi: 18 satır, yeni hedefler çizilir
+  // Hedefler penceresi: 19 satır, yeni hedefler çizilir
   for (const id of Object.keys(st.milestones)) delete st.milestones[id];
   game.events.emit('ui:toggleGoals');
   await new Promise((r) => setTimeout(r, 700));
   game.ui.render();
   const rows = [...document.querySelectorAll('.goals-panel .goal-row[data-goal]')];
   const late = NEW.map((id) => rows.find((r) => r.dataset.goal === id));
-  c('B1: Hedefler penceresinde 18 satır; dört geç oyun hedefi satırda ad, açıklama ve ilerleme ayrıntısıyla', rows.length === 18 && late.every(Boolean) && late.every((r) => r.querySelector('.goal-name')?.textContent.length > 5 && r.querySelector('.goal-description')?.textContent.length > 10), rows.length);
+  c('B1: Hedefler penceresinde 19 satır; dört geç oyun hedefi satırda ad, açıklama ve ilerleme ayrıntısıyla', rows.length === 19 && late.every(Boolean) && late.every((r) => r.querySelector('.goal-name')?.textContent.length > 5 && r.querySelector('.goal-description')?.textContent.length > 10), rows.length);
   game.events.emit('ui:toggleGoals');
 
   // ---- B2 rehber
