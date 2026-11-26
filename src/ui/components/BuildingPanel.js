@@ -213,6 +213,11 @@ export class BuildingPanel {
       this.element.hidden = id === null;
       this.lastKey = '';
     });
+    // (33.0) Ferman / tahsildar çipi: paneli Krallık bölümüne kaydır (bölüm çizilince)
+    game.events.on('ui:scrollToCrown', () => {
+      this.crownScroll = true;
+      this.lastKey = '';
+    });
   }
 
   button(label, title, onClick) {
@@ -355,6 +360,7 @@ export class BuildingPanel {
     this.renderApprentices(building, state);
     this.renderLuxury(building, state);
     this.renderCrown(building, state);
+    if (this.crownScroll && !this.crownBox.hidden) { this.crownScroll = false; this.crownBox.scrollIntoView({ block: 'start' }); }
     this.renderTrust(building, state);
     this.renderRite(building, state);
     this.renderCrisis(building, state);
