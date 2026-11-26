@@ -823,7 +823,7 @@ export class Brain {
     for (let y = cy - spec.natureRadius; y <= cy + spec.natureRadius; y++) {
       for (let x = cx - spec.natureRadius; x <= cx + spec.natureRadius; x++) {
         const object = map.getObject(x, y);
-        if (object !== 'oak' && object !== 'pine') continue;
+        if ((object !== 'oak' && object !== 'pine') || !map.isOpen(x, y)) continue; // (34.1) kilitli parselde ot toplanmaz
         for (const s of this.world.getApproachSpots(x, y)) {
           if (!this.world.isReserved(s.x, s.y, c.id)) options.push({ ...s, face: { x: x * 16 + 8, y: y * 16 + 8 } });
         }

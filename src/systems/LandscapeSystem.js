@@ -36,7 +36,7 @@ export class LandscapeSystem {
     this.world.aesthetics = new Float32Array(world.map.width * world.map.height);
     const mark = () => (this.dirty = true);
     this.unsubscribers = [
-      ...['building:placed', 'building:completed', 'building:removed', 'club:works'].map((n) => game.events.on(n, mark)),
+      ...['building:placed', 'building:completed', 'building:removed', 'club:works', 'map:parcelOpened'].map((n) => game.events.on(n, mark)),
       game.events.on('terrain:painted', ({ type }) => {
         this.dirty = true;
         if (type) this.state.landscape.roadsPainted += 1;
@@ -74,6 +74,7 @@ export class LandscapeSystem {
     const map = this.world.map;
     this.world.aesthetics = computeAestheticField(map, this.world.buildings);
     this.state.landscapeField = this.world.aesthetics; // arayüz için türetilmiş önbellek (kayda girmez)
+    this.state.landscapeAt = (x, y) => this.aestheticAt(x, y); // (34.1) arayüz için koordinatla okuma (kayda girmez)
     const score = townAestheticScore(map, this.world.buildings);
     const percent = aestheticPercent(score);
     const before = this.state.landscape.percent;

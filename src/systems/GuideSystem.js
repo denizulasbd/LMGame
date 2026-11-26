@@ -63,7 +63,7 @@ export class GuideSystem {
       const map = world?.map;
       if (map?.getObject) {
         let rocks = 0;
-        for (let y = 0; y < map.height && !rocks; y++) for (let x = 0; x < map.width; x++) if (map.getObject(x, y) === 'rock') { rocks = 1; break; }
+        for (let y = map.openBounds.y0; y < map.openBounds.y1 && !rocks; y++) for (let x = map.openBounds.x0; x < map.openBounds.x1; x++) if (map.getObject(x, y) === 'rock' && map.isOpen(x, y)) { rocks = 1; break; }
         if (!rocks) f.rocksGone = true;
       }
     }

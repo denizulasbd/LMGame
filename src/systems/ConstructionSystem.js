@@ -25,8 +25,10 @@ import { itemCount } from './Exploration.js';
 import { DECOR_TYPES } from '../data/townDecor.js';
 import { royalGranted } from './Renown.js';
 import { engineOn } from './Engines.js';
+import { PARCEL_TEXT } from '../data/parcels.js';
 
 const DEMOLISH_REFUND = 0.5;
+const LOCKED_REASON = PARCEL_TEXT.locked; // (34.1) kilitli parsel
 
 export class ConstructionSystem {
   /**
@@ -115,6 +117,7 @@ export class ConstructionSystem {
         footprint.push({ x, y });
         if (reason) continue;
         if (!map.inBounds(x, y)) reason = 'Harita dışına taşıyor';
+        else if (!map.isOpen(x, y)) reason = LOCKED_REASON; // (34.1)
         else if (map.getOccupant(x, y) !== 0) reason = 'Başka bir yapının üstüne kurulamaz';
         else if (!allowed.includes(map.get(x, y))) reason = `${TILE_TYPES[map.get(x, y)].name} üzerine kurulamaz`;
         else {
@@ -315,6 +318,7 @@ export class ConstructionSystem {
     const def = TILE_BUILDS[type];
     const map = this.world.map;
     if (!map.inBounds(x, y)) return { ok: false, reason: 'Harita dışı' };
+    if (!map.isOpen(x, y)) return { ok: false, reason: LOCKED_REASON }; // (34.1)
     const tile = map.get(x, y);
     if (tile === def.result) return { ok: false, reason: `Zaten ${def.name.toLowerCase()}`, already: true };
     if (map.getOccupant(x, y) !== 0) return { ok: false, reason: 'Yapının üstüne döşenemez' };

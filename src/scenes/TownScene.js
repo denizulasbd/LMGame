@@ -15,6 +15,8 @@ import { generateTown } from '../world/WorldGenerator.js';
 import { World } from '../world/World.js';
 import { lifeSeedOf } from '../utils/lifeSeed.js';
 import { captureTerrain, diffTerrain, applyTerrain } from '../world/TerrainSnapshot.js';
+import { expandWorld, openParcel } from '../world/Expansion.js';
+import { LOCKED_VIEW } from '../data/parcels.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { fireflyIntensity, isRainActive } from '../data/weather.js';
 import { getSeason } from '../data/seasons.js';
@@ -139,8 +141,17 @@ export class TownScene extends Scene {
     }
     const { width, height, generator } = state.map;
     const life = lifeSeedOf(state); // (33.1) haritanın DIŞINDAKİ bütün üreteçler hayat tohumundan; harita yalnızca state.seed'den
-    const { map, landmarks, structures } = generateTown(width, height, new Random(state.seed), { biomes: generator >= 2 });
+    const town = generateTown(width, height, new Random(state.seed), { biomes: generator >= 2 });
+    const { landmarks, structures } = town;
+    // (34.1) Çekirdek harita aynen üretilir, sonra çevresindeki parsel halkalarıyla (kilitli) tek dünyaya yerleşir; açılmış parseller açılır
+    const { map, parcels } = expandWorld(town.map, state.seed);
     this.map = map;
+    this.parcels = parcels;
+    if (this.game.devOpenAllParcels) state.parcels = parcels.map((p) => p.id); // (34.1) ?parcels=all (yalnızca araçlar)
+    for (const id of state.parcels) {
+      const parcel = parcels.find((p) => p.id === id);
+      if (parcel) openParcel(map, parcel);
+    }
     this.baseTerrain = captureTerrain(map); // kayıtta yalnızca bundan farklı karolar saklanır
 
     // Kayıttan yüklendiyse harita farkları ve yapılar kayıttan gelir, sakinler zaten durumdadır
@@ -413,7 +424,7 @@ export class TownScene extends Scene {
     this.toolView = { camera: this.camera, get width() { return renderer.width; }, get height() { return renderer.height; } };
     const size = CONFIG.TILE_SIZE;
     this.camera.centerOn(landmarks.plaza.centerX * size, landmarks.plaza.centerY * size, renderer.width, renderer.height);
-    this.camera.clamp(map.pixelWidth, map.pixelHeight, renderer.width, renderer.height);
+    this.clampCamera(this.camera);
 
     this.queue = new RenderQueue();
     this.dayNight = new DayNightOverlay();
@@ -662,7 +673,7 @@ export class TownScene extends Scene {
       renderer.width,
       renderer.height
     );
-    this.camera.clamp(this.map.pixelWidth, this.map.pixelHeight, renderer.width, renderer.height);
+    this.clampCamera(this.camera);
   }
 
   /** Başlangıç ekranında haritaya gelen tıklama ve sürüklemeler yok sayılır. */
@@ -741,7 +752,36 @@ export class TownScene extends Scene {
       }
     }
 
-    camera.clamp(this.map.pixelWidth, this.map.pixelHeight, renderer.width, renderer.height);
+    this.clampCamera(camera);
+  }
+
+  /** (34.1) Kamera açık alanın LOCKED_VIEW.cameraMargin karo ötesine kadar gider, dünyanın kenarında durur. */
+  clampCamera(camera) {
+    const { renderer } = this.game;
+    const map = this.map;
+    const m = LOCKED_VIEW.cameraMargin;
+    const o = map.openBounds;
+    const T = CONFIG.TILE_SIZE;
+    const x0 = Math.max(map.x0, o.x0 - m);
+    const y0 = Math.max(map.y0, o.y0 - m);
+    const x1 = Math.min(map.x1, o.x1 + m);
+    const y1 = Math.min(map.y1, o.y1 + m);
+    camera.clamp((x1 - x0) * T, (y1 - y0) * T, renderer.width, renderer.height, x0 * T, y0 * T);
+  }
+
+  /**
+   * (34.1) Bir parseli açar (34.1'de yalnızca geliştirici / test yolu: sim.unlockParcel). Dönüş: açıldıysa true.
+   * Açılan toprak yürünür ve inşa edilir; ulaşılabilirlik, yol bulma ızgarası ve estetik yeniden hesaplanır.
+   */
+  unlockParcel(id) {
+    const parcel = this.parcels.find((p) => p.id === id);
+    const state = this.game.state;
+    if (!parcel || state.parcels.includes(id)) return false;
+    state.parcels.push(id);
+    openParcel(this.map, parcel);
+    this.world.refreshStaticData();
+    this.game.events.emit('map:parcelOpened', { parcel });
+    return true;
   }
 
   hoveredTile() {
@@ -825,7 +865,7 @@ export class TownScene extends Scene {
     const k = 1 - Math.exp(-dt * FOLLOW_SMOOTHING);
     this.camera.x += (tx - this.camera.x) * k;
     this.camera.y += (ty - this.camera.y) * k;
-    this.camera.clamp(this.map.pixelWidth, this.map.pixelHeight, renderer.width, renderer.height);
+    this.clampCamera(this.camera);
 
     // Tek seferlik odaklanma hedefe varınca biter
     if (this.focusId !== null && Math.hypot(tx - this.camera.x, ty - this.camera.y) < 1) this.focusId = null;
@@ -910,6 +950,7 @@ export class TownScene extends Scene {
     this.leaves.draw(renderer);
     this.weatherFx.drawClouds(renderer, this.camera, weather, this.map, this.animationTime);
     this.weatherFx.drawMist(renderer, this.camera, weather, this.map, this.animationTime);
+    this.map.renderLocked(renderer, this.camera); // (34.1) kilitli parseller soluk ve sisli, açık alanın kenarında ince çizgi
 
     const lights = this.lights ?? (this.lights = []);
     lights.length = 0;

@@ -68,6 +68,7 @@ export class JobSystem {
 
   /** Bu karoya toplama emri verilebilir mi? */
   isHarvestable(x, y) {
+    if (!this.world.map.isOpen(x, y)) return false; // (34.1) kilitli parselde toplama yok
     const building = this.world.getBuilding(this.world.map.getOccupant(x, y));
     if (building) return !building.underConstruction && Boolean(BUILDINGS[building.type].harvest) && building.berries > 0;
     const object = this.world.map.getObject(x, y);

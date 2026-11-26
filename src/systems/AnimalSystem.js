@@ -95,7 +95,8 @@ export class AnimalSystem {
     this.state.animalMeta.wildlifeSeeded = true;
     const rng = new Random(lifeSeedOf(this.state) + 11);
     const map = this.world.map;
-    const scale = (map.width * map.height) / (80 * 80);
+    const open = map.openBounds; // (34.1) yaban hayatı açık alana yerleşir
+    const scale = ((open.x1 - open.x0) * (open.y1 - open.y0)) / (80 * 80);
     for (const [kind, def] of Object.entries(WILDLIFE)) {
       const count = Math.max(1, Math.round(def.count * scale));
       const homes = [];
@@ -117,8 +118,9 @@ export class AnimalSystem {
     const map = this.world.map;
     const plaza = this.world.landmarks.plaza;
     for (let attempt = 0; attempt < 400; attempt++) {
-      const x = near ? near.x + rng.int(-10, 10) : rng.int(2, map.width - 3);
-      const y = near ? near.y + rng.int(-10, 10) : rng.int(2, map.height - 3);
+      const open = map.openBounds; // (34.1)
+      const x = near ? near.x + rng.int(-10, 10) : rng.int(open.x0 + 2, open.x1 - 3);
+      const y = near ? near.y + rng.int(-10, 10) : rng.int(open.y0 + 2, open.y1 - 3);
       if (!map.inBounds(x, y) || !def.tiles.includes(map.get(x, y)) || !map.isWalkable(x, y) || map.getObject(x, y)) continue;
       if (Math.hypot(x - plaza.centerX, y - plaza.centerY) < def.minTownDistance) continue;
       if (taken.some((h) => Math.hypot(h.x - x, h.y - y) < 6)) continue;

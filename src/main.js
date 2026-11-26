@@ -21,6 +21,8 @@ const seedParam = Number.parseInt(params.get('seed'), 10);
 const lifeParam = Number.parseInt(params.get('life'), 10);
 
 const game = new Game({ canvas, uiRoot });
+// (34.1) ?parcels=all bütün harita parsellerini açar (yalnızca araçlar: test, ekran görüntüsü, performans ölçümü)
+if (params.get('parcels') === 'all') game.devOpenAllParcels = true;
 
 function startNewGame(seed, lifeSeed = null) {
   game.state.reset(seed, null, lifeSeed); // (33.1) lifeSeed boşsa rastgele: ?seed=42 aynı haritayı açar, insanlar her seferinde farklıdır

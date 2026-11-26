@@ -10,6 +10,7 @@ import { emptyDoctrine, restoreDoctrine } from '../systems/Doctrine.js';
 import { emptyGoldenAge, emptyChronicle } from '../systems/GoldenAge.js';
 import { GOLDEN_AGE } from '../data/goldenAge.js';
 import { CONFIG } from '../config.js';
+import { legacyTerrainToCoords } from '../world/TerrainSnapshot.js';
 import { STARTING_RESOURCES, BASE_STORAGE_CAPACITY } from '../data/resources.js';
 import { STARTING_WEATHER } from '../data/weather.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -96,6 +97,7 @@ export class GameState {
     this.jobs = []; // oyuncunun verdiği iş emirleri (JobSystem)
     this.nextJobId = 1;
     this.regrowth = []; // yeniden büyüyen ağaçlar (NatureSystem)
+    this.parcels = []; // (34.1) açılmış harita parsellerinin kimlikleri (Parcels.js); boş = yalnızca çekirdek
     // Hava: type hedef hava, cloud/rain o an görünen yumuşak değerler, changes değişim sayacı,
     // nextChangeAt bir sonraki değişimin oyun dakikası (WeatherSystem)
     this.weather = { type: STARTING_WEATHER, cloud: 0, rain: 0, mist: 0, changes: 0, nextChangeAt: null };
@@ -335,6 +337,7 @@ export class GameState {
       jobs: this.jobs.map((j) => ({ ...j, assignees: [] })), // görevler kaydedilmez, işler yeniden dağıtılır
       nextJobId: this.nextJobId,
       regrowth: this.regrowth,
+      parcels: [...this.parcels], // (34.1)
       weather: this.weather,
       relationships: this.relationships,
       equipment: this.equipment,
@@ -506,10 +509,18 @@ export class GameState {
     next.university = restoreUniversity(data.university); // (32.4) yoksa null
     next.clubs = restoreClubs(data.clubs, new Set(next.characters.map((c) => c.id))); // (32.5) yoksa null
     next.justice = data.justice ? restoreJustice(data.justice, new Set(next.characters.map((c) => c.id))) : null; // (32.1) yoksa boş
-    next.pendingTerrain = data.terrain;
+    // (34.1) Sürüm ≤ 41 hücreleri koordinata çevrilir (göçten geçmeyen yükleme yolları için de; zaten koordinatlıysa değişmez)
+    next.pendingTerrain = legacyTerrainToCoords(data.terrain, next.map.width, next.map.height);
+    next.parcels = restoreParcels(data.parcels); // (34.1) açılmış parseller; yoksa yalnızca çekirdek
     Object.assign(this, next);
     return warnings;
   }
+}
+
+/** (34.1) Açılmış parsel kimlikleri: yalnızca metin, tekrarsız. Haritada olmayan kimliği sahne atlar. */
+function restoreParcels(data) {
+  if (!Array.isArray(data)) return [];
+  return [...new Set(data.filter((id) => typeof id === 'string' && id.length > 0 && id.length <= 16))].slice(0, 256);
 }
 
 /** (30.1) Kayıttaki oyuncu tercihleri: yalnızca bilinen alanlar, doğru türde. */

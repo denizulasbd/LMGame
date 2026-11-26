@@ -101,11 +101,14 @@ function octile(dx, dy) {
  */
 export function findPath(grid, start, goal, options = {}) {
   const { width, height, isWalkable, cost } = grid;
+  // (34.1) Izgara dünyanın bir dikdörtgeni olabilir (genişleyen harita: açık alan, eksi koordinatlar): x0 / y0 sol üst karo
+  const ox = grid.x0 ?? 0;
+  const oy = grid.y0 ?? 0;
   const minCost = grid.minCost ?? 1;
   const allowBlockedGoal = options.allowBlockedGoal ?? false;
   const maxIterations = options.maxIterations ?? width * height * 4;
 
-  const inBounds = (x, y) => x >= 0 && y >= 0 && x < width && y < height;
+  const inBounds = (x, y) => x >= ox && y >= oy && x < ox + width && y < oy + height;
   if (!inBounds(start.x, start.y) || !inBounds(goal.x, goal.y)) return null;
   if (start.x === goal.x && start.y === goal.y) return [{ x: start.x, y: start.y }];
 
@@ -113,8 +116,8 @@ export function findPath(grid, start, goal, options = {}) {
   if (goalBlocked && !allowBlockedGoal) return null;
 
   const total = width * height;
-  const goalIndex = goal.y * width + goal.x;
-  const startIndex = start.y * width + start.x;
+  const goalIndex = (goal.y - oy) * width + (goal.x - ox);
+  const startIndex = (start.y - oy) * width + (start.x - ox);
   const { gScore, parent, stamp, closed, generation } = acquireBuffers(total);
   const open = new MinHeap();
   const g = (i) => (stamp[i] === generation ? gScore[i] : Infinity);
@@ -130,17 +133,18 @@ export function findPath(grid, start, goal, options = {}) {
   while (open.size > 0 && iterations++ < maxIterations) {
     const current = open.pop();
     if (closed[current] === generation) continue;
-    if (current === goalIndex) return reconstruct(parent, current, width);
+    if (current === goalIndex) return reconstruct(parent, current, width, ox, oy);
     closed[current] = generation;
 
-    const cx = current % width;
-    const cy = (current - cx) / width;
+    const lx = current % width;
+    const cx = lx + ox;
+    const cy = (current - lx) / width + oy;
 
     for (const [dx, dy] of DIRECTIONS) {
       const nx = cx + dx;
       const ny = cy + dy;
       if (!inBounds(nx, ny)) continue;
-      const next = ny * width + nx;
+      const next = (ny - oy) * width + (nx - ox);
       if (closed[next] === generation) continue;
 
       const diagonal = dx !== 0 && dy !== 0;
@@ -166,10 +170,10 @@ export function findPath(grid, start, goal, options = {}) {
   return null;
 }
 
-function reconstruct(parent, endIndex, width) {
+function reconstruct(parent, endIndex, width, ox = 0, oy = 0) {
   const path = [];
   for (let i = endIndex; i !== -1; i = parent[i]) {
-    path.push({ x: i % width, y: Math.floor(i / width) });
+    path.push({ x: (i % width) + ox, y: Math.floor(i / width) + oy });
   }
   return path.reverse();
 }

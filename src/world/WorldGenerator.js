@@ -370,8 +370,8 @@ function carveSideTrails(map, rng, plaza, trailCount) {
 }
 
 export function assignBridgeVariants(map) {
-  for (let y = 0; y < map.height; y++) {
-    for (let x = 0; x < map.width; x++) {
+  for (let y = map.y0; y < map.y1; y++) {
+    for (let x = map.x0; x < map.x1; x++) {
       if (map.get(x, y) !== 'bridge') continue;
       const up = map.get(x, y - 1) === 'bridge';
       const down = map.get(x, y + 1) === 'bridge';

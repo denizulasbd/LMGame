@@ -30,7 +30,10 @@ export class World {
     this.guests = []; // (26.3) geçici gezgin konuk (Seyyar Ozan / Nadir Takasçı / Yaşlı Seyyah; GuestSystem): nüfusa, konuta, iş gücüne sayılmaz
     this.boats = []; // nehirdeki ticaret teknesi (HarborSystem, 12. aşama; yalnızca çizim)
 
+    // (34.1) Yol bulma ızgarası açık alanın sınır dikdörtgenine kırpılır (kilitli parseller aranmaz); refreshStaticData günceller
     this.pathGrid = {
+      x0: 0,
+      y0: 0,
       width: map.width,
       height: map.height,
       minCost: MIN_MOVE_COST,
@@ -51,6 +54,8 @@ export class World {
 
   /** Harita veya yapılar değiştiğinde ulaşılabilirlik ve buluşma noktalarını yeniden hesaplar. */
   refreshStaticData() {
+    const open = this.map.openBounds;
+    Object.assign(this.pathGrid, { x0: open.x0, y0: open.y0, width: open.x1 - open.x0, height: open.y1 - open.y0 });
     const seed = this.findReachabilitySeed();
     this.reachable = seed ? this.map.computeReachable(seed.x, seed.y) : new Uint8Array(this.map.width * this.map.height);
     this.spotCache = new Map();
@@ -59,8 +64,8 @@ export class World {
     this.riverbankSpots = [];
     this.flowerSpots = [];
     this.strollSpots = [];
-    for (let y = 0; y < this.map.height; y++) {
-      for (let x = 0; x < this.map.width; x++) {
+    for (let y = open.y0; y < open.y1; y++) {
+      for (let x = open.x0; x < open.x1; x++) {
         if (!this.isReachable(x, y)) continue;
         const tile = this.map.get(x, y);
         if (tile === 'sand') {
@@ -224,10 +229,12 @@ export class World {
   findEntryTile(rng) {
     const border = [];
     const roads = [];
-    const { width, height } = this.map;
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (x !== 0 && y !== 0 && x !== width - 1 && y !== height - 1) continue;
+    // (34.1) Açık alanın kenarı: komşularından biri kilitli ya da dünya dışı olan ulaşılabilir karo (parselsiz haritada harita kenarı)
+    const map = this.map;
+    const { x0, y0, x1, y1 } = map.openBounds;
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        if (map.isOpen(x, y - 1) && map.isOpen(x, y + 1) && map.isOpen(x - 1, y) && map.isOpen(x + 1, y)) continue;
         if (!this.isReachable(x, y)) continue;
         border.push({ x, y });
         if (this.map.get(x, y) === 'path' || this.map.get(x, y) === 'cobble') roads.push({ x, y });

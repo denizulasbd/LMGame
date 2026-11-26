@@ -49,8 +49,9 @@ export function computeAestheticField(map, buildings) {
     const { w, h } = BUILDINGS[b.type].size;
     spread(b.tileX + (w - 1) / 2, b.tileY + (h - 1) / 2, value, AESTHETIC.radius + (Math.max(w, h) - 1) / 2);
   }
-  for (let y = 0; y < map.height; y++) {
-    for (let x = 0; x < map.width; x++) {
+  const open = map.openBounds; // (34.1) yalnızca açık alan (kilitli parsellerde döşeme yoktur)
+  for (let y = open.y0; y < open.y1; y++) {
+    for (let x = open.x0; x < open.x1; x++) {
       const value = AESTHETIC.tileValues[map.get(x, y)];
       if (value) spread(x, y, value, AESTHETIC.tileRadius);
     }
@@ -63,11 +64,12 @@ export function townAestheticScore(map, buildings) {
   let score = 0;
   for (const b of buildings) score += aestheticValue(b);
   let tiles = 0;
-  for (let i = 0; i < map.tiles.length; i++) {
-    const x = i % map.width;
-    const y = Math.floor(i / map.width);
-    const value = AESTHETIC.tileValues[map.get(x, y)];
-    if (value) tiles += value / AESTHETIC.tileValues.cobble; // parke 1, taş plaka 1,75 sayılır
+  const open = map.openBounds; // (34.1)
+  for (let y = open.y0; y < open.y1; y++) {
+    for (let x = open.x0; x < open.x1; x++) {
+      const value = AESTHETIC.tileValues[map.get(x, y)];
+      if (value) tiles += value / AESTHETIC.tileValues.cobble; // parke 1, taş plaka 1,75 sayılır
+    }
   }
   return score + tiles * AESTHETIC.tileScoreWeight;
 }

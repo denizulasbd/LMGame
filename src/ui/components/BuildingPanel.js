@@ -1607,7 +1607,7 @@ export class BuildingPanel {
     }
     // (18. aşama) Süsün çevreye kattığı estetik ve bulunduğu köşenin güzelliği
     if (AESTHETIC.values[building.type] && building.functional) {
-      const here = state.landscapeField?.[building.tileY * state.map.width + building.tileX] ?? null;
+      const here = state.landscapeAt?.(building.tileX, building.tileY) ?? null; // (34.1) dünya koordinatıyla (genişleyen harita)
       const level = here !== null ? aestheticLevel(here) : null;
       lines.push(`Çevre estetiği: +${AESTHETIC.values[building.type]} (yaklaşık ${Math.round(AESTHETIC.radius)} karoya yayılır)${level ? ` · burası ${level.toLocaleLowerCase('tr')}` : ''}`);
       lines.push(`Kasabanın estetiği ${state.landscape?.score ?? 0} puan · refah +%${state.landscape?.percent ?? 0}`);

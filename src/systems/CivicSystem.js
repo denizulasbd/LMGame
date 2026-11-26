@@ -130,8 +130,9 @@ export class CivicSystem {
     const map = this.world.map;
     const plaza = this.world.landmarks.plaza;
     const roads = [];
-    for (let y = 0; y < map.height; y++) {
-      for (let x = 0; x < map.width; x++) if (map.get(x, y) === 'path') roads.push({ x, y, d: Math.hypot(x - plaza.centerX, y - plaza.centerY) });
+    const open = map.openBounds; // (34.1)
+    for (let y = open.y0; y < open.y1; y++) {
+      for (let x = open.x0; x < open.x1; x++) if (map.get(x, y) === 'path' && map.isOpen(x, y)) roads.push({ x, y, d: Math.hypot(x - plaza.centerX, y - plaza.centerY) });
     }
     roads.sort((a, b) => a.d - b.d);
     const chosen = roads.slice(0, count);
