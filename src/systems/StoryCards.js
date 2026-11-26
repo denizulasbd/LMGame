@@ -20,6 +20,7 @@ import { genitive, accusative } from '../utils/turkish.js';
 import { engineOn } from './Engines.js';
 import { courtOf } from './Justice.js';
 import { COURT_TEXT } from '../data/justice.js';
+import { PARCEL_TEXT } from '../data/parcels.js'; // (34.2)
 
 export function filterKeyOf(value) {
   return STORY_FILTERS[value] ? value : STORY_DEFAULT_FILTER;
@@ -127,6 +128,11 @@ export function makeCard(event, p = {}, ctx = {}) {
       card = base(event, toldText('fear', p.character, p.fear), [p.character]);
       break;
     }
+    case 'parcel:bought':
+      // (34.2) kasaba genişledi: "Doğu Çayırı artık bizim!" (portre yok; "Git" yok)
+      if (!p.parcel) return null;
+      card = base(event, PARCEL_TEXT.story(p.parcel.name), [], { go: null, key: `parcel:${p.parcel.id}` });
+      break;
     case 'pantry:low':
       // (30.3) kiler bir günden az yeter ("Git" kileri seçer)
       card = base(event, 'Kiler boşalıyor: yiyecek bir günden az yeter.', [], { go: Number.isFinite(p.buildingId) ? { kind: 'building', id: p.buildingId } : null, key: `pantry:${day}` });

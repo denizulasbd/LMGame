@@ -2,8 +2,9 @@
 // söyler; görünme ve tamamlanma koşulları systems/Guide.js'te (saf işlevler, oyun durumundan okunur).
 // Her kart en çok iki kısa cümle; **kalın** sözcükler arayüzdeki düğme adlarıdır. target: karta eşlik eden düğmenin
 // CSS seçicisi (GuideCard yanıp söndürür; seçici hiçbir öğeye uymuyorsa kart yine görünür).
-export const GUIDE_TABLE_VERSION = 7; // (32.6b) Kasaba ve Gelişmiş Şehir kartları; (32.2) Adalet Sarayı'nın ilk davası; (30.6) yiyecek, tahsildar, altın ve taş kartları (ENGINES.novicePath); // (30.2) hikâye kartı ve Yakından izle adımları eklendi; (30.4a) ilk doğal vefat kartı; (30.4b) Kasaba Doktrini kartı
+export const GUIDE_TABLE_VERSION = 8; // (34.2) Parsel satın alma kartı (sıkışan kasaba); (32.6b) Kasaba ve Gelişmiş Şehir kartları; (32.2) Adalet Sarayı'nın ilk davası; (30.6) yiyecek, tahsildar, altın ve taş kartları (ENGINES.novicePath); // (30.2) hikâye kartı ve Yakından izle adımları eklendi; (30.4a) ilk doğal vefat kartı; (30.4b) Kasaba Doktrini kartı
 
+import { PARCEL_TEXT } from './parcels.js';
 export const GUIDE_STEPS = [
   // (30.4a) kasabadaki ilk doğal vefatta bir kez (tablonun başında: bekleyen öteki adımların arkasında kalmasın; "Anladım" ile biter)
   { id: 'lifespan', text: 'Sakinlerin ömrü var. Vefat edenler anıtta anılır; öyküleri kitabede kalır.', target: null },
@@ -30,6 +31,8 @@ export const GUIDE_STEPS = [
   { id: 'townGrown', text: 'Kasaban büyüdü: **Adalet Sarayı** ve hobi evleri artık kurulabilir.', target: '.tool-btn[data-tool="build"]' },
   // (32.6b) Gelişmiş Şehir olunca bir kez (ENGINES.university); Darülfünun kurulunca ya da "Anladım" ile biter
   { id: 'cityGrown', text: 'Gelişmiş Şehir oldun: **Darülfünun** artık kurulabilir. Bilgelik Evi mezunları orada okur.', target: '.tool-btn[data-tool="build"]' },
+  // (34.2) nüfus sınırına yaklaşınca ya da göç nüfus sınırında kalınca bir kez (alınabilir parsel varken); parsel alınınca ya da "Anladım" ile biter
+  { id: 'expand', text: PARCEL_TEXT.guide, target: null },
   // (30.2)
   { id: 'cards', text: 'Sol alttaki kartlar kasabada olup biteni anlatır. **Git** seni oraya götürür.', target: '.story-card .story-go' },
   { id: 'cardAction', text: 'Bazı kartlarda yapabileceğin bir şey vardır.', target: '.story-card .story-action' },
@@ -47,3 +50,5 @@ export const GUIDE_STORAGE_RATIO = 0.9;
 export const GUIDE_SPEED_DELAY_MINUTES = 120;
 /** Kayıtta rehber bilgisi yoksa nüfusu bundan fazla olan oyunda rehber kapalı başlar. */
 export const GUIDE_OLD_SAVE_POPULATION = 8;
+/** (34.2) Nüfus, göç sınırına bu kadar kala "Kasaban sıkıştı" kartı çıkar. */
+export const GUIDE_EXPAND_MARGIN = 2;

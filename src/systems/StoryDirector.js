@@ -22,6 +22,7 @@ const EVENTS = [
   'renown:tier', 'renown:grant', // (32.3)
   'university:admitted', 'university:graduated', 'university:dropped', // (32.4)
   'club:founded', 'club:work', 'club:exhibition', // (32.5)
+  'parcel:bought', // (34.2)
 ];
 
 export class StoryDirector {

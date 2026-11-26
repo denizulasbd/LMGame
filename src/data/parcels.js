@@ -27,6 +27,14 @@ export const EXPANSION = {
   rocks: { cluster: -0.05, rockyChance: 0.42, scatterAt: 0.3, scatterChance: 0.3, pebbleChance: 0.012 },
 };
 
+// (34.2) Parsel çerçevesi (üstüne gelince / kart açıkken) ve satın alma efekti: çizim, zamanlar saniye
+export const PARCEL_VIEW = {
+  hoverFill: 'rgba(255, 246, 214, 0.16)',
+  hoverBorder: 'rgba(255, 236, 160, 0.95)',
+  borderWidth: 2,
+  fx: { seconds: 1.6, glow: 'rgba(255, 224, 120, 0.38)', spark: '#fff1b0', sparks: 26 }, // sevinç: parlayan çerçeve ve yükselen pırıltılar
+};
+
 // Kilitli alanın çizimi
 export const LOCKED_VIEW = {
   fog: 'rgba(214, 222, 230, 0.55)', // soluk, sisli örtü
@@ -34,7 +42,58 @@ export const LOCKED_VIEW = {
   cameraMargin: 6,                    // kamera açık alanın bu kadar karo ötesini gösterir
 };
 
+// (34.2) Parsel satın alma: fiyat, kota, seviye kapısı. Hepsi buradan ayarlanır.
+export const PARCEL_MARKET = {
+  // Fiyat (altın) = işe yarar karo (su ve kaya nesnesi dışı) × karo başı fiyat × çarpan, 5'in katına yuvarlanır.
+  // Çarpan = ratio ^ (alınmış parsel sayısı / (toplam parsel − 1)): ilk parselde ×1, sonuncuda ×ratio; arası üstel artar (tohumda kaç parsel
+  // olursa olsun son parseller aynı bantta kalır). Hedef: ilk parsel 40-80, orta parseller 300-800, son parseller 3.000-6.000
+  // (tools/sim/tests/34.2-parcels.mjs ölçer).
+  price: { perTile: 0.09, ratio: 60, min: 40, roundTo: 5 },
+  // Nüfus kotası: (işe yarar karo − offset) / tilesPerResident (yuvarlanır), [min, max] içinde: alan büyüdükçe kota artar.
+  quota: { offset: 300, tilesPerResident: 150, min: 1, max: 4 },
+  // Kasaba seviyesine göre kapı: maxParcels = o seviyede toplam en çok kaç parsel; ring = en dış alınabilir halka (atlama yok: ikinci
+  // halka yalnızca Gelişmiş Şehir'de). Kasaba'da ilk halkanın tamamı, Gelişmiş Şehir'de her şey açıktır.
+  gates: { 1: { maxParcels: 2, ring: 1 }, 2: { maxParcels: 6, ring: 1 }, 3: { ring: 1 }, 4: { ring: Infinity } },
+  maxPopulation: 60, // göç sınırı (seviye sınırı + açık parsellerin kotası) bunu aşmaz; mevcut kasabanın sınırı hiçbir zaman düşmez
+  // Parsel içeriği: hangi ölçüt neye bakar (öncelik sırasıyla: göl > kaya > orman > çayır). Oranlar parsel alanına göredir.
+  content: { lake: 0.04, rocky: 0.15, forest: 0.3 },
+  goalId: 'firstExpansion',
+  // Satın alma sevinç efekti (kısa, çizim)
+  celebrateSeconds: 1.6,
+};
+
+// Parsel adları: yön + içerik. göl ve kaya parselleri yönsüz anılır (adı aynıysa yön eklenir, sonra sıra sayısı)
+export const PARCEL_NAMES = {
+  directions: { n: 'Kuzey', ne: 'Kuzeydoğu', e: 'Doğu', se: 'Güneydoğu', s: 'Güney', sw: 'Güneybatı', w: 'Batı', nw: 'Kuzeybatı' },
+  // kind: orman / kaya / göl / çayır. withDirection: adın başına yön gelir. noun: adın gövdesi
+  kinds: {
+    forest: { label: 'orman', withDirection: true, nouns: { pine: 'Çam Ormanı', oak: 'Meşe Ormanı' } },
+    rocky: { label: 'kaya', withDirection: false, nouns: { any: 'Kayalık Yamaç' } },
+    lake: { label: 'göl', withDirection: false, nouns: { any: 'Göl Kıyısı Çayırı' } },
+    meadow: { label: 'çayır', withDirection: true, nouns: { any: 'Çayırı' } },
+  },
+  ordinals: ['', ' II', ' III', ' IV', ' V', ' VI'],
+};
+
 // Metinler
 export const PARCEL_TEXT = {
   locked: 'Bu toprak henüz kasabanın değil',
+  tip: ({ name, w, h, label, price, quota }) => `Bu toprak henüz kasabanın değil · ${name} · ${w}×${h} · ${label} · ${price} altın · Nüfus +${quota}`,
+  buy: 'Satın Al',
+  cardTitle: 'Toprak Parseli',
+  close: 'Kapat',
+  owned: 'Kasabanın toprağı',
+  // pasif düğmenin nedenleri
+  needNeighbor: 'Önce komşu toprağı al',
+  needTier: (tierName) => `${tierName} seviyesinde açılır`,
+  needGold: (price, have) => `Yetersiz altın (${price} gerekir, ${have} var)`,
+  priceLine: ({ useful, perTile, step, multiplier, total }) => `${useful} işe yarar karo × ${String(perTile).replace('.', ',')} altın × ${String(multiplier).replace('.', ',')} (${step}. parsel) = ${total} altın`,
+  usefulLine: ({ useful, area }) => `İşe yarar alan: ${useful}/${area} karo (su ve kaya dışı)`,
+  quotaLine: (quota) => `Nüfus kotası: +${quota}`,
+  story: (name) => `Kasaba genişledi: ${name} artık bizim!`,
+  journal: (name, price, quota) => `Kasaba genişledi: ${name} satın alındı (${price} altın, nüfus sınırı +${quota})`,
+  toast: (name) => `${name} artık kasabanın!`,
+  guide: 'Kasaban sıkıştı: kenardaki toprakları satın alabilirsin.',
+  limitLine: ({ tier, parcels, total, cap }) => `Göç sınırı: ${tier} (seviye) + ${parcels} (parseller) = ${total}${total >= cap ? ` (en çok ${cap})` : ''}`,
+  goal: { name: 'İlk Genişleme', description: 'Kasabanın çevresinden bir parsel satın al.' },
 };

@@ -2,6 +2,7 @@
 // src/systems/MilestoneSystem.js'te; burada yalnızca ad, açıklama, simge ve hedef sayı var.
 //   kind  : ölçüm türü (MilestoneSystem yorumlar)
 //   target: tamamlanması için gereken sayı (ilerleme çubuğu için)
+import { PARCEL_TEXT } from './parcels.js';
 export const MILESTONES = [
   {
     id: 'firstHome',
@@ -42,6 +43,15 @@ export const MILESTONES = [
     icon: 'star',
     kind: 'masters',
     target: 3,
+  },
+  // (34.2) İlk Genişleme: bir parsel satın al
+  {
+    id: 'firstExpansion',
+    name: PARCEL_TEXT.goal.name,
+    description: PARCEL_TEXT.goal.description,
+    icon: 'coin',
+    kind: 'parcels',
+    target: 1,
   },
   // (30.4b, ENGINES.midgame) beş ara hedef: şalter kapalıyken liste dokuz hedeftir (MilestoneSystem.activeMilestones)
   {

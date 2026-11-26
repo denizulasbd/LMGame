@@ -40,7 +40,9 @@ import {
   tierChecks,
   formatTownTitle,
   foodSupply,
+  immigrationBreakdown,
 } from '../../systems/TownStatus.js';
+import { PARCEL_TEXT } from '../../data/parcels.js'; // (34.2)
 import { el } from '../dom.js';
 import { caseChips } from './justiceCards.js'; // (32.2)
 import { RenownBadge } from './renownCards.js'; // (32.3)
@@ -177,9 +179,10 @@ export class Hud {
     const venerable = state.characters.length - population;
     const capacity = housingCapacity(state);
     const status = immigrationStatus(state);
+    const limit = immigrationBreakdown(state); // (34.2) seviye sınırı + açık parsellerin kotası
     const trust = Math.round(trustValue(state));
     const revolt = state.trust?.revolt ?? null;
-    const key = `${happiness}|${population}|${venerable}|${capacity}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}|${trust}|${Boolean(revolt)}`;
+    const key = `${happiness}|${population}|${venerable}|${capacity}|${limit.total}|${limit.parcels}|${state.landscape?.percent}|${status.checks.map((c) => c.text).join("|")}|${trust}|${Boolean(revolt)}`;
     if (key !== this.lastWelfare) {
       this.lastWelfare = key;
       this.welfareFill.style.width = `${happiness}%`;
@@ -207,7 +210,7 @@ export class Hud {
       this.population.classList.toggle('is-full', population >= capacity);
       const lines = status.checks.map((c) => `${c.ok ? '✓' : '✗'} ${c.text}`);
       this.renderPulse(state, true);
-      this.populationWrap.title = `${population} sakin / ${capacity} yatak${venerable ? ` (+${venerable} Saygın Büyük: yatağı olmayan, nüfus kotasına sayılmayan bilgeler)` : ''}. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
+      this.populationWrap.title = `${population} sakin / ${capacity} yatak${venerable ? ` (+${venerable} Saygın Büyük: yatağı olmayan, nüfus kotasına sayılmayan bilgeler)` : ''}. ${PARCEL_TEXT.limitLine({ ...limit, tier: limit.tier })}. Yarın 08:00 göç koşulları:\n${lines.join('\n')}`;
     }
     this.renderPulse(state, false);
     this.renownBadge.render(state); // (32.3)

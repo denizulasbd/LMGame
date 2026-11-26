@@ -22,7 +22,8 @@ import { MERCHANT, offersFor, offerStock } from '../data/trade.js';
 import { getSeason } from '../data/seasons.js';
 import { RESOURCES } from '../data/resources.js';
 import { isRainActive } from '../data/weather.js';
-import { immigrationStatus, townFun, townTier, quarantined } from './TownStatus.js';
+import { immigrationStatus, immigrationLimit, townFun, townTier, quarantined } from './TownStatus.js';
+import { activePopulation } from './LifeStages.js';
 import { Random } from '../utils/random.js';
 import { clamp } from '../utils/math.js';
 import { merchantIntervalMultiplier } from './Exploration.js';
@@ -105,6 +106,8 @@ export class EventSystem {
       this.population.welcomeNewcomers(Math.min(status.freeBeds, status.maxPerMorning));
       return;
     }
+    // (34.2) Nüfus sınırı doldu: rehber "kenardaki toprakları satın al" der (parseller sınırı artırır)
+    if (activePopulation(this.state) >= immigrationLimit(this.state)) this.events.emit('immigration:capped', { limit: immigrationLimit(this.state) });
     // Boş yatak var ama başka bir koşul tutmuyor: oyuncu nedenini bir kez görsün
     const blocker = status.checks.find((c) => !c.ok);
     const day = this.state.time.day;

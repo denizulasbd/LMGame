@@ -40,6 +40,7 @@ export const STORY_PRIORITY = {
   'venerable:became': 2,
   'relationship:quarrel': 1,
   'relationship:reconciled': 1,
+  'parcel:bought': 4, // (34.2) kasaba genişledi (önemli kart)
   'pantry:low': 4, // (30.3) kiler bir günden az yeter
   'storm:struck': 4, // (30.6) fırtına / kurt sonrası hasar kartı
   'crisis:raidResolved': 4, // (30.6) baskın sonrası hasar kartı (yalnızca yapı hasar gördüyse)

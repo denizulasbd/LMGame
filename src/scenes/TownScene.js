@@ -16,7 +16,9 @@ import { World } from '../world/World.js';
 import { lifeSeedOf } from '../utils/lifeSeed.js';
 import { captureTerrain, diffTerrain, applyTerrain } from '../world/TerrainSnapshot.js';
 import { expandWorld, openParcel, reconcileParcels } from '../world/Expansion.js';
-import { LOCKED_VIEW } from '../data/parcels.js';
+import { describeParcels, registerParcels } from '../systems/ParcelMarket.js';
+import { ParcelSystem } from '../systems/ParcelSystem.js';
+import { LOCKED_VIEW, PARCEL_VIEW, PARCEL_TEXT } from '../data/parcels.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { fireflyIntensity, isRainActive } from '../data/weather.js';
 import { getSeason } from '../data/seasons.js';
@@ -144,7 +146,10 @@ export class TownScene extends Scene {
     const town = generateTown(width, height, new Random(state.seed), { biomes: generator >= 2 });
     const { landmarks, structures } = town;
     // (34.1) Çekirdek harita aynen üretilir, sonra çevresindeki parsel halkalarıyla (kilitli) tek dünyaya yerleşir; açılmış parseller açılır
-    const { map, parcels } = expandWorld(town.map, state.seed);
+    const expanded = expandWorld(town.map, state.seed);
+    const map = expanded.map;
+    const parcels = describeParcels(map, expanded.parcels, town.map); // (34.2) içerik, ad, kota (temiz haritadan)
+    registerParcels(parcels);
     this.map = map;
     this.parcels = parcels;
     if (this.game.devOpenAllParcels) state.parcels = parcels.map((p) => p.id); // (34.1) ?parcels=all (yalnızca araçlar)
@@ -226,6 +231,7 @@ export class TownScene extends Scene {
     this.animals = new AnimalSystem(this.game, this.world, new Random(life + 9));
     this.civic = new CivicSystem(this.game, this.world, this.economy);
     this.journal = new JournalSystem(this.game);
+    this.parcelSystem = new ParcelSystem(this.game, this, this.economy); // (34.2) parsel satın alma (yalnızca olay dinler)
     this.research = new ResearchSystem(this.game, this.world, this.economy, new Random(life + 12));
     this.harbor = new HarborSystem(this.game, this.world, this.economy, new Random(life + 13));
     this.luxury = new LuxurySystem(this.game, this.economy);
@@ -370,6 +376,7 @@ export class TownScene extends Scene {
       this.behavior,
       this.tools,
       this.journal,
+      this.parcelSystem,
       this.saves,
       this.townEvents,
       this.audio,
@@ -460,7 +467,16 @@ export class TownScene extends Scene {
     this.expression = new ExpressionLayer(events); // (29.8) Duygu Katmanı (M) ve düşünce balonları
     this.cinematic = false; // (13. aşama) fotoğraf modu: arayüz gizli, haritada imleç ve seçim çizilmez
 
+    this.hoverParcelId = null; // (34.2) üstüne gelinen kilitli parsel (çerçeve vurgusu)
+    this.cardParcelId = null; // (34.2) parsel kartı açık olan parsel
+    this.parcelFx = null; // (34.2) satın alma sevinci { parcel, t0 }
     this.unsubscribers = [
+      events.on('ui:closeParcel', () => (this.cardParcelId = null)),
+      events.on('parcel:bought', ({ parcel }) => {
+        this.parcelFx = { parcel, t0: this.animationTime };
+        if (this.cardParcelId === parcel.id) this.cardParcelId = null;
+        events.emit('ui:closeParcel');
+      }),
       events.on('goldenAge:chime', () => this.chimeWaves.ring()),
       events.on('ui:toggleEmotions', () => this.expression.setEnabled(!this.expression.enabled)), // (29.8)
       events.on('ui:setCinematic', (on) => {
@@ -792,6 +808,57 @@ export class TownScene extends Scene {
     return true;
   }
 
+  /** (34.2) Bu karonun parseli (çekirdekte null). */
+  parcelAt(x, y) {
+    return this.parcels.find((p) => x >= p.x && y >= p.y && x < p.x + p.w && y < p.y + p.h) ?? null;
+  }
+
+  /** (34.2) İpucu için parsel özeti: { id, name, w, h, label, price, quota, tip }. */
+  parcelTip(parcel) {
+    const status = this.parcelSystem.status(parcel.id);
+    const price = status?.price ?? 0;
+    return { id: parcel.id, name: parcel.name, w: parcel.w, h: parcel.h, label: parcel.kindLabel, price, quota: parcel.quota, tip: PARCEL_TEXT.tip({ name: parcel.name, w: parcel.w, h: parcel.h, label: parcel.kindLabel, price, quota: parcel.quota }) };
+  }
+
+  /** (34.2) Parsel çerçevesi (üstüne gelince / kart açıkken) ve satın alma sevinci (parlayan çerçeve, yükselen pırıltılar). */
+  drawParcelFrames(renderer) {
+    const size = CONFIG.TILE_SIZE;
+    const frame = (parcel, fill, border) => {
+      const x = parcel.x * size;
+      const y = parcel.y * size;
+      const w = parcel.w * size;
+      const h = parcel.h * size;
+      if (fill) renderer.fillRect(x, y, w, h, fill);
+      const b = PARCEL_VIEW.borderWidth;
+      renderer.fillRect(x, y, w, b, border);
+      renderer.fillRect(x, y + h - b, w, b, border);
+      renderer.fillRect(x, y, b, h, border);
+      renderer.fillRect(x + w - b, y, b, h, border);
+    };
+    for (const id of new Set([this.cardParcelId, this.hoverParcelId])) {
+      const parcel = id ? this.parcels.find((p) => p.id === id) : null;
+      if (parcel && !this.game.state.parcels.includes(parcel.id)) frame(parcel, PARCEL_VIEW.hoverFill, PARCEL_VIEW.hoverBorder);
+    }
+    const fx = this.parcelFx;
+    if (!fx) return;
+    const age = this.animationTime - fx.t0;
+    if (age > PARCEL_VIEW.fx.seconds) {
+      this.parcelFx = null;
+      return;
+    }
+    const k = 1 - age / PARCEL_VIEW.fx.seconds;
+    const p = fx.parcel;
+    renderer.ctx.globalAlpha = k;
+    frame(p, PARCEL_VIEW.fx.glow, PARCEL_VIEW.fx.spark);
+    for (let i = 0; i < PARCEL_VIEW.fx.sparks; i++) {
+      const hx = ((i * 7919) % 97) / 97;
+      const hy = ((i * 104729) % 89) / 89;
+      const rise = age * (18 + (i % 5) * 9);
+      renderer.fillRect(p.x * size + hx * p.w * size, p.y * size + hy * p.h * size - rise, 2 + (i % 3), 2 + (i % 3), PARCEL_VIEW.fx.spark);
+    }
+    renderer.ctx.globalAlpha = 1;
+  }
+
   hoveredTile() {
     const tile = this.game.input.getHoveredTile(this.camera);
     return tile && this.map.inBounds(tile.tileX, tile.tileY) ? tile : null;
@@ -801,6 +868,7 @@ export class TownScene extends Scene {
   handleSelectionInput(escapeUsed) {
     const { input } = this.game;
     if (input.wasPressed('cancel') && !escapeUsed) {
+      if (this.cardParcelId) this.game.events.emit('ui:closeParcel');
       this.select(null);
       this.selectBuilding(null);
       this.selectGuest(false);
@@ -809,6 +877,14 @@ export class TownScene extends Scene {
     const click = input.consumeClick();
     if (!click) return;
     const point = this.camera.screenToWorld(click.x, click.y);
+    // (34.2) Kilitli toprağa tıklamak küçük parsel kartını açar; başka bir yere tıklamak kartı kapatır
+    const clickedParcel = this.map.inBounds(Math.floor(point.x / CONFIG.TILE_SIZE), Math.floor(point.y / CONFIG.TILE_SIZE)) && !this.map.isOpen(Math.floor(point.x / CONFIG.TILE_SIZE), Math.floor(point.y / CONFIG.TILE_SIZE)) ? this.parcelAt(Math.floor(point.x / CONFIG.TILE_SIZE), Math.floor(point.y / CONFIG.TILE_SIZE)) : null;
+    if (clickedParcel) {
+      this.cardParcelId = clickedParcel.id;
+      this.game.events.emit('ui:openParcel', { id: clickedParcel.id, x: click.x, y: click.y });
+      return;
+    }
+    if (this.cardParcelId) this.game.events.emit('ui:closeParcel');
     // Gezgin tüccara tıklamak takas penceresini açar
     if (this.world.findVisitorAt(point.x, point.y)) {
       this.game.events.emit('ui:openTrade');
@@ -899,6 +975,10 @@ export class TownScene extends Scene {
     let info = hovered ? this.world.getTileInfo(hovered.tileX, hovered.tileY) : null;
     if (info && character) info = { ...info, character: { id: character.id, name: character.name, visitor: Boolean(visitor), guest: Boolean(character.isGuest), label: character.isGuest ? character.activityLabel : null } };
     if (info) info.job = this.jobs.jobAt(hovered.tileX, hovered.tileY)?.type ?? null;
+    // (34.2) kilitli toprakta parsel ipucu (ad, boyut, içerik, fiyat, kota) ve çerçeve vurgusu
+    const lockedParcel = info?.locked && !this.tools.isActive && !this.cinematic ? this.parcelAt(hovered.tileX, hovered.tileY) : null;
+    this.hoverParcelId = lockedParcel?.id ?? null;
+    if (info && lockedParcel) info.parcel = this.parcelTip(lockedParcel);
     this.game.events.emit('map:hover', info);
   }
 
@@ -959,6 +1039,7 @@ export class TownScene extends Scene {
     this.weatherFx.drawClouds(renderer, this.camera, weather, this.map, this.animationTime);
     this.weatherFx.drawMist(renderer, this.camera, weather, this.map, this.animationTime);
     this.map.renderLocked(renderer, this.camera); // (34.1) kilitli parseller soluk ve sisli, açık alanın kenarında ince çizgi
+    if (!this.cinematic) this.drawParcelFrames(renderer); // (34.2) üstüne gelinen / kart açık parsel çerçevesi, satın alma sevinci
 
     const lights = this.lights ?? (this.lights = []);
     lights.length = 0;

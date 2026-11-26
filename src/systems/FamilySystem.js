@@ -20,7 +20,7 @@ import { MARRIAGE } from '../data/relationships.js';
 import { ACTIVITIES } from '../data/activities.js';
 import { APPEARANCE_PARTS, NEED_KEYS, TRAITS } from '../data/characters.js';
 import { partnerOf, childrenOf } from './RelationshipSystem.js';
-import { townHappiness } from './TownStatus.js';
+import { townHappiness, immigrationLimit } from './TownStatus.js';
 import { clashesWithOwn } from '../ai/TraitProfile.js';
 import { clamp } from '../utils/math.js';
 
@@ -185,9 +185,14 @@ export class FamilySystem {
    * Bu sabah çocuk sahibi olabilecek çiftler: [{ a, b, home }]. Evi dolu olan çift için evdeki bekâr
    * bir ev arkadaşı başka bir evdeki boş yatağa geçerek yer açar.
    */
+  /** (34.2) Doğum sınırı: bugünkü 30 ya da (parsel kotasıyla büyümüş) göç sınırı, hangisi büyükse; hiçbir kasabanın sınırı düşmez. */
+  birthLimit() {
+    return Math.max(CHILDREN.maxPopulation, immigrationLimit(this.state));
+  }
+
   eligibleCouples() {
     const now = this.state.totalMinutes;
-    if (activePopulation(this.state) >= CHILDREN.maxPopulation) return [];
+    if (activePopulation(this.state) >= this.birthLimit()) return [];
     if (townHappiness(this.state) < CHILDREN.minHappiness) return [];
     const couples = [];
     for (const a of this.world.characters) {
@@ -222,7 +227,7 @@ export class FamilySystem {
 
   tryBirths() {
     for (const { a, b, home } of this.eligibleCouples()) {
-      if (activePopulation(this.state) >= CHILDREN.maxPopulation) return;
+      if (activePopulation(this.state) >= this.birthLimit()) return;
       if (this.rng.next() < CHILDREN.chancePerDay) this.welcomeChild(a, b, home);
     }
   }

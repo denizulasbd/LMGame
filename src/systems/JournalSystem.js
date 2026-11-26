@@ -39,6 +39,7 @@ import { QUIRKS } from '../data/social.js';
 import { ITEMS } from '../data/citizens.js';
 import { PROFESSIONS } from '../data/apprenticeship.js';
 import { HEIRLOOMS } from '../data/heirloom.js';
+import { PARCEL_TEXT } from '../data/parcels.js'; // (34.2)
 
 // İşlenmiş malların ilk üretimi
 const FIRST_GOODS_TEXT = {
@@ -341,6 +342,7 @@ export class JournalSystem {
       on('goldDecree:issued', ({ decree, price }) => this.log(`Altın fermanı: ${decree.name} (${price} altın)`, decree.icon)),
       on('character:renamed', ({ character, from }) => this.log(`${from} artık ${character.name} adıyla anılıyor`, 'heart')),
       on('worker:pinned', ({ building, character }) => this.log(`${character.name} ${building.name} işine sabitlendi`, 'pin')),
+      on('parcel:bought', ({ parcel, price, quota }) => this.log(PARCEL_TEXT.journal(parcel.name, price, quota), 'coin')), // (34.2)
       on('civic:decreed', ({ project }) => this.log(`Belediye fermanı: ${project.name}`, project.icon)),
       on('building:mended', ({ building, kind }) => this.log(`${building.name} ${kind === 'fire' ? 'yangın' : kind === 'raid' ? 'baskın' : 'fırtına'} hasarından onarıldı`, 'hammer')),
       // 23. aşama: yangın, haydut baskını, yaralanma

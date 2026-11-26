@@ -36,6 +36,7 @@ export class GuideSystem {
         if (action) this.facts.storyActionShown = true;
       }),
       on('ui:storyGo', () => (this.facts.storyGo = true)),
+      on('immigration:capped', () => (this.facts.capped = true)), // (34.2) göç nüfus sınırında kaldı
       on('ui:storyAction', () => (this.facts.storyActed = true)),
       // (30.6) hazine / taş art arda kaç gün 0'da (yalnızca oturum gerçeği; kaydedilmez) ve çevredeki kayalar tükendi mi
       on('time:newDay', () => this.dailyFacts()),

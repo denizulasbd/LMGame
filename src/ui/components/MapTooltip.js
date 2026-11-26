@@ -28,7 +28,7 @@ export class MapTooltip {
 
     game.events.on('map:hover', (info) => {
       this.info = info;
-      const key = info ? `${info.x},${info.y},${info.character?.id ?? ''},${info.building?.name ?? ''},${info.job ?? ''}` : '';
+      const key = info ? `${info.x},${info.y},${info.character?.id ?? ''},${info.building?.name ?? ''},${info.job ?? ''},${info.parcel?.tip ?? ''}` : '';
       if (key !== this.key) {
         this.key = key;
         this.shownAt = performance.now() + SHOW_DELAY_MS;
@@ -54,7 +54,13 @@ export class MapTooltip {
     let name;
     let status;
     let tone = 'is-info';
-    if (info.character) {
+    if (info.locked && info.parcel) {
+      // (34.2) kilitli toprak: "Bu toprak henüz kasabanın değil" + ad, boyut, içerik, fiyat, nüfus kotası
+      const [head, ...rest] = info.parcel.tip.split(' · ');
+      name = head;
+      status = rest.join(' · ');
+      tone = 'is-warn';
+    } else if (info.character) {
       name = info.character.name;
       status = info.character.visitor ? 'Gezgin tüccar · tıkla ve takas et' : info.character.guest ? `Gezgin konuk · ${info.character.label ?? 'kasabada misafir'} · tıkla ve tanış` : 'Kasaba sakini · tıkla ve incele';
     } else if (info.building) {
