@@ -48,6 +48,42 @@ export function expandWorld(core, seed) {
   return { map, parcels, core: coreRect };
 }
 
+/**
+ * (34.2) Kayıttaki açık parsel kimliklerini bugünkü bölünmeye uyarlar (saf hesap). Hiçbir karo ve yapı kilitli kalmaz:
+ *  - bilinen kimlik olduğu gibi kalır;
+ *  - bilinmeyen kimlik 34.1'in ilk bölünmesinden (`r1n0`) gelir: o bölünme yeniden üretilir, dikdörtgenine değen bütün yeni parseller açılır;
+ *  - kayıtlı arazi farkı ya da yapı kilitli bir parselde duruyorsa o parsel de açılır (sigorta).
+ * @param {string[]} ids kayıttaki kimlikler
+ * @param {object[]} parcels bugünkü parseller
+ * @param {{ width, height }} coreSize çekirdek boyutu
+ * @param {number} seed harita tohumu
+ * @param {Array<{x, y}>} points kayıtta saklı konumlar (arazi farkları, yapı karoları)
+ */
+export function reconcileParcels(ids, parcels, coreSize, seed, points = []) {
+  const known = new Set(parcels.map((p) => p.id));
+  const open = new Set(ids.filter((id) => known.has(id)));
+  const stray = ids.filter((id) => !known.has(id));
+  if (stray.length) {
+    const old = layoutParcels(coreSize.width, coreSize.height, seed, true).parcels;
+    for (const id of stray) {
+      const was = old.find((p) => p.id === id);
+      if (!was) continue; // tanınmayan kimlik: sessizce atlanır
+      for (const p of parcels) if (rectsOverlap(was, p)) open.add(p.id);
+    }
+  }
+  const inCore = (x, y) => x >= 0 && y >= 0 && x < coreSize.width && y < coreSize.height;
+  for (const { x, y } of points) {
+    if (inCore(x, y)) continue;
+    const p = parcels.find((q) => x >= q.x && y >= q.y && x < q.x + q.w && y < q.y + q.h);
+    if (p) open.add(p.id);
+  }
+  return parcels.filter((p) => open.has(p.id)).map((p) => p.id);
+}
+
+function rectsOverlap(a, b) {
+  return Math.min(a.x + a.w, b.x + b.w) > Math.max(a.x, b.x) && Math.min(a.y + a.h, b.y + b.h) > Math.max(a.y, b.y);
+}
+
 /** Bir parseli açar (yürünür, inşa edilir). */
 export function openParcel(map, parcel) {
   map.setOpenRect(parcel.x, parcel.y, parcel.w, parcel.h, true);

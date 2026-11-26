@@ -15,7 +15,7 @@ import { generateTown } from '../world/WorldGenerator.js';
 import { World } from '../world/World.js';
 import { lifeSeedOf } from '../utils/lifeSeed.js';
 import { captureTerrain, diffTerrain, applyTerrain } from '../world/TerrainSnapshot.js';
-import { expandWorld, openParcel } from '../world/Expansion.js';
+import { expandWorld, openParcel, reconcileParcels } from '../world/Expansion.js';
 import { LOCKED_VIEW } from '../data/parcels.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { fireflyIntensity, isRainActive } from '../data/weather.js';
@@ -148,6 +148,14 @@ export class TownScene extends Scene {
     this.map = map;
     this.parcels = parcels;
     if (this.game.devOpenAllParcels) state.parcels = parcels.map((p) => p.id); // (34.1) ?parcels=all (yalnızca araçlar)
+    // (34.2) Kayıttaki açık parseller bugünkü bölünmeye uyarlanır (eski v42 kimlikleri çevrilir; kilitli kalan karo ya da yapı olmaz)
+    state.parcels = reconcileParcels(state.parcels, parcels, town.map, state.seed, [
+      ...(state.pendingTerrain ?? []).map((c) => ({ x: c[0], y: c[1] })),
+      ...state.buildings.flatMap((b) => {
+        const size = BUILDINGS[b.type]?.size ?? { w: 1, h: 1 };
+        return [{ x: b.tileX, y: b.tileY }, { x: b.tileX + size.w - 1, y: b.tileY + size.h - 1 }];
+      }),
+    ]);
     for (const id of state.parcels) {
       const parcel = parcels.find((p) => p.id === id);
       if (parcel) openParcel(map, parcel);

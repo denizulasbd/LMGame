@@ -28,8 +28,8 @@ const out = await page.evaluate(async () => {
   const c = build(43);
   check('aynı tohum: aynı parsel bölünmesi ve içerik', sig(a) === sig(b), `${a.parcels.length} parsel, dünya ${a.map.width}x${a.map.height}`);
   check('başka tohum: başka bölünme / içerik', sig(a) !== sig(c));
-  const sizesOk = a.parcels.every((p) => Math.min(p.w, p.h) >= 12 && Math.max(p.w, p.h) <= 24);
-  check('parsel kenarları 12-24 karo', sizesOk, a.parcels.map((p) => `${p.w}x${p.h}`).slice(0, 6).join(' '));
+  const sizesOk = a.parcels.every((p) => Math.min(p.w, p.h) >= 20 && Math.max(p.w, p.h) <= 40);
+  check('parsel kenarları 20-40 karo (34.2 bölünmesi)', sizesOk, a.parcels.map((p) => `${p.w}x${p.h}`).slice(0, 6).join(' '));
   check('parsellerin alanı toplamı = halkalar', a.parcels.reduce((s, p) => s + p.area, 0) === a.map.width * a.map.height - 80 * 80);
 
   // 2. Çekirdek eskisiyle (yalnız çekirdek üretimi) karo karo aynı; 48'lik eski harita da
@@ -162,7 +162,8 @@ for (const name of ['save-v41.json', 'save-v41-asama32.json', 'save-v8.json', 's
     const lockedBuild = game.state.buildings.filter((b) => !map.isOpen(b.tileX, b.tileY)).length;
     return { wrong, lockedBuild, parcels: [...game.state.parcels], neg: src.terrain.filter((c) => c[0] < 0 || c[1] < 0).length };
   }, raw);
-  check('save-v42.json: arazi farkları ve parseller yerinde', r.wrong === 0 && r.neg > 0 && r.parcels.join() === data.parcels.join(), `${r.neg} eksi koordinatlı hücre, parseller ${r.parcels.join(',')}`);
+  // (34.2) Eski (34.1) parsel kimlikleri yeni bölünmeye çevrilir: eski dikdörtgenlere değen bütün yeni parseller açık, arazi ve yapı yerinde
+  check('save-v42.json: arazi farkları yerinde, eski parseller yeni kimliğe çevrildi', r.wrong === 0 && r.neg > 0 && r.parcels.length >= data.parcels.length && r.parcels.every((id) => id.startsWith('p')), `${r.neg} eksi koordinatlı hücre, parseller ${r.parcels.join(',')}`);
   check('save-v42.json: bütün yapılar açık alanda', r.lockedBuild === 0);
 }
 

@@ -1,13 +1,16 @@
 // (34.1) Genişleyen harita: parsel halkaları, içerik üretimi ve kilitli alan görünümü için sayılar.
 export const PARCELS = {
-  // Çekirdeğin çevresindeki halkaların kalınlığı (karo; harita tohumundan, [en az, en çok])
+  // (34.2) Çekirdeğin çevresindeki halkaların kalınlığı (karo; harita tohumundan, [en az, en çok]). Halkalar toplamı en az 42 karo:
+  // 34.1 bölünmesinin dünyası bunun içinde kalır (eski v42 kayıtlarındaki arazi yeni haritaya sığar).
   rings: [
-    [14, 18],
-    [18, 24],
+    [20, 22],
+    [22, 24],
   ],
-  // Bir şeridin boyunca kesilen parsel kenarı (karo)
-  segment: { min: 12, max: 24 },
+  // Bir şeridin boyunca kesilen parsel kenarı (karo): en az, en çok, hedef (parça sayısı uzunluk / hedefe yakın olur)
+  segment: { min: 24, max: 40, target: 36 },
   seedSalt: 0x34a1, // parsel bölünmesi ve içerik gürültüsü harita tohumunun bu karmasından (çekirdek üretecine dokunmaz)
+  // (34.1) İlk bölünme (kimlikler `r1n0`): yalnızca eski kayıtlardaki açık parselleri yeni parsellere çevirmek için
+  legacy: { rings: [[14, 18], [18, 24]], segment: { min: 12, max: 24 }, idPrefix: 'r' },
 };
 
 // Parsel içeriği (dünya koordinatından): çekirdek kenarı devralma, biyomlar, göller, nehir, yollar
