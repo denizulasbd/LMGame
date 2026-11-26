@@ -104,7 +104,7 @@ const out = await page.evaluate(async () => {
   const treesBefore = F.countTrees(sc().map);
   forest().newDay();
   const planted = st.regrowth.slice(regrowBefore);
-  check('gün dönümünde hızlı fidan (günde 4)', forest().lastSprouted === FD.FOREST.fastPerDay && planted.length === FD.FOREST.fastPerDay && planted.every((e) => e.stage === 'sapling' && sc().map.getObject(e.x, e.y) === 'sapling'), `${planted.length}`);
+  check('gün dönümünde hızlı fidan (günde fastPerDay)', forest().lastSprouted === FD.FOREST.fastPerDay && planted.length === FD.FOREST.fastPerDay && planted.every((e) => e.stage === 'sapling' && sc().map.getObject(e.x, e.y) === 'sapling'), `${planted.length}`);
   const buildingsNow = st.buildings.map((b) => ({ b, w: BUILDINGS[b.type].size.w, h: BUILDINGS[b.type].size.h }));
   const roadOrBuildingNear = (x, y, d) => {
     const m = sc().map;

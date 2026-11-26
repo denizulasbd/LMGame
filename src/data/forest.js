@@ -16,6 +16,6 @@ export const FOREST = {
   //   üstünde: fidan çıkmaz
   fastBelow: 0.7,
   slowBelow: 1,
-  fastPerDay: 4,
-  slowPerDay: 1,
+  fastPerDay: 6,
+  slowPerDay: 2,
 };

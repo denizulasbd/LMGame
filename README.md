@@ -427,7 +427,7 @@ doludur. Boş yatak olduğu hâlde göçmen gelmezse nedeni bildirim ve günlük
 9. aşamadan beri evli çiftlerin evlerindeki boş yataklar çocuklara ayrılır: göçmenler oraya yerleşmez
 (bkz. *Aile, drama ve zanaat*).
 
-**Doğa:** (34.3) Kesilen ağaç ve kırılan kaya kalıntı (kütük, çakıl) bırakmaz; karo boşalır. Orman kendiliğinden yenilenir: açık alandaki ağaç sayısı başlangıçtakinin %70'inin altına inerse günde 4, %100'ün altındaysa günde 1 fidan, kasabadan (yapı, yol, meydan) en az 4 karo uzakta ve var olan ağaçların yanında çıkar; fidan 36 saatte ağaç olur.
+**Doğa:** (34.3) Kesilen ağaç ve kırılan kaya kalıntı (kütük, çakıl) bırakmaz; karo boşalır. Orman kendiliğinden yenilenir: açık alandaki ağaç sayısı başlangıçtakinin %70'inin altına inerse günde 6, %100'ün altındaysa günde 2 fidan, kasabadan (yapı, yol, meydan) en az 4 karo uzakta ve var olan ağaçların yanında çıkar; fidan 36 saatte ağaç olur.
 
 ## Kayıt ve yükleme
 
