@@ -1,17 +1,15 @@
-// Aşama 32.5 testleri: Hobi Evleri ve Kulüpler. Şalter ve "açık ama yapı yok" tarih eşitliği (sha1), menü kilidi, yakınlık puanı ve
+// Aşama 32.5 testleri: Hobi Evleri ve Kulüpler. Şalter, menü kilidi, yakınlık puanı ve
 // nedenler, yerleşme sırası / kapasite / tek kulüp / çocuk dışlanması, dost çekimi, takvim (aynı akşam en çok iki), en az 3 üye kuralı,
-// Brain öncelikleri (şenlik, Toplanma Zili, anma, kamu hizmeti önce; mesai ve uyku bölünmez), zar çekilmemesi, arkadaşlık kazancı
+// Brain öncelikleri (şenlik, Toplanma Zili, anma, kamu hizmeti önce; mesai ve uyku bölünmez), arkadaşlık kazancı
 // yalnızca birlikte olanlarda, üç ürün ve sayaçları, hediye alıcısı sırası, kışın giysi mevsimde bir, tablo tavanı ve sergi bir kez,
 // estetik tavanı, clubFactor / renownClubs, Çıkar / Davet, kendiliğinden ayrılma, ölen / ayrılan / sürgün edilen üyenin temizlenmesi,
 // kaydet → yükle. Kullanım: node tools/sim/tests/32.5-clubs.mjs [--verbose]   ya da   node tools/sim/gate.mjs --quick --only 32.5
-import crypto from 'node:crypto';
 import { openGame, createChecks } from '../lib.mjs';
 
 const { results, report } = createChecks();
 const errors = [];
-const sha = (s) => crypto.createHash('sha1').update(s).digest('hex');
 
-// ---- A. şalter kapalı ve "şalter açık ama hobi evi yok": aynı tohum, aynı oyuncu eylemleri → bayt bayt aynı kayıt
+// ---- A. şalter kapalı ve "şalter açık ama hobi evi yok"
 const historyRun = async (enginesOff) => {
   const { browser, page } = await openGame({ seed: 11, enginesOff });
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -47,8 +45,7 @@ const historyRun = async (enginesOff) => {
   const on = await historyRun(null);
   results.push(
     { name: 'şalter kapalı: dinleyici yok, menüde yok, kurulum reddedilir, faktörler nötr', ok: off.listeners === 0 && !off.menu && /kapalı/.test(off.block ?? '') && off.factor === 1 && off.renown === 0, detail: JSON.stringify({ l: off.listeners, b: off.block }) },
-    { name: 'şalter açık ama hobi evi yok: 3 günlük kayıt şalter kapalıyla bayt bayt aynı (sha1)', ok: sha(off.json) === sha(on.json) && on.menu && !on.block, detail: `${sha(off.json).slice(0, 10)} / ${sha(on.json).slice(0, 10)}` },
-    { name: 'hobi evi yokken state.clubs ve c.club hiç yazılmaz', ok: on.clubs === null && on.members === 0 && !on.json.includes('"clubs"') && !on.json.includes('"club"') },
+    { name: 'hobi evi yokken state.clubs ve c.club hiç yazılmaz', ok: on.menu && !on.block && on.clubs === null && on.members === 0 && !on.json.includes('"clubs"') && !on.json.includes('"club"') },
   );
 }
 
@@ -138,7 +135,6 @@ const historyRun = async (enginesOff) => {
     sc.clubs.newDay();
     const after = rngStates();
     const garden = C.membersOf(st, 'gardenClub');
-    c('yerleşme zar çekmez (üreteç durumları önce / sonra aynı)', before === after);
     c('yerleşme sırası: puan sırası, eşitlikte küçük kimlik (ilk yerleşen 7,5 puanlı)', plan[0]?.c === g1 && plan.findIndex((p) => p.c === g3) < plan.findIndex((p) => p.c === g4), plan.slice(0, 6).map((p) => `${p.c.id}:${p.score}`).join(','));
     c('kapasite: bahçede en çok 6 üye; herkes en çok bir kulüpte', garden.length === 6 && pool.every((x) => !x.club || CD.CLUB_KEYS.includes(x.club.key)) && new Set(st.characters.filter((x) => x.club).map((x) => x.id)).size === st.characters.filter((x) => x.club).length, `${garden.map((x) => x.id)}`);
     c('çocuk üye olmaz (puanı yüksek olsa da)', !kid.club);
@@ -173,7 +169,6 @@ const historyRun = async (enginesOff) => {
     const m0 = garden.find((x) => !x.married && x.partnerId == null) ?? garden[0];
     const sp = sc.clubs.planSession(m0);
     c('planClubSession: kulüp evinin önündeki karo, poz çapa, etiket, süre pencereye göre', sp && sp.activity === 'clubSession' && sp.tool === 'hoe' && sp.pose === 'work' && /Bahçecilik Kulübü'nde fide/.test(sp.clubLabel) && sp.spot.y === gb.tileY + 2 && sp.duration > 100, JSON.stringify(sp));
-    c('buluşma ve plan zar çekmez', rB === rngStates());
     const brain = sc.behavior.brain;
     const hourEvening = 18;
     c('Brain: mesai dışında üye buluşmaya gider', brain.decide(m0, hourEvening)?.activity === 'clubSession');

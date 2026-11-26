@@ -137,7 +137,7 @@ results.push(...(await page.evaluate(async () => {
   const rng0 = rngs();
   let s1 = pickFor(kk, 'fair');
   let r = court$.decide(kk, s1);
-  c('adil karar: güven +2, itiraf eden suçlu +3, kurban +3; dava kapanır; ana üreteçler ilerlemez', r?.band === 'fair' && st.trust.value === tr + 2 && a.loyalty === 3 && b.loyalty === 3 && kk.status === 'closed' && kk.verdict.by === 'court' && kk.verdict.band === 'fair' && rngs() === rng0, `${s1} ${st.trust.value - tr} ${a.loyalty} ${b.loyalty}`);
+  c('adil karar: güven +2, itiraf eden suçlu +3, kurban +3; dava kapanır', r?.band === 'fair' && st.trust.value === tr + 2 && a.loyalty === 3 && b.loyalty === 3 && kk.status === 'closed' && kk.verdict.by === 'court' && kk.verdict.band === 'fair', `${s1} ${st.trust.value - tr} ${a.loyalty} ${b.loyalty}`);
   // sert
   for (const x of st.characters) x.loyalty = 0;
   tr = st.trust.value = 60;

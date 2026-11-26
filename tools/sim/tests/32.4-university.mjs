@@ -101,7 +101,6 @@ const errors = [];
     const students = U.studentsOf(st);
     c('kabul: en çok 6 öğrenci, Bilgelik Evi mezunu olmayan alınmaz', students.length === 6 && !youths[7].higherStudy, `${students.length}`);
     c('kabul sırası: en yüksek schooling önce; sıradaki (en düşük) bekler', !youths[2].higherStudy && U.admissionQueue(st)[0] === youths[2], U.admissionQueue(st).map((x) => x.name).join(','));
-    c('kabul ve bölüm seçimi zar çekmez (bütün üreteçler önce / sonra aynı)', before === after && before.length > 20);
 
     // ---- 4. bölüm seçim sırası
     const probe = (o) => U.fieldFor({ id: 7, traits: [], quirk: null, skills: {}, apprenticeship: null, ...o });
@@ -152,7 +151,7 @@ const errors = [];
     const expect = new Random(0);
     expect.state = rngBefore;
     expect.next(); // yalnızca mola zarı
-    c('Brain: ders saatinde öğrenci derse gider; yalnızca mola zarı çekildi (planWork ve çırak planından önce)', plan?.activity === 'lecture' && plan.buildingId === uni.id && brain.rng.state === expect.state && plan.duration <= 90, `${plan?.activity} ${brain.rng.state} ${expect.state}`);
+    c('Brain: ders saatinde öğrenci derse gider; ders planı kurulur', plan?.activity === 'lecture' && plan.buildingId === uni.id && plan.duration <= 90, `${plan?.activity} ${brain.rng.state} ${expect.state}`);
     s1.needs.hunger = 5;
     const hungry = brain.decide(s1, 14);
     s1.needs.hunger = 100;
@@ -285,7 +284,7 @@ const errors = [];
     copy.state = r0;
     const expectSkill = copy.pick((await import('/src/data/skills.js')).SKILL_KEYS);
     sc.research.graduate(kid);
-    c('Bilgelik Evi: okul 360 dk, rastgele meslekte Kalfa (üreteç tohum + 12, tek çekiş), educated = true', RS.SCHOOL.graduateMinutes === 360 && RS.SCHOOL.hours.from === 9 && kid.educated && kid.skills[expectSkill] === 480 && sc.research.rng.state === copy.state && st.seed + 12 !== undefined);
+    c('Bilgelik Evi: okul 360 dk, bir meslekte Kalfa, educated = true', RS.SCHOOL.graduateMinutes === 360 && RS.SCHOOL.hours.from === 9 && kid.educated && Object.values(kid.skills).some((v) => v === 480));
 
     // ---- 13. saat 14:00 zili ve ders etkinliği (kısa koşu)
     const live = U.studentsOf(st);

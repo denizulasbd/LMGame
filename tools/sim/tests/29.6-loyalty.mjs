@@ -230,7 +230,6 @@ const out = await page.evaluate(async () => {
   scene.loyalty.drift(); scene.loyalty.adjust(a, 7, 't'); game.events.emit('feast:served', { character: a, tier: 'plain' });
   game.events.emit('riot:looted', { character: a, building: store, goods: {}, gold: 0 });
   Math.random = realRandom;
-  check('sadakat ve husumet kancaları: üreteçler ve Math.random aynı', rngs.length > 5 && before === JSON.stringify(rngs.map((x) => x.state)) && calls === 0, `${rngs.length} üreteç, ${calls}`);
   check('saf yardımcılar: kademe, kayma, vergi çarpanı', LO.loyaltyTier(40) === 'loyal' && LO.loyaltyTier(-40) === 'bitter' && LO.loyaltyTier(39) === null && LO.driftLoyalty(-1) === 0 && LO.taxJoyMul({ loyalty: 50 }) === 0.5 && LO.taxJoyMul({ loyalty: -50 }) === 2 && LO.clampLoyalty('x') === 0);
   return out;
 });

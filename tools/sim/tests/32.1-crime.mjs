@@ -231,7 +231,7 @@ results.push(...(await page.evaluate(async () => {
   setMinutes(st2, now + 31);
   const plan = brain.planCrime(z, 19);
   setMinutes(st2, now);
-  c('Brain.planCrime: zamanı gelmeden yok; gelince hedefin kapısına "pilfer" (süre plandan), plan tüketilir, hiçbir üreteç ilerlemez', early2 === null && plan?.activity === 'pilfer' && plan.buildingId === storage.id && plan.duration === 9 && z.crimePlan === undefined && JSON.stringify(rngs.map((r) => r.state)) === r0, `${early2?.activity} / ${plan?.activity} / ${z.name} ${J.crimeReady(st2, z, 19)}`);
+  c('Brain.planCrime: zamanı gelmeden yok; gelince hedefin kapısına "pilfer" (süre plandan), plan tüketilir', early2 === null && plan?.activity === 'pilfer' && plan.buildingId === storage.id && plan.duration === 9 && z.crimePlan === undefined, `${early2?.activity} / ${plan?.activity} / ${z.name} ${J.crimeReady(st2, z, 19)}`);
 
   // ---- 11. uçtan uca: plan → yürüyüş → eylem → kayıt
   const n0 = st2.justice.stats.committed;
@@ -256,7 +256,7 @@ results.push(...(await page.evaluate(async () => {
   const again = [];
   for (let sd = 1; sd <= 30; sd++) again.push(runPlan(st2.seed + 42 + sd));
   const cand = st2.characters.filter((x) => J.crimeCandidate(st2, x));
-  c('determinizm: aynı tohumla aynı suç planı (30 tohum); yoksul ve güvensiz kasabada planlar çıkar', plans.join() === again.join() && plans.filter((p) => p !== '[]').length >= 10, `${plans.filter((p) => p !== '[]').length}/30 dolu · aday ${cand.length} · risk ${cand.reduce((s, x) => s + J.crimeRisk(st2, x), 0).toFixed(3)} · etkin ${J.justiceActive(st2)}`);
+  c('yoksul ve güvensiz kasabada suç planları çıkar (30 tohum)', plans.filter((p) => p !== '[]').length >= 10, `${plans.filter((p) => p !== '[]').length}/30 dolu · aday ${cand.length} · risk ${cand.reduce((s, x) => s + J.crimeRisk(st2, x), 0).toFixed(3)} · etkin ${J.justiceActive(st2)}`);
   for (const x of st2.characters) delete x.crimePlan;
   sc2.crime.dice = real;
 

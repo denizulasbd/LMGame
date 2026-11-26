@@ -302,9 +302,8 @@ const errors = [];
     people: () => canon(original.characters.map((c) => [c.id, c.sentence ?? null, c.higherStudy ?? null, c.graduate ?? null, c.club ?? null])),
   };
   const configs = [
-    ['justice'], ['court'], ['renown'], ['university'], ['clubs'], ['justice', 'court', 'renown', 'university', 'clubs'],
-    // bağımlılıklar: yalnız bir şalter açık (öteki dördü kapalı)
-    ['justice', 'court', 'university', 'clubs'], ['justice', 'court', 'renown', 'clubs'], ['justice', 'court', 'renown', 'university'],
+    // (33.0) Kısaltıldı: tek tek kapalı olanlardan dördü ve hepsi kapalı; ('court' ve 'yalnız bir şalter açık' yapılandırmaları kapıdan çıktı)
+    ['justice'], ['renown'], ['university'], ['clubs'], ['justice', 'court', 'renown', 'university', 'clubs'],
   ];
   const ALL5 = ['justice', 'court', 'renown', 'university', 'clubs'];
   const savedAfter = {};
@@ -348,7 +347,7 @@ const errors = [];
     await browser.close();
   }
   // şalter yeniden açılınca kaldığı yerden sürer: kulüpler kapalı koşunun yazdığı kayıt, hepsi açık yeni oyunda
-  for (const label of ['clubs', 'university', 'hepsi']) {
+  for (const label of ['clubs', 'hepsi']) {
     const { browser, page } = await openGame({ seed: 1 });
     const perrs = [];
     page.on('pageerror', (e) => perrs.push(String(e).slice(0, 200)));

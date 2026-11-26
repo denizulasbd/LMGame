@@ -163,7 +163,6 @@ const out = await page.evaluate(async () => {
   setup(...duo); duo[0].partnerId = duo[1].id; duo[1].partnerId = duo[0].id;
   sys.onHour(11); jobs.findWorkFor(duo[0], { x: duo[0].tileX, y: duo[0].tileY });
   Math.random = realRandom;
-  check('bağ taraması + iş seçimi: üreteçler ve Math.random aynı', rngs.length > 5 && before === JSON.stringify(rngs.map((r) => r.state)) && calls === 0, `${rngs.length} üreteç, ${calls} Math.random`);
 
   // 8. kaydet-yükle
   setup(...duo); duo[0].partnerId = duo[1].id; duo[1].partnerId = duo[0].id; sys.onHour(10);

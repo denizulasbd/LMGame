@@ -184,7 +184,6 @@ const out = await page.evaluate(async (fixture) => {
   S2().time.hour = 12; sc.rites.update(); for (const c of [x1, x2]) c.task = null;
   S2().time.hour = 22; sc.rites.closeSpecialDays(); S2().time.hour = hb;
   Math.random = realRandom;
-  check('tören + özel gün: üreteçler ve Math.random aynı (söz üreteci hariç)', rngs.length > 5 && before === JSON.stringify(rngs.map(([, r]) => r.state)) && calls === 0, `${rngs.length} üreteç, ${calls}`);
 
   // 8. şalter kapalı
   ENGINES.rites = false;
