@@ -12,8 +12,8 @@ const { browser, page, errors } = await openGame({ seed, stopLoop: false, viewpo
 const wait = (ms) => page.waitForTimeout(ms);
 const shot = async (name) => { await wait(450); await page.screenshot({ path: `${out}/${name}.png` }); console.log(`${out}/${name}.png`); };
 
-// Hazırlık: kuzey şeridinde çekirdeğe değen bir parsel; kamera çekirdeğin kuzey kenarında, yakınlık 2
-const setup = await page.evaluate(() => {
+// Hazırlık: kamera çekirdeğin kuzey-batı köşesinde (yakınlık 2); ekranın üst-sol kısmı kilitli ilk halka
+await page.evaluate(() => {
   const { game } = window;
   const sc = game.scenes.current;
   const s = game.state;
@@ -22,19 +22,25 @@ const setup = await page.evaluate(() => {
   s.weather.cloud = 0;
   s.resources.gold = 60;
   sc.camera.zoom = 2;
-  const p = sc.parcels.find((q) => q.ring === 1 && q.side === 'n' && q.neighbors.includes('core') && q.kind !== undefined);
-  sc.camera.centerOn((p.x + p.w / 2) * 16, (p.y + p.h - 4) * 16, game.renderer.width, game.renderer.height);
-  const t = (wx, wy) => ({ x: (wx * 16 - sc.camera.x) * sc.camera.zoom, y: (wy * 16 - sc.camera.y) * sc.camera.zoom });
-  const hover = t(p.x + p.w / 2 + 3, p.y + p.h - 6);
-  return { id: p.id, name: p.name, hover };
+  sc.camera.centerOn(8 * 16, 8 * 16, game.renderer.width, game.renderer.height);
 });
-await page.mouse.move(setup.hover.x, setup.hover.y);
+await wait(300);
+// Ekranda (330, 130) noktasının altındaki parsel
+const at = async (sx, sy) => page.evaluate(({ sx, sy }) => {
+  const sc = window.game.scenes.current;
+  const w = sc.camera.screenToWorld(sx, sy);
+  const p = sc.parcelAt(Math.floor(w.x / 16), Math.floor(w.y / 16));
+  return p ? { id: p.id, name: p.name } : null;
+}, { sx, sy });
+const spot = { x: 330, y: 130 };
+const setup = { ...(await at(spot.x, spot.y)), hover: spot };
+await page.mouse.move(spot.x, spot.y);
 await wait(500);
 await page.evaluate(() => window.game.ui.render());
 await shot('1-ipucu');
 
 // Parsel kartı, altın yetmiyor (pasif düğme, neden yazılı)
-await page.mouse.click(setup.hover.x, setup.hover.y);
+await page.mouse.click(spot.x, spot.y);
 await wait(300);
 await page.mouse.move(640, 700);
 await shot('2-kart-yetersiz-altin');
@@ -44,27 +50,30 @@ await page.evaluate(() => { window.game.state.resources.gold = 500; });
 await wait(400);
 await shot('3-kart-alinabilir');
 
-// Pasif: komşu değil (ikinci halka) — kamera ikinci halkaya
-const far = await page.evaluate((id) => {
-  const { game } = window;
+// Pasif: seviye kapısı (Mezra'da iki parselden sonra) — iki parsel geliştirici yoluyla açılır, üçüncüsüne tıklanır
+await page.evaluate((keep) => {
+  const { game, sim } = window;
   const sc = game.scenes.current;
-  const p = sc.parcels.find((q) => q.id === id);
-  const q = sc.parcels.find((r) => r.ring === 2 && r.side === 'n' && r.x < p.x + p.w && r.x + r.w > p.x);
-  sc.camera.centerOn((q.x + q.w / 2) * 16, (q.y + q.h / 2) * 16, game.renderer.width, game.renderer.height);
-  return { x: (q.x + q.w / 2) * 16 * 0 + (((q.x + q.w / 2) * 16 - sc.camera.x) * sc.camera.zoom), y: ((q.y + q.h / 2) * 16 - sc.camera.y) * sc.camera.zoom };
+  const others = sc.parcels.filter((q) => q.ring === 1 && q.neighbors.includes('core') && q.id !== keep);
+  sim.unlockParcel(others[0].id);
+  sim.unlockParcel(others[1].id);
+  const t = others[2];
+  sc.camera.centerOn((t.x + t.w / 2) * 16, (t.y + t.h / 2) * 16, game.renderer.width, game.renderer.height);
 }, setup.id);
-await wait(200);
-await page.mouse.click(far.x, far.y);
+await wait(300);
+const spot2 = { x: 900, y: 400 };
+await page.mouse.click(spot2.x, spot2.y);
 await wait(300);
 await page.mouse.move(640, 760);
-await shot('4-kart-komsu-degil');
+await shot('4-kart-seviye-kapisi');
 
 // Satın alma: kartta Satın Al; hemen ardından sevinç efekti ve hikâye kartı
 await page.evaluate((id) => {
   const sc = window.game.scenes.current;
-  const p = sc.parcels.find((q) => q.id === id);
-  sc.camera.centerOn((p.x + p.w / 2) * 16, (p.y + p.h - 4) * 16, window.game.renderer.width, window.game.renderer.height);
-  window.game.events.emit('ui:openParcel', { id, x: 700, y: 260 });
+  window.game.state.town.tier = 3;
+  window.game.state.resources.gold = 900;
+  sc.camera.centerOn(8 * 16, 8 * 16, window.game.renderer.width, window.game.renderer.height);
+  window.game.events.emit('ui:openParcel', { id, x: 500, y: 260 });
 }, setup.id);
 await wait(300);
 await page.click('.parcel-buy');

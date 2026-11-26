@@ -2,6 +2,14 @@
 
 Bundan sonraki aşama notları buraya yazılır: aşama başına en çok 10 satır (33.0'da 20'den indirildi). README'ye yeni aşama bölümü eklenmez.
 
+## Aşama 34.2 — Parsel satın alma ve nüfus kotası (kayıt sürümü 42 kalır)
+- Parseller büyüdü (`world/Parcels.js`): halka 20-22 + 22-24 karo, parça 24-40, tohum başına 26-30 parsel (34.1: 51); kimlik `p1n0`. Eski v42 kayıtlarındaki `r1n1` kimlikleri açılışta yeni parsellere çevrilir (`reconcileParcels`); kilitli kalan arazi / yapı olmaz. Fikstürler: `save-v42.json` (yeni), `save-v42-asama34.1.json` (eski kimlikler).
+- Pazar (`data/parcels.js` → `PARCEL_MARKET`, saf hesap `systems/ParcelMarket.js`): içerik (orman / kaya / göl / çayır) ve ad haritadan; fiyat = işe yarar karo × 0,09 × 60^(alınan / (toplam − 1)); kota (işe yarar − 300) / 150, 1-4. Tohum 42: ilk 65, orta 320-585, son 3.370-4.730 altın.
+- Kapı: Mezra ≤ 2, Köy ≤ 6 parsel (yalnızca ilk halka), Kasaba ilk halkanın tamamı, Şehir hepsi; komşu şartı. Göç sınırı = seviye sınırı + açık parsellerin kotası, en çok 60, seviye sınırının altına inmez; doğum sınırı da buna bağlı (`FamilySystem.birthLimit`).
+- Arayüz: üstüne gelince çerçeve + ipucu, tıklayınca parsel kartı (`ParcelCard`; pasif düğme nedenleri), satın alma efekti, hikâye kartı, günlük satırı, "İlk Genişleme" hedefi, rehber "Kasaban sıkıştı" (tablo sürümü 8), nüfus çipinde sınır dökümü.
+- Otopilot parsel alır (`--no-parcels` kapatır). Hız: `tools/sim/speed34.mjs`; 62 kişi / 35 kişi, 10 gün 39,6 sn / 22,7 sn = ×1,74 (yol bulma ve `AnimalSystem.nearestPerson` baskın; `maxPopulation` kendiliğinden düşürülmedi).
+- Eski testlerde yalnızca sayılar (hedef 19, rehber 22 adım, tablo 8). Test: `tests/34.2-parcels.mjs` (56). Ekran: `docs/playtest/img34.2/` (`shots34.2.mjs`).
+
 ## Aşama 34.1 — Genişleyen Harita: altyapı (kayıt sürümü 42)
 - Yaklaşım (A): çekirdek koordinatlar sabit, dünya eksiye uzar (`TileMap.x0/y0`, `index`, `coordOf`, `openBounds`, `isOpen`). Yapı, sakin, hayvan, iş koordinatları hiç kaymaz. Tasarım: `docs/design/34-harita.md`.
 - Çekirdek bugünkü üretimle aynen (80×80; eski 48×48) üretilir, çevresine iki halka parsel (`world/Parcels.js`: halka 14-18 ve 18-24 karo, parsel kenarı 12-24, tohum 42'de 51 parsel, dünya 144×144; en çok 164×164).
