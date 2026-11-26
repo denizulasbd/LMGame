@@ -4608,7 +4608,8 @@ geçer); `--all` bütün fikstürleri koşar (29.10'da ve elle). Aşama notları
 | Meslekler, kademe eşikleri | `data/skills.js` |
 | Göç / şenlik koşulları, bonuslar, kasaba adı önerileri | `data/town.js` |
 | Yeni kasaba hedefi | `data/milestones.js` (+ ölçümü `systems/MilestoneSystem.js` → `milestoneProgress`) |
-| Harita boyutu | `config.js` → `MAP_WIDTH`, `MAP_HEIGHT` (yalnızca yeni oyunlar; kayıt kendi boyutunu saklar) |
+| Harita boyutu | `config.js` → `MAP_WIDTH`, `MAP_HEIGHT` (çekirdek; yalnızca yeni oyunlar; kayıt kendi boyutunu saklar) |
+| (34.1) Genişleyen harita: halka kalınlığı, parsel boyu, parsel içeriği, kilitli alan görünümü | `data/parcels.js` (+ bölünme `world/Parcels.js`, içerik `world/Expansion.js`; tasarım `docs/design/34-harita.md`) |
 | Yeni biyom ya da biyom bonusu | `data/tiles.js` (`biome.buildingBonus`, `GROUND_TILES`) + `art/tiles/index.js` + `world/WorldGenerator.js` → `paintBiomes` |
 | Yükseltme maliyeti / etkileri | `data/buildings.js` → ilgili yapının `upgrade` alanı (+ görsel `art/sprites/structuresTier2.js`) |
 | Yeni harabe | `data/buildings.js` (`ruin` alanı, `RUIN_TYPES`) + `art/sprites/structuresTier2.js` |

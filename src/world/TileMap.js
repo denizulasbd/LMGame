@@ -32,6 +32,12 @@ const CORNER_DIAGONALS = [
 const isRoad = (tile) => Boolean(tile && TILE_TYPES[tile].road && tile !== 'bridge');
 const isGroundTile = (tile) => Boolean(tile && TILE_TYPES[tile].ground);
 const MUDDY = new Set(MUD.tiles);
+// (34.1) Hızlı yürünebilirlik tabloları (kimliğe göre): genişleyen haritada taşma ve yol bulma çok daha çok karo dolaşır
+const TILE_WALK = new Uint8Array(256);
+for (const def of Object.values(TILE_TYPES)) TILE_WALK[def.id] = def.walkable ? 1 : 0;
+const OBJECT_WALK = new Uint8Array(256);
+OBJECT_WALK[0] = 1;
+for (const def of Object.values(OBJECT_TYPES)) OBJECT_WALK[def.id] = def.walkable ? 1 : 0;
 
 // Ağaç gibi uzun nesneler üstteki karolara taşar; görünür alanın altına bu kadar
 // fazladan satır eklenir ki ekranın altından taşan tepeler kesilmesin.
@@ -178,12 +184,12 @@ export class TileMap {
   // ---- Kurallar ----
 
   isWalkable(x, y) {
-    const tile = this.get(x, y);
-    if (!tile || !TILE_TYPES[tile].walkable) return false;
-    if (!this.open[this.index(x, y)]) return false; // (34.1) kilitli toprak
-    if (this.getOccupant(x, y) !== 0 && !this.passable[this.index(x, y)]) return false;
-    const object = this.getObject(x, y);
-    return !object || OBJECT_TYPES[object].walkable;
+    return this.inBounds(x, y) && this.walkableAt(this.index(x, y));
+  }
+
+  /** (34.1) İndeksle yürünebilirlik: açık, zemini yürünür, yapı yok (ya da kemer), nesnesi yürünür. */
+  walkableAt(i) {
+    return this.open[i] === 1 && TILE_WALK[this.tiles[i]] === 1 && (this.occupants[i] === 0 || this.passable[i] === 1) && OBJECT_WALK[this.objects[i]] === 1;
   }
 
   isBuildable(x, y) {
@@ -216,20 +222,28 @@ export class TileMap {
    * Dönüş: her karo için 1 (ulaşılabilir) / 0 içeren dizi.
    */
   computeReachable(seedX, seedY, blocked = null) {
-    const reachable = new Uint8Array(this.width * this.height);
+    const { width, height } = this;
+    const reachable = new Uint8Array(width * height);
     if (!this.isWalkable(seedX, seedY) || blocked?.has(this.index(seedX, seedY))) return reachable;
-    const stack = [[seedX, seedY]];
-    reachable[this.index(seedX, seedY)] = 1;
-    while (stack.length > 0) {
-      const [x, y] = stack.pop();
-      for (const [dx, dy] of NEIGHBOR_OFFSETS) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (!this.inBounds(nx, ny)) continue;
-        const i = this.index(nx, ny);
-        if (reachable[i] || !this.isWalkable(nx, ny) || blocked?.has(i)) continue;
-        reachable[i] = 1;
-        stack.push([nx, ny]);
+    // (34.1) İndeks yığınıyla taşma (genişleyen haritada çok karo): komşu karolar yerel sütun / satırla sınırlanır
+    const stack = new Int32Array(width * height);
+    let top = 0;
+    const start = this.index(seedX, seedY);
+    reachable[start] = 1;
+    stack[top++] = start;
+    while (top > 0) {
+      const i = stack[--top];
+      const lx = i % width;
+      const ly = (i - lx) / width;
+      for (let k = 0; k < 4; k++) {
+        let n;
+        if (k === 0) n = ly > 0 ? i - width : -1;
+        else if (k === 1) n = lx < width - 1 ? i + 1 : -1;
+        else if (k === 2) n = ly < height - 1 ? i + width : -1;
+        else n = lx > 0 ? i - 1 : -1;
+        if (n < 0 || reachable[n] || !this.walkableAt(n) || blocked?.has(n)) continue;
+        reachable[n] = 1;
+        stack[top++] = n;
       }
     }
     return reachable;

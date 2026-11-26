@@ -95,6 +95,7 @@ const speed = Number(options.speed ?? 4);
 const { browser, page, errors } = await openGame({ seed, life: options.life !== undefined && options.life !== true ? Number(options.life) : seed, enginesOff: typeof options['engines-off'] === 'string' ? options['engines-off'] : null }); // (30.4a) açılıştan önce
 await page.evaluate((speed) => (window.game.state.time.speed = speed), speed);
 await installMonitor(page);
+if (options.parcels === 'all') console.log(`(34.1) açılan parsel: ${await page.evaluate(() => window.sim.unlockAllParcels())}`); // performans ölçümü: bütün harita açık
 if (options['start-food'] !== undefined) await page.evaluate((v) => { window.game.state.resources.food = v; }, Number(options['start-food'])); // (30.6) denge denemesi: başlangıç yiyeceği
 if (options.stories) await page.evaluate((f) => { window.game.scenes.current.storyDirector.autoTick = true; if (f) window.game.events.emit('ui:setStoryFilter', { filter: f }); }, typeof options['story-filter'] === 'string' ? options['story-filter'] : null); // (30.2)
 // (29.4) --evo "rules.decayPerDay=3;sources.moodlets.quarrel=..." : denge denemeleri için evrim verisini bellekte geçersiz kılar (dosyaya yazmaz).
@@ -689,7 +690,7 @@ await page.evaluate((passive) => {
   /** Bir karodan en yakın yol karosuna en kısa yürünebilir rota (BFS, en çok 30 adım); rota üzerindeki doğal zemin. */
   const routeToRoad = (world, sx, sy) => {
     const map = world.map;
-    const key = (x, y) => y * map.width + x;
+    const key = (x, y) => map.index(x, y); // (34.1) dünya kökeni eksi olabilir
     const prev = new Map([[key(sx, sy), null]]);
     const queue = [[sx, sy, 0]];
     while (queue.length) {
@@ -698,9 +699,7 @@ await page.evaluate((passive) => {
         const tiles = [];
         let k = prev.get(key(x, y));
         while (k !== null && k !== undefined) {
-          const tx = k % map.width;
-          const ty = Math.floor(k / map.width);
-          tiles.push({ x: tx, y: ty });
+          tiles.push(map.coordOf(k));
           k = prev.get(k);
         }
         return tiles;
